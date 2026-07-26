@@ -42,9 +42,8 @@ export function AppSidebar() {
     <SidebarPrimitive collapsible="icon" className="border-r-0 bg-sidebar text-sidebar-foreground">
       <SidebarHeader>
         <div className="flex h-10 items-center gap-2 px-1">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
-            D
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG mark, no Next Image optimization needed */}
+          <img src="/rupp-logo.svg" alt="" className="h-8 w-8 shrink-0" />
           <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
             DSE-PMS
           </span>
