@@ -24,6 +24,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarTrigger,
 } from "@dse-pms/ui";
 
 /** Sidebar follows the canvas theme (white in light mode, near-black in dark), collapsible to icons. Nav items come from the plugin manifest, grouped into sections. */
@@ -41,12 +42,14 @@ export function AppSidebar() {
   return (
     <SidebarPrimitive collapsible="icon" className="border-r-0 bg-sidebar text-sidebar-foreground">
       <SidebarHeader>
-        <div className="flex h-10 items-center gap-2 px-1">
+        <div className="flex h-10 items-center justify-between gap-2 px-1">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG mark, no Next Image optimization needed */}
-          <img src="/rupp-logo.svg" alt="" className="h-8 w-8 shrink-0" />
-          <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
-            DSE-PMS
-          </span>
+          <img
+            src="/dse-logo.svg"
+            alt=""
+            className="h-6 w-auto shrink-0 group-data-[collapsible=icon]:hidden"
+          />
+          <SidebarTrigger className="hover:bg-sidebar-active hover:text-sidebar-foreground" />
         </div>
       </SidebarHeader>
 
