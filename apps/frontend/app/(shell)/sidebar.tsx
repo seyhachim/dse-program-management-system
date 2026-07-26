@@ -24,6 +24,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarTrigger,
 } from "@dse-pms/ui";
 
 /** Sidebar follows the canvas theme (white in light mode, near-black in dark), collapsible to icons. Nav items come from the plugin manifest, grouped into sections. */
@@ -41,13 +42,17 @@ export function AppSidebar() {
   return (
     <SidebarPrimitive collapsible="icon" className="border-r-0 bg-sidebar text-sidebar-foreground">
       <SidebarHeader>
-        <div className="flex h-10 items-center gap-2 px-1">
+        <div className="flex h-10 items-center justify-between gap-2 px-1">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG mark, no Next Image optimization needed */}
           <img
             src="/dse-logo.svg"
             alt="DSE-PMS"
-            className="h-6 w-auto shrink-0 group-data-[collapsible=icon]:hidden"
+            className="h-10 w-auto shrink-0 group-data-[collapsible=icon]:hidden"
           />
+          {/* Desktop-only: on mobile the sidebar renders inside a hidden Sheet, so
+              a trigger inside it can't be the sole way to open it. Topbar carries
+              the matching trigger for md:hidden. */}
+          <SidebarTrigger className="hidden hover:bg-sidebar-active hover:text-sidebar-foreground md:flex" />
         </div>
       </SidebarHeader>
 
