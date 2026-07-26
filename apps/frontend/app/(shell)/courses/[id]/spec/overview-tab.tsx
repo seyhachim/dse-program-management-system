@@ -79,8 +79,6 @@ export function OverviewTab({
                 value={courseInfo.programmeYear ? `Year ${courseInfo.programmeYear}` : ""}
               />
               <Field label="Pre-requisites" value={courseInfo.prerequisites} full />
-              <Field label="Instructor" value={courseInfo.instructorName} />
-              <Field label="Email" value={courseInfo.email} />
             </dl>
           ) : (
             <EmptyHint text="No course information yet." action="Fill it in" onClick={onEditCourseInfo} />
