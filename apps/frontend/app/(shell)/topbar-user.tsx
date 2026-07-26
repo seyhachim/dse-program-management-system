@@ -1,12 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, LogOut } from "lucide-react";
+import { useTheme } from "next-themes";
+import { ChevronDown, LogOut, Moon, Sun } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@dse-pms/ui";
 import { useMe } from "@/lib/auth";
@@ -21,10 +26,14 @@ function initialsOf(name: string): string {
     .join("");
 }
 
-/** Profile pic (initials avatar), name, role title, and a dropdown with account info + sign out. */
+/** Profile pic (initials avatar), name, role title, and a dropdown with account info, theme and sign out. */
 export function TopbarUser() {
   const router = useRouter();
   const { me } = useMe();
+  const { setTheme, resolvedTheme } = useTheme();
+  // Avoid a hydration mismatch: the resolved theme is only known client-side.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const signOut = async () => {
     await getSupabase().auth.signOut();
@@ -57,6 +66,18 @@ export function TopbarUser() {
           <p className="text-foreground">{me.email}</p>
           <p className="capitalize text-muted-foreground">{me.role}</p>
         </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            {mounted && resolvedTheme === "dark" ? <Moon /> : <Sun />}
+            Theme
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         {AUTH_MODE === "supabase" ? (
           <>
             <DropdownMenuSeparator />

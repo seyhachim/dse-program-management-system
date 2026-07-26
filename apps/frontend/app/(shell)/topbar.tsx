@@ -1,5 +1,4 @@
 import { SidebarTrigger } from "@dse-pms/ui";
-import { ThemeToggle } from "./theme-toggle";
 import { TopbarUser } from "./topbar-user";
 
 export interface TopbarProps {
@@ -20,7 +19,6 @@ export function Topbar({ title, subtitle }: TopbarProps) {
       </div>
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <TopbarUser />
-        <ThemeToggle />
       </div>
     </header>
   );
