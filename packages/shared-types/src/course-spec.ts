@@ -54,6 +54,15 @@ export type SpecSectionId = (typeof SPEC_SECTIONS)[number]["id"];
 export const SpecSectionStatus = z.enum(["draft", "complete"]);
 export type SpecSectionStatus = z.infer<typeof SpecSectionStatus>;
 
+/** How many of a course's "ready" wizard sections are marked complete — backs the programme dashboard. */
+export interface CourseSpecProgress {
+  courseId: string;
+  code: string;
+  title: string;
+  completed: number;
+  total: number;
+}
+
 /* ------------------------------------------------------- reference constants */
 
 /** A Bloom-style level: code (e.g. "C3"), short name, and ordinal. */

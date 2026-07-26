@@ -110,8 +110,12 @@ export const dashboardManifest: PluginManifest = {
   id: "dashboard",
   name: "Dashboard",
   version: "0.1.0",
-  description: "Sidebar entry for a not-yet-built landing dashboard.",
-  routes: [{ label: "Dashboard", path: "/dashboard", icon: "dashboard" }],
+  description: "Programme overview: key counts, course spec completion, offering/student status.",
+  // Admin-only, like Students/Offerings/Lecturers below: the dashboard aggregates
+  // programme-wide totals from those same three sources, which aren't scoped
+  // per-lecturer server-side, so a lecturer viewing it would see numbers that
+  // don't match the lecturer-scoped Courses/Spec Progress panels on the same page.
+  routes: [{ label: "Dashboard", path: "/dashboard", icon: "dashboard", roles: ["admin"] }],
 };
 
 /**

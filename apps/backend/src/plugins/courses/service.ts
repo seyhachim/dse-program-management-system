@@ -1,12 +1,14 @@
-import type {
-  CourseInfoSection,
-  CoursesServiceContract,
-  CreateCourseInput,
-  LecturersServiceContract,
-  ListCoursesQuery,
-  OfferingsServiceContract,
-  SpecSectionId,
-  UpdateCourseInput,
+import {
+  SPEC_SECTION_SCHEMAS,
+  type CourseInfoSection,
+  type CourseSpecProgress,
+  type CoursesServiceContract,
+  type CreateCourseInput,
+  type LecturersServiceContract,
+  type ListCoursesQuery,
+  type OfferingsServiceContract,
+  type SpecSectionId,
+  type UpdateCourseInput,
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
@@ -41,6 +43,22 @@ async function withLecturer<T extends { lecturerId: string | null }>(course: T) 
   return { ...course, lecturer };
 }
 
+/** Courses a lecturer owns or teaches an offering of — the non-admin list/dashboard scope. */
+async function ownerScopeFilter(lecturerScope: string) {
+  return {
+    OR: [
+      { lecturerId: lecturerScope },
+      { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } },
+    ],
+  };
+}
+
+// Sections that can actually be saved/marked complete — excludes "programme",
+// which is a read-only Part 1 reference page with no PUT path (SPEC_SECTIONS
+// lists it as "ready", but it has no entry here, so it would otherwise inflate
+// the completion denominator by one section a course can never complete).
+const COMPLETABLE_SECTION_IDS = Object.keys(SPEC_SECTION_SCHEMAS) as SpecSectionId[];
+
 export const courseService = {
   /**
    * List courses. When `lecturerScope` is given, results are scoped to that
@@ -58,19 +76,38 @@ export const courseService = {
           ],
         }
       : {};
-    const scopeFilter = lecturerScope
-      ? {
-          OR: [
-            { lecturerId: lecturerScope },
-            { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } },
-          ],
-        }
-      : {};
+    const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
     const courses = await prisma.course.findMany({
       where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
     });
     return Promise.all(courses.map(withLecturer));
+  },
+
+  /**
+   * Per-course count of completable spec sections marked complete — backs the
+   * programme dashboard's Course Specification Progress view. Scoped the same
+   * way as `list()` for non-admin callers. Selects only `status`, not the full
+   * (much larger) `data` JSON blob, since that's all this needs.
+   */
+  async listSpecProgress(lecturerScope?: string): Promise<CourseSpecProgress[]> {
+    const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
+    const courses = await prisma.course.findMany({
+      where: scopeFilter,
+      orderBy: { code: "asc" },
+      select: { id: true, code: true, title: true, spec: { select: { status: true } } },
+    });
+    return courses.map((course) => {
+      const status = (course.spec?.status as Record<string, string>) ?? {};
+      const completed = COMPLETABLE_SECTION_IDS.filter((id) => status[id] === "complete").length;
+      return {
+        courseId: course.id,
+        code: course.code,
+        title: course.title,
+        completed,
+        total: COMPLETABLE_SECTION_IDS.length,
+      };
+    });
   },
 
   /**
