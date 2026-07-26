@@ -110,7 +110,7 @@ export const dashboardManifest: PluginManifest = {
   id: "dashboard",
   name: "Dashboard",
   version: "0.1.0",
-  description: "Sidebar entry for a not-yet-built landing dashboard.",
+  description: "Programme overview: key counts, course spec completion, offering/student status.",
   routes: [{ label: "Dashboard", path: "/dashboard", icon: "dashboard" }],
 };
 

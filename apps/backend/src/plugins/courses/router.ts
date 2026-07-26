@@ -45,6 +45,12 @@ export function createCourseRouter(): Router {
     res.json(await courseService.list(parsed.data, ownerScope));
   });
 
+  // Static route registered before "/:id" so "spec-progress" isn't swallowed as a course id.
+  router.get("/spec-progress", requirePermission("courses:read"), async (req, res) => {
+    const ownerScope = req.user!.role === "admin" ? undefined : req.user!.id;
+    res.json(await courseService.listSpecProgress(ownerScope));
+  });
+
   router.get("/:id", requirePermission("courses:read"), async (req, res) => {
     if (!(await ensureCourseAccess(req, res, req.params.id!))) return;
     const course = await courseService.getDetailed(req.params.id!);

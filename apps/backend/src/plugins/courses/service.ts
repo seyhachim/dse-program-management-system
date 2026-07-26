@@ -1,12 +1,14 @@
-import type {
-  CourseInfoSection,
-  CoursesServiceContract,
-  CreateCourseInput,
-  LecturersServiceContract,
-  ListCoursesQuery,
-  OfferingsServiceContract,
-  SpecSectionId,
-  UpdateCourseInput,
+import {
+  SPEC_SECTIONS,
+  type CourseInfoSection,
+  type CourseSpecProgress,
+  type CoursesServiceContract,
+  type CreateCourseInput,
+  type LecturersServiceContract,
+  type ListCoursesQuery,
+  type OfferingsServiceContract,
+  type SpecSectionId,
+  type UpdateCourseInput,
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
@@ -41,6 +43,18 @@ async function withLecturer<T extends { lecturerId: string | null }>(course: T) 
   return { ...course, lecturer };
 }
 
+/** Courses a lecturer owns or teaches an offering of — the non-admin list/dashboard scope. */
+async function ownerScopeFilter(lecturerScope: string) {
+  return {
+    OR: [
+      { lecturerId: lecturerScope },
+      { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } },
+    ],
+  };
+}
+
+const READY_SECTION_IDS = SPEC_SECTIONS.filter((s) => s.state === "ready").map((s) => s.id);
+
 export const courseService = {
   /**
    * List courses. When `lecturerScope` is given, results are scoped to that
@@ -58,19 +72,31 @@ export const courseService = {
           ],
         }
       : {};
-    const scopeFilter = lecturerScope
-      ? {
-          OR: [
-            { lecturerId: lecturerScope },
-            { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } },
-          ],
-        }
-      : {};
+    const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
     const courses = await prisma.course.findMany({
       where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
     });
     return Promise.all(courses.map(withLecturer));
+  },
+
+  /**
+   * Per-course count of "ready" spec sections marked complete — backs the
+   * programme dashboard's Course Specification Progress view. Scoped the same
+   * way as `list()` for non-admin callers.
+   */
+  async listSpecProgress(lecturerScope?: string): Promise<CourseSpecProgress[]> {
+    const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
+    const courses = await prisma.course.findMany({
+      where: scopeFilter,
+      orderBy: { code: "asc" },
+      include: { spec: true },
+    });
+    return courses.map((course) => {
+      const status = (course.spec?.status as Record<string, string>) ?? {};
+      const completed = READY_SECTION_IDS.filter((id) => status[id] === "complete").length;
+      return { courseId: course.id, code: course.code, title: course.title, completed, total: READY_SECTION_IDS.length };
+    });
   },
 
   /**

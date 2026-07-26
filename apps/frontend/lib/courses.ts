@@ -1,4 +1,10 @@
-import type { Course, CreateCourseInput, Lecturer, UpdateCourseInput } from "@dse-pms/shared-types";
+import type {
+  Course,
+  CourseSpecProgress,
+  CreateCourseInput,
+  Lecturer,
+  UpdateCourseInput,
+} from "@dse-pms/shared-types";
 import { api } from "./api";
 
 /** Course as returned by the API — lecturer joined via the registry. */
@@ -8,6 +14,9 @@ export const coursesApi = {
   list(search?: string): Promise<CourseView[]> {
     const qs = search ? `?search=${encodeURIComponent(search)}` : "";
     return api.get<CourseView[]>(`/api/courses${qs}`);
+  },
+  specProgress(): Promise<CourseSpecProgress[]> {
+    return api.get<CourseSpecProgress[]>("/api/courses/spec-progress");
   },
   get(id: string): Promise<CourseView> {
     return api.get<CourseView>(`/api/courses/${id}`);
