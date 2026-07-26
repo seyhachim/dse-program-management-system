@@ -1,81 +1,87 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  BookOpen,
-  CalendarRange,
-  GraduationCap,
-  Users,
-} from "lucide-react";
+import { BookOpen, CalendarRange, GraduationCap, Users } from "lucide-react";
 import {
   OFFERING_STATUSES,
   STUDENT_STATUSES,
   type CourseSpecProgress,
-  type OfferingStatus,
   type OfferingView,
   type Student,
-  type StudentStatus,
 } from "@dse-pms/shared-types";
-import { CompletionRing, Progress, Skeleton } from "@dse-pms/ui";
-import { ApiError } from "@/lib/api";
+import { CompletionRing, Progress, Skeleton, type StatusTone } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
-import { offeringsApi } from "@/lib/offerings";
-import { studentsApi } from "@/lib/students";
+import { offeringsApi, offeringTone } from "@/lib/offerings";
+import { statusTone, studentsApi } from "@/lib/students";
 import { lecturersApi } from "@/lib/lecturers";
 
-const OFFERING_STATUS_COLORS: Record<OfferingStatus, string> = {
-  Planned: "#3b82f6",
-  Active: "#22c55e",
-  Completed: "#94a3b8",
+/** Maps the app's semantic status tones to their themed CSS variables (defined
+ * in globals.css, adapt to light/dark) so distribution-bar colors stay in sync
+ * with the same tones StatusBadge uses elsewhere, instead of a second
+ * hardcoded hex palette. */
+const TONE_COLORS: Record<StatusTone, string> = {
+  live: "var(--status-live)",
+  upcoming: "var(--status-upcoming)",
+  tournament: "var(--status-tournament)",
+  neutral: "var(--status-neutral)",
 };
 
-const STUDENT_STATUS_COLORS: Record<StudentStatus, string> = {
-  Active: "#22c55e",
-  Pending: "#f59e0b",
-  Inactive: "#94a3b8",
-};
+interface LoadState {
+  students: Student[];
+  courses: CourseView[];
+  offerings: OfferingView[];
+  lecturerCount: number;
+  specProgress: CourseSpecProgress[];
+}
 
-/** Programme overview for the "Dashboard" nav item — counts + spec-completion and
- * status-distribution visualizations, scoped the same way the underlying list
- * endpoints already scope for lecturers (own courses/offerings only). */
+const EMPTY_STATE: LoadState = { students: [], courses: [], offerings: [], lecturerCount: 0, specProgress: [] };
+
+/** Admin-only programme overview for the "Dashboard" nav item — counts plus
+ * spec-completion and status-distribution visualizations across every course,
+ * offering, student and lecturer. */
 export function DashboardClient() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [courses, setCourses] = useState<CourseView[]>([]);
-  const [offerings, setOfferings] = useState<OfferingView[]>([]);
-  const [lecturerCount, setLecturerCount] = useState(0);
-  const [specProgress, setSpecProgress] = useState<CourseSpecProgress[]>([]);
+  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const [state, setState] = useState<LoadState>(EMPTY_STATE);
 
   useEffect(() => {
     let active = true;
     (async () => {
       setLoading(true);
-      setError(null);
-      try {
-        const [studentsRes, coursesRes, offeringsRes, lecturersRes, specRes] = await Promise.all([
-          studentsApi.list({}),
-          coursesApi.list(),
-          offeringsApi.list(),
-          lecturersApi.list(),
-          coursesApi.specProgress(),
-        ]);
-        if (!active) return;
-        setStudents(studentsRes);
-        setCourses(coursesRes);
-        setOfferings(offeringsRes);
-        setLecturerCount(lecturersRes.length);
-        setSpecProgress(specRes);
-      } catch (err) {
-        if (active) setError(err instanceof ApiError ? err.message : "Failed to load dashboard");
-      } finally {
-        if (active) setLoading(false);
-      }
+      const [studentsRes, coursesRes, offeringsRes, lecturersRes, specRes] = await Promise.allSettled([
+        studentsApi.list({}),
+        coursesApi.list(),
+        offeringsApi.list(),
+        lecturersApi.list(),
+        coursesApi.specProgress(),
+      ]);
+      if (!active) return;
+
+      // Apply whatever loaded successfully rather than discarding it all when
+      // one source fails, so an outage in one endpoint doesn't render every
+      // other (successfully fetched) panel as misleading zeros.
+      const failed: string[] = [];
+      const orElse = <T,>(label: string, result: PromiseSettledResult<T>, fallback: T): T => {
+        if (result.status === "fulfilled") return result.value;
+        failed.push(label);
+        return fallback;
+      };
+      setState({
+        students: orElse("students", studentsRes, EMPTY_STATE.students),
+        courses: orElse("courses", coursesRes, EMPTY_STATE.courses),
+        offerings: orElse("offerings", offeringsRes, EMPTY_STATE.offerings),
+        lecturerCount: orElse("lecturers", lecturersRes, []).length,
+        specProgress: orElse("spec progress", specRes, EMPTY_STATE.specProgress),
+      });
+      setFailedSources(failed);
+      setLoading(false);
     })();
     return () => {
       active = false;
     };
   }, []);
+
+  const { students, courses, offerings, lecturerCount, specProgress } = state;
 
   if (loading) {
     return (
@@ -105,9 +111,9 @@ export function DashboardClient() {
 
   return (
     <div className="space-y-6">
-      {error ? (
+      {failedSources.length > 0 ? (
         <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
-          {error}
+          Failed to load {failedSources.join(", ")} — showing the rest of the dashboard. Try refreshing.
         </div>
       ) : null}
 
@@ -193,7 +199,7 @@ export function DashboardClient() {
           segments={offeringsByStatus.map(({ status, count }) => ({
             name: status,
             count,
-            color: OFFERING_STATUS_COLORS[status],
+            color: TONE_COLORS[offeringTone(status)],
           }))}
         />
 
@@ -204,7 +210,7 @@ export function DashboardClient() {
           segments={studentsByStatus.map(({ status, count }) => ({
             name: status,
             count,
-            color: STUDENT_STATUS_COLORS[status],
+            color: TONE_COLORS[statusTone(status)],
           }))}
         />
       </div>

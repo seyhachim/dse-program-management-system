@@ -1,5 +1,5 @@
 import {
-  SPEC_SECTIONS,
+  SPEC_SECTION_SCHEMAS,
   type CourseInfoSection,
   type CourseSpecProgress,
   type CoursesServiceContract,
@@ -53,7 +53,11 @@ async function ownerScopeFilter(lecturerScope: string) {
   };
 }
 
-const READY_SECTION_IDS = SPEC_SECTIONS.filter((s) => s.state === "ready").map((s) => s.id);
+// Sections that can actually be saved/marked complete — excludes "programme",
+// which is a read-only Part 1 reference page with no PUT path (SPEC_SECTIONS
+// lists it as "ready", but it has no entry here, so it would otherwise inflate
+// the completion denominator by one section a course can never complete).
+const COMPLETABLE_SECTION_IDS = Object.keys(SPEC_SECTION_SCHEMAS) as SpecSectionId[];
 
 export const courseService = {
   /**
@@ -81,21 +85,28 @@ export const courseService = {
   },
 
   /**
-   * Per-course count of "ready" spec sections marked complete — backs the
+   * Per-course count of completable spec sections marked complete — backs the
    * programme dashboard's Course Specification Progress view. Scoped the same
-   * way as `list()` for non-admin callers.
+   * way as `list()` for non-admin callers. Selects only `status`, not the full
+   * (much larger) `data` JSON blob, since that's all this needs.
    */
   async listSpecProgress(lecturerScope?: string): Promise<CourseSpecProgress[]> {
     const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
     const courses = await prisma.course.findMany({
       where: scopeFilter,
       orderBy: { code: "asc" },
-      include: { spec: true },
+      select: { id: true, code: true, title: true, spec: { select: { status: true } } },
     });
     return courses.map((course) => {
       const status = (course.spec?.status as Record<string, string>) ?? {};
-      const completed = READY_SECTION_IDS.filter((id) => status[id] === "complete").length;
-      return { courseId: course.id, code: course.code, title: course.title, completed, total: READY_SECTION_IDS.length };
+      const completed = COMPLETABLE_SECTION_IDS.filter((id) => status[id] === "complete").length;
+      return {
+        courseId: course.id,
+        code: course.code,
+        title: course.title,
+        completed,
+        total: COMPLETABLE_SECTION_IDS.length,
+      };
     });
   },
 
