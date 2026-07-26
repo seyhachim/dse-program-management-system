@@ -13,41 +13,88 @@
  * Noviq design-system tokens as CSS variables. Values here (and in .dark
  * below) are what packages/config/theme.css maps onto Tailwind utilities
  * (bg-primary, text-foreground, …).
+ *
+ * Two layers coexist deliberately:
+ *  - the original token names (--card, --muted, --sidebar, --status-live, …)
+ *    are load-bearing — Tailwind utilities and every shadcn/ui primitive in
+ *    packages/ui reference them by name, so they're kept and just re-tinted.
+ *  - a small semantic layer on top (--surface-*, --foreground-*, --success/
+ *    --warning/--error/--info/--inactive, --button-*) gives future themes a
+ *    vocabulary that isn't tied 1:1 to a specific component, without a
+ *    breaking rename of anything already in use.
  */
 :root {
-  --canvas: #f0f4f8;
+  --canvas: #f8fafc;
   --background: var(--canvas);
   --card: #ffffff;
-  --foreground: #102a30;
+  --foreground: #0f172a;
 
-  /* Sidebar follows the canvas/foreground pair so it flips white/black with
-     the theme instead of staying a fixed brand colour; see .dark below. */
-  --sidebar: var(--card);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-muted: var(--muted-foreground);
-  --sidebar-active: var(--muted);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+  /* Sidebar is a fixed brand navy in both themes — it's meant to read as a
+     distinct branded surface, not one that flips white/black with the
+     theme; see .dark below for the dark-mode navy. */
+  --sidebar: #0f1e3a;
+  --sidebar-hover: #16284d;
+  --sidebar-foreground: #ffffff;
+  --sidebar-muted: #b8c7e0;
+  --sidebar-active: #1d3b73;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: var(--primary);
 
   --primary: #2563eb; /* vivid blue — CTA buttons, links, focus */
+  --primary-hover: #1d4ed8;
+  --primary-light: #3b82f6;
+  --primary-soft: #dbeafe;
   --primary-foreground: #ffffff;
 
   --accent: #dbeafe; /* light blue tint — chips, badges, hover fills */
   --accent-foreground: #1e3a8a;
 
   --border: #e2e8f0;
+  --border-light: #f1f5f9;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
 
+  /* Semantic surface/foreground scale — additive, for components that want
+     finer-grained steps than card/background or foreground/muted-foreground. */
+  --surface: #ffffff;
+  --surface-secondary: #f8fafc;
+  --surface-hover: #f1f5f9;
+  --foreground-secondary: #334155;
+  --foreground-muted: #64748b;
+  --foreground-disabled: #94a3b8;
+
   /* Status tokens */
-  --status-live: #15a06a; /* green  — live/active/success */
-  --status-live-bg: #e6f6ee;
-  --status-upcoming: #e07b1a; /* orange — upcoming/pending */
-  --status-upcoming-bg: #fdf0e2;
+  --status-live: #16a34a; /* green  — live/active/success */
+  --status-live-bg: #dcfce7;
+  --status-upcoming: #f59e0b; /* orange — upcoming/pending */
+  --status-upcoming-bg: #fef3c7;
   --status-tournament: #8b5cf6; /* purple — tournament/category */
   --status-tournament-bg: #f1ebfe;
   --status-neutral: #64748b; /* gray — link/neutral */
   --status-neutral-bg: #f1f5f9;
+
+  /* Semantic aliases of the status tokens above — same colours, names that
+     read by meaning (success/warning/error/info/inactive) rather than by
+     the live/upcoming/tournament/neutral vocabulary StatusBadge coined. */
+  --success: var(--status-live);
+  --success-bg: var(--status-live-bg);
+  --warning: var(--status-upcoming);
+  --warning-bg: var(--status-upcoming-bg);
+  --error: #dc2626;
+  --error-bg: #fee2e2;
+  --info: var(--primary);
+  --info-bg: var(--accent);
+  --inactive: var(--status-neutral);
+  --inactive-bg: var(--status-neutral-bg);
+
+  /* Button tokens — additive; existing buttons still style off --primary/
+     --card/--border via packages/ui, these are for future custom buttons. */
+  --button-primary: var(--primary);
+  --button-primary-hover: var(--primary-hover);
+  --button-primary-active: #1e40af;
+  --button-secondary: var(--card);
+  --button-secondary-hover: #f8fafc;
+  --button-secondary-border: #cbd5e1;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-heading: var(--font-sans);
@@ -61,41 +108,77 @@
   --secondary-foreground: var(--foreground);
   --input: var(--border);
   --ring: var(--primary);
-  --destructive: #dc2626;
+  --destructive: var(--error);
   --destructive-foreground: #ffffff;
   --radius: 0.75rem;
 }
 
 /**
- * Dark theme — same token names, re-tinted for a dark canvas. Sidebar tokens
- * have no separate override here: they alias --card/--foreground/etc in
- * :root, which resolve to the values below wherever .dark is applied.
+ * Dark theme — same token names, re-tinted for a dark canvas. Sidebar is its
+ * own fixed navy here too (darker than the light-mode navy), not an alias of
+ * --card/--foreground — see the :root comment above.
  */
 .dark {
-  --canvas: #0a0a0a;
-  --card: #18181b;
-  --foreground: #fafafa;
+  --canvas: #0f172a;
+  --card: #111827;
+  --foreground: #f8fafc;
 
-  --primary: #3b82f6; /* vivid blue, brightened for dark backgrounds */
+  --sidebar: #0b1b34;
+  --sidebar-hover: #122448;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-muted: #a7b8d8;
+  --sidebar-active: #1c3f82;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: var(--primary);
+
+  --primary: #2563eb;
+  --primary-hover: #3b82f6; /* brightened for dark backgrounds */
+  --primary-light: #60a5fa;
   --primary-foreground: #ffffff;
 
   --accent: #1e3a8a;
   --accent-foreground: #eaf2fa;
 
-  --border: #27272a;
-  --muted: #18181b;
-  --muted-foreground: #a1a1aa;
+  --border: #334155;
+  --border-light: #475569;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --surface: #111827;
+  --surface-secondary: #1e293b;
+  --surface-hover: #263447;
+  --foreground-secondary: #cbd5e1;
+  --foreground-muted: #94a3b8;
+  --foreground-disabled: #64748b;
 
   --status-live: #34d399;
-  --status-live-bg: rgba(21, 160, 106, 0.16);
+  --status-live-bg: rgba(22, 163, 74, 0.16);
   --status-upcoming: #f5a24d;
-  --status-upcoming-bg: rgba(224, 123, 26, 0.18);
+  --status-upcoming-bg: rgba(245, 158, 11, 0.18);
   --status-tournament: #a78bfa;
   --status-tournament-bg: rgba(139, 92, 246, 0.18);
   --status-neutral: #94a3b8;
   --status-neutral-bg: rgba(100, 116, 139, 0.2);
 
-  --destructive: #f87171;
+  --success: var(--status-live);
+  --success-bg: var(--status-live-bg);
+  --warning: var(--status-upcoming);
+  --warning-bg: var(--status-upcoming-bg);
+  --error: #f87171;
+  --error-bg: rgba(248, 113, 113, 0.16);
+  --info: var(--primary-hover);
+  --info-bg: rgba(59, 130, 246, 0.16);
+  --inactive: var(--status-neutral);
+  --inactive-bg: var(--status-neutral-bg);
+
+  --button-primary: var(--primary);
+  --button-primary-hover: var(--primary-hover);
+  --button-primary-active: #1e40af;
+  --button-secondary: var(--card);
+  --button-secondary-hover: var(--surface-hover);
+  --button-secondary-border: var(--border-light);
+
+  --destructive: var(--error);
   --destructive-foreground: #2a0a0a;
 }
 
