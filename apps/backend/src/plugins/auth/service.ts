@@ -39,6 +39,14 @@ function getAdminClient(): SupabaseClient {
 }
 
 export const authService = {
+  /** Full profile (incl. name) for the resolved caller — `req.user` only carries id/email/role. */
+  async me(userId: string) {
+    return prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, email: true, role: true, name: true },
+    });
+  },
+
   /**
    * Provision a login account: invite the email via Supabase, then upsert the
    * app `User` (role from input, authId = the new auth uid). If a profile row
