@@ -20,6 +20,12 @@ export interface PluginRoute {
    * (sidebar filter + shell page guard); backend permission strings gate the API.
    */
   roles?: Role[];
+  /**
+   * Sidebar section this route is grouped under (e.g. "Academic"). Omitted =
+   * rendered ungrouped, above any labeled section. The special value "footer"
+   * is rendered in the sidebar footer instead of the main nav list.
+   */
+  group?: string;
 }
 
 /**
@@ -60,7 +66,7 @@ export const studentsManifest: PluginManifest = {
   name: "Students",
   version: "0.1.0",
   description: "Student records — CRUD, list, profile.",
-  routes: [{ label: "Students", path: "/students", icon: "users", roles: ["admin"] }],
+  routes: [{ label: "Students", path: "/students", icon: "users", roles: ["admin"], group: "Academic" }],
   permissions: ["students:read", "students:write"],
 };
 
@@ -69,7 +75,9 @@ export const coursesManifest: PluginManifest = {
   name: "Courses",
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
-  routes: [{ label: "Course Management", path: "/courses", icon: "book", roles: ["admin", "lecturer"] }],
+  routes: [
+    { label: "Course Management", path: "/courses", icon: "book", roles: ["admin", "lecturer"], group: "Academic" },
+  ],
   permissions: ["courses:read", "courses:write", "courses:manage"],
 };
 
@@ -78,7 +86,7 @@ export const offeringsManifest: PluginManifest = {
   name: "Course Offerings",
   version: "0.1.0",
   description: "Links Students, Courses and Lecturers for a given term.",
-  routes: [{ label: "Course Offerings", path: "/offerings", icon: "layers", roles: ["admin"] }],
+  routes: [{ label: "Course Offerings", path: "/offerings", icon: "layers", roles: ["admin"], group: "Academic" }],
   permissions: ["offerings:read", "offerings:write", "offerings:manage"],
 };
 
@@ -87,8 +95,50 @@ export const lecturersManifest: PluginManifest = {
   name: "Lecturers",
   version: "0.1.0",
   description: "Lecturers — Users with the lecturer role, incl. syllabus contact details.",
-  routes: [{ label: "Lecturers", path: "/lecturers", icon: "presentation", roles: ["admin"] }],
+  routes: [
+    { label: "Lecturers", path: "/lecturers", icon: "presentation", roles: ["admin"], group: "Academic" },
+  ],
   permissions: ["lecturers:read", "lecturers:write"],
+};
+
+/**
+ * Ungrouped "Dashboard" entry — split from `placeholdersManifest` below and
+ * placed first in `pluginManifests` so its ungrouped bucket is created before
+ * "Academic" is, and it renders above every labeled section (issue #49).
+ */
+export const dashboardManifest: PluginManifest = {
+  id: "dashboard",
+  name: "Dashboard",
+  version: "0.1.0",
+  description: "Sidebar entry for a not-yet-built landing dashboard.",
+  routes: [{ label: "Dashboard", path: "/dashboard", icon: "dashboard" }],
+};
+
+/**
+ * Sidebar-only placeholder pages for sections not built yet (issue #49). Each
+ * route renders a generic "coming soon" page — no backend plugin/router, since
+ * `pluginManifests` (frontend nav) is fully decoupled from what's registered in
+ * apps/backend/src/core/app.ts. Mirrors the inverse of methods/rubrics/auth
+ * below, which register a backend plugin but contribute no sidebar route.
+ */
+export const placeholdersManifest: PluginManifest = {
+  id: "placeholders",
+  name: "Placeholders",
+  version: "0.1.0",
+  description: "Sidebar entries for sections not yet built — link to a coming-soon page.",
+  routes: [
+    { label: "Programme Management", path: "/programme-management", icon: "clipboard-list", group: "Academic" },
+    { label: "Assessment Management", path: "/assessment-management", icon: "file-check", group: "Academic" },
+    { label: "Teaching Management", path: "/teaching-management", icon: "graduation-cap", group: "Academic" },
+    { label: "QA Dashboard", path: "/qa-dashboard", icon: "shield-check", group: "Quality Assurance" },
+    { label: "Reports", path: "/reports", icon: "bar-chart", group: "Quality Assurance" },
+    { label: "CQI", path: "/cqi", icon: "refresh-cw", group: "Quality Assurance" },
+    { label: "Document Library", path: "/document-library", icon: "file-text", group: "Quality Assurance" },
+    { label: "Users", path: "/users", icon: "user-cog", group: "Admin" },
+    { label: "Settings", path: "/settings", icon: "settings", group: "Admin" },
+    { label: "Audit Trail", path: "/audit-trail", icon: "history", group: "Admin" },
+    { label: "Help & Support", path: "/help", icon: "help-circle", group: "footer" },
+  ],
 };
 
 export const methodsManifest: PluginManifest = {
@@ -119,10 +169,12 @@ export const authManifest: PluginManifest = {
 };
 
 export const pluginManifests: PluginManifest[] = [
+  dashboardManifest,
   studentsManifest,
   coursesManifest,
   offeringsManifest,
   lecturersManifest,
+  placeholdersManifest,
   methodsManifest,
   rubricsManifest,
   authManifest,
@@ -141,4 +193,28 @@ export function navFromManifests(manifests: PluginManifest[]): PluginRoute[] {
 /** Nav routes a given role may see — `navFromManifests` filtered by `roles`. */
 export function navForRole(manifests: PluginManifest[], role: Role): PluginRoute[] {
   return navFromManifests(manifests).filter((r) => routeAllowsRole(r, role));
+}
+
+/** One sidebar section: `label` undefined = ungrouped, rendered with no heading. */
+export interface NavGroup {
+  label?: string;
+  routes: PluginRoute[];
+}
+
+/**
+ * Nav routes for `role`, bucketed by `route.group` and ordered by each
+ * group's first appearance across `manifests` — no separate priority field,
+ * the manifest array order is the display order.
+ */
+export function navGroupsForRole(manifests: PluginManifest[], role: Role): NavGroup[] {
+  const order: (string | undefined)[] = [];
+  const buckets = new Map<string | undefined, PluginRoute[]>();
+  for (const route of navForRole(manifests, role)) {
+    if (!buckets.has(route.group)) {
+      buckets.set(route.group, []);
+      order.push(route.group);
+    }
+    buckets.get(route.group)!.push(route);
+  }
+  return order.map((label) => ({ label, routes: buckets.get(label)! }));
 }
