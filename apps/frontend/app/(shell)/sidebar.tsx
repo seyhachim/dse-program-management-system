@@ -43,10 +43,11 @@ export function AppSidebar() {
       <SidebarHeader>
         <div className="flex h-10 items-center gap-2 px-1">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG mark, no Next Image optimization needed */}
-          <img src="/dse-logo.svg" alt="" className="h-6 w-auto shrink-0" />
-          {/*<span className="text-xs font-semibold group-data-[collapsible=icon]:hidden">
-            Program Management System
-          </span>*/}
+          <img
+            src="/dse-logo.svg"
+            alt=""
+            className="h-6 w-auto shrink-0 group-data-[collapsible=icon]:hidden"
+          />
         </div>
       </SidebarHeader>
 
