@@ -170,7 +170,7 @@ function CourseNavItem({
         isActive={pathname === route.path}
         tooltip={route.label}
         render={
-          <Link href={route.path}>
+          <Link href={route.path} onClick={() => setOpen((o) => !o)}>
             {Icon ? <Icon /> : null}
             <span>{route.label}</span>
           </Link>
