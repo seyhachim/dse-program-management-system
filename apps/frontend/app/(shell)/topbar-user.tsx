@@ -6,7 +6,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@dse-pms/ui";
@@ -54,10 +53,10 @@ export function TopbarUser() {
         }
       />
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>
+        <div className="px-2 py-1.5 text-xs">
           <p className="text-foreground">{me.email}</p>
           <p className="capitalize text-muted-foreground">{me.role}</p>
-        </DropdownMenuLabel>
+        </div>
         {AUTH_MODE === "supabase" ? (
           <>
             <DropdownMenuSeparator />
