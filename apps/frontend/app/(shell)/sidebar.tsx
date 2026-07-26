@@ -45,7 +45,7 @@ export function AppSidebar() {
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG mark, no Next Image optimization needed */}
           <img
             src="/dse-logo.svg"
-            alt=""
+            alt="DSE-PMS"
             className="h-6 w-auto shrink-0 group-data-[collapsible=icon]:hidden"
           />
         </div>
