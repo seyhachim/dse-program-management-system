@@ -6,12 +6,12 @@ export interface TopbarProps {
   subtitle?: string;
 }
 
-/** Page topbar: sidebar toggle + title + user menu + theme switcher. */
+/** Page topbar: sidebar toggle (mobile only, md:hidden) + title + user menu + theme switcher. On desktop the toggle lives in the sidebar header instead, next to the logo. */
 export function Topbar({ title, subtitle }: TopbarProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex items-center gap-3">
-        <SidebarTrigger />
+        <SidebarTrigger className="md:hidden" />
         <div>
           <h1 className="text-lg font-semibold text-foreground">{title}</h1>
           {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
