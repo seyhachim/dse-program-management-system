@@ -16,7 +16,11 @@ enum StudentStatus {
   Pending
 }
 
-enum Role {
+/// User.role's storage type. Named UserRole (not Role) so it doesn't collide with
+/// the Role model below — the normalized role/permission tables are additive for
+/// now (see Role/Permission/RolePermission doc comment); User.role still reads
+/// this enum directly. See https://github.com/thymadona/dse-program-management-system/issues/65.
+enum UserRole {
   admin
   lecturer
   student
@@ -59,7 +63,7 @@ model User {
   authId        String?  @unique
   email         String   @unique
   name          String
-  role          Role     @default(student)
+  role          UserRole @default(student)
   title         String?
   qualification String?
   phone         String?
@@ -68,6 +72,52 @@ model User {
   coursesLed   Course[]   @relation("CourseLecturer")
   offeringsLed Offering[] @relation("OfferingLecturer")
   rubricsOwned Rubric[]   @relation("RubricOwner")
+}
+
+/// Normalized role/permission model (issue #65, phase 1 — schema only). Not yet
+/// wired to User.role or requirePermission: authorization still runs entirely on
+/// UserRole + the hardcoded ROLE_PERMISSIONS map in core/permissions/index.ts.
+/// These tables exist so seed data can mirror that map as DB rows ahead of the
+/// follow-up that migrates User.role -> roleId and makes this the enforced
+/// source of truth. `slug` values match UserRole's values / the permission
+/// strings requirePermission() already checks (e.g. "courses:write"), so the
+/// eventual cutover is a lookup swap, not a renumbering.
+model Role {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+/// Join table: which permissions a role grants. Composite PK prevents duplicate
+/// grants; both FKs cascade so deleting a role or permission cleans up its grants.
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
 }
 
 /// Students plugin domain model.

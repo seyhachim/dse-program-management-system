@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { pluginManifests } from "@dse-pms/shared-types";
 
 /**
  * Seeds dev users (incl. several lecturers), students, courses, offerings and a
@@ -59,6 +60,93 @@ const teachingMethods = [
 const assessmentMethods = [
   "Assignment", "Mid-term Quiz", "Final Exam", "Quiz", "Lab Report",
   "Project", "Presentation & Defence", "Peer Review", "Reflection Journal",
+];
+
+/**
+ * Role/Permission/RolePermission seed data (issue #65, phase 1). Mirrors
+ * ROLE_PERMISSIONS in apps/backend/src/core/permissions/index.ts exactly, so the
+ * DB documents today's authorization behavior even though nothing reads from it
+ * yet — requirePermission() still checks that hardcoded map. Keep roleDefs in
+ * sync with it until the follow-up that makes this the enforced source of truth.
+ *
+ * The permission *slugs* themselves aren't hand-copied a third time, though:
+ * they're derived from pluginManifests (packages/shared-types/src/plugins.ts),
+ * per CLAUDE.md's "shared-types is the single source of truth ... for ...
+ * permission strings" — this map only supplies a human-readable title per slug.
+ */
+const permissionTitles: Record<string, string> = {
+  "accounts:create": "Create lecturer accounts",
+  "students:read": "View students",
+  "students:write": "Create/edit students",
+  "courses:read": "View courses",
+  "courses:write": "Edit a course's own specification",
+  "courses:manage": "Create/edit/delete/reassign courses",
+  "offerings:read": "View offerings",
+  "offerings:write": "Manage enrollment for an offering",
+  "offerings:manage": "Create/edit/delete offerings",
+  "lecturers:read": "View lecturers",
+  "lecturers:write": "Edit lecturer profiles",
+  "methods:read": "View teaching/assessment methods",
+  "methods:write": "Add teaching/assessment methods",
+  "rubrics:read": "View rubrics",
+  "rubrics:write": "Create/edit rubrics",
+};
+
+const permissionSlugs = [...new Set(pluginManifests.flatMap((m) => m.permissions ?? []))];
+
+const roleDefs: { slug: string; title: string; description: string; permissions: string[] }[] = [
+  {
+    slug: "admin",
+    title: "Admin",
+    description: "Full curriculum-admin access.",
+    permissions: [
+      "accounts:create",
+      "students:read",
+      "students:write",
+      "courses:read",
+      "courses:write",
+      "courses:manage",
+      "offerings:read",
+      "offerings:write",
+      "offerings:manage",
+      "lecturers:read",
+      "lecturers:write",
+      "methods:read",
+      "methods:write",
+      "rubrics:read",
+      "rubrics:write",
+    ],
+  },
+  {
+    slug: "lecturer",
+    title: "Lecturer",
+    description: "Reads the catalog and fills in the specification of assigned courses/offerings.",
+    permissions: [
+      "students:read",
+      "courses:read",
+      "courses:write",
+      "offerings:read",
+      "offerings:write",
+      "lecturers:read",
+      "methods:read",
+      "methods:write",
+      "rubrics:read",
+      "rubrics:write",
+    ],
+  },
+  {
+    slug: "student",
+    title: "Student",
+    description: "Read-only access to the catalog.",
+    permissions: [
+      "students:read",
+      "courses:read",
+      "offerings:read",
+      "lecturers:read",
+      "methods:read",
+      "rubrics:read",
+    ],
+  },
 ];
 
 // Standard 4-point rating scale shared by the sample rubrics.
@@ -131,6 +219,32 @@ async function main() {
     await prisma.student.upsert({ where: { email: s.email }, update: s, create: s });
   }
 
+  for (const slug of permissionSlugs) {
+    const title = permissionTitles[slug] ?? slug;
+    await prisma.permission.upsert({ where: { slug }, update: { title }, create: { slug, title } });
+  }
+  for (const r of roleDefs) {
+    const role = await prisma.role.upsert({
+      where: { slug: r.slug },
+      update: { title: r.title, description: r.description },
+      create: { slug: r.slug, title: r.title, description: r.description },
+    });
+    for (const permSlug of r.permissions) {
+      const permission = await prisma.permission.findUniqueOrThrow({ where: { slug: permSlug } });
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+        update: {},
+        create: { roleId: role.id, permissionId: permission.id },
+      });
+    }
+    // Revoke any grant this role held previously but no longer lists — otherwise
+    // a permission removed from roleDefs (mirroring a ROLE_PERMISSIONS edit, e.g.
+    // commit 0c6ae0d's lecturer least-privilege fix) would stay granted forever.
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permission: { slug: { notIn: r.permissions } } },
+    });
+  }
+
   for (const name of teachingMethods) {
     await prisma.teachingMethod.upsert({ where: { name }, update: {}, create: { name } });
   }
@@ -199,7 +313,8 @@ async function main() {
   console.log(
     `Seeded ${users.length} users, ${students.length} students, ${courses.length} courses, ` +
       `${teachingMethods.length} teaching + ${assessmentMethods.length} assessment methods, ` +
-      `${rubrics.length} rubrics, 1 offering.`,
+      `${rubrics.length} rubrics, 1 offering, ${roleDefs.length} roles, ` +
+      `${permissionSlugs.length} permissions.`,
   );
 }
 
