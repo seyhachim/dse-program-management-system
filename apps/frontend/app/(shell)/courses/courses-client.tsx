@@ -81,6 +81,19 @@ export function CoursesClient() {
     }
   };
 
+  const lecturerColumn: DataTableColumn<CourseView> = {
+    key: "lecturer",
+    header: "Lecturer",
+    render: (c) =>
+      c.lecturer ? (
+        <StatusBadge tone="tournament" label={c.lecturer.name} icon={false} />
+      ) : (
+        <span className="text-muted-foreground">Unassigned</span>
+      ),
+  };
+
+  // Lecturers only ever see their own assigned courses, so a LECTURER column
+  // would be redundant — admins keep it since they see and manage all courses.
   const columns: DataTableColumn<CourseView>[] = [
     { key: "code", header: "Code", render: (c) => <span className="font-medium">{c.code}</span> },
     { key: "title", header: "Title", render: (c) => c.title },
@@ -110,16 +123,7 @@ export function CoursesClient() {
           <span className="text-muted-foreground">—</span>
         ),
     },
-    {
-      key: "lecturer",
-      header: "Lecturer",
-      render: (c) =>
-        c.lecturer ? (
-          <StatusBadge tone="tournament" label={c.lecturer.name} icon={false} />
-        ) : (
-          <span className="text-muted-foreground">Unassigned</span>
-        ),
-    },
+    ...(isAdmin ? [lecturerColumn] : []),
   ];
 
   return (
