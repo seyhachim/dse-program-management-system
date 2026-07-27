@@ -61,6 +61,86 @@ const assessmentMethods = [
   "Project", "Presentation & Defence", "Peer Review", "Reflection Journal",
 ];
 
+/**
+ * Role/Permission/RolePermission seed data (issue #65, phase 1). Mirrors
+ * ROLE_PERMISSIONS in apps/backend/src/core/permissions/index.ts exactly, so the
+ * DB documents today's authorization behavior even though nothing reads from it
+ * yet — requirePermission() still checks that hardcoded map. Keep the two in
+ * sync until the follow-up that makes this the enforced source of truth.
+ */
+const permissionDefs: Record<string, string> = {
+  "accounts:create": "Create lecturer accounts",
+  "students:read": "View students",
+  "students:write": "Create/edit students",
+  "courses:read": "View courses",
+  "courses:write": "Edit a course's own specification",
+  "courses:manage": "Create/edit/delete/reassign courses",
+  "offerings:read": "View offerings",
+  "offerings:write": "Manage enrollment for an offering",
+  "offerings:manage": "Create/edit/delete offerings",
+  "lecturers:read": "View lecturers",
+  "lecturers:write": "Edit lecturer profiles",
+  "methods:read": "View teaching/assessment methods",
+  "methods:write": "Add teaching/assessment methods",
+  "rubrics:read": "View rubrics",
+  "rubrics:write": "Create/edit rubrics",
+};
+
+const roleDefs: { slug: string; title: string; description: string; permissions: string[] }[] = [
+  {
+    slug: "admin",
+    title: "Admin",
+    description: "Full curriculum-admin access.",
+    permissions: [
+      "accounts:create",
+      "students:read",
+      "students:write",
+      "courses:read",
+      "courses:write",
+      "courses:manage",
+      "offerings:read",
+      "offerings:write",
+      "offerings:manage",
+      "lecturers:read",
+      "lecturers:write",
+      "methods:read",
+      "methods:write",
+      "rubrics:read",
+      "rubrics:write",
+    ],
+  },
+  {
+    slug: "lecturer",
+    title: "Lecturer",
+    description: "Reads the catalog and fills in the specification of assigned courses/offerings.",
+    permissions: [
+      "students:read",
+      "courses:read",
+      "courses:write",
+      "offerings:read",
+      "offerings:write",
+      "lecturers:read",
+      "methods:read",
+      "methods:write",
+      "rubrics:read",
+      "rubrics:write",
+    ],
+  },
+  {
+    slug: "student",
+    title: "Student",
+    description: "Read-only access to the catalog.",
+    permissions: [
+      "students:read",
+      "courses:read",
+      "offerings:read",
+      "lecturers:read",
+      "methods:read",
+      "rubrics:read",
+    ],
+  },
+];
+
 // Standard 4-point rating scale shared by the sample rubrics.
 const scale4 = [
   { label: "Excellent", points: 4 },
@@ -131,6 +211,25 @@ async function main() {
     await prisma.student.upsert({ where: { email: s.email }, update: s, create: s });
   }
 
+  for (const [slug, title] of Object.entries(permissionDefs)) {
+    await prisma.permission.upsert({ where: { slug }, update: { title }, create: { slug, title } });
+  }
+  for (const r of roleDefs) {
+    const role = await prisma.role.upsert({
+      where: { slug: r.slug },
+      update: { title: r.title, description: r.description },
+      create: { slug: r.slug, title: r.title, description: r.description },
+    });
+    for (const permSlug of r.permissions) {
+      const permission = await prisma.permission.findUniqueOrThrow({ where: { slug: permSlug } });
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+        update: {},
+        create: { roleId: role.id, permissionId: permission.id },
+      });
+    }
+  }
+
   for (const name of teachingMethods) {
     await prisma.teachingMethod.upsert({ where: { name }, update: {}, create: { name } });
   }
@@ -199,7 +298,8 @@ async function main() {
   console.log(
     `Seeded ${users.length} users, ${students.length} students, ${courses.length} courses, ` +
       `${teachingMethods.length} teaching + ${assessmentMethods.length} assessment methods, ` +
-      `${rubrics.length} rubrics, 1 offering.`,
+      `${rubrics.length} rubrics, 1 offering, ${roleDefs.length} roles, ` +
+      `${Object.keys(permissionDefs).length} permissions.`,
   );
 }
 
