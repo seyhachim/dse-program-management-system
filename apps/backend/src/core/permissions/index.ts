@@ -1,12 +1,13 @@
 import type { NextFunction, Request, Response } from "express";
 import type { Role } from "../auth/token.ts";
+import { prisma } from "../db/prisma.ts";
 
 /**
- * Role → permission map. Kept in the core (not per-plugin) so the whole
- * authorization surface is auditable in one place. Plugins declare which
- * permission a route needs; this map decides which roles hold it.
+ * Kept only as a rollback reference for issue #67's cutover — no longer read.
+ * The enforced source of truth is now the RolePermission cache below, built
+ * from the DB rows this map used to mirror.
  */
-const ROLE_PERMISSIONS: Record<Role, string[]> = {
+export const ROLE_PERMISSIONS_LEGACY: Record<Role, string[]> = {
   admin: [
     "accounts:create",
     "students:read",
@@ -24,13 +25,6 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "rubrics:read",
     "rubrics:write",
   ],
-  // Lecturers get exactly what their job needs: read the catalog, fill in the
-  // specification of the courses/offerings they're assigned to, and grow the
-  // methods vocabulary from the CLO (§14) form. They do NOT get "*:manage" (creating,
-  // deleting, or reassigning courses/offerings — a curriculum-admin action) or
-  // "lecturers:write" (editing other lecturers' profiles) or "accounts:create".
-  // Ownership of the specific course/offering is enforced in the route handlers,
-  // not just by holding the permission string.
   lecturer: [
     "students:read",
     "courses:read",
@@ -53,8 +47,31 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
   ],
 };
 
-export function roleHasPermission(role: Role, permission: string): boolean {
-  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+/**
+ * Role -> permission set, loaded once from Role/Permission/RolePermission
+ * (issue #67) and cached in memory for the life of the process. Built lazily on
+ * first use rather than at import time, so a cold DB connection can't block
+ * server startup. No invalidation: nothing mutates these tables at runtime yet
+ * (there's no admin UI to edit them), so the cache never goes stale in practice.
+ */
+let permissionCache: Promise<Record<string, Set<string>>> | undefined;
+
+function loadPermissionCache(): Promise<Record<string, Set<string>>> {
+  permissionCache ??= prisma.role
+    .findMany({ include: { rolePermissions: { include: { permission: true } } } })
+    .then((roles) => {
+      const cache: Record<string, Set<string>> = {};
+      for (const role of roles) {
+        cache[role.slug] = new Set(role.rolePermissions.map((rp) => rp.permission.slug));
+      }
+      return cache;
+    });
+  return permissionCache;
+}
+
+export async function roleHasPermission(role: Role, permission: string): Promise<boolean> {
+  const cache = await loadPermissionCache();
+  return cache[role]?.has(permission) ?? false;
 }
 
 /**
@@ -62,13 +79,13 @@ export function roleHasPermission(role: Role, permission: string): boolean {
  * ran first (so `req.user` is set); returns 403 when the role lacks the permission.
  */
 export function requirePermission(permission: string) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const user = req.user;
     if (!user) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    if (!roleHasPermission(user.role, permission)) {
+    if (!(await roleHasPermission(user.role, permission))) {
       res.status(403).json({ error: `Missing permission: ${permission}` });
       return;
     }

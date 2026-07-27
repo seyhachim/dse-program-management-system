@@ -54,13 +54,17 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
 
   // Prefer the stable auth uid; fall back to email so pre-existing seeded
   // profiles (created before they ever logged in) link on first login.
-  let user = await prisma.user.findUnique({ where: { authId } });
+  let user = await prisma.user.findUnique({ where: { authId }, include: { roleRef: true } });
   if (!user) {
-    const byEmail = await prisma.user.findUnique({ where: { email } });
+    const byEmail = await prisma.user.findUnique({ where: { email }, include: { roleRef: true } });
     if (byEmail) {
       user = byEmail.authId
         ? byEmail
-        : await prisma.user.update({ where: { id: byEmail.id }, data: { authId } });
+        : await prisma.user.update({
+            where: { id: byEmail.id },
+            data: { authId },
+            include: { roleRef: true },
+          });
     }
   }
 
@@ -68,5 +72,7 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
     throw new UnprovisionedAccountError("No account provisioned for this login");
   }
 
-  return { id: user.id, email: user.email, role: user.role as Role };
+  // roleId is the authorization source of truth (issue #67) — the User.role enum
+  // column is kept in sync but no longer read here.
+  return { id: user.id, email: user.email, role: user.roleRef.slug as Role };
 }

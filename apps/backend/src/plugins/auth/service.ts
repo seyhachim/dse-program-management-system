@@ -66,8 +66,19 @@ export const authService = {
 
     return prisma.user.upsert({
       where: { email: input.email },
-      update: { authId: data.user.id, name: input.name, role: input.role },
-      create: { authId: data.user.id, email: input.email, name: input.name, role: input.role },
+      update: {
+        authId: data.user.id,
+        name: input.name,
+        role: input.role,
+        roleRef: { connect: { slug: input.role } },
+      },
+      create: {
+        authId: data.user.id,
+        email: input.email,
+        name: input.name,
+        role: input.role,
+        roleRef: { connect: { slug: input.role } },
+      },
       select: accountSelect,
     });
   },
