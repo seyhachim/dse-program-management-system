@@ -19,6 +19,7 @@ export function CoursesClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -52,8 +53,14 @@ export function CoursesClient() {
   useEffect(() => {
     authApi
       .me()
-      .then((me) => setIsAdmin(me.role === "admin"))
-      .catch(() => setIsAdmin(false));
+      .then((me) => {
+        setIsAdmin(me.role === "admin");
+        setCurrentUserId(me.id);
+      })
+      .catch(() => {
+        setIsAdmin(false);
+        setCurrentUserId(null);
+      });
   }, []);
 
   const handleSubmit = async (values: CourseFormValues) => {
@@ -80,6 +87,22 @@ export function CoursesClient() {
       setError(err instanceof ApiError ? err.message : "Failed to delete course");
     }
   };
+
+  const lecturerColumn: DataTableColumn<CourseView> = {
+    key: "lecturer",
+    header: "Lecturer",
+    render: (c) =>
+      c.lecturer ? (
+        <StatusBadge tone="tournament" label={c.lecturer.name} icon={false} />
+      ) : (
+        <span className="text-muted-foreground">Unassigned</span>
+      ),
+  };
+
+  // A lecturer's list can include courses they merely teach an offering of, not
+  // just ones they own (courses/service.ts's ownerScopeFilter) — so the column
+  // is only redundant when every visible row is actually theirs.
+  const showLecturerColumn = isAdmin || rows.some((r) => r.lecturer?.id !== currentUserId);
 
   const columns: DataTableColumn<CourseView>[] = [
     { key: "code", header: "Code", render: (c) => <span className="font-medium">{c.code}</span> },
@@ -110,16 +133,7 @@ export function CoursesClient() {
           <span className="text-muted-foreground">—</span>
         ),
     },
-    {
-      key: "lecturer",
-      header: "Lecturer",
-      render: (c) =>
-        c.lecturer ? (
-          <StatusBadge tone="tournament" label={c.lecturer.name} icon={false} />
-        ) : (
-          <span className="text-muted-foreground">Unassigned</span>
-        ),
-    },
+    ...(showLecturerColumn ? [lecturerColumn] : []),
   ];
 
   return (
