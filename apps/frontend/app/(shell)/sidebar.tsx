@@ -40,7 +40,10 @@ export function AppSidebar() {
   const mainGroups = groups.filter((g) => g.label !== "footer");
 
   return (
-    <SidebarPrimitive collapsible="icon" className="border-r-0 bg-sidebar text-sidebar-foreground">
+    <SidebarPrimitive
+      collapsible="icon"
+      className="border-r-0 bg-sidebar text-sidebar-foreground"
+    >
       <SidebarHeader>
         <div className="flex h-10 items-center justify-between gap-2 px-1">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG mark, no Next Image optimization needed */}
@@ -73,7 +76,9 @@ export function AppSidebar() {
           mainGroups.map((group, i) => (
             <SidebarGroup key={group.label ?? `ungrouped-${i}`}>
               {group.label ? (
-                <SidebarGroupLabel className="text-sidebar-muted">{group.label}</SidebarGroupLabel>
+                <SidebarGroupLabel className="text-sidebar-muted">
+                  {group.label}
+                </SidebarGroupLabel>
               ) : null}
               <SidebarGroupContent>
                 <SidebarMenu>
@@ -83,10 +88,17 @@ export function AppSidebar() {
                     // jumps straight to its spec page instead of routing through the table.
                     if (route.path === "/courses") {
                       return (
-                        <CourseNavItem key={route.path} route={route} Icon={Icon} pathname={pathname} />
+                        <CourseNavItem
+                          key={route.path}
+                          route={route}
+                          Icon={Icon}
+                          pathname={pathname}
+                        />
                       );
                     }
-                    const active = pathname === route.path || pathname.startsWith(`${route.path}/`);
+                    const active =
+                      pathname === route.path ||
+                      pathname.startsWith(`${route.path}/`);
                     return (
                       <SidebarMenuItem key={route.path}>
                         <SidebarMenuButton
@@ -114,7 +126,9 @@ export function AppSidebar() {
           <SidebarMenu>
             {footerRoutes.map((route) => {
               const Icon = route.icon ? iconMap[route.icon] : undefined;
-              const active = pathname === route.path || pathname.startsWith(`${route.path}/`);
+              const active =
+                pathname === route.path ||
+                pathname.startsWith(`${route.path}/`);
               return (
                 <SidebarMenuItem key={route.path}>
                   <SidebarMenuButton
@@ -133,7 +147,7 @@ export function AppSidebar() {
           </SidebarMenu>
         ) : null}
         <p className="px-2 py-1 text-xs text-sidebar-muted group-data-[collapsible=icon]:hidden">
-          DSE Program Management
+          DSE Program Management System
         </p>
       </SidebarFooter>
     </SidebarPrimitive>
@@ -155,7 +169,8 @@ function CourseNavItem({
   Icon?: LucideIcon;
   pathname: string;
 }) {
-  const onCourseRoute = pathname === route.path || pathname.startsWith(`${route.path}/`);
+  const onCourseRoute =
+    pathname === route.path || pathname.startsWith(`${route.path}/`);
   const [open, setOpen] = useState(onCourseRoute);
   const [courses, setCourses] = useState<CourseView[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -187,7 +202,9 @@ function CourseNavItem({
         aria-label={open ? "Collapse courses" : "Expand courses"}
         aria-expanded={open}
       >
-        <ChevronRight className={`transition-transform ${open ? "rotate-90" : ""}`} />
+        <ChevronRight
+          className={`transition-transform ${open ? "rotate-90" : ""}`}
+        />
       </SidebarMenuAction>
 
       {open ? (
@@ -202,7 +219,10 @@ function CourseNavItem({
                 <SidebarMenuSubButton
                   isActive={pathname.startsWith(`/courses/${course.id}`)}
                   render={
-                    <Link href={`/courses/${course.id}/spec`} title={`${course.code} – ${course.title}`}>
+                    <Link
+                      href={`/courses/${course.id}/spec`}
+                      title={`${course.code} – ${course.title}`}
+                    >
                       <span>
                         {course.code} – {course.title}
                       </span>
@@ -213,7 +233,9 @@ function CourseNavItem({
             ))
           ) : (
             <SidebarMenuSubItem>
-              <span className="px-2 py-1 text-xs text-sidebar-muted">No courses yet</span>
+              <span className="px-2 py-1 text-xs text-sidebar-muted">
+                No courses yet
+              </span>
             </SidebarMenuSubItem>
           )}
         </SidebarMenuSub>
