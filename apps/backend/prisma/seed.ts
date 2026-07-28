@@ -212,13 +212,8 @@ const rubrics = [
 ];
 
 async function main() {
-  for (const u of users) {
-    await prisma.user.upsert({ where: { email: u.email }, update: u, create: u });
-  }
-  for (const s of students) {
-    await prisma.student.upsert({ where: { email: s.email }, update: s, create: s });
-  }
-
+  // Roles/permissions must exist before users are upserted below — User.roleId
+  // (issue #67) is a required FK connected by role slug.
   for (const slug of permissionSlugs) {
     const title = permissionTitles[slug] ?? slug;
     await prisma.permission.upsert({ where: { slug }, update: { title }, create: { slug, title } });
@@ -243,6 +238,18 @@ async function main() {
     await prisma.rolePermission.deleteMany({
       where: { roleId: role.id, permission: { slug: { notIn: r.permissions } } },
     });
+  }
+
+  for (const u of users) {
+    const roleRef = { connect: { slug: u.role } };
+    await prisma.user.upsert({
+      where: { email: u.email },
+      update: { ...u, roleRef },
+      create: { ...u, roleRef },
+    });
+  }
+  for (const s of students) {
+    await prisma.student.upsert({ where: { email: s.email }, update: s, create: s });
   }
 
   for (const name of teachingMethods) {

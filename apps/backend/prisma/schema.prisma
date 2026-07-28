@@ -63,7 +63,13 @@ model User {
   authId        String?  @unique
   email         String   @unique
   name          String
+  // Expand/contract (issue #67): `role` is the enum column, still present but no
+  // longer read by app code — `roleId`/`roleRef` is the new source of truth. Kept
+  // around (not dropped) so a mid-deploy state can't break either version of the
+  // code; dropping it is a separate follow-up once this has run in production.
   role          UserRole @default(student)
+  roleId        String
+  roleRef       Role     @relation(fields: [roleId], references: [id])
   title         String?
   qualification String?
   phone         String?
@@ -74,14 +80,11 @@ model User {
   rubricsOwned Rubric[]   @relation("RubricOwner")
 }
 
-/// Normalized role/permission model (issue #65, phase 1 — schema only). Not yet
-/// wired to User.role or requirePermission: authorization still runs entirely on
-/// UserRole + the hardcoded ROLE_PERMISSIONS map in core/permissions/index.ts.
-/// These tables exist so seed data can mirror that map as DB rows ahead of the
-/// follow-up that migrates User.role -> roleId and makes this the enforced
-/// source of truth. `slug` values match UserRole's values / the permission
-/// strings requirePermission() already checks (e.g. "courses:write"), so the
-/// eventual cutover is a lookup swap, not a renumbering.
+/// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
+/// additively; phase 2 (#67) wires `User.roleId` to `Role` and switches
+/// `requirePermission` to read `RolePermission` instead of the hardcoded
+/// ROLE_PERMISSIONS map. `slug` values match UserRole's values / the permission
+/// strings requirePermission() already checks (e.g. "courses:write").
 model Role {
   id          String   @id @default(uuid())
   slug        String   @unique
@@ -91,6 +94,7 @@ model Role {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  users           User[]
   rolePermissions RolePermission[]
 }
 

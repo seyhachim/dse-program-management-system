@@ -54,7 +54,7 @@ export const lecturerService = {
 
   create(input: CreateLecturerInput) {
     return prisma.user.create({
-      data: { ...input, role: "lecturer" },
+      data: { ...input, role: "lecturer", roleRef: { connect: { slug: "lecturer" } } },
       select: lecturerSelect,
     });
   },
