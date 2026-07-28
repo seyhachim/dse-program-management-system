@@ -8,7 +8,6 @@ import { DataTable, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import { authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { CourseForm, type CourseFormValues } from "./course-form";
 
 export function CoursesClient() {
   const router = useRouter();
@@ -18,9 +17,6 @@ export function CoursesClient() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<CourseView | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,21 +43,6 @@ export function CoursesClient() {
       .then((me) => setIsAdmin(me.role === "admin"))
       .catch(() => setIsAdmin(false));
   }, []);
-
-  const handleSubmit = async (values: CourseFormValues) => {
-    setSubmitting(true);
-    try {
-      if (editing) await coursesApi.update(editing.id, values);
-      else await coursesApi.create(values);
-      setFormOpen(false);
-      setEditing(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to save course");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = async (course: CourseView) => {
     if (!confirm(`Delete ${course.code}?`)) return;
@@ -111,14 +92,7 @@ export function CoursesClient() {
         onSearchChange={setSearch}
         searchPlaceholder="Search courses…"
         addLabel={isAdmin ? "Add Course" : undefined}
-        onAdd={
-          isAdmin
-            ? () => {
-                setEditing(null);
-                setFormOpen(true);
-              }
-            : undefined
-        }
+        onAdd={isAdmin ? () => router.push("/courses/new") : undefined}
       />
 
       {error ? (
@@ -140,30 +114,12 @@ export function CoursesClient() {
             onClick: (c) => router.push(`/courses/${c.id}/spec`),
           },
         ]}
-        onEdit={
-          isAdmin
-            ? (c) => {
-                setEditing(c);
-                setFormOpen(true);
-              }
-            : undefined
-        }
+        onEdit={isAdmin ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}
         onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
         emptyMessage={
           isAdmin ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
         }
-      />
-
-      <CourseForm
-        open={formOpen}
-        onOpenChange={(o) => {
-          setFormOpen(o);
-          if (!o) setEditing(null);
-        }}
-        editing={editing}
-        onSubmit={handleSubmit}
-        submitting={submitting}
       />
     </div>
   );
