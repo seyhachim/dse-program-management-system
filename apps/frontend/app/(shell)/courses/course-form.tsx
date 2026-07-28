@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   COURSE_TYPES,
   CreateCourseInput,
   courseTypeLabel,
   type CourseType,
-  type Lecturer,
 } from "@dse-pms/shared-types";
 import {
   Button,
@@ -31,7 +30,6 @@ export type CourseFormValues = {
   code: string;
   title: string;
   description?: string;
-  lecturerId?: string | null;
   // Syllabus Course Information — §4 credits, §5 prerequisites, §11 type.
   credits?: number | null;
   prerequisites?: string;
@@ -43,16 +41,13 @@ interface CourseFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing?: CourseView | null;
-  lecturers: Lecturer[];
   onSubmit: (values: CourseFormValues) => Promise<void>;
   submitting?: boolean;
 }
 
-const UNASSIGNED = "";
 // The Select item value can't be "" (that's reserved for "nothing selected"),
-// so optional/clearable fields use these sentinels and map back to "" at the edges.
+// so optional/clearable fields use this sentinel and map back to "" at the edges.
 const NOT_SET = "__not_set__";
-const UNASSIGNED_SENTINEL = "__unassigned__";
 
 // base-ui's <Select.Value> renders the raw value unless the Root gets an `items`
 // map (value -> label); without it the trigger would show the enum/lecturer id.
@@ -65,19 +60,17 @@ export function CourseForm({
   open,
   onOpenChange,
   editing,
-  lecturers,
   onSubmit,
   submitting,
 }: CourseFormProps) {
   const {
     register,
-    control,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<CourseFormValues>({
     resolver: zodResolver(CreateCourseInput),
-    defaultValues: { code: "", title: "", description: "", lecturerId: UNASSIGNED, prerequisites: "" },
+    defaultValues: { code: "", title: "", description: "", prerequisites: "" },
   });
 
   // Credits (§4) and course type (§11) live in local state so an empty choice
@@ -94,10 +87,9 @@ export function CourseForm({
               code: editing.code,
               title: editing.title,
               description: editing.description ?? "",
-              lecturerId: editing.lecturerId ?? UNASSIGNED,
               prerequisites: editing.prerequisites ?? "",
             }
-          : { code: "", title: "", description: "", lecturerId: UNASSIGNED, prerequisites: "" },
+          : { code: "", title: "", description: "", prerequisites: "" },
       );
       setCredits(editing?.credits != null ? String(editing.credits) : "");
       setCourseType(editing?.courseType ?? "");
@@ -105,27 +97,21 @@ export function CourseForm({
     }
   }, [open, editing, reset]);
 
-  const lecturerItems: Record<string, string> = {
-    [UNASSIGNED_SENTINEL]: "— Unassigned —",
-    ...Object.fromEntries(lecturers.map((l) => [l.id, l.name])),
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? "Edit course" : "Add course"}</DialogTitle>
           <DialogDescription>
-            {editing ? "Update course details and assigned lecturer." : "Create a new course."}
+            {editing ? "Update course details." : "Create a new course."}
           </DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={handleSubmit(async (values) => {
-            // Normalise "" (Unassigned / not set) to null for the API.
+            // Normalise "" (not set) to null for the API.
             await onSubmit({
               ...values,
-              lecturerId: values.lecturerId || null,
               prerequisites: values.prerequisites?.trim() || undefined,
               credits: credits ? Number(credits) : null,
               courseType: (courseType || null) as CourseType | null,
@@ -189,32 +175,6 @@ export function CourseForm({
               {...register("prerequisites")}
             />
           </Field>
-          <Field label="Lecturer" error={errors.lecturerId?.message}>
-            <Controller
-              control={control}
-              name="lecturerId"
-              render={({ field }) => (
-                <Select
-                  items={lecturerItems}
-                  value={field.value || UNASSIGNED_SENTINEL}
-                  onValueChange={(v) => field.onChange(v === UNASSIGNED_SENTINEL ? UNASSIGNED : v)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNASSIGNED_SENTINEL}>— Unassigned —</SelectItem>
-                    {lecturers.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText } from "lucide-react";
-import type { Lecturer } from "@dse-pms/shared-types";
 import { courseTypeLabel } from "@dse-pms/shared-types";
 import { DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
-import { lecturersApi } from "@/lib/lecturers";
 import { authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { CourseForm, type CourseFormValues } from "./course-form";
@@ -15,7 +13,6 @@ import { CourseForm, type CourseFormValues } from "./course-form";
 export function CoursesClient() {
   const router = useRouter();
   const [rows, setRows] = useState<CourseView[]>([]);
-  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -42,11 +39,6 @@ export function CoursesClient() {
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
   }, [load]);
-
-  // Lecturers for the assign dropdown (loaded once).
-  useEffect(() => {
-    lecturersApi.list().then(setLecturers).catch(() => setLecturers([]));
-  }, []);
 
   // Creating/editing/deleting a course record is admin-only (courses:manage);
   // lecturers only fill in the spec of their assigned courses via "Syllabus".
@@ -194,7 +186,6 @@ export function CoursesClient() {
           if (!o) setEditing(null);
         }}
         editing={editing}
-        lecturers={lecturers}
         onSubmit={handleSubmit}
         submitting={submitting}
       />
