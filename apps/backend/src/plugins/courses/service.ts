@@ -44,14 +44,14 @@ async function withLecturer<T extends { lecturerId: string | null }>(course: T) 
   return { ...course, lecturer };
 }
 
-/** Courses a lecturer owns or teaches an offering of — the non-admin list/dashboard scope. */
+/**
+ * Courses a lecturer was actually offered — the non-admin list/dashboard scope.
+ * Deliberately Offering-based only: `Course.lecturerId` is just the course
+ * record's default/on-file lecturer and does not by itself grant visibility —
+ * a lecturer must be assigned to a real Offering of the course to see it.
+ */
 async function ownerScopeFilter(lecturerScope: string) {
-  return {
-    OR: [
-      { lecturerId: lecturerScope },
-      { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } },
-    ],
-  };
+  return { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } };
 }
 
 // Sections that can actually be saved/marked complete — excludes "programme",
@@ -64,8 +64,8 @@ export const courseService = {
   /**
    * List courses. When `lecturerScope` is given, results are scoped to that
    * lecturer — the router passes it for non-admin callers. Scope = courses they
-   * own (Course.lecturerId) OR teach an offering of, so teaching an offering of a
-   * course surfaces the course in Course Management too.
+   * were offered (assigned to teach an Offering of), not merely on file as the
+   * course's default lecturer.
    */
   async list(query: ListCoursesQuery, lecturerScope?: string) {
     const { search } = query;
@@ -112,16 +112,11 @@ export const courseService = {
   },
 
   /**
-   * May the given lecturer see/edit this course? True when they own it or teach
-   * an offering of it. Backs the router's per-course access guard.
+   * May the given lecturer see/edit this course? True only when they were
+   * offered it (assigned to teach an Offering of it) — backs the router's
+   * per-course access guard.
    */
   async lecturerCanAccess(courseId: string, lecturerId: string): Promise<boolean> {
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
-      select: { lecturerId: true },
-    });
-    if (!course) return false;
-    if (course.lecturerId === lecturerId) return true;
     return (await offerings().courseIdsForLecturer(lecturerId)).includes(courseId);
   },
 

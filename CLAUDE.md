@@ -96,7 +96,20 @@ login with no provisioned `User` row is a 403 (`UnprovisionedAccountError`).
 strings) and the `requirePermission(...)` guard factory — plugins declare which
 permission a route needs, this map is the one auditable place deciding which roles hold
 it. Every plugin router calls `requireAuth` then `requirePermission(...)` per route
-(`"<id>:read"|"<id>:write"`, plus the admin-only `"accounts:create"`).
+(`"<id>:read"|"<id>:write"`, plus the admin-only `"accounts:create"`). `requirePermission`
+only checks that coarse permission string; row-level ownership is a separate check layered
+on top in the plugins that need it — e.g. `courses/router.ts`'s `ensureCourseAccess` and
+the `ownerScope` passed into `courseService.list`/`listSpecProgress` (mirrored in
+`offerings/router.ts`) let admins see/act on every course or offering while a lecturer only
+sees courses they were actually offered — assigned to teach an `Offering` of (any
+`Offering.lecturerId`). `Course.lecturerId` is just the course record's on-file default
+lecturer and does not by itself grant visibility.
+
+A normalized `Role`/`Permission`/`RolePermission` schema also exists (`schema.prisma`),
+seeded by `prisma/seed.ts` to mirror `ROLE_PERMISSIONS` as DB rows — but it's additive
+only so far (issue #65 phase 1): `User.role` (the `UserRole` enum) and the hardcoded map
+above remain the actual enforcement path until a follow-up phase wires `User.roleId` to
+it and switches `requirePermission` to read from the DB instead.
 
 **Account provisioning** is the `auth` plugin. `GET /api/auth/me` returns the resolved
 caller; `POST /api/auth/accounts` (admin-only, `accounts:create`) creates a lecturer
