@@ -71,6 +71,25 @@ export const authService = {
       select: accountSelect,
     });
   },
+
+  /**
+   * Called via the registry when another plugin deletes a User (e.g. lecturers)
+   * so the linked Supabase Auth identity doesn't outlive the app row — without
+   * this, the login stays active (harmless — resolveSupabaseUser then 403s as
+   * unprovisioned) and permanently blocks re-inviting that email, since
+   * `inviteUserByEmail` rejects an address already registered in Supabase.
+   * A `null` authId (dev-created rows, never provisioned) is a no-op, so this
+   * is safe to call unconditionally and never requires Supabase env locally.
+   */
+  async deleteAccountForUser(authId: string | null): Promise<void> {
+    if (!authId) return;
+    const admin = getAdminClient();
+    const { error } = await admin.auth.admin.deleteUser(authId);
+    // Already gone is success, not failure — keeps this idempotent/retry-safe.
+    if (error && error.status !== 404) {
+      throw new ProvisioningError(error.message);
+    }
+  },
 };
 
 export type AuthService = typeof authService;

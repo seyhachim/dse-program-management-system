@@ -1,10 +1,12 @@
 import type {
+  AuthServiceContract,
   CreateLecturerInput,
   LecturersServiceContract,
   ListLecturersQuery,
   UpdateLecturerInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { registry } from "../../core/plugins/registry.ts";
 
 /**
  * Lecturers = Users with role "lecturer". `list`/`getById` are the public
@@ -65,9 +67,15 @@ export const lecturerService = {
   },
 
   async remove(id: string) {
-    const existing = await prisma.user.findFirst({ where: { id, role: "lecturer" }, select: { id: true } });
+    const existing = await prisma.user.findFirst({
+      where: { id, role: "lecturer" },
+      select: { id: true, authId: true },
+    });
     if (!existing) throw new NotFoundError("Lecturer not found");
     // Course/Offering.lecturerId is ON DELETE SET NULL, so this won't orphan rows.
+    // Delete the Supabase Auth identity (if any) before the app row, so a failure
+    // here aborts the whole delete instead of leaving an orphaned login behind.
+    await registry.get<AuthServiceContract>("auth").service.deleteAccountForUser(existing.authId);
     return prisma.user.delete({ where: { id } });
   },
 } satisfies LecturersServiceContract & Record<string, unknown>;

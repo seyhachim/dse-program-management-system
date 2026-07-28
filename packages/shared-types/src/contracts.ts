@@ -58,3 +58,12 @@ export interface OfferingsServiceContract {
    */
   courseIdsForLecturer(lecturerId: string): Promise<string[]>;
 }
+
+export interface AuthServiceContract {
+  /**
+   * Remove the Supabase Auth identity linked to a User, so deleting an app row
+   * (e.g. a lecturer) doesn't leave an orphaned login behind — a `null` authId
+   * (dev-created rows that never went through account provisioning) is a no-op.
+   */
+  deleteAccountForUser(authId: string | null): Promise<void>;
+}
