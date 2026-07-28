@@ -1,5 +1,6 @@
 import {
   SPEC_SECTION_SCHEMAS,
+  type CourseInfoInput,
   type CourseInfoSection,
   type CourseSpecProgress,
   type CoursesServiceContract,
@@ -153,9 +154,11 @@ export const courseService = {
   /* ---------------------------------------------------- Course Specification */
 
   /**
-   * Return the full spec document for a course. If the Course Information section
-   * hasn't been saved yet, it is pre-filled (in memory, not persisted) from the
-   * existing course + lecturer + latest offering so the wizard opens populated.
+   * Return the full spec document for a course. Course Information (§1–13) is
+   * always recomputed live from the current course + assigned lecturer + latest
+   * offering — never read back from storage — so reassigning a lecturer or
+   * editing the course elsewhere is reflected immediately instead of showing a
+   * stale snapshot from whenever the section was last saved.
    */
   async getSpec(courseId: string) {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
@@ -165,48 +168,47 @@ export const courseService = {
     const data = { ...((spec?.data as Record<string, unknown>) ?? {}) };
     const status = { ...((spec?.status as Record<string, string>) ?? {}) };
 
-    if (!data.courseInfo) {
-      data.courseInfo = await buildCourseInfoPrefill(course);
-    }
+    data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status };
   },
 
   /**
-   * Upsert one section of the spec, marking it complete. For the Course Information
-   * section, the overlapping scalars are mirrored back onto the Course row so the
-   * courses list stays accurate.
+   * Upsert one section of the spec, marking it complete. For the Course
+   * Information section, `values` is already restricted by `CourseInfoInput` to
+   * Pre-requisites/Description — every other §1–13 field is admin/assignment-
+   * derived (see `getSpec`) and isn't accepted here, so it's mirrored onto the
+   * Course row rather than stored as a section snapshot; nothing is written to
+   * `data.courseInfo`, since `getSpec` recomputes it fresh on every read.
    */
   async saveSection(courseId: string, sectionId: SpecSectionId, values: unknown) {
-    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    let course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
     if (sectionId === "courseInfo") {
-      const info = values as CourseInfoSection;
-      await prisma.course.update({
+      const info = values as CourseInfoInput;
+      course = await prisma.course.update({
         where: { id: courseId },
         data: {
-          title: info.courseTitle,
-          code: info.courseCode,
-          description: info.description || null,
-          credits: info.credits ?? null,
           prerequisites: info.prerequisites || null,
-          courseType: info.courseType ?? null,
+          description: info.description || null,
         },
       });
     }
 
     const existing = await prisma.courseSpec.findUnique({ where: { courseId } });
-    const data = { ...((existing?.data as Record<string, unknown>) ?? {}), [sectionId]: values };
+    const existingData = { ...((existing?.data as Record<string, unknown>) ?? {}) };
+    if (sectionId === "courseInfo") delete existingData.courseInfo;
+    else existingData[sectionId] = values;
     const status = { ...((existing?.status as Record<string, string>) ?? {}), [sectionId]: "complete" };
 
-    const jsonData = data as Prisma.InputJsonValue;
+    const jsonData = existingData as Prisma.InputJsonValue;
     const jsonStatus = status as Prisma.InputJsonValue;
     await prisma.courseSpec.upsert({
       where: { courseId },
       create: { courseId, data: jsonData, status: jsonStatus },
       update: { data: jsonData, status: jsonStatus },
     });
-    return { courseId, data, status };
+    return { courseId, data: { ...existingData, courseInfo: await buildCourseInfoPrefill(course) }, status };
   },
 } satisfies CoursesServiceContract & Record<string, unknown>;
 

@@ -224,31 +224,48 @@ export type FocusCode = z.infer<typeof FocusCode>;
 /* -------------------------------------------- §1–13 Course Information */
 
 /**
- * Course Information (§1–13). Programme Title (§1) is fixed config and not stored
- * here. Instructor block (§6–9) is captured as a snapshot on the spec (a lecturer
- * fills the form as a document); the overlapping course scalars (§2–5, §11, §13)
- * are mirrored back onto the Course row on save.
+ * Course Information (§1–13) as returned by `GET /:id/spec` — a read model, not
+ * stored verbatim. Programme Title (§1) is fixed config; the administrative
+ * scalars (§2–4, §11) come live from the Course row, the instructor block (§6–9)
+ * from the assigned lecturer's profile, and availability/other-lecturers (§10,
+ * §12) from the course's latest Offering — all recomputed on every read so
+ * reassigning a lecturer or editing the course is reflected immediately. Only
+ * Pre-requisites (§5) and Course Description (§14) are actually editable; see
+ * `CourseInfoInput`, which is what `PUT /:id/spec/courseInfo` accepts.
  */
 export const CourseInfoSection = z.object({
-  // §2 / §3 / §4 / §5 / §11 / §13 — mirrored to Course.
+  // §2 / §3 / §4 / §11 — read live from Course; edited via the Course entity.
   courseTitle: z.string().min(1, "Course title is required"),
   courseCode: z.string().min(1, "Course code is required"),
   credits: z.coerce.number().int().min(1).max(30).nullable().optional(),
-  prerequisites: z.string().optional(),
   courseType: CourseTypeSchema.nullable().optional(),
+  // §5 / §14 — the only fields a save actually persists.
+  prerequisites: z.string().optional(),
   description: z.string().optional(),
-  // §6–9 instructor snapshot.
+  // §6–9 — read live from the assigned lecturer's profile.
   instructorName: z.string().optional(),
   qualification: z.string().optional(),
   email: z.string().email("A valid email is required").or(z.literal("")).optional(),
   telephone: z.string().optional(),
-  // §10 other lecturers (free text).
+  // §10 — read live from the latest Offering; edited via the Offering entity.
   otherLecturers: z.string().optional(),
-  // §12 availability.
+  // §12 — read live from the latest Offering; edited via the Offering entity.
   semester: SemesterSchema.nullable().optional(),
   programmeYear: z.coerce.number().int().min(1).max(10).nullable().optional(),
 });
 export type CourseInfoSection = z.infer<typeof CourseInfoSection>;
+
+/**
+ * What `PUT /:id/spec/courseInfo` actually accepts. Every other Course
+ * Information field is admin/assignment-derived (see `CourseInfoSection`) and
+ * must not be settable through the spec wizard — by a lecturer or an admin —
+ * so the input schema, not just the form UI, is what enforces that boundary.
+ */
+export const CourseInfoInput = z.object({
+  prerequisites: z.string().optional(),
+  description: z.string().optional(),
+});
+export type CourseInfoInput = z.infer<typeof CourseInfoInput>;
 
 /* --------------------------------------- §14 Course Learning Outcomes */
 
@@ -505,7 +522,7 @@ export function componentsMapped(
 
 /** Zod schema for a given section id. Extend as later phases add sections. */
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
-  courseInfo: CourseInfoSection,
+  courseInfo: CourseInfoInput,
   clos: ClosSection,
   slt: WeeklyPlanSection,
   assessmentPlan: AssessmentPlanSection,
