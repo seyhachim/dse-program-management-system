@@ -10,7 +10,7 @@ PR here closes one (`Closes #N` in the PR body), and branches follow a `<type>/<
 convention (`feat/supabase-auth`, `docs/claude-md`, `fix/...`). This skill just makes
 that loop explicit and repeatable instead of ad hoc.
 
-The loop has five stages. Don't skip stages, but use judgment on *scope* — a two-line
+The loop has five stages. Don't skip stages, but use judgment on _scope_ — a two-line
 typo fix the user dictated directly doesn't need this ceremony; a feature, bug, or
 anything the user describes as a task to pick up does.
 
@@ -19,14 +19,14 @@ Progress / Done) that should track which stage it's actually in — set explicit
 at each transition below rather than assumed. Reference IDs (stable — same project
 every time):
 
-| | value |
-|---|---|
-| Project number | `4` (owner `thymadona`) |
-| Project ID | `PVT_kwHOBODUqM4BeBd4` |
-| Status field ID | `PVTSSF_lAHOBODUqM4BeBd4zhYetxE` |
-| Todo option ID | `f75ad846` |
-| In Progress option ID | `47fc9ee4` |
-| Done option ID | `98236657` |
+|                       | value                            |
+| --------------------- | -------------------------------- |
+| Project number        | `4` (owner `thymadona`)          |
+| Project ID            | `PVT_kwHOBODUqM4BeBd4`           |
+| Status field ID       | `PVTSSF_lAHOBODUqM4BeBd4zhYetxE` |
+| Todo option ID        | `f75ad846`                       |
+| In Progress option ID | `47fc9ee4`                       |
+| Done option ID        | `98236657`                       |
 
 ## 1. Find or open the issue
 
