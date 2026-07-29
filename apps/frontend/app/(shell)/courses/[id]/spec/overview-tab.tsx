@@ -101,6 +101,16 @@ export function OverviewTab({
                 value={courseInfo.prerequisites}
                 full
               />
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-muted-foreground">
+                  Course Description / Synopsis
+                </dt>
+                <dd className="whitespace-pre-wrap text-foreground">
+                  {courseInfo.description || (
+                    <span className="text-muted-foreground">Not provided</span>
+                  )}
+                </dd>
+              </div>
             </dl>
           ) : (
             <EmptyHint
