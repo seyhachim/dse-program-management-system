@@ -1,5 +1,5 @@
 import {
-  SPEC_SECTION_SCHEMAS,
+  COMPLETABLE_SPEC_SECTIONS,
   type CourseInfoInput,
   type CourseInfoSection,
   type CourseSpecProgress,
@@ -54,11 +54,7 @@ async function ownerScopeFilter(lecturerScope: string) {
   return { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } };
 }
 
-// Sections that can actually be saved/marked complete — excludes "programme",
-// which is a read-only Part 1 reference page with no PUT path (SPEC_SECTIONS
-// lists it as "ready", but it has no entry here, so it would otherwise inflate
-// the completion denominator by one section a course can never complete).
-const COMPLETABLE_SECTION_IDS = Object.keys(SPEC_SECTION_SCHEMAS) as SpecSectionId[];
+const COMPLETABLE_SECTION_IDS = COMPLETABLE_SPEC_SECTIONS.map((s) => s.id);
 
 export const courseService = {
   /**

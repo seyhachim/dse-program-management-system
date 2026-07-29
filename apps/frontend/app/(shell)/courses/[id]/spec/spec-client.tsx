@@ -68,6 +68,7 @@ import {
   type MappingForm,
 } from "./mapping-model";
 import { OverviewTab } from "./overview-tab";
+import { CompletionSummary } from "./completion-summary";
 
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId = "overview" | "documentPreview" | SpecSectionId;
@@ -252,6 +253,21 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
   const canSaveActive = activeTab === "slt" || activeTab === "mapping";
 
+  // Course Information (courseInfo) has no tab of its own — it's edited via the
+  // dialog opened from the Overview tab — so "Continue Editing" needs a special
+  // case to land there and open it, rather than just switching tabs like the rest.
+  const goToSection = useCallback(
+    (sectionId: SpecSectionId) => {
+      if (sectionId === "courseInfo") {
+        setActiveTab("overview");
+        setCourseInfoDialogOpen(true);
+      } else {
+        setActiveTab(sectionId);
+      }
+    },
+    [setActiveTab],
+  );
+
   const breadcrumbLabel = course
     ? `${course.code} – ${course.title}`
     : "Course Specification";
@@ -299,6 +315,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
           {error}
         </div>
       ) : null}
+
+      {loading ? null : (
+        <CompletionSummary status={status} onContinue={goToSection} />
+      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
