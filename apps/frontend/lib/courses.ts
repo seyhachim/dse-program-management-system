@@ -7,8 +7,8 @@ import type {
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
-/** Course as returned by the API — lecturer joined via the registry. */
-export type CourseView = Course & { lecturer: Lecturer | null };
+/** Course as returned by the API — lecturer/coLecturers joined via the registry. */
+export type CourseView = Course & { lecturer: Lecturer | null; coLecturers: Lecturer[] };
 
 export const coursesApi = {
   list(search?: string): Promise<CourseView[]> {

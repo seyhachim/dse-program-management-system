@@ -276,6 +276,19 @@ async function main() {
     });
   }
 
+  // One co-lecturer (issue #73): CS101's primary lecturer is lecturer@dse.dev;
+  // add hopper.lecturer@dse.dev as a co-lecturer so visibility/UI can be checked
+  // by logging in as either.
+  const cs101ForCoLecturer = await prisma.course.findUnique({ where: { code: "CS101" } });
+  const coLecturer = await prisma.user.findUnique({ where: { email: "hopper.lecturer@dse.dev" } });
+  if (cs101ForCoLecturer && coLecturer) {
+    await prisma.courseCoLecturer.upsert({
+      where: { courseId_lecturerId: { courseId: cs101ForCoLecturer.id, lecturerId: coLecturer.id } },
+      update: {},
+      create: { courseId: cs101ForCoLecturer.id, lecturerId: coLecturer.id },
+    });
+  }
+
   // Sample rubrics owned by the seed lecturer. Name isn't unique, so guard on
   // (name, ownerId) to keep the seed idempotent.
   const rubricOwner = await prisma.user.findUnique({ where: { email: "lecturer@dse.dev" } });

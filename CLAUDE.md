@@ -101,9 +101,11 @@ only checks that coarse permission string; row-level ownership is a separate che
 on top in the plugins that need it — e.g. `courses/router.ts`'s `ensureCourseAccess` and
 the `ownerScope` passed into `courseService.list`/`listSpecProgress` (mirrored in
 `offerings/router.ts`) let admins see/act on every course or offering while a lecturer only
-sees courses they were actually offered — assigned to teach an `Offering` of (any
-`Offering.lecturerId`). `Course.lecturerId` is just the course record's on-file default
-lecturer and does not by itself grant visibility.
+sees courses they're actually assigned to (`courseService`'s `ownerScopeFilter`): assigned
+to teach an `Offering` of it (any `Offering.lecturerId`), on file as its `Course.lecturerId`
+primary lecturer, or an assigned `CourseCoLecturer` (issue #73) — any of the three grants
+both read and write (`ensureCourseAccess` gates spec saves too). `Offering.lecturerId` is a
+separate per-term assignment from `Course`'s primary/co-lecturers and isn't affected by them.
 
 A normalized `Role`/`Permission`/`RolePermission` schema also exists (`schema.prisma`),
 seeded by `prisma/seed.ts` to mirror `ROLE_PERMISSIONS` as DB rows — but it's additive

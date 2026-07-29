@@ -72,9 +72,11 @@ export const lecturerService = {
       select: { id: true, authId: true },
     });
     if (!existing) throw new NotFoundError("Lecturer not found");
-    // Course/Offering.lecturerId is ON DELETE SET NULL, so this won't orphan rows.
-    // Delete the Supabase Auth identity (if any) before the app row, so a failure
-    // here aborts the whole delete instead of leaving an orphaned login behind.
+    // Course/Offering.lecturerId is ON DELETE SET NULL, so this won't orphan rows;
+    // CourseCoLecturer rows for this lecturer cascade-delete instead, since they're
+    // pure link rows with no data of their own to preserve. Delete the Supabase
+    // Auth identity (if any) before the app row, so a failure here aborts the
+    // whole delete instead of leaving an orphaned login behind.
     await registry.get<AuthServiceContract>("auth").service.deleteAccountForUser(existing.authId);
     return prisma.user.delete({ where: { id } });
   },
