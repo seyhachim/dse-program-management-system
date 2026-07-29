@@ -75,9 +75,10 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed   Course[]   @relation("CourseLecturer")
-  offeringsLed Offering[] @relation("OfferingLecturer")
-  rubricsOwned Rubric[]   @relation("RubricOwner")
+  coursesLed    Course[]           @relation("CourseLecturer")
+  offeringsLed  Offering[]         @relation("OfferingLecturer")
+  rubricsOwned  Rubric[]           @relation("RubricOwner")
+  coLecturerOf  CourseCoLecturer[] @relation("CourseCoLecturer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -156,8 +157,25 @@ model Course {
   totalSltHours Int?
   createdAt   DateTime @default(now())
 
-  offerings Offering[]
-  spec      CourseSpec?
+  offerings   Offering[]
+  spec        CourseSpec?
+  coLecturers CourseCoLecturer[]
+}
+
+/// Join table (issue #73): co-lecturers are existing lecturer Users assigned to a
+/// course alongside its primary `Course.lecturerId`, distinct from both that field
+/// (the on-file default lecturer) and `Offering.otherLecturers` (per-term free
+/// text) — neither of those is touched by this table. Cascades on either side
+/// since a row here is a pure link with no data of its own to preserve.
+model CourseCoLecturer {
+  courseId   String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lecturerId String
+  lecturer   User     @relation("CourseCoLecturer", fields: [lecturerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([courseId, lecturerId])
+  @@index([lecturerId])
 }
 
 /// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a

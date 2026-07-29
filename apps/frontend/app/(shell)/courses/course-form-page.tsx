@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateCourseInput, type CourseType } from "@dse-pms/shared-types";
+import { CreateCourseInput, type CourseType, type Lecturer } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -18,6 +18,7 @@ import {
 import { Topbar } from "../topbar";
 import { ApiError } from "@/lib/api";
 import { coursesApi } from "@/lib/courses";
+import { lecturersApi } from "@/lib/lecturers";
 import { CourseFormFields, type CourseFormValues } from "./course-form-fields";
 
 const BACK_HREF = "/courses";
@@ -26,6 +27,8 @@ const emptyDefaults: CourseFormValues = {
   code: "",
   title: "",
   description: "",
+  lecturerId: null,
+  coLecturerIds: [],
   prerequisites: "",
 };
 
@@ -33,6 +36,7 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
   const router = useRouter();
   const editing = courseId !== null;
 
+  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +47,7 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
   const [totalSltHours, setTotalSltHours] = useState<string>("");
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -51,25 +56,35 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
     resolver: zodResolver(CreateCourseInput),
     defaultValues: emptyDefaults,
   });
+  const lecturerId = useWatch({ control, name: "lecturerId" }) ?? null;
 
   useEffect(() => {
-    if (!courseId) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const course = await coursesApi.get(courseId);
+        const [lecturerList, course] = await Promise.all([
+          lecturersApi.list(),
+          courseId ? coursesApi.get(courseId) : Promise.resolve(null),
+        ]);
         if (cancelled) return;
-        reset({
-          code: course.code,
-          title: course.title,
-          description: course.description ?? "",
-          prerequisites: course.prerequisites ?? "",
-        });
-        setCredits(course.credits != null ? String(course.credits) : "");
-        setCourseType(course.courseType ?? "");
-        setTotalSltHours(course.totalSltHours != null ? String(course.totalSltHours) : "");
+        setLecturers(lecturerList);
+        if (courseId && !course) {
+          setNotFound(true);
+        } else if (course) {
+          reset({
+            code: course.code,
+            title: course.title,
+            description: course.description ?? "",
+            lecturerId: course.lecturer?.id ?? null,
+            coLecturerIds: course.coLecturers.map((l) => l.id),
+            prerequisites: course.prerequisites ?? "",
+          });
+          setCredits(course.credits != null ? String(course.credits) : "");
+          setCourseType(course.courseType ?? "");
+          setTotalSltHours(course.totalSltHours != null ? String(course.totalSltHours) : "");
+        }
       } catch (err) {
         if (!cancelled) {
           if (err instanceof ApiError && err.status === 404) setNotFound(true);
@@ -89,6 +104,8 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
     setError(null);
     const payload = {
       ...values,
+      lecturerId: values.lecturerId || null,
+      coLecturerIds: values.coLecturerIds ?? [],
       prerequisites: values.prerequisites?.trim() || undefined,
       credits: credits ? Number(credits) : null,
       courseType: (courseType || null) as CourseType | null,
@@ -145,8 +162,11 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
               className="space-y-6 rounded-xl border border-border bg-card p-6"
             >
               <CourseFormFields
+                control={control}
                 register={register}
                 errors={errors}
+                lecturers={lecturers}
+                lecturerId={lecturerId}
                 credits={credits}
                 onCreditsChange={setCredits}
                 totalSltHours={totalSltHours}
