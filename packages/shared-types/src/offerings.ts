@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LecturerRef } from "./contracts.ts";
 
 /**
  * Course Offering schemas. An offering is a course delivered in a term with an
@@ -21,10 +22,50 @@ export function semesterLabel(semester: Semester | null | undefined): string {
   return "—";
 }
 
-export const CreateOfferingInput = z.object({
+/**
+ * Shared invariant for co-lecturer assignment (issue #79, moved from Course to
+ * Offering — see #73/#71), factored out so both the Zod validation below and the
+ * offerings service's merged-state check (which sees the full
+ * lecturerId/coLecturerIds pair even on a partial PATCH) agree on one rule: no
+ * duplicate co-lecturers, and the primary lecturer can't also be a co-lecturer.
+ * `null` means the assignment is valid.
+ */
+export interface CoLecturerAssignment {
+  lecturerId?: string | null;
+  coLecturerIds?: string[];
+}
+export type CoLecturerViolation = "duplicate" | "primaryIsCoLecturer";
+
+export function coLecturerViolation({
+  lecturerId,
+  coLecturerIds,
+}: CoLecturerAssignment): CoLecturerViolation | null {
+  if (!coLecturerIds || coLecturerIds.length === 0) return null;
+  if (new Set(coLecturerIds).size !== coLecturerIds.length) return "duplicate";
+  if (lecturerId && coLecturerIds.includes(lecturerId)) return "primaryIsCoLecturer";
+  return null;
+}
+
+function refineCoLecturers(data: CoLecturerAssignment, ctx: z.RefinementCtx): void {
+  const violation = coLecturerViolation(data);
+  if (violation === "duplicate") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Duplicate co-lecturer", path: ["coLecturerIds"] });
+  } else if (violation === "primaryIsCoLecturer") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "The primary lecturer cannot also be a co-lecturer",
+      path: ["coLecturerIds"],
+    });
+  }
+}
+
+const OfferingInputShape = z.object({
   courseId: z.string().uuid("A course is required"),
   term: z.string().min(1, "Term is required"),
   lecturerId: z.string().uuid().nullable().optional(),
+  // Existing lecturer users assigned alongside the primary lecturer (issue #79).
+  // Distinct from otherLecturers (per-term free text) — untouched here.
+  coLecturerIds: z.array(z.string().uuid()).optional(),
   capacity: z.coerce.number().int().min(1).max(1000).default(30),
   status: OfferingStatusSchema.default("Planned"),
   // §12 Course Availability — optional. Year is the programme/study year (1–6).
@@ -33,9 +74,13 @@ export const CreateOfferingInput = z.object({
   // §10 Other Course Lecturer(s) — optional free text, co-teachers this term.
   otherLecturers: z.string().optional(),
 });
+
+export const CreateOfferingInput = OfferingInputShape.superRefine(refineCoLecturers);
 export type CreateOfferingInput = z.infer<typeof CreateOfferingInput>;
 
-export const UpdateOfferingInput = CreateOfferingInput.partial().omit({ courseId: true });
+export const UpdateOfferingInput = OfferingInputShape.omit({ courseId: true })
+  .partial()
+  .superRefine(refineCoLecturers);
 export type UpdateOfferingInput = z.infer<typeof UpdateOfferingInput>;
 
 export const ListOfferingsQuery = z.object({
@@ -70,5 +115,7 @@ export interface OfferingView {
     qualification: string | null;
     phone: string | null;
   } | null;
+  // Existing lecturer users assigned alongside the primary lecturer (issue #79).
+  coLecturers: LecturerRef[];
   students: { id: string; name: string; studentId: string }[];
 }

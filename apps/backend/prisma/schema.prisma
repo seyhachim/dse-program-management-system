@@ -75,10 +75,10 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed    Course[]           @relation("CourseLecturer")
-  offeringsLed  Offering[]         @relation("OfferingLecturer")
-  rubricsOwned  Rubric[]           @relation("RubricOwner")
-  coLecturerOf  CourseCoLecturer[] @relation("CourseCoLecturer")
+  coursesLed   Course[]             @relation("CourseLecturer")
+  offeringsLed Offering[]           @relation("OfferingLecturer")
+  rubricsOwned Rubric[]             @relation("RubricOwner")
+  coLecturerOf OfferingCoLecturer[] @relation("OfferingCoLecturer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -142,12 +142,12 @@ model Student {
 /// Courses plugin domain model. lecturerId references a User with role = lecturer
 /// (validated at the service layer through registry.get('lecturers')).
 model Course {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  title       String
-  description String?
-  lecturerId  String?
-  lecturer    User?    @relation("CourseLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
+  id            String      @id @default(uuid())
+  code          String      @unique
+  title         String
+  description   String?
+  lecturerId    String?
+  lecturer      User?       @relation("CourseLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
   // Syllabus Course Information — §4 credits, §5 prerequisites (free text), §11 type.
   credits       Int?
   prerequisites String?
@@ -155,27 +155,10 @@ model Course {
   // Admin-entered total Student Learning Time for the course (hours). Independent of
   // §16 — always a direct input, never derived. Used as the §15 Focus % denominator.
   totalSltHours Int?
-  createdAt   DateTime @default(now())
+  createdAt     DateTime    @default(now())
 
-  offerings   Offering[]
-  spec        CourseSpec?
-  coLecturers CourseCoLecturer[]
-}
-
-/// Join table (issue #73): co-lecturers are existing lecturer Users assigned to a
-/// course alongside its primary `Course.lecturerId`, distinct from both that field
-/// (the on-file default lecturer) and `Offering.otherLecturers` (per-term free
-/// text) — neither of those is touched by this table. Cascades on either side
-/// since a row here is a pure link with no data of its own to preserve.
-model CourseCoLecturer {
-  courseId   String
-  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lecturerId String
-  lecturer   User     @relation("CourseCoLecturer", fields: [lecturerId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-
-  @@id([courseId, lecturerId])
-  @@index([lecturerId])
+  offerings Offering[]
+  spec      CourseSpec?
 }
 
 /// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a
@@ -196,25 +179,43 @@ model CourseSpec {
 /// lecturer, a seat capacity, and enrolled students. The architectural proof point:
 /// it links Students <-> Courses <-> Lecturers through the registry.
 model Offering {
-  id         String         @id @default(uuid())
-  courseId   String
-  course     Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lecturerId String?
-  lecturer   User?          @relation("OfferingLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
-  term       String
-  capacity   Int            @default(30)
-  status     OfferingStatus @default(Planned)
+  id             String         @id @default(uuid())
+  courseId       String
+  course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lecturerId     String?
+  lecturer       User?          @relation("OfferingLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
+  term           String
+  capacity       Int            @default(30)
+  status         OfferingStatus @default(Planned)
   // Syllabus §12 Course Availability — optional, filled on the course spec form.
-  semester      Semester?
-  programmeYear Int?
+  semester       Semester?
+  programmeYear  Int?
   // Syllabus §10 Other Course Lecturer(s) — optional free text, varies per term.
   otherLecturers String?
-  createdAt  DateTime       @default(now())
+  createdAt      DateTime       @default(now())
 
   enrollments Enrollment[]
+  coLecturers OfferingCoLecturer[]
 
   @@unique([courseId, term])
   @@index([status])
+}
+
+/// Join table (issue #79, supersedes #73's Course-level table): co-lecturers are
+/// existing lecturer Users assigned to an Offering (a course delivered in a given
+/// term) alongside its primary `Offering.lecturerId`, distinct from
+/// `Offering.otherLecturers` (per-term free text, untouched by this table).
+/// Cascades on either side since a row here is a pure link with no data of its
+/// own to preserve.
+model OfferingCoLecturer {
+  offeringId String
+  offering   Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  lecturerId String
+  lecturer   User     @relation("OfferingCoLecturer", fields: [lecturerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([offeringId, lecturerId])
+  @@index([lecturerId])
 }
 
 /// Join model linking a Student to an Offering (enrollment).

@@ -11,11 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@dse-pms/ui";
+import { LecturerChecklist } from "./lecturer-checklist";
 
 export type OfferingFormValues = {
   courseId: string;
   term: string;
   lecturerId?: string | null;
+  // Existing lecturer users assigned alongside the primary lecturer (issue #79).
+  coLecturerIds?: string[];
   capacity: number;
   status: (typeof OFFERING_STATUSES)[number];
   // §12 Course Availability — optional.
@@ -50,6 +53,7 @@ interface OfferingFormFieldsProps {
   errors: FieldErrors<OfferingFormValues>;
   courses: CourseView[];
   lecturers: Lecturer[];
+  lecturerId: string | null;
   /** Course is fixed once an offering exists — an offering can't change its course. */
   courseLocked?: boolean;
   semester: string;
@@ -64,6 +68,7 @@ export function OfferingFormFields({
   errors,
   courses,
   lecturers,
+  lecturerId,
   courseLocked,
   semester,
   onSemesterChange,
@@ -77,6 +82,8 @@ export function OfferingFormFields({
     [UNASSIGNED_SENTINEL]: "— Unassigned —",
     ...Object.fromEntries(lecturers.map((l) => [l.id, l.name])),
   };
+  // The primary lecturer can't also be picked as a co-lecturer.
+  const coLecturerOptions = lecturers.filter((l) => l.id !== lecturerId);
 
   return (
     <div className="space-y-4">
@@ -195,6 +202,21 @@ export function OfferingFormFields({
           )}
         />
       </Field>
+      <Controller
+        control={control}
+        name="coLecturerIds"
+        render={({ field }) => (
+          <LecturerChecklist
+            label="Co-Lecturers"
+            options={coLecturerOptions}
+            selectedIds={field.value ?? []}
+            onChange={field.onChange}
+          />
+        )}
+      />
+      {errors.coLecturerIds?.message ? (
+        <p className="text-xs text-status-live">{errors.coLecturerIds.message}</p>
+      ) : null}
       <Field label="Other lecturer(s) (§10)" error={errors.otherLecturers?.message}>
         <Input placeholder="Co-teachers this term (optional)" {...register("otherLecturers")} />
       </Field>

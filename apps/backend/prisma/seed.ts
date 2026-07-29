@@ -276,19 +276,6 @@ async function main() {
     });
   }
 
-  // One co-lecturer (issue #73): CS101's primary lecturer is lecturer@dse.dev;
-  // add hopper.lecturer@dse.dev as a co-lecturer so visibility/UI can be checked
-  // by logging in as either.
-  const cs101ForCoLecturer = await prisma.course.findUnique({ where: { code: "CS101" } });
-  const coLecturer = await prisma.user.findUnique({ where: { email: "hopper.lecturer@dse.dev" } });
-  if (cs101ForCoLecturer && coLecturer) {
-    await prisma.courseCoLecturer.upsert({
-      where: { courseId_lecturerId: { courseId: cs101ForCoLecturer.id, lecturerId: coLecturer.id } },
-      update: {},
-      create: { courseId: cs101ForCoLecturer.id, lecturerId: coLecturer.id },
-    });
-  }
-
   // Sample rubrics owned by the seed lecturer. Name isn't unique, so guard on
   // (name, ownerId) to keep the seed idempotent.
   const rubricOwner = await prisma.user.findUnique({ where: { email: "lecturer@dse.dev" } });
@@ -325,6 +312,17 @@ async function main() {
         where: { offeringId_studentId: { offeringId: offering.id, studentId: s.id } },
         update: {},
         create: { offeringId: offering.id, studentId: s.id },
+      });
+    }
+
+    // A co-lecturer on the same offering (issue #79) — distinct from the primary
+    // lecturer above, demonstrates the first-class co-lecturer assignment.
+    const coLecturer = await prisma.user.findUnique({ where: { email: "hopper.lecturer@dse.dev" } });
+    if (coLecturer) {
+      await prisma.offeringCoLecturer.upsert({
+        where: { offeringId_lecturerId: { offeringId: offering.id, lecturerId: coLecturer.id } },
+        update: {},
+        create: { offeringId: offering.id, lecturerId: coLecturer.id },
       });
     }
   }

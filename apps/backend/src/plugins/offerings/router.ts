@@ -100,14 +100,19 @@ export function createOfferingRouter(): Router {
   return router;
 }
 
-/** True (and untouched response) if the caller may manage this offering's roster. */
+/**
+ * True (and untouched response) if the caller may manage this offering's
+ * roster: an admin, the primary lecturer, or an assigned co-lecturer (#79).
+ */
 async function assertOwnOfferingOrAdmin(
   req: import("express").Request,
   res: import("express").Response,
 ): Promise<boolean> {
   if (req.user!.role === "admin") return true;
   const offering = await offeringService.getById(req.params.id!);
-  if (!offering || offering.lecturer?.id !== req.user!.id) {
+  const isAssigned =
+    offering?.lecturer?.id === req.user!.id || offering?.coLecturers.some((c) => c.id === req.user!.id);
+  if (!isAssigned) {
     res.status(403).json({ error: "You can only manage enrollment for your own offerings" });
     return false;
   }

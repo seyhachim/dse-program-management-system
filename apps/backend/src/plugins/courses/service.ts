@@ -1,12 +1,10 @@
 import {
   COMPLETABLE_SPEC_SECTIONS,
-  coLecturerViolation,
   type CourseInfoInput,
   type CourseInfoSection,
   type CourseSpecProgress,
   type CoursesServiceContract,
   type CreateCourseInput,
-  type LecturerRef,
   type LecturersServiceContract,
   type ListCoursesQuery,
   type OfferingsServiceContract,
@@ -40,67 +38,20 @@ async function assertLecturerExists(lecturerId: string | null | undefined): Prom
   if (!lecturer) throw new ReferenceError("Assigned lecturer does not exist");
 }
 
-async function assertLecturersExist(lecturerIds: string[]): Promise<void> {
-  const found = await Promise.all(lecturerIds.map((id) => lecturers().getById(id)));
-  if (found.some((l) => l === null)) throw new ReferenceError("One or more co-lecturers do not exist");
-}
-
-/** Attach the primary lecturer and co-lecturer summaries to one course row. */
-async function withLecturer<T extends { id: string; lecturerId: string | null }>(course: T) {
-  const [attached] = await attachLecturers([course]);
-  return attached!;
+/** Attach the lecturer summary to a course row for API responses. */
+async function withLecturer<T extends { lecturerId: string | null }>(course: T) {
+  const lecturer = course.lecturerId ? await lecturers().getById(course.lecturerId) : null;
+  return { ...course, lecturer };
 }
 
 /**
- * Batch-attach lecturer/coLecturers to a list of course rows: one `list()` call
- * for all lecturers plus one `courseCoLecturer` query for all courses, rather
- * than a per-course lookup (which `withLecturer` alone would be for a list).
- */
-async function attachLecturers<T extends { id: string; lecturerId: string | null }>(
-  courses: T[],
-): Promise<(T & { lecturer: LecturerRef | null; coLecturers: LecturerRef[] })[]> {
-  if (courses.length === 0) return [];
-  const [lecturerList, coLecturerRows] = await Promise.all([
-    lecturers().list(),
-    prisma.courseCoLecturer.findMany({
-      where: { courseId: { in: courses.map((c) => c.id) } },
-      select: { courseId: true, lecturerId: true },
-    }),
-  ]);
-  const lecturerById = new Map(lecturerList.map((l) => [l.id, l]));
-  const coLecturersByCourse = new Map<string, LecturerRef[]>();
-  for (const row of coLecturerRows) {
-    const lecturer = lecturerById.get(row.lecturerId);
-    if (!lecturer) continue;
-    const list = coLecturersByCourse.get(row.courseId) ?? [];
-    list.push(lecturer);
-    coLecturersByCourse.set(row.courseId, list);
-  }
-  return courses.map((course) => ({
-    ...course,
-    lecturer: (course.lecturerId ? lecturerById.get(course.lecturerId) : null) ?? null,
-    coLecturers: coLecturersByCourse.get(course.id) ?? [],
-  }));
-}
-
-/**
- * Courses a lecturer may see/edit — the non-admin list/dashboard scope. Grants
- * visibility (issue #73) when the lecturer is: assigned to teach a real
- * `Offering` of the course, the course's on-file primary lecturer, or an
- * assigned co-lecturer. Note this also gates `ensureCourseAccess`
- * (courses/router.ts), so being the primary lecturer or a co-lecturer now
- * grants course + spec *write* access too, not just read — previously only an
- * Offering assignment did.
+ * Courses a lecturer was actually offered — the non-admin list/dashboard scope.
+ * Deliberately Offering-based only: `Course.lecturerId` is just the course
+ * record's default/on-file lecturer and does not by itself grant visibility —
+ * a lecturer must be assigned to a real Offering of the course to see it.
  */
 async function ownerScopeFilter(lecturerScope: string) {
-  const offeredCourseIds = await offerings().courseIdsForLecturer(lecturerScope);
-  return {
-    OR: [
-      { id: { in: offeredCourseIds } },
-      { lecturerId: lecturerScope },
-      { coLecturers: { some: { lecturerId: lecturerScope } } },
-    ],
-  };
+  return { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } };
 }
 
 const COMPLETABLE_SECTION_IDS = COMPLETABLE_SPEC_SECTIONS.map((s) => s.id);
@@ -108,8 +59,9 @@ const COMPLETABLE_SECTION_IDS = COMPLETABLE_SPEC_SECTIONS.map((s) => s.id);
 export const courseService = {
   /**
    * List courses. When `lecturerScope` is given, results are scoped to that
-   * lecturer — the router passes it for non-admin callers. See `ownerScopeFilter`
-   * for what counts as in-scope.
+   * lecturer — the router passes it for non-admin callers. Scope = courses they
+   * were offered (assigned to teach an Offering of), not merely on file as the
+   * course's default lecturer.
    */
   async list(query: ListCoursesQuery, lecturerScope?: string) {
     const { search } = query;
@@ -126,7 +78,7 @@ export const courseService = {
       where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
     });
-    return attachLecturers(courses);
+    return Promise.all(courses.map(withLecturer));
   },
 
   /**
@@ -156,18 +108,12 @@ export const courseService = {
   },
 
   /**
-   * May the given lecturer see/edit this course? True when they're offered it
-   * (assigned to teach an Offering of it), are the on-file primary lecturer, or
-   * an assigned co-lecturer — backs the router's per-course access guard.
+   * May the given lecturer see/edit this course? True only when they were
+   * offered it (assigned to teach an Offering of it) — backs the router's
+   * per-course access guard.
    */
   async lecturerCanAccess(courseId: string, lecturerId: string): Promise<boolean> {
-    if ((await offerings().courseIdsForLecturer(lecturerId)).includes(courseId)) return true;
-    const course = await prisma.course.findUnique({ where: { id: courseId }, select: { lecturerId: true } });
-    if (course?.lecturerId === lecturerId) return true;
-    const coLecturer = await prisma.courseCoLecturer.findUnique({
-      where: { courseId_lecturerId: { courseId, lecturerId } },
-    });
-    return coLecturer !== null;
+    return (await offerings().courseIdsForLecturer(lecturerId)).includes(courseId);
   },
 
   // Part of CoursesServiceContract — used by the offerings plugin via the registry.
@@ -181,52 +127,14 @@ export const courseService = {
   },
 
   async create(input: CreateCourseInput) {
-    const { coLecturerIds, ...courseInput } = input;
-    await assertLecturerExists(courseInput.lecturerId);
-    if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
-    const course = await prisma.course.create({
-      data: {
-        ...courseInput,
-        coLecturers: coLecturerIds?.length
-          ? { create: coLecturerIds.map((lecturerId) => ({ lecturerId })) }
-          : undefined,
-      },
-    });
+    await assertLecturerExists(input.lecturerId);
+    const course = await prisma.course.create({ data: input });
     return withLecturer(course);
   },
 
   async update(id: string, input: UpdateCourseInput) {
-    const { coLecturerIds, ...courseInput } = input;
-
-    // Zod's superRefine only sees the fields in *this* request, so a PATCH that
-    // changes only lecturerId (or only coLecturerIds) needs the invariant
-    // re-checked against the merged final state.
-    const existing = await prisma.course.findUnique({
-      where: { id },
-      include: { coLecturers: { select: { lecturerId: true } } },
-    });
-    if (!existing) throw new ReferenceError("Course not found");
-    const nextLecturerId = courseInput.lecturerId !== undefined ? courseInput.lecturerId : existing.lecturerId;
-    const nextCoLecturerIds =
-      coLecturerIds !== undefined ? coLecturerIds : existing.coLecturers.map((c) => c.lecturerId);
-    if (coLecturerViolation({ lecturerId: nextLecturerId, coLecturerIds: nextCoLecturerIds })) {
-      throw new ReferenceError("The primary lecturer cannot also be a co-lecturer");
-    }
-
-    await assertLecturerExists(courseInput.lecturerId);
-    if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
-
-    const course = await prisma.$transaction(async (tx) => {
-      if (coLecturerIds !== undefined) {
-        await tx.courseCoLecturer.deleteMany({ where: { courseId: id } });
-        if (coLecturerIds.length) {
-          await tx.courseCoLecturer.createMany({
-            data: coLecturerIds.map((lecturerId) => ({ courseId: id, lecturerId })),
-          });
-        }
-      }
-      return tx.course.update({ where: { id }, data: courseInput });
-    });
+    await assertLecturerExists(input.lecturerId);
+    const course = await prisma.course.update({ where: { id }, data: input });
     return withLecturer(course);
   },
 

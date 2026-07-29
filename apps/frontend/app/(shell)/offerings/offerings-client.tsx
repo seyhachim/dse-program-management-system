@@ -75,7 +75,10 @@ export function OfferingsClient() {
   };
 
   const handleManage = (offering: OfferingView) => {
-    if (!isAdmin && offering.lecturer?.id !== currentUserId) {
+    const isAssigned =
+      offering.lecturer?.id === currentUserId ||
+      offering.coLecturers.some((l) => l.id === currentUserId);
+    if (!isAdmin && !isAssigned) {
       setError("You can only manage enrollment for offerings you teach.");
       return;
     }
@@ -121,12 +124,20 @@ export function OfferingsClient() {
     {
       key: "lecturer",
       header: "Lecturer",
-      render: (o) =>
-        o.lecturer ? (
-          <StatusBadge tone="tournament" label={o.lecturer.name} icon={false} />
-        ) : (
-          <span className="text-muted-foreground">Unassigned</span>
-        ),
+      render: (o) => (
+        <div className="flex flex-col gap-1">
+          {o.lecturer ? (
+            <StatusBadge tone="tournament" label={o.lecturer.name} icon={false} />
+          ) : (
+            <span className="text-muted-foreground">Unassigned</span>
+          )}
+          {o.coLecturers.length > 0 ? (
+            <span className="text-xs text-muted-foreground">
+              +{o.coLecturers.length} co-lecturer{o.coLecturers.length === 1 ? "" : "s"}
+            </span>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "capacity",
