@@ -91,21 +91,28 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
     const requested = searchParams.get("tab");
-    return TABS.some((t) => t.id === requested) ? (requested as TabId) : "overview";
+    return TABS.some((t) => t.id === requested)
+      ? (requested as TabId)
+      : "overview";
   });
   const setActiveTab = useCallback(
     (id: TabId) => {
       setActiveTabState(id);
-      router.replace(id === "overview" ? pathname : `${pathname}?tab=${id}`, { scroll: false });
+      router.replace(id === "overview" ? pathname : `${pathname}?tab=${id}`, {
+        scroll: false,
+      });
     },
     [pathname, router],
   );
   const [course, setCourse] = useState<CourseView | null>(null);
   const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
-  const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
+  const [courseInfo, setCourseInfo] =
+    useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
-  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
-  const [assessments, setAssessments] = useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
+  const [weeklyPlan, setWeeklyPlan] =
+    useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
+  const [assessments, setAssessments] =
+    useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
@@ -125,7 +132,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
         methodsApi.list(),
         coursesApi.get(courseId),
       ]);
-      setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
+      setCourseInfo(
+        toCourseInfoForm(
+          spec.data.courseInfo as Record<string, unknown> | undefined,
+        ),
+      );
       setClos(toClosForm(spec.data.clos, spec.data.cloMapping));
       setWeeklyPlan(toWeeklyPlanForm(spec.data.slt));
       setAssessments(toAssessmentForm(spec.data.assessmentPlan));
@@ -135,7 +146,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setCourse(courseView);
       setCourseTotalSlt(courseView.totalSltHours ?? null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Failed to load the course specification",
+      );
     } finally {
       setLoading(false);
     }
@@ -158,7 +173,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setClosSavedAt(new Date());
         return true;
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to save this section");
+        setError(
+          err instanceof ApiError ? err.message : "Failed to save this section",
+        );
         return false;
       } finally {
         setSaving(false);
@@ -175,11 +192,17 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setSaving(true);
       setError(null);
       try {
-        await courseSpecApi.saveSection(courseId, "assessmentPlan", toAssessmentPayload(items));
+        await courseSpecApi.saveSection(
+          courseId,
+          "assessmentPlan",
+          toAssessmentPayload(items),
+        );
         setStatus((s) => ({ ...s, assessmentPlan: "complete" }));
         return true;
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to save this section");
+        setError(
+          err instanceof ApiError ? err.message : "Failed to save this section",
+        );
         return false;
       } finally {
         setSaving(false);
@@ -194,9 +217,17 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setError(null);
       try {
         if (sectionId === "courseInfo") {
-          await courseSpecApi.saveSection(courseId, "courseInfo", toCourseInfoPayload(courseInfo));
+          await courseSpecApi.saveSection(
+            courseId,
+            "courseInfo",
+            toCourseInfoPayload(courseInfo),
+          );
         } else if (sectionId === "slt") {
-          await courseSpecApi.saveSection(courseId, "slt", toWeeklyPlanPayload(weeklyPlan));
+          await courseSpecApi.saveSection(
+            courseId,
+            "slt",
+            toWeeklyPlanPayload(weeklyPlan),
+          );
         } else if (sectionId === "mapping") {
           const refs = validRefs(clos, weeklyPlan, assessments);
           const payload = toMappingPayload(mapping, refs);
@@ -208,7 +239,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to save this section");
+        setError(
+          err instanceof ApiError ? err.message : "Failed to save this section",
+        );
         return false;
       } finally {
         setSaving(false);
@@ -219,7 +252,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
   const canSaveActive = activeTab === "slt" || activeTab === "mapping";
 
-  const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
+  const breadcrumbLabel = course
+    ? `${course.code} – ${course.title}`
+    : "Course Specification";
   const activeTabLabel = TABS.find((t) => t.id === activeTab)?.label;
 
   return (
@@ -227,7 +262,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink render={<Link href="/courses">Course Management</Link>} />
+            <BreadcrumbLink
+              render={<Link href="/courses">Course Management</Link>}
+            />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -249,8 +286,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
       </Breadcrumb>
 
       <header>
-        <h1 className="text-2xl font-bold text-foreground">Course Specification</h1>
-        <p className="text-sm text-muted-foreground">Design and manage your course in OBE format.</p>
+        <h1 className="text-2xl font-bold text-foreground">
+          Course Specification
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Design and manage your course in OBE format.
+        </p>
       </header>
 
       {error ? (
@@ -262,11 +303,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as TabId)}
-        >
-          <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
+          <TabsList variant="line" className="w-full justify-start ">
             {TABS.map((t) => (
               <TabsTrigger key={t.id} value={t.id}>
                 {t.label}
@@ -303,13 +341,19 @@ export function SpecClient({ courseId }: { courseId: string }) {
               value={weeklyPlan}
               onChange={setWeeklyPlan}
               courseId={courseId}
-              courseName={course ? `${course.code} - ${course.title}` : undefined}
+              courseName={
+                course ? `${course.code} - ${course.title}` : undefined
+              }
               cloCodes={clos.map((c) => c.code)}
             />
           </TabsContent>
 
           <TabsContent value="assessmentPlan" className="mt-4">
-            <AssessmentSection value={assessments} courseId={courseId} onPersist={persistAssessments} />
+            <AssessmentSection
+              value={assessments}
+              courseId={courseId}
+              onPersist={persistAssessments}
+            />
           </TabsContent>
 
           <TabsContent value="mapping" className="mt-4">
@@ -319,7 +363,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
               assessments={assessments}
               value={mapping}
               onChange={setMapping}
-              courseName={course ? `${course.code} - ${course.title}` : undefined}
+              courseName={
+                course ? `${course.code} - ${course.title}` : undefined
+              }
             />
           </TabsContent>
 
@@ -338,11 +384,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
           <TabsContent value="documentPreview" className="mt-4">
             <SectionPanel>
               <div className="py-10 text-center">
-                <p className="text-sm font-medium text-foreground">Document Preview</p>
+                <p className="text-sm font-medium text-foreground">
+                  Document Preview
+                </p>
                 <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                  Assembling Part 1 + Part 2 into the final syllabus document is coming in a later
-                  phase. Each section above is saved as you go, so nothing here is lost once this
-                  ships.
+                  Assembling Part 1 + Part 2 into the final syllabus document is
+                  coming in a later phase. Each section above is saved as you
+                  go, so nothing here is lost once this ships.
                 </p>
               </div>
             </SectionPanel>
@@ -350,7 +398,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
           {canSaveActive ? (
             <div className="mt-4 flex items-center justify-end gap-3">
-              {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
+              {savedFlash ? (
+                <span className="text-sm text-emerald-600">Saved ✓</span>
+              ) : null}
               <Button
                 variant="outline"
                 onClick={() => saveSection(activeTab as "slt" | "mapping")}
@@ -363,7 +413,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
         </Tabs>
       )}
 
-      <Dialog open={courseInfoDialogOpen} onOpenChange={setCourseInfoDialogOpen}>
+      <Dialog
+        open={courseInfoDialogOpen}
+        onOpenChange={setCourseInfoDialogOpen}
+      >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Course Information</DialogTitle>
@@ -373,7 +426,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
             onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCourseInfoDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setCourseInfoDialogOpen(false)}
+            >
               Cancel
             </Button>
             <Button
@@ -393,19 +449,24 @@ export function SpecClient({ courseId }: { courseId: string }) {
 }
 
 function SectionPanel({ children }: { children: React.ReactNode }) {
-  return <section className="rounded-xl border border-border bg-card p-6">{children}</section>;
+  return (
+    <section className="rounded-xl border border-border bg-card p-6">
+      {children}
+    </section>
+  );
 }
 
 function ComingSoon({ meta }: { meta?: { title: string; ref?: string } }) {
   return (
     <div className="py-10 text-center">
       <p className="text-sm font-medium text-foreground">
-        {meta?.title} <span className="text-muted-foreground">({meta?.ref})</span>
+        {meta?.title}{" "}
+        <span className="text-muted-foreground">({meta?.ref})</span>
       </p>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        This section is coming in a later phase. The full syllabus structure is shown here so you can
-        see the whole document — for now, fill in <strong>Course Information</strong>, CLOs, Weekly
-        Plan, and Mapping.
+        This section is coming in a later phase. The full syllabus structure is
+        shown here so you can see the whole document — for now, fill in{" "}
+        <strong>Course Information</strong>, CLOs, Weekly Plan, and Mapping.
       </p>
     </div>
   );

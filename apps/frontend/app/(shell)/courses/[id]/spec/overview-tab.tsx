@@ -16,7 +16,11 @@ import type { CourseInfoForm } from "./course-info-section";
 import { focusCodeOf, focusPercentOf, type CloForm } from "./clo-model";
 import type { WeeklyPlanForm } from "./weekly-plan-section";
 import { weekSltForm, weeklyPlanFormTotals } from "./weekly-plan-model";
-import { assessmentTotalWeight, assessmentTypeChip, type AssessmentForm } from "./assessment-model";
+import {
+  assessmentTotalWeight,
+  assessmentTypeChip,
+  type AssessmentForm,
+} from "./assessment-model";
 import { ProgrammeSection } from "./programme-section";
 
 export function OverviewTab({
@@ -43,7 +47,9 @@ export function OverviewTab({
   const completed = fillable.filter((s) => status[s.id] === "complete").length;
   const inProgress = fillable.filter((s) => status[s.id] === "draft").length;
   const missing = fillable.length - completed - inProgress;
-  const percent = fillable.length ? Math.round((completed / fillable.length) * 100) : 0;
+  const percent = fillable.length
+    ? Math.round((completed / fillable.length) * 100)
+    : 0;
 
   const deliverables = weeklyPlan.filter((w) => w.assessment.trim());
   const planTotals = weeklyPlanFormTotals(weeklyPlan);
@@ -68,20 +74,40 @@ export function OverviewTab({
               <Field label="Credits" value={courseInfo.credits} />
               <Field
                 label="Course Type"
-                value={courseInfo.courseType ? courseTypeLabel(courseInfo.courseType as CourseType) : ""}
+                value={
+                  courseInfo.courseType
+                    ? courseTypeLabel(courseInfo.courseType as CourseType)
+                    : ""
+                }
               />
               <Field
                 label="Semester"
-                value={courseInfo.semester ? semesterLabel(courseInfo.semester as Semester) : ""}
+                value={
+                  courseInfo.semester
+                    ? semesterLabel(courseInfo.semester as Semester)
+                    : ""
+                }
               />
               <Field
                 label="Programme Year"
-                value={courseInfo.programmeYear ? `Year ${courseInfo.programmeYear}` : ""}
+                value={
+                  courseInfo.programmeYear
+                    ? `Year ${courseInfo.programmeYear}`
+                    : ""
+                }
               />
-              <Field label="Pre-requisites" value={courseInfo.prerequisites} full />
+              <Field
+                label="Pre-requisites"
+                value={courseInfo.prerequisites}
+                full
+              />
             </dl>
           ) : (
-            <EmptyHint text="No course information yet." action="Fill it in" onClick={onEditCourseInfo} />
+            <EmptyHint
+              text="No course information yet."
+              action="Fill it in"
+              onClick={onEditCourseInfo}
+            />
           )}
         </Card>
 
@@ -100,7 +126,11 @@ export function OverviewTab({
             }
           />
           {clos.length === 0 ? (
-            <EmptyHint text="No CLOs yet." action="+ Add CLO" onClick={() => onGoToTab("clos")} />
+            <EmptyHint
+              text="No CLOs yet."
+              action="+ Add CLO"
+              onClick={() => onGoToTab("clos")}
+            />
           ) : (
             <ul className="space-y-2">
               {clos.slice(0, 5).map((clo) => (
@@ -108,7 +138,9 @@ export function OverviewTab({
                   <span className="mt-0.5 shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
                     {clo.code}
                   </span>
-                  <span className="text-foreground">{clo.description || "—"}</span>
+                  <span className="text-foreground">
+                    {clo.description || "—"}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -130,7 +162,11 @@ export function OverviewTab({
             }
           />
           {weeklyPlan.length === 0 ? (
-            <EmptyHint text="No weeks planned yet." action="Go to Weekly Plan" onClick={() => onGoToTab("slt")} />
+            <EmptyHint
+              text="No weeks planned yet."
+              action="Go to Weekly Plan"
+              onClick={() => onGoToTab("slt")}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -145,19 +181,26 @@ export function OverviewTab({
                 <tbody>
                   {weeklyPlan.slice(0, 6).map((w) => (
                     <tr key={w.id} className="border-t border-border">
-                      <td className="py-1.5 pr-2 text-muted-foreground">{w.week || "—"}</td>
-                      <td className="py-1.5 pr-2 text-foreground">{w.topic || "Untitled"}</td>
+                      <td className="py-1.5 pr-2 text-muted-foreground">
+                        {w.week || "—"}
+                      </td>
+                      <td className="py-1.5 pr-2 text-foreground">
+                        {w.topic || "Untitled"}
+                      </td>
                       <td className="py-1.5 pr-2 text-muted-foreground">
                         {w.cloCodes.length ? w.cloCodes.join(", ") : "—"}
                       </td>
-                      <td className="py-1.5 text-right text-foreground">{weekSltForm(w)}</td>
+                      <td className="py-1.5 text-right text-foreground">
+                        {weekSltForm(w)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border text-xs font-medium text-muted-foreground">
                     <td className="py-1.5 pr-2" colSpan={3}>
-                      Total SLT ({weeklyPlan.length} {weeklyPlan.length === 1 ? "week" : "weeks"})
+                      Total SLT ({weeklyPlan.length}{" "}
+                      {weeklyPlan.length === 1 ? "week" : "weeks"})
                     </td>
                     <td className="py-1.5 text-right">{planTotals.slt} h</td>
                   </tr>
@@ -182,7 +225,11 @@ export function OverviewTab({
             }
           />
           {assessments.length === 0 ? (
-            <EmptyHint text="No assessments yet." action="Go to Assessment" onClick={() => onGoToTab("assessmentPlan")} />
+            <EmptyHint
+              text="No assessments yet."
+              action="Go to Assessment"
+              onClick={() => onGoToTab("assessmentPlan")}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -197,7 +244,9 @@ export function OverviewTab({
                 <tbody>
                   {assessments.slice(0, 6).map((a) => (
                     <tr key={a.id} className="border-t border-border">
-                      <td className="py-1.5 pr-2 text-foreground">{a.name || "Untitled"}</td>
+                      <td className="py-1.5 pr-2 text-foreground">
+                        {a.name || "Untitled"}
+                      </td>
                       <td className="py-1.5 pr-2">
                         <span
                           className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${assessmentTypeChip(a.type)}`}
@@ -208,16 +257,23 @@ export function OverviewTab({
                       <td className="py-1.5 pr-2 text-muted-foreground">
                         {a.cloCodes.length ? a.cloCodes.join(", ") : "—"}
                       </td>
-                      <td className="py-1.5 text-right text-foreground">{a.weight === "" ? "—" : `${a.weight}%`}</td>
+                      <td className="py-1.5 text-right text-foreground">
+                        {a.weight === "" ? "—" : `${a.weight}%`}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border text-xs font-medium text-muted-foreground">
                     <td className="py-1.5 pr-2" colSpan={3}>
-                      Total ({assessments.length} {assessments.length === 1 ? "assessment" : "assessments"})
+                      Total ({assessments.length}{" "}
+                      {assessments.length === 1 ? "assessment" : "assessments"})
                     </td>
-                    <td className="py-1.5 text-right">{Math.round(assessmentTotalWeight(assessments) * 100) / 100}%</td>
+                    <td className="py-1.5 text-right">
+                      {Math.round(assessmentTotalWeight(assessments) * 100) /
+                        100}
+                      %
+                    </td>
                   </tr>
                 </tfoot>
               </table>
@@ -240,7 +296,11 @@ export function OverviewTab({
             }
           />
           {deliverables.length === 0 ? (
-            <EmptyHint text="No deliverables yet." action="Go to Weekly Plan" onClick={() => onGoToTab("slt")} />
+            <EmptyHint
+              text="No deliverables yet."
+              action="Go to Weekly Plan"
+              onClick={() => onGoToTab("slt")}
+            />
           ) : (
             <div className="space-y-1.5 text-sm">
               {deliverables.slice(0, 6).map((w) => (
@@ -268,13 +328,28 @@ export function OverviewTab({
       <div className="space-y-4">
         {/* Completeness */}
         <Card>
-          <CardHeader title="Course Completeness" />
+          <CardHeader title="Course Specification Completeness" />
           <div className="flex flex-col items-center gap-4">
             <CompletionRing value={percent} />
             <dl className="w-full space-y-1.5 text-sm">
-              <LegendRow color="var(--status-live)" label="Completed" value={completed} total={fillable.length} />
-              <LegendRow color="var(--status-upcoming)" label="In Progress" value={inProgress} total={fillable.length} />
-              <LegendRow color="var(--muted-foreground)" label="Missing" value={missing} total={fillable.length} />
+              <LegendRow
+                color="var(--status-live)"
+                label="Completed"
+                value={completed}
+                total={fillable.length}
+              />
+              <LegendRow
+                color="var(--status-upcoming)"
+                label="In Progress"
+                value={inProgress}
+                total={fillable.length}
+              />
+              <LegendRow
+                color="var(--muted-foreground)"
+                label="Missing"
+                value={missing}
+                total={fillable.length}
+              />
             </dl>
           </div>
         </Card>
@@ -283,8 +358,14 @@ export function OverviewTab({
         <Card>
           <CardHeader title="Quick Actions" />
           <ul className="divide-y divide-border text-sm">
-            <QuickAction label="CLOs & PLO Mapping" onClick={() => onGoToTab("clos")} />
-            <QuickAction label="Assessment" onClick={() => onGoToTab("assessmentPlan")} />
+            <QuickAction
+              label="CLOs & PLO Mapping"
+              onClick={() => onGoToTab("clos")}
+            />
+            <QuickAction
+              label="Assessment"
+              onClick={() => onGoToTab("assessmentPlan")}
+            />
             <QuickAction label="Weekly Plan" onClick={() => onGoToTab("slt")} />
           </ul>
         </Card>
@@ -303,18 +384,26 @@ export function OverviewTab({
               </button>
             }
           />
-          <p className="mb-2 text-xs text-muted-foreground">CLO → PLO (Focus: F / M / P)</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            CLO → PLO (Focus: F / M / P)
+          </p>
           {clos.length === 0 ? (
             <EmptyHint text="No CLOs yet." />
           ) : (
             <ul className="space-y-1.5 text-sm">
               {clos.map((clo) => {
                 const percent = focusPercentOf(clo.sltHours, courseTotalSlt);
-                const focus = FOCUS_LEVELS.find((f) => f.code === focusCodeOf(percent));
+                const focus = FOCUS_LEVELS.find(
+                  (f) => f.code === focusCodeOf(percent),
+                );
                 return (
-                  <li key={clo.code} className="flex items-center justify-between">
+                  <li
+                    key={clo.code}
+                    className="flex items-center justify-between"
+                  >
                     <span className="text-foreground">
-                      {clo.code} → {clo.mappedPlos.length ? clo.mappedPlos.join(", ") : "—"}
+                      {clo.code} →{" "}
+                      {clo.mappedPlos.length ? clo.mappedPlos.join(", ") : "—"}
                     </span>
                     {focus ? (
                       <span className="rounded-full bg-status-live-bg px-2 py-0.5 text-xs font-medium text-status-live">
@@ -340,10 +429,20 @@ export function OverviewTab({
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <section className="rounded-xl border border-border bg-card p-5">{children}</section>;
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      {children}
+    </section>
+  );
 }
 
-function CardHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+function CardHeader({
+  title,
+  action,
+}: {
+  title: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="mb-3 flex items-center justify-between">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -352,21 +451,43 @@ function CardHeader({ title, action }: { title: string; action?: React.ReactNode
   );
 }
 
-function Field({ label, value, full }: { label: string; value: string; full?: boolean }) {
+function Field({
+  label,
+  value,
+  full,
+}: {
+  label: string;
+  value: string;
+  full?: boolean;
+}) {
   return (
     <div className={full ? "sm:col-span-2" : undefined}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-foreground">{value || <span className="text-muted-foreground">—</span>}</dd>
+      <dd className="text-foreground">
+        {value || <span className="text-muted-foreground">—</span>}
+      </dd>
     </div>
   );
 }
 
-function EmptyHint({ text, action, onClick }: { text: string; action?: string; onClick?: () => void }) {
+function EmptyHint({
+  text,
+  action,
+  onClick,
+}: {
+  text: string;
+  action?: string;
+  onClick?: () => void;
+}) {
   return (
     <div className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
       <p>{text}</p>
       {action && onClick ? (
-        <button type="button" onClick={onClick} className="mt-1 font-medium text-accent-foreground hover:underline">
+        <button
+          type="button"
+          onClick={onClick}
+          className="mt-1 font-medium text-accent-foreground hover:underline"
+        >
           {action}
         </button>
       ) : null}
@@ -388,7 +509,10 @@ function LegendRow({
   return (
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2 text-muted-foreground">
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ backgroundColor: color }}
+        />
         {label}
       </span>
       <span className="font-medium text-foreground">
@@ -398,7 +522,13 @@ function LegendRow({
   );
 }
 
-function QuickAction({ label, onClick }: { label: string; onClick: () => void }) {
+function QuickAction({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
   return (
     <li>
       <button
