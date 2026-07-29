@@ -3,28 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText } from "lucide-react";
-import type { Lecturer } from "@dse-pms/shared-types";
 import { courseTypeLabel } from "@dse-pms/shared-types";
-import { DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
+import { DataTable, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
-import { lecturersApi } from "@/lib/lecturers";
 import { authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { CourseForm, type CourseFormValues } from "./course-form";
 
 export function CoursesClient() {
   const router = useRouter();
   const [rows, setRows] = useState<CourseView[]>([]);
-  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<CourseView | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,40 +35,14 @@ export function CoursesClient() {
     return () => clearTimeout(t);
   }, [load]);
 
-  // Lecturers for the assign dropdown (loaded once).
-  useEffect(() => {
-    lecturersApi.list().then(setLecturers).catch(() => setLecturers([]));
-  }, []);
-
   // Creating/editing/deleting a course record is admin-only (courses:manage);
   // lecturers only fill in the spec of their assigned courses via "Syllabus".
   useEffect(() => {
     authApi
       .me()
-      .then((me) => {
-        setIsAdmin(me.role === "admin");
-        setCurrentUserId(me.id);
-      })
-      .catch(() => {
-        setIsAdmin(false);
-        setCurrentUserId(null);
-      });
+      .then((me) => setIsAdmin(me.role === "admin"))
+      .catch(() => setIsAdmin(false));
   }, []);
-
-  const handleSubmit = async (values: CourseFormValues) => {
-    setSubmitting(true);
-    try {
-      if (editing) await coursesApi.update(editing.id, values);
-      else await coursesApi.create(values);
-      setFormOpen(false);
-      setEditing(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to save course");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = async (course: CourseView) => {
     if (!confirm(`Delete ${course.code}?`)) return;
@@ -87,22 +53,6 @@ export function CoursesClient() {
       setError(err instanceof ApiError ? err.message : "Failed to delete course");
     }
   };
-
-  const lecturerColumn: DataTableColumn<CourseView> = {
-    key: "lecturer",
-    header: "Lecturer",
-    render: (c) =>
-      c.lecturer ? (
-        <StatusBadge tone="tournament" label={c.lecturer.name} icon={false} />
-      ) : (
-        <span className="text-muted-foreground">Unassigned</span>
-      ),
-  };
-
-  // A lecturer's list can include courses they merely teach an offering of, not
-  // just ones they own (courses/service.ts's ownerScopeFilter) — so the column
-  // is only redundant when every visible row is actually theirs.
-  const showLecturerColumn = isAdmin || rows.some((r) => r.lecturer?.id !== currentUserId);
 
   const columns: DataTableColumn<CourseView>[] = [
     { key: "code", header: "Code", render: (c) => <span className="font-medium">{c.code}</span> },
@@ -133,7 +83,6 @@ export function CoursesClient() {
           <span className="text-muted-foreground">—</span>
         ),
     },
-    ...(showLecturerColumn ? [lecturerColumn] : []),
   ];
 
   return (
@@ -143,14 +92,7 @@ export function CoursesClient() {
         onSearchChange={setSearch}
         searchPlaceholder="Search courses…"
         addLabel={isAdmin ? "Add Course" : undefined}
-        onAdd={
-          isAdmin
-            ? () => {
-                setEditing(null);
-                setFormOpen(true);
-              }
-            : undefined
-        }
+        onAdd={isAdmin ? () => router.push("/courses/new") : undefined}
       />
 
       {error ? (
@@ -172,31 +114,12 @@ export function CoursesClient() {
             onClick: (c) => router.push(`/courses/${c.id}/spec`),
           },
         ]}
-        onEdit={
-          isAdmin
-            ? (c) => {
-                setEditing(c);
-                setFormOpen(true);
-              }
-            : undefined
-        }
+        onEdit={isAdmin ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}
         onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
         emptyMessage={
           isAdmin ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
         }
-      />
-
-      <CourseForm
-        open={formOpen}
-        onOpenChange={(o) => {
-          setFormOpen(o);
-          if (!o) setEditing(null);
-        }}
-        editing={editing}
-        lecturers={lecturers}
-        onSubmit={handleSubmit}
-        submitting={submitting}
       />
     </div>
   );
