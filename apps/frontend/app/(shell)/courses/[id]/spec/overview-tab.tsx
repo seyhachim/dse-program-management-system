@@ -2,8 +2,8 @@
 
 import { Pencil } from "lucide-react";
 import {
+  COMPLETABLE_SPEC_SECTIONS,
   FOCUS_LEVELS,
-  SPEC_SECTIONS,
   courseTypeLabel,
   semesterLabel,
   type CourseType,
@@ -43,7 +43,7 @@ export function OverviewTab({
   onEditCourseInfo: () => void;
   onGoToTab: (id: SpecSectionId) => void;
 }) {
-  const fillable = SPEC_SECTIONS.filter((s) => s.id !== "programme");
+  const fillable = COMPLETABLE_SPEC_SECTIONS;
   const completed = fillable.filter((s) => status[s.id] === "complete").length;
   const inProgress = fillable.filter((s) => status[s.id] === "draft").length;
   const missing = fillable.length - completed - inProgress;

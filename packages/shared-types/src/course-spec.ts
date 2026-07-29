@@ -529,6 +529,17 @@ export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> 
   mapping: MappingSection,
 };
 
+/**
+ * Ordered subset of SPEC_SECTIONS that a lecturer can actually fill in and mark
+ * complete — i.e. sections with a save schema. Excludes "programme" (a
+ * read-only Part 1 reference with no save path) and "soon" sections (not
+ * implemented yet), so completion tracking (dashboard progress, the spec
+ * page's completion summary) never counts work that can't be finished.
+ */
+export const COMPLETABLE_SPEC_SECTIONS: readonly SpecSectionMeta[] = SPEC_SECTIONS.filter(
+  (s) => s.id in SPEC_SECTION_SCHEMAS,
+);
+
 /* ------------------------------------------------------------- spec envelope */
 
 /** Full spec as returned by the API: opaque per-section data + status map. */

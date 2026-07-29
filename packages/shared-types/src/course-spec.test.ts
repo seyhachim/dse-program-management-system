@@ -17,6 +17,7 @@ import {
   mappingDistribution,
   cloAlignmentAverages,
   componentsMapped,
+  COMPLETABLE_SPEC_SECTIONS,
 } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
@@ -204,4 +205,14 @@ test("componentsMapped counts refs with at least one aligned (>=1) cell", () => 
 
 test("mapping is registered in SPEC_SECTION_SCHEMAS", () => {
   expect(SPEC_SECTION_SCHEMAS.mapping).toBe(MappingSection);
+});
+
+test("COMPLETABLE_SPEC_SECTIONS is the save-able sections, in SPEC_SECTIONS order", () => {
+  expect(COMPLETABLE_SPEC_SECTIONS.map((s) => s.id)).toEqual([
+    "courseInfo",
+    "clos",
+    "slt",
+    "assessmentPlan",
+    "mapping",
+  ]);
 });
