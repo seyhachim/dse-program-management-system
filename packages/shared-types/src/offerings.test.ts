@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test";
-import { coLecturerViolation, CreateCourseInput, UpdateCourseInput } from "./courses.ts";
+import { coLecturerViolation, CreateOfferingInput, UpdateOfferingInput } from "./offerings.ts";
 
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
+const COURSE = "33333333-3333-3333-3333-333333333333";
 
 test("coLecturerViolation is null when unset or empty", () => {
   expect(coLecturerViolation({})).toBeNull();
@@ -23,33 +24,37 @@ test("coLecturerViolation flags the primary lecturer also listed as a co-lecture
   expect(coLecturerViolation({ lecturerId: A, coLecturerIds: [A, B] })).toBe("primaryIsCoLecturer");
 });
 
-test("CreateCourseInput rejects duplicate co-lecturers", () => {
-  const result = CreateCourseInput.safeParse({ code: "CS101", title: "Intro", coLecturerIds: [A, A] });
+test("CreateOfferingInput rejects duplicate co-lecturers", () => {
+  const result = CreateOfferingInput.safeParse({
+    courseId: COURSE,
+    term: "2025-Fall",
+    coLecturerIds: [A, A],
+  });
   expect(result.success).toBe(false);
 });
 
-test("CreateCourseInput rejects the primary lecturer listed as a co-lecturer", () => {
-  const result = CreateCourseInput.safeParse({
-    code: "CS101",
-    title: "Intro",
+test("CreateOfferingInput rejects the primary lecturer listed as a co-lecturer", () => {
+  const result = CreateOfferingInput.safeParse({
+    courseId: COURSE,
+    term: "2025-Fall",
     lecturerId: A,
     coLecturerIds: [A],
   });
   expect(result.success).toBe(false);
 });
 
-test("CreateCourseInput accepts a valid co-lecturer assignment", () => {
-  const result = CreateCourseInput.safeParse({
-    code: "CS101",
-    title: "Intro",
+test("CreateOfferingInput accepts a valid co-lecturer assignment", () => {
+  const result = CreateOfferingInput.safeParse({
+    courseId: COURSE,
+    term: "2025-Fall",
     lecturerId: A,
     coLecturerIds: [B],
   });
   expect(result.success).toBe(true);
 });
 
-test("UpdateCourseInput applies the same invariant on a partial patch", () => {
-  expect(UpdateCourseInput.safeParse({ lecturerId: A, coLecturerIds: [A] }).success).toBe(false);
-  expect(UpdateCourseInput.safeParse({ coLecturerIds: [B] }).success).toBe(true);
-  expect(UpdateCourseInput.safeParse({}).success).toBe(true);
+test("UpdateOfferingInput applies the same invariant on a partial patch", () => {
+  expect(UpdateOfferingInput.safeParse({ lecturerId: A, coLecturerIds: [A] }).success).toBe(false);
+  expect(UpdateOfferingInput.safeParse({ coLecturerIds: [B] }).success).toBe(true);
+  expect(UpdateOfferingInput.safeParse({}).success).toBe(true);
 });

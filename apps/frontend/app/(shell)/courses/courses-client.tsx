@@ -58,20 +58,6 @@ export function CoursesClient() {
     { key: "code", header: "Code", render: (c) => <span className="font-medium">{c.code}</span> },
     { key: "title", header: "Title", render: (c) => c.title },
     {
-      key: "lecturer",
-      header: "Lecturer",
-      render: (c) => (
-        <div className="flex flex-col">
-          <span>{c.lecturer?.name ?? <span className="text-muted-foreground">—</span>}</span>
-          {c.coLecturers.length > 0 ? (
-            <span className="text-xs text-muted-foreground">
-              +{c.coLecturers.length} co-lecturer{c.coLecturers.length === 1 ? "" : "s"}
-            </span>
-          ) : null}
-        </div>
-      ),
-    },
-    {
       key: "credits",
       header: "Credits",
       render: (c) =>

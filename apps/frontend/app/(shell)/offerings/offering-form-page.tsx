@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CreateOfferingInput,
@@ -32,6 +32,7 @@ const emptyDefaults: OfferingFormValues = {
   courseId: "",
   term: "",
   lecturerId: null,
+  coLecturerIds: [],
   capacity: 30,
   status: "Planned",
   otherLecturers: "",
@@ -62,6 +63,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     resolver: zodResolver(CreateOfferingInput),
     defaultValues: emptyDefaults,
   });
+  const lecturerId = useWatch({ control, name: "lecturerId" }) ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +86,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
             courseId: offering.course?.id ?? "",
             term: offering.term,
             lecturerId: offering.lecturer?.id ?? null,
+            coLecturerIds: offering.coLecturers.map((l) => l.id),
             capacity: offering.capacity,
             status: offering.status,
             otherLecturers: offering.otherLecturers ?? "",
@@ -110,6 +113,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     const payload = {
       ...values,
       lecturerId: values.lecturerId || null,
+      coLecturerIds: values.coLecturerIds ?? [],
       semester: (semester || null) as Semester | null,
       programmeYear: programmeYear ? Number(programmeYear) : null,
       otherLecturers: values.otherLecturers?.trim() || undefined,
@@ -177,6 +181,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 errors={errors}
                 courses={courses}
                 lecturers={lecturers}
+                lecturerId={lecturerId}
                 courseLocked={editing}
                 semester={semester}
                 onSemesterChange={setSemester}

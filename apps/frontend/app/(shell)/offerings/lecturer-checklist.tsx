@@ -4,9 +4,9 @@ import type { Lecturer } from "@dse-pms/shared-types";
 
 /**
  * A multi-select checkbox list of lecturers — the co-lecturer picker (issue
- * #73). Mirrors the §14 CLO method checklist's visual pattern
+ * #79). Mirrors the §14 CLO method checklist's visual pattern
  * (spec/method-checklist.tsx), kept as its own component since it's scoped to
- * the Course admin form rather than the spec wizard.
+ * the Offering admin form rather than the spec wizard.
  */
 export function LecturerChecklist({
   label,
