@@ -17,9 +17,10 @@ enum StudentStatus {
 }
 
 /// User.role's storage type. Named UserRole (not Role) so it doesn't collide with
-/// the Role model below — the normalized role/permission tables are additive for
-/// now (see Role/Permission/RolePermission doc comment); User.role still reads
-/// this enum directly. See https://github.com/thymadona/dse-program-management-system/issues/65.
+/// the Role model below. `User.role` is no longer read by app code (see the
+/// normalized Role/Permission/RolePermission and UserRoleAssignment doc comments)
+/// but stays written until issue #77 phase C drops it.
+/// See https://github.com/thymadona/dse-program-management-system/issues/65.
 enum UserRole {
   admin
   lecturer
@@ -63,10 +64,11 @@ model User {
   authId        String?  @unique
   email         String   @unique
   name          String
-  // Expand/contract (issue #67): `role` is the enum column, still present but no
-  // longer read by app code — `roleId`/`roleRef` is the new source of truth. Kept
-  // around (not dropped) so a mid-deploy state can't break either version of the
-  // code; dropping it is a separate follow-up once this has run in production.
+  // Expand/contract (issues #67, #77): `role`/`roleId`/`roleRef` are no longer
+  // read by app code as of #77 phase B — `roleAssignments` (UserRoleAssignment)
+  // is the source of truth. Kept around, still written by every creation path,
+  // so a mid-deploy state can't break either version of the code; dropping them
+  // is #77 phase C, once phase B has run in production for a while.
   role          UserRole @default(student)
   roleId        String
   roleRef       Role     @relation(fields: [roleId], references: [id])
@@ -127,14 +129,15 @@ model RolePermission {
   @@id([roleId, permissionId])
 }
 
-/// Additive many-to-many bridge for User<->Role (issue #77, phase A). Named
-/// `UserRoleAssignment` rather than `UserRole` because that name is already the
-/// legacy enum on `User.role`. The migration backfilled one row per existing
-/// `User.roleId`; every path that creates or reassigns a User's role since
+/// Many-to-many bridge for User<->Role (issue #77). Named `UserRoleAssignment`
+/// rather than `UserRole` because that name is already the legacy enum on
+/// `User.role`. Phase A's migration backfilled one row per existing
+/// `User.roleId`; every path that creates or reassigns a User's role
 /// (`auth.createAccount`, `lecturers.create`, `prisma/seed.ts`) keeps a matching
-/// row here too — but it's not yet read by any app code: `User.roleId`/`roleRef`
-/// remains the sole enforcement path until phase B switches `requirePermission`
-/// over and phase C drops `role`/`roleId`.
+/// row here too. As of phase B this is the sole authorization source of truth
+/// (`core/auth/middleware.ts`, `core/permissions/index.ts`) — `User.role`/
+/// `roleId`/`roleRef` are still written but no longer read anywhere, kept only
+/// until phase C drops them.
 model UserRoleAssignment {
   userId    String
   roleId    String

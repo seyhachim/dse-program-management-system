@@ -69,9 +69,10 @@ function loadPermissionCache(): Promise<Record<string, Set<string>>> {
   return permissionCache;
 }
 
-export async function roleHasPermission(role: Role, permission: string): Promise<boolean> {
+/** True if any of `roles` grants `permission` (issue #77 phase B — a caller can hold more than one role). */
+export async function roleHasPermission(roles: Role[], permission: string): Promise<boolean> {
   const cache = await loadPermissionCache();
-  return cache[role]?.has(permission) ?? false;
+  return roles.some((role) => cache[role]?.has(permission) ?? false);
 }
 
 /**
@@ -85,7 +86,7 @@ export function requirePermission(permission: string) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    if (!(await roleHasPermission(user.role, permission))) {
+    if (!(await roleHasPermission(user.roles, permission))) {
       res.status(403).json({ error: `Missing permission: ${permission}` });
       return;
     }

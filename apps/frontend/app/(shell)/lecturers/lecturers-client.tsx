@@ -44,7 +44,7 @@ export function LecturersClient() {
   useEffect(() => {
     authApi
       .me()
-      .then((me) => setIsAdmin(me.role === "admin"))
+      .then((me) => setIsAdmin(me.roles.includes("admin")))
       .catch(() => setIsAdmin(false));
   }, []);
 

@@ -31,9 +31,9 @@ import {
 export function AppSidebar() {
   const pathname = usePathname();
   const { me, loading } = useMe();
-  // Only show nav the caller's role is allowed to see. While `me` loads we show
+  // Only show nav the caller's roles are allowed to see. While `me` loads we show
   // skeletons rather than the full list, so restricted items never flash in.
-  const groups = me ? getNavGroups(me.role) : [];
+  const groups = me ? getNavGroups(me.roles) : [];
   // "footer" is a special group label rendered in the sidebar footer (e.g. Help
   // & Support) instead of the main scrollable nav list.
   const footerRoutes = groups.find((g) => g.label === "footer")?.routes ?? [];

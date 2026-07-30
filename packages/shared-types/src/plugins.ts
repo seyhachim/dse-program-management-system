@@ -184,9 +184,14 @@ export const pluginManifests: PluginManifest[] = [
   authManifest,
 ];
 
-/** Whether `route` is visible to `role` (a route with no `roles` is open to all). */
-export function routeAllowsRole(route: PluginRoute, role: Role): boolean {
-  return route.roles === undefined || route.roles.includes(role);
+/**
+ * Whether `route` is visible to a caller holding `roles` (issue #77 phase B —
+ * a caller can hold more than one role, so this is a union check: the route
+ * needs only one of the caller's roles to match, not all of them). A route
+ * with no `roles` restriction is open to everyone.
+ */
+export function routeAllowsRole(route: PluginRoute, roles: Role[]): boolean {
+  return route.roles === undefined || route.roles.some((r) => roles.includes(r));
 }
 
 /** Sidebar nav is generated automatically from plugin routes. */
@@ -194,9 +199,9 @@ export function navFromManifests(manifests: PluginManifest[]): PluginRoute[] {
   return manifests.flatMap((m) => m.routes ?? []);
 }
 
-/** Nav routes a given role may see — `navFromManifests` filtered by `roles`. */
-export function navForRole(manifests: PluginManifest[], role: Role): PluginRoute[] {
-  return navFromManifests(manifests).filter((r) => routeAllowsRole(r, role));
+/** Nav routes visible to a caller holding any of `roles` — the union across all of them. */
+export function navForRole(manifests: PluginManifest[], roles: Role[]): PluginRoute[] {
+  return navFromManifests(manifests).filter((r) => routeAllowsRole(r, roles));
 }
 
 /** One sidebar section: `label` undefined = ungrouped, rendered with no heading. */
@@ -206,14 +211,14 @@ export interface NavGroup {
 }
 
 /**
- * Nav routes for `role`, bucketed by `route.group` and ordered by each
+ * Nav routes for `roles` (union across all of them), bucketed by `route.group` and ordered by each
  * group's first appearance across `manifests` — no separate priority field,
  * the manifest array order is the display order.
  */
-export function navGroupsForRole(manifests: PluginManifest[], role: Role): NavGroup[] {
+export function navGroupsForRole(manifests: PluginManifest[], roles: Role[]): NavGroup[] {
   const order: (string | undefined)[] = [];
   const buckets = new Map<string | undefined, PluginRoute[]>();
-  for (const route of navForRole(manifests, role)) {
+  for (const route of navForRole(manifests, roles)) {
     if (!buckets.has(route.group)) {
       buckets.set(route.group, []);
       order.push(route.group);

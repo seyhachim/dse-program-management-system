@@ -108,7 +108,7 @@ async function assertOwnOfferingOrAdmin(
   req: import("express").Request,
   res: import("express").Response,
 ): Promise<boolean> {
-  if (req.user!.role === "admin") return true;
+  if (req.user!.roles.includes("admin")) return true;
   const offering = await offeringService.getById(req.params.id!);
   const isAssigned =
     offering?.lecturer?.id === req.user!.id || offering?.coLecturers.some((c) => c.id === req.user!.id);

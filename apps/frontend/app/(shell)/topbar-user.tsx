@@ -26,7 +26,12 @@ function initialsOf(name: string): string {
     .join("");
 }
 
-/** Profile pic (initials avatar), name, role title, and a dropdown with account info, theme and sign out. */
+/** Comma-joined role titles (e.g. "Admin, Lecturer") — a caller can hold more than one role (issue #77). */
+function rolesOf(roles: string[]): string {
+  return roles.join(", ");
+}
+
+/** Profile pic (initials avatar), name, role title(s), and a dropdown with account info, theme and sign out. */
 export function TopbarUser() {
   const router = useRouter();
   const { me } = useMe();
@@ -55,7 +60,7 @@ export function TopbarUser() {
             </div>
             <div className="text-left leading-tight">
               <p className="text-sm font-medium text-foreground">{me.name}</p>
-              <p className="text-xs capitalize text-muted-foreground">{me.role}</p>
+              <p className="text-xs capitalize text-muted-foreground">{rolesOf(me.roles)}</p>
             </div>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -64,7 +69,7 @@ export function TopbarUser() {
       <DropdownMenuContent align="end">
         <div className="px-2 py-1.5 text-xs">
           <p className="text-foreground">{me.email}</p>
-          <p className="capitalize text-muted-foreground">{me.role}</p>
+          <p className="capitalize text-muted-foreground">{rolesOf(me.roles)}</p>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuSub>

@@ -39,12 +39,28 @@ function getAdminClient(): SupabaseClient {
 }
 
 export const authService = {
-  /** Full profile (incl. name) for the resolved caller — `req.user` only carries id/email/role. */
+  /** Full profile (incl. name) for the resolved caller — `req.user` only carries id/email/roles. */
   async me(userId: string) {
-    return prisma.user.findUniqueOrThrow({
+    const user = await prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, email: true, role: true, name: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        name: true,
+        roleAssignments: { select: { role: { select: { slug: true } } } },
+      },
     });
+    // Fall back to the legacy single role if a row somehow has no assignments
+    // yet — see the same fallback in core/auth/middleware.ts.
+    const roles = user.roleAssignments.map((a) => a.role.slug);
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      roles: roles.length > 0 ? roles : [user.role],
+    };
   },
 
   /**
@@ -82,17 +98,21 @@ export const authService = {
       select: accountSelect,
     });
 
-    // Additive join table (issue #77 phase A) — not read by app code yet, but
-    // kept populated here (not just by seed.ts) so real accounts aren't missing
-    // rows once a later phase starts enforcing off it.
+    // UserRoleAssignment (issue #77 phase B) is what enforcement now reads —
+    // keep it populated here, not just by seed.ts. Reassigning an existing
+    // email to a different role also drops its old assignment, mirroring the
+    // roleRef overwrite just above.
     const role = await prisma.role.findUniqueOrThrow({ where: { slug: input.role } });
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
       update: {},
       create: { userId: user.id, roleId: role.id },
     });
+    await prisma.userRoleAssignment.deleteMany({
+      where: { userId: user.id, roleId: { not: role.id } },
+    });
 
-    return user;
+    return { ...user, roles: [role.slug] };
   },
 
   /**
