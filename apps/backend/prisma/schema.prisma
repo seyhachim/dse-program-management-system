@@ -75,10 +75,11 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed   Course[]             @relation("CourseLecturer")
-  offeringsLed Offering[]           @relation("OfferingLecturer")
-  rubricsOwned Rubric[]             @relation("RubricOwner")
-  coLecturerOf OfferingCoLecturer[] @relation("OfferingCoLecturer")
+  coursesLed      Course[]             @relation("CourseLecturer")
+  offeringsLed    Offering[]           @relation("OfferingLecturer")
+  rubricsOwned    Rubric[]             @relation("RubricOwner")
+  coLecturerOf    OfferingCoLecturer[] @relation("OfferingCoLecturer")
+  roleAssignments UserRoleAssignment[]
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -97,6 +98,7 @@ model Role {
 
   users           User[]
   rolePermissions RolePermission[]
+  userAssignments UserRoleAssignment[]
 }
 
 model Permission {
@@ -123,6 +125,24 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
+}
+
+/// Additive many-to-many bridge for User<->Role (issue #77, phase A). Named
+/// `UserRoleAssignment` rather than `UserRole` because that name is already the
+/// legacy enum on `User.role`. Backfilled from `User.roleId` on creation, kept
+/// in sync by seed.ts — but not yet read by any app code: `User.roleId`/`roleRef`
+/// remains the sole enforcement path until phase B switches `requirePermission`
+/// over and phase C drops `role`/`roleId`.
+model UserRoleAssignment {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
 }
 
 /// Students plugin domain model.

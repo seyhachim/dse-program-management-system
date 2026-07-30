@@ -88,14 +88,18 @@ an API call and is what lets a plugin be added or removed without touching other
 sets `req.user: AuthUser` and every downstream check depends only on that shape. In
 `supabase` mode `resolveSupabaseUser` looks the caller up in our own `User` table (by
 `authId`, falling back to `email` and backfilling `authId` on first login — the
-`user_auth_id` migration added that column), and **`User.role` is the authorization
-source of truth** so Supabase metadata can never escalate a role. A valid Supabase
-login with no provisioned `User` row is a 403 (`UnprovisionedAccountError`).
+`user_auth_id` migration added that column), and **`User.roleId`/`roleRef` is the
+authorization source of truth** (not the legacy `User.role` enum column, kept but
+unread since issue #67) so Supabase metadata can never escalate a role. A valid
+Supabase login with no provisioned `User` row is a 403 (`UnprovisionedAccountError`).
 
-`core/permissions/index.ts` holds the single `ROLE_PERMISSIONS` map (role → permission
-strings) and the `requirePermission(...)` guard factory — plugins declare which
-permission a route needs, this map is the one auditable place deciding which roles hold
-it. Every plugin router calls `requireAuth` then `requirePermission(...)` per route
+`core/permissions/index.ts` builds an in-memory cache from the DB (`Role` →
+`RolePermission` → `Permission`, loaded once and never invalidated since nothing
+mutates those tables at runtime yet) and exposes `requirePermission(...)`, the guard
+factory plugins use — this cache, not a hardcoded map, is the one auditable place
+deciding which roles hold a permission (`ROLE_PERMISSIONS_LEGACY` in the same file is
+dead code, kept only as a rollback reference for issue #67's cutover). Every plugin
+router calls `requireAuth` then `requirePermission(...)` per route
 (`"<id>:read"|"<id>:write"`, plus the admin-only `"accounts:create"`). `requirePermission`
 only checks that coarse permission string; row-level ownership is a separate check layered
 on top in the plugins that need it — e.g. `courses/router.ts`'s `ensureCourseAccess` and
@@ -108,11 +112,15 @@ lecturer and does not by itself grant visibility; lecturer/co-lecturer assignmen
 happens on the Offering form (issue #71), never on the Course form — `Offering.lecturerId`
 is a separate per-term assignment from `Course.lecturerId` and isn't affected by it.
 
-A normalized `Role`/`Permission`/`RolePermission` schema also exists (`schema.prisma`),
-seeded by `prisma/seed.ts` to mirror `ROLE_PERMISSIONS` as DB rows — but it's additive
-only so far (issue #65 phase 1): `User.role` (the `UserRole` enum) and the hardcoded map
-above remain the actual enforcement path until a follow-up phase wires `User.roleId` to
-it and switches `requirePermission` to read from the DB instead.
+The normalized `Role`/`Permission`/`RolePermission` schema (`schema.prisma`, issue #65)
+is seeded by `prisma/seed.ts` and, as of issue #67, is the live enforcement path
+described above — `User.roleId` is a required FK to `Role`, one role per user. Issue
+#77 is migrating that to many-to-many in expand/contract phases mirroring #65-#67:
+phase A (landed) added an additive `UserRoleAssignment` join table (named to avoid
+colliding with the `UserRole` enum), backfilled from `User.roleId` and kept in sync by
+`prisma/seed.ts`, but not yet read anywhere — `User.roleId`/`roleRef` remains sole
+enforcement until a phase B cutover, with `role`/`roleId`/the `UserRole` enum dropped
+only in a later phase C once B has run in production for a while.
 
 **Account provisioning** is the `auth` plugin. `GET /api/auth/me` returns the resolved
 caller; `POST /api/auth/accounts` (admin-only, `accounts:create`) creates a lecturer
