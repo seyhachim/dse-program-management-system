@@ -75,10 +75,7 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
     throw new UnprovisionedAccountError("No account provisioned for this login");
   }
 
-  // UserRoleAssignment is the authorization source of truth (issue #77 phase B).
-  // Fall back to the legacy single role if a row somehow has no assignments yet
-  // (shouldn't happen — every creation path writes one — but a 403 for a caller
-  // with a perfectly valid roleId would be a worse failure mode than this).
+  // UserRoleAssignment is the authorization source of truth (issue #77).
   const roles = user.roleAssignments.map((a) => a.role.slug as Role);
-  return { id: user.id, email: user.email, roles: roles.length > 0 ? roles : [user.role as Role] };
+  return { id: user.id, email: user.email, roles };
 }

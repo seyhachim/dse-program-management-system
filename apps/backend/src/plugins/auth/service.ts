@@ -16,7 +16,6 @@ const accountSelect = {
   authId: true,
   name: true,
   email: true,
-  role: true,
 } as const;
 
 export class ProvisioningError extends Error {}
@@ -46,20 +45,20 @@ export const authService = {
       select: {
         id: true,
         email: true,
-        role: true,
         name: true,
         roleAssignments: { select: { role: { select: { slug: true } } } },
       },
     });
-    // Fall back to the legacy single role if a row somehow has no assignments
-    // yet — see the same fallback in core/auth/middleware.ts.
+    // Every creation path writes a UserRoleAssignment row, so this is always
+    // non-empty in practice (the legacy single-role column it used to fall
+    // back to was dropped in issue #77 phase C).
     const roles = user.roleAssignments.map((a) => a.role.slug);
     return {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role,
-      roles: roles.length > 0 ? roles : [user.role],
+      role: roles[0],
+      roles,
     };
   },
 
@@ -85,23 +84,18 @@ export const authService = {
       update: {
         authId: data.user.id,
         name: input.name,
-        role: input.role,
-        roleRef: { connect: { slug: input.role } },
       },
       create: {
         authId: data.user.id,
         email: input.email,
         name: input.name,
-        role: input.role,
-        roleRef: { connect: { slug: input.role } },
       },
       select: accountSelect,
     });
 
-    // UserRoleAssignment (issue #77 phase B) is what enforcement now reads —
-    // keep it populated here, not just by seed.ts. Reassigning an existing
-    // email to a different role also drops its old assignment, mirroring the
-    // roleRef overwrite just above.
+    // UserRoleAssignment is the role source of truth — keep it populated here,
+    // not just by seed.ts. Reassigning an existing email to a different role
+    // also drops its old assignment.
     const role = await prisma.role.findUniqueOrThrow({ where: { slug: input.role } });
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
@@ -112,7 +106,7 @@ export const authService = {
       where: { userId: user.id, roleId: { not: role.id } },
     });
 
-    return { ...user, roles: [role.slug] };
+    return { ...user, role: role.slug, roles: [role.slug] };
   },
 
   /**
