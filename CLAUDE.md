@@ -54,8 +54,8 @@ style `base-luma` — see `packages/ui/components.json`). Actual brand colour
 
 ### Plugin registry (backend)
 
-Each domain (`students`, `courses`, `offerings`, `lecturers`, `methods`, `auth`) lives
-under `apps/backend/src/plugins/<id>/` as `index.ts` (exports a `BackendPlugin` — the
+Each domain (`students`, `courses`, `offerings`, `lecturers`, `methods`, `rubrics`,
+`auth`) lives under `apps/backend/src/plugins/<id>/` as `index.ts` (exports a `BackendPlugin` — the
 shared `DSEPlugin` contract plus an Express router + service) + `router.ts` +
 `service.ts`. `core/app.ts` is the only place
 plugins are registered (`registry.register(...)`) and is deliberately domain-agnostic:
