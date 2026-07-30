@@ -241,15 +241,15 @@ async function main() {
   }
 
   for (const u of users) {
-    const roleRef = { connect: { slug: u.role } };
+    const { role: roleSlug, ...userData } = u;
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: { ...u, roleRef },
-      create: { ...u, roleRef },
+      update: userData,
+      create: userData,
     });
-    // Keep the additive UserRoleAssignment join table (issue #77 phase A) in
-    // sync with roleRef so a fresh/re-seeded DB isn't missing join rows.
-    const role = await prisma.role.findUniqueOrThrow({ where: { slug: u.role } });
+    // Keep UserRoleAssignment (the role source of truth, issue #77 phase C) in
+    // sync with each seed user's `role` field above.
+    const role = await prisma.role.findUniqueOrThrow({ where: { slug: roleSlug } });
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
       update: {},

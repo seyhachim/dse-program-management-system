@@ -92,10 +92,10 @@ sets `req.user: AuthUser` (`{ id, email, roles: Role[] }` — a caller can hold 
 than one role) and every downstream check depends only on that shape. In `supabase`
 mode `resolveSupabaseUser` looks the caller up in our own `User` table (by `authId`,
 falling back to `email` and backfilling `authId` on first login — the `user_auth_id`
-migration added that column), and **`UserRoleAssignment` is the authorization source
-of truth** (not the legacy `User.role`/`roleId` columns, kept in sync but unread
-since issue #77 phase B) so Supabase metadata can never escalate a role. A valid
-Supabase login with no provisioned `User` row is a 403 (`UnprovisionedAccountError`).
+migration added that column), and **`UserRoleAssignment` is the sole role/authorization
+source of truth** — `User` has no `role`/`roleId` column at all (dropped in issue #77
+phase C) — so Supabase metadata can never escalate a role. A valid Supabase login with
+no provisioned `User` row is a 403 (`UnprovisionedAccountError`).
 
 `core/permissions/index.ts` builds an in-memory cache from the DB (`Role` →
 `RolePermission` → `Permission`, loaded once and never invalidated since nothing
@@ -126,17 +126,17 @@ many-to-many in expand/contract phases mirroring #65-#67: phase A added an addit
 `UserRoleAssignment` join table (named to avoid colliding with the legacy `UserRole`
 enum), backfilled from `User.roleId` and kept in sync by every path that
 creates/reassigns a role (`auth.createAccount`, `lecturers.create`, `prisma/seed.ts`).
-Phase B (landed) cut enforcement over to it — `AuthUser`/`GET /api/auth/me`
-(`MeResponse`) now carry `roles: Role[]`, and the frontend nav/ownership checks
-(`routeAllowsRole`, `navForRole`, `navGroupsForRole` in `packages/shared-types`) take
-a `Role[]` and match on any one of them. `User.role`/`roleId`/`roleRef` are still
-written by every creation path (so a mid-rollout state can't diverge) but no longer
-read by enforcement anywhere. `GET /api/auth/me` also still returns a single `role`
-field (the primary/first role) alongside `roles`, purely so a frontend bundle
-deployed before this field existed doesn't break during the Render/Vercel deploy-skew
-window — drop it once that's no longer a concern. Phase C (not yet started) drops
-`role`/`roleId`/the `UserRole` enum once phase B has run in production for a while;
-that's the point a production backup is actually warranted.
+Phase B cut enforcement over to it — `AuthUser`/`GET /api/auth/me` (`MeResponse`) carry
+`roles: Role[]`, and the frontend nav/ownership checks (`routeAllowsRole`, `navForRole`,
+`navGroupsForRole` in `packages/shared-types`) take a `Role[]` and match on any one of
+them. Phase C (landed) dropped `User.role`/`roleId`/the `UserRole` enum outright —
+`lecturers/service.ts`'s `list`/`getById`/`update`/`remove` (previously filtering on
+`role: "lecturer"`) now filter on `roleAssignments: { some: { role: { slug: "lecturer" } } }`
+instead, since that column-based filter would otherwise have broken on the drop.
+`GET /api/auth/me` still returns a single `role` field (now just `roles[0]`, the
+primary/first role) alongside `roles`, purely so a frontend bundle deployed before
+`roles` existed doesn't break during the Render/Vercel deploy-skew window — drop it
+once that's no longer a concern.
 
 **Account provisioning** is the `auth` plugin. `GET /api/auth/me` returns the resolved
 caller; `POST /api/auth/accounts` (admin-only, `accounts:create`) creates a lecturer

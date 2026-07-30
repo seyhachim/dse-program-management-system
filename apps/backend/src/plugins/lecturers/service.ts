@@ -25,12 +25,15 @@ const lecturerSelect = {
   phone: true,
 } as const;
 
+/** A User holding the "lecturer" role, per UserRoleAssignment (issue #77 phase C). */
+const isLecturer = { roleAssignments: { some: { role: { slug: "lecturer" } } } } as const;
+
 export const lecturerService = {
   list(query: ListLecturersQuery = {}) {
     const { search } = query;
     return prisma.user.findMany({
       where: {
-        role: "lecturer",
+        ...isLecturer,
         ...(search
           ? {
               OR: [
@@ -47,20 +50,19 @@ export const lecturerService = {
 
   getById(id: string) {
     return prisma.user.findFirst({
-      where: { id, role: "lecturer" },
+      where: { id, ...isLecturer },
       select: lecturerSelect,
     });
   },
 
   async create(input: CreateLecturerInput) {
     const user = await prisma.user.create({
-      data: { ...input, role: "lecturer", roleRef: { connect: { slug: "lecturer" } } },
+      data: input,
       select: lecturerSelect,
     });
 
-    // Additive join table (issue #77 phase A) — not read by app code yet, but
-    // kept populated here (not just by seed.ts) so real accounts aren't missing
-    // rows once a later phase starts enforcing off it.
+    // Keep UserRoleAssignment (the role source of truth) populated here, not
+    // just by seed.ts.
     const role = await prisma.role.findUniqueOrThrow({ where: { slug: "lecturer" } });
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
@@ -73,14 +75,14 @@ export const lecturerService = {
 
   async update(id: string, input: UpdateLecturerInput) {
     // Scope the update to lecturers so this endpoint can't mutate admins/students.
-    const existing = await prisma.user.findFirst({ where: { id, role: "lecturer" }, select: { id: true } });
+    const existing = await prisma.user.findFirst({ where: { id, ...isLecturer }, select: { id: true } });
     if (!existing) throw new NotFoundError("Lecturer not found");
     return prisma.user.update({ where: { id }, data: input, select: lecturerSelect });
   },
 
   async remove(id: string) {
     const existing = await prisma.user.findFirst({
-      where: { id, role: "lecturer" },
+      where: { id, ...isLecturer },
       select: { id: true, authId: true },
     });
     if (!existing) throw new NotFoundError("Lecturer not found");
