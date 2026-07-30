@@ -64,7 +64,7 @@ export const authService = {
       throw new ProvisioningError(error?.message ?? "Supabase could not invite the user");
     }
 
-    return prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { email: input.email },
       update: {
         authId: data.user.id,
@@ -81,6 +81,18 @@ export const authService = {
       },
       select: accountSelect,
     });
+
+    // Additive join table (issue #77 phase A) — not read by app code yet, but
+    // kept populated here (not just by seed.ts) so real accounts aren't missing
+    // rows once a later phase starts enforcing off it.
+    const role = await prisma.role.findUniqueOrThrow({ where: { slug: input.role } });
+    await prisma.userRoleAssignment.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      update: {},
+      create: { userId: user.id, roleId: role.id },
+    });
+
+    return user;
   },
 
   /**
