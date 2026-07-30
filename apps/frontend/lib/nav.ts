@@ -51,12 +51,12 @@ export const iconMap: Record<string, LucideIcon> = {
   "help-circle": HelpCircle,
 };
 
-/** All nav routes, or — when a role is given — only those that role may see. */
-export function getNavRoutes(role?: Role): PluginRoute[] {
-  return role ? navForRole(pluginManifests, role) : navFromManifests(pluginManifests);
+/** All nav routes, or — when roles are given — only those the caller's roles may see. */
+export function getNavRoutes(roles?: Role[]): PluginRoute[] {
+  return roles ? navForRole(pluginManifests, roles) : navFromManifests(pluginManifests);
 }
 
-/** Nav routes for `role`, grouped into sidebar sections (see `NavGroup`). */
-export function getNavGroups(role: Role): NavGroup[] {
-  return navGroupsForRole(pluginManifests, role);
+/** Nav routes for `roles` (union across all of them), grouped into sidebar sections (see `NavGroup`). */
+export function getNavGroups(roles: Role[]): NavGroup[] {
+  return navGroupsForRole(pluginManifests, roles);
 }

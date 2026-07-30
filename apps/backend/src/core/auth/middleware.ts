@@ -23,8 +23,9 @@ declare global {
  * app reads the raw token. In `dev` mode it verifies a local HS256 token whole.
  * In `supabase` mode it verifies the Supabase JWT for identity only, then
  * resolves the caller to an app `User` row (by authId, falling back to email and
- * backfilling authId on first login) — the `User.role` is the authorization
- * source of truth. A valid Supabase login with no provisioned `User` is 403.
+ * backfilling authId on first login) — the `UserRoleAssignment` join table
+ * (issue #77 phase B) is the authorization source of truth. A valid Supabase
+ * login with no provisioned `User` is 403.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization ?? "";
@@ -52,18 +53,20 @@ class UnprovisionedAccountError extends Error {}
 async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   const { authId, email } = await verifySupabaseToken(token);
 
+  const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
+
   // Prefer the stable auth uid; fall back to email so pre-existing seeded
   // profiles (created before they ever logged in) link on first login.
-  let user = await prisma.user.findUnique({ where: { authId }, include: { roleRef: true } });
+  let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
   if (!user) {
-    const byEmail = await prisma.user.findUnique({ where: { email }, include: { roleRef: true } });
+    const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
     if (byEmail) {
       user = byEmail.authId
         ? byEmail
         : await prisma.user.update({
             where: { id: byEmail.id },
             data: { authId },
-            include: { roleRef: true },
+            include: roleAssignmentsInclude,
           });
     }
   }
@@ -72,7 +75,10 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
     throw new UnprovisionedAccountError("No account provisioned for this login");
   }
 
-  // roleId is the authorization source of truth (issue #67) — the User.role enum
-  // column is kept in sync but no longer read here.
-  return { id: user.id, email: user.email, role: user.roleRef.slug as Role };
+  // UserRoleAssignment is the authorization source of truth (issue #77 phase B).
+  // Fall back to the legacy single role if a row somehow has no assignments yet
+  // (shouldn't happen — every creation path writes one — but a 403 for a caller
+  // with a perfectly valid roleId would be a worse failure mode than this).
+  const roles = user.roleAssignments.map((a) => a.role.slug as Role);
+  return { id: user.id, email: user.email, roles: roles.length > 0 ? roles : [user.role as Role] };
 }

@@ -17,11 +17,17 @@ export type CreateAccountInput = z.infer<typeof CreateAccountInput>;
 export const Role = z.enum(["admin", "lecturer", "student"]);
 export type Role = z.infer<typeof Role>;
 
-/** Shape returned by GET /api/auth/me — the resolved caller. */
+/**
+ * Shape returned by GET /api/auth/me — the resolved caller. `role` is the
+ * caller's primary role, kept alongside `roles` (issue #77 phase B, all of the
+ * caller's assigned roles) so a frontend bundle deployed before this field
+ * existed keeps working through the Render/Vercel deploy-skew window.
+ */
 export const MeResponse = z.object({
   id: z.string(),
   email: z.string().email(),
   role: Role,
+  roles: z.array(Role),
   name: z.string(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;

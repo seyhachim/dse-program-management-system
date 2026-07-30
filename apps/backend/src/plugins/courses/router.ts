@@ -16,7 +16,7 @@ import { courseService, ReferenceError } from "./service.ts";
  * and returns false. `requireAuth` has already run, so `req.user` is set.
  */
 async function ensureCourseAccess(req: Request, res: Response, courseId: string): Promise<boolean> {
-  if (req.user!.role === "admin") return true;
+  if (req.user!.roles.includes("admin")) return true;
   const course = await courseService.getById(courseId);
   if (!course) {
     res.status(404).json({ error: "Course not found" });
@@ -41,13 +41,13 @@ export function createCourseRouter(): Router {
       return;
     }
     // Non-admins only ever see the courses assigned to them.
-    const ownerScope = req.user!.role === "admin" ? undefined : req.user!.id;
+    const ownerScope = req.user!.roles.includes("admin") ? undefined : req.user!.id;
     res.json(await courseService.list(parsed.data, ownerScope));
   });
 
   // Static route registered before "/:id" so "spec-progress" isn't swallowed as a course id.
   router.get("/spec-progress", requirePermission("courses:read"), async (req, res) => {
-    const ownerScope = req.user!.role === "admin" ? undefined : req.user!.id;
+    const ownerScope = req.user!.roles.includes("admin") ? undefined : req.user!.id;
     res.json(await courseService.listSpecProgress(ownerScope));
   });
 

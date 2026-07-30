@@ -23,11 +23,11 @@ export function RoleAccessGuard({ children }: { children: React.ReactNode }) {
     .filter((r) => pathname === r.path || pathname.startsWith(`${r.path}/`))
     .sort((a, b) => b.path.length - a.path.length)[0];
 
-  const allowed = !me || !matched || routeAllowsRole(matched, me.role);
+  const allowed = !me || !matched || routeAllowsRole(matched, me.roles);
 
   useEffect(() => {
     if (loading || allowed) return;
-    const home = getNavRoutes(me!.role)[0];
+    const home = getNavRoutes(me!.roles)[0];
     router.replace(home ? home.path : "/login");
   }, [loading, allowed, me, router]);
 

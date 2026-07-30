@@ -16,7 +16,8 @@ export type Role = "admin" | "lecturer" | "student";
 export interface AuthUser {
   id: string;
   email: string;
-  role: Role;
+  /** All roles this caller holds (issue #77 phase B) — never empty. */
+  roles: Role[];
 }
 
 /**
@@ -43,21 +44,35 @@ export function signToken(
   user: AuthUser,
   expiresIn: jwt.SignOptions["expiresIn"] = "7d",
 ): string {
-  return jwt.sign({ email: user.email, role: user.role }, getSecret(), {
+  return jwt.sign({ email: user.email, roles: user.roles }, getSecret(), {
     subject: user.id,
     expiresIn,
   });
 }
 
+/**
+ * Accepts both the current `roles: Role[]` claim and the legacy single-`role`
+ * claim signed before issue #77 phase B — the live demo's `NEXT_PUBLIC_DEV_TOKEN`
+ * is a 7-day token already in the wild when this ships, so old tokens must keep
+ * verifying rather than 401ing until they naturally expire.
+ */
 export function verifyToken(token: string): AuthUser {
   const payload = jwt.verify(token, getSecret()) as jwt.JwtPayload;
-  if (!payload.sub || typeof payload.email !== "string" || typeof payload.role !== "string") {
+  if (!payload.sub || typeof payload.email !== "string") {
+    throw new Error("Malformed token payload");
+  }
+  const roles = Array.isArray(payload.roles)
+    ? (payload.roles as Role[])
+    : typeof payload.role === "string"
+      ? [payload.role as Role]
+      : undefined;
+  if (!roles || roles.length === 0) {
     throw new Error("Malformed token payload");
   }
   return {
     id: payload.sub,
     email: payload.email,
-    role: payload.role as Role,
+    roles,
   };
 }
 

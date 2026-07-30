@@ -78,19 +78,23 @@ an API call and is what lets a plugin be added or removed without touching other
 (default `dev`) and the two schemes coexist:
 
 - **`dev`** — local HS256 tokens minted by `signToken` / `bun run gen-token` and
-  verified whole by `verifyToken`. The token carries the role. Local dev and CI run
-  in this mode with no live Supabase project.
+  verified whole by `verifyToken`. The token carries a `roles: Role[]` claim (issue
+  #77 phase B); `verifyToken` also still accepts the legacy single-`role` claim
+  shape signed before that phase, since a token minted under the old shape can
+  still be in the wild (7-day expiry) when the new code deploys. Local dev and CI
+  run in this mode with no live Supabase project.
 - **`supabase`** — real Supabase-issued JWTs, verified against the project JWKS
   (`SUPABASE_JWKS_URL`) in `verifySupabaseToken`, which returns **identity only**
   (auth uid + email). The token is **never trusted for role**.
 
 `core/auth/middleware.ts` (`requireAuth`) is the only place a raw token is read; it
-sets `req.user: AuthUser` and every downstream check depends only on that shape. In
-`supabase` mode `resolveSupabaseUser` looks the caller up in our own `User` table (by
-`authId`, falling back to `email` and backfilling `authId` on first login — the
-`user_auth_id` migration added that column), and **`User.roleId`/`roleRef` is the
-authorization source of truth** (not the legacy `User.role` enum column, kept but
-unread since issue #67) so Supabase metadata can never escalate a role. A valid
+sets `req.user: AuthUser` (`{ id, email, roles: Role[] }` — a caller can hold more
+than one role) and every downstream check depends only on that shape. In `supabase`
+mode `resolveSupabaseUser` looks the caller up in our own `User` table (by `authId`,
+falling back to `email` and backfilling `authId` on first login — the `user_auth_id`
+migration added that column), and **`UserRoleAssignment` is the authorization source
+of truth** (not the legacy `User.role`/`roleId` columns, kept in sync but unread
+since issue #77 phase B) so Supabase metadata can never escalate a role. A valid
 Supabase login with no provisioned `User` row is a 403 (`UnprovisionedAccountError`).
 
 `core/permissions/index.ts` builds an in-memory cache from the DB (`Role` →
@@ -98,30 +102,41 @@ Supabase login with no provisioned `User` row is a 403 (`UnprovisionedAccountErr
 mutates those tables at runtime yet) and exposes `requirePermission(...)`, the guard
 factory plugins use — this cache, not a hardcoded map, is the one auditable place
 deciding which roles hold a permission (`ROLE_PERMISSIONS_LEGACY` in the same file is
-dead code, kept only as a rollback reference for issue #67's cutover). Every plugin
-router calls `requireAuth` then `requirePermission(...)` per route
-(`"<id>:read"|"<id>:write"`, plus the admin-only `"accounts:create"`). `requirePermission`
-only checks that coarse permission string; row-level ownership is a separate check layered
-on top in the plugins that need it — e.g. `courses/router.ts`'s `ensureCourseAccess` and
-the `ownerScope` passed into `courseService.list`/`listSpecProgress` (mirrored in
-`offerings/router.ts`) let admins see/act on every course or offering while a lecturer only
-sees courses they were actually offered — assigned as an `Offering`'s primary lecturer
-(`Offering.lecturerId`) *or* an assigned `OfferingCoLecturer` (issue #79) — either grants
-both read and write. `Course.lecturerId` is just the course record's on-file default
-lecturer and does not by itself grant visibility; lecturer/co-lecturer assignment only
-happens on the Offering form (issue #71), never on the Course form — `Offering.lecturerId`
-is a separate per-term assignment from `Course.lecturerId` and isn't affected by it.
+dead code, kept only as a rollback reference for issue #67's cutover). `roleHasPermission`
+takes the caller's full `roles` array and grants access if *any* role has the
+permission (a union, not an intersection). Every plugin router calls `requireAuth`
+then `requirePermission(...)` per route (`"<id>:read"|"<id>:write"`, plus the
+admin-only `"accounts:create"`). `requirePermission` only checks that coarse
+permission string; row-level ownership is a separate check layered on top in the
+plugins that need it — e.g. `courses/router.ts`'s `ensureCourseAccess` and the
+`ownerScope` passed into `courseService.list`/`listSpecProgress` (mirrored in
+`offerings/router.ts`, both now checking `req.user!.roles.includes("admin")`) let
+admins see/act on every course or offering while a lecturer only sees courses they
+were actually offered — assigned as an `Offering`'s primary lecturer
+(`Offering.lecturerId`) *or* an assigned `OfferingCoLecturer` (issue #79) — either
+grants both read and write. `Course.lecturerId` is just the course record's on-file
+default lecturer and does not by itself grant visibility; lecturer/co-lecturer
+assignment only happens on the Offering form (issue #71), never on the Course form —
+`Offering.lecturerId` is a separate per-term assignment from `Course.lecturerId` and
+isn't affected by it.
 
-The normalized `Role`/`Permission`/`RolePermission` schema (`schema.prisma`, issue #65)
-is seeded by `prisma/seed.ts` and, as of issue #67, is the live enforcement path
-described above — `User.roleId` is a required FK to `Role`, one role per user. Issue
-#77 is migrating that to many-to-many in expand/contract phases mirroring #65-#67:
-phase A (landed) added an additive `UserRoleAssignment` join table (named to avoid
-colliding with the `UserRole` enum), backfilled from `User.roleId` and kept in sync by
-every path that creates/reassigns a role (`auth.createAccount`, `lecturers.create`,
-`prisma/seed.ts`) — but not yet read anywhere: `User.roleId`/`roleRef` remains sole
-enforcement until a phase B cutover, with `role`/`roleId`/the `UserRole` enum dropped
-only in a later phase C once B has run in production for a while.
+The normalized `Role`/`Permission`/`RolePermission` schema (`schema.prisma`, issue
+#65) is seeded by `prisma/seed.ts`. Issue #77 migrated `User`↔`Role` from a 1:1 FK to
+many-to-many in expand/contract phases mirroring #65-#67: phase A added an additive
+`UserRoleAssignment` join table (named to avoid colliding with the legacy `UserRole`
+enum), backfilled from `User.roleId` and kept in sync by every path that
+creates/reassigns a role (`auth.createAccount`, `lecturers.create`, `prisma/seed.ts`).
+Phase B (landed) cut enforcement over to it — `AuthUser`/`GET /api/auth/me`
+(`MeResponse`) now carry `roles: Role[]`, and the frontend nav/ownership checks
+(`routeAllowsRole`, `navForRole`, `navGroupsForRole` in `packages/shared-types`) take
+a `Role[]` and match on any one of them. `User.role`/`roleId`/`roleRef` are still
+written by every creation path (so a mid-rollout state can't diverge) but no longer
+read by enforcement anywhere. `GET /api/auth/me` also still returns a single `role`
+field (the primary/first role) alongside `roles`, purely so a frontend bundle
+deployed before this field existed doesn't break during the Render/Vercel deploy-skew
+window — drop it once that's no longer a concern. Phase C (not yet started) drops
+`role`/`roleId`/the `UserRole` enum once phase B has run in production for a while;
+that's the point a production backup is actually warranted.
 
 **Account provisioning** is the `auth` plugin. `GET /api/auth/me` returns the resolved
 caller; `POST /api/auth/accounts` (admin-only, `accounts:create`) creates a lecturer

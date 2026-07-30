@@ -34,7 +34,7 @@ export function OfferingsClient() {
     authApi
       .me()
       .then((me) => {
-        setIsAdmin(me.role === "admin");
+        setIsAdmin(me.roles.includes("admin"));
         setCurrentUserId(me.id);
       })
       .catch(() => {
