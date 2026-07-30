@@ -9,19 +9,40 @@ import type {
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 
-/** Include the owner's id+name so responses can show "Created By" without a join. */
-const withOwner = { owner: { select: { id: true, name: true } } } as const;
-type RubricRow = Prisma.RubricGetPayload<{ include: typeof withOwner }>;
+/**
+ * Include the owner's id+name (for "Created By") plus the normalized
+ * levels/criteria/cells (issue #80 phase B read source — the jsonb
+ * `levels`/`criteria` columns are no longer read here, only dual-written by
+ * `syncNormalizedRubricTables` for phase C rollback safety).
+ */
+const withNormalized = {
+  owner: { select: { id: true, name: true } },
+  levelRows: { orderBy: { order: "asc" } },
+  criterionRows: {
+    orderBy: { order: "asc" },
+    include: { cells: true },
+  },
+} as const;
+type RubricRow = Prisma.RubricGetPayload<{ include: typeof withNormalized }>;
 
-/** Shape a Prisma row into the API `Rubric` (dates → ISO, JSON columns typed). */
+/** Shape a Prisma row into the API `Rubric` (dates → ISO, normalized tables → arrays). */
 function toRubric(row: RubricRow): Rubric {
+  const levels = row.levelRows.map((l) => ({ label: l.label, points: l.points }));
+  const criteria = row.criterionRows.map((c) => {
+    const descriptorByLevelId = new Map(c.cells.map((cell) => [cell.levelId, cell.descriptor]));
+    return {
+      id: c.id,
+      name: c.name,
+      descriptors: row.levelRows.map((l) => descriptorByLevelId.get(l.id) ?? ""),
+    };
+  });
   return {
     id: row.id,
     name: row.name,
     type: row.type as Rubric["type"],
     description: row.description,
-    levels: (row.levels as RubricLevel[] | null) ?? [],
-    criteria: (row.criteria as RubricCriterion[] | null) ?? [],
+    levels,
+    criteria,
     status: row.status,
     owner: row.owner ? { id: row.owner.id, name: row.owner.name } : null,
     createdAt: row.createdAt.toISOString(),
@@ -31,8 +52,10 @@ function toRubric(row: RubricRow): Rubric {
 
 /**
  * Rewrite the normalized RubricLevel/RubricCriterion/RubricCell rows for one
- * rubric from its current levels/criteria (issue #80 phase A dual-write — the
- * jsonb columns stay the read source until phase B). Full replace, mirroring
+ * rubric from its current levels/criteria (dual-written alongside the jsonb
+ * columns since issue #80 phase A; phase B cut reads over to these tables,
+ * so the jsonb columns are now write-only, kept for phase C rollback
+ * safety). Full replace, mirroring
  * the jsonb columns' own replace-the-whole-array semantics: existing rows are
  * deleted (FK cascades take RubricCell with them) and rebuilt from scratch
  * rather than diffed, since the caller always has the complete final arrays.
@@ -94,20 +117,20 @@ export const rubricService = {
             }
           : {}),
       },
-      include: withOwner,
+      include: withNormalized,
       orderBy: { updatedAt: "desc" },
     });
     return rows.map(toRubric);
   },
 
   async getById(id: string): Promise<Rubric | null> {
-    const row = await prisma.rubric.findUnique({ where: { id }, include: withOwner });
+    const row = await prisma.rubric.findUnique({ where: { id }, include: withNormalized });
     return row ? toRubric(row) : null;
   },
 
   async create(input: CreateRubricInput, ownerId: string): Promise<Rubric> {
     return prisma.$transaction(async (tx) => {
-      const row = await tx.rubric.create({
+      const created = await tx.rubric.create({
         data: {
           name: input.name,
           type: input.type,
@@ -117,16 +140,34 @@ export const rubricService = {
           status: input.status,
           ownerId,
         },
-        include: withOwner,
+        select: { id: true },
       });
-      await syncNormalizedRubricTables(tx, row.id, input.levels, input.criteria);
+      await syncNormalizedRubricTables(tx, created.id, input.levels, input.criteria);
+      const row = await tx.rubric.findUniqueOrThrow({
+        where: { id: created.id },
+        include: withNormalized,
+      });
       return toRubric(row);
     });
   },
 
   async update(id: string, input: UpdateRubricInput): Promise<Rubric> {
     return prisma.$transaction(async (tx) => {
-      const row = await tx.rubric.update({
+      // A partial update (only one of levels/criteria) still needs both to
+      // feed syncNormalizedRubricTables with the full final state. Read the
+      // missing side from the normalized tables (not the jsonb columns,
+      // which phase B stopped reading) so this stays a normalized-only read
+      // path ahead of phase C dropping them.
+      let finalLevels = input.levels;
+      let finalCriteria = input.criteria;
+      if (finalLevels === undefined || finalCriteria === undefined) {
+        const current = toRubric(
+          await tx.rubric.findUniqueOrThrow({ where: { id }, include: withNormalized }),
+        );
+        finalLevels ??= current.levels;
+        finalCriteria ??= current.criteria;
+      }
+      await tx.rubric.update({
         where: { id },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
@@ -136,19 +177,11 @@ export const rubricService = {
           ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
         },
-        include: withOwner,
       });
-      // row.levels/criteria reflect the final state either way (unset fields
-      // keep their persisted value), so this is the source of truth to sync
-      // from regardless of which of the two the caller actually changed.
       if (input.levels !== undefined || input.criteria !== undefined) {
-        await syncNormalizedRubricTables(
-          tx,
-          id,
-          row.levels as RubricLevel[],
-          row.criteria as RubricCriterion[],
-        );
+        await syncNormalizedRubricTables(tx, id, finalLevels as RubricLevel[], finalCriteria as RubricCriterion[]);
       }
+      const row = await tx.rubric.findUniqueOrThrow({ where: { id }, include: withNormalized });
       return toRubric(row);
     });
   },

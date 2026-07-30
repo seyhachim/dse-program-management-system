@@ -210,20 +210,27 @@ This is the largest and most active domain, defined entirely in
 ### Rubric Library
 
 `Rubric.levels`/`Rubric.criteria` (the rating-scale columns and criterion rows of a
-rubric grid) are stored as jsonb, validated by the shared Zod schema in
-`packages/shared-types/src/rubrics.ts` at the API boundary — the read path and the
-API contract are unchanged. Issue #80 is normalizing this into `RubricLevel` /
-`RubricCriterion` / `RubricCell` tables via the same expand/contract pattern as
-issue #77: phase A (landed) added the tables and made `rubricService.create`/
-`update`/`prisma/seed.ts` dual-write them (`syncNormalizedRubricTables` in
-`plugins/rubrics/service.ts`) while `levels`/`criteria` stay the sole read source;
-reads cut over in phase B, and the jsonb columns drop in phase C.
+rubric grid), validated by the shared Zod schema in
+`packages/shared-types/src/rubrics.ts` at the API boundary — the API contract is
+unchanged throughout. Issue #80 is normalizing this out of the original jsonb
+columns into `RubricLevel`/`RubricCriterion`/`RubricCell` tables via the same
+expand/contract pattern as issue #77: phase A added the tables and made
+`rubricService.create`/`update`/`prisma/seed.ts` dual-write them
+(`syncNormalizedRubricTables` in `plugins/rubrics/service.ts`); phase B (landed)
+cut `rubricService.list`/`getById`/`create`/`update` over to reading the
+normalized tables (`toRubric` reassembles `levels`/`criteria` from
+`levelRows`/`criterionRows`/their `cells`, ordered by each row's `order` column) —
+`Rubric.levels`/`criteria` are still written on every create/update (rollback
+safety) but nothing reads them anymore. The jsonb columns drop in phase C.
 `RubricCriterion`'s id is preserved from the jsonb criterion's own client-generated
 `id` (`crypto.randomUUID()`, what the edit form keys rows on) rather than
 synthesized — but that id is only unique *within* a rubric (the seeded sample
 rubrics reuse short ids like `"c1"` across different rubrics), so its primary key
 is the `(rubricId, id)` pair, not `id` alone; `RubricCell` carries `rubricId`
-alongside `criterionId`/`levelId` to satisfy that composite FK.
+alongside `criterionId`/`levelId` to satisfy that composite FK. Writes to the
+normalized tables are always a full delete-and-rebuild per rubric, not a diff — a
+real single-cell targeted write (the actual fix for issue #80's stated concurrent-
+edit problem) is a still-later improvement this schema only makes possible.
 
 ### Frontend
 

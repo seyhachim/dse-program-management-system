@@ -258,9 +258,9 @@ model AssessmentMethod {
 ///
 /// `levelRows`/`criterionRows` are the normalized decomposition of `levels`/
 /// `criteria` (issue #77-style expand/contract, this time issue #80): phase A
-/// dual-writes them alongside the jsonb columns, which stay the sole read
-/// source until phase B cuts reads over. Kept until phase C drops `levels`/
-/// `criteria` for good.
+/// dual-wrote them alongside the jsonb columns; phase B cut reads over to
+/// these tables, so `levels`/`criteria` are now write-only (rollback
+/// safety). Kept until phase C drops `levels`/`criteria` for good.
 model Rubric {
   id            String            @id @default(uuid())
   name          String
