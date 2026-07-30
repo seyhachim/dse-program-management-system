@@ -52,8 +52,10 @@ function toRubric(row: RubricRow): Rubric {
 
 /**
  * Rewrite the normalized RubricLevel/RubricCriterion/RubricCell rows for one
- * rubric from its current levels/criteria (issue #80 phase A dual-write — the
- * jsonb columns stay the read source until phase B). Full replace, mirroring
+ * rubric from its current levels/criteria (dual-written alongside the jsonb
+ * columns since issue #80 phase A; phase B cut reads over to these tables,
+ * so the jsonb columns are now write-only, kept for phase C rollback
+ * safety). Full replace, mirroring
  * the jsonb columns' own replace-the-whole-array semantics: existing rows are
  * deleted (FK cascades take RubricCell with them) and rebuilt from scratch
  * rather than diffed, since the caller always has the complete final arrays.
@@ -151,7 +153,21 @@ export const rubricService = {
 
   async update(id: string, input: UpdateRubricInput): Promise<Rubric> {
     return prisma.$transaction(async (tx) => {
-      const updated = await tx.rubric.update({
+      // A partial update (only one of levels/criteria) still needs both to
+      // feed syncNormalizedRubricTables with the full final state. Read the
+      // missing side from the normalized tables (not the jsonb columns,
+      // which phase B stopped reading) so this stays a normalized-only read
+      // path ahead of phase C dropping them.
+      let finalLevels = input.levels;
+      let finalCriteria = input.criteria;
+      if (finalLevels === undefined || finalCriteria === undefined) {
+        const current = toRubric(
+          await tx.rubric.findUniqueOrThrow({ where: { id }, include: withNormalized }),
+        );
+        finalLevels ??= current.levels;
+        finalCriteria ??= current.criteria;
+      }
+      await tx.rubric.update({
         where: { id },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
@@ -161,19 +177,9 @@ export const rubricService = {
           ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
         },
-        select: { levels: true, criteria: true },
       });
-      // updated.levels/criteria reflect the final state either way (unset
-      // fields keep their persisted value), so this is the source of truth
-      // to sync from regardless of which of the two the caller actually
-      // changed.
       if (input.levels !== undefined || input.criteria !== undefined) {
-        await syncNormalizedRubricTables(
-          tx,
-          id,
-          updated.levels as RubricLevel[],
-          updated.criteria as RubricCriterion[],
-        );
+        await syncNormalizedRubricTables(tx, id, finalLevels as RubricLevel[], finalCriteria as RubricCriterion[]);
       }
       const row = await tx.rubric.findUniqueOrThrow({ where: { id }, include: withNormalized });
       return toRubric(row);
