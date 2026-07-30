@@ -133,4 +133,3 @@ board automation, so Status still lands on Done with no extra step:
 ```bash
 gh issue close <N> --comment "<reason>"
 ```
-
