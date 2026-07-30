@@ -118,7 +118,8 @@ described above — `User.roleId` is a required FK to `Role`, one role per user.
 #77 is migrating that to many-to-many in expand/contract phases mirroring #65-#67:
 phase A (landed) added an additive `UserRoleAssignment` join table (named to avoid
 colliding with the `UserRole` enum), backfilled from `User.roleId` and kept in sync by
-`prisma/seed.ts`, but not yet read anywhere — `User.roleId`/`roleRef` remains sole
+every path that creates/reassigns a role (`auth.createAccount`, `lecturers.create`,
+`prisma/seed.ts`) — but not yet read anywhere: `User.roleId`/`roleRef` remains sole
 enforcement until a phase B cutover, with `role`/`roleId`/the `UserRole` enum dropped
 only in a later phase C once B has run in production for a while.
 

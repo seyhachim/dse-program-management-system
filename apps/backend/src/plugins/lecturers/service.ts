@@ -52,11 +52,23 @@ export const lecturerService = {
     });
   },
 
-  create(input: CreateLecturerInput) {
-    return prisma.user.create({
+  async create(input: CreateLecturerInput) {
+    const user = await prisma.user.create({
       data: { ...input, role: "lecturer", roleRef: { connect: { slug: "lecturer" } } },
       select: lecturerSelect,
     });
+
+    // Additive join table (issue #77 phase A) — not read by app code yet, but
+    // kept populated here (not just by seed.ts) so real accounts aren't missing
+    // rows once a later phase starts enforcing off it.
+    const role = await prisma.role.findUniqueOrThrow({ where: { slug: "lecturer" } });
+    await prisma.userRoleAssignment.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      update: {},
+      create: { userId: user.id, roleId: role.id },
+    });
+
+    return user;
   },
 
   async update(id: string, input: UpdateLecturerInput) {

@@ -255,6 +255,12 @@ async function main() {
       update: {},
       create: { userId: user.id, roleId: role.id },
     });
+    // Revoke any assignment for a role this user no longer has — otherwise
+    // editing a seed user's `role` above (single-role today) leaves a stale
+    // row behind, mirroring the RolePermission cleanup above.
+    await prisma.userRoleAssignment.deleteMany({
+      where: { userId: user.id, roleId: { not: role.id } },
+    });
   }
   for (const s of students) {
     await prisma.student.upsert({ where: { email: s.email }, update: s, create: s });

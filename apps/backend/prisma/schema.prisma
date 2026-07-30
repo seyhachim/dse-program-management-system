@@ -129,8 +129,10 @@ model RolePermission {
 
 /// Additive many-to-many bridge for User<->Role (issue #77, phase A). Named
 /// `UserRoleAssignment` rather than `UserRole` because that name is already the
-/// legacy enum on `User.role`. Backfilled from `User.roleId` on creation, kept
-/// in sync by seed.ts — but not yet read by any app code: `User.roleId`/`roleRef`
+/// legacy enum on `User.role`. The migration backfilled one row per existing
+/// `User.roleId`; every path that creates or reassigns a User's role since
+/// (`auth.createAccount`, `lecturers.create`, `prisma/seed.ts`) keeps a matching
+/// row here too — but it's not yet read by any app code: `User.roleId`/`roleRef`
 /// remains the sole enforcement path until phase B switches `requirePermission`
 /// over and phase C drops `role`/`roleId`.
 model UserRoleAssignment {
