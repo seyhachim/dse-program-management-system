@@ -314,10 +314,13 @@ model RubricCriterion {
 }
 
 /// One grid cell: a criterion's descriptor at a given level (normalized form
-/// of `RubricCriterion.descriptors[levelIndex]`, issue #80 phase A). Editing
-/// one cell is a single targeted row write here instead of rewriting the
-/// whole `Rubric.criteria` jsonb column. `rubricId` is carried alongside
-/// `criterionId` to satisfy RubricCriterion's composite (rubricId, id) key.
+/// of `RubricCriterion.descriptors[levelIndex]`, issue #80 phase A). Phase A
+/// still writes this table via a full delete-and-rebuild per rubric
+/// (`syncNormalizedRubricTables`), same as `RubricLevel`/`RubricCriterion` —
+/// a real single-cell targeted write is a later-phase improvement this table
+/// only makes possible, not one phase A delivers yet. `rubricId` is carried
+/// alongside `criterionId` to satisfy RubricCriterion's composite
+/// (rubricId, id) key.
 model RubricCell {
   rubricId    String
   criterionId String
