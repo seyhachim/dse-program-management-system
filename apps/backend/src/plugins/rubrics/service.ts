@@ -11,9 +11,8 @@ import { prisma } from "../../core/db/prisma.ts";
 
 /**
  * Include the owner's id+name (for "Created By") plus the normalized
- * levels/criteria/cells (issue #80 phase B read source — the jsonb
- * `levels`/`criteria` columns are no longer read here, only dual-written by
- * `syncNormalizedRubricTables` for phase C rollback safety).
+ * levels/criteria/cells — the sole storage for these since issue #80 phase C
+ * dropped the `Rubric.levels`/`criteria` jsonb columns outright.
  */
 const withNormalized = {
   owner: { select: { id: true, name: true } },
@@ -52,13 +51,11 @@ function toRubric(row: RubricRow): Rubric {
 
 /**
  * Rewrite the normalized RubricLevel/RubricCriterion/RubricCell rows for one
- * rubric from its current levels/criteria (dual-written alongside the jsonb
- * columns since issue #80 phase A; phase B cut reads over to these tables,
- * so the jsonb columns are now write-only, kept for phase C rollback
- * safety). Full replace, mirroring
- * the jsonb columns' own replace-the-whole-array semantics: existing rows are
- * deleted (FK cascades take RubricCell with them) and rebuilt from scratch
- * rather than diffed, since the caller always has the complete final arrays.
+ * rubric from its current levels/criteria — the sole write path for this
+ * data since issue #80 phase C dropped the jsonb columns. Full replace:
+ * existing rows are deleted (FK cascades take RubricCell with them) and
+ * rebuilt from scratch rather than diffed, since the caller always has the
+ * complete final arrays.
  */
 export async function syncNormalizedRubricTables(
   tx: Prisma.TransactionClient,
@@ -135,8 +132,6 @@ export const rubricService = {
           name: input.name,
           type: input.type,
           description: input.description,
-          levels: input.levels,
-          criteria: input.criteria,
           status: input.status,
           ownerId,
         },
@@ -155,9 +150,8 @@ export const rubricService = {
     return prisma.$transaction(async (tx) => {
       // A partial update (only one of levels/criteria) still needs both to
       // feed syncNormalizedRubricTables with the full final state. Read the
-      // missing side from the normalized tables (not the jsonb columns,
-      // which phase B stopped reading) so this stays a normalized-only read
-      // path ahead of phase C dropping them.
+      // missing side from the normalized tables, the sole storage since
+      // phase C dropped the jsonb columns.
       let finalLevels = input.levels;
       let finalCriteria = input.criteria;
       if (finalLevels === undefined || finalCriteria === undefined) {
@@ -173,8 +167,6 @@ export const rubricService = {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.type !== undefined ? { type: input.type } : {}),
           ...(input.description !== undefined ? { description: input.description } : {}),
-          ...(input.levels !== undefined ? { levels: input.levels } : {}),
-          ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
         },
       });

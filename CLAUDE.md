@@ -209,28 +209,28 @@ This is the largest and most active domain, defined entirely in
 
 ### Rubric Library
 
-`Rubric.levels`/`Rubric.criteria` (the rating-scale columns and criterion rows of a
-rubric grid), validated by the shared Zod schema in
-`packages/shared-types/src/rubrics.ts` at the API boundary — the API contract is
-unchanged throughout. Issue #80 is normalizing this out of the original jsonb
-columns into `RubricLevel`/`RubricCriterion`/`RubricCell` tables via the same
-expand/contract pattern as issue #77: phase A added the tables and made
-`rubricService.create`/`update`/`prisma/seed.ts` dual-write them
-(`syncNormalizedRubricTables` in `plugins/rubrics/service.ts`); phase B (landed)
-cut `rubricService.list`/`getById`/`create`/`update` over to reading the
-normalized tables (`toRubric` reassembles `levels`/`criteria` from
-`levelRows`/`criterionRows`/their `cells`, ordered by each row's `order` column) —
-`Rubric.levels`/`criteria` are still written on every create/update (rollback
-safety) but nothing reads them anymore. The jsonb columns drop in phase C.
-`RubricCriterion`'s id is preserved from the jsonb criterion's own client-generated
-`id` (`crypto.randomUUID()`, what the edit form keys rows on) rather than
-synthesized — but that id is only unique *within* a rubric (the seeded sample
-rubrics reuse short ids like `"c1"` across different rubrics), so its primary key
-is the `(rubricId, id)` pair, not `id` alone; `RubricCell` carries `rubricId`
-alongside `criterionId`/`levelId` to satisfy that composite FK. Writes to the
-normalized tables are always a full delete-and-rebuild per rubric, not a diff — a
-real single-cell targeted write (the actual fix for issue #80's stated concurrent-
-edit problem) is a still-later improvement this schema only makes possible.
+The `Rubric`'s rating-scale columns and criterion rows live in the normalized
+`RubricLevel`/`RubricCriterion`/`RubricCell` tables (`plugins/rubrics/service.ts`),
+reassembled into the API's `levels`/`criteria` shape (`toRubric`, ordered by each
+row's `order` column) validated by the shared Zod schema in
+`packages/shared-types/src/rubrics.ts` at the API boundary — the API contract itself
+never changed. Issue #80 got here via the same three-phase expand/contract pattern
+as issue #77: phase A added these tables and dual-wrote them alongside a
+`Rubric.levels`/`criteria` jsonb pair (`syncNormalizedRubricTables`); phase B cut
+`rubricService.list`/`getById`/`create`/`update`'s reads over to them; phase C
+(landed) dropped the `levels`/`criteria` jsonb columns outright — `create`/`update`
+now write only through `syncNormalizedRubricTables`, and `update`'s partial-update
+path (only one of `levels`/`criteria` given) sources the untouched side from a
+normalized-tables read rather than a jsonb one. `RubricCriterion`'s id is preserved
+from the criterion's own client-generated `id` (`crypto.randomUUID()`, what the edit
+form keys rows on) rather than synthesized — but that id is only unique *within* a
+rubric (the seeded sample rubrics reuse short ids like `"c1"` across different
+rubrics), so its primary key is the `(rubricId, id)` pair, not `id` alone;
+`RubricCell` carries `rubricId` alongside `criterionId`/`levelId` to satisfy that
+composite FK. Writes to the normalized tables are always a full delete-and-rebuild
+per rubric, not a diff — a real single-cell targeted write (the actual fix for issue
+#80's stated concurrent-edit problem) is a still-later improvement this schema only
+makes possible.
 
 ### Frontend
 
