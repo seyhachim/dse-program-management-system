@@ -250,24 +250,23 @@ model AssessmentMethod {
   createdAt DateTime @default(now())
 }
 
-/// Rubric Library — a reusable assessment grid shared across courses. `levels`
-/// holds the ordered rating scale (columns) and `criteria` the rows, each with
-/// one descriptor per level; both are opaque JSON validated by the shared Zod
-/// schema at the API boundary. `ownerId` is the User who created it (nulled if
-/// that user is removed, matching Course/Offering lecturer relations).
+/// Rubric Library — a reusable assessment grid shared across courses. `levelRows`
+/// holds the ordered rating scale (columns) and `criterionRows` the rows, each
+/// with one `RubricCell` descriptor per level; the API's `levels`/`criteria`
+/// arrays (opaque JSON validated by the shared Zod schema at the API boundary)
+/// are reassembled from these on read. `ownerId` is the User who created it
+/// (nulled if that user is removed, matching Course/Offering lecturer relations).
 ///
-/// `levelRows`/`criterionRows` are the normalized decomposition of `levels`/
-/// `criteria` (issue #77-style expand/contract, this time issue #80): phase A
-/// dual-wrote them alongside the jsonb columns; phase B cut reads over to
-/// these tables, so `levels`/`criteria` are now write-only (rollback
-/// safety). Kept until phase C drops `levels`/`criteria` for good.
+/// `levelRows`/`criterionRows` are the normalized replacement for what was
+/// originally a `levels`/`criteria` jsonb pair on this model (issue #77-style
+/// expand/contract, this time issue #80): phase A added these tables and
+/// dual-wrote them alongside the jsonb columns, phase B cut reads over, and
+/// phase C dropped the jsonb columns outright — this is now the sole storage.
 model Rubric {
   id            String            @id @default(uuid())
   name          String
   type          String
   description   String            @default("")
-  levels        Json              @default("[]")
-  criteria      Json              @default("[]")
   status        RubricStatus      @default(Draft)
   ownerId       String?
   owner         User?             @relation("RubricOwner", fields: [ownerId], references: [id], onDelete: SetNull)
@@ -279,10 +278,10 @@ model Rubric {
   @@index([status])
 }
 
-/// One rating-scale column of a Rubric (normalized form of `Rubric.levels`,
-/// issue #80 phase A). `id` is synthesized (the jsonb form has no id — the
-/// frontend indexes levels by array position, not identity) so `RubricCell`
-/// has something to reference.
+/// One rating-scale column of a Rubric (normalized form of the API's `levels`
+/// array, issue #80). `id` is synthesized (the API's `levels` entries have no
+/// id — the frontend indexes levels by array position, not identity) so
+/// `RubricCell` has something to reference.
 model RubricLevel {
   id       String       @id @default(uuid())
   rubricId String
@@ -295,8 +294,8 @@ model RubricLevel {
   @@index([rubricId])
 }
 
-/// One criterion row of a Rubric (normalized form of `Rubric.criteria`, issue
-/// #80 phase A). `id` is preserved from the jsonb criterion's own `id` field
+/// One criterion row of a Rubric (normalized form of the API's `criteria`
+/// array, issue #80). `id` is preserved from the criterion's own `id` field
 /// (client-generated via `crypto.randomUUID()`, keyed on by the edit form)
 /// rather than synthesized — but that id is only unique *within* a rubric
 /// (seeded rubrics reuse short ids like "c1" across different rubrics), so
@@ -314,13 +313,12 @@ model RubricCriterion {
 }
 
 /// One grid cell: a criterion's descriptor at a given level (normalized form
-/// of `RubricCriterion.descriptors[levelIndex]`, issue #80 phase A). Phase A
-/// still writes this table via a full delete-and-rebuild per rubric
-/// (`syncNormalizedRubricTables`), same as `RubricLevel`/`RubricCriterion` —
-/// a real single-cell targeted write is a later-phase improvement this table
-/// only makes possible, not one phase A delivers yet. `rubricId` is carried
-/// alongside `criterionId` to satisfy RubricCriterion's composite
-/// (rubricId, id) key.
+/// of a `criteria[].descriptors[levelIndex]` entry, issue #80). Still written
+/// via a full delete-and-rebuild per rubric (`syncNormalizedRubricTables`),
+/// same as `RubricLevel`/`RubricCriterion` — a real single-cell targeted
+/// write is a later improvement this table only makes possible, not one
+/// delivered yet. `rubricId` is carried alongside `criterionId` to satisfy
+/// RubricCriterion's composite (rubricId, id) key.
 model RubricCell {
   rubricId    String
   criterionId String
