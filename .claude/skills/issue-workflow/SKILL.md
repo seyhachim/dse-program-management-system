@@ -134,10 +134,3 @@ board automation, so Status still lands on Done with no extra step:
 gh issue close <N> --comment "<reason>"
 ```
 
-## 5. Review — before merge
-
-Once the PR is open, run `/code-review` against it before treating the work as
-mergeable. Wait for its `gh pr comment` (issues found, or an explicit "no issues
-found") before calling the PR ready. If it finds anything scoring ≥80, address it
-with additional commits on the same branch and re-run the review rather than
-merging past it.
