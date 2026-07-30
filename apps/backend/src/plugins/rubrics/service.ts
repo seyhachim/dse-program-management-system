@@ -30,6 +30,48 @@ function toRubric(row: RubricRow): Rubric {
 }
 
 /**
+ * Rewrite the normalized RubricLevel/RubricCriterion/RubricCell rows for one
+ * rubric from its current levels/criteria (issue #80 phase A dual-write — the
+ * jsonb columns stay the read source until phase B). Full replace, mirroring
+ * the jsonb columns' own replace-the-whole-array semantics: existing rows are
+ * deleted (FK cascades take RubricCell with them) and rebuilt from scratch
+ * rather than diffed, since the caller always has the complete final arrays.
+ */
+export async function syncNormalizedRubricTables(
+  tx: Prisma.TransactionClient,
+  rubricId: string,
+  levels: readonly RubricLevel[],
+  criteria: readonly RubricCriterion[],
+): Promise<void> {
+  await tx.rubricLevel.deleteMany({ where: { rubricId } });
+  await tx.rubricCriterion.deleteMany({ where: { rubricId } });
+
+  const levelRows = levels.map((l, i) => ({
+    id: crypto.randomUUID(),
+    rubricId,
+    label: l.label,
+    points: l.points,
+    order: i,
+  }));
+  if (levelRows.length > 0) await tx.rubricLevel.createMany({ data: levelRows });
+
+  if (criteria.length > 0) {
+    await tx.rubricCriterion.createMany({
+      data: criteria.map((c, i) => ({ id: c.id, rubricId, name: c.name, order: i })),
+    });
+  }
+
+  const cellRows = criteria.flatMap((c) =>
+    c.descriptors
+      .map((descriptor, i) =>
+        levelRows[i] ? { rubricId, criterionId: c.id, levelId: levelRows[i].id, descriptor } : null,
+      )
+      .filter((cell): cell is NonNullable<typeof cell> => cell !== null),
+  );
+  if (cellRows.length > 0) await tx.rubricCell.createMany({ data: cellRows });
+}
+
+/**
  * Rubric Library business logic over Prisma. This object is the plugin's public
  * service surface, reachable cross-plugin via `registry.get("rubrics").service`.
  * Rubrics are global (shared across all courses); `ownerId` records who created
@@ -64,35 +106,51 @@ export const rubricService = {
   },
 
   async create(input: CreateRubricInput, ownerId: string): Promise<Rubric> {
-    const row = await prisma.rubric.create({
-      data: {
-        name: input.name,
-        type: input.type,
-        description: input.description,
-        levels: input.levels,
-        criteria: input.criteria,
-        status: input.status,
-        ownerId,
-      },
-      include: withOwner,
+    return prisma.$transaction(async (tx) => {
+      const row = await tx.rubric.create({
+        data: {
+          name: input.name,
+          type: input.type,
+          description: input.description,
+          levels: input.levels,
+          criteria: input.criteria,
+          status: input.status,
+          ownerId,
+        },
+        include: withOwner,
+      });
+      await syncNormalizedRubricTables(tx, row.id, input.levels, input.criteria);
+      return toRubric(row);
     });
-    return toRubric(row);
   },
 
   async update(id: string, input: UpdateRubricInput): Promise<Rubric> {
-    const row = await prisma.rubric.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.type !== undefined ? { type: input.type } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.levels !== undefined ? { levels: input.levels } : {}),
-        ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-      },
-      include: withOwner,
+    return prisma.$transaction(async (tx) => {
+      const row = await tx.rubric.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.type !== undefined ? { type: input.type } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.levels !== undefined ? { levels: input.levels } : {}),
+          ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+        },
+        include: withOwner,
+      });
+      // row.levels/criteria reflect the final state either way (unset fields
+      // keep their persisted value), so this is the source of truth to sync
+      // from regardless of which of the two the caller actually changed.
+      if (input.levels !== undefined || input.criteria !== undefined) {
+        await syncNormalizedRubricTables(
+          tx,
+          id,
+          row.levels as RubricLevel[],
+          row.criteria as RubricCriterion[],
+        );
+      }
+      return toRubric(row);
     });
-    return toRubric(row);
   },
 
   async remove(id: string): Promise<void> {

@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { pluginManifests } from "@dse-pms/shared-types";
+import { syncNormalizedRubricTables } from "../src/plugins/rubrics/service.ts";
 
 /**
  * Seeds dev users (incl. several lecturers), students, courses, offerings and a
@@ -297,11 +298,12 @@ async function main() {
     const existing = await prisma.rubric.findFirst({
       where: { name: r.name, ownerId: rubricOwner?.id ?? null },
     });
-    if (existing) {
-      await prisma.rubric.update({ where: { id: existing.id }, data: { ...r } });
-    } else {
-      await prisma.rubric.create({ data: { ...r, ownerId: rubricOwner?.id ?? null } });
-    }
+    const rubricId = existing
+      ? (await prisma.rubric.update({ where: { id: existing.id }, data: { ...r } })).id
+      : (await prisma.rubric.create({ data: { ...r, ownerId: rubricOwner?.id ?? null } })).id;
+    // Keep the normalized RubricLevel/Criterion/Cell tables in sync here too,
+    // not just via rubricService (issue #80 phase A dual-write).
+    await syncNormalizedRubricTables(prisma, rubricId, r.levels, r.criteria);
   }
 
   // One offering: CS101 in 2025-Fall, taught by its course lecturer, enrol 2 students.
