@@ -15,7 +15,7 @@ code never depends on which is active.
 
 ```bash
 bun install                            # install all workspaces
-bun run db:up                          # start Postgres via Docker (docker-compose.yml)
+brew services start postgresql@15      # local Postgres (native Homebrew — docker-compose.yml/db:up are unused)
 bun run --cwd apps/backend db:migrate  # apply Prisma migrations (dev)
 bun run seed                           # seed dev users + sample data
 bun run gen-token --role admin         # AUTH_MODE=dev only: mint a dev JWT (roles: admin | lecturer | student)
@@ -147,9 +147,14 @@ login via the Supabase **Admin API** (`inviteUserByEmail`, using the server-only
 On the frontend, `lib/api.ts` is the single place the bearer token is attached:
 `lib/supabase.ts` exposes `AUTH_MODE` (from `NEXT_PUBLIC_AUTH_MODE`) and a lazily-built
 browser client, so `dev` mode uses the static `NEXT_PUBLIC_DEV_TOKEN` and `supabase`
-mode uses the live session access token. Login UI is `app/login/page.tsx`, the
-authenticated shell is gated by `app/(shell)/auth-guard.tsx`, and `lib/auth.ts` wraps
-the `auth` plugin calls (`me`, `createAccount`).
+mode uses the live session access token. Login UI is `app/login/page.tsx`; the
+authenticated shell (`app/(shell)/layout.tsx`) nests two guards around every page —
+`auth-guard.tsx` (`AuthGuard`) redirects to `/login` if there's no resolved caller at
+all, then `role-access-guard.tsx` (`RoleAccessGuard`) redirects a caller who *is*
+authenticated but whose role isn't allowed on the current path (matched against the
+manifest's per-route `roles` via `routeAllowsRole`, the same check the sidebar itself
+uses to decide what to render) to the first route their role does allow. `lib/auth.ts`
+wraps the `auth` plugin calls (`me`, `createAccount`).
 
 ### Course Specification wizard
 
@@ -235,7 +240,17 @@ makes possible.
 ### Frontend
 
 Next.js App Router. `app/(shell)/` is the authenticated shell (sidebar + topbar);
-each plugin gets a route segment there. The course spec wizard lives under
+each plugin gets a route segment there. A manifest entry doesn't require a
+hand-built page, though: `[slug]/page.tsx` is a generic "coming soon" placeholder
+that matches any nav route with no dedicated static folder (`courses`, `students`,
+`offerings`, `lecturers` take precedence since Next resolves static segments before
+the dynamic one), so a new sidebar entry renders immediately even before its real
+page exists. `dashboard` is one such manifest entry (`dashboardManifest` in
+`packages/shared-types/src/plugins.ts`) that *is* backed by a real page
+(`app/(shell)/dashboard/`) but has no corresponding `apps/backend/src/plugins/`
+folder — it's an admin-only aggregation view reading other plugins' services, not a
+domain of its own, so a manifest entry and a backend plugin are related but not
+1:1. The course spec wizard lives under
 `app/(shell)/courses/[id]/spec/`, one `*-section.tsx` file per wizard section plus
 `spec-client.tsx` orchestrating the stepper. `lib/*.ts` (one file per plugin, e.g.
 `students.ts`, `course-spec.ts`) wraps `lib/api.ts` with typed calls built on the
