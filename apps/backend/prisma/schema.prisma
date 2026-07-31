@@ -190,8 +190,6 @@ model CourseSpec {
   id        String              @id @default(uuid())
   courseId  String              @unique
   course    Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  data      Json                @default("{}")
-  status    Json                @default("{}")
   sections  CourseSpecSection[]
   clos      CourseSpecClo[]
   updatedAt DateTime            @updatedAt

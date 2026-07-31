@@ -163,10 +163,36 @@ This is the largest and most active domain, defined entirely in
 
 - `SPEC_SECTIONS` is the ordered registry driving the wizard stepper (`id`, `title`,
   syllabus `ref` like `"§16"`, `part`, and `state: "ready" | "soon"` for
-  not-yet-implemented sections). Storage is one `CourseSpec` row per course
-  (`prisma/schema.prisma`), with `data[sectionId]` holding that section's opaque JSON
-  and `status[sectionId]` tracking `draft`/`complete` so a lecturer can save one
-  section and resume later.
+  not-yet-implemented sections). Storage is one `CourseSpec` row per course plus a
+  `CourseSpecSection` row per saved section (`sectionKey`/`content`/`status`,
+  `courseService.saveSection` upserting on the `(courseSpecId, sectionKey)` unique
+  key) — issue #81's normalization of what was originally a single `data`/`status`
+  jsonb blob per course, so that saving one section's `content`/`status`/`updatedAt`
+  never touches another section's row (the read-modify-write on the whole blob was a
+  concurrent-edit hazard for co-lecturers editing different sections at once). §14
+  CLOs are further normalized into their own `CourseSpecClo` rows rather than living
+  in a section's `content` json (`sectionKey = "clos"` always has `content = {}`);
+  each CLO's `id` is client-generated (`crypto.randomUUID()`, minted once in
+  `emptyClo()`) and only unique *within* a course spec, so its primary key is the
+  composite `(courseSpecId, id)` — the same pattern `RubricCriterion` already uses
+  in this codebase, for the same reason (a client-supplied id can't be trusted
+  globally unique). `code` (`CLO1`, `CLO2`…) is **not** stored — it's always
+  re-derived from `order` on read (`courseService.reassembleSpec`), since the
+  frontend already recomputes it by position on every save (`withCodes` in
+  `clo-model.ts`) and a stored copy could only drift from that. Each CLO's
+  `teachingMethodIds`/`assessmentMethodIds` are FK-enforced join tables
+  (`CourseSpecCloTeachingMethod`/`CourseSpecCloAssessmentMethod`, composite FK to
+  `CourseSpecClo`'s composite key) rather than unvalidated ids sitting in json — a
+  save with a nonexistent method id now fails instead of silently persisting a
+  dangling reference. `sectionKey = "courseInfo"` also always has `content = {}`,
+  unchanged from before: courseInfo is mirrored onto `Course.prerequisites`/
+  `description` and live-recomputed via `buildCourseInfoPrefill` on every read,
+  never stored as json. Issue #81 landed in two PRs mirroring the #80 rubric
+  precedent above: phase A/B (#91) added the normalized tables and backfilled every
+  existing spec into them, cutting `courseService`'s reads/writes over; phase C
+  dropped the old `CourseSpec.data`/`status` jsonb columns outright once that had
+  run through a deploy cycle and the backfill was verified correct against
+  production data.
 - `SPEC_SECTION_SCHEMAS` maps a `SpecSectionId` to its Zod schema. The backend route
   `PUT /api/courses/:id/spec/:sectionId` (`plugins/courses/router.ts`) looks up the
   schema for the given section id and 400s if the section isn't implemented yet —
