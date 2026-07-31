@@ -45,6 +45,20 @@ enum RubricStatus {
   Archived
 }
 
+/// Per-section save state for CourseSpecSection — mirrors the shared-types
+/// `SpecSectionStatus` zod enum ("draft"|"complete").
+enum CourseSpecSectionStatus {
+  Draft
+  Complete
+}
+
+/// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
+/// normalized CLO row.
+enum CloRowStatus {
+  Active
+  Inactive
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -166,17 +180,94 @@ model Course {
 }
 
 /// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a
-/// single JSON document per course. `data` holds each section's content keyed by
-/// section id; `status` tracks per-section draft/complete so a lecturer can save one
-/// section and continue later. Overlapping §1–13 scalars are mirrored onto Course.
+/// single document per course. Overlapping §1–13 scalars are mirrored onto Course.
+/// `data`/`status` are the pre-issue-#81 storage: one JSON blob for every section,
+/// so saving any one section required rewriting the whole row. Superseded by
+/// `sections` (one `CourseSpecSection` row per section) and `clos` (normalized CLO
+/// rows) — kept in place unused for one deploy cycle before being dropped in a
+/// follow-up migration (issue #81 phase C), same expand/contract pattern as #80.
 model CourseSpec {
-  id        String   @id @default(uuid())
-  courseId  String   @unique
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  data      Json     @default("{}")
-  status    Json     @default("{}")
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  id        String              @id @default(uuid())
+  courseId  String              @unique
+  course    Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  data      Json                @default("{}")
+  status    Json                @default("{}")
+  sections  CourseSpecSection[]
+  clos      CourseSpecClo[]
+  updatedAt DateTime            @updatedAt
+  createdAt DateTime            @default(now())
+}
+
+/// Issue #81: one row per wizard section, replacing the CourseSpec.data/status
+/// blob so saving one section doesn't touch another's `updatedAt`/content.
+/// `sectionKey = "clos"` and `"courseInfo"` always have `content = {}` — CLOs are
+/// normalized into CourseSpecClo below, and courseInfo is mirrored onto
+/// Course.prerequisites/description and always live-recomputed (courseService's
+/// buildCourseInfoPrefill); both rows exist here only to track section status for
+/// the spec-progress dashboard.
+model CourseSpecSection {
+  id           String                  @id @default(uuid())
+  courseSpecId String
+  courseSpec   CourseSpec              @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  sectionKey   String
+  content      Json                    @default("{}")
+  status       CourseSpecSectionStatus @default(Draft)
+  updatedAt    DateTime                @updatedAt
+
+  @@unique([courseSpecId, sectionKey])
+}
+
+/// Issue #81: normalized §14 CLO rows (previously the `clos` section's JSON
+/// array). `id` is client-generated (crypto.randomUUID(), mirroring
+/// RubricCriterion) and is the stable identity the method join tables key on —
+/// but, also like RubricCriterion, only unique *within* a course spec (a client
+/// could send the same id for two different courses), hence the composite
+/// `(courseSpecId, id)` key rather than a bare `@id`. `order` preserves array
+/// position; `code` (e.g. "CLO1") isn't stored at all — it's a position-derived
+/// display label the frontend recomputes on every add/remove
+/// (`withCodes()`/clo-model.ts) and the backend re-derives the same way from
+/// `order` on reassembly, so there's exactly one source of truth for position
+/// instead of a stored value that could drift from it.
+model CourseSpecClo {
+  id                String                          @default(uuid())
+  courseSpecId      String
+  courseSpec        CourseSpec                      @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order             Int
+  description       String
+  level             String?
+  mappedPlos        String[]                        @default([])
+  sltHours          Int?
+  status            CloRowStatus                    @default(Active)
+  notes             String                          @default("")
+  teachingMethods   CourseSpecCloTeachingMethod[]
+  assessmentMethods CourseSpecCloAssessmentMethod[]
+
+  @@id([courseSpecId, id])
+}
+
+/// Issue #81: enforces §14 teaching-method picks against the TeachingMethod
+/// vocab via a real FK (previously an unenforced id string inside CLO JSON).
+/// FK to CourseSpecClo is itself composite, mirroring RubricCell's FK to
+/// RubricCriterion, to satisfy CourseSpecClo's composite key.
+model CourseSpecCloTeachingMethod {
+  courseSpecId     String
+  cloId            String
+  clo              CourseSpecClo  @relation(fields: [courseSpecId, cloId], references: [courseSpecId, id], onDelete: Cascade)
+  teachingMethodId String
+  teachingMethod   TeachingMethod @relation(fields: [teachingMethodId], references: [id], onDelete: Cascade)
+
+  @@id([courseSpecId, cloId, teachingMethodId])
+}
+
+/// Issue #81: same as CourseSpecCloTeachingMethod, for §14 assessment-method picks.
+model CourseSpecCloAssessmentMethod {
+  courseSpecId       String
+  cloId              String
+  clo                CourseSpecClo    @relation(fields: [courseSpecId, cloId], references: [courseSpecId, id], onDelete: Cascade)
+  assessmentMethodId String
+  assessmentMethod   AssessmentMethod @relation(fields: [assessmentMethodId], references: [id], onDelete: Cascade)
+
+  @@id([courseSpecId, cloId, assessmentMethodId])
 }
 
 /// Course Offerings plugin — a course delivered in a given term, with an assigned
@@ -238,16 +329,18 @@ model Enrollment {
 /// as lecturers add methods from the course-spec form. Names are unique so an
 /// add of an existing name reuses the row.
 model TeachingMethod {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  id        String                        @id @default(uuid())
+  name      String                        @unique
+  createdAt DateTime                      @default(now())
+  cloLinks  CourseSpecCloTeachingMethod[]
 }
 
 /// §15 assessment-method vocabulary. Same lifecycle as TeachingMethod.
 model AssessmentMethod {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  id        String                          @id @default(uuid())
+  name      String                          @unique
+  createdAt DateTime                        @default(now())
+  cloLinks  CourseSpecCloAssessmentMethod[]
 }
 
 /// Rubric Library — a reusable assessment grid shared across courses. `levelRows`

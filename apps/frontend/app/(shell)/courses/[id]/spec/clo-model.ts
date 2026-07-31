@@ -2,6 +2,7 @@ import { CAP_LEVELS, cloFocusCode, cloFocusPercent, COGNITIVE_LEVELS } from "@ds
 
 /** A CLO held as a form model for input binding; converted on save by the wizard. */
 export type CloForm = {
+  id: string;
   code: string;
   description: string;
   level: string;
@@ -18,6 +19,7 @@ export const EMPTY_CLOS: CloForm[] = [];
 /** A fresh, empty CLO (code is assigned by position on save). */
 export function emptyClo(): CloForm {
   return {
+    id: crypto.randomUUID(),
     code: "",
     description: "",
     level: "",
@@ -64,6 +66,7 @@ export function toClosForm(data: unknown, legacyMapping?: unknown): CloForm[] {
       const legacy = legacyByCode.get(asStr(d.code));
       const teachingMethodIds = asStrArray(d.teachingMethodIds);
       return {
+        id: asStr(d.id),
         code: asStr(d.code),
         description: asStr(d.description),
         level: asStr(d.level),
@@ -82,6 +85,7 @@ export function toClosForm(data: unknown, legacyMapping?: unknown): CloForm[] {
 export function toClosPayload(items: CloForm[]) {
   return {
     items: withCodes(items).map((f) => ({
+      id: f.id,
       code: f.code,
       description: f.description.trim(),
       level: f.level || null,

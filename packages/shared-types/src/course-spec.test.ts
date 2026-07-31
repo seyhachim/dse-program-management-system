@@ -22,13 +22,14 @@ import {
 import { CreateMethodInput } from "./methods.ts";
 
 test("CloItem defaults method id arrays to []", () => {
-  const parsed = CloItem.parse({ code: "CLO1", description: "Do the thing" });
+  const parsed = CloItem.parse({ id: "clo-1", code: "CLO1", description: "Do the thing" });
   expect(parsed.teachingMethodIds).toEqual([]);
   expect(parsed.assessmentMethodIds).toEqual([]);
 });
 
 test("CloItem preserves provided SLT hours and method ids", () => {
   const parsed = CloItem.parse({
+    id: "clo-1",
     code: "CLO1",
     description: "Do the thing",
     sltHours: 42,

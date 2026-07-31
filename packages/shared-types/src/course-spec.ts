@@ -285,6 +285,8 @@ export type CloStatus = z.infer<typeof CloStatus>;
  * (SLT + methods); they were merged into one per-CLO form.
  */
 export const CloItem = z.object({
+  /** Stable identity (client-generated), unlike the position-derived `code` below. */
+  id: z.string().min(1),
   code: z.string().min(1),
   description: z.string().min(1, "Describe what students will be able to do"),
   level: CapLevel.nullable().optional(),
