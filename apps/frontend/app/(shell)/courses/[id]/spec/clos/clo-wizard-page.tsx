@@ -36,6 +36,7 @@ import {
   CloStepReview,
 } from "./clo-wizard-steps";
 import { CloWizardSidebar } from "./clo-wizard-sidebar";
+import { clearCloDraft, loadCloDraft, saveCloDraft } from "./clo-draft-storage";
 
 /**
  * Full-page multi-step wizard for adding/editing a §14 CLO (issue #94) —
@@ -50,6 +51,8 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [draft, setDraft] = useState<CloForm | null>(null);
+  const [baseDraft, setBaseDraft] = useState<CloForm | null>(null);
+  const [restoredDraft, setRestoredDraft] = useState(false);
   const [step, setStep] = useState<WizardStepId>(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,12 +77,21 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
         setTeachingMethods(methods.teaching);
         setAssessmentMethods(methods.assessment);
         setCourse(courseView);
+        let base: CloForm | null;
         if (cloCode) {
           const existing = closForm.find((c) => c.code === cloCode) ?? null;
-          setDraft(existing);
+          base = existing;
           setNotFound(!existing);
         } else {
-          setDraft(emptyClo());
+          base = emptyClo();
+        }
+        setBaseDraft(base);
+        const stored = base ? loadCloDraft(courseId, cloCode) : null;
+        if (stored) {
+          setDraft(stored);
+          setRestoredDraft(true);
+        } else {
+          setDraft(base);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
@@ -104,14 +116,33 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
   const code = cloCode ?? `CLO${clos.length + 1}`;
   const errors = draft ? cloWizardErrors(draft) : { statement: true };
 
+  const persistDraft = () => {
+    if (draft) saveCloDraft(courseId, cloCode, draft);
+  };
+
   const goNext = () => {
     if (step === 1 && errors.statement) {
       setTouched(true);
       return;
     }
+    persistDraft();
     setStep((s) => (s < 5 ? ((s + 1) as WizardStepId) : s));
   };
-  const goPrev = () => setStep((s) => (s > 1 ? ((s - 1) as WizardStepId) : s));
+  const goPrev = () => {
+    persistDraft();
+    setStep((s) => (s > 1 ? ((s - 1) as WizardStepId) : s));
+  };
+  const goToStep = (id: WizardStepId) => {
+    persistDraft();
+    setStep(id);
+  };
+
+  const discardDraft = () => {
+    clearCloDraft(courseId, cloCode);
+    setDraft(baseDraft);
+    setRestoredDraft(false);
+    setStep(1);
+  };
 
   const submit = async () => {
     if (!draft) return;
@@ -126,6 +157,7 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
     try {
       const next = cloCode ? clos.map((c) => (c.code === cloCode ? draft : c)) : [...clos, draft];
       await courseSpecApi.saveSection(courseId, "clos", toClosPayload(withCodes(next)));
+      clearCloDraft(courseId, cloCode);
       router.push(backHref);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save this CLO");
@@ -182,6 +214,19 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
               That CLO could not be found. <Link href={backHref} className="underline">Back to CLOs</Link>
             </p>
           ) : draft ? (
+            <>
+            {restoredDraft ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200/70 bg-blue-50/60 px-3 py-2 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300">
+                <span>Restored your unsaved changes from a previous session.</span>
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  className="cursor-pointer whitespace-nowrap text-xs font-medium underline underline-offset-2 hover:no-underline"
+                >
+                  Discard and start over
+                </button>
+              </div>
+            ) : null}
             <div className="overflow-hidden rounded-xl border border-border bg-card">
               <div className="border-b border-border px-5 py-3">
                 <ol className="flex items-center gap-1 overflow-x-auto">
@@ -193,7 +238,7 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
                         <button
                           type="button"
                           aria-current={isActive ? "step" : undefined}
-                          onClick={() => setStep(s.id)}
+                          onClick={() => goToStep(s.id)}
                           className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                             isActive
                               ? "bg-accent text-accent-foreground"
@@ -249,7 +294,7 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
               </div>
 
               <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
-                <Button variant="outline" render={<Link href={backHref}>Cancel</Link>} />
+                <Button variant="outline" onClick={persistDraft} render={<Link href={backHref}>Cancel</Link>} />
                 {step > 1 ? (
                   <Button variant="outline" onClick={goPrev}>
                     Previous
@@ -264,6 +309,7 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
                 )}
               </div>
             </div>
+            </>
           ) : null}
         </div>
       </main>
