@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Copy, Eye, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { bloomStyle, focusCodeOf, focusPercentOf, withCodes, type CloForm } from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
+import { CloWizardModal } from "./clos/clo-wizard-modal";
 
 // Re-exported so the wizard can keep importing the CLO model from this section.
 export { EMPTY_CLOS, toClosForm, toClosPayload, type CloForm } from "./clo-model";
@@ -23,14 +23,14 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 export function ClosSection({
   value,
-  courseId,
+  teachingMethods,
   assessmentMethods,
   courseTotalSlt,
   lastSavedAt,
   onPersist,
 }: {
   value: CloForm[];
-  courseId: string;
+  teachingMethods: Method[];
   assessmentMethods: Method[];
   /** Course's total SLT hours — CLO SLT hours must sum to this. */
   courseTotalSlt: number | null;
@@ -38,7 +38,6 @@ export function ClosSection({
   /** Persist the given CLO list (whole §14 section) and sync wizard state. */
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
-  const router = useRouter();
   const clos = withCodes(value);
   const methodName = useMemo(() => {
     const map = new Map(assessmentMethods.map((m) => [m.id, m.name]));
@@ -65,8 +64,23 @@ export function ClosSection({
     return true;
   });
 
-  const openAdd = () => router.push(`/courses/${courseId}/spec/clos/add`);
-  const openEdit = (code: string) => router.push(`/courses/${courseId}/spec/clos/${code}/edit`);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  // Bumped on every open so the modal remounts with a fresh draft even when
+  // re-opening the same target (e.g. Add → Cancel → Add) — `editingCode` alone
+  // doesn't change in that case.
+  const [wizardSeq, setWizardSeq] = useState(0);
+
+  const openAdd = () => {
+    setEditingCode(null);
+    setWizardSeq((n) => n + 1);
+    setWizardOpen(true);
+  };
+  const openEdit = (code: string) => {
+    setEditingCode(code);
+    setWizardSeq((n) => n + 1);
+    setWizardOpen(true);
+  };
 
   const duplicate = (index: number) => {
     const src = clos[index];
@@ -291,6 +305,24 @@ export function ClosSection({
           </p>
         ) : null}
       </section>
+
+      <CloWizardModal
+        key={wizardSeq}
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        editing={editingCode ? clos.find((c) => c.code === editingCode) ?? null : null}
+        nextCode={`CLO${clos.length + 1}`}
+        teachingMethods={teachingMethods}
+        assessmentMethods={assessmentMethods}
+        courseTotalSlt={courseTotalSlt}
+        onSave={(draft) =>
+          onPersist(
+            withCodes(
+              editingCode ? clos.map((c) => (c.code === editingCode ? draft : c)) : [...clos, draft],
+            ),
+          )
+        }
+      />
     </div>
   );
 }
