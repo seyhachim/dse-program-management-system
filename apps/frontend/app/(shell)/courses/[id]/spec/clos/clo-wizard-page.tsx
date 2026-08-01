@@ -309,7 +309,12 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
 
               <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={saveDraftNow}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={saveDraftNow}
+                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                  >
                     Save Draft
                   </Button>
                   {draftSavedAt ? (
