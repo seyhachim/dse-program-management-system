@@ -69,7 +69,9 @@ import {
 } from "./mapping-model";
 import { OverviewTab } from "./overview-tab";
 import { CompletionSummary } from "./completion-summary";
-
+import { DocumentPreview } from "./document-preview";
+import { buildCourseDocument } from "./course-document-model";
+import { useMemo } from "react";
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId = "overview" | "documentPreview" | SpecSectionId;
 
@@ -273,6 +275,17 @@ export function SpecClient({ courseId }: { courseId: string }) {
     : "Course Specification";
   const activeTabLabel = TABS.find((t) => t.id === activeTab)?.label;
 
+  const courseDocument = useMemo(
+    () =>
+      buildCourseDocument({
+        courseInfo,
+        clos,
+        weeklyPlan,
+        assessments,
+      }),
+    [courseInfo, clos, weeklyPlan, assessments],
+  );
+
   return (
     <div className="mx-auto max-w-7xl space-y-4">
       <Breadcrumb>
@@ -402,18 +415,22 @@ export function SpecClient({ courseId }: { courseId: string }) {
           </TabsContent>
 
           <TabsContent value="documentPreview" className="mt-4">
-            <SectionPanel>
-              <div className="py-10 text-center">
-                <p className="text-sm font-medium text-foreground">
-                  Document Preview
-                </p>
-                <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                  Assembling Part 1 + Part 2 into the final syllabus document is
-                  coming in a later phase. Each section above is saved as you
-                  go, so nothing here is lost once this ships.
-                </p>
-              </div>
-            </SectionPanel>
+            {course ? (
+              // <DocumentPreview
+              //   course={course}
+              //   courseInfo={courseInfo}
+              //   clos={clos}
+              //   weeklyPlan={weeklyPlan}
+              //   assessments={assessments}
+              // />
+              <DocumentPreview document={courseDocument} />
+            ) : (
+              <SectionPanel>
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  Course information is not available.
+                </div>
+              </SectionPanel>
+            )}
           </TabsContent>
 
           {canSaveActive ? (
