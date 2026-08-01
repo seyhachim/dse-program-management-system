@@ -149,7 +149,9 @@ export function CloStepPlos({ draft, toggle }: { draft: CloForm; toggle: (id: st
             <li key={plo.id}>
               <label
                 className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors ${
-                  checked ? "border-accent bg-accent/10" : "border-border hover:bg-muted/40"
+                  checked
+                    ? "border-violet-400 bg-violet-50 dark:border-violet-700/60 dark:bg-violet-950/20"
+                    : "border-border hover:border-violet-200 hover:bg-violet-50/50 dark:hover:border-violet-800/50 dark:hover:bg-violet-950/10"
                 }`}
               >
                 <input

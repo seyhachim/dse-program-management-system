@@ -44,13 +44,13 @@ export function ChipMultiSelect({
         <ul className="flex flex-wrap gap-1.5">
           {selected.map((m) => (
             <li key={m.id}>
-              <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 py-1 pl-3 pr-1.5 text-sm text-accent-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 py-1 pl-3 pr-1.5 text-sm text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
                 {m.name}
                 <button
                   type="button"
                   aria-label={`Remove ${m.name}`}
                   onClick={() => remove(m.id)}
-                  className="cursor-pointer rounded-full p-0.5 hover:bg-accent/25"
+                  className="cursor-pointer rounded-full p-0.5 hover:bg-violet-100 dark:hover:bg-violet-950/60"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -86,7 +86,7 @@ export function ChipMultiSelect({
                   <button
                     type="button"
                     onClick={() => add(m.id)}
-                    className="cursor-pointer rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-solid hover:border-accent-foreground hover:bg-accent/15 hover:text-accent-foreground"
+                    className="cursor-pointer rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-solid hover:border-violet-400 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700/60 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
                   >
                     + {m.name}
                   </button>
