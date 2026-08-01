@@ -117,7 +117,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
-  const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -144,7 +143,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setAssessments(toAssessmentForm(spec.data.assessmentPlan));
       setMapping(toMappingForm(spec.data.mapping));
       setStatus(spec.status ?? {});
-      setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
       setCourse(courseView);
       setCourseTotalSlt(courseView.totalSltHours ?? null);
@@ -350,7 +348,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
           <TabsContent value="clos" className="mt-4">
             <ClosSection
               value={clos}
-              teachingMethods={teachingMethods}
+              courseId={courseId}
               assessmentMethods={assessmentMethods}
               courseTotalSlt={courseTotalSlt}
               lastSavedAt={closSavedAt}
