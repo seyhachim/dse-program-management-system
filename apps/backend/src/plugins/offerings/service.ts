@@ -34,32 +34,43 @@ async function assertLecturersExist(lecturerIds: string[]): Promise<void> {
   if (found.some((l) => l === null)) throw new ReferenceError("One or more co-lecturers do not exist");
 }
 
+/** Fetch the lecturer lookup map once for a batch of `toView` calls. */
+async function lecturerLookup(): Promise<Map<string, LecturerRef>> {
+  const lecturerList = await lecturers().list();
+  return new Map(lecturerList.map((l) => [l.id, l]));
+}
+
 const withRelations = {
   enrollments: { select: { studentId: true } },
   coLecturers: { select: { lecturerId: true } },
 } as const;
 
-/** Assemble an enriched OfferingView by joining across plugins via the registry. */
-async function toView(offering: {
-  id: string;
-  courseId: string;
-  lecturerId: string | null;
-  term: string;
-  capacity: number;
-  status: OfferingView["status"];
-  semester: OfferingView["semester"];
-  programmeYear: number | null;
-  otherLecturers: string | null;
-  createdAt: Date;
-  enrollments: { studentId: string }[];
-  coLecturers: { lecturerId: string }[];
-}): Promise<OfferingView> {
-  const [course, lecturerList, enrolledStudents] = await Promise.all([
+/**
+ * Assemble an enriched OfferingView by joining across plugins via the registry.
+ * `lecturerById` is looked up once by the caller (not per offering row) so that
+ * listing N offerings doesn't re-fetch the whole lecturers table N times.
+ */
+async function toView(
+  offering: {
+    id: string;
+    courseId: string;
+    lecturerId: string | null;
+    term: string;
+    capacity: number;
+    status: OfferingView["status"];
+    semester: OfferingView["semester"];
+    programmeYear: number | null;
+    otherLecturers: string | null;
+    createdAt: Date;
+    enrollments: { studentId: string }[];
+    coLecturers: { lecturerId: string }[];
+  },
+  lecturerById: Map<string, LecturerRef>,
+): Promise<OfferingView> {
+  const [course, enrolledStudents] = await Promise.all([
     courses().getById(offering.courseId),
-    lecturers().list(),
     students().findByIds(offering.enrollments.map((e) => e.studentId)),
   ]);
-  const lecturerById = new Map(lecturerList.map((l) => [l.id, l]));
   const lecturer = offering.lecturerId ? (lecturerById.get(offering.lecturerId) ?? null) : null;
   const coLecturers = offering.coLecturers
     .map((c) => lecturerById.get(c.lecturerId))
@@ -102,12 +113,13 @@ export const offeringService = {
       include: withRelations,
       orderBy: [{ term: "desc" }, { createdAt: "desc" }],
     });
-    return Promise.all(offerings.map(toView));
+    const lecturerById = await lecturerLookup();
+    return Promise.all(offerings.map((o) => toView(o, lecturerById)));
   },
 
   async getById(id: string): Promise<OfferingView | null> {
     const offering = await prisma.offering.findUnique({ where: { id }, include: withRelations });
-    return offering ? toView(offering) : null;
+    return offering ? toView(offering, await lecturerLookup()) : null;
   },
 
   async create(input: CreateOfferingInput): Promise<OfferingView> {
@@ -136,7 +148,7 @@ export const offeringService = {
       },
       include: withRelations,
     });
-    return toView(offering);
+    return toView(offering, await lecturerLookup());
   },
 
   async update(id: string, input: UpdateOfferingInput): Promise<OfferingView> {
@@ -188,7 +200,7 @@ export const offeringService = {
         include: withRelations,
       });
     });
-    return toView(offering);
+    return toView(offering, await lecturerLookup());
   },
 
   async remove(id: string) {
