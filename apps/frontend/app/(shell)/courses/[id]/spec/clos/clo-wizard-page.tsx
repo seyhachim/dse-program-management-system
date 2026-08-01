@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -53,6 +54,7 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
   const [draft, setDraft] = useState<CloForm | null>(null);
   const [baseDraft, setBaseDraft] = useState<CloForm | null>(null);
   const [restoredDraft, setRestoredDraft] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
   const [step, setStep] = useState<WizardStepId>(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,6 +121,18 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
   const persistDraft = () => {
     if (draft) saveCloDraft(courseId, cloCode, draft);
   };
+
+  const saveDraftNow = () => {
+    if (!draft) return;
+    saveCloDraft(courseId, cloCode, draft);
+    setDraftSavedAt(Date.now());
+  };
+
+  useEffect(() => {
+    if (!draftSavedAt) return;
+    const timer = setTimeout(() => setDraftSavedAt(null), 3000);
+    return () => clearTimeout(timer);
+  }, [draftSavedAt]);
 
   const goNext = () => {
     if (step === 1 && errors.statement) {
@@ -293,20 +307,36 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
-                <Button variant="outline" onClick={persistDraft} render={<Link href={backHref}>Cancel</Link>} />
-                {step > 1 ? (
-                  <Button variant="outline" onClick={goPrev}>
-                    Previous
+              <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={saveDraftNow}>
+                    Save Draft
                   </Button>
-                ) : null}
-                {step < 5 ? (
-                  <Button onClick={goNext}>Next</Button>
-                ) : (
-                  <Button onClick={submit} disabled={saving}>
-                    {saving ? "Saving…" : "Save CLO"}
-                  </Button>
-                )}
+                  {draftSavedAt ? (
+                    <span
+                      aria-live="polite"
+                      className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Draft saved on this device
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={persistDraft} render={<Link href={backHref}>Cancel</Link>} />
+                  {step > 1 ? (
+                    <Button variant="outline" onClick={goPrev}>
+                      Previous
+                    </Button>
+                  ) : null}
+                  {step < 5 ? (
+                    <Button onClick={goNext}>Next</Button>
+                  ) : (
+                    <Button onClick={submit} disabled={saving}>
+                      {saving ? "Saving…" : "Save CLO"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             </>
