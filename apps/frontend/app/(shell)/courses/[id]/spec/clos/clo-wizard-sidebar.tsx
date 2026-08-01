@@ -79,7 +79,7 @@ export function CloWizardSidebar({
               <button
                 type="button"
                 onClick={() => onInsertVerb(appendBloomVerb(draft.description, verb))}
-                className="rounded-full border border-border px-2.5 py-1 text-xs text-foreground transition-colors hover:border-accent hover:text-accent-foreground"
+                className="cursor-pointer rounded-full border border-border px-2.5 py-1 text-xs text-foreground transition-colors hover:border-accent-foreground hover:bg-accent/15 hover:text-accent-foreground"
               >
                 {verb}
               </button>

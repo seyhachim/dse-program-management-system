@@ -50,7 +50,7 @@ export function ChipMultiSelect({
                   type="button"
                   aria-label={`Remove ${m.name}`}
                   onClick={() => remove(m.id)}
-                  className="rounded-full p-0.5 hover:bg-accent/25"
+                  className="cursor-pointer rounded-full p-0.5 hover:bg-accent/25"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -86,7 +86,7 @@ export function ChipMultiSelect({
                   <button
                     type="button"
                     onClick={() => add(m.id)}
-                    className="rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-accent hover:text-accent-foreground"
+                    className="cursor-pointer rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-solid hover:border-accent-foreground hover:bg-accent/15 hover:text-accent-foreground"
                   >
                     + {m.name}
                   </button>
