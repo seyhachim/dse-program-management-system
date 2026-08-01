@@ -52,8 +52,6 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [draft, setDraft] = useState<CloForm | null>(null);
-  const [baseDraft, setBaseDraft] = useState<CloForm | null>(null);
-  const [restoredDraft, setRestoredDraft] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
   const [step, setStep] = useState<WizardStepId>(1);
   const [loading, setLoading] = useState(true);
@@ -87,14 +85,8 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
         } else {
           base = emptyClo();
         }
-        setBaseDraft(base);
         const stored = base ? loadCloDraft(courseId, cloCode) : null;
-        if (stored) {
-          setDraft(stored);
-          setRestoredDraft(true);
-        } else {
-          setDraft(base);
-        }
+        setDraft(stored ?? base);
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
       } finally {
@@ -149,13 +141,6 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
   const goToStep = (id: WizardStepId) => {
     persistDraft();
     setStep(id);
-  };
-
-  const discardDraft = () => {
-    clearCloDraft(courseId, cloCode);
-    setDraft(baseDraft);
-    setRestoredDraft(false);
-    setStep(1);
   };
 
   const submit = async () => {
@@ -228,19 +213,6 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
               That CLO could not be found. <Link href={backHref} className="underline">Back to CLOs</Link>
             </p>
           ) : draft ? (
-            <>
-            {restoredDraft ? (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200/70 bg-blue-50/60 px-3 py-2 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300">
-                <span>Restored your unsaved changes from a previous session.</span>
-                <button
-                  type="button"
-                  onClick={discardDraft}
-                  className="cursor-pointer whitespace-nowrap text-xs font-medium underline underline-offset-2 hover:no-underline"
-                >
-                  Discard and start over
-                </button>
-              </div>
-            ) : null}
             <div className="overflow-hidden rounded-xl border border-border bg-card">
               <div className="border-b border-border px-5 py-3">
                 <ol className="flex items-center gap-1 overflow-x-auto">
@@ -344,7 +316,6 @@ export function CloWizardPage({ courseId, cloCode }: { courseId: string; cloCode
                 </div>
               </div>
             </div>
-            </>
           ) : null}
         </div>
       </main>
