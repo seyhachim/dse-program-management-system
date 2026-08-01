@@ -122,6 +122,7 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
+  @@index([permissionId])
 }
 
 /// Many-to-many bridge for User<->Role (issue #77). Phase A's migration
@@ -141,6 +142,7 @@ model UserRoleAssignment {
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+  @@index([roleId])
 }
 
 /// Students plugin domain model.
@@ -177,6 +179,8 @@ model Course {
 
   offerings Offering[]
   spec      CourseSpec?
+
+  @@index([lecturerId])
 }
 
 /// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a
@@ -255,6 +259,7 @@ model CourseSpecCloTeachingMethod {
   teachingMethod   TeachingMethod @relation(fields: [teachingMethodId], references: [id], onDelete: Cascade)
 
   @@id([courseSpecId, cloId, teachingMethodId])
+  @@index([teachingMethodId])
 }
 
 /// Issue #81: same as CourseSpecCloTeachingMethod, for §14 assessment-method picks.
@@ -266,6 +271,7 @@ model CourseSpecCloAssessmentMethod {
   assessmentMethod   AssessmentMethod @relation(fields: [assessmentMethodId], references: [id], onDelete: Cascade)
 
   @@id([courseSpecId, cloId, assessmentMethodId])
+  @@index([assessmentMethodId])
 }
 
 /// Course Offerings plugin — a course delivered in a given term, with an assigned
@@ -292,6 +298,7 @@ model Offering {
 
   @@unique([courseId, term])
   @@index([status])
+  @@index([lecturerId])
 }
 
 /// Join table (issue #79, supersedes #73's Course-level table): co-lecturers are
@@ -321,6 +328,7 @@ model Enrollment {
   createdAt  DateTime @default(now())
 
   @@unique([offeringId, studentId])
+  @@index([studentId])
 }
 
 /// §15 teaching-method vocabulary. Global and shared across all courses; grows
@@ -367,6 +375,7 @@ model Rubric {
   updatedAt     DateTime          @updatedAt
 
   @@index([status])
+  @@index([ownerId])
 }
 
 /// One rating-scale column of a Rubric (normalized form of the API's `levels`
@@ -419,4 +428,5 @@ model RubricCell {
   descriptor  String
 
   @@id([rubricId, criterionId, levelId])
+  @@index([levelId])
 }

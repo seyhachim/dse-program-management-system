@@ -6,6 +6,7 @@ import {
   type CourseSpecProgress,
   type CoursesServiceContract,
   type CreateCourseInput,
+  type LecturerRef,
   type LecturersServiceContract,
   type ListCoursesQuery,
   type OfferingsServiceContract,
@@ -39,9 +40,19 @@ async function assertLecturerExists(lecturerId: string | null | undefined): Prom
   if (!lecturer) throw new ReferenceError("Assigned lecturer does not exist");
 }
 
-/** Attach the lecturer summary to a course row for API responses. */
-async function withLecturer<T extends { lecturerId: string | null }>(course: T) {
-  const lecturer = course.lecturerId ? await lecturers().getById(course.lecturerId) : null;
+/** Fetch the lecturer lookup map once for a batch of `withLecturer` calls. */
+async function lecturerLookup(): Promise<Map<string, LecturerRef>> {
+  const lecturerList = await lecturers().list();
+  return new Map(lecturerList.map((l) => [l.id, l]));
+}
+
+/**
+ * Attach the lecturer summary to a course row for API responses. `lecturerById`
+ * is looked up once by the caller (not per course row) so that listing N
+ * courses doesn't issue N separate lecturer lookups.
+ */
+function withLecturer<T extends { lecturerId: string | null }>(course: T, lecturerById: Map<string, LecturerRef>) {
+  const lecturer = course.lecturerId ? (lecturerById.get(course.lecturerId) ?? null) : null;
   return { ...course, lecturer };
 }
 
@@ -79,7 +90,8 @@ export const courseService = {
       where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
     });
-    return Promise.all(courses.map(withLecturer));
+    const lecturerById = await lecturerLookup();
+    return courses.map((course) => withLecturer(course, lecturerById));
   },
 
   /**
@@ -131,19 +143,19 @@ export const courseService = {
 
   async getDetailed(id: string) {
     const course = await prisma.course.findUnique({ where: { id } });
-    return course ? withLecturer(course) : null;
+    return course ? withLecturer(course, await lecturerLookup()) : null;
   },
 
   async create(input: CreateCourseInput) {
     await assertLecturerExists(input.lecturerId);
     const course = await prisma.course.create({ data: input });
-    return withLecturer(course);
+    return withLecturer(course, await lecturerLookup());
   },
 
   async update(id: string, input: UpdateCourseInput) {
     await assertLecturerExists(input.lecturerId);
     const course = await prisma.course.update({ where: { id }, data: input });
-    return withLecturer(course);
+    return withLecturer(course, await lecturerLookup());
   },
 
   async remove(id: string) {
