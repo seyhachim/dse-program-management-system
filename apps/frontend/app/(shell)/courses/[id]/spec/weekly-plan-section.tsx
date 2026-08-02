@@ -18,6 +18,7 @@ import {
   cloChip,
   cloColor,
   cloCoverage,
+  weekContactHoursForm,
   weekSltForm,
   weeklyPlanFormTotals,
   weeklyPlanSummary,
@@ -51,6 +52,7 @@ export function WeeklyPlanSectionForm({
   const editWeekHref = (weekId: string) => `/courses/${courseId}/spec/weekly-plan/${weekId}/edit`;
 
   const totals = weeklyPlanFormTotals(value);
+  const totalContactHours = totals.lectureHours + totals.tutorialHours + totals.practiceHours + totals.otherHours;
 
   const remove = (id: string) => {
     const w = value.find((x) => x.id === id);
@@ -103,14 +105,15 @@ export function WeeklyPlanSectionForm({
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[920px] text-sm">
+              <table className="w-full min-w-[1060px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
                     <th className="w-14 px-3 py-2.5">Week</th>
                     <th className="px-3 py-2.5">Topic / Content</th>
                     <th className="px-3 py-2.5">CLOs</th>
                     <th className="px-3 py-2.5">Learning Activities</th>
-                    <th className="px-3 py-2.5 text-center">Contact Hours (L+T)</th>
+                    <th className="px-3 py-2.5">LLOs</th>
+                    <th className="px-3 py-2.5 text-center">Contact Hours (L+T+P+O)</th>
                     <th className="px-3 py-2.5 text-center">Self-Study Hours</th>
                     <th className="px-3 py-2.5 text-center">SLT (Hours)</th>
                     <th className="px-3 py-2.5">Assessment / Deliverables</th>
@@ -158,7 +161,20 @@ export function WeeklyPlanSectionForm({
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-center text-foreground">{w.contactHours || "—"}</td>
+                      <td className="max-w-[220px] px-3 py-3">
+                        {w.lloItems.length ? (
+                          <ul className="space-y-0.5">
+                            {w.lloItems.map((llo, i) => (
+                              <li key={i} className="text-foreground">
+                                <span className="font-medium text-muted-foreground">LLO{i + 1}:</span> {llo}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center text-foreground">{weekContactHoursForm(w) || "—"}</td>
                       <td className="px-3 py-3 text-center text-foreground">{w.selfStudyHours || "—"}</td>
                       <td className="px-3 py-3 text-center font-medium text-foreground">{weekSltForm(w)}</td>
                       <td className="px-3 py-3 text-foreground">
@@ -184,10 +200,10 @@ export function WeeklyPlanSectionForm({
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border bg-muted/40 text-sm font-semibold text-foreground">
-                    <td colSpan={4} className="px-3 py-2.5">
+                    <td colSpan={5} className="px-3 py-2.5">
                       Total ({value.length} {value.length === 1 ? "Week" : "Weeks"})
                     </td>
-                    <td className="px-3 py-2.5 text-center">{totals.contactHours}</td>
+                    <td className="px-3 py-2.5 text-center">{totalContactHours}</td>
                     <td className="px-3 py-2.5 text-center">{totals.selfStudyHours}</td>
                     <td className="px-3 py-2.5 text-center">{totals.slt}</td>
                     <td colSpan={2} className="px-3 py-2.5" />
@@ -199,7 +215,7 @@ export function WeeklyPlanSectionForm({
 
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             <Info className="h-3.5 w-3.5 shrink-0" />
-            SLT = Contact Hours (Lecture + Tutorial) + Self-Study Hours
+            SLT = Contact Hours (Lecture + Tutorial + Practice + Other) + Self-Study Hours
           </div>
         </div>
 
@@ -327,7 +343,11 @@ function SummaryCard({ plan }: { plan: WeeklyPlanForm }) {
       <CardHeader title="Weekly Plan Summary" />
       <dl className="space-y-2.5 text-sm">
         <SummaryRow icon={<CalendarDays className="h-4 w-4" />} label="Total Weeks" value={s.totalWeeks} />
-        <SummaryRow icon={<Clock className="h-4 w-4" />} label="Total Contact Hours (L+T)" value={s.contactHours} />
+        <SummaryRow
+          icon={<Clock className="h-4 w-4" />}
+          label="Total Contact Hours (L+T+P+O)"
+          value={s.contactHours}
+        />
         <SummaryRow icon={<Timer className="h-4 w-4" />} label="Total Self-Study Hours" value={s.selfStudyHours} />
         <SummaryRow icon={<Clock className="h-4 w-4" />} label="Total SLT Hours" value={s.slt} />
         <SummaryRow icon={<ClipboardList className="h-4 w-4" />} label="Assessments" value={s.assessments} />

@@ -9,8 +9,12 @@ export type WeekForm = {
   week: string;
   topic: string;
   cloCodes: string[];
+  lloItems: string[];
   activities: string[];
-  contactHours: string;
+  lectureHours: string;
+  tutorialHours: string;
+  practiceHours: string;
+  otherHours: string;
   selfStudyHours: string;
   assessment: string;
 };
@@ -31,8 +35,12 @@ export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
     week: String(nextNo),
     topic: "",
     cloCodes: [],
+    lloItems: [],
     activities: [],
-    contactHours: "",
+    lectureHours: "",
+    tutorialHours: "",
+    practiceHours: "",
+    otherHours: "",
     selfStudyHours: "",
     assessment: "",
   };
@@ -40,20 +48,31 @@ export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
 
 /**
  * Map the API's §18 payload into the form model. Tolerates the retired §16 grid
- * shape (which had no `weeks` array) by yielding an empty plan.
+ * shape (which had no `weeks` array) by yielding an empty plan. Also folds a week's
+ * legacy single `contactHours` figure (saved before Contact Hours was split into
+ * Lecture/Tutorial/Practice/Other) into `lectureHours` when no breakdown is present,
+ * so pre-existing weeks keep a correct total/SLT until next saved in the new shape —
+ * the same read-only migration `toClosForm` does for the retired §15 `cloMapping`.
  */
 export function toWeeklyPlanForm(data: unknown): WeeklyPlanForm {
   const weeks = (data as { weeks?: unknown[] } | undefined)?.weeks ?? [];
   return weeks
     .map((raw) => {
       const d = (raw ?? {}) as Record<string, unknown>;
+      const hasHourBreakdown =
+        d.lectureHours != null || d.tutorialHours != null || d.practiceHours != null || d.otherHours != null;
+      const legacyContactHours = !hasHourBreakdown && d.contactHours != null ? String(d.contactHours) : "";
       return {
         id: str(d.id) || uuid(),
         week: str(d.week),
         topic: str(d.topic),
         cloCodes: strArray(d.cloCodes),
+        lloItems: strArray(d.lloItems),
         activities: strArray(d.activities),
-        contactHours: d.contactHours == null ? "" : String(d.contactHours),
+        lectureHours: d.lectureHours == null ? legacyContactHours : String(d.lectureHours),
+        tutorialHours: d.tutorialHours == null ? "" : String(d.tutorialHours),
+        practiceHours: d.practiceHours == null ? "" : String(d.practiceHours),
+        otherHours: d.otherHours == null ? "" : String(d.otherHours),
         selfStudyHours: d.selfStudyHours == null ? "" : String(d.selfStudyHours),
         assessment: str(d.assessment),
       };
@@ -69,29 +88,46 @@ export function toWeeklyPlanPayload(form: WeeklyPlanForm): WeeklyPlanSection {
       week: Number(w.week) || 1,
       topic: w.topic.trim(),
       cloCodes: w.cloCodes,
+      lloItems: w.lloItems.map((l) => l.trim()).filter(Boolean),
       activities: w.activities,
-      contactHours: w.contactHours === "" ? null : Number(w.contactHours),
+      lectureHours: w.lectureHours === "" ? null : Number(w.lectureHours),
+      tutorialHours: w.tutorialHours === "" ? null : Number(w.tutorialHours),
+      practiceHours: w.practiceHours === "" ? null : Number(w.practiceHours),
+      otherHours: w.otherHours === "" ? null : Number(w.otherHours),
       selfStudyHours: w.selfStudyHours === "" ? null : Number(w.selfStudyHours),
       assessment: w.assessment.trim(),
     })),
   } as WeeklyPlanSection;
 }
 
-/** Weekly SLT for the form model: Contact + Self-Study (blank counts as 0). */
+/** Contact Hours for the form model: Lecture + Tutorial + Practice + Other (blank counts as 0). */
+export function weekContactHoursForm(w: WeekForm): number {
+  return (
+    (Number(w.lectureHours) || 0) +
+    (Number(w.tutorialHours) || 0) +
+    (Number(w.practiceHours) || 0) +
+    (Number(w.otherHours) || 0)
+  );
+}
+
+/** Weekly SLT for the form model: Contact Hours (L+T+P+O) + Self-Study (blank counts as 0). */
 export function weekSltForm(w: WeekForm): number {
-  return (Number(w.contactHours) || 0) + (Number(w.selfStudyHours) || 0);
+  return weekContactHoursForm(w) + (Number(w.selfStudyHours) || 0);
 }
 
 /** Footer totals across the form model. */
 export function weeklyPlanFormTotals(form: WeeklyPlanForm) {
   return form.reduce(
     (acc, w) => {
-      acc.contactHours += Number(w.contactHours) || 0;
+      acc.lectureHours += Number(w.lectureHours) || 0;
+      acc.tutorialHours += Number(w.tutorialHours) || 0;
+      acc.practiceHours += Number(w.practiceHours) || 0;
+      acc.otherHours += Number(w.otherHours) || 0;
       acc.selfStudyHours += Number(w.selfStudyHours) || 0;
       acc.slt += weekSltForm(w);
       return acc;
     },
-    { contactHours: 0, selfStudyHours: 0, slt: 0 },
+    { lectureHours: 0, tutorialHours: 0, practiceHours: 0, otherHours: 0, selfStudyHours: 0, slt: 0 },
   );
 }
 
@@ -120,6 +156,7 @@ export function cloCoverage(form: WeeklyPlanForm, cloCodes?: string[]): CloCover
 /** Rolled-up figures for the Weekly Plan Summary panel. */
 export function weeklyPlanSummary(form: WeeklyPlanForm) {
   const totals = weeklyPlanFormTotals(form);
+  const contactHours = totals.lectureHours + totals.tutorialHours + totals.practiceHours + totals.otherHours;
   const assessments = form.filter((w) => w.assessment.trim()).length;
   const isProject = (w: WeekForm) =>
     /project/i.test(w.topic) ||
@@ -132,7 +169,7 @@ export function weeklyPlanSummary(form: WeeklyPlanForm) {
     .sort((a, b) => a - b);
   return {
     totalWeeks: form.length,
-    contactHours: totals.contactHours,
+    contactHours,
     selfStudyHours: totals.selfStudyHours,
     slt: totals.slt,
     assessments,

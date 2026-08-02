@@ -7,6 +7,7 @@ import {
   cloFocusPercent,
   WeeklyPlanSection,
   SPEC_SECTION_SCHEMAS,
+  weekContactHours,
   weekSlt,
   weeklyPlanTotals,
   MappingSection,
@@ -63,47 +64,84 @@ test("WeeklyPlanSection defaults weeks to []", () => {
 
 test("WeeklyPlanSection coerces string hours and defaults array/optional fields", () => {
   const parsed = WeeklyPlanSection.parse({
-    weeks: [{ id: "w1", week: "1", topic: "Intro", contactHours: "2", selfStudyHours: "3" }],
+    weeks: [
+      {
+        id: "w1",
+        week: "1",
+        topic: "Intro",
+        lectureHours: "2",
+        tutorialHours: "1",
+        selfStudyHours: "3",
+      },
+    ],
   });
   const w = parsed.weeks[0]!;
   expect(w.week).toBe(1);
-  expect(w.contactHours).toBe(2);
+  expect(w.lectureHours).toBe(2);
+  expect(w.tutorialHours).toBe(1);
   expect(w.selfStudyHours).toBe(3);
   expect(w.cloCodes).toEqual([]);
+  expect(w.lloItems).toEqual([]);
   expect(w.activities).toEqual([]);
   expect(w.assessment).toBe("");
 });
 
-test("WeeklyPlanRow keeps linked CLOs and activities, hours default to null", () => {
+test("WeeklyPlanRow keeps linked CLOs, LLOs, and activities, hours default to null", () => {
   const parsed = WeeklyPlanSection.parse({
-    weeks: [{ id: "w1", week: 2, topic: "EDA", cloCodes: ["CLO1"], activities: ["Lecture", "Lab Exercise"] }],
+    weeks: [
+      {
+        id: "w1",
+        week: 2,
+        topic: "EDA",
+        cloCodes: ["CLO1"],
+        lloItems: ["Explain the ML workflow.", "Set up a Python environment."],
+        activities: ["Lecture", "Lab Exercise"],
+      },
+    ],
   });
   const w = parsed.weeks[0]!;
   expect(w.cloCodes).toEqual(["CLO1"]);
+  expect(w.lloItems).toEqual(["Explain the ML workflow.", "Set up a Python environment."]);
   expect(w.activities).toEqual(["Lecture", "Lab Exercise"]);
-  expect(w.contactHours).toBeNull();
+  expect(w.lectureHours).toBeNull();
+  expect(w.tutorialHours).toBeNull();
+  expect(w.practiceHours).toBeNull();
+  expect(w.otherHours).toBeNull();
   expect(w.selfStudyHours).toBeNull();
 });
 
 test("WeeklyPlanSection rejects hours out of range and non-positive weeks", () => {
-  expect(WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 1, contactHours: 201 }] }).success).toBe(false);
+  expect(WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 1, lectureHours: 201 }] }).success).toBe(false);
   expect(WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 0 }] }).success).toBe(false);
 });
 
-test("weekSlt sums contact + self-study, treating nulls as 0", () => {
-  expect(weekSlt({ contactHours: 2, selfStudyHours: 3 })).toBe(5);
-  expect(weekSlt({ contactHours: 2, selfStudyHours: null })).toBe(2);
+test("weekContactHours sums L+T+P+O, treating nulls as 0", () => {
+  expect(weekContactHours({ lectureHours: 2, tutorialHours: 1, practiceHours: 1, otherHours: 0 })).toBe(4);
+  expect(weekContactHours({ lectureHours: 2 })).toBe(2);
+  expect(weekContactHours({})).toBe(0);
+});
+
+test("weekSlt sums contact (L+T+P+O) + self-study, treating nulls as 0", () => {
+  expect(weekSlt({ lectureHours: 2, tutorialHours: 1, selfStudyHours: 3 })).toBe(6);
+  expect(weekSlt({ lectureHours: 2, selfStudyHours: null })).toBe(2);
   expect(weekSlt({})).toBe(0);
 });
 
-test("weeklyPlanTotals sums contact, self-study, and derived SLT over all weeks", () => {
+test("weeklyPlanTotals sums each hour category and the derived SLT over all weeks", () => {
   const section = WeeklyPlanSection.parse({
     weeks: [
-      { id: "1", week: 1, contactHours: 2, selfStudyHours: 3 },
-      { id: "2", week: 2, contactHours: 2, selfStudyHours: 6 },
+      { id: "1", week: 1, lectureHours: 2, tutorialHours: 1, selfStudyHours: 3 },
+      { id: "2", week: 2, lectureHours: 1, practiceHours: 1, otherHours: 1, selfStudyHours: 6 },
     ],
   });
-  expect(weeklyPlanTotals(section)).toEqual({ contactHours: 4, selfStudyHours: 9, slt: 13 });
+  expect(weeklyPlanTotals(section)).toEqual({
+    lectureHours: 3,
+    tutorialHours: 1,
+    practiceHours: 1,
+    otherHours: 1,
+    selfStudyHours: 9,
+    slt: 15,
+  });
 });
 
 test("slt is registered in SPEC_SECTION_SCHEMAS as the weekly plan", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { LEARNING_ACTIVITIES } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import type { CloForm } from "../clos-section";
@@ -9,7 +9,7 @@ import { weekSltForm, type WeekForm } from "../weekly-plan-model";
 
 const TOPIC_MAX = 200;
 
-/** The five §18 form sections, shared by the full-page Add Week and Edit Week routes. */
+/** The six §18 form sections, shared by the full-page Add Week and Edit Week routes. */
 export function WeekFormFields({
   draft,
   set,
@@ -28,6 +28,7 @@ export function WeekFormFields({
   const errors = {
     topic: draft.topic.trim().length === 0,
     clos: draft.cloCodes.length === 0,
+    llos: draft.lloItems.length === 0 || draft.lloItems.some((l) => !l.trim()),
     activities: draft.activities.length === 0,
   };
 
@@ -100,27 +101,68 @@ export function WeekFormFields({
         {touched && errors.clos ? <p className="text-xs text-status-live">Link at least one CLO.</p> : null}
       </Section>
 
-      {/* 3. Learning Activities */}
-      <Section n={3} title="Learning Activities" required>
+      {/* 3. Lesson Learning Outcomes (LLOs) */}
+      <Section n={3} title="Lesson Learning Outcomes (LLOs)" required>
+        <p className="text-xs text-muted-foreground">Outcomes students should achieve by the end of this lesson.</p>
+        <LloEditor value={draft.lloItems} onChange={(lloItems) => set({ lloItems })} />
+        {touched && errors.llos ? (
+          <p className="text-xs text-status-live">Add at least one LLO (none left blank).</p>
+        ) : null}
+      </Section>
+
+      {/* 4. Learning Activities */}
+      <Section n={4} title="Learning Activities" required>
         <ActivityPicker value={draft.activities} onChange={(activities) => set({ activities })} />
         {touched && errors.activities ? (
           <p className="text-xs text-status-live">Add at least one learning activity.</p>
         ) : null}
       </Section>
 
-      {/* 4. Time Allocation */}
-      <Section n={4} title="Time Allocation">
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Contact Hours (L+T)">
+      {/* 5. Time Allocation */}
+      <Section n={5} title="Time Allocation (Hours)">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="Lecture (L)">
             <input
               type="number"
               min={0}
-              value={draft.contactHours}
-              onChange={(e) => set({ contactHours: e.target.value })}
+              value={draft.lectureHours}
+              onChange={(e) => set({ lectureHours: e.target.value })}
               placeholder="e.g. 2"
               className={inputCls}
             />
           </Field>
+          <Field label="Tutorial (T)">
+            <input
+              type="number"
+              min={0}
+              value={draft.tutorialHours}
+              onChange={(e) => set({ tutorialHours: e.target.value })}
+              placeholder="e.g. 1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Practice (P)">
+            <input
+              type="number"
+              min={0}
+              value={draft.practiceHours}
+              onChange={(e) => set({ practiceHours: e.target.value })}
+              placeholder="e.g. 1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Other (O)">
+            <input
+              type="number"
+              min={0}
+              value={draft.otherHours}
+              onChange={(e) => set({ otherHours: e.target.value })}
+              placeholder="e.g. 0"
+              className={inputCls}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Self-Study Hours">
             <input
               type="number"
@@ -140,8 +182,8 @@ export function WeekFormFields({
         </div>
       </Section>
 
-      {/* 5. Assessment / Deliverables */}
-      <Section n={5} title="Assessment / Deliverables">
+      {/* 6. Assessment / Deliverables */}
+      <Section n={6} title="Assessment / Deliverables">
         <input
           list="week-assessment-options"
           value={draft.assessment}
@@ -164,8 +206,55 @@ export function weekFormErrors(draft: WeekForm) {
   return {
     topic: draft.topic.trim().length === 0,
     clos: draft.cloCodes.length === 0,
+    llos: draft.lloItems.length === 0 || draft.lloItems.some((l) => !l.trim()),
     activities: draft.activities.length === 0,
   };
+}
+
+/** Ordered, editable list of Lesson Learning Outcomes: LLO1, LLO2… by position, add/delete. */
+function LloEditor({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const setAt = (i: number, text: string) => onChange(value.map((v, idx) => (idx === i ? text : v)));
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const add = () => onChange([...value, ""]);
+
+  return (
+    <div className="space-y-2">
+      {value.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
+          No LLOs added yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {value.map((llo, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40 px-2 text-xs font-semibold text-muted-foreground">
+                LLO{i + 1}
+              </span>
+              <input
+                type="text"
+                value={llo}
+                onChange={(e) => setAt(i, e.target.value)}
+                placeholder="e.g. Explain the machine learning workflow."
+                className={`${inputCls} flex-1`}
+              />
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                aria-label={`Delete LLO${i + 1}`}
+                title="Delete"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-status-live/40 hover:text-status-live"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button type="button" variant="outline" size="sm" onClick={add}>
+        <Plus className="mr-1 h-3.5 w-3.5" /> Add LLO
+      </Button>
+    </div>
+  );
 }
 
 /** Chip-based multi-select for learning activities: preset suggestions + free entry. */
