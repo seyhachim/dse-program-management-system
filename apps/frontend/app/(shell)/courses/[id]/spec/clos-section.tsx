@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Copy, Eye, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { bloomStyle, focusCodeOf, focusPercentOf, withCodes, type CloForm } from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
+import { CloWizardModal } from "./clos/clo-wizard-modal";
 
 // Re-exported so the wizard can keep importing the CLO model from this section.
 export { EMPTY_CLOS, toClosForm, toClosPayload, type CloForm } from "./clo-model";
@@ -24,6 +24,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 export function ClosSection({
   value,
   courseId,
+  teachingMethods,
   assessmentMethods,
   courseTotalSlt,
   lastSavedAt,
@@ -31,6 +32,7 @@ export function ClosSection({
 }: {
   value: CloForm[];
   courseId: string;
+  teachingMethods: Method[];
   assessmentMethods: Method[];
   /** Course's total SLT hours — CLO SLT hours must sum to this. */
   courseTotalSlt: number | null;
@@ -38,7 +40,6 @@ export function ClosSection({
   /** Persist the given CLO list (whole §14 section) and sync wizard state. */
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
-  const router = useRouter();
   const clos = withCodes(value);
   const methodName = useMemo(() => {
     const map = new Map(assessmentMethods.map((m) => [m.id, m.name]));
@@ -51,6 +52,10 @@ export function ClosSection({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
+  const [modal, setModal] = useState<{ open: boolean; cloCode: string | null }>({
+    open: false,
+    cloCode: null,
+  });
 
   const visible = clos.filter((c) => {
     if (filter === "active" && c.status !== "active") return false;
@@ -65,8 +70,8 @@ export function ClosSection({
     return true;
   });
 
-  const openAdd = () => router.push(`/courses/${courseId}/spec/clos/add`);
-  const openEdit = (code: string) => router.push(`/courses/${courseId}/spec/clos/${code}/edit`);
+  const openAdd = () => setModal({ open: true, cloCode: null });
+  const openEdit = (code: string) => setModal({ open: true, cloCode: code });
 
   const duplicate = (index: number) => {
     const src = clos[index];
@@ -292,6 +297,17 @@ export function ClosSection({
         ) : null}
       </section>
 
+      <CloWizardModal
+        open={modal.open}
+        onOpenChange={(open) => setModal((m) => ({ ...m, open }))}
+        courseId={courseId}
+        cloCode={modal.cloCode}
+        clos={clos}
+        teachingMethods={teachingMethods}
+        assessmentMethods={assessmentMethods}
+        courseTotalSlt={courseTotalSlt}
+        onPersist={onPersist}
+      />
     </div>
   );
 }
