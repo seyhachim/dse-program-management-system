@@ -17,6 +17,7 @@ export function WeekFormFields({
   clos,
   touched,
   existingAssessments,
+  lloRequired = true,
 }: {
   draft: WeekForm;
   set: (patch: Partial<WeekForm>) => void;
@@ -24,13 +25,10 @@ export function WeekFormFields({
   clos: CloForm[];
   touched: boolean;
   existingAssessments: string[];
+  /** False for a legacy week that already existed with zero LLOs — lets it be saved without adding any. */
+  lloRequired?: boolean;
 }) {
-  const errors = {
-    topic: draft.topic.trim().length === 0,
-    clos: draft.cloCodes.length === 0,
-    llos: draft.lloItems.length === 0 || draft.lloItems.some((l) => !l.trim()),
-    activities: draft.activities.length === 0,
-  };
+  const errors = weekFormErrors(draft, lloRequired);
 
   return (
     <div className="space-y-6">
@@ -102,11 +100,16 @@ export function WeekFormFields({
       </Section>
 
       {/* 3. Lesson Learning Outcomes (LLOs) */}
-      <Section n={3} title="Lesson Learning Outcomes (LLOs)" required>
-        <p className="text-xs text-muted-foreground">Outcomes students should achieve by the end of this lesson.</p>
+      <Section n={3} title="Lesson Learning Outcomes (LLOs)" required={lloRequired}>
+        <p className="text-xs text-muted-foreground">
+          Outcomes students should achieve by the end of this lesson.
+          {lloRequired ? null : " Optional for this legacy week — leave it empty, or fill in any you add."}
+        </p>
         <LloEditor value={draft.lloItems} onChange={(lloItems) => set({ lloItems })} />
         {touched && errors.llos ? (
-          <p className="text-xs text-status-live">Add at least one LLO (none left blank).</p>
+          <p className="text-xs text-status-live">
+            {lloRequired ? "Add at least one LLO (none left blank)." : "Remove blank LLOs, or leave the list empty."}
+          </p>
         ) : null}
       </Section>
 
@@ -201,12 +204,19 @@ export function WeekFormFields({
   );
 }
 
-/** Validation shared between the fields above and the page that hosts them. */
-export function weekFormErrors(draft: WeekForm) {
+/**
+ * Validation shared between the fields above and the page that hosts them. LLOs are
+ * required for a new/already-LLO'd week, but optional for a legacy week that existed
+ * with zero LLOs before this field shipped — see `lloRequired` in `WeekFormPage`.
+ * Either way, any LLO row that's present can't be left blank.
+ */
+export function weekFormErrors(draft: WeekForm, lloRequired = true) {
   return {
     topic: draft.topic.trim().length === 0,
     clos: draft.cloCodes.length === 0,
-    llos: draft.lloItems.length === 0 || draft.lloItems.some((l) => !l.trim()),
+    llos: lloRequired
+      ? draft.lloItems.length === 0 || draft.lloItems.some((l) => !l.trim())
+      : draft.lloItems.some((l) => !l.trim()),
     activities: draft.activities.length === 0,
   };
 }

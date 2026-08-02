@@ -32,6 +32,7 @@ export function WeekFormPage({ courseId, weekId }: { courseId: string; weekId: s
   const [clos, setClos] = useState<CloForm[]>([]);
   const [weeks, setWeeks] = useState<WeeklyPlanForm>([]);
   const [draft, setDraft] = useState<WeekForm | null>(null);
+  const [lloRequired, setLloRequired] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -54,8 +55,12 @@ export function WeekFormPage({ courseId, weekId }: { courseId: string; weekId: s
           const existing = weeklyForm.find((w) => w.id === weekId) ?? null;
           setDraft(existing);
           setNotFound(!existing);
+          // A legacy week that already existed with zero LLOs stays optional; one that
+          // already has LLOs (or is brand new) keeps the field required going forward.
+          setLloRequired(!existing || existing.lloItems.length > 0);
         } else {
           setDraft(emptyWeek(weeklyForm));
+          setLloRequired(true);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the weekly plan");
@@ -89,8 +94,8 @@ export function WeekFormPage({ courseId, weekId }: { courseId: string; weekId: s
   const submit = async () => {
     if (!draft) return;
     setTouched(true);
-    const errors = weekFormErrors(draft);
-    if (errors.topic || errors.clos || errors.activities) return;
+    const errors = weekFormErrors(draft, lloRequired);
+    if (errors.topic || errors.clos || errors.llos || errors.activities) return;
 
     setSaving(true);
     setError(null);
@@ -163,6 +168,7 @@ export function WeekFormPage({ courseId, weekId }: { courseId: string; weekId: s
                 clos={clos}
                 touched={touched}
                 existingAssessments={existingAssessments}
+                lloRequired={lloRequired}
               />
 
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
