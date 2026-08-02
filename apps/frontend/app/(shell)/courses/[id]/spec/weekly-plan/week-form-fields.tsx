@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Search, Trash2, X } from "lucide-react";
 import { LEARNING_ACTIVITIES } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import type { CloForm } from "../clos-section";
@@ -257,66 +257,109 @@ function LloEditor({ value, onChange }: { value: string[]; onChange: (v: string[
   );
 }
 
-/** Chip-based multi-select for learning activities: preset suggestions + free entry. */
+/**
+ * Chip-based multi-select for learning activities: search + click-to-add preset
+ * suggestions, plus free-text entries not in the list. Mirrors the look/feel of
+ * `ChipMultiSelect` (the CLO wizard's teaching/assessment method picker), adapted
+ * for a plain string list rather than id-backed `Method` records.
+ */
 function ActivityPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
-  const [input, setInput] = useState("");
+  const [query, setQuery] = useState("");
 
-  const suggestions = useMemo(() => LEARNING_ACTIVITIES.filter((a) => !value.includes(a)), [value]);
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return LEARNING_ACTIVITIES.filter(
+      (a) => !value.some((v) => v.toLowerCase() === a.toLowerCase()) && (!q || a.toLowerCase().includes(q)),
+    );
+  }, [value, query]);
+
+  const trimmedQuery = query.trim();
+  const isNewEntry =
+    trimmedQuery.length > 0 &&
+    !value.some((v) => v.toLowerCase() === trimmedQuery.toLowerCase()) &&
+    !LEARNING_ACTIVITIES.some((a) => a.toLowerCase() === trimmedQuery.toLowerCase());
 
   const add = (raw: string) => {
     const name = raw.trim();
-    if (!name || value.includes(name)) return;
+    if (!name || value.some((v) => v.toLowerCase() === name.toLowerCase())) return;
     onChange([...value, name]);
-    setInput("");
+    setQuery("");
   };
   const remove = (name: string) => onChange(value.filter((v) => v !== name));
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-card p-2">
-        {value.length === 0 ? (
-          <span className="px-1 py-0.5 text-xs text-muted-foreground">No activities yet</span>
-        ) : (
-          value.map((a) => (
-            <span
-              key={a}
-              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
-            >
-              {a}
+      <span className="text-sm font-medium text-foreground">
+        Activities <span className="text-muted-foreground">({value.length})</span>
+      </span>
+
+      {value.length > 0 ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {value.map((a) => (
+            <li key={a}>
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 py-1 pl-3 pr-1.5 text-sm text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                {a}
+                <button
+                  type="button"
+                  aria-label={`Remove ${a}`}
+                  onClick={() => remove(a)}
+                  className="cursor-pointer rounded-full p-0.5 hover:bg-violet-100 dark:hover:bg-violet-950/60"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="space-y-2 rounded-lg border border-border bg-card p-2.5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add(query);
+              }
+            }}
+            placeholder="Search or add an activity…"
+            className="h-8 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+        </div>
+        <ul className="flex flex-wrap gap-1.5">
+          {isNewEntry ? (
+            <li>
               <button
                 type="button"
-                onClick={() => remove(a)}
-                className="text-muted-foreground hover:text-status-live"
-                aria-label={`Remove ${a}`}
+                onClick={() => add(trimmedQuery)}
+                className="cursor-pointer rounded-full border border-dashed border-accent px-3 py-1 text-sm text-accent-foreground transition-colors hover:border-solid hover:bg-accent/10"
               >
-                <X className="h-3 w-3" />
+                <Plus className="mr-1 inline h-3 w-3" />
+                Add “{trimmedQuery}”
               </button>
-            </span>
-          ))
-        )}
-      </div>
-      <div className="flex gap-2">
-        <input
-          list="week-activity-options"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add(input);
-            }
-          }}
-          placeholder="Add or pick an activity…"
-          className={`${inputCls} flex-1`}
-        />
-        <datalist id="week-activity-options">
-          {suggestions.map((a) => (
-            <option key={a} value={a} />
-          ))}
-        </datalist>
-        <Button type="button" variant="outline" size="sm" onClick={() => add(input)}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> Add
-        </Button>
+            </li>
+          ) : null}
+          {suggestions.length === 0 && !isNewEntry ? (
+            <li className="text-xs text-muted-foreground">
+              {value.length === LEARNING_ACTIVITIES.length ? "All suggested activities selected." : "No matches."}
+            </li>
+          ) : (
+            suggestions.map((a) => (
+              <li key={a}>
+                <button
+                  type="button"
+                  onClick={() => add(a)}
+                  className="cursor-pointer rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-solid hover:border-violet-400 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700/60 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+                >
+                  + {a}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
       </div>
     </div>
   );
