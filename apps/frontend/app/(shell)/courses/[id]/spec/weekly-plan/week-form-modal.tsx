@@ -77,13 +77,13 @@ export function WeekFormModal({
     onOpenChange(false);
   };
 
-  const title = weekId ? `Edit Week ${draft?.week ?? ""}` : "Add Week";
+  const title = weekId ? `Edit Week ${draft?.week ?? ""}` : "Add Weekly Plan";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="text-lg font-bold">{title}</DialogTitle>
         </DialogHeader>
 
         {draft ? (
