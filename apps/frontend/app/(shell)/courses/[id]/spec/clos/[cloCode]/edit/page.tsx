@@ -1,4 +1,4 @@
-import { CloFormPage } from "../../clo-form-page";
+import { CloWizardPage } from "../../clo-wizard-page";
 
 export default async function EditCloPage({
   params,
@@ -6,5 +6,5 @@ export default async function EditCloPage({
   params: Promise<{ id: string; cloCode: string }>;
 }) {
   const { id, cloCode } = await params;
-  return <CloFormPage courseId={id} cloCode={cloCode} />;
+  return <CloWizardPage courseId={id} cloCode={cloCode} />;
 }

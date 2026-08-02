@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   ChevronDown,
@@ -11,7 +11,6 @@ import {
   Grid3x3,
   ListChecks,
   Pencil,
-  Sparkles,
   Target,
 } from "lucide-react";
 import {
@@ -124,7 +123,12 @@ export function MappingSection({
     onChange(setCell(cells, col.kind, col.ref, cloCode, strength));
   };
 
-  const handleAutoFill = () => onChange(seedFromLinks(cells, [...weekColumns, ...assessmentColumns]));
+  // Seed a Medium rating for any newly linked CLO (§17/§18) that has no rating yet —
+  // replaces the old manual "Auto-fill from links" button with the same behavior by default.
+  useEffect(() => {
+    const seeded = seedFromLinks(cells, [...weekColumns, ...assessmentColumns]);
+    if (seeded.length !== cells.length) onChange(seeded);
+  }, [cells, weekColumns, assessmentColumns, onChange]);
 
   const exportCsv = () => {
     const csv = mappingCsv(cells, clos, weekColumns, assessmentColumns);
@@ -219,9 +223,6 @@ export function MappingSection({
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-foreground">CLO Mapping Matrix</h3>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAutoFill}>
-                  <Sparkles className="h-3.5 w-3.5" /> Auto-fill from links
-                </Button>
                 <Select
                   value={alignmentFilter}
                   onValueChange={(v) => setAlignmentFilter(v as AlignmentFilter)}

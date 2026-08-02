@@ -1,4 +1,11 @@
-import { CAP_LEVELS, cloFocusCode, cloFocusPercent, COGNITIVE_LEVELS } from "@dse-pms/shared-types";
+import {
+  AFFECTIVE_LEVELS,
+  CAP_LEVELS,
+  cloFocusCode,
+  cloFocusPercent,
+  COGNITIVE_LEVELS,
+  PSYCHOMOTOR_LEVELS,
+} from "@dse-pms/shared-types";
 
 /** A CLO held as a form model for input binding; converted on save by the wizard. */
 export type CloForm = {
@@ -144,3 +151,69 @@ export function bloomStyle(code: string): BloomStyle {
 
 /** The six cognitive Bloom levels, in order — drives the distribution bar. */
 export const BLOOM_COGNITIVE = COGNITIVE_LEVELS;
+
+/* -------------------------------------------------------------- Wizard */
+
+export const STATEMENT_MAX = 300;
+export const NOTES_MAX = 300;
+
+export type WizardStepId = 1 | 2 | 3 | 4 | 5;
+
+export const CLO_WIZARD_STEPS: { id: WizardStepId; title: string }[] = [
+  { id: 1, title: "CLO Info" },
+  { id: 2, title: "PLO Mapping" },
+  { id: 3, title: "Learning" },
+  { id: 4, title: "Assessment" },
+  { id: 5, title: "Review" },
+];
+
+/**
+ * Fields that block Save entirely — mirrors the shared Zod schema
+ * (`description` is the only required §14 CLO field; `level` is nullable and
+ * `mappedPlos` defaults to `[]`), so a pre-existing CLO missing those never gets
+ * trapped mid-wizard with no way to save.
+ */
+export function cloWizardErrors(draft: CloForm) {
+  return {
+    statement: draft.description.trim().length === 0,
+  };
+}
+
+/**
+ * Whether a step's fields are filled in, for the stepper's progress dots and the
+ * Review step — advisory only, doesn't block navigation (see `cloWizardErrors`).
+ */
+export function wizardStepComplete(step: WizardStepId, draft: CloForm): boolean {
+  switch (step) {
+    case 1:
+      return draft.description.trim().length > 0 && draft.level.trim().length > 0;
+    case 2:
+      return draft.mappedPlos.length > 0;
+    case 3:
+      return draft.sltHours.trim().length > 0 && draft.teachingMethodIds.length > 0;
+    case 4:
+      return draft.assessmentMethodIds.length > 0;
+    case 5:
+      return true;
+  }
+}
+
+/** Suggested Bloom's action verbs, grouped by domain — powers the wizard's verb-chip helper. */
+const BLOOM_VERBS: Record<"cognitive" | "affective" | "psychomotor", string[]> = {
+  cognitive: ["Analyze", "Apply", "Design", "Evaluate", "Explain", "Create", "Develop", "Solve"],
+  affective: ["Value", "Justify", "Advocate", "Collaborate", "Respond", "Demonstrate"],
+  psychomotor: ["Perform", "Operate", "Construct", "Execute", "Adapt", "Demonstrate"],
+};
+
+/** Recommended verbs for a level's domain; defaults to the cognitive set when no level is chosen yet. */
+export function bloomVerbsFor(level: string): string[] {
+  if (AFFECTIVE_LEVELS.some((l) => l.code === level)) return BLOOM_VERBS.affective;
+  if (PSYCHOMOTOR_LEVELS.some((l) => l.code === level)) return BLOOM_VERBS.psychomotor;
+  return BLOOM_VERBS.cognitive;
+}
+
+/** Append a Bloom verb to the end of a CLO statement, clamped to the field's max length. */
+export function appendBloomVerb(description: string, verb: string): string {
+  const next = description.trim().length > 0 ? `${description.trim()} ${verb}` : verb;
+  return next.slice(0, STATEMENT_MAX);
+}
