@@ -9,7 +9,7 @@ import { weekSltForm, type WeekForm } from "../weekly-plan-model";
 
 const TOPIC_MAX = 200;
 
-/** The six §18 form sections, shared by the full-page Add Week and Edit Week routes. */
+/** The six §18 form sections, shared by the Add Week / Edit Week popup modal. */
 export function WeekFormFields({
   draft,
   set,
@@ -207,7 +207,7 @@ export function WeekFormFields({
 /**
  * Validation shared between the fields above and the page that hosts them. LLOs are
  * required for a new/already-LLO'd week, but optional for a legacy week that existed
- * with zero LLOs before this field shipped — see `lloRequired` in `WeekFormPage`.
+ * with zero LLOs before this field shipped — see `lloRequired` in `WeekFormModal`.
  * Either way, any LLO row that's present can't be left blank.
  */
 export function weekFormErrors(draft: WeekForm, lloRequired = true) {

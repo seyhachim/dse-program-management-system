@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@dse-pms/ui";
+import type { CloForm } from "./clos-section";
 import {
   cloChip,
   cloColor,
@@ -25,6 +26,7 @@ import {
   type CloCoverage,
   type WeeklyPlanForm,
 } from "./weekly-plan-model";
+import { WeekFormModal } from "./weekly-plan/week-form-modal";
 
 // Re-exported so the wizard keeps importing the weekly-plan model from this section.
 export {
@@ -37,19 +39,22 @@ export {
 export function WeeklyPlanSectionForm({
   value,
   onChange,
-  courseId,
   courseName,
-  cloCodes = [],
+  clos = [],
 }: {
   value: WeeklyPlanForm;
   onChange: (v: WeeklyPlanForm) => void;
-  courseId: string;
   courseName?: string;
-  /** §14 CLO codes (e.g. ["CLO1", "CLO2"]) so coverage counts uncovered CLOs too. */
-  cloCodes?: string[];
+  /** §14 CLOs, for the modal's "Link CLOs" picker and the coverage sidebar. */
+  clos?: CloForm[];
 }) {
-  const addWeekHref = `/courses/${courseId}/spec/weekly-plan/add`;
-  const editWeekHref = (weekId: string) => `/courses/${courseId}/spec/weekly-plan/${weekId}/edit`;
+  const cloCodes = clos.map((c) => c.code);
+  const [modal, setModal] = useState<{ open: boolean; weekId: string | null }>({
+    open: false,
+    weekId: null,
+  });
+  const openAdd = () => setModal({ open: true, weekId: null });
+  const openEdit = (weekId: string) => setModal({ open: true, weekId });
 
   const totals = weeklyPlanFormTotals(value);
   const totalContactHours = totals.lectureHours + totals.tutorialHours + totals.practiceHours + totals.otherHours;
@@ -73,14 +78,9 @@ export function WeeklyPlanSectionForm({
             {courseName ? ` for ${courseName}` : ""}.
           </p>
         </div>
-        <Button
-          size="sm"
-          render={
-            <Link href={addWeekHref}>
-              <Plus className="mr-1.5 h-4 w-4" /> Add Week
-            </Link>
-          }
-        />
+        <Button size="sm" onClick={openAdd}>
+          <Plus className="mr-1.5 h-4 w-4" /> Add Week
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -96,12 +96,13 @@ export function WeeklyPlanSectionForm({
           {value.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-12 text-center">
               <p className="text-sm text-muted-foreground">No weeks planned yet.</p>
-              <Link
-                href={addWeekHref}
-                className="mt-1 inline-block text-sm font-medium text-accent-foreground hover:underline"
+              <button
+                type="button"
+                onClick={openAdd}
+                className="mt-1 text-sm font-medium text-accent-foreground hover:underline"
               >
                 + Add your first week
-              </Link>
+              </button>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
@@ -182,14 +183,9 @@ export function WeeklyPlanSectionForm({
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={editWeekHref(w.id)}
-                            aria-label={`Edit week ${w.week}`}
-                            title={`Edit week ${w.week}`}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          >
+                          <IconButton label={`Edit week ${w.week}`} onClick={() => openEdit(w.id)}>
                             <Pencil className="h-4 w-4" />
-                          </Link>
+                          </IconButton>
                           <IconButton label={`Delete week ${w.week}`} danger onClick={() => remove(w.id)}>
                             <Trash2 className="h-4 w-4" />
                           </IconButton>
@@ -225,6 +221,15 @@ export function WeeklyPlanSectionForm({
           <SummaryCard plan={value} />
         </aside>
       </div>
+
+      <WeekFormModal
+        open={modal.open}
+        onOpenChange={(open) => setModal((m) => ({ ...m, open }))}
+        weekId={modal.weekId}
+        weeks={value}
+        clos={clos}
+        onSave={onChange}
+      />
     </div>
   );
 }
