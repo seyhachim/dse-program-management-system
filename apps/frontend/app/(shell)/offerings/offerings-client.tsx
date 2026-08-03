@@ -47,9 +47,38 @@ export function OfferingsClient() {
     setLoading(true);
     setError(null);
     try {
-      setRows(await offeringsApi.list());
+      const offerings = await offeringsApi.list();
+
+      offerings.sort((a, b) => {
+        // 1. Semester
+        const semesterCompare = String(a.semester ?? "").localeCompare(
+          String(b.semester ?? ""),
+          undefined,
+          { numeric: true },
+        );
+
+        if (semesterCompare !== 0) return semesterCompare;
+
+        // 2. Study year
+        const yearCompare = String(a.programmeYear ?? "").localeCompare(
+          String(b.programmeYear ?? ""),
+          undefined,
+          { numeric: true },
+        );
+
+        if (yearCompare !== 0) return yearCompare;
+
+        // 3. Course code
+        return String(a.course?.code ?? "").localeCompare(
+          String(b.course?.code ?? ""),
+        );
+      });
+
+      setRows(offerings);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load offerings");
+      setError(
+        err instanceof ApiError ? err.message : "Failed to load offerings",
+      );
     } finally {
       setLoading(false);
     }
@@ -61,7 +90,10 @@ export function OfferingsClient() {
 
   // Reference data for the enrollment dialog.
   useEffect(() => {
-    studentsApi.list({}).then(setStudents).catch(() => setStudents([]));
+    studentsApi
+      .list({})
+      .then(setStudents)
+      .catch(() => setStudents([]));
   }, []);
 
   const handleDelete = async (offering: OfferingView) => {
@@ -70,7 +102,9 @@ export function OfferingsClient() {
       await offeringsApi.remove(offering.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to delete offering");
+      setError(
+        err instanceof ApiError ? err.message : "Failed to delete offering",
+      );
     }
   };
 
@@ -127,13 +161,18 @@ export function OfferingsClient() {
       render: (o) => (
         <div className="flex flex-col gap-1">
           {o.lecturer ? (
-            <StatusBadge tone="tournament" label={o.lecturer.name} icon={false} />
+            <StatusBadge
+              tone="tournament"
+              label={o.lecturer.name}
+              icon={false}
+            />
           ) : (
             <span className="text-muted-foreground">Unassigned</span>
           )}
           {o.coLecturers.length > 0 ? (
             <span className="text-xs text-muted-foreground">
-              +{o.coLecturers.length} co-lecturer{o.coLecturers.length === 1 ? "" : "s"}
+              +{o.coLecturers.length} co-lecturer
+              {o.coLecturers.length === 1 ? "" : "s"}
             </span>
           ) : null}
         </div>
@@ -143,7 +182,11 @@ export function OfferingsClient() {
       key: "capacity",
       header: "Enrolled",
       render: (o) => (
-        <span className={o.enrolledCount >= o.capacity ? "text-status-upcoming" : undefined}>
+        <span
+          className={
+            o.enrolledCount >= o.capacity ? "text-status-upcoming" : undefined
+          }
+        >
           {o.enrolledCount}/{o.capacity}
         </span>
       ),
@@ -151,7 +194,9 @@ export function OfferingsClient() {
     {
       key: "status",
       header: "Status",
-      render: (o) => <StatusBadge tone={offeringTone(o.status)} label={o.status} />,
+      render: (o) => (
+        <StatusBadge tone={offeringTone(o.status)} label={o.status} />
+      ),
     },
   ];
 
@@ -184,7 +229,9 @@ export function OfferingsClient() {
             onClick: handleManage,
           },
         ]}
-        onEdit={isAdmin ? (o) => router.push(`/offerings/${o.id}/edit`) : undefined}
+        onEdit={
+          isAdmin ? (o) => router.push(`/offerings/${o.id}/edit`) : undefined
+        }
         onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
         emptyMessage="No offerings yet. Add one to link a course, lecturer and students for a term."
