@@ -171,28 +171,43 @@ This is the largest and most active domain, defined entirely in
   never touches another section's row (the read-modify-write on the whole blob was a
   concurrent-edit hazard for co-lecturers editing different sections at once). §14
   CLOs are further normalized into their own `CourseSpecClo` rows rather than living
-  in a section's `content` json (`sectionKey = "clos"` always has `content = {}`);
-  each CLO's `id` is client-generated (`crypto.randomUUID()`, minted once in
-  `emptyClo()`) and only unique *within* a course spec, so its primary key is the
-  composite `(courseSpecId, id)` — the same pattern `RubricCriterion` already uses
-  in this codebase, for the same reason (a client-supplied id can't be trusted
-  globally unique). `code` (`CLO1`, `CLO2`…) is **not** stored — it's always
-  re-derived from `order` on read (`courseService.reassembleSpec`), since the
-  frontend already recomputes it by position on every save (`withCodes` in
-  `clo-model.ts`) and a stored copy could only drift from that. Each CLO's
-  `teachingMethodIds`/`assessmentMethodIds` are FK-enforced join tables
-  (`CourseSpecCloTeachingMethod`/`CourseSpecCloAssessmentMethod`, composite FK to
-  `CourseSpecClo`'s composite key) rather than unvalidated ids sitting in json — a
-  save with a nonexistent method id now fails instead of silently persisting a
-  dangling reference. `sectionKey = "courseInfo"` also always has `content = {}`,
-  unchanged from before: courseInfo is mirrored onto `Course.prerequisites`/
-  `description` and live-recomputed via `buildCourseInfoPrefill` on every read,
-  never stored as json. Issue #81 landed in two PRs mirroring the #80 rubric
-  precedent above: phase A/B (#91) added the normalized tables and backfilled every
-  existing spec into them, cutting `courseService`'s reads/writes over; phase C
-  dropped the old `CourseSpec.data`/`status` jsonb columns outright once that had
-  run through a deploy cycle and the backfill was verified correct against
-  production data.
+  in a section's `content` json; each CLO's `id` is client-generated
+  (`crypto.randomUUID()`, minted once in `emptyClo()`) and only unique *within* a
+  course spec, so its primary key is the composite `(courseSpecId, id)` — the same
+  pattern `RubricCriterion` already uses in this codebase, for the same reason (a
+  client-supplied id can't be trusted globally unique). `code` (`CLO1`, `CLO2`…) is
+  **not** stored — it's always re-derived from `order` on read
+  (`courseService.reassembleSpec`), since the frontend already recomputes it by
+  position on every save (`withCodes` in `clo-model.ts`) and a stored copy could only
+  drift from that. Each CLO's `teachingMethodIds`/`assessmentMethodIds` are
+  FK-enforced join tables (`CourseSpecCloTeachingMethod`/
+  `CourseSpecCloAssessmentMethod`, composite FK to `CourseSpecClo`'s composite key)
+  rather than unvalidated ids sitting in json — a save with a nonexistent method id
+  now fails instead of silently persisting a dangling reference. Issue #103 finished
+  what #81 started: the §18 Weekly Plan (`CourseSpecWeek`), §17 Assessment Plan
+  (`CourseSpecAssessmentItem`), and CLO Alignment Mapping (`CourseSpecMappingCell`)
+  sections are normalized the same way, and `"courseInfo"` is mirrored onto
+  `Course.prerequisites`/`description` and live-recomputed via
+  `buildCourseInfoPrefill` on every read, never stored as json — so **every**
+  saveable section's `CourseSpecSection.content` is now always `{}`
+  (`courseService`'s `NORMALIZED_SECTIONS` set), kept only to track per-section save
+  status for the spec-progress dashboard. `reassembleSpec` only sets `data[key]` when
+  a `CourseSpecSection` row exists for that key (the same presence guard `clos` has
+  always used), so a section that was never opened stays `undefined` — distinct from
+  a saved-but-empty section (e.g. `{ weeks: [] }`) — which is what the wizard uses to
+  know whether a section was ever saved. **`content` itself has no more readers or
+  writers left** — it is the last `Json` column in the schema and is dropped outright
+  in a phase C migration once #103's phase A/B backfill (which also had to fold two
+  live legacy shapes it inherited — the pre-§14/§15-merge `cloMapping` blob and the
+  pre-L/T/P/O single-`contactHours` Weekly Plan shape — forward into the normalized
+  tables rather than just copying them across) is verified against production. Any
+  future section (the still-`state: "soon"` §19–25 sections) must land its own
+  normalized table(s) following this same pattern rather than reintroducing a `Json`
+  column. Issue #81 landed in two PRs mirroring the #80 rubric precedent above: phase
+  A/B (#91) added the normalized tables and backfilled every existing spec into them,
+  cutting `courseService`'s reads/writes over; phase C dropped the old
+  `CourseSpec.data`/`status` jsonb columns outright once that had run through a
+  deploy cycle and the backfill was verified correct against production data.
 - `SPEC_SECTION_SCHEMAS` maps a `SpecSectionId` to its Zod schema. The backend route
   `PUT /api/courses/:id/spec/:sectionId` (`plugins/courses/router.ts`) looks up the
   schema for the given section id and 400s if the section isn't implemented yet —
@@ -208,10 +223,13 @@ This is the largest and most active domain, defined entirely in
   in `clos-section.tsx`); Focus % / F-M-P are derived from each CLO's share of that
   total (`cloFocusPercent`/`cloFocusCode` in `course-spec.ts`, wrapped for form string
   input by `focusPercentOf`/`focusCodeOf` in `clo-model.ts`) — not stored. Course specs
-  saved before this merge carry their SLT hours/teaching methods in a dead `cloMapping`
-  JSON blob; `toClosForm` folds that into the CLO on load if the CLO doesn't already
-  have its own values, so nothing is lost, and the field is dropped for good next time
-  §14 is saved. The **Weekly Plan** (§18, tab labelled "Weekly Plan", stored under the
+  saved before this merge used to carry their SLT hours/teaching methods in a dead
+  `cloMapping` JSON blob that `toClosForm` folded into the CLO on load if the CLO
+  didn't already have its own values; issue #103's backfill did that same fold once,
+  server-side, into `CourseSpecClo`, and deleted the now-fully-obsolete `cloMapping`
+  rows — `toClosForm`'s fold is now dead code kept only because a `legacyMapping` arg
+  of `undefined` is always a no-op, not because live data still needs it. The
+  **Weekly Plan** (§18, tab labelled "Weekly Plan", stored under the
   `slt` section key) is a week-by-week outline: one row per week with a topic, linked
   CLOs, learning activities, Contact Hours (L+T), Self-Study Hours, and
   Assessment/Deliverables. Weekly SLT is derived (`weekSlt` = Contact + Self-Study) and
@@ -228,12 +246,18 @@ This is the largest and most active domain, defined entirely in
   cross-reference view, not a numbered RUPP section: a matrix of §14 CLOs against §18
   Weekly Plan weeks and §17 assessments, each cell storing an editable alignment
   **strength** (0 None / 1 Low / 2 Medium / 3 High). Storage is sparse — only rated
-  cells live in `data.mapping.cells` (absent = *unrated*, distinct from an explicit
-  None); cells referencing a deleted week/assessment/CLO are reconciled away on load
-  and save. Every headline figure (overall %, per-CLO and per-column averages, the
-  distribution donut) is derived from these cells by pure helpers in
-  `course-spec.ts` (`mappingOverallPercent`, `cloAlignmentAverages`, …). Frontend lives
-  in `mapping-section.tsx` + `mapping-model.ts`.
+  cells exist as `CourseSpecMappingCell` rows, reassembled into `data.mapping.cells`
+  (absent = *unrated*, distinct from an explicit None); a cell's `(cloCode, kind,
+  ref)` triple is its composite primary key directly (no synthetic id needed — a
+  lecturer can only rate one strength per CLO × week/assessment pair) and `ref` (a
+  week or assessment id, depending on `kind`) has no DB-level FK, same as it had none
+  in the pre-#103 jsonb array — cells referencing a deleted week/assessment/CLO are
+  still reconciled away only at the frontend/save layer (`reconcileCells`/`validRefs`
+  in `mapping-model.ts`), not enforced by the database. Every headline figure
+  (overall %, per-CLO and per-column averages, the distribution donut) is derived
+  from these cells by pure helpers in `course-spec.ts` (`mappingOverallPercent`,
+  `cloAlignmentAverages`, …). Frontend lives in `mapping-section.tsx` +
+  `mapping-model.ts`.
 - `TeachingMethod`/`AssessmentMethod` (the `methods` plugin) are global vocabularies
   shared across all courses — an add of an existing name reuses the row rather than
   duplicating it.
