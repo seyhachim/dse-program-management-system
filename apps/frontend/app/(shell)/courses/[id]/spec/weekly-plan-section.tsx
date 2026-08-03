@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -14,16 +14,19 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@dse-pms/ui";
+import type { CloForm } from "./clos-section";
 import {
   cloChip,
   cloColor,
   cloCoverage,
+  weekContactHoursForm,
   weekSltForm,
   weeklyPlanFormTotals,
   weeklyPlanSummary,
   type CloCoverage,
   type WeeklyPlanForm,
 } from "./weekly-plan-model";
+import { WeekFormModal } from "./weekly-plan/week-form-modal";
 
 // Re-exported so the wizard keeps importing the weekly-plan model from this section.
 export {
@@ -36,21 +39,25 @@ export {
 export function WeeklyPlanSectionForm({
   value,
   onChange,
-  courseId,
   courseName,
-  cloCodes = [],
+  clos = [],
 }: {
   value: WeeklyPlanForm;
   onChange: (v: WeeklyPlanForm) => void;
-  courseId: string;
   courseName?: string;
-  /** §14 CLO codes (e.g. ["CLO1", "CLO2"]) so coverage counts uncovered CLOs too. */
-  cloCodes?: string[];
+  /** §14 CLOs, for the modal's "Link CLOs" picker and the coverage sidebar. */
+  clos?: CloForm[];
 }) {
-  const addWeekHref = `/courses/${courseId}/spec/weekly-plan/add`;
-  const editWeekHref = (weekId: string) => `/courses/${courseId}/spec/weekly-plan/${weekId}/edit`;
+  const cloCodes = clos.map((c) => c.code);
+  const [modal, setModal] = useState<{ open: boolean; weekId: string | null }>({
+    open: false,
+    weekId: null,
+  });
+  const openAdd = () => setModal({ open: true, weekId: null });
+  const openEdit = (weekId: string) => setModal({ open: true, weekId });
 
   const totals = weeklyPlanFormTotals(value);
+  const totalContactHours = totals.lectureHours + totals.tutorialHours + totals.practiceHours + totals.otherHours;
 
   const remove = (id: string) => {
     const w = value.find((x) => x.id === id);
@@ -71,14 +78,9 @@ export function WeeklyPlanSectionForm({
             {courseName ? ` for ${courseName}` : ""}.
           </p>
         </div>
-        <Button
-          size="sm"
-          render={
-            <Link href={addWeekHref}>
-              <Plus className="mr-1.5 h-4 w-4" /> Add Week
-            </Link>
-          }
-        />
+        <Button size="sm" onClick={openAdd}>
+          <Plus className="mr-1.5 h-4 w-4" /> Add Week
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -94,23 +96,25 @@ export function WeeklyPlanSectionForm({
           {value.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-12 text-center">
               <p className="text-sm text-muted-foreground">No weeks planned yet.</p>
-              <Link
-                href={addWeekHref}
-                className="mt-1 inline-block text-sm font-medium text-accent-foreground hover:underline"
+              <button
+                type="button"
+                onClick={openAdd}
+                className="mt-1 text-sm font-medium text-accent-foreground hover:underline"
               >
                 + Add your first week
-              </Link>
+              </button>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[920px] text-sm">
+              <table className="w-full min-w-[1060px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
                     <th className="w-14 px-3 py-2.5">Week</th>
                     <th className="px-3 py-2.5">Topic / Content</th>
                     <th className="px-3 py-2.5">CLOs</th>
                     <th className="px-3 py-2.5">Learning Activities</th>
-                    <th className="px-3 py-2.5 text-center">Contact Hours (L+T)</th>
+                    <th className="px-3 py-2.5">LLOs</th>
+                    <th className="px-3 py-2.5 text-center">Contact Hours (L+T+P+O)</th>
                     <th className="px-3 py-2.5 text-center">Self-Study Hours</th>
                     <th className="px-3 py-2.5 text-center">SLT (Hours)</th>
                     <th className="px-3 py-2.5">Assessment / Deliverables</th>
@@ -158,7 +162,20 @@ export function WeeklyPlanSectionForm({
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-center text-foreground">{w.contactHours || "—"}</td>
+                      <td className="max-w-[220px] px-3 py-3">
+                        {w.lloItems.length ? (
+                          <ul className="space-y-0.5">
+                            {w.lloItems.map((llo, i) => (
+                              <li key={i} className="text-foreground">
+                                <span className="font-medium text-muted-foreground">LLO{i + 1}:</span> {llo}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center text-foreground">{weekContactHoursForm(w) || "—"}</td>
                       <td className="px-3 py-3 text-center text-foreground">{w.selfStudyHours || "—"}</td>
                       <td className="px-3 py-3 text-center font-medium text-foreground">{weekSltForm(w)}</td>
                       <td className="px-3 py-3 text-foreground">
@@ -166,14 +183,9 @@ export function WeeklyPlanSectionForm({
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={editWeekHref(w.id)}
-                            aria-label={`Edit week ${w.week}`}
-                            title={`Edit week ${w.week}`}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          >
+                          <IconButton label={`Edit week ${w.week}`} onClick={() => openEdit(w.id)}>
                             <Pencil className="h-4 w-4" />
-                          </Link>
+                          </IconButton>
                           <IconButton label={`Delete week ${w.week}`} danger onClick={() => remove(w.id)}>
                             <Trash2 className="h-4 w-4" />
                           </IconButton>
@@ -184,10 +196,10 @@ export function WeeklyPlanSectionForm({
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border bg-muted/40 text-sm font-semibold text-foreground">
-                    <td colSpan={4} className="px-3 py-2.5">
+                    <td colSpan={5} className="px-3 py-2.5">
                       Total ({value.length} {value.length === 1 ? "Week" : "Weeks"})
                     </td>
-                    <td className="px-3 py-2.5 text-center">{totals.contactHours}</td>
+                    <td className="px-3 py-2.5 text-center">{totalContactHours}</td>
                     <td className="px-3 py-2.5 text-center">{totals.selfStudyHours}</td>
                     <td className="px-3 py-2.5 text-center">{totals.slt}</td>
                     <td colSpan={2} className="px-3 py-2.5" />
@@ -199,7 +211,7 @@ export function WeeklyPlanSectionForm({
 
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             <Info className="h-3.5 w-3.5 shrink-0" />
-            SLT = Contact Hours (Lecture + Tutorial) + Self-Study Hours
+            SLT = Contact Hours (Lecture + Tutorial + Practice + Other) + Self-Study Hours
           </div>
         </div>
 
@@ -209,6 +221,15 @@ export function WeeklyPlanSectionForm({
           <SummaryCard plan={value} />
         </aside>
       </div>
+
+      <WeekFormModal
+        open={modal.open}
+        onOpenChange={(open) => setModal((m) => ({ ...m, open }))}
+        weekId={modal.weekId}
+        weeks={value}
+        clos={clos}
+        onSave={onChange}
+      />
     </div>
   );
 }
@@ -327,7 +348,11 @@ function SummaryCard({ plan }: { plan: WeeklyPlanForm }) {
       <CardHeader title="Weekly Plan Summary" />
       <dl className="space-y-2.5 text-sm">
         <SummaryRow icon={<CalendarDays className="h-4 w-4" />} label="Total Weeks" value={s.totalWeeks} />
-        <SummaryRow icon={<Clock className="h-4 w-4" />} label="Total Contact Hours (L+T)" value={s.contactHours} />
+        <SummaryRow
+          icon={<Clock className="h-4 w-4" />}
+          label="Total Contact Hours (L+T+P+O)"
+          value={s.contactHours}
+        />
         <SummaryRow icon={<Timer className="h-4 w-4" />} label="Total Self-Study Hours" value={s.selfStudyHours} />
         <SummaryRow icon={<Clock className="h-4 w-4" />} label="Total SLT Hours" value={s.slt} />
         <SummaryRow icon={<ClipboardList className="h-4 w-4" />} label="Assessments" value={s.assessments} />

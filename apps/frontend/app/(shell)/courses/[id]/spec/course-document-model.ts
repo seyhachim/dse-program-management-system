@@ -6,7 +6,7 @@ import {
 
 import type { CourseInfoForm } from "./course-info-section";
 import type { CloForm } from "./clo-model";
-import type { WeeklyPlanForm } from "./weekly-plan-model";
+import { weekContactHoursForm, type WeeklyPlanForm } from "./weekly-plan-model";
 import type { AssessmentForm } from "./assessment-model";
 
 /* -------------------------------------------------------------------------- */
@@ -165,7 +165,7 @@ export function buildCourseDocument({
     })),
 
     weeklyPlan: weeklyPlan.map((week) => {
-      const contact = Number(week.contactHours) || 0;
+      const contact = weekContactHoursForm(week);
       const selfStudy = Number(week.selfStudyHours) || 0;
       const slt = contact + selfStudy;
 
@@ -175,7 +175,7 @@ export function buildCourseDocument({
         topic: week.topic,
         cloCodes: week.cloCodes,
         activities: week.activities,
-        contactHours: week.contactHours,
+        contactHours: contact > 0 ? String(contact) : "",
         selfStudyHours: week.selfStudyHours,
         sltHours: slt > 0 ? String(slt) : "",
         assessment: week.assessment,

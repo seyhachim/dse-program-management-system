@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, Search, Trash2, X } from "lucide-react";
 import { LEARNING_ACTIVITIES } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import type { CloForm } from "../clos-section";
@@ -9,7 +9,7 @@ import { weekSltForm, type WeekForm } from "../weekly-plan-model";
 
 const TOPIC_MAX = 200;
 
-/** The five §18 form sections, shared by the full-page Add Week and Edit Week routes. */
+/** The six §18 form sections, shared by the Add Week / Edit Week popup modal. */
 export function WeekFormFields({
   draft,
   set,
@@ -17,6 +17,7 @@ export function WeekFormFields({
   clos,
   touched,
   existingAssessments,
+  lloRequired = true,
 }: {
   draft: WeekForm;
   set: (patch: Partial<WeekForm>) => void;
@@ -24,12 +25,10 @@ export function WeekFormFields({
   clos: CloForm[];
   touched: boolean;
   existingAssessments: string[];
+  /** False for a legacy week that already existed with zero LLOs — lets it be saved without adding any. */
+  lloRequired?: boolean;
 }) {
-  const errors = {
-    topic: draft.topic.trim().length === 0,
-    clos: draft.cloCodes.length === 0,
-    activities: draft.activities.length === 0,
-  };
+  const errors = weekFormErrors(draft, lloRequired);
 
   return (
     <div className="space-y-6">
@@ -100,27 +99,73 @@ export function WeekFormFields({
         {touched && errors.clos ? <p className="text-xs text-status-live">Link at least one CLO.</p> : null}
       </Section>
 
-      {/* 3. Learning Activities */}
-      <Section n={3} title="Learning Activities" required>
+      {/* 3. Lesson Learning Outcomes (LLOs) */}
+      <Section n={3} title="Lesson Learning Outcomes (LLOs)" required={lloRequired}>
+        <p className="text-xs text-muted-foreground">
+          Outcomes students should achieve by the end of this lesson.
+          {lloRequired ? null : " Optional for this legacy week — leave it empty, or fill in any you add."}
+        </p>
+        <LloEditor value={draft.lloItems} onChange={(lloItems) => set({ lloItems })} />
+        {touched && errors.llos ? (
+          <p className="text-xs text-status-live">
+            {lloRequired ? "Add at least one LLO (none left blank)." : "Remove blank LLOs, or leave the list empty."}
+          </p>
+        ) : null}
+      </Section>
+
+      {/* 4. Learning Activities */}
+      <Section n={4} title="Learning Activities" required>
         <ActivityPicker value={draft.activities} onChange={(activities) => set({ activities })} />
         {touched && errors.activities ? (
           <p className="text-xs text-status-live">Add at least one learning activity.</p>
         ) : null}
       </Section>
 
-      {/* 4. Time Allocation */}
-      <Section n={4} title="Time Allocation">
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Contact Hours (L+T)">
+      {/* 5. Time Allocation */}
+      <Section n={5} title="Time Allocation (Hours)">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="Lecture (L)">
             <input
               type="number"
               min={0}
-              value={draft.contactHours}
-              onChange={(e) => set({ contactHours: e.target.value })}
+              value={draft.lectureHours}
+              onChange={(e) => set({ lectureHours: e.target.value })}
               placeholder="e.g. 2"
               className={inputCls}
             />
           </Field>
+          <Field label="Tutorial (T)">
+            <input
+              type="number"
+              min={0}
+              value={draft.tutorialHours}
+              onChange={(e) => set({ tutorialHours: e.target.value })}
+              placeholder="e.g. 1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Practice (P)">
+            <input
+              type="number"
+              min={0}
+              value={draft.practiceHours}
+              onChange={(e) => set({ practiceHours: e.target.value })}
+              placeholder="e.g. 1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Other (O)">
+            <input
+              type="number"
+              min={0}
+              value={draft.otherHours}
+              onChange={(e) => set({ otherHours: e.target.value })}
+              placeholder="e.g. 0"
+              className={inputCls}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Self-Study Hours">
             <input
               type="number"
@@ -140,8 +185,8 @@ export function WeekFormFields({
         </div>
       </Section>
 
-      {/* 5. Assessment / Deliverables */}
-      <Section n={5} title="Assessment / Deliverables">
+      {/* 6. Assessment / Deliverables */}
+      <Section n={6} title="Assessment / Deliverables">
         <input
           list="week-assessment-options"
           value={draft.assessment}
@@ -159,75 +204,172 @@ export function WeekFormFields({
   );
 }
 
-/** Validation shared between the fields above and the page that hosts them. */
-export function weekFormErrors(draft: WeekForm) {
+/**
+ * Validation shared between the fields above and the page that hosts them. LLOs are
+ * required for a new/already-LLO'd week, but optional for a legacy week that existed
+ * with zero LLOs before this field shipped — see `lloRequired` in `WeekFormModal`.
+ * Either way, any LLO row that's present can't be left blank.
+ */
+export function weekFormErrors(draft: WeekForm, lloRequired = true) {
   return {
     topic: draft.topic.trim().length === 0,
     clos: draft.cloCodes.length === 0,
+    llos: lloRequired
+      ? draft.lloItems.length === 0 || draft.lloItems.some((l) => !l.trim())
+      : draft.lloItems.some((l) => !l.trim()),
     activities: draft.activities.length === 0,
   };
 }
 
-/** Chip-based multi-select for learning activities: preset suggestions + free entry. */
-function ActivityPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
-  const [input, setInput] = useState("");
+/** Ordered, editable list of Lesson Learning Outcomes: LLO1, LLO2… by position, add/delete. */
+function LloEditor({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const setAt = (i: number, text: string) => onChange(value.map((v, idx) => (idx === i ? text : v)));
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const add = () => onChange([...value, ""]);
 
-  const suggestions = useMemo(() => LEARNING_ACTIVITIES.filter((a) => !value.includes(a)), [value]);
+  return (
+    <div className="space-y-2">
+      {value.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
+          No LLOs added yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {value.map((llo, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40 px-2 text-xs font-semibold text-muted-foreground">
+                LLO{i + 1}
+              </span>
+              <input
+                type="text"
+                value={llo}
+                onChange={(e) => setAt(i, e.target.value)}
+                placeholder="e.g. Explain the machine learning workflow."
+                className={`${inputCls} flex-1`}
+              />
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                aria-label={`Delete LLO${i + 1}`}
+                title="Delete"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-status-live/40 hover:text-status-live"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button type="button" variant="outline" size="sm" onClick={add}>
+        <Plus className="mr-1 h-3.5 w-3.5" /> Add LLO
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Chip-based multi-select for learning activities: search + click-to-add preset
+ * suggestions, plus free-text entries not in the list. Mirrors the look/feel of
+ * `ChipMultiSelect` (the CLO wizard's teaching/assessment method picker), adapted
+ * for a plain string list rather than id-backed `Method` records.
+ */
+function ActivityPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [query, setQuery] = useState("");
+
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return LEARNING_ACTIVITIES.filter(
+      (a) => !value.some((v) => v.toLowerCase() === a.toLowerCase()) && (!q || a.toLowerCase().includes(q)),
+    );
+  }, [value, query]);
+
+  const trimmedQuery = query.trim();
+  const isNewEntry =
+    trimmedQuery.length > 0 &&
+    !value.some((v) => v.toLowerCase() === trimmedQuery.toLowerCase()) &&
+    !LEARNING_ACTIVITIES.some((a) => a.toLowerCase() === trimmedQuery.toLowerCase());
 
   const add = (raw: string) => {
     const name = raw.trim();
-    if (!name || value.includes(name)) return;
+    if (!name || value.some((v) => v.toLowerCase() === name.toLowerCase())) return;
     onChange([...value, name]);
-    setInput("");
+    setQuery("");
   };
   const remove = (name: string) => onChange(value.filter((v) => v !== name));
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-card p-2">
-        {value.length === 0 ? (
-          <span className="px-1 py-0.5 text-xs text-muted-foreground">No activities yet</span>
-        ) : (
-          value.map((a) => (
-            <span
-              key={a}
-              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
-            >
-              {a}
+      <span className="text-sm font-medium text-foreground">
+        Activities <span className="text-muted-foreground">({value.length})</span>
+      </span>
+
+      {value.length > 0 ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {value.map((a) => (
+            <li key={a}>
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 py-1 pl-3 pr-1.5 text-sm text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                {a}
+                <button
+                  type="button"
+                  aria-label={`Remove ${a}`}
+                  onClick={() => remove(a)}
+                  className="cursor-pointer rounded-full p-0.5 hover:bg-violet-100 dark:hover:bg-violet-950/60"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="space-y-2 rounded-lg border border-border bg-card p-2.5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add(query);
+              }
+            }}
+            placeholder="Search or add an activity…"
+            className="h-8 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+        </div>
+        <ul className="flex flex-wrap gap-1.5">
+          {isNewEntry ? (
+            <li>
               <button
                 type="button"
-                onClick={() => remove(a)}
-                className="text-muted-foreground hover:text-status-live"
-                aria-label={`Remove ${a}`}
+                onClick={() => add(trimmedQuery)}
+                className="cursor-pointer rounded-full border border-dashed border-accent px-3 py-1 text-sm text-accent-foreground transition-colors hover:border-solid hover:bg-accent/10"
               >
-                <X className="h-3 w-3" />
+                <Plus className="mr-1 inline h-3 w-3" />
+                Add “{trimmedQuery}”
               </button>
-            </span>
-          ))
-        )}
-      </div>
-      <div className="flex gap-2">
-        <input
-          list="week-activity-options"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add(input);
-            }
-          }}
-          placeholder="Add or pick an activity…"
-          className={`${inputCls} flex-1`}
-        />
-        <datalist id="week-activity-options">
-          {suggestions.map((a) => (
-            <option key={a} value={a} />
-          ))}
-        </datalist>
-        <Button type="button" variant="outline" size="sm" onClick={() => add(input)}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> Add
-        </Button>
+            </li>
+          ) : null}
+          {suggestions.length === 0 && !isNewEntry ? (
+            <li className="text-xs text-muted-foreground">
+              {value.length === LEARNING_ACTIVITIES.length ? "All suggested activities selected." : "No matches."}
+            </li>
+          ) : (
+            suggestions.map((a) => (
+              <li key={a}>
+                <button
+                  type="button"
+                  onClick={() => add(a)}
+                  className="cursor-pointer rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-solid hover:border-violet-400 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700/60 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+                >
+                  + {a}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
       </div>
     </div>
   );

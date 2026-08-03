@@ -325,16 +325,23 @@ const WeekHours = z.coerce.number().min(0).max(200);
 
 /**
  * One week of the course outline. `cloCodes` reference §14 CLOs by code; `activities`
- * are learning-activity labels (LEARNING_ACTIVITIES presets or custom). Weekly SLT is
- * derived — `contactHours` (Lecture + Tutorial) + `selfStudyHours` — not stored.
+ * are learning-activity labels (LEARNING_ACTIVITIES presets or custom); `lloItems` are
+ * this lesson's Lesson Learning Outcomes, in display order. Contact time is captured
+ * as Lecture (L) / Tutorial (T) / Practice (P) / Other (O) hours rather than a single
+ * combined figure — see `weekContactHours`. Weekly SLT is derived — contact hours +
+ * `selfStudyHours` — not stored.
  */
 export const WeeklyPlanRow = z.object({
   id: z.string().min(1),
   week: z.coerce.number().int().min(1).max(52),
   topic: z.string().default(""),
   cloCodes: z.array(z.string()).default([]),
+  lloItems: z.array(z.string()).default([]),
   activities: z.array(z.string()).default([]),
-  contactHours: WeekHours.nullable().default(null),
+  lectureHours: WeekHours.nullable().default(null),
+  tutorialHours: WeekHours.nullable().default(null),
+  practiceHours: WeekHours.nullable().default(null),
+  otherHours: WeekHours.nullable().default(null),
   selfStudyHours: WeekHours.nullable().default(null),
   assessment: z.string().default(""),
 });
@@ -345,23 +352,40 @@ export const WeeklyPlanSection = z.object({
 });
 export type WeeklyPlanSection = z.infer<typeof WeeklyPlanSection>;
 
-/** SLT for one week: Contact Hours (Lecture + Tutorial) + Self-Study Hours. Nulls count as 0. */
-export function weekSlt(row: { contactHours?: number | null; selfStudyHours?: number | null }): number {
-  return (row.contactHours ?? 0) + (row.selfStudyHours ?? 0);
+/** Contact Hours for one week: Lecture + Tutorial + Practice + Other. Nulls count as 0. */
+export function weekContactHours(row: {
+  lectureHours?: number | null;
+  tutorialHours?: number | null;
+  practiceHours?: number | null;
+  otherHours?: number | null;
+}): number {
+  return (row.lectureHours ?? 0) + (row.tutorialHours ?? 0) + (row.practiceHours ?? 0) + (row.otherHours ?? 0);
 }
 
-/** Weekly-plan footer totals: Contact, Self-Study, and the derived SLT, summed over all weeks. */
+/** SLT for one week: Contact Hours (L+T+P+O) + Self-Study Hours. Nulls count as 0. */
+export function weekSlt(row: {
+  lectureHours?: number | null;
+  tutorialHours?: number | null;
+  practiceHours?: number | null;
+  otherHours?: number | null;
+  selfStudyHours?: number | null;
+}): number {
+  return weekContactHours(row) + (row.selfStudyHours ?? 0);
+}
+
+/** Weekly-plan footer totals: each contact category, Self-Study, and the derived SLT, summed over all weeks. */
 export function weeklyPlanTotals(section: WeeklyPlanSection) {
   return section.weeks.reduce(
     (acc, w) => {
-      const contact = w.contactHours ?? 0;
-      const self = w.selfStudyHours ?? 0;
-      acc.contactHours += contact;
-      acc.selfStudyHours += self;
-      acc.slt += contact + self;
+      acc.lectureHours += w.lectureHours ?? 0;
+      acc.tutorialHours += w.tutorialHours ?? 0;
+      acc.practiceHours += w.practiceHours ?? 0;
+      acc.otherHours += w.otherHours ?? 0;
+      acc.selfStudyHours += w.selfStudyHours ?? 0;
+      acc.slt += weekSlt(w);
       return acc;
     },
-    { contactHours: 0, selfStudyHours: 0, slt: 0 },
+    { lectureHours: 0, tutorialHours: 0, practiceHours: 0, otherHours: 0, selfStudyHours: 0, slt: 0 },
   );
 }
 

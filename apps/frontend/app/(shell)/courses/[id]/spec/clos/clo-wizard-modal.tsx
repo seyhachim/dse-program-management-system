@@ -153,7 +153,7 @@ export function CloWizardModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[1200px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="text-lg font-bold">{title}</DialogTitle>
         </DialogHeader>
 
         {error ? (

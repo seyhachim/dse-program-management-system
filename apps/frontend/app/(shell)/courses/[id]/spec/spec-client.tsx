@@ -376,11 +376,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
             <WeeklyPlanSectionForm
               value={weeklyPlan}
               onChange={setWeeklyPlan}
-              courseId={courseId}
               courseName={
                 course ? `${course.code} - ${course.title}` : undefined
               }
-              cloCodes={clos.map((c) => c.code)}
+              clos={clos}
             />
           </TabsContent>
 
