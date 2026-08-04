@@ -226,20 +226,20 @@ model CourseSpec {
 
 /// Issue #81: one row per wizard section, replacing the CourseSpec.data/status
 /// blob so saving one section doesn't touch another's `updatedAt`/content.
-/// `content` always holds `{}` now — every saveable section's actual payload lives
-/// in its own normalized table (CourseSpecClo for "clos", CourseSpecWeek for "slt",
-/// CourseSpecAssessmentItem for "assessmentPlan", CourseSpecMappingCell for
-/// "mapping"; "courseInfo" is mirrored onto Course.prerequisites/description and
-/// always live-recomputed) — this row exists purely to track per-section save
-/// status for the spec-progress dashboard. The column is kept (issue #103 phase A/B)
-/// rather than dropped immediately so the phase-A backfill can be verified against
-/// production before phase C drops it for good.
+/// Every saveable section's actual payload lives in its own normalized table
+/// (CourseSpecClo for "clos", CourseSpecWeek for "slt", CourseSpecAssessmentItem
+/// for "assessmentPlan", CourseSpecMappingCell for "mapping"; "courseInfo" is
+/// mirrored onto Course.prerequisites/description and always live-recomputed) —
+/// this row exists purely to track per-section save status for the spec-progress
+/// dashboard. Issue #103 phase C dropped the last `Json` column (`content`) once
+/// its backfill was verified against production — there is no jsonb column left
+/// anywhere in this schema; any future section must land its own normalized
+/// table(s) rather than reintroducing one.
 model CourseSpecSection {
   id           String                  @id @default(uuid())
   courseSpecId String
   courseSpec   CourseSpec              @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   sectionKey   String
-  content      Json                    @default("{}")
   status       CourseSpecSectionStatus @default(Draft)
   updatedAt    DateTime                @updatedAt
 

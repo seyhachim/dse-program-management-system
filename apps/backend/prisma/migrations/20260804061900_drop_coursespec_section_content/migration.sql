@@ -1,0 +1,12 @@
+-- Issue #103 phase C: drop the last jsonb column in the schema.
+--
+-- CourseSpecSection.content has had no readers or writers since the phase A/B
+-- migration (20260803140000_normalize_coursespec_weekly_assessment_mapping) and
+-- the service.ts cutover that shipped alongside it — every saveable section's
+-- payload lives in its own normalized table. That backfill has been verified
+-- against production: row counts match exactly between the legacy content
+-- arrays and the normalized tables for every existing spec, the legacy
+-- contactHours-only `slt` shape folded correctly into `lectureHours`, and all
+-- `cloMapping` rows were folded into CourseSpecClo and deleted.
+-- AlterTable
+ALTER TABLE "CourseSpecSection" DROP COLUMN "content";

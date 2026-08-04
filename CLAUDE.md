@@ -188,26 +188,27 @@ This is the largest and most active domain, defined entirely in
   (`CourseSpecAssessmentItem`), and CLO Alignment Mapping (`CourseSpecMappingCell`)
   sections are normalized the same way, and `"courseInfo"` is mirrored onto
   `Course.prerequisites`/`description` and live-recomputed via
-  `buildCourseInfoPrefill` on every read, never stored as json — so **every**
-  saveable section's `CourseSpecSection.content` is now always `{}`
-  (`courseService`'s `NORMALIZED_SECTIONS` set), kept only to track per-section save
-  status for the spec-progress dashboard. `reassembleSpec` only sets `data[key]` when
-  a `CourseSpecSection` row exists for that key (the same presence guard `clos` has
-  always used), so a section that was never opened stays `undefined` — distinct from
-  a saved-but-empty section (e.g. `{ weeks: [] }`) — which is what the wizard uses to
-  know whether a section was ever saved. **`content` itself has no more readers or
-  writers left** — it is the last `Json` column in the schema and is dropped outright
-  in a phase C migration once #103's phase A/B backfill (which also had to fold two
+  `buildCourseInfoPrefill` on every read, never stored as json. `reassembleSpec` only
+  sets `data[key]` when a `CourseSpecSection` row exists for that key (the same
+  presence guard `clos` has always used), so a section that was never opened stays
+  `undefined` — distinct from a saved-but-empty section (e.g. `{ weeks: [] }`) — which
+  is what the wizard uses to know whether a section was ever saved.
+  **`CourseSpecSection` no longer has a `content` column at all** — issue #103's
+  phase C dropped it outright once phase A/B's backfill (which also had to fold two
   live legacy shapes it inherited — the pre-§14/§15-merge `cloMapping` blob and the
   pre-L/T/P/O single-`contactHours` Weekly Plan shape — forward into the normalized
-  tables rather than just copying them across) is verified against production. Any
+  tables rather than just copying them across) was verified against production; the
+  row now exists purely to track per-section save status for the spec-progress
+  dashboard. **There is no `Json`/jsonb column left anywhere in this schema.** Any
   future section (the still-`state: "soon"` §19–25 sections) must land its own
-  normalized table(s) following this same pattern rather than reintroducing a `Json`
-  column. Issue #81 landed in two PRs mirroring the #80 rubric precedent above: phase
-  A/B (#91) added the normalized tables and backfilled every existing spec into them,
+  normalized table(s) following this same pattern rather than reintroducing one.
+  Issue #81 landed in two PRs mirroring the #80 rubric precedent above: phase A/B
+  (#91) added the normalized tables and backfilled every existing spec into them,
   cutting `courseService`'s reads/writes over; phase C dropped the old
   `CourseSpec.data`/`status` jsonb columns outright once that had run through a
-  deploy cycle and the backfill was verified correct against production data.
+  deploy cycle and the backfill was verified correct against production data. Issue
+  #103 repeated that same phase A/B (#105) → phase C (#106) split for
+  `CourseSpecSection.content`, the last holdout.
 - `SPEC_SECTION_SCHEMAS` maps a `SpecSectionId` to its Zod schema. The backend route
   `PUT /api/courses/:id/spec/:sectionId` (`plugins/courses/router.ts`) looks up the
   schema for the given section id and 400s if the section isn't implemented yet —
