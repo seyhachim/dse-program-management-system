@@ -27,11 +27,27 @@ test("CreateAccountInput rejects an empty name", () => {
   expect(result.success).toBe(false);
 });
 
-test("CreateAccountInput rejects an unknown role", () => {
+test("CreateAccountInput rejects admin (manual/seed-only, not self-service invite)", () => {
   const result = CreateAccountInput.safeParse({
     name: "Ada",
     email: "ada@dse.dev",
     role: "admin",
   });
   expect(result.success).toBe(false);
+});
+
+test("CreateAccountInput rejects student (provisioned via Add Student, not an invite)", () => {
+  const result = CreateAccountInput.safeParse({
+    name: "Ada",
+    email: "ada@dse.dev",
+    role: "student",
+  });
+  expect(result.success).toBe(false);
+});
+
+test("CreateAccountInput accepts the programme/QA roles added for issue #101", () => {
+  for (const role of ["program_coordinator", "program_secretary", "qa_reviewer"] as const) {
+    const result = CreateAccountInput.safeParse({ name: "Ada", email: "ada@dse.dev", role });
+    expect(result.success).toBe(true);
+  }
 });

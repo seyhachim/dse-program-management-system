@@ -3,13 +3,18 @@ import { z } from "zod";
 /**
  * Auth plugin schemas. `CreateAccountInput` backs the admin-only "create a login
  * account" action: an admin provisions a Supabase auth credential (via invite) and
- * a linked app `User` row. `role` is fixed to "lecturer" for now (issue #10) but is
- * modelled as an enum so it can widen without a shape change.
+ * a linked app `User` row. `role` accepts the roles that need a self-service invite
+ * path (issue #101 follow-up) — deliberately not the full `Role` enum:
+ * - `admin` is excluded — minting a new admin login stays a manual/seed-only
+ *   action, not something exposed through this form.
+ * - `student` is excluded — students are provisioned via "Add Student" on the
+ *   Students page, which creates a roster profile, not a login account.
  */
+export const INVITABLE_ROLES = ["lecturer", "program_coordinator", "program_secretary", "qa_reviewer"] as const;
 export const CreateAccountInput = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("A valid email is required"),
-  role: z.enum(["lecturer"]).default("lecturer"),
+  role: z.enum(INVITABLE_ROLES).default("lecturer"),
 });
 export type CreateAccountInput = z.infer<typeof CreateAccountInput>;
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateAccountInput } from "@dse-pms/shared-types";
+import { CreateAccountInput, INVITABLE_ROLES } from "@dse-pms/shared-types";
 import {
   Button,
   Dialog,
@@ -13,9 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@dse-pms/ui";
 
-export type CreateAccountValues = { name: string; email: string };
+export type CreateAccountValues = CreateAccountInput;
 
 interface CreateAccountFormProps {
   open: boolean;
@@ -24,22 +29,31 @@ interface CreateAccountFormProps {
   submitting?: boolean;
 }
 
-const empty: CreateAccountValues = { name: "", email: "" };
+const ROLE_LABELS: Record<(typeof INVITABLE_ROLES)[number], string> = {
+  lecturer: "Lecturer",
+  program_coordinator: "Program Coordinator",
+  program_secretary: "Program Secretary",
+  qa_reviewer: "QA Reviewer",
+};
+
+const empty: CreateAccountValues = { name: "", email: "", role: "lecturer" };
 
 /**
- * Admin-only: provision a lecturer *login account*. Distinct from "Add Lecturer"
- * (which creates a profile only) — this sends a Supabase invite so the lecturer
- * sets their own password and can sign in.
+ * Admin-only: provision a login account for one of the invitable roles
+ * (issue #101 follow-up — admin/student are deliberately not offered here,
+ * see INVITABLE_ROLES). For `lecturer`, this is distinct from "Add Lecturer"
+ * (which creates a profile only) — this sends a Supabase invite so the
+ * invitee sets their own password and can sign in.
  */
 export function CreateAccountForm({ open, onOpenChange, onSubmit, submitting }: CreateAccountFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<CreateAccountValues>({
-    // role defaults to "lecturer" server-side; the form only collects name + email.
-    resolver: zodResolver(CreateAccountInput.pick({ name: true, email: true })),
+    resolver: zodResolver(CreateAccountInput),
     defaultValues: empty,
   });
 
@@ -53,8 +67,8 @@ export function CreateAccountForm({ open, onOpenChange, onSubmit, submitting }: 
         <DialogHeader>
           <DialogTitle>Create login account</DialogTitle>
           <DialogDescription>
-            Sends an invite email so the lecturer can set a password and sign in. Creates or links
-            their lecturer profile automatically.
+            Sends an invite email so the invitee can set a password and sign in. For a lecturer,
+            this also creates or links their lecturer profile automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -64,6 +78,26 @@ export function CreateAccountForm({ open, onOpenChange, onSubmit, submitting }: 
           </Field>
           <Field label="Email" error={errors.email?.message}>
             <Input placeholder="chim.seyha@rupp.edu.kh" {...register("email")} />
+          </Field>
+          <Field label="Role" error={errors.role?.message}>
+            <Controller
+              control={control}
+              name="role"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INVITABLE_ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {ROLE_LABELS[role]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
 
           <DialogFooter>

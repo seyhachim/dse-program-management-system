@@ -51,7 +51,7 @@ export function LecturersClient() {
     setError(null);
     setNotice(null);
     try {
-      await authApi.createAccount({ ...values, role: "lecturer" });
+      await authApi.createAccount(values);
       setAccountOpen(false);
       setNotice(`Invite sent to ${values.email}.`);
       await load();
