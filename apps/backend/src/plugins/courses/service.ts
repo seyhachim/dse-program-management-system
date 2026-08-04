@@ -1,5 +1,6 @@
 import {
   COMPLETABLE_SPEC_SECTIONS,
+  type AssessmentPlanSection,
   type ClosSection,
   type CourseInfoInput,
   type CourseInfoSection,
@@ -9,9 +10,11 @@ import {
   type LecturerRef,
   type LecturersServiceContract,
   type ListCoursesQuery,
+  type MappingSection,
   type OfferingsServiceContract,
   type SpecSectionId,
   type UpdateCourseInput,
+  type WeeklyPlanSection,
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
@@ -212,8 +215,21 @@ export const courseService = {
       const spec = await tx.courseSpec.upsert({ where: { courseId }, create: { courseId }, update: {} });
 
       if (sectionId === "clos") await syncClos(tx, spec.id, (values as ClosSection).items);
+      if (sectionId === "slt") await syncWeeklyPlan(tx, spec.id, (values as WeeklyPlanSection).weeks);
+      if (sectionId === "assessmentPlan") await syncAssessmentPlan(tx, spec.id, (values as AssessmentPlanSection).items);
+      if (sectionId === "mapping") await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
 
-      const content = sectionId === "clos" || sectionId === "courseInfo" ? {} : (values as Prisma.InputJsonValue);
+      // `content` has no writer left besides this line, and this line only ever
+      // writes `{}` — enforced, not just documented, so a future section added to
+      // SPEC_SECTION_SCHEMAS without a normalized table (and a NORMALIZED_SECTIONS
+      // entry) fails loudly here instead of silently reintroducing a jsonb writer.
+      if (!NORMALIZED_SECTIONS.has(sectionId)) {
+        throw new Error(
+          `Section "${sectionId}" has no normalized storage — add it to NORMALIZED_SECTIONS ` +
+            `and a sync function/reassembleSpec case instead of writing CourseSpecSection.content directly.`,
+        );
+      }
+      const content = {};
       await tx.courseSpecSection.upsert({
         where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey: sectionId } },
         create: { courseSpecId: spec.id, sectionKey: sectionId, content, status: "Complete" },
@@ -228,19 +244,35 @@ export const courseService = {
   },
 } satisfies CoursesServiceContract & Record<string, unknown>;
 
+/**
+ * Sections whose payload lives entirely in normalized tables rather than
+ * `CourseSpecSection.content` (issue #103 finished what #81 started for `clos`) —
+ * their `content` is always written as `{}`, and `reassembleSpec` below rebuilds
+ * `data[key]` from the normalized rows instead of reading it back.
+ */
+const NORMALIZED_SECTIONS = new Set<SpecSectionId>(["clos", "courseInfo", "slt", "assessmentPlan", "mapping"]);
+
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
 const SPEC_INCLUDE = {
   sections: true,
   clos: { include: { teachingMethods: true, assessmentMethods: true }, orderBy: { order: "asc" as const } },
+  weeks: { orderBy: { order: "asc" as const } },
+  assessmentItems: { orderBy: { order: "asc" as const } },
+  mappingCells: true,
 } satisfies Prisma.CourseSpecInclude;
 
 type SpecRow = Prisma.CourseSpecGetPayload<{ include: typeof SPEC_INCLUDE }>;
 
 /**
  * Reassemble the flat `{data, status}` envelope the API has always returned
- * (issue #81 changed storage, not the contract) from the normalized
- * CourseSpecSection/CourseSpecClo rows. Caller still needs to overlay a live
- * `data.courseInfo` afterwards.
+ * (issue #81/#103 changed storage, not the contract) from the normalized
+ * CourseSpecSection/CourseSpecClo/CourseSpecWeek/CourseSpecAssessmentItem/
+ * CourseSpecMappingCell rows. Caller still needs to overlay a live `data.courseInfo`
+ * afterwards. `data[key]` is only set when a `CourseSpecSection` row exists for that
+ * key — same presence-guard the `clos` case has always used — so a section that was
+ * never saved stays `undefined` (distinct from a saved-but-empty section, which
+ * still comes back as e.g. `{ weeks: [] }`); the wizard depends on that distinction
+ * to know whether a section was ever opened.
  */
 function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; status: Record<string, string> } {
   const data: Record<string, unknown> = {};
@@ -249,9 +281,11 @@ function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; 
 
   for (const section of spec.sections) {
     status[section.sectionKey] = section.status === "Complete" ? "complete" : "draft";
-    if (section.sectionKey !== "clos") data[section.sectionKey] = section.content;
+    if (!NORMALIZED_SECTIONS.has(section.sectionKey as SpecSectionId)) data[section.sectionKey] = section.content;
   }
-  if (spec.sections.some((s) => s.sectionKey === "clos")) {
+  const hasSection = (key: SpecSectionId) => spec.sections.some((s) => s.sectionKey === key);
+
+  if (hasSection("clos")) {
     // `code` isn't stored — re-derived from `order` so it can't drift from the
     // one source of truth for CLO position (see CourseSpecClo's schema comment).
     data.clos = {
@@ -266,6 +300,57 @@ function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; 
         assessmentMethodIds: clo.assessmentMethods.map((a) => a.assessmentMethodId),
         status: clo.status === "Inactive" ? "inactive" : "active",
         notes: clo.notes,
+      })),
+    };
+  }
+  if (hasSection("slt")) {
+    data.slt = {
+      weeks: spec.weeks.map((w) => ({
+        id: w.id,
+        week: w.week,
+        topic: w.topic,
+        cloCodes: w.cloCodes,
+        lloItems: w.lloItems,
+        activities: w.activities,
+        lectureHours: w.lectureHours,
+        tutorialHours: w.tutorialHours,
+        practiceHours: w.practiceHours,
+        otherHours: w.otherHours,
+        selfStudyHours: w.selfStudyHours,
+        assessment: w.assessment,
+      })),
+    };
+  }
+  if (hasSection("assessmentPlan")) {
+    data.assessmentPlan = {
+      items: spec.assessmentItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        description: item.description,
+        mode: item.mode === "Group" ? "group" : "individual",
+        status: item.status === "Inactive" ? "inactive" : "active",
+        cloCodes: item.cloCodes,
+        bloomLevel: item.bloomLevel,
+        weight: item.weight,
+        dueWeek: item.dueWeek,
+        durationWeeks: item.durationWeeks,
+        format: item.format,
+        submissionMethod: item.submissionMethod,
+        instructions: item.instructions,
+        rubric: item.rubric,
+        mappedPlos: item.mappedPlos,
+        notes: item.notes,
+      })),
+    };
+  }
+  if (hasSection("mapping")) {
+    data.mapping = {
+      cells: spec.mappingCells.map((cell) => ({
+        cloCode: cell.cloCode,
+        kind: cell.kind === "Assessment" ? "assessment" : "week",
+        ref: cell.ref,
+        strength: cell.strength,
       })),
     };
   }
@@ -305,6 +390,85 @@ async function syncClos(tx: Prisma.TransactionClient, courseSpecId: string, item
     item.assessmentMethodIds.map((assessmentMethodId) => ({ courseSpecId, cloId: item.id, assessmentMethodId })),
   );
   if (assessmentRows.length > 0) await tx.courseSpecCloAssessmentMethod.createMany({ data: assessmentRows });
+}
+
+/** Delete-and-rebuild CourseSpecWeek rows for an `slt` (§18 Weekly Plan) section save. */
+async function syncWeeklyPlan(tx: Prisma.TransactionClient, courseSpecId: string, weeks: WeeklyPlanSection["weeks"]) {
+  await tx.courseSpecWeek.deleteMany({ where: { courseSpecId } });
+  if (weeks.length === 0) return;
+  await tx.courseSpecWeek.createMany({
+    data: weeks.map((w, order) => ({
+      id: w.id,
+      courseSpecId,
+      order,
+      week: w.week,
+      topic: w.topic,
+      cloCodes: w.cloCodes,
+      lloItems: w.lloItems,
+      activities: w.activities,
+      lectureHours: w.lectureHours ?? null,
+      tutorialHours: w.tutorialHours ?? null,
+      practiceHours: w.practiceHours ?? null,
+      otherHours: w.otherHours ?? null,
+      selfStudyHours: w.selfStudyHours ?? null,
+      assessment: w.assessment,
+    })),
+  });
+}
+
+/** Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17) section save. */
+async function syncAssessmentPlan(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  items: AssessmentPlanSection["items"],
+) {
+  await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
+  if (items.length === 0) return;
+  await tx.courseSpecAssessmentItem.createMany({
+    data: items.map((item, order) => ({
+      id: item.id,
+      courseSpecId,
+      order,
+      name: item.name,
+      type: item.type,
+      description: item.description,
+      mode: item.mode === "group" ? ("Group" as const) : ("Individual" as const),
+      status: item.status === "inactive" ? ("Inactive" as const) : ("Active" as const),
+      cloCodes: item.cloCodes,
+      bloomLevel: item.bloomLevel ?? null,
+      weight: item.weight ?? null,
+      dueWeek: item.dueWeek ?? null,
+      durationWeeks: item.durationWeeks ?? null,
+      format: item.format,
+      submissionMethod: item.submissionMethod,
+      instructions: item.instructions,
+      rubric: item.rubric,
+      mappedPlos: item.mappedPlos,
+      notes: item.notes,
+    })),
+  });
+}
+
+/** Delete-and-rebuild CourseSpecMappingCell rows for a `mapping` (CLO Alignment) section save. */
+async function syncMappingCells(tx: Prisma.TransactionClient, courseSpecId: string, cells: MappingSection["cells"]) {
+  await tx.courseSpecMappingCell.deleteMany({ where: { courseSpecId } });
+  if (cells.length === 0) return;
+  await tx.courseSpecMappingCell.createMany({
+    data: cells.map((cell) => ({
+      courseSpecId,
+      cloCode: cell.cloCode,
+      kind: cell.kind === "assessment" ? ("Assessment" as const) : ("Week" as const),
+      ref: cell.ref,
+      strength: cell.strength,
+    })),
+    // Unlike CourseSpecWeek/CourseSpecAssessmentItem (client-generated uuid ids —
+    // collision-free by construction), this table's PK is a composite of
+    // user-selected values (cloCode, kind, ref); a payload with a repeated triple
+    // is plausible client state, not just historical data, so this needs the same
+    // dedupe posture the migration's own backfill already takes (`ON CONFLICT DO
+    // NOTHING`) rather than throwing a unique-violation on save.
+    skipDuplicates: true,
+  });
 }
 
 /** Assemble a Course Information (§1–13) snapshot from existing course-related data. */

@@ -59,6 +59,27 @@ enum CloRowStatus {
   Inactive
 }
 
+/// Mirrors the shared-types `AssessmentMode` zod enum ("individual"|"group") for a
+/// normalized §17 assessment row.
+enum AssessmentItemMode {
+  Individual
+  Group
+}
+
+/// Mirrors the shared-types `AssessmentStatus` zod enum ("active"|"inactive") for a
+/// normalized §17 assessment row.
+enum AssessmentItemStatus {
+  Active
+  Inactive
+}
+
+/// Mirrors the shared-types `MappingComponentKind` zod enum ("week"|"assessment")
+/// for a normalized CLO Alignment Mapping cell.
+enum MappingComponentKind {
+  Week
+  Assessment
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -191,22 +212,28 @@ model Course {
 /// rows) — kept in place unused for one deploy cycle before being dropped in a
 /// follow-up migration (issue #81 phase C), same expand/contract pattern as #80.
 model CourseSpec {
-  id        String              @id @default(uuid())
-  courseId  String              @unique
-  course    Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  sections  CourseSpecSection[]
-  clos      CourseSpecClo[]
-  updatedAt DateTime            @updatedAt
-  createdAt DateTime            @default(now())
+  id              String                     @id @default(uuid())
+  courseId        String                     @unique
+  course          Course                     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sections        CourseSpecSection[]
+  clos            CourseSpecClo[]
+  weeks           CourseSpecWeek[]
+  assessmentItems CourseSpecAssessmentItem[]
+  mappingCells    CourseSpecMappingCell[]
+  updatedAt       DateTime                   @updatedAt
+  createdAt       DateTime                   @default(now())
 }
 
 /// Issue #81: one row per wizard section, replacing the CourseSpec.data/status
 /// blob so saving one section doesn't touch another's `updatedAt`/content.
-/// `sectionKey = "clos"` and `"courseInfo"` always have `content = {}` — CLOs are
-/// normalized into CourseSpecClo below, and courseInfo is mirrored onto
-/// Course.prerequisites/description and always live-recomputed (courseService's
-/// buildCourseInfoPrefill); both rows exist here only to track section status for
-/// the spec-progress dashboard.
+/// `content` always holds `{}` now — every saveable section's actual payload lives
+/// in its own normalized table (CourseSpecClo for "clos", CourseSpecWeek for "slt",
+/// CourseSpecAssessmentItem for "assessmentPlan", CourseSpecMappingCell for
+/// "mapping"; "courseInfo" is mirrored onto Course.prerequisites/description and
+/// always live-recomputed) — this row exists purely to track per-section save
+/// status for the spec-progress dashboard. The column is kept (issue #103 phase A/B)
+/// rather than dropped immediately so the phase-A backfill can be verified against
+/// production before phase C drops it for good.
 model CourseSpecSection {
   id           String                  @id @default(uuid())
   courseSpecId String
@@ -272,6 +299,86 @@ model CourseSpecCloAssessmentMethod {
 
   @@id([courseSpecId, cloId, assessmentMethodId])
   @@index([assessmentMethodId])
+}
+
+/// Issue #103: normalized §18 Weekly Plan rows (previously the `slt` section's JSON
+/// `weeks` array). `id` is client-generated, only unique *within* a course spec —
+/// same composite-key rationale as CourseSpecClo. `week` is the user-entered week
+/// number (not necessarily sequential); `order` separately preserves array
+/// position, same split CourseSpecClo makes between its stored `order` and its
+/// derived `code`. `cloCodes` reference §14 CLOs by code, not id — a loose
+/// reference, same as CourseSpecClo's own `mappedPlos`, left unenforced by a DB FK
+/// since `code` isn't a stored/unique column to FK against (it's derived from
+/// `order`) and the frontend already reconciles orphaned references on save.
+model CourseSpecWeek {
+  id             String     @default(uuid())
+  courseSpecId   String
+  courseSpec     CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order          Int
+  week           Int
+  topic          String     @default("")
+  cloCodes       String[]   @default([])
+  lloItems       String[]   @default([])
+  activities     String[]   @default([])
+  lectureHours   Float?
+  tutorialHours  Float?
+  practiceHours  Float?
+  otherHours     Float?
+  selfStudyHours Float?
+  assessment     String     @default("")
+
+  @@id([courseSpecId, id])
+}
+
+/// Issue #103: normalized §17 Course Assessment Plan rows (previously the
+/// `assessmentPlan` section's JSON `items` array). Same composite-key rationale as
+/// CourseSpecWeek. `type`/`bloomLevel` stay plain `String` rather than a Prisma enum,
+/// mirroring CourseSpecClo.level — both are validated against a closed vocabulary at
+/// the Zod layer already, so a DB enum would only add migration weight for no extra
+/// safety. `cloCodes`/`mappedPlos` are loose references, same as CourseSpecWeek.
+model CourseSpecAssessmentItem {
+  id               String               @default(uuid())
+  courseSpecId     String
+  courseSpec       CourseSpec           @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order            Int
+  name             String
+  type             String
+  description      String               @default("")
+  mode             AssessmentItemMode   @default(Individual)
+  status           AssessmentItemStatus @default(Active)
+  cloCodes         String[]             @default([])
+  bloomLevel       String?
+  weight           Float?
+  dueWeek          Int?
+  durationWeeks    Float?
+  format           String               @default("")
+  submissionMethod String               @default("")
+  instructions     String               @default("")
+  rubric           String               @default("")
+  mappedPlos       String[]             @default([])
+  notes            String               @default("")
+
+  @@id([courseSpecId, id])
+}
+
+/// Issue #103: normalized CLO Alignment Mapping cells (previously the `mapping`
+/// section's sparse JSON `cells` array). No synthetic id needed — the
+/// `(cloCode, kind, ref)` triple is already the cell's natural, unique identity
+/// (a lecturer can only rate one strength per CLO × week/assessment pair), so it's
+/// the composite PK directly. `ref` (a CourseSpecWeek or CourseSpecAssessmentItem
+/// id, depending on `kind`) has no DB FK — it's polymorphic across two possible
+/// parent tables, and, like `cloCode`, was already an unenforced loose reference
+/// before this migration (mapping-model.ts's `reconcileCells` is the only place
+/// orphaned refs get cleaned up today; this doesn't regress that).
+model CourseSpecMappingCell {
+  courseSpecId String
+  courseSpec   CourseSpec           @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  cloCode      String
+  kind         MappingComponentKind
+  ref          String
+  strength     Int
+
+  @@id([courseSpecId, cloCode, kind, ref])
 }
 
 /// Course Offerings plugin — a course delivered in a given term, with an assigned
