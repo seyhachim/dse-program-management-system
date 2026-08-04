@@ -10,6 +10,9 @@ const prisma = new PrismaClient();
 
 const users = [
   { email: "admin@dse.dev", name: "Admin User", role: "admin" as const },
+  { email: "coordinator@dse.dev", name: "Coordinator User", role: "program_coordinator" as const },
+  { email: "secretary@dse.dev", name: "Secretary User", role: "program_secretary" as const },
+  { email: "qa@dse.dev", name: "QA Reviewer User", role: "qa_reviewer" as const },
   { email: "student@dse.dev", name: "Student User", role: "student" as const },
   {
     email: "lecturer@dse.dev",
@@ -64,11 +67,12 @@ const assessmentMethods = [
 ];
 
 /**
- * Role/Permission/RolePermission seed data (issue #65, phase 1). Mirrors
- * ROLE_PERMISSIONS in apps/backend/src/core/permissions/index.ts exactly, so the
- * DB documents today's authorization behavior even though nothing reads from it
- * yet — requirePermission() still checks that hardcoded map. Keep roleDefs in
- * sync with it until the follow-up that makes this the enforced source of truth.
+ * Role/Permission/RolePermission seed data (issue #65, phase 1). This is now
+ * the enforced source of truth (issue #67 phase 2's cutover) — requirePermission()
+ * reads the RolePermission cache these rows populate, not a hardcoded map.
+ * ROLE_PERMISSIONS_LEGACY in apps/backend/src/core/permissions/index.ts is a
+ * frozen rollback reference for the pre-#67 world and is deliberately not kept
+ * in sync with roleDefs beyond that point.
  *
  * The permission *slugs* themselves aren't hand-copied a third time, though:
  * they're derived from pluginManifests (packages/shared-types/src/plugins.ts),
@@ -119,6 +123,50 @@ const roleDefs: { slug: string; title: string; description: string; permissions:
     ],
   },
   {
+    slug: "program_coordinator",
+    title: "Program Coordinator",
+    // Programme academic management (issue #101 §5). Full read/write across the
+    // academic catalog, same as admin minus admin-only system administration
+    // ("accounts:create") — there's exactly one programme today, so "programme
+    // academic management" and admin's academic slice coincide.
+    description: "Manages programme academic content: curriculum, courses, offerings, lecturer assignments.",
+    permissions: [
+      "students:read",
+      "courses:read",
+      "courses:write",
+      "courses:manage",
+      "offerings:read",
+      "offerings:write",
+      "offerings:manage",
+      "lecturers:read",
+      "lecturers:write",
+      "methods:read",
+      "methods:write",
+      "rubrics:read",
+      "rubrics:write",
+    ],
+  },
+  {
+    slug: "program_secretary",
+    title: "Program Secretary",
+    // Programme administrative support (issue #101 §6-8): can prepare/maintain
+    // operational records (offerings, rosters, lecturer-assignment scheduling)
+    // but not curriculum/course-specification decisions, which stay with the
+    // Program Coordinator.
+    description: "Programme administrative and operational support — not academic decision authority.",
+    permissions: [
+      "students:read",
+      "students:write",
+      "courses:read",
+      "offerings:read",
+      "offerings:write",
+      "offerings:manage",
+      "lecturers:read",
+      "methods:read",
+      "rubrics:read",
+    ],
+  },
+  {
     slug: "lecturer",
     title: "Lecturer",
     description: "Reads the catalog and fills in the specification of assigned courses/offerings.",
@@ -134,6 +182,15 @@ const roleDefs: { slug: string; title: string; description: string; permissions:
       "rubrics:read",
       "rubrics:write",
     ],
+  },
+  {
+    slug: "qa_reviewer",
+    title: "QA Reviewer",
+    // Quality assurance review (issue #101 §15-16): read-only across the
+    // catalog for now — there's no QA/evidence plugin yet, so there's nothing
+    // QA-specific to grant beyond visibility into what it would review.
+    description: "Reviews programme evidence and findings for quality assurance. Read-only.",
+    permissions: ["students:read", "courses:read", "offerings:read", "lecturers:read", "methods:read", "rubrics:read"],
   },
   {
     slug: "student",

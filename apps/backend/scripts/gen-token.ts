@@ -11,14 +11,16 @@ import { signToken, type Role } from "../src/core/auth/token.ts";
  */
 const prisma = new PrismaClient();
 
+const ROLES: Role[] = ["admin", "program_coordinator", "program_secretary", "lecturer", "qa_reviewer", "student"];
+
 function parseRole(): Role {
   const idx = process.argv.indexOf("--role");
   const value = idx >= 0 ? process.argv[idx + 1] : "admin";
-  if (value !== "admin" && value !== "lecturer" && value !== "student") {
-    console.error(`Invalid role "${value}". Use one of: admin, lecturer, student`);
+  if (!ROLES.includes(value as Role)) {
+    console.error(`Invalid role "${value}". Use one of: ${ROLES.join(", ")}`);
     process.exit(1);
   }
-  return value;
+  return value as Role;
 }
 
 async function main() {

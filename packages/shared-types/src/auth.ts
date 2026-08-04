@@ -13,8 +13,20 @@ export const CreateAccountInput = z.object({
 });
 export type CreateAccountInput = z.infer<typeof CreateAccountInput>;
 
-/** The three application roles. Shared so nav/permission gating can key off it. */
-export const Role = z.enum(["admin", "lecturer", "student"]);
+/**
+ * The application roles (issue #101). Shared so nav/permission gating can key
+ * off it. `program_coordinator`/`program_secretary`/`qa_reviewer` are
+ * programme-wide today (there is exactly one programme, so nothing to scope
+ * to yet) — see `PROGRAMME_WIDE_ROLES` in the backend's `token.ts`.
+ */
+export const Role = z.enum([
+  "admin",
+  "program_coordinator",
+  "program_secretary",
+  "lecturer",
+  "qa_reviewer",
+  "student",
+]);
 export type Role = z.infer<typeof Role>;
 
 /**

@@ -6,6 +6,7 @@ import {
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
+import type { Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { CapacityError, offeringService, ReferenceError } from "./service.ts";
 
@@ -101,14 +102,24 @@ export function createOfferingRouter(): Router {
 }
 
 /**
+ * Roles that may manage any offering's roster without being its assigned
+ * lecturer — admin plus the two academic/administrative roles the roster
+ * workflow (§9 of issue #101) names explicitly. `qa_reviewer` is deliberately
+ * excluded: it never holds `offerings:write`, so it would never reach this
+ * check anyway.
+ */
+const OFFERING_ROSTER_WIDE_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"];
+
+/**
  * True (and untouched response) if the caller may manage this offering's
- * roster: an admin, the primary lecturer, or an assigned co-lecturer (#79).
+ * roster: a programme-wide role, the primary lecturer, or an assigned
+ * co-lecturer (#79).
  */
 async function assertOwnOfferingOrAdmin(
   req: import("express").Request,
   res: import("express").Response,
 ): Promise<boolean> {
-  if (req.user!.roles.includes("admin")) return true;
+  if (req.user!.roles.some((r) => OFFERING_ROSTER_WIDE_ROLES.includes(r))) return true;
   const offering = await offeringService.getById(req.params.id!);
   const isAssigned =
     offering?.lecturer?.id === req.user!.id || offering?.coLecturers.some((c) => c.id === req.user!.id);

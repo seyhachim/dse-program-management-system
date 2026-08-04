@@ -66,7 +66,9 @@ export const studentsManifest: PluginManifest = {
   name: "Students",
   version: "0.1.0",
   description: "Student records — CRUD, list, profile.",
-  routes: [{ label: "Students", path: "/students", icon: "users", roles: ["admin"], group: "Academic" }],
+  // Program Secretary maintains student/class lists (issue #101 §6); Program
+  // Coordinator's proposed sidebar has no Students entry, so it's left off.
+  routes: [{ label: "Students", path: "/students", icon: "users", roles: ["admin", "program_secretary"], group: "Academic" }],
   permissions: ["students:read", "students:write"],
 };
 
@@ -76,7 +78,13 @@ export const coursesManifest: PluginManifest = {
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
   routes: [
-    { label: "Course Management", path: "/courses", icon: "book", roles: ["admin", "lecturer"], group: "Academic" },
+    {
+      label: "Course Management",
+      path: "/courses",
+      icon: "book",
+      roles: ["admin", "program_coordinator", "program_secretary", "lecturer"],
+      group: "Academic",
+    },
   ],
   permissions: ["courses:read", "courses:write", "courses:manage"],
 };
@@ -86,7 +94,15 @@ export const offeringsManifest: PluginManifest = {
   name: "Course Offerings",
   version: "0.1.0",
   description: "Links Students, Courses and Lecturers for a given term.",
-  routes: [{ label: "Course Offerings", path: "/offerings", icon: "layers", roles: ["admin"], group: "Academic" }],
+  routes: [
+    {
+      label: "Course Offerings",
+      path: "/offerings",
+      icon: "layers",
+      roles: ["admin", "program_coordinator", "program_secretary"],
+      group: "Academic",
+    },
+  ],
   permissions: ["offerings:read", "offerings:write", "offerings:manage"],
 };
 
@@ -96,7 +112,13 @@ export const lecturersManifest: PluginManifest = {
   version: "0.1.0",
   description: "Lecturers — Users with the lecturer role, incl. syllabus contact details.",
   routes: [
-    { label: "Lecturers", path: "/lecturers", icon: "presentation", roles: ["admin"], group: "Academic" },
+    {
+      label: "Lecturers",
+      path: "/lecturers",
+      icon: "presentation",
+      roles: ["admin", "program_coordinator", "program_secretary"],
+      group: "Academic",
+    },
   ],
   permissions: ["lecturers:read", "lecturers:write"],
 };
@@ -111,11 +133,19 @@ export const dashboardManifest: PluginManifest = {
   name: "Dashboard",
   version: "0.1.0",
   description: "Programme overview: key counts, course spec completion, offering/student status.",
-  // Admin-only, like Students/Offerings/Lecturers below: the dashboard aggregates
-  // programme-wide totals from those same three sources, which aren't scoped
-  // per-lecturer server-side, so a lecturer viewing it would see numbers that
-  // don't match the lecturer-scoped Courses/Spec Progress panels on the same page.
-  routes: [{ label: "Dashboard", path: "/dashboard", icon: "dashboard", roles: ["admin"] }],
+  // Programme-wide roles only (PROGRAMME_WIDE_ROLES, mirrored here since this
+  // manifest has no backend plugin of its own to import the constant from): the
+  // dashboard aggregates totals from Students/Courses/Offerings unscoped, so a
+  // lecturer viewing it would see numbers that don't match the lecturer-scoped
+  // Courses/Spec Progress panels on the same page.
+  routes: [
+    {
+      label: "Dashboard",
+      path: "/dashboard",
+      icon: "dashboard",
+      roles: ["admin", "program_coordinator", "program_secretary"],
+    },
+  ],
 };
 
 /**
