@@ -34,12 +34,17 @@ export type Role = z.infer<typeof Role>;
  * caller's primary role, kept alongside `roles` (issue #77 phase B, all of the
  * caller's assigned roles) so a frontend bundle deployed before this field
  * existed keeps working through the Render/Vercel deploy-skew window.
+ * `permissions` is the union of every permission string granted by any of
+ * `roles` (same union semantics as the backend's `roleHasPermission`) — it lets
+ * the frontend gate actions (Add/Edit/Delete buttons, etc.) against the same
+ * source of truth the backend enforces, instead of hardcoding role names.
  */
 export const MeResponse = z.object({
   id: z.string(),
   email: z.string().email(),
   role: Role,
   roles: z.array(Role),
+  permissions: z.array(z.string()),
   name: z.string(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;

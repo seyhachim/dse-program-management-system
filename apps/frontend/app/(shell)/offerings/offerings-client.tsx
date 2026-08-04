@@ -13,9 +13,18 @@ import {
 } from "@dse-pms/ui";
 import { offeringsApi, offeringTone } from "@/lib/offerings";
 import { studentsApi } from "@/lib/students";
-import { authApi } from "@/lib/auth";
+import { useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { EnrollmentDialog } from "./enrollment-dialog";
+
+/**
+ * Roles that may manage any offering's roster without being its assigned
+ * lecturer — mirrors the backend's `OFFERING_ROSTER_WIDE_ROLES`
+ * (apps/backend/src/plugins/offerings/router.ts). Roster access also needs an
+ * ownership check (assigned lecturer/co-lecturer), which a coarse permission
+ * string can't express, so this stays role-based rather than permission-based.
+ */
+const OFFERING_ROSTER_WIDE_ROLES = ["admin", "program_coordinator", "program_secretary"];
 
 export function OfferingsClient() {
   const router = useRouter();
@@ -26,22 +35,14 @@ export function OfferingsClient() {
 
   const [manage, setManage] = useState<OfferingView | null>(null);
 
-  // Scheduling an offering (create/edit/delete) is admin-only (offerings:manage);
-  // a lecturer may only manage the roster ("Manage") of an offering they teach.
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  useEffect(() => {
-    authApi
-      .me()
-      .then((me) => {
-        setIsAdmin(me.roles.includes("admin"));
-        setCurrentUserId(me.id);
-      })
-      .catch(() => {
-        setIsAdmin(false);
-        setCurrentUserId(null);
-      });
-  }, []);
+  // Scheduling an offering (create/edit/delete) needs `offerings:manage`
+  // (admin, program_coordinator, program_secretary); managing the roster
+  // ("Manage") is either one of those same roles, or the offering's assigned
+  // lecturer/co-lecturer.
+  const { me } = useMe();
+  const canManage = me?.permissions.includes("offerings:manage") ?? false;
+  const canManageAnyRoster = me?.roles.some((r) => OFFERING_ROSTER_WIDE_ROLES.includes(r)) ?? false;
+  const currentUserId = me?.id ?? null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,7 +113,7 @@ export function OfferingsClient() {
     const isAssigned =
       offering.lecturer?.id === currentUserId ||
       offering.coLecturers.some((l) => l.id === currentUserId);
-    if (!isAdmin && !isAssigned) {
+    if (!canManageAnyRoster && !isAssigned) {
       setError("You can only manage enrollment for offerings you teach.");
       return;
     }
@@ -206,8 +207,8 @@ export function OfferingsClient() {
         search=""
         onSearchChange={() => {}}
         searchPlaceholder="Offerings"
-        addLabel={isAdmin ? "Add Offering" : undefined}
-        onAdd={isAdmin ? () => router.push("/offerings/new") : undefined}
+        addLabel={canManage ? "Add Offering" : undefined}
+        onAdd={canManage ? () => router.push("/offerings/new") : undefined}
       />
 
       {error ? (
@@ -230,9 +231,9 @@ export function OfferingsClient() {
           },
         ]}
         onEdit={
-          isAdmin ? (o) => router.push(`/offerings/${o.id}/edit`) : undefined
+          canManage ? (o) => router.push(`/offerings/${o.id}/edit`) : undefined
         }
-        onDelete={isAdmin ? handleDelete : undefined}
+        onDelete={canManage ? handleDelete : undefined}
         loading={loading}
         emptyMessage="No offerings yet. Add one to link a course, lecturer and students for a term."
       />

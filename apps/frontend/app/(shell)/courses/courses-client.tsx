@@ -6,7 +6,7 @@ import { FileText } from "lucide-react";
 import { courseTypeLabel } from "@dse-pms/shared-types";
 import { DataTable, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
-import { authApi } from "@/lib/auth";
+import { useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 
 export function CoursesClient() {
@@ -14,7 +14,12 @@ export function CoursesClient() {
   const [rows, setRows] = useState<CourseView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Creating/editing/deleting a course record needs `courses:manage`
+  // (admin, program_coordinator); lecturers hold `courses:write` for editing
+  // the spec of their assigned courses via "Syllabus", not the record itself.
+  const { me } = useMe();
+  const canManage = me?.permissions.includes("courses:manage") ?? false;
 
   const [search, setSearch] = useState("");
 
@@ -34,15 +39,6 @@ export function CoursesClient() {
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
   }, [load]);
-
-  // Creating/editing/deleting a course record is admin-only (courses:manage);
-  // lecturers only fill in the spec of their assigned courses via "Syllabus".
-  useEffect(() => {
-    authApi
-      .me()
-      .then((me) => setIsAdmin(me.roles.includes("admin")))
-      .catch(() => setIsAdmin(false));
-  }, []);
 
   const handleDelete = async (course: CourseView) => {
     if (!confirm(`Delete ${course.code}?`)) return;
@@ -91,8 +87,8 @@ export function CoursesClient() {
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search courses…"
-        addLabel={isAdmin ? "Add Course" : undefined}
-        onAdd={isAdmin ? () => router.push("/courses/new") : undefined}
+        addLabel={canManage ? "Add Course" : undefined}
+        onAdd={canManage ? () => router.push("/courses/new") : undefined}
       />
 
       {error ? (
@@ -114,11 +110,11 @@ export function CoursesClient() {
             onClick: (c) => router.push(`/courses/${c.id}/spec`),
           },
         ]}
-        onEdit={isAdmin ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}
-        onDelete={isAdmin ? handleDelete : undefined}
+        onEdit={canManage ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}
+        onDelete={canManage ? handleDelete : undefined}
         loading={loading}
         emptyMessage={
-          isAdmin ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
+          canManage ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
         }
       />
     </div>

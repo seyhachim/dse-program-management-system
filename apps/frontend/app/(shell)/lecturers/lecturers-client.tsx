@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Lecturer } from "@dse-pms/shared-types";
 import { Button, DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { lecturersApi } from "@/lib/lecturers";
-import { authApi } from "@/lib/auth";
+import { authApi, useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { LecturerForm, type LecturerFormValues } from "./lecturer-form";
 import { CreateAccountForm, type CreateAccountValues } from "./create-account-form";
@@ -19,7 +19,12 @@ export function LecturersClient() {
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Creating/editing/deleting a lecturer record needs `lecturers:write`
+  // (admin, program_coordinator); provisioning a login needs `accounts:create`
+  // (admin only).
+  const { me } = useMe();
+  const canWrite = me?.permissions.includes("lecturers:write") ?? false;
+  const canCreateAccount = me?.permissions.includes("accounts:create") ?? false;
   const [accountOpen, setAccountOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -40,13 +45,6 @@ export function LecturersClient() {
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
   }, [load]);
-
-  useEffect(() => {
-    authApi
-      .me()
-      .then((me) => setIsAdmin(me.roles.includes("admin")))
-      .catch(() => setIsAdmin(false));
-  }, []);
 
   const handleInvite = async (values: CreateAccountValues) => {
     setInviting(true);
@@ -132,9 +130,9 @@ export function LecturersClient() {
             search={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search lecturers…"
-            addLabel={isAdmin ? "Add Lecturer" : undefined}
+            addLabel={canWrite ? "Add Lecturer" : undefined}
             onAdd={
-              isAdmin
+              canWrite
                 ? () => {
                     setEditing(null);
                     setFormOpen(true);
@@ -143,7 +141,7 @@ export function LecturersClient() {
             }
           />
         </div>
-        {isAdmin ? (
+        {canCreateAccount ? (
           <Button variant="outline" onClick={() => setAccountOpen(true)}>
             Create login account
           </Button>
@@ -167,14 +165,14 @@ export function LecturersClient() {
         rows={rows}
         getRowId={(l) => l.id}
         onEdit={
-          isAdmin
+          canWrite
             ? (l) => {
                 setEditing(l);
                 setFormOpen(true);
               }
             : undefined
         }
-        onDelete={isAdmin ? handleDelete : undefined}
+        onDelete={canWrite ? handleDelete : undefined}
         loading={loading}
         emptyMessage="No lecturers yet. Add your first lecturer."
       />
