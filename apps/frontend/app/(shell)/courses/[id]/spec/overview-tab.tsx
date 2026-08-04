@@ -70,8 +70,11 @@ export function OverviewTab({
           {courseInfo.courseCode || courseInfo.courseTitle ? (
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Field label="Course Code" value={courseInfo.courseCode} />
+
               <Field label="Course Title" value={courseInfo.courseTitle} />
+
               <Field label="Credits" value={courseInfo.credits} />
+
               <Field
                 label="Course Type"
                 value={
@@ -80,6 +83,7 @@ export function OverviewTab({
                     : ""
                 }
               />
+
               <Field
                 label="Semester"
                 value={
@@ -88,6 +92,7 @@ export function OverviewTab({
                     : ""
                 }
               />
+
               <Field
                 label="Programme Year"
                 value={
@@ -96,21 +101,32 @@ export function OverviewTab({
                     : ""
                 }
               />
+
               <Field
                 label="Pre-requisites"
                 value={courseInfo.prerequisites}
                 full
               />
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-muted-foreground">
-                  Course Description / Synopsis
-                </dt>
-                <dd className="whitespace-pre-wrap text-foreground">
-                  {courseInfo.description || (
-                    <span className="text-muted-foreground">Not provided</span>
-                  )}
-                </dd>
-              </div>
+
+              <Field label="Instructor" value={courseInfo.instructorName} />
+
+              <Field label="Qualification" value={courseInfo.qualification} />
+
+              <Field label="Email" value={courseInfo.email} />
+
+              <Field label="Telephone" value={courseInfo.telephone} />
+
+              <Field
+                label="Other Course Lecturer(s)"
+                value={courseInfo.otherLecturers}
+                full
+              />
+
+              <Field
+                label="Course Description / Synopsis"
+                value={courseInfo.description}
+                full
+              />
             </dl>
           ) : (
             <EmptyHint

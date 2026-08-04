@@ -45,7 +45,8 @@ export function withCodes(items: CloForm[]): CloForm[] {
 }
 
 const asStr = (v: unknown) => (v == null ? "" : String(v));
-const asStrArray = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
+const asStrArray = (v: unknown) =>
+  Array.isArray(v) ? v.map((x) => String(x)) : [];
 
 /**
  * Map the API's §14 payload into the string-based form model, migrating legacy
@@ -57,7 +58,8 @@ const asStrArray = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) :
  */
 export function toClosForm(data: unknown, legacyMapping?: unknown): CloForm[] {
   const items = (data as { items?: unknown[] } | undefined)?.items ?? [];
-  const legacyItems = (legacyMapping as { items?: unknown[] } | undefined)?.items ?? [];
+  const legacyItems =
+    (legacyMapping as { items?: unknown[] } | undefined)?.items ?? [];
   const legacyByCode = new Map(
     legacyItems.map((raw) => {
       const d = (raw ?? {}) as Record<string, unknown>;
@@ -78,8 +80,15 @@ export function toClosForm(data: unknown, legacyMapping?: unknown): CloForm[] {
         description: asStr(d.description),
         level: asStr(d.level),
         mappedPlos,
-        sltHours: d.sltHours != null ? asStr(d.sltHours) : legacy?.sltHours != null ? asStr(legacy.sltHours) : "",
-        teachingMethodIds: teachingMethodIds.length ? teachingMethodIds : asStrArray(legacy?.teachingMethodIds),
+        sltHours:
+          d.sltHours != null
+            ? asStr(d.sltHours)
+            : legacy?.sltHours != null
+              ? asStr(legacy.sltHours)
+              : "",
+        teachingMethodIds: teachingMethodIds.length
+          ? teachingMethodIds
+          : asStrArray(legacy?.teachingMethodIds),
         assessmentMethodIds: asStrArray(d.assessmentMethodIds),
         status: d.status === "inactive" ? "inactive" : "active",
         notes: asStr(d.notes),
@@ -107,7 +116,10 @@ export function toClosPayload(items: CloForm[]) {
 }
 
 /** A CLO's share of the course's total SLT, as a whole percent (string-input wrapper). */
-export function focusPercentOf(sltHours: string, totalSlt: number | null): number | null {
+export function focusPercentOf(
+  sltHours: string,
+  totalSlt: number | null,
+): number | null {
   return cloFocusPercent(sltHours ? Number(sltHours) : null, totalSlt);
 }
 
@@ -128,12 +140,36 @@ export type BloomStyle = {
 
 /** Cognitive levels (C1–C6) carry the reference colour scheme. */
 const COGNITIVE_STYLE: Record<string, Omit<BloomStyle, "name">> = {
-  C1: { dot: "#3b82f6", bar: "#3b82f6", chip: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" },
-  C2: { dot: "#22c55e", bar: "#22c55e", chip: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
-  C3: { dot: "#f59e0b", bar: "#f59e0b", chip: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
-  C4: { dot: "#8b5cf6", bar: "#8b5cf6", chip: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" },
-  C5: { dot: "#ef4444", bar: "#ef4444", chip: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300" },
-  C6: { dot: "#ec4899", bar: "#ec4899", chip: "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300" },
+  C1: {
+    dot: "#3b82f6",
+    bar: "#3b82f6",
+    chip: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+  },
+  C2: {
+    dot: "#22c55e",
+    bar: "#22c55e",
+    chip: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+  },
+  C3: {
+    dot: "#f59e0b",
+    bar: "#f59e0b",
+    chip: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+  },
+  C4: {
+    dot: "#8b5cf6",
+    bar: "#8b5cf6",
+    chip: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
+  },
+  C5: {
+    dot: "#ef4444",
+    bar: "#ef4444",
+    chip: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
+  },
+  C6: {
+    dot: "#ec4899",
+    bar: "#ec4899",
+    chip: "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300",
+  },
 };
 
 const NEUTRAL_STYLE: Omit<BloomStyle, "name"> = {
@@ -162,7 +198,7 @@ export type WizardStepId = 1 | 2 | 3 | 4 | 5;
 export const CLO_WIZARD_STEPS: { id: WizardStepId; title: string }[] = [
   { id: 1, title: "CLO Info" },
   { id: 2, title: "PLO Mapping" },
-  { id: 3, title: "Learning" },
+  { id: 3, title: "Teaching Methods" },
   { id: 4, title: "Assessment" },
   { id: 5, title: "Review" },
 ];
@@ -183,14 +219,19 @@ export function cloWizardErrors(draft: CloForm) {
  * Whether a step's fields are filled in, for the stepper's progress dots and the
  * Review step — advisory only, doesn't block navigation (see `cloWizardErrors`).
  */
-export function wizardStepComplete(step: WizardStepId, draft: CloForm): boolean {
+export function wizardStepComplete(
+  step: WizardStepId,
+  draft: CloForm,
+): boolean {
   switch (step) {
     case 1:
-      return draft.description.trim().length > 0 && draft.level.trim().length > 0;
+      return (
+        draft.description.trim().length > 0 && draft.level.trim().length > 0
+      );
     case 2:
       return draft.mappedPlos.length > 0;
     case 3:
-      return draft.sltHours.trim().length > 0 && draft.teachingMethodIds.length > 0;
+      return draft.teachingMethodIds.length > 0;
     case 4:
       return draft.assessmentMethodIds.length > 0;
     case 5:
@@ -199,21 +240,48 @@ export function wizardStepComplete(step: WizardStepId, draft: CloForm): boolean 
 }
 
 /** Suggested Bloom's action verbs, grouped by domain — powers the wizard's verb-chip helper. */
-const BLOOM_VERBS: Record<"cognitive" | "affective" | "psychomotor", string[]> = {
-  cognitive: ["Analyze", "Apply", "Design", "Evaluate", "Explain", "Create", "Develop", "Solve"],
-  affective: ["Value", "Justify", "Advocate", "Collaborate", "Respond", "Demonstrate"],
-  psychomotor: ["Perform", "Operate", "Construct", "Execute", "Adapt", "Demonstrate"],
-};
+const BLOOM_VERBS: Record<"cognitive" | "affective" | "psychomotor", string[]> =
+  {
+    cognitive: [
+      "Analyze",
+      "Apply",
+      "Design",
+      "Evaluate",
+      "Explain",
+      "Create",
+      "Develop",
+      "Solve",
+    ],
+    affective: [
+      "Value",
+      "Justify",
+      "Advocate",
+      "Collaborate",
+      "Respond",
+      "Demonstrate",
+    ],
+    psychomotor: [
+      "Perform",
+      "Operate",
+      "Construct",
+      "Execute",
+      "Adapt",
+      "Demonstrate",
+    ],
+  };
 
 /** Recommended verbs for a level's domain; defaults to the cognitive set when no level is chosen yet. */
 export function bloomVerbsFor(level: string): string[] {
-  if (AFFECTIVE_LEVELS.some((l) => l.code === level)) return BLOOM_VERBS.affective;
-  if (PSYCHOMOTOR_LEVELS.some((l) => l.code === level)) return BLOOM_VERBS.psychomotor;
+  if (AFFECTIVE_LEVELS.some((l) => l.code === level))
+    return BLOOM_VERBS.affective;
+  if (PSYCHOMOTOR_LEVELS.some((l) => l.code === level))
+    return BLOOM_VERBS.psychomotor;
   return BLOOM_VERBS.cognitive;
 }
 
 /** Append a Bloom verb to the end of a CLO statement, clamped to the field's max length. */
 export function appendBloomVerb(description: string, verb: string): string {
-  const next = description.trim().length > 0 ? `${description.trim()} ${verb}` : verb;
+  const next =
+    description.trim().length > 0 ? `${description.trim()} ${verb}` : verb;
   return next.slice(0, STATEMENT_MAX);
 }

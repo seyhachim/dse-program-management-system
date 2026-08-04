@@ -25,11 +25,13 @@ export const EMPTY_WEEKLY_PLAN: WeeklyPlanForm = [];
 
 const uuid = () => globalThis.crypto.randomUUID();
 const str = (v: unknown) => (v == null ? "" : String(v));
-const strArray = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
+const strArray = (v: unknown) =>
+  Array.isArray(v) ? v.map((x) => String(x)) : [];
 
 /** A fresh week, numbered one past the current highest week. */
 export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
-  const nextNo = existing.reduce((max, w) => Math.max(max, Number(w.week) || 0), 0) + 1;
+  const nextNo =
+    existing.reduce((max, w) => Math.max(max, Number(w.week) || 0), 0) + 1;
   return {
     id: uuid(),
     week: String(nextNo),
@@ -60,8 +62,14 @@ export function toWeeklyPlanForm(data: unknown): WeeklyPlanForm {
     .map((raw) => {
       const d = (raw ?? {}) as Record<string, unknown>;
       const hasHourBreakdown =
-        d.lectureHours != null || d.tutorialHours != null || d.practiceHours != null || d.otherHours != null;
-      const legacyContactHours = !hasHourBreakdown && d.contactHours != null ? String(d.contactHours) : "";
+        d.lectureHours != null ||
+        d.tutorialHours != null ||
+        d.practiceHours != null ||
+        d.otherHours != null;
+      const legacyContactHours =
+        !hasHourBreakdown && d.contactHours != null
+          ? String(d.contactHours)
+          : "";
       return {
         id: str(d.id) || uuid(),
         week: str(d.week),
@@ -69,11 +77,13 @@ export function toWeeklyPlanForm(data: unknown): WeeklyPlanForm {
         cloCodes: strArray(d.cloCodes),
         lloItems: strArray(d.lloItems),
         activities: strArray(d.activities),
-        lectureHours: d.lectureHours == null ? legacyContactHours : String(d.lectureHours),
+        lectureHours:
+          d.lectureHours == null ? legacyContactHours : String(d.lectureHours),
         tutorialHours: d.tutorialHours == null ? "" : String(d.tutorialHours),
         practiceHours: d.practiceHours == null ? "" : String(d.practiceHours),
         otherHours: d.otherHours == null ? "" : String(d.otherHours),
-        selfStudyHours: d.selfStudyHours == null ? "" : String(d.selfStudyHours),
+        selfStudyHours:
+          d.selfStudyHours == null ? "" : String(d.selfStudyHours),
         assessment: str(d.assessment),
       };
     })
@@ -127,19 +137,81 @@ export function weeklyPlanFormTotals(form: WeeklyPlanForm) {
       acc.slt += weekSltForm(w);
       return acc;
     },
-    { lectureHours: 0, tutorialHours: 0, practiceHours: 0, otherHours: 0, selfStudyHours: 0, slt: 0 },
+    {
+      lectureHours: 0,
+      tutorialHours: 0,
+      practiceHours: 0,
+      otherHours: 0,
+      selfStudyHours: 0,
+      slt: 0,
+    },
   );
 }
 
 /** A CLO's coverage across the plan: how many weeks reference it. */
 export type CloCoverage = { code: string; weeks: number };
+/** A CLO's allocated SLT derived from the Weekly Plan. */
+export type CloSltAllocation = {
+  code: string;
+  sltHours: number;
+};
 
+/**
+ * Allocate each week's SLT equally across the CLOs linked to that week.
+ *
+ * Example:
+ * - Week SLT = 6h, linked to CLO1       → CLO1 receives 6h
+ * - Week SLT = 8h, linked to CLO1,CLO2 → each receives 4h
+ *
+ * Duplicate CLO codes within a week are ignored.
+ * Weeks with no linked CLOs do not contribute to CLO allocation.
+ */
+export function cloSltAllocation(
+  form: WeeklyPlanForm,
+  cloCodes?: string[],
+): CloSltAllocation[] {
+  const allocations = new Map<string, number>();
+
+  // Include known CLOs even when they currently receive 0 hours.
+  for (const code of cloCodes ?? []) {
+    allocations.set(code, 0);
+  }
+
+  for (const week of form) {
+    const linkedCodes = [...new Set(week.cloCodes)].filter(
+      (code) => !cloCodes || allocations.has(code),
+    );
+
+    if (linkedCodes.length === 0) continue;
+
+    const weekSlt = weekSltForm(week);
+    const share = weekSlt / linkedCodes.length;
+
+    for (const code of linkedCodes) {
+      allocations.set(code, (allocations.get(code) ?? 0) + share);
+    }
+  }
+
+  return [...allocations.entries()]
+    .map(([code, sltHours]) => ({
+      code,
+      sltHours,
+    }))
+    .sort(
+      (a, b) =>
+        (Number(a.code.replace(/\D/g, "")) || 0) -
+        (Number(b.code.replace(/\D/g, "")) || 0),
+    );
+}
 /**
  * Per-CLO week counts for the coverage chart. When `cloCodes` is given (the §14
  * CLO list) it drives the set so uncovered CLOs still show as 0; otherwise the
  * codes are derived from the weeks themselves.
  */
-export function cloCoverage(form: WeeklyPlanForm, cloCodes?: string[]): CloCoverage[] {
+export function cloCoverage(
+  form: WeeklyPlanForm,
+  cloCodes?: string[],
+): CloCoverage[] {
   const counts = new Map<string, number>();
   for (const code of cloCodes ?? []) counts.set(code, 0);
   for (const w of form) {
@@ -150,13 +222,21 @@ export function cloCoverage(form: WeeklyPlanForm, cloCodes?: string[]): CloCover
   }
   return [...counts.entries()]
     .map(([code, weeks]) => ({ code, weeks }))
-    .sort((a, b) => (Number(a.code.replace(/\D/g, "")) || 0) - (Number(b.code.replace(/\D/g, "")) || 0));
+    .sort(
+      (a, b) =>
+        (Number(a.code.replace(/\D/g, "")) || 0) -
+        (Number(b.code.replace(/\D/g, "")) || 0),
+    );
 }
 
 /** Rolled-up figures for the Weekly Plan Summary panel. */
 export function weeklyPlanSummary(form: WeeklyPlanForm) {
   const totals = weeklyPlanFormTotals(form);
-  const contactHours = totals.lectureHours + totals.tutorialHours + totals.practiceHours + totals.otherHours;
+  const contactHours =
+    totals.lectureHours +
+    totals.tutorialHours +
+    totals.practiceHours +
+    totals.otherHours;
   const assessments = form.filter((w) => w.assessment.trim()).length;
   const isProject = (w: WeekForm) =>
     /project/i.test(w.topic) ||
@@ -180,7 +260,14 @@ export function weeklyPlanSummary(form: WeeklyPlanForm) {
 /* ---------------------------------------------------------------- CLO chart colours */
 
 /** Solid colour values for a CLO donut/legend, parallel to the chip palette above. */
-const CLO_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#ec4899"];
+const CLO_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#f43f5e",
+  "#ec4899",
+];
 
 /** CSS colour for a CLO code (e.g. "CLO3"), matching {@link cloChip} by number. */
 export function cloColor(code: string): string {

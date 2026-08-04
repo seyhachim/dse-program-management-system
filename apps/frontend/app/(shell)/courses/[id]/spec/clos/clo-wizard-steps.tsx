@@ -5,21 +5,18 @@ import { Search } from "lucide-react";
 import {
   AFFECTIVE_LEVELS,
   COGNITIVE_LEVELS,
-  FOCUS_LEVELS,
   PLOS,
   PSYCHOMOTOR_LEVELS,
   type Method,
 } from "@dse-pms/shared-types";
 import { Switch } from "@dse-pms/ui";
 import {
-  focusCodeOf,
-  focusPercentOf,
   NOTES_MAX,
   STATEMENT_MAX,
   wizardStepComplete,
   type CloForm,
 } from "../clo-model";
-import { ReferenceGuide } from "../reference-guide";
+
 import { ChipMultiSelect } from "./chip-multiselect";
 
 type SetPatch = (patch: Partial<CloForm>) => void;
@@ -62,12 +59,18 @@ export function CloStepInfo({
           }`}
         />
         <div className="flex items-center justify-between">
-          <Hint>Clear and measurable statement of what students will be able to do.</Hint>
+          <Hint>
+            Clear and measurable statement of what students will be able to do.
+          </Hint>
           <span className="text-xs text-muted-foreground">
             {draft.description.length} / {STATEMENT_MAX}
           </span>
         </div>
-        {statementError ? <p className="text-xs text-status-live">A CLO statement is required.</p> : null}
+        {statementError ? (
+          <p className="text-xs text-status-live">
+            A CLO statement is required.
+          </p>
+        ) : null}
       </Field>
 
       <Field label="Bloom's Taxonomy Level">
@@ -99,13 +102,21 @@ export function CloStepInfo({
             ))}
           </optgroup>
         </select>
-        <Hint>The cognitive level this CLO addresses. Pick a verb from the helper to match it.</Hint>
+        <Hint>
+          The cognitive level this CLO addresses. Pick a verb from the helper to
+          match it.
+        </Hint>
       </Field>
 
       <Field label="Status" required>
         <label className="flex items-center gap-3">
-          <Switch checked={draft.status === "active"} onCheckedChange={(v) => set({ status: v ? "active" : "inactive" })} />
-          <span className="text-sm text-foreground">{draft.status === "active" ? "Active" : "Inactive"}</span>
+          <Switch
+            checked={draft.status === "active"}
+            onCheckedChange={(v) => set({ status: v ? "active" : "inactive" })}
+          />
+          <span className="text-sm text-foreground">
+            {draft.status === "active" ? "Active" : "Inactive"}
+          </span>
         </label>
         <Hint>Inactive CLOs will not be used in mapping and reports.</Hint>
       </Field>
@@ -115,18 +126,30 @@ export function CloStepInfo({
 
 /* -------------------------------------------------------- Step 2 — PLO Mapping */
 
-export function CloStepPlos({ draft, toggle }: { draft: CloForm; toggle: (id: string) => void }) {
+export function CloStepPlos({
+  draft,
+  toggle,
+}: {
+  draft: CloForm;
+  toggle: (id: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return PLOS;
-    return PLOS.filter((p) => p.id.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+    return PLOS.filter(
+      (p) =>
+        p.id.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q),
+    );
   }, [query]);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Select the PLOs that this CLO contributes to.</p>
+        <p className="text-sm text-muted-foreground">
+          Select the PLOs that this CLO contributes to.
+        </p>
         <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
           {draft.mappedPlos.length} selected
         </span>
@@ -162,13 +185,19 @@ export function CloStepPlos({ draft, toggle }: { draft: CloForm; toggle: (id: st
                 />
                 <span>
                   <span className="font-medium text-foreground">{plo.id}</span>{" "}
-                  <span className="text-muted-foreground">{plo.description}</span>
+                  <span className="text-muted-foreground">
+                    {plo.description}
+                  </span>
                 </span>
               </label>
             </li>
           );
         })}
-        {filtered.length === 0 ? <li className="text-sm text-muted-foreground">No PLOs match your search.</li> : null}
+        {filtered.length === 0 ? (
+          <li className="text-sm text-muted-foreground">
+            No PLOs match your search.
+          </li>
+        ) : null}
       </ul>
     </div>
   );
@@ -180,69 +209,27 @@ export function CloStepLearning({
   draft,
   set,
   teachingMethods,
-  courseTotalSlt,
 }: {
   draft: CloForm;
   set: SetPatch;
   teachingMethods: Method[];
-  courseTotalSlt: number | null;
 }) {
-  const focusPercent = focusPercentOf(draft.sltHours, courseTotalSlt);
-  const focusCode = focusCodeOf(focusPercent);
-  const focusName = FOCUS_LEVELS.find((f) => f.code === focusCode)?.name;
-
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-foreground">Student Learning Time</h4>
-        <p className="text-xs text-muted-foreground">
-          Hours of Student Learning Time this CLO accounts for. Across all CLOs these must add up to the
-          course&apos;s total SLT; Focus and its F/M/P category are derived automatically from this CLO&apos;s
-          share of that total.
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="SLT hours">
-            <input
-              type="number"
-              min={0}
-              placeholder="e.g. 42"
-              className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              value={draft.sltHours}
-              onChange={(e) => set({ sltHours: e.target.value })}
-            />
-          </Field>
-          <div className="block space-y-1.5">
-            <span className="text-sm font-medium text-foreground">Focus (auto)</span>
-            <div
-              className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
-              title="Derived from this CLO's share of the course's total SLT"
-            >
-              {focusCode ? `${focusCode} — ${focusName}` : "—"}
-            </div>
-          </div>
-          <div className="block space-y-1.5">
-            <span className="text-sm font-medium text-foreground">Focus % (auto)</span>
-            <div
-              className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
-              title="This CLO's SLT hours ÷ the course's total SLT"
-            >
-              {focusPercent == null ? "—" : `${focusPercent}%`}
-            </div>
-          </div>
-        </div>
-        <ReferenceGuide title="Focus on PLO (F / M / P)" rows={[...FOCUS_LEVELS]} />
-      </div>
+    <div className="space-y-3">
+      <h4 className="text-sm font-semibold text-foreground">
+        Teaching Methods
+      </h4>
 
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-foreground">Teaching Methods</h4>
-        <p className="text-xs text-muted-foreground">Select the teaching methods used to deliver this CLO.</p>
-        <ChipMultiSelect
-          label="Teaching methods"
-          options={teachingMethods}
-          selectedIds={draft.teachingMethodIds}
-          onChange={(ids) => set({ teachingMethodIds: ids })}
-        />
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Select the teaching methods used to deliver this CLO.
+      </p>
+
+      <ChipMultiSelect
+        label="Teaching methods"
+        options={teachingMethods}
+        selectedIds={draft.teachingMethodIds}
+        onChange={(ids) => set({ teachingMethodIds: ids })}
+      />
     </div>
   );
 }
@@ -261,8 +248,12 @@ export function CloStepAssessment({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-foreground">Assessment Methods</h4>
-        <p className="text-xs text-muted-foreground">Select the assessment methods that measure this CLO.</p>
+        <h4 className="text-sm font-semibold text-foreground">
+          Assessment Methods
+        </h4>
+        <p className="text-xs text-muted-foreground">
+          Select the assessment methods that measure this CLO.
+        </p>
         <ChipMultiSelect
           label="Assessment methods"
           options={assessmentMethods}
@@ -305,35 +296,69 @@ export function CloStepReview({
   assessmentMethods: Method[];
   onJump: (step: 1 | 2 | 3 | 4) => void;
 }) {
-  const methodName = (list: Method[], id: string) => list.find((m) => m.id === id)?.name ?? id;
+  const methodName = (list: Method[], id: string) =>
+    list.find((m) => m.id === id)?.name ?? id;
 
   return (
     <div className="space-y-4">
-      <ReviewCard title="CLO Information" onEdit={() => onJump(1)} incomplete={!wizardStepComplete(1, draft)}>
+      <ReviewCard
+        title="CLO Information"
+        onEdit={() => onJump(1)}
+        incomplete={!wizardStepComplete(1, draft)}
+      >
         <ReviewRow label="Code" value={code} />
         <ReviewRow label="Statement" value={draft.description || "—"} />
         <ReviewRow label="Bloom's Level" value={draft.level || "Not set"} />
-        <ReviewRow label="Status" value={draft.status === "active" ? "Active" : "Inactive"} />
-      </ReviewCard>
-
-      <ReviewCard title="Mapped PLOs" onEdit={() => onJump(2)} incomplete={!wizardStepComplete(2, draft)}>
-        <ReviewRow label="PLOs" value={draft.mappedPlos.length ? draft.mappedPlos.join(", ") : "None selected"} />
-      </ReviewCard>
-
-      <ReviewCard title="Learning & Teaching" onEdit={() => onJump(3)} incomplete={!wizardStepComplete(3, draft)}>
-        <ReviewRow label="SLT Hours" value={draft.sltHours || "—"} />
         <ReviewRow
-          label="Teaching Methods"
-          value={draft.teachingMethodIds.length ? draft.teachingMethodIds.map((id) => methodName(teachingMethods, id)).join(", ") : "None selected"}
+          label="Status"
+          value={draft.status === "active" ? "Active" : "Inactive"}
         />
       </ReviewCard>
 
-      <ReviewCard title="Assessment" onEdit={() => onJump(4)} incomplete={!wizardStepComplete(4, draft)}>
+      <ReviewCard
+        title="Mapped PLOs"
+        onEdit={() => onJump(2)}
+        incomplete={!wizardStepComplete(2, draft)}
+      >
+        <ReviewRow
+          label="PLOs"
+          value={
+            draft.mappedPlos.length
+              ? draft.mappedPlos.join(", ")
+              : "None selected"
+          }
+        />
+      </ReviewCard>
+
+      <ReviewCard
+        title="Teaching Methods"
+        onEdit={() => onJump(3)}
+        incomplete={!wizardStepComplete(3, draft)}
+      >
+        <ReviewRow
+          label="Teaching Methods"
+          value={
+            draft.teachingMethodIds.length
+              ? draft.teachingMethodIds
+                  .map((id) => methodName(teachingMethods, id))
+                  .join(", ")
+              : "None selected"
+          }
+        />
+      </ReviewCard>
+
+      <ReviewCard
+        title="Assessment"
+        onEdit={() => onJump(4)}
+        incomplete={!wizardStepComplete(4, draft)}
+      >
         <ReviewRow
           label="Assessment Methods"
           value={
             draft.assessmentMethodIds.length
-              ? draft.assessmentMethodIds.map((id) => methodName(assessmentMethods, id)).join(", ")
+              ? draft.assessmentMethodIds
+                  .map((id) => methodName(assessmentMethods, id))
+                  .join(", ")
               : "None selected"
           }
         />
@@ -365,7 +390,11 @@ function ReviewCard({
             </span>
           ) : null}
         </h4>
-        <button type="button" onClick={onEdit} className="text-xs font-medium text-accent-foreground hover:underline">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-xs font-medium text-accent-foreground hover:underline"
+        >
           Edit
         </button>
       </div>
@@ -385,7 +414,15 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 
 /* --------------------------------------------------------------- Shared bits */
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <span className="block text-sm font-medium text-foreground">
