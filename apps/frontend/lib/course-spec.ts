@@ -6,7 +6,14 @@ export const courseSpecApi = {
   get(courseId: string): Promise<CourseSpecView> {
     return api.get<CourseSpecView>(`/api/courses/${courseId}/spec`);
   },
-  saveSection(courseId: string, sectionId: SpecSectionId, values: unknown): Promise<CourseSpecView> {
-    return api.put<CourseSpecView>(`/api/courses/${courseId}/spec/${sectionId}`, values);
+  saveSection(
+    courseId: string,
+    sectionId: SpecSectionId,
+    values: unknown,
+  ): Promise<CourseSpecView> {
+    return api.put<CourseSpecView>(
+      `/api/courses/${courseId}/spec/${sectionId}`,
+      values,
+    );
   },
 };

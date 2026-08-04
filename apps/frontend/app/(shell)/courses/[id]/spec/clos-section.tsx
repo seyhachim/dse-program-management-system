@@ -1,15 +1,28 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Eye, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Copy,
+  Eye,
+  ListFilter,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
-import { bloomStyle, focusCodeOf, focusPercentOf, withCodes, type CloForm } from "./clo-model";
+import { bloomStyle, withCodes, type CloForm } from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
 import { CloWizardModal } from "./clos/clo-wizard-modal";
 
 // Re-exported so the wizard can keep importing the CLO model from this section.
-export { EMPTY_CLOS, toClosForm, toClosPayload, type CloForm } from "./clo-model";
+export {
+  EMPTY_CLOS,
+  toClosForm,
+  toClosPayload,
+  type CloForm,
+} from "./clo-model";
 
 type FilterKey = "all" | "active" | "inactive" | "mapped" | "unmapped";
 
@@ -47,15 +60,18 @@ export function ClosSection({
   }, [assessmentMethods]);
 
   const assignedSlt = clos.reduce((s, c) => s + (Number(c.sltHours) || 0), 0);
-  const sltMismatch = courseTotalSlt != null && clos.length > 0 && assignedSlt !== courseTotalSlt;
+  const sltMismatch =
+    courseTotalSlt != null && clos.length > 0 && assignedSlt !== courseTotalSlt;
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
-  const [modal, setModal] = useState<{ open: boolean; cloCode: string | null }>({
-    open: false,
-    cloCode: null,
-  });
+  const [modal, setModal] = useState<{ open: boolean; cloCode: string | null }>(
+    {
+      open: false,
+      cloCode: null,
+    },
+  );
 
   const visible = clos.filter((c) => {
     if (filter === "active" && c.status !== "active") return false;
@@ -64,7 +80,8 @@ export function ClosSection({
     if (filter === "unmapped" && c.mappedPlos.length > 0) return false;
     if (query.trim()) {
       const q = query.toLowerCase();
-      const hay = `${c.code} ${c.description} ${c.mappedPlos.join(" ")}`.toLowerCase();
+      const hay =
+        `${c.code} ${c.description} ${c.mappedPlos.join(" ")}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -76,13 +93,20 @@ export function ClosSection({
   const duplicate = (index: number) => {
     const src = clos[index];
     if (!src) return;
-    const next = [...clos.slice(0, index + 1), { ...src, code: "" }, ...clos.slice(index + 1)];
+    const next = [
+      ...clos.slice(0, index + 1),
+      { ...src, code: "" },
+      ...clos.slice(index + 1),
+    ];
     onPersist(withCodes(next));
   };
 
   const remove = (index: number) => {
     const src = clos[index];
-    if (typeof window !== "undefined" && !window.confirm(`Delete ${src?.code}? This can't be undone.`)) {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Delete ${src?.code}? This can't be undone.`)
+    ) {
       return;
     }
     onPersist(withCodes(clos.filter((_, i) => i !== index)));
@@ -93,7 +117,9 @@ export function ClosSection({
       {/* Section header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-foreground">Course Learning Outcomes (CLOs)</h2>
+          <h2 className="text-lg font-bold text-foreground">
+            Course Learning Outcomes (CLOs)
+          </h2>
           <p className="text-sm text-muted-foreground">
             Define and manage the Course Learning Outcomes for this course.
           </p>
@@ -107,7 +133,9 @@ export function ClosSection({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setNotice("Preview & PDF export are coming in a later phase.")}
+            onClick={() =>
+              setNotice("Preview & PDF export are coming in a later phase.")
+            }
           >
             <Eye className="mr-1.5 h-4 w-4" /> Preview CLOs
           </Button>
@@ -120,34 +148,13 @@ export function ClosSection({
       {notice ? (
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           {notice}
-          <button type="button" onClick={() => setNotice(null)} className="text-xs font-medium hover:text-foreground">
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="text-xs font-medium hover:text-foreground"
+          >
             Dismiss
           </button>
-        </div>
-      ) : null}
-
-      {clos.length > 0 ? (
-        <div className="space-y-1">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
-            <span className="text-muted-foreground">Total SLT (course)</span>
-            {courseTotalSlt != null ? (
-              <span className="font-semibold text-foreground">{courseTotalSlt} h</span>
-            ) : (
-              <span className="text-muted-foreground">— set it on the course</span>
-            )}
-          </div>
-          <div className="flex items-center justify-between px-3 text-sm">
-            <span className="text-muted-foreground">Assigned across CLOs</span>
-            <span className={sltMismatch ? "font-semibold text-amber-600" : "font-medium text-foreground"}>
-              {assignedSlt} h
-            </span>
-          </div>
-          {sltMismatch ? (
-            <p className="px-3 text-xs text-amber-600">
-              ⚠ CLO SLT hours add up to {assignedSlt} h but the course total SLT is {courseTotalSlt} h — they
-              must match.
-            </p>
-          ) : null}
         </div>
       ) : null}
 
@@ -156,7 +163,9 @@ export function ClosSection({
       {/* Table */}
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Course Learning Outcomes (CLOs)</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Course Learning Outcomes (CLOs)
+          </h3>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -186,7 +195,9 @@ export function ClosSection({
 
         {clos.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border py-12 text-center">
-            <p className="text-sm text-muted-foreground">No learning outcomes yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No learning outcomes yet.
+            </p>
             <button
               type="button"
               onClick={openAdd}
@@ -205,7 +216,6 @@ export function ClosSection({
                   <th className="py-2 pr-3">Course Learning Outcome</th>
                   <th className="py-2 pr-3">Bloom's Level</th>
                   <th className="py-2 pr-3">Mapped PLOs</th>
-                  <th className="py-2 pr-3">SLT / Focus</th>
                   <th className="py-2 pr-3">Assessment Methods</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 text-right">Actions</th>
@@ -214,7 +224,10 @@ export function ClosSection({
               <tbody>
                 {visible.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={8}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
                       No CLOs match your search.
                     </td>
                   </tr>
@@ -223,15 +236,26 @@ export function ClosSection({
                     const index = clos.indexOf(clo);
                     const bloom = clo.level ? bloomStyle(clo.level) : null;
                     return (
-                      <tr key={clo.code} className="border-b border-border/70 align-top">
-                        <td className="py-3 pr-2 text-muted-foreground">{index + 1}</td>
-                        <td className="py-3 pr-3 font-semibold text-accent-foreground">{clo.code}</td>
+                      <tr
+                        key={clo.code}
+                        className="border-b border-border/70 align-top"
+                      >
+                        <td className="py-3 pr-2 text-muted-foreground">
+                          {index + 1}
+                        </td>
+                        <td className="py-3 pr-3 font-semibold text-accent-foreground">
+                          {clo.code}
+                        </td>
                         <td className="max-w-[320px] py-3 pr-3 text-foreground">
-                          {clo.description || <span className="text-muted-foreground">—</span>}
+                          {clo.description || (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="py-3 pr-3">
                           {bloom ? (
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${bloom.chip}`}>
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${bloom.chip}`}
+                            >
                               {bloom.name}
                             </span>
                           ) : (
@@ -239,21 +263,13 @@ export function ClosSection({
                           )}
                         </td>
                         <td className="py-3 pr-3 text-foreground">
-                          {clo.mappedPlos.length ? clo.mappedPlos.join(", ") : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="py-3 pr-3 text-muted-foreground">
-                          {clo.sltHours ? (
-                            <>
-                              {clo.sltHours}h
-                              {(() => {
-                                const code = focusCodeOf(focusPercentOf(clo.sltHours, courseTotalSlt));
-                                return code ? ` · ${code}` : "";
-                              })()}
-                            </>
+                          {clo.mappedPlos.length ? (
+                            clo.mappedPlos.join(", ")
                           ) : (
-                            "—"
+                            <span className="text-muted-foreground">—</span>
                           )}
                         </td>
+
                         <td className="max-w-[220px] py-3 pr-3 text-muted-foreground">
                           {clo.assessmentMethodIds.length
                             ? clo.assessmentMethodIds.map(methodName).join(", ")
@@ -263,20 +279,37 @@ export function ClosSection({
                           <span className="inline-flex items-center gap-1.5">
                             <span
                               className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: clo.status === "active" ? "#22c55e" : "var(--muted-foreground)" }}
+                              style={{
+                                backgroundColor:
+                                  clo.status === "active"
+                                    ? "#22c55e"
+                                    : "var(--muted-foreground)",
+                              }}
                             />
-                            <span className="text-foreground">{clo.status === "active" ? "Active" : "Inactive"}</span>
+                            <span className="text-foreground">
+                              {clo.status === "active" ? "Active" : "Inactive"}
+                            </span>
                           </span>
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1">
-                            <IconButton label={`Edit ${clo.code}`} onClick={() => openEdit(clo.code)}>
+                            <IconButton
+                              label={`Edit ${clo.code}`}
+                              onClick={() => openEdit(clo.code)}
+                            >
                               <Pencil className="h-4 w-4" />
                             </IconButton>
-                            <IconButton label={`Duplicate ${clo.code}`} onClick={() => duplicate(index)}>
+                            <IconButton
+                              label={`Duplicate ${clo.code}`}
+                              onClick={() => duplicate(index)}
+                            >
                               <Copy className="h-4 w-4" />
                             </IconButton>
-                            <IconButton label={`Delete ${clo.code}`} danger onClick={() => remove(index)}>
+                            <IconButton
+                              label={`Delete ${clo.code}`}
+                              danger
+                              onClick={() => remove(index)}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </IconButton>
                           </div>
@@ -292,7 +325,8 @@ export function ClosSection({
 
         {clos.length > 0 ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            Showing {visible.length} of {clos.length} CLO{clos.length === 1 ? "" : "s"}
+            Showing {visible.length} of {clos.length} CLO
+            {clos.length === 1 ? "" : "s"}
           </p>
         ) : null}
       </section>
@@ -330,7 +364,9 @@ function IconButton({
       title={label}
       onClick={onClick}
       className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted ${
-        danger ? "text-status-live hover:border-status-live/40" : "text-muted-foreground hover:text-foreground"
+        danger
+          ? "text-status-live hover:border-status-live/40"
+          : "text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}

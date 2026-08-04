@@ -37,7 +37,9 @@ function offerings(): OfferingsServiceContract {
   return registry.get<OfferingsServiceContract>("offerings").service;
 }
 
-async function assertLecturerExists(lecturerId: string | null | undefined): Promise<void> {
+async function assertLecturerExists(
+  lecturerId: string | null | undefined,
+): Promise<void> {
   if (!lecturerId) return;
   const lecturer = await lecturers().getById(lecturerId);
   if (!lecturer) throw new ReferenceError("Assigned lecturer does not exist");
@@ -54,8 +56,13 @@ async function lecturerLookup(): Promise<Map<string, LecturerRef>> {
  * is looked up once by the caller (not per course row) so that listing N
  * courses doesn't issue N separate lecturer lookups.
  */
-function withLecturer<T extends { lecturerId: string | null }>(course: T, lecturerById: Map<string, LecturerRef>) {
-  const lecturer = course.lecturerId ? (lecturerById.get(course.lecturerId) ?? null) : null;
+function withLecturer<T extends { lecturerId: string | null }>(
+  course: T,
+  lecturerById: Map<string, LecturerRef>,
+) {
+  const lecturer = course.lecturerId
+    ? (lecturerById.get(course.lecturerId) ?? null)
+    : null;
   return { ...course, lecturer };
 }
 
@@ -88,7 +95,9 @@ export const courseService = {
           ],
         }
       : {};
-    const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
+    const scopeFilter = lecturerScope
+      ? await ownerScopeFilter(lecturerScope)
+      : {};
     const courses = await prisma.course.findMany({
       where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
@@ -102,8 +111,12 @@ export const courseService = {
    * programme dashboard's Course Specification Progress view. Scoped the same
    * way as `list()` for non-admin callers. Selects only each section's key/status.
    */
-  async listSpecProgress(lecturerScope?: string): Promise<CourseSpecProgress[]> {
-    const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
+  async listSpecProgress(
+    lecturerScope?: string,
+  ): Promise<CourseSpecProgress[]> {
+    const scopeFilter = lecturerScope
+      ? await ownerScopeFilter(lecturerScope)
+      : {};
     const courses = await prisma.course.findMany({
       where: scopeFilter,
       orderBy: { code: "asc" },
@@ -111,18 +124,18 @@ export const courseService = {
         id: true,
         code: true,
         title: true,
-        spec: { select: { sections: { select: { sectionKey: true, status: true } } } },
+        spec: {
+          select: { sections: { select: { sectionKey: true, status: true } } },
+        },
       },
     });
     return courses.map((course) => {
       const sections = course.spec?.sections ?? [];
-      const completeIds = new Set(
-        sections.filter((s) => s.status === "Complete").map((s) => s.sectionKey),
-      );
-      const incompleteSections = COMPLETABLE_SPEC_SECTIONS.filter((s) => !completeIds.has(s.id)).map((s) => ({
-        id: s.id,
-        title: s.title,
-      }));
+      const completed = sections.filter(
+        (s) =>
+          s.status === "Complete" &&
+          COMPLETABLE_SECTION_IDS.includes(s.sectionKey as SpecSectionId),
+      ).length;
       return {
         courseId: course.id,
         code: course.code,
@@ -139,8 +152,13 @@ export const courseService = {
    * offered it (assigned to teach an Offering of it) — backs the router's
    * per-course access guard.
    */
-  async lecturerCanAccess(courseId: string, lecturerId: string): Promise<boolean> {
-    return (await offerings().courseIdsForLecturer(lecturerId)).includes(courseId);
+  async lecturerCanAccess(
+    courseId: string,
+    lecturerId: string,
+  ): Promise<boolean> {
+    return (await offerings().courseIdsForLecturer(lecturerId)).includes(
+      courseId,
+    );
   },
 
   // Part of CoursesServiceContract — used by the offerings plugin via the registry.
@@ -182,7 +200,10 @@ export const courseService = {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) return null;
 
-    const spec = await prisma.courseSpec.findUnique({ where: { courseId }, include: SPEC_INCLUDE });
+    const spec = await prisma.courseSpec.findUnique({
+      where: { courseId },
+      include: SPEC_INCLUDE,
+    });
     const { data, status } = reassembleSpec(spec);
     data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status };
@@ -200,7 +221,11 @@ export const courseService = {
    * upsert of its own CourseSpecSection row, isolated from every other section's
    * `updatedAt`/content.
    */
-  async saveSection(courseId: string, sectionId: SpecSectionId, values: unknown) {
+  async saveSection(
+    courseId: string,
+    sectionId: SpecSectionId,
+    values: unknown,
+  ) {
     let course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
@@ -216,12 +241,24 @@ export const courseService = {
     }
 
     await prisma.$transaction(async (tx) => {
-      const spec = await tx.courseSpec.upsert({ where: { courseId }, create: { courseId }, update: {} });
+      const spec = await tx.courseSpec.upsert({
+        where: { courseId },
+        create: { courseId },
+        update: {},
+      });
 
-      if (sectionId === "clos") await syncClos(tx, spec.id, (values as ClosSection).items);
-      if (sectionId === "slt") await syncWeeklyPlan(tx, spec.id, (values as WeeklyPlanSection).weeks);
-      if (sectionId === "assessmentPlan") await syncAssessmentPlan(tx, spec.id, (values as AssessmentPlanSection).items);
-      if (sectionId === "mapping") await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
+      if (sectionId === "clos")
+        await syncClos(tx, spec.id, (values as ClosSection).items);
+      if (sectionId === "slt")
+        await syncWeeklyPlan(tx, spec.id, (values as WeeklyPlanSection).weeks);
+      if (sectionId === "assessmentPlan")
+        await syncAssessmentPlan(
+          tx,
+          spec.id,
+          (values as AssessmentPlanSection).items,
+        );
+      if (sectionId === "mapping")
+        await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
 
       // Every saveable section must have a normalized table to write into — enforced,
       // not just documented, so a future section added to SPEC_SECTION_SCHEMAS without
@@ -235,13 +272,25 @@ export const courseService = {
         );
       }
       await tx.courseSpecSection.upsert({
-        where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey: sectionId } },
-        create: { courseSpecId: spec.id, sectionKey: sectionId, status: "Complete" },
+        where: {
+          courseSpecId_sectionKey: {
+            courseSpecId: spec.id,
+            sectionKey: sectionId,
+          },
+        },
+        create: {
+          courseSpecId: spec.id,
+          sectionKey: sectionId,
+          status: "Complete",
+        },
         update: { status: "Complete" },
       });
     });
 
-    const spec = await prisma.courseSpec.findUnique({ where: { courseId }, include: SPEC_INCLUDE });
+    const spec = await prisma.courseSpec.findUnique({
+      where: { courseId },
+      include: SPEC_INCLUDE,
+    });
     const { data, status } = reassembleSpec(spec);
     data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status };
@@ -254,12 +303,21 @@ export const courseService = {
  * itself, which now exists only to track per-section save status. `reassembleSpec`
  * below rebuilds `data[key]` from the normalized rows.
  */
-const NORMALIZED_SECTIONS = new Set<SpecSectionId>(["clos", "courseInfo", "slt", "assessmentPlan", "mapping"]);
+const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
+  "clos",
+  "courseInfo",
+  "slt",
+  "assessmentPlan",
+  "mapping",
+]);
 
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
 const SPEC_INCLUDE = {
   sections: true,
-  clos: { include: { teachingMethods: true, assessmentMethods: true }, orderBy: { order: "asc" as const } },
+  clos: {
+    include: { teachingMethods: true, assessmentMethods: true },
+    orderBy: { order: "asc" as const },
+  },
   weeks: { orderBy: { order: "asc" as const } },
   assessmentItems: { orderBy: { order: "asc" as const } },
   mappingCells: true,
@@ -278,15 +336,20 @@ type SpecRow = Prisma.CourseSpecGetPayload<{ include: typeof SPEC_INCLUDE }>;
  * still comes back as e.g. `{ weeks: [] }`); the wizard depends on that distinction
  * to know whether a section was ever opened.
  */
-function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; status: Record<string, string> } {
+function reassembleSpec(spec: SpecRow | null): {
+  data: Record<string, unknown>;
+  status: Record<string, string>;
+} {
   const data: Record<string, unknown> = {};
   const status: Record<string, string> = {};
   if (!spec) return { data, status };
 
   for (const section of spec.sections) {
-    status[section.sectionKey] = section.status === "Complete" ? "complete" : "draft";
+    status[section.sectionKey] =
+      section.status === "Complete" ? "complete" : "draft";
   }
-  const hasSection = (key: SpecSectionId) => spec.sections.some((s) => s.sectionKey === key);
+  const hasSection = (key: SpecSectionId) =>
+    spec.sections.some((s) => s.sectionKey === key);
 
   if (hasSection("clos")) {
     // `code` isn't stored — re-derived from `order` so it can't drift from the
@@ -300,7 +363,9 @@ function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; 
         mappedPlos: clo.mappedPlos,
         sltHours: clo.sltHours,
         teachingMethodIds: clo.teachingMethods.map((t) => t.teachingMethodId),
-        assessmentMethodIds: clo.assessmentMethods.map((a) => a.assessmentMethodId),
+        assessmentMethodIds: clo.assessmentMethods.map(
+          (a) => a.assessmentMethodId,
+        ),
         status: clo.status === "Inactive" ? "inactive" : "active",
         notes: clo.notes,
       })),
@@ -314,7 +379,9 @@ function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; 
         topic: w.topic,
         cloCodes: w.cloCodes,
         lloItems: w.lloItems,
+        lessonLearningOutcomes: w.lessonLearningOutcomes ?? [],
         activities: w.activities,
+        studentLearningActivities: w.studentLearningActivities ?? [],
         lectureHours: w.lectureHours,
         tutorialHours: w.tutorialHours,
         practiceHours: w.practiceHours,
@@ -368,7 +435,11 @@ function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; 
  * composite key values explicit instead of relying on Prisma to infer both parts
  * of a composite FK from a single nested-write relation.
  */
-async function syncClos(tx: Prisma.TransactionClient, courseSpecId: string, items: ClosSection["items"]) {
+async function syncClos(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  items: ClosSection["items"],
+) {
   await tx.courseSpecClo.deleteMany({ where: { courseSpecId } });
 
   const cloRows = items.map((item, order) => ({
@@ -379,24 +450,39 @@ async function syncClos(tx: Prisma.TransactionClient, courseSpecId: string, item
     level: item.level ?? null,
     mappedPlos: item.mappedPlos,
     sltHours: item.sltHours ?? null,
-    status: item.status === "inactive" ? ("Inactive" as const) : ("Active" as const),
+    status:
+      item.status === "inactive" ? ("Inactive" as const) : ("Active" as const),
     notes: item.notes,
   }));
   if (cloRows.length > 0) await tx.courseSpecClo.createMany({ data: cloRows });
 
   const teachingRows = items.flatMap((item) =>
-    item.teachingMethodIds.map((teachingMethodId) => ({ courseSpecId, cloId: item.id, teachingMethodId })),
+    item.teachingMethodIds.map((teachingMethodId) => ({
+      courseSpecId,
+      cloId: item.id,
+      teachingMethodId,
+    })),
   );
-  if (teachingRows.length > 0) await tx.courseSpecCloTeachingMethod.createMany({ data: teachingRows });
+  if (teachingRows.length > 0)
+    await tx.courseSpecCloTeachingMethod.createMany({ data: teachingRows });
 
   const assessmentRows = items.flatMap((item) =>
-    item.assessmentMethodIds.map((assessmentMethodId) => ({ courseSpecId, cloId: item.id, assessmentMethodId })),
+    item.assessmentMethodIds.map((assessmentMethodId) => ({
+      courseSpecId,
+      cloId: item.id,
+      assessmentMethodId,
+    })),
   );
-  if (assessmentRows.length > 0) await tx.courseSpecCloAssessmentMethod.createMany({ data: assessmentRows });
+  if (assessmentRows.length > 0)
+    await tx.courseSpecCloAssessmentMethod.createMany({ data: assessmentRows });
 }
 
 /** Delete-and-rebuild CourseSpecWeek rows for an `slt` (§18 Weekly Plan) section save. */
-async function syncWeeklyPlan(tx: Prisma.TransactionClient, courseSpecId: string, weeks: WeeklyPlanSection["weeks"]) {
+async function syncWeeklyPlan(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  weeks: WeeklyPlanSection["weeks"],
+) {
   await tx.courseSpecWeek.deleteMany({ where: { courseSpecId } });
   if (weeks.length === 0) return;
   await tx.courseSpecWeek.createMany({
@@ -408,7 +494,9 @@ async function syncWeeklyPlan(tx: Prisma.TransactionClient, courseSpecId: string
       topic: w.topic,
       cloCodes: w.cloCodes,
       lloItems: w.lloItems,
+      lessonLearningOutcomes: w.lessonLearningOutcomes,
       activities: w.activities,
+      studentLearningActivities: w.studentLearningActivities,
       lectureHours: w.lectureHours ?? null,
       tutorialHours: w.tutorialHours ?? null,
       practiceHours: w.practiceHours ?? null,
@@ -435,8 +523,12 @@ async function syncAssessmentPlan(
       name: item.name,
       type: item.type,
       description: item.description,
-      mode: item.mode === "group" ? ("Group" as const) : ("Individual" as const),
-      status: item.status === "inactive" ? ("Inactive" as const) : ("Active" as const),
+      mode:
+        item.mode === "group" ? ("Group" as const) : ("Individual" as const),
+      status:
+        item.status === "inactive"
+          ? ("Inactive" as const)
+          : ("Active" as const),
       cloCodes: item.cloCodes,
       bloomLevel: item.bloomLevel ?? null,
       weight: item.weight ?? null,
@@ -453,14 +545,21 @@ async function syncAssessmentPlan(
 }
 
 /** Delete-and-rebuild CourseSpecMappingCell rows for a `mapping` (CLO Alignment) section save. */
-async function syncMappingCells(tx: Prisma.TransactionClient, courseSpecId: string, cells: MappingSection["cells"]) {
+async function syncMappingCells(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  cells: MappingSection["cells"],
+) {
   await tx.courseSpecMappingCell.deleteMany({ where: { courseSpecId } });
   if (cells.length === 0) return;
   await tx.courseSpecMappingCell.createMany({
     data: cells.map((cell) => ({
       courseSpecId,
       cloCode: cell.cloCode,
-      kind: cell.kind === "assessment" ? ("Assessment" as const) : ("Week" as const),
+      kind:
+        cell.kind === "assessment"
+          ? ("Assessment" as const)
+          : ("Week" as const),
       ref: cell.ref,
       strength: cell.strength,
     })),
@@ -485,7 +584,9 @@ async function buildCourseInfoPrefill(course: {
   courseType: string | null;
   lecturerId: string | null;
 }): Promise<CourseInfoSection> {
-  const lecturer = course.lecturerId ? await lecturers().getById(course.lecturerId) : null;
+  const lecturer = course.lecturerId
+    ? await lecturers().getById(course.lecturerId)
+    : null;
   const offering = await prisma.offering.findFirst({
     where: { courseId: course.id },
     orderBy: { createdAt: "desc" },

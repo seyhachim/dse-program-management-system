@@ -311,21 +311,23 @@ model CourseSpecCloAssessmentMethod {
 /// since `code` isn't a stored/unique column to FK against (it's derived from
 /// `order`) and the frontend already reconciles orphaned references on save.
 model CourseSpecWeek {
-  id             String     @default(uuid())
-  courseSpecId   String
-  courseSpec     CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
-  order          Int
-  week           Int
-  topic          String     @default("")
-  cloCodes       String[]   @default([])
-  lloItems       String[]   @default([])
-  activities     String[]   @default([])
-  lectureHours   Float?
-  tutorialHours  Float?
-  practiceHours  Float?
-  otherHours     Float?
-  selfStudyHours Float?
-  assessment     String     @default("")
+  id                        String     @default(uuid())
+  courseSpecId              String
+  courseSpec                CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order                     Int
+  week                      Int
+  topic                     String     @default("")
+  cloCodes                  String[]   @default([])
+  lloItems                  String[]   @default([])
+  lessonLearningOutcomes    Json?
+  activities                String[]   @default([])
+  studentLearningActivities Json?
+  lectureHours              Float?
+  tutorialHours             Float?
+  practiceHours             Float?
+  otherHours                Float?
+  selfStudyHours            Float?
+  assessment                String     @default("")
 
   @@id([courseSpecId, id])
 }

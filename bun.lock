@@ -78,6 +78,7 @@
       },
       "devDependencies": {
         "@dse-pms/config": "workspace:*",
+        "@types/bun": "^1.3.14",
         "typescript": "^5.6.3",
       },
     },

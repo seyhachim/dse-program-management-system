@@ -27,7 +27,11 @@ import {
 import { CreateMethodInput } from "./methods.ts";
 
 test("CloItem defaults method id arrays to []", () => {
-  const parsed = CloItem.parse({ id: "clo-1", code: "CLO1", description: "Do the thing" });
+  const parsed = CloItem.parse({
+    id: "clo-1",
+    code: "CLO1",
+    description: "Do the thing",
+  });
   expect(parsed.teachingMethodIds).toEqual([]);
   expect(parsed.assessmentMethodIds).toEqual([]);
 });
@@ -105,8 +109,12 @@ test("WeeklyPlanRow keeps linked CLOs, LLOs, and activities, hours default to nu
   });
   const w = parsed.weeks[0]!;
   expect(w.cloCodes).toEqual(["CLO1"]);
-  expect(w.lloItems).toEqual(["Explain the ML workflow.", "Set up a Python environment."]);
+  expect(w.lloItems).toEqual([
+    "Explain the ML workflow.",
+    "Set up a Python environment.",
+  ]);
   expect(w.activities).toEqual(["Lecture", "Lab Exercise"]);
+  expect(w.studentLearningActivities).toEqual([]);
   expect(w.lectureHours).toBeNull();
   expect(w.tutorialHours).toBeNull();
   expect(w.practiceHours).toBeNull();
@@ -114,19 +122,135 @@ test("WeeklyPlanRow keeps linked CLOs, LLOs, and activities, hours default to nu
   expect(w.selfStudyHours).toBeNull();
 });
 
+test("parses structured student learning activities", () => {
+  const parsed = WeeklyPlanSection.parse({
+    weeks: [
+      {
+        id: "week-1",
+        week: 1,
+        topic: "Introduction to Smart Agriculture",
+        cloCodes: ["CLO1"],
+        lloItems: ["LLO1.1"],
+
+        // Old format — empty for this new example
+        activities: [],
+
+        // New structured format
+        studentLearningActivities: [
+          {
+            id: "activity-1",
+            title: "Workflow Exercise",
+            description:
+              "Students arrange the predictive analytics workflow stages.",
+            lloIds: ["LLO1.1"],
+          },
+          {
+            id: "activity-2",
+            title: "Classification Activity",
+            description:
+              "Students classify examples as descriptive or predictive analytics.",
+            lloIds: ["LLO1.1"],
+          },
+        ],
+
+        lectureHours: 2,
+        tutorialHours: 1,
+        practiceHours: null,
+        otherHours: null,
+        selfStudyHours: 3,
+        assessment: "",
+      },
+    ],
+  });
+
+  const week = parsed.weeks[0];
+
+  expect(week?.studentLearningActivities).toEqual([
+    {
+      id: "activity-1",
+      title: "Workflow Exercise",
+      description: "Students arrange the predictive analytics workflow stages.",
+      lloIds: ["LLO1.1"],
+    },
+    {
+      id: "activity-2",
+      title: "Classification Activity",
+      description:
+        "Students classify examples as descriptive or predictive analytics.",
+      lloIds: ["LLO1.1"],
+    },
+  ]);
+
+  expect(week?.activities).toEqual([]);
+});
+
+const parsed = WeeklyPlanSection.parse({
+  weeks: [
+    {
+      id: "week-1",
+      week: 1,
+      studentLearningActivities: [
+        {
+          id: "activity-1",
+          title: "Dataset Exercise",
+        },
+      ],
+    },
+  ],
+});
+expect(parsed.weeks[0]?.studentLearningActivities).toEqual([
+  {
+    id: "activity-1",
+    title: "Dataset Exercise",
+    description: "",
+    lloIds: [],
+  },
+]);
+expect(() =>
+  WeeklyPlanSection.parse({
+    weeks: [
+      {
+        id: "week-1",
+        week: 1,
+        studentLearningActivities: [
+          {
+            id: "",
+            title: "",
+          },
+        ],
+      },
+    ],
+  }),
+).toThrow();
+
 test("WeeklyPlanSection rejects hours out of range and non-positive weeks", () => {
-  expect(WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 1, lectureHours: 201 }] }).success).toBe(false);
-  expect(WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 0 }] }).success).toBe(false);
+  expect(
+    WeeklyPlanSection.safeParse({
+      weeks: [{ id: "w1", week: 1, lectureHours: 201 }],
+    }).success,
+  ).toBe(false);
+  expect(
+    WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 0 }] }).success,
+  ).toBe(false);
 });
 
 test("weekContactHours sums L+T+P+O, treating nulls as 0", () => {
-  expect(weekContactHours({ lectureHours: 2, tutorialHours: 1, practiceHours: 1, otherHours: 0 })).toBe(4);
+  expect(
+    weekContactHours({
+      lectureHours: 2,
+      tutorialHours: 1,
+      practiceHours: 1,
+      otherHours: 0,
+    }),
+  ).toBe(4);
   expect(weekContactHours({ lectureHours: 2 })).toBe(2);
   expect(weekContactHours({})).toBe(0);
 });
 
 test("weekSlt sums contact (L+T+P+O) + self-study, treating nulls as 0", () => {
-  expect(weekSlt({ lectureHours: 2, tutorialHours: 1, selfStudyHours: 3 })).toBe(6);
+  expect(
+    weekSlt({ lectureHours: 2, tutorialHours: 1, selfStudyHours: 3 }),
+  ).toBe(6);
   expect(weekSlt({ lectureHours: 2, selfStudyHours: null })).toBe(2);
   expect(weekSlt({})).toBe(0);
 });
@@ -134,8 +258,21 @@ test("weekSlt sums contact (L+T+P+O) + self-study, treating nulls as 0", () => {
 test("weeklyPlanTotals sums each hour category and the derived SLT over all weeks", () => {
   const section = WeeklyPlanSection.parse({
     weeks: [
-      { id: "1", week: 1, lectureHours: 2, tutorialHours: 1, selfStudyHours: 3 },
-      { id: "2", week: 2, lectureHours: 1, practiceHours: 1, otherHours: 1, selfStudyHours: 6 },
+      {
+        id: "1",
+        week: 1,
+        lectureHours: 2,
+        tutorialHours: 1,
+        selfStudyHours: 3,
+      },
+      {
+        id: "2",
+        week: 2,
+        lectureHours: 1,
+        practiceHours: 1,
+        otherHours: 1,
+        selfStudyHours: 6,
+      },
     ],
   });
   expect(weeklyPlanTotals(section)).toEqual({
@@ -158,7 +295,15 @@ test("AssessmentPlanSection defaults items to []", () => {
 
 test("AssessmentItem coerces weight, defaults arrays/optionals, and requires a name", () => {
   const parsed = AssessmentPlanSection.parse({
-    items: [{ id: "a1", name: "Assignment 1", type: "Assignment", weight: "10", cloCodes: ["CLO1"] }],
+    items: [
+      {
+        id: "a1",
+        name: "Assignment 1",
+        type: "Assignment",
+        weight: "10",
+        cloCodes: ["CLO1"],
+      },
+    ],
   });
   const a = parsed.items[0]!;
   expect(a.weight).toBe(10);
@@ -168,8 +313,16 @@ test("AssessmentItem coerces weight, defaults arrays/optionals, and requires a n
   expect(a.mappedPlos).toEqual([]);
   expect(a.dueWeek).toBeUndefined();
 
-  expect(AssessmentPlanSection.safeParse({ items: [{ id: "a1", name: "", type: "Quiz" }] }).success).toBe(false);
-  expect(AssessmentPlanSection.safeParse({ items: [{ id: "a1", name: "X", type: "Nope" }] }).success).toBe(false);
+  expect(
+    AssessmentPlanSection.safeParse({
+      items: [{ id: "a1", name: "", type: "Quiz" }],
+    }).success,
+  ).toBe(false);
+  expect(
+    AssessmentPlanSection.safeParse({
+      items: [{ id: "a1", name: "X", type: "Nope" }],
+    }).success,
+  ).toBe(false);
 });
 
 test("assessmentPlanTotalWeight sums only active assessments", () => {
@@ -198,9 +351,26 @@ test("MappingSection defaults cells to [] and coerces string strengths", () => {
 });
 
 test("MappingCell rejects strengths out of range and unknown kinds", () => {
-  expect(MappingCell.safeParse({ cloCode: "CLO1", kind: "week", ref: "w1", strength: 4 }).success).toBe(false);
-  expect(MappingCell.safeParse({ cloCode: "CLO1", kind: "exam", ref: "w1", strength: 2 }).success).toBe(false);
-  expect(MappingCell.safeParse({ cloCode: "", kind: "week", ref: "w1", strength: 2 }).success).toBe(false);
+  expect(
+    MappingCell.safeParse({
+      cloCode: "CLO1",
+      kind: "week",
+      ref: "w1",
+      strength: 4,
+    }).success,
+  ).toBe(false);
+  expect(
+    MappingCell.safeParse({
+      cloCode: "CLO1",
+      kind: "exam",
+      ref: "w1",
+      strength: 2,
+    }).success,
+  ).toBe(false);
+  expect(
+    MappingCell.safeParse({ cloCode: "", kind: "week", ref: "w1", strength: 2 })
+      .success,
+  ).toBe(false);
 });
 
 test("alignmentBand rounds to the nearest level and returns null when unrated", () => {

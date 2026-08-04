@@ -33,18 +33,90 @@ export interface SpecSectionMeta {
 
 /** Ordered wizard steps. Part 1 is a read-only programme reference; Part 2 is §1–25. */
 export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
-  { id: "programme", title: "Programme", ref: "Part 1", part: "Part 1", state: "ready" },
-  { id: "courseInfo", title: "Course Information", ref: "§1–13", part: "Part 2", state: "ready" },
-  { id: "clos", title: "Course Learning Outcomes", ref: "§14", part: "Part 2", state: "ready" },
-  { id: "slt", title: "Weekly Plan", ref: "§18", part: "Part 2", state: "ready" },
-  { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "ready" },
-  { id: "mapping", title: "CLO Alignment Mapping", ref: "§14–18", part: "Part 2", state: "ready" },
-  { id: "resources", title: "Required Resources", ref: "§19", part: "Part 2", state: "soon" },
-  { id: "references", title: "References / Textbooks", ref: "§20", part: "Part 2", state: "soon" },
-  { id: "responsibility", title: "Student Responsibility", ref: "§21", part: "Part 2", state: "soon" },
-  { id: "rubric", title: "Rubric & Rating Scale", ref: "§22", part: "Part 2", state: "soon" },
-  { id: "policy", title: "Course Policy", ref: "§23", part: "Part 2", state: "soon" },
-  { id: "ratingScale", title: "Rating Scale", ref: "§24", part: "Part 2", state: "soon" },
+  {
+    id: "programme",
+    title: "Programme",
+    ref: "Part 1",
+    part: "Part 1",
+    state: "ready",
+  },
+  {
+    id: "courseInfo",
+    title: "Course Information",
+    ref: "§1–13",
+    part: "Part 2",
+    state: "ready",
+  },
+  {
+    id: "clos",
+    title: "Course Learning Outcomes",
+    ref: "§14",
+    part: "Part 2",
+    state: "ready",
+  },
+  {
+    id: "slt",
+    title: "Weekly Plan",
+    ref: "§18",
+    part: "Part 2",
+    state: "ready",
+  },
+  {
+    id: "assessmentPlan",
+    title: "Course Assessment Plan",
+    ref: "§17",
+    part: "Part 2",
+    state: "ready",
+  },
+  {
+    id: "mapping",
+    title: "CLO Alignment Mapping",
+    ref: "§14–18",
+    part: "Part 2",
+    state: "ready",
+  },
+  {
+    id: "resources",
+    title: "Required Resources",
+    ref: "§19",
+    part: "Part 2",
+    state: "soon",
+  },
+  {
+    id: "references",
+    title: "References / Textbooks",
+    ref: "§20",
+    part: "Part 2",
+    state: "soon",
+  },
+  {
+    id: "responsibility",
+    title: "Student Responsibility",
+    ref: "§21",
+    part: "Part 2",
+    state: "soon",
+  },
+  {
+    id: "rubric",
+    title: "Rubric & Rating Scale",
+    ref: "§22",
+    part: "Part 2",
+    state: "soon",
+  },
+  {
+    id: "policy",
+    title: "Course Policy",
+    ref: "§23",
+    part: "Part 2",
+    state: "soon",
+  },
+  {
+    id: "ratingScale",
+    title: "Rating Scale",
+    ref: "§24",
+    part: "Part 2",
+    state: "soon",
+  },
   { id: "date", title: "Date", ref: "§25", part: "Part 2", state: "soon" },
 ] as const;
 
@@ -145,7 +217,11 @@ export const PSYCHOMOTOR_LEVELS: readonly LevelGuideEntry[] = [
 ] as const;
 
 /** §14 focus of a CLO on its mapped PLOs relative to total SLT. */
-export const FOCUS_LEVELS: readonly { code: string; name: string; hint: string }[] = [
+export const FOCUS_LEVELS: readonly {
+  code: string;
+  name: string;
+  hint: string;
+}[] = [
   { code: "F", name: "Fully", hint: "more than 50% of total SLT" },
   { code: "M", name: "Moderate", hint: "31%–50% of total SLT" },
   { code: "P", name: "Partial", hint: "less than 30% of total SLT" },
@@ -217,7 +293,12 @@ export const SUBMISSION_METHODS: readonly string[] = [
 ] as const;
 
 /** §24 letter-grade rating scale (fixed programme standard). */
-export const LETTER_GRADES: readonly { grade: string; point: string; score: string; label: string }[] = [
+export const LETTER_GRADES: readonly {
+  grade: string;
+  point: string;
+  score: string;
+  label: string;
+}[] = [
   { grade: "A", point: "4.00", score: "85–100", label: "Excellent" },
   { grade: "B+", point: "3.50", score: "80–84", label: "Very Good" },
   { grade: "B", point: "3.00", score: "75–79", label: "Good" },
@@ -230,19 +311,70 @@ export const LETTER_GRADES: readonly { grade: string; point: string; score: stri
 
 /** The ten programme learning outcomes (Part 1). Referenced by CLOs in §14. */
 export const PLOS: readonly { id: string; description: string }[] = [
-  { id: "PLO1", description: "Apply knowledge in data science and engineering to develop appropriate solutions for real-world problems." },
-  { id: "PLO2", description: "Analyze data-related problems using logical reasoning and systems thinking." },
-  { id: "PLO3", description: "Utilize data science tools and technologies to develop technical solutions for practical applications." },
-  { id: "PLO4", description: "Participate effectively in multicultural and multidisciplinary teams with intercultural competence and responsible citizenship." },
-  { id: "PLO5", description: "Demonstrate leadership, accountability, and lifelong learning in professional practice." },
-  { id: "PLO6", description: "Develop innovative and entrepreneurial data-driven solutions that support national development and cultural sustainability in Cambodia and the ASEAN region." },
-  { id: "PLO7", description: "Make ethical decisions that reflect professional responsibility and awareness of social, cultural and environmental impacts." },
-  { id: "PLO8", description: "Communicate ideas and findings clearly through oral, written, and visual form." },
-  { id: "PLO9", description: "Utilize digital technologies and platforms to support communication, collaboration, and data-driven work." },
-  { id: "PLO10", description: "Apply mathematical, logical, and statistical reasoning in data analysis and problem solving." },
+  {
+    id: "PLO1",
+    description:
+      "Apply knowledge in data science and engineering to develop appropriate solutions for real-world problems.",
+  },
+  {
+    id: "PLO2",
+    description:
+      "Analyze data-related problems using logical reasoning and systems thinking.",
+  },
+  {
+    id: "PLO3",
+    description:
+      "Utilize data science tools and technologies to develop technical solutions for practical applications.",
+  },
+  {
+    id: "PLO4",
+    description:
+      "Participate effectively in multicultural and multidisciplinary teams with intercultural competence and responsible citizenship.",
+  },
+  {
+    id: "PLO5",
+    description:
+      "Demonstrate leadership, accountability, and lifelong learning in professional practice.",
+  },
+  {
+    id: "PLO6",
+    description:
+      "Develop innovative and entrepreneurial data-driven solutions that support national development and cultural sustainability in Cambodia and the ASEAN region.",
+  },
+  {
+    id: "PLO7",
+    description:
+      "Make ethical decisions that reflect professional responsibility and awareness of social, cultural and environmental impacts.",
+  },
+  {
+    id: "PLO8",
+    description:
+      "Communicate ideas and findings clearly through oral, written, and visual form.",
+  },
+  {
+    id: "PLO9",
+    description:
+      "Utilize digital technologies and platforms to support communication, collaboration, and data-driven work.",
+  },
+  {
+    id: "PLO10",
+    description:
+      "Apply mathematical, logical, and statistical reasoning in data analysis and problem solving.",
+  },
 ] as const;
 
-export const PLO_IDS = ["PLO1", "PLO2", "PLO3", "PLO4", "PLO5", "PLO6", "PLO7", "PLO8", "PLO9", "PLO10"] as const;
+export const PLO_IDS = [
+  "PLO1",
+  "PLO2",
+  "PLO3",
+  "PLO4",
+  "PLO5",
+  "PLO6",
+  "PLO7",
+  "PLO8",
+  "PLO9",
+  "PLO10",
+] as const;
 export const PloId = z.enum(PLO_IDS);
 export type PloId = z.infer<typeof PloId>;
 
@@ -288,7 +420,11 @@ export const CourseInfoSection = z.object({
   // §6–9 — read live from the assigned lecturer's profile.
   instructorName: z.string().optional(),
   qualification: z.string().optional(),
-  email: z.string().email("A valid email is required").or(z.literal("")).optional(),
+  email: z
+    .string()
+    .email("A valid email is required")
+    .or(z.literal(""))
+    .optional(),
   telephone: z.string().optional(),
   // §10 — read live from the latest Offering; edited via the Offering entity.
   otherLecturers: z.string().optional(),
@@ -348,7 +484,10 @@ export const ClosSection = z.object({
 export type ClosSection = z.infer<typeof ClosSection>;
 
 /** A CLO's share of the course's total SLT, as a whole percent. `null` when not yet computable. */
-export function cloFocusPercent(sltHours: number | null | undefined, totalSlt: number | null | undefined): number | null {
+export function cloFocusPercent(
+  sltHours: number | null | undefined,
+  totalSlt: number | null | undefined,
+): number | null {
   if (!totalSlt || !sltHours) return null;
   return Math.round((sltHours / totalSlt) * 100);
 }
@@ -367,6 +506,21 @@ export function cloFocusCode(percent: number | null): FocusCode | null {
 const WeekHours = z.coerce.number().min(0).max(200);
 
 /**
+ * A structured student learning activity within a weekly plan.
+ *
+ * Unlike `activities`, which is retained for backward compatibility,
+ * this represents what students actually do and which LLOs the
+ * activity supports.
+ */
+export const StudentLearningActivity = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().default(""),
+  lloIds: z.array(z.string()).default([]),
+});
+
+export type StudentLearningActivity = z.infer<typeof StudentLearningActivity>;
+/**
  * One week of the course outline. `cloCodes` reference §14 CLOs by code; `activities`
  * are learning-activity labels (LEARNING_ACTIVITIES presets or custom); `lloItems` are
  * this lesson's Lesson Learning Outcomes, in display order. Contact time is captured
@@ -374,13 +528,23 @@ const WeekHours = z.coerce.number().min(0).max(200);
  * combined figure — see `weekContactHours`. Weekly SLT is derived — contact hours +
  * `selfStudyHours` — not stored.
  */
+
+export const LessonLearningOutcome = z.object({
+  id: z.string().min(1),
+  description: z.string().default(""),
+});
+
+export type LessonLearningOutcome = z.infer<typeof LessonLearningOutcome>;
+
 export const WeeklyPlanRow = z.object({
   id: z.string().min(1),
   week: z.coerce.number().int().min(1).max(52),
   topic: z.string().default(""),
   cloCodes: z.array(z.string()).default([]),
   lloItems: z.array(z.string()).default([]),
+  lessonLearningOutcomes: z.array(LessonLearningOutcome).default([]),
   activities: z.array(z.string()).default([]),
+  studentLearningActivities: z.array(StudentLearningActivity).default([]),
   lectureHours: WeekHours.nullable().default(null),
   tutorialHours: WeekHours.nullable().default(null),
   practiceHours: WeekHours.nullable().default(null),
@@ -402,7 +566,12 @@ export function weekContactHours(row: {
   practiceHours?: number | null;
   otherHours?: number | null;
 }): number {
-  return (row.lectureHours ?? 0) + (row.tutorialHours ?? 0) + (row.practiceHours ?? 0) + (row.otherHours ?? 0);
+  return (
+    (row.lectureHours ?? 0) +
+    (row.tutorialHours ?? 0) +
+    (row.practiceHours ?? 0) +
+    (row.otherHours ?? 0)
+  );
 }
 
 /** SLT for one week: Contact Hours (L+T+P+O) + Self-Study Hours. Nulls count as 0. */
@@ -428,7 +597,14 @@ export function weeklyPlanTotals(section: WeeklyPlanSection) {
       acc.slt += weekSlt(w);
       return acc;
     },
-    { lectureHours: 0, tutorialHours: 0, practiceHours: 0, otherHours: 0, selfStudyHours: 0, slt: 0 },
+    {
+      lectureHours: 0,
+      tutorialHours: 0,
+      practiceHours: 0,
+      otherHours: 0,
+      selfStudyHours: 0,
+      slt: 0,
+    },
   );
 }
 
@@ -483,7 +659,9 @@ export const AssessmentPlanSection = z.object({
 export type AssessmentPlanSection = z.infer<typeof AssessmentPlanSection>;
 
 /** Total weight (%) across active assessments — the figure the plan should sum to 100. */
-export function assessmentPlanTotalWeight(section: AssessmentPlanSection): number {
+export function assessmentPlanTotalWeight(
+  section: AssessmentPlanSection,
+): number {
   return section.items
     .filter((a) => a.status === "active")
     .reduce((sum, a) => sum + (a.weight ?? 0), 0);
@@ -532,7 +710,11 @@ export const MappingSection = z.object({
 export type MappingSection = z.infer<typeof MappingSection>;
 
 /** Stable key for a cell, used to look one up by CLO + component. */
-export function mappingCellKey(kind: MappingComponentKind, ref: string, cloCode: string): string {
+export function mappingCellKey(
+  kind: MappingComponentKind,
+  ref: string,
+  cloCode: string,
+): string {
   return `${kind}:${ref}:${cloCode}`;
 }
 
@@ -557,7 +739,9 @@ export function mappingOverallPercent(cells: readonly MappingCell[]): number {
 }
 
 /** Count of rated cells in each strength band (0–3). */
-export function mappingDistribution(cells: readonly MappingCell[]): Record<0 | 1 | 2 | 3, number> {
+export function mappingDistribution(
+  cells: readonly MappingCell[],
+): Record<0 | 1 | 2 | 3, number> {
   const dist: Record<0 | 1 | 2 | 3, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
   for (const c of cells) {
     const v = Math.max(0, Math.min(3, Math.round(c.strength))) as 0 | 1 | 2 | 3;
@@ -590,7 +774,9 @@ export function componentsMapped(
 }
 
 /** Zod schema for a given section id. Extend as later phases add sections. */
-export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
+export const SPEC_SECTION_SCHEMAS: Partial<
+  Record<SpecSectionId, z.ZodTypeAny>
+> = {
   courseInfo: CourseInfoInput,
   clos: ClosSection,
   slt: WeeklyPlanSection,
@@ -605,9 +791,8 @@ export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> 
  * implemented yet), so completion tracking (dashboard progress, the spec
  * page's completion summary) never counts work that can't be finished.
  */
-export const COMPLETABLE_SPEC_SECTIONS: readonly SpecSectionMeta[] = SPEC_SECTIONS.filter(
-  (s) => s.id in SPEC_SECTION_SCHEMAS,
-);
+export const COMPLETABLE_SPEC_SECTIONS: readonly SpecSectionMeta[] =
+  SPEC_SECTIONS.filter((s) => s.id in SPEC_SECTION_SCHEMAS);
 
 /* ------------------------------------------------------------- spec envelope */
 

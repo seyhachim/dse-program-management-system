@@ -1,4 +1,8 @@
-import type { WeeklyPlanSection } from "@dse-pms/shared-types";
+import type {
+  LessonLearningOutcome,
+  StudentLearningActivity,
+  WeeklyPlanSection,
+} from "@dse-pms/shared-types";
 
 /**
  * The Weekly Plan (§18) held as a form model for input binding, converted on save
@@ -10,7 +14,9 @@ export type WeekForm = {
   topic: string;
   cloCodes: string[];
   lloItems: string[];
+  lessonLearningOutcomes: LessonLearningOutcome[];
   activities: string[];
+  studentLearningActivities: StudentLearningActivity[];
   lectureHours: string;
   tutorialHours: string;
   practiceHours: string;
@@ -28,6 +34,58 @@ const str = (v: unknown) => (v == null ? "" : String(v));
 const strArray = (v: unknown) =>
   Array.isArray(v) ? v.map((x) => String(x)) : [];
 
+const lessonLearningOutcomeArray = (
+  value: unknown,
+): LessonLearningOutcome[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return [];
+    }
+
+    const item = raw as Record<string, unknown>;
+
+    const id = str(item.id);
+    const description = str(item.description);
+
+    if (!id) return [];
+
+    return [
+      {
+        id,
+        description,
+      },
+    ];
+  });
+};
+const studentLearningActivityArray = (
+  value: unknown,
+): StudentLearningActivity[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return [];
+    }
+
+    const item = raw as Record<string, unknown>;
+
+    const id = str(item.id);
+    const title = str(item.title).trim();
+
+    if (!id || !title) return [];
+
+    return [
+      {
+        id,
+        title,
+        description: str(item.description),
+        lloIds: strArray(item.lloIds),
+      },
+    ];
+  });
+};
 /** A fresh week, numbered one past the current highest week. */
 export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
   const nextNo =
@@ -38,7 +96,9 @@ export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
     topic: "",
     cloCodes: [],
     lloItems: [],
+    lessonLearningOutcomes: [],
     activities: [],
+    studentLearningActivities: [],
     lectureHours: "",
     tutorialHours: "",
     practiceHours: "",
@@ -70,13 +130,61 @@ export function toWeeklyPlanForm(data: unknown): WeeklyPlanForm {
         !hasHourBreakdown && d.contactHours != null
           ? String(d.contactHours)
           : "";
+
+      const legacyLloItems = strArray(d.lloItems);
+
+      const storedLessonLearningOutcomes = lessonLearningOutcomeArray(
+        d.lessonLearningOutcomes,
+      );
+
+      const lessonLearningOutcomes =
+        storedLessonLearningOutcomes.length > 0
+          ? storedLessonLearningOutcomes
+          : legacyLloItems
+              .map((description) => description.trim())
+              .filter(Boolean)
+              .map((description) => ({
+                id: uuid(),
+                description,
+              }));
+      const rawStudentLearningActivities = studentLearningActivityArray(
+        d.studentLearningActivities,
+      );
+
+      const studentLearningActivities = rawStudentLearningActivities.map(
+        (activity) => ({
+          ...activity,
+
+          lloIds: activity.lloIds
+            .map((lloId) => {
+              // Already a stable ID — keep it.
+              if (lessonLearningOutcomes.some((llo) => llo.id === lloId)) {
+                return lloId;
+              }
+
+              // Legacy positional reference: "LLO1", "LLO2", ...
+              const match = /^LLO(\d+)$/i.exec(lloId);
+
+              if (!match) {
+                return null;
+              }
+
+              const index = Number(match[1]) - 1;
+
+              return lessonLearningOutcomes[index]?.id ?? null;
+            })
+            .filter((id): id is string => id !== null),
+        }),
+      );
       return {
         id: str(d.id) || uuid(),
         week: str(d.week),
         topic: str(d.topic),
         cloCodes: strArray(d.cloCodes),
-        lloItems: strArray(d.lloItems),
+        lloItems: legacyLloItems,
+        lessonLearningOutcomes,
         activities: strArray(d.activities),
+        studentLearningActivities,
         lectureHours:
           d.lectureHours == null ? legacyContactHours : String(d.lectureHours),
         tutorialHours: d.tutorialHours == null ? "" : String(d.tutorialHours),
@@ -93,20 +201,57 @@ export function toWeeklyPlanForm(data: unknown): WeeklyPlanForm {
 /** Convert the form model into the WeeklyPlanSection payload the API validates. */
 export function toWeeklyPlanPayload(form: WeeklyPlanForm): WeeklyPlanSection {
   return {
-    weeks: form.map((w) => ({
-      id: w.id,
-      week: Number(w.week) || 1,
-      topic: w.topic.trim(),
-      cloCodes: w.cloCodes,
-      lloItems: w.lloItems.map((l) => l.trim()).filter(Boolean),
-      activities: w.activities,
-      lectureHours: w.lectureHours === "" ? null : Number(w.lectureHours),
-      tutorialHours: w.tutorialHours === "" ? null : Number(w.tutorialHours),
-      practiceHours: w.practiceHours === "" ? null : Number(w.practiceHours),
-      otherHours: w.otherHours === "" ? null : Number(w.otherHours),
-      selfStudyHours: w.selfStudyHours === "" ? null : Number(w.selfStudyHours),
-      assessment: w.assessment.trim(),
-    })),
+    weeks: form.map((w) => {
+      const lessonLearningOutcomes = w.lessonLearningOutcomes
+        .map((llo) => ({
+          id: llo.id,
+          description: llo.description.trim(),
+        }))
+        .filter((llo) => llo.description.length > 0);
+
+      const validLloIds = new Set(lessonLearningOutcomes.map((llo) => llo.id));
+
+      return {
+        id: w.id,
+        week: Number(w.week) || 1,
+        topic: w.topic.trim(),
+        cloCodes: w.cloCodes,
+
+        // New source of truth with stable IDs.
+        lessonLearningOutcomes,
+
+        // Legacy representation kept synchronized for old consumers.
+        lloItems: lessonLearningOutcomes.map((llo) => llo.description),
+
+        // Legacy activities retained for backward compatibility.
+        activities: w.activities,
+
+        // Structured activities reference stable LLO IDs.
+        studentLearningActivities: w.studentLearningActivities.map(
+          (activity) => ({
+            id: activity.id,
+            title: activity.title.trim(),
+            description: activity.description.trim(),
+
+            // Never persist references to an LLO that no longer exists.
+            lloIds: activity.lloIds.filter((id) => validLloIds.has(id)),
+          }),
+        ),
+
+        lectureHours: w.lectureHours === "" ? null : Number(w.lectureHours),
+
+        tutorialHours: w.tutorialHours === "" ? null : Number(w.tutorialHours),
+
+        practiceHours: w.practiceHours === "" ? null : Number(w.practiceHours),
+
+        otherHours: w.otherHours === "" ? null : Number(w.otherHours),
+
+        selfStudyHours:
+          w.selfStudyHours === "" ? null : Number(w.selfStudyHours),
+
+        assessment: w.assessment.trim(),
+      };
+    }),
   } as WeeklyPlanSection;
 }
 
@@ -241,7 +386,10 @@ export function weeklyPlanSummary(form: WeeklyPlanForm) {
   const isProject = (w: WeekForm) =>
     /project/i.test(w.topic) ||
     /project/i.test(w.assessment) ||
-    w.activities.some((a) => /project/i.test(a));
+    w.activities.some((a) => /project/i.test(a)) ||
+    w.studentLearningActivities.some(
+      (a) => /project/i.test(a.title) || /project/i.test(a.description),
+    );
   const projectWeeks = form
     .filter(isProject)
     .map((w) => Number(w.week))
