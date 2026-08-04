@@ -7,16 +7,18 @@ import {
   type SpecSectionId,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
+import { PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
 
 /**
- * A lecturer may only see/edit courses they're assigned to; admins may access any.
+ * A lecturer may only see/edit courses they're assigned to; programme-wide
+ * roles (admin and friends — see `PROGRAMME_WIDE_ROLES`) may access any.
  * Returns true when the caller may proceed; otherwise writes the 403/404 response
  * and returns false. `requireAuth` has already run, so `req.user` is set.
  */
 async function ensureCourseAccess(req: Request, res: Response, courseId: string): Promise<boolean> {
-  if (req.user!.roles.includes("admin")) return true;
+  if (req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r))) return true;
   const course = await courseService.getById(courseId);
   if (!course) {
     res.status(404).json({ error: "Course not found" });
@@ -40,14 +42,14 @@ export function createCourseRouter(): Router {
       res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
       return;
     }
-    // Non-admins only ever see the courses assigned to them.
-    const ownerScope = req.user!.roles.includes("admin") ? undefined : req.user!.id;
+    // Lecturers/students only ever see the courses assigned to them.
+    const ownerScope = req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r)) ? undefined : req.user!.id;
     res.json(await courseService.list(parsed.data, ownerScope));
   });
 
   // Static route registered before "/:id" so "spec-progress" isn't swallowed as a course id.
   router.get("/spec-progress", requirePermission("courses:read"), async (req, res) => {
-    const ownerScope = req.user!.roles.includes("admin") ? undefined : req.user!.id;
+    const ownerScope = req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r)) ? undefined : req.user!.id;
     res.json(await courseService.listSpecProgress(ownerScope));
   });
 

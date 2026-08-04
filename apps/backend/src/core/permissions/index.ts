@@ -5,9 +5,11 @@ import { prisma } from "../db/prisma.ts";
 /**
  * Kept only as a rollback reference for issue #67's cutover — no longer read.
  * The enforced source of truth is now the RolePermission cache below, built
- * from the DB rows this map used to mirror.
+ * from the DB rows this map used to mirror. Pinned to the three roles that
+ * existed pre-#67/pre-#101 (not the current `Role` type) since it documents
+ * that frozen moment, not today's role set.
  */
-export const ROLE_PERMISSIONS_LEGACY: Record<Role, string[]> = {
+export const ROLE_PERMISSIONS_LEGACY: Record<"admin" | "lecturer" | "student", string[]> = {
   admin: [
     "accounts:create",
     "students:read",
