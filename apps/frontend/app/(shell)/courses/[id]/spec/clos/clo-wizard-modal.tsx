@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@dse-pms/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@dse-pms/ui";
 import type { Method } from "@dse-pms/shared-types";
 import {
   CLO_WIZARD_STEPS,
@@ -60,7 +66,9 @@ export function CloWizardModal({
 
   useEffect(() => {
     if (!open) return;
-    const base = cloCode ? (clos.find((c) => c.code === cloCode) ?? emptyClo()) : emptyClo();
+    const base = cloCode
+      ? (clos.find((c) => c.code === cloCode) ?? emptyClo())
+      : emptyClo();
     const stored = loadCloDraft(courseId, cloCode);
     setDraft(stored ?? base);
     setStep(1);
@@ -72,12 +80,18 @@ export function CloWizardModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, cloCode, courseId]);
 
-  const set = (patch: Partial<CloForm>) => setDraft((d) => (d ? { ...d, ...patch } : d));
+  const set = (patch: Partial<CloForm>) =>
+    setDraft((d) => (d ? { ...d, ...patch } : d));
   const toggleMappedPlo = (id: string) =>
     setDraft((d) => {
       if (!d) return d;
       const has = d.mappedPlos.includes(id);
-      return { ...d, mappedPlos: has ? d.mappedPlos.filter((x) => x !== id) : [...d.mappedPlos, id] };
+      return {
+        ...d,
+        mappedPlos: has
+          ? d.mappedPlos.filter((x) => x !== id)
+          : [...d.mappedPlos, id],
+      };
     });
 
   const code = cloCode ?? `CLO${clos.length + 1}`;
@@ -132,7 +146,9 @@ export function CloWizardModal({
     setSaving(true);
     setError(null);
     try {
-      const next = cloCode ? clos.map((c) => (c.code === cloCode ? draft : c)) : [...clos, draft];
+      const next = cloCode
+        ? clos.map((c) => (c.code === cloCode ? draft : c))
+        : [...clos, draft];
       const ok = await onPersist(withCodes(next));
       if (!ok) {
         setError("Failed to save this CLO");
@@ -185,7 +201,9 @@ export function CloWizardModal({
                       >
                         <span
                           className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] ${
-                            isActive ? "border-accent-foreground" : "border-current"
+                            isActive
+                              ? "border-accent-foreground"
+                              : "border-current"
                           }`}
                         >
                           {s.id}
@@ -203,17 +221,31 @@ export function CloWizardModal({
 
             <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[1fr_280px]">
               <div className="min-w-0">
-                {step === 1 ? <CloStepInfo draft={draft} code={code} set={set} touched={touched} /> : null}
-                {step === 2 ? <CloStepPlos draft={draft} toggle={toggleMappedPlo} /> : null}
+                {step === 1 ? (
+                  <CloStepInfo
+                    draft={draft}
+                    code={code}
+                    set={set}
+                    touched={touched}
+                  />
+                ) : null}
+                {step === 2 ? (
+                  <CloStepPlos draft={draft} toggle={toggleMappedPlo} />
+                ) : null}
                 {step === 3 ? (
                   <CloStepLearning
                     draft={draft}
                     set={set}
                     teachingMethods={teachingMethods}
-                    courseTotalSlt={courseTotalSlt}
                   />
                 ) : null}
-                {step === 4 ? <CloStepAssessment draft={draft} set={set} assessmentMethods={assessmentMethods} /> : null}
+                {step === 4 ? (
+                  <CloStepAssessment
+                    draft={draft}
+                    set={set}
+                    assessmentMethods={assessmentMethods}
+                  />
+                ) : null}
                 {step === 5 ? (
                   <CloStepReview
                     draft={draft}
@@ -225,7 +257,11 @@ export function CloWizardModal({
                 ) : null}
               </div>
               <div className="lg:border-l lg:border-border lg:pl-6">
-                <CloWizardSidebar draft={draft} code={code} onInsertVerb={(next) => set({ description: next })} />
+                <CloWizardSidebar
+                  draft={draft}
+                  code={code}
+                  onInsertVerb={(next) => set({ description: next })}
+                />
               </div>
             </div>
 
@@ -250,7 +286,10 @@ export function CloWizardModal({
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                >
                   Cancel
                 </Button>
                 {step > 1 ? (
