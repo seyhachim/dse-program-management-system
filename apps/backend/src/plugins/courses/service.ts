@@ -100,8 +100,7 @@ export const courseService = {
   /**
    * Per-course count of completable spec sections marked complete — backs the
    * programme dashboard's Course Specification Progress view. Scoped the same
-   * way as `list()` for non-admin callers. Selects only each section's
-   * key/status, not its `content`, since that's all this needs.
+   * way as `list()` for non-admin callers. Selects only each section's key/status.
    */
   async listSpecProgress(lecturerScope?: string): Promise<CourseSpecProgress[]> {
     const scopeFilter = lecturerScope ? await ownerScopeFilter(lecturerScope) : {};
@@ -219,21 +218,21 @@ export const courseService = {
       if (sectionId === "assessmentPlan") await syncAssessmentPlan(tx, spec.id, (values as AssessmentPlanSection).items);
       if (sectionId === "mapping") await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
 
-      // `content` has no writer left besides this line, and this line only ever
-      // writes `{}` — enforced, not just documented, so a future section added to
-      // SPEC_SECTION_SCHEMAS without a normalized table (and a NORMALIZED_SECTIONS
-      // entry) fails loudly here instead of silently reintroducing a jsonb writer.
+      // Every saveable section must have a normalized table to write into — enforced,
+      // not just documented, so a future section added to SPEC_SECTION_SCHEMAS without
+      // one (and a NORMALIZED_SECTIONS entry) fails loudly here instead of silently
+      // having nowhere to persist its payload (there's no `content` column to fall
+      // back to since issue #103 phase C dropped it).
       if (!NORMALIZED_SECTIONS.has(sectionId)) {
         throw new Error(
           `Section "${sectionId}" has no normalized storage — add it to NORMALIZED_SECTIONS ` +
-            `and a sync function/reassembleSpec case instead of writing CourseSpecSection.content directly.`,
+            `and a sync function/reassembleSpec case for it.`,
         );
       }
-      const content = {};
       await tx.courseSpecSection.upsert({
         where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey: sectionId } },
-        create: { courseSpecId: spec.id, sectionKey: sectionId, content, status: "Complete" },
-        update: { content, status: "Complete" },
+        create: { courseSpecId: spec.id, sectionKey: sectionId, status: "Complete" },
+        update: { status: "Complete" },
       });
     });
 
@@ -245,10 +244,10 @@ export const courseService = {
 } satisfies CoursesServiceContract & Record<string, unknown>;
 
 /**
- * Sections whose payload lives entirely in normalized tables rather than
- * `CourseSpecSection.content` (issue #103 finished what #81 started for `clos`) —
- * their `content` is always written as `{}`, and `reassembleSpec` below rebuilds
- * `data[key]` from the normalized rows instead of reading it back.
+ * Every saveable section — its payload lives entirely in its own normalized table
+ * (issue #103 finished what #81 started for `clos`), never in `CourseSpecSection`
+ * itself, which now exists only to track per-section save status. `reassembleSpec`
+ * below rebuilds `data[key]` from the normalized rows.
  */
 const NORMALIZED_SECTIONS = new Set<SpecSectionId>(["clos", "courseInfo", "slt", "assessmentPlan", "mapping"]);
 
@@ -281,7 +280,6 @@ function reassembleSpec(spec: SpecRow | null): { data: Record<string, unknown>; 
 
   for (const section of spec.sections) {
     status[section.sectionKey] = section.status === "Complete" ? "complete" : "draft";
-    if (!NORMALIZED_SECTIONS.has(section.sectionKey as SpecSectionId)) data[section.sectionKey] = section.content;
   }
   const hasSection = (key: SpecSectionId) => spec.sections.some((s) => s.sectionKey === key);
 
