@@ -1,5 +1,16 @@
 import { expect, test } from "bun:test";
-import { CreateAccountInput } from "./auth.ts";
+import { CreateAccountInput, Role } from "./auth.ts";
+
+test("Role supports all six roles from issue #101", () => {
+  expect(Role.options).toEqual([
+    "admin",
+    "program_coordinator",
+    "program_secretary",
+    "lecturer",
+    "qa_reviewer",
+    "student",
+  ]);
+});
 
 test("CreateAccountInput defaults role to lecturer", () => {
   const parsed = CreateAccountInput.parse({ name: "Ada", email: "ada@dse.dev" });

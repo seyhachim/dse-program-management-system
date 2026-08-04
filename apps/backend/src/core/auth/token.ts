@@ -11,7 +11,18 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
  * resolved from our own `User` table, not trusted from a token claim.
  */
 
-export type Role = "admin" | "lecturer" | "student";
+export type Role = "admin" | "program_coordinator" | "program_secretary" | "lecturer" | "qa_reviewer" | "student";
+
+/**
+ * Roles whose access is programme-wide rather than scoped to owned
+ * courses/offerings — today that's every role except `lecturer` and
+ * `student`. There's exactly one programme in the system right now, so
+ * "programme-wide" and "system-wide" coincide and this list can just mirror
+ * `admin`'s bypass everywhere ownership is checked (`ensureCourseAccess`,
+ * `courses/router.ts`'s `ownerScope`). Once a `Programme` model exists this
+ * becomes a real per-programme membership lookup instead of a flat allowlist.
+ */
+export const PROGRAMME_WIDE_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary", "qa_reviewer"];
 
 export interface AuthUser {
   id: string;
