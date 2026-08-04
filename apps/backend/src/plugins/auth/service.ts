@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CreateAccountInput } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { permissionsForRoles } from "../../core/permissions/index.ts";
+import type { Role } from "../../core/auth/token.ts";
 
 /**
  * Auth service: admin-only account provisioning. Creates a Supabase auth
@@ -52,13 +54,14 @@ export const authService = {
     // Every creation path writes a UserRoleAssignment row, so this is always
     // non-empty in practice (the legacy single-role column it used to fall
     // back to was dropped in issue #77 phase C).
-    const roles = user.roleAssignments.map((a) => a.role.slug);
+    const roles = user.roleAssignments.map((a) => a.role.slug) as Role[];
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: roles[0],
       roles,
+      permissions: await permissionsForRoles(roles),
     };
   },
 

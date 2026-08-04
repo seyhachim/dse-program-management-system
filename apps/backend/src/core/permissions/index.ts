@@ -78,6 +78,22 @@ export async function roleHasPermission(roles: Role[], permission: string): Prom
 }
 
 /**
+ * The union of every permission string granted by any of `roles` — same union
+ * semantics as `roleHasPermission`, but returning the whole set instead of
+ * checking one string. Backs `GET /api/auth/me`'s `permissions` field so the
+ * frontend can gate actions against the same source of truth this cache
+ * enforces, instead of duplicating role-name checks.
+ */
+export async function permissionsForRoles(roles: Role[]): Promise<string[]> {
+  const cache = await loadPermissionCache();
+  const union = new Set<string>();
+  for (const role of roles) {
+    for (const permission of cache[role] ?? []) union.add(permission);
+  }
+  return [...union];
+}
+
+/**
  * Guard factory: `requirePermission("students:write")`. Assumes `requireAuth`
  * ran first (so `req.user` is set); returns 403 when the role lacks the permission.
  */
