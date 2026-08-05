@@ -112,6 +112,19 @@ export function MyCoursesClient() {
     [offerings],
   );
 
+  // base-ui's <Select.Value> renders the raw `value` unless the Root gets an
+  // `items` map (value -> label) — without it the trigger shows the ALL
+  // sentinel literally instead of "All".
+  const termItems: Record<string, string> = { [ALL]: "All", ...Object.fromEntries(terms.map((t) => [t, t])) };
+  const semesterItems: Record<string, string> = {
+    [ALL]: "All",
+    ...Object.fromEntries(SEMESTERS.map((s) => [s, semesterLabel(s)])),
+  };
+  const studyYearItems: Record<string, string> = {
+    [ALL]: "All",
+    ...Object.fromEntries(studyYears.map((y) => [String(y), `Year ${y}`])),
+  };
+
   const filtered = rows.filter((r) => {
     if (term !== ALL && r.offering.term !== term) return false;
     if (semester !== ALL && r.offering.semester !== semester) return false;
@@ -190,7 +203,7 @@ export function MyCoursesClient() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Academic Year">
-            <Select value={term} onValueChange={(v) => setTerm(v ?? ALL)}>
+            <Select items={termItems} value={term} onValueChange={(v) => setTerm(v ?? ALL)}>
               <SelectTrigger className="w-36">
                 <SelectValue />
               </SelectTrigger>
@@ -205,7 +218,11 @@ export function MyCoursesClient() {
             </Select>
           </Field>
           <Field label="Semester">
-            <Select value={semester} onValueChange={(v) => setSemester((v ?? ALL) as Semester | typeof ALL)}>
+            <Select
+              items={semesterItems}
+              value={semester}
+              onValueChange={(v) => setSemester((v ?? ALL) as Semester | typeof ALL)}
+            >
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -220,7 +237,7 @@ export function MyCoursesClient() {
             </Select>
           </Field>
           <Field label="Study Year">
-            <Select value={studyYear} onValueChange={(v) => setStudyYear(v ?? ALL)}>
+            <Select items={studyYearItems} value={studyYear} onValueChange={(v) => setStudyYear(v ?? ALL)}>
               <SelectTrigger className="w-28">
                 <SelectValue />
               </SelectTrigger>
