@@ -7,6 +7,10 @@ export interface CompletionRingProps {
   strokeWidth?: number;
   label?: string;
   className?: string;
+  /** Indicator stroke color — any valid CSS color, defaults to the "live" status green. */
+  color?: string;
+  /** Show the label line below the percentage — off by default for compact (e.g. table-cell) rings. */
+  showLabel?: boolean;
 }
 
 /** Circular completion indicator (SVG donut) — used by Course Completeness cards. */
@@ -16,6 +20,8 @@ export function CompletionRing({
   strokeWidth = 14,
   label = "Complete",
   className,
+  color = "var(--status-live)",
+  showLabel = true,
 }: CompletionRingProps) {
   const clamped = Math.max(0, Math.min(100, value));
   const radius = (size - strokeWidth) / 2;
@@ -42,7 +48,7 @@ export function CompletionRing({
           cy={center}
           r={radius}
           fill="none"
-          stroke="var(--status-live)"
+          stroke={color}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -51,8 +57,13 @@ export function CompletionRing({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold text-foreground">{clamped}%</span>
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span
+          className="text-3xl font-bold text-foreground"
+          style={size < 100 ? { fontSize: Math.max(11, size * 0.22) } : undefined}
+        >
+          {clamped}%
+        </span>
+        {showLabel ? <span className="text-xs text-muted-foreground">{label}</span> : null}
       </div>
     </div>
   );

@@ -143,7 +143,7 @@ export function DataTable<T>({
                             key={action.key}
                             onClick={() => action.onClick(row)}
                             className={cn(
-                              "rounded-md px-2 py-1 text-xs font-medium hover:bg-muted",
+                              "rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium hover:bg-muted",
                               action.tone === "danger" ? "text-status-live" : "text-foreground",
                             )}
                           >

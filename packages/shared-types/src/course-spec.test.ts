@@ -19,6 +19,10 @@ import {
   cloAlignmentAverages,
   componentsMapped,
   COMPLETABLE_SPEC_SECTIONS,
+  type CourseSpecProgress,
+  specAttention,
+  specCompletionLabel,
+  specCompletionPercent,
 } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
@@ -254,4 +258,38 @@ test("COMPLETABLE_SPEC_SECTIONS is the save-able sections, in SPEC_SECTIONS orde
     "assessmentPlan",
     "mapping",
   ]);
+});
+
+/* -------------------------------------------- lecturer "My Courses" (issue #104) */
+
+function progress(completed: number, total: number, incompleteSections: CourseSpecProgress["incompleteSections"] = []): CourseSpecProgress {
+  return { courseId: "c1", code: "CS101", title: "Test Course", completed, total, incompleteSections };
+}
+
+test("specCompletionPercent rounds completed/total, and is 0 when total is 0", () => {
+  expect(specCompletionPercent(progress(4, 5))).toBe(80);
+  expect(specCompletionPercent(progress(0, 5))).toBe(0);
+  expect(specCompletionPercent(progress(5, 5))).toBe(100);
+  expect(specCompletionPercent(progress(0, 0))).toBe(0);
+});
+
+test("specCompletionLabel: Complete only at 5/5, Not started at 0, In progress otherwise", () => {
+  expect(specCompletionLabel(progress(5, 5))).toBe("Complete");
+  expect(specCompletionLabel(progress(4, 5))).toBe("In progress");
+  expect(specCompletionLabel(progress(0, 5))).toBe("Not started");
+  expect(specCompletionLabel(progress(0, 0))).toBe("Not started");
+});
+
+test("specAttention is upToDate with no items once every completable section is complete", () => {
+  expect(specAttention(progress(5, 5, []))).toEqual({ level: "upToDate", items: [] });
+});
+
+test("specAttention is needsAttention (critical) when nothing has been saved yet", () => {
+  const sections = [{ id: "courseInfo" as const, title: "Course Information" }];
+  expect(specAttention(progress(0, 5, sections))).toEqual({ level: "needsAttention", items: sections });
+});
+
+test("specAttention is itemsRemaining, carrying the incomplete sections, when partially complete", () => {
+  const sections = [{ id: "mapping" as const, title: "CLO Alignment Mapping" }];
+  expect(specAttention(progress(4, 5, sections))).toEqual({ level: "itemsRemaining", items: sections });
 });
