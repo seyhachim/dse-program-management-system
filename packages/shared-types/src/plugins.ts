@@ -82,7 +82,11 @@ export const coursesManifest: PluginManifest = {
       label: "Course Management",
       path: "/courses",
       icon: "book",
-      roles: ["admin", "program_coordinator", "program_secretary", "lecturer"],
+      // qa_reviewer already holds courses:read (seed.ts) but had no frontend
+      // route to reach it — this is QA's path to Course Specification content
+      // for review (issue #101 §15); Add/Edit/Delete stay hidden via the
+      // `courses:manage` permission check the page already does (PR #110).
+      roles: ["admin", "program_coordinator", "program_secretary", "lecturer", "qa_reviewer"],
       group: "Academic",
     },
   ],
@@ -154,6 +158,16 @@ export const dashboardManifest: PluginManifest = {
  * `pluginManifests` (frontend nav) is fully decoupled from what's registered in
  * apps/backend/src/core/app.ts. Mirrors the inverse of methods/rubrics/auth
  * below, which register a backend plugin but contribute no sidebar route.
+ *
+ * `roles` on each entry follows the per-role sidebars proposed in issue #101
+ * (§4 Admin, §5 Coordinator, §6 Secretary, §15 QA Reviewer) — Coordinator owns
+ * academic/curriculum decisions, Secretary supports operationally but is
+ * explicitly excluded from academic-decision entries (§8), and QA's own
+ * "QA Dashboard" is its landing page distinct from the general `/dashboard`.
+ * `Users`/`Settings`/`Audit Trail` are system administration and stay
+ * admin-only, matching the role-comparison table (§18). `student` isn't
+ * listed anywhere here — there's no student portal built yet, so it (like
+ * every other unlisted role) only ever sees the unrestricted footer entry.
  */
 export const placeholdersManifest: PluginManifest = {
   id: "placeholders",
@@ -161,16 +175,58 @@ export const placeholdersManifest: PluginManifest = {
   version: "0.1.0",
   description: "Sidebar entries for sections not yet built — link to a coming-soon page.",
   routes: [
-    { label: "Programme Management", path: "/programme-management", icon: "clipboard-list", group: "Academic" },
-    { label: "Assessment Management", path: "/assessment-management", icon: "file-check", group: "Academic" },
-    { label: "Teaching Management", path: "/teaching-management", icon: "graduation-cap", group: "Academic" },
-    { label: "QA Dashboard", path: "/qa-dashboard", icon: "shield-check", group: "Quality Assurance" },
-    { label: "Reports", path: "/reports", icon: "bar-chart", group: "Quality Assurance" },
-    { label: "CQI", path: "/cqi", icon: "refresh-cw", group: "Quality Assurance" },
-    { label: "Document Library", path: "/document-library", icon: "file-text", group: "Quality Assurance" },
-    { label: "Users", path: "/users", icon: "user-cog", group: "Admin" },
-    { label: "Settings", path: "/settings", icon: "settings", group: "Admin" },
-    { label: "Audit Trail", path: "/audit-trail", icon: "history", group: "Admin" },
+    {
+      label: "Programme Management",
+      path: "/programme-management",
+      icon: "clipboard-list",
+      roles: ["admin", "program_coordinator", "program_secretary"],
+      group: "Academic",
+    },
+    {
+      label: "Assessment Management",
+      path: "/assessment-management",
+      icon: "file-check",
+      roles: ["admin", "program_coordinator"],
+      group: "Academic",
+    },
+    {
+      label: "Teaching Management",
+      path: "/teaching-management",
+      icon: "graduation-cap",
+      roles: ["admin", "program_coordinator", "program_secretary"],
+      group: "Academic",
+    },
+    {
+      label: "QA Dashboard",
+      path: "/qa-dashboard",
+      icon: "shield-check",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Reports",
+      path: "/reports",
+      icon: "bar-chart",
+      roles: ["admin", "program_coordinator", "program_secretary", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "CQI",
+      path: "/cqi",
+      icon: "refresh-cw",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Document Library",
+      path: "/document-library",
+      icon: "file-text",
+      roles: ["admin", "program_coordinator", "program_secretary", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    { label: "Users", path: "/users", icon: "user-cog", roles: ["admin"], group: "Admin" },
+    { label: "Settings", path: "/settings", icon: "settings", roles: ["admin"], group: "Admin" },
+    { label: "Audit Trail", path: "/audit-trail", icon: "history", roles: ["admin"], group: "Admin" },
     { label: "Help & Support", path: "/help", icon: "help-circle", group: "footer" },
   ],
 };
