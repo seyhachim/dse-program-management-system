@@ -104,11 +104,20 @@ async function toView(
 }
 
 export const offeringService = {
-  async list(query: ListOfferingsQuery): Promise<OfferingView[]> {
+  /**
+   * List offerings. When `lecturerScope` is given (the router passes it for
+   * non-programme-wide callers — issue #104), results are restricted to
+   * offerings where that lecturer is the primary lecturer or an assigned
+   * co-lecturer. Mirrors `courseService.list`'s `lecturerScope` pattern.
+   */
+  async list(query: ListOfferingsQuery, lecturerScope?: string): Promise<OfferingView[]> {
     const offerings = await prisma.offering.findMany({
       where: {
         ...(query.term ? { term: { contains: query.term, mode: "insensitive" } } : {}),
         ...(query.status ? { status: query.status } : {}),
+        ...(lecturerScope
+          ? { OR: [{ lecturerId: lecturerScope }, { coLecturers: { some: { lecturerId: lecturerScope } } }] }
+          : {}),
       },
       include: withRelations,
       orderBy: [{ term: "desc" }, { createdAt: "desc" }],

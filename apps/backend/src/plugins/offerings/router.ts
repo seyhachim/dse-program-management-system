@@ -6,7 +6,7 @@ import {
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
-import type { Role } from "../../core/auth/token.ts";
+import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { CapacityError, offeringService, ReferenceError } from "./service.ts";
 
@@ -20,7 +20,10 @@ export function createOfferingRouter(): Router {
       res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
       return;
     }
-    res.json(await offeringService.list(parsed.data));
+    // Lecturers only ever see offerings they're assigned to (primary or
+    // co-lecturer) — issue #104. Programme-wide roles see everything.
+    const ownerScope = req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r)) ? undefined : req.user!.id;
+    res.json(await offeringService.list(parsed.data, ownerScope));
   });
 
   router.get("/:id", requirePermission("offerings:read"), async (req, res) => {
@@ -28,6 +31,16 @@ export function createOfferingRouter(): Router {
     if (!offering) {
       res.status(404).json({ error: "Offering not found" });
       return;
+    }
+    // A lecturer may only fetch an offering they're assigned to (issue #104);
+    // programme-wide roles may fetch any.
+    if (!req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r))) {
+      const isAssigned =
+        offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
+      if (!isAssigned) {
+        res.status(403).json({ error: "You can only access your own offerings" });
+        return;
+      }
     }
     res.json(offering);
   });

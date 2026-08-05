@@ -116,15 +116,20 @@ export const courseService = {
     });
     return courses.map((course) => {
       const sections = course.spec?.sections ?? [];
-      const completed = sections.filter(
-        (s) => s.status === "Complete" && COMPLETABLE_SECTION_IDS.includes(s.sectionKey as SpecSectionId),
-      ).length;
+      const completeIds = new Set(
+        sections.filter((s) => s.status === "Complete").map((s) => s.sectionKey),
+      );
+      const incompleteSections = COMPLETABLE_SPEC_SECTIONS.filter((s) => !completeIds.has(s.id)).map((s) => ({
+        id: s.id,
+        title: s.title,
+      }));
       return {
         courseId: course.id,
         code: course.code,
         title: course.title,
-        completed,
+        completed: COMPLETABLE_SECTION_IDS.length - incompleteSections.length,
         total: COMPLETABLE_SECTION_IDS.length,
+        incompleteSections,
       };
     });
   },

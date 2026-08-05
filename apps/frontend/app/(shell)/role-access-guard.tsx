@@ -18,12 +18,18 @@ export function RoleAccessGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  // The manifest route governing the current path (longest matching prefix).
-  const matched = getNavRoutes()
-    .filter((r) => pathname === r.path || pathname.startsWith(`${r.path}/`))
-    .sort((a, b) => b.path.length - a.path.length)[0];
+  // The manifest route(s) governing the current path (longest matching prefix).
+  // A path can be governed by more than one route — e.g. "/courses" has a
+  // role-split "My Courses"/"Course Management" pair (issue #104) — so access is
+  // allowed if *any* of them permits the caller's role, not just the first one
+  // in manifest order.
+  const candidates = getNavRoutes().filter(
+    (r) => pathname === r.path || pathname.startsWith(`${r.path}/`),
+  );
+  const longestLength = candidates.length ? Math.max(...candidates.map((r) => r.path.length)) : 0;
+  const matched = candidates.filter((r) => r.path.length === longestLength);
 
-  const allowed = !me || !matched || routeAllowsRole(matched, me.roles);
+  const allowed = !me || matched.length === 0 || matched.some((r) => routeAllowsRole(r, me.roles));
 
   useEffect(() => {
     if (loading || allowed) return;

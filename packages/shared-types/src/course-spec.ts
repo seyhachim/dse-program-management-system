@@ -61,6 +61,13 @@ export interface CourseSpecProgress {
   title: string;
   completed: number;
   total: number;
+  /**
+   * Completable sections not yet marked Complete (in wizard order) — the
+   * deterministic, explainable basis for a lecturer-facing "Attention" detail
+   * (issue #104), e.g. "CLO Alignment Mapping incomplete". Empty when `completed
+   * === total`.
+   */
+  incompleteSections: { id: SpecSectionId; title: string }[];
 }
 
 /* ------------------------------------------------------- reference constants */

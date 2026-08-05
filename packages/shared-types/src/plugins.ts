@@ -77,7 +77,19 @@ export const coursesManifest: PluginManifest = {
   name: "Courses",
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
+  // Two route entries at the same path, split by role (issue #104): a lecturer
+  // gets a teaching-focused "My Courses" label/page, everyone else keeps the
+  // curriculum-management label. Safe to split like this because the role sets
+  // are disjoint in practice — a caller holding both would see both sidebar
+  // entries, an accepted edge case (no seeded user holds both today).
   routes: [
+    {
+      label: "My Courses",
+      path: "/courses",
+      icon: "book",
+      roles: ["lecturer"],
+      group: "Academic",
+    },
     {
       label: "Course Management",
       path: "/courses",
@@ -86,7 +98,7 @@ export const coursesManifest: PluginManifest = {
       // route to reach it — this is QA's path to Course Specification content
       // for review (issue #101 §15); Add/Edit/Delete stay hidden via the
       // `courses:manage` permission check the page already does (PR #110).
-      roles: ["admin", "program_coordinator", "program_secretary", "lecturer", "qa_reviewer"],
+      roles: ["admin", "program_coordinator", "program_secretary", "qa_reviewer"],
       group: "Academic",
     },
   ],
