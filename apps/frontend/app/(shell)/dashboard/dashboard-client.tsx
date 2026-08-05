@@ -36,9 +36,10 @@ interface LoadState {
 
 const EMPTY_STATE: LoadState = { students: [], courses: [], offerings: [], lecturerCount: 0, specProgress: [] };
 
-/** Admin-only programme overview for the "Dashboard" nav item — counts plus
- * spec-completion and status-distribution visualizations across every course,
- * offering, student and lecturer. */
+/** Programme-wide overview for the "Dashboard" nav item (admin, program_coordinator,
+ * program_secretary — see `dashboardManifest` in packages/shared-types/src/plugins.ts)
+ * — counts plus spec-completion and status-distribution visualizations across every
+ * course, offering, student and lecturer. */
 export function DashboardClient() {
   const [loading, setLoading] = useState(true);
   const [failedSources, setFailedSources] = useState<string[]>([]);
