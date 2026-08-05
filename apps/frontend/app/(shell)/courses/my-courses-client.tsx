@@ -6,6 +6,9 @@ import { AlertCircle, AlertTriangle, CheckCircle2, Search } from "lucide-react";
 import {
   SEMESTERS,
   semesterLabel,
+  specAttention,
+  specCompletionLabel,
+  specCompletionPercent,
   type CourseSpecProgress,
   type OfferingView,
   type Semester,
@@ -278,12 +281,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** Compact per-row completion ring + Complete/In progress/Not started label — derived
- * entirely from `progress.completed`/`total` (COMPLETABLE_SPEC_SECTIONS), never invented. */
+/** Compact per-row completion ring + Complete/In progress/Not started label — both
+ * derived by the shared `specCompletionPercent`/`specCompletionLabel` helpers
+ * (packages/shared-types/src/course-spec.ts), the same ones the unit tests cover. */
 function SpecStatusCell({ progress }: { progress: CourseSpecProgress }) {
-  const { completed, total } = progress;
-  const percent = total ? Math.round((completed / total) * 100) : 0;
-  const label = total === 0 ? "Not started" : completed === total ? "Complete" : completed === 0 ? "Not started" : "In progress";
+  const percent = specCompletionPercent(progress);
+  const label = specCompletionLabel(progress);
   const color = label === "Complete" ? "var(--success)" : label === "In progress" ? "var(--warning)" : "var(--inactive)";
   return (
     <div className="flex flex-col items-center gap-1">
@@ -293,14 +296,13 @@ function SpecStatusCell({ progress }: { progress: CourseSpecProgress }) {
   );
 }
 
-/** Deterministic Attention status from the same completable-section data as
- * `SpecStatusCell` — up to date (all complete), N items (some incomplete, some
- * done), or needs attention (nothing saved yet). Hover/focus explains which
- * sections are outstanding. */
+/** Deterministic Attention status from the shared `specAttention` helper — up to
+ * date (all complete), N items (some incomplete, some done), or needs attention
+ * (nothing saved yet). Hover/focus explains which sections are outstanding. */
 function AttentionCell({ progress }: { progress: CourseSpecProgress }) {
-  const { completed, total, incompleteSections } = progress;
+  const attention = specAttention(progress);
 
-  if (total > 0 && completed === total) {
+  if (attention.level === "upToDate") {
     return (
       <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
         <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -312,8 +314,8 @@ function AttentionCell({ progress }: { progress: CourseSpecProgress }) {
     );
   }
 
-  const critical = completed === 0;
-  const count = incompleteSections.length;
+  const critical = attention.level === "needsAttention";
+  const count = attention.items.length;
   const label = critical ? "Needs attention" : `${count} item${count === 1 ? "" : "s"}`;
   const sub = critical ? "No content yet" : "Need attention";
   const Icon = critical ? AlertCircle : AlertTriangle;
@@ -337,7 +339,7 @@ function AttentionCell({ progress }: { progress: CourseSpecProgress }) {
               {count} item{count === 1 ? "" : "s"} need attention
             </p>
             <ul className="list-disc pl-4">
-              {incompleteSections.map((s) => (
+              {attention.items.map((s) => (
                 <li key={s.id}>{s.title} incomplete</li>
               ))}
             </ul>

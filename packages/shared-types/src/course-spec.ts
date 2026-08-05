@@ -70,6 +70,42 @@ export interface CourseSpecProgress {
   incompleteSections: { id: SpecSectionId; title: string }[];
 }
 
+/** Completion percentage (0–100) of a course's completable spec sections. */
+export function specCompletionPercent(progress: Pick<CourseSpecProgress, "completed" | "total">): number {
+  return progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
+}
+
+/** Human label for `specCompletionPercent` — backs the lecturer "My Courses" table (issue #104). */
+export type SpecCompletionLabel = "Complete" | "In progress" | "Not started";
+
+export function specCompletionLabel(progress: Pick<CourseSpecProgress, "completed" | "total">): SpecCompletionLabel {
+  if (progress.total === 0 || progress.completed === 0) return "Not started";
+  if (progress.completed === progress.total) return "Complete";
+  return "In progress";
+}
+
+/**
+ * Deterministic "Attention" status for the lecturer "My Courses" table (issue
+ * #104) — derived purely from `completed`/`total`/`incompleteSections`, never
+ * invented client-side:
+ *  - "upToDate": every completable section is marked Complete.
+ *  - "needsAttention": nothing has been saved yet (critical — no content at all).
+ *  - "itemsRemaining": some but not all sections are complete.
+ */
+export type SpecAttentionLevel = "upToDate" | "itemsRemaining" | "needsAttention";
+
+export interface SpecAttention {
+  level: SpecAttentionLevel;
+  /** The same list as `progress.incompleteSections` — empty when `level === "upToDate"`. */
+  items: { id: SpecSectionId; title: string }[];
+}
+
+export function specAttention(progress: CourseSpecProgress): SpecAttention {
+  if (progress.total > 0 && progress.completed === progress.total) return { level: "upToDate", items: [] };
+  if (progress.completed === 0) return { level: "needsAttention", items: progress.incompleteSections };
+  return { level: "itemsRemaining", items: progress.incompleteSections };
+}
+
 /* ------------------------------------------------------- reference constants */
 
 /** A Bloom-style level: code (e.g. "C3"), short name, and ordinal. */
