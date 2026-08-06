@@ -131,16 +131,29 @@ export const courseService = {
     });
     return courses.map((course) => {
       const sections = course.spec?.sections ?? [];
-      const completed = sections.filter(
-        (s) =>
-          s.status === "Complete" &&
-          COMPLETABLE_SECTION_IDS.includes(s.sectionKey as SpecSectionId),
-      ).length;
+
+      const completedSectionIds = new Set(
+        sections
+          .filter(
+            (s) =>
+              s.status === "Complete" &&
+              COMPLETABLE_SECTION_IDS.includes(s.sectionKey as SpecSectionId),
+          )
+          .map((s) => s.sectionKey as SpecSectionId),
+      );
+
+      const incompleteSections = COMPLETABLE_SPEC_SECTIONS.filter(
+        (section) => !completedSectionIds.has(section.id),
+      ).map((section) => ({
+        id: section.id,
+        title: section.title,
+      }));
+
       return {
         courseId: course.id,
         code: course.code,
         title: course.title,
-        completed: COMPLETABLE_SECTION_IDS.length - incompleteSections.length,
+        completed: completedSectionIds.size,
         total: COMPLETABLE_SECTION_IDS.length,
         incompleteSections,
       };
