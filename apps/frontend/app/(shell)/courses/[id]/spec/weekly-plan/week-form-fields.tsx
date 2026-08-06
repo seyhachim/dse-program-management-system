@@ -9,6 +9,7 @@ import type {
 import { Button } from "@dse-pms/ui";
 import type { CloForm } from "../clos-section";
 import { weekSltForm, type WeekForm } from "../weekly-plan-model";
+import type { Method } from "@dse-pms/shared-types";
 
 const TOPIC_MAX = 200;
 
@@ -18,6 +19,7 @@ export function WeekFormFields({
   set,
   toggleClo,
   clos,
+  assessmentMethods,
   touched,
   existingAssessments,
   lloRequired = true,
@@ -26,9 +28,9 @@ export function WeekFormFields({
   set: (patch: Partial<WeekForm>) => void;
   toggleClo: (code: string) => void;
   clos: CloForm[];
+  assessmentMethods: Method[];
   touched: boolean;
   existingAssessments: string[];
-  /** False for a legacy week that already existed with zero LLOs. */
   lloRequired?: boolean;
 }) {
   const errors = weekFormErrors(draft, lloRequired);
@@ -55,7 +57,23 @@ export function WeekFormFields({
       studentLearningActivities,
     });
   };
+  const availableAssessmentMethodIds = new Set(
+    clos
+      .filter((clo) => draft.cloCodes.includes(clo.code))
+      .flatMap((clo) => clo.assessmentMethodIds),
+  );
 
+  const availableAssessmentMethods = assessmentMethods.filter((method) =>
+    availableAssessmentMethodIds.has(method.id),
+  );
+
+  const toggleAssessmentMethod = (methodId: string) => {
+    set({
+      assessmentMethodIds: draft.assessmentMethodIds.includes(methodId)
+        ? draft.assessmentMethodIds.filter((id) => id !== methodId)
+        : [...draft.assessmentMethodIds, methodId],
+    });
+  };
   return (
     <div className="space-y-6">
       {/* 1. Week Information */}
@@ -258,19 +276,59 @@ export function WeekFormFields({
 
       {/* 6. Assessment / Deliverables */}
       <Section n={6} title="Assessment">
-        <input
-          list="week-assessment-options"
-          value={draft.assessment}
-          onChange={(e) => set({ assessment: e.target.value })}
-          placeholder="e.g. Lab 1, EDA Report…"
-          className={inputCls}
-        />
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Assessment Method(s)
+            </p>
 
-        <datalist id="week-assessment-options">
-          {existingAssessments.map((assessment) => (
-            <option key={assessment} value={assessment} />
-          ))}
-        </datalist>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Select the assessment methods used this week. Available methods
+              are based on the CLOs linked to this week.
+            </p>
+          </div>
+
+          {draft.cloCodes.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+              Link at least one CLO to see available assessment methods.
+            </div>
+          ) : availableAssessmentMethods.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+              The linked CLOs do not have assessment methods assigned yet.
+            </div>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {availableAssessmentMethods.map((method) => {
+                const selected = draft.assessmentMethodIds.includes(method.id);
+
+                return (
+                  <button
+                    key={method.id}
+                    type="button"
+                    onClick={() => toggleAssessmentMethod(method.id)}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+                      selected
+                        ? "border-primary bg-primary/5 text-foreground"
+                        : "border-border bg-background text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border"
+                      }`}
+                    >
+                      {selected ? "✓" : ""}
+                    </span>
+
+                    <span className="font-medium">{method.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </Section>
     </div>
   );

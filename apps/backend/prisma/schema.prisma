@@ -327,6 +327,7 @@ model CourseSpecWeek {
   practiceHours             Float?
   otherHours                Float?
   selfStudyHours            Float?
+  assessmentMethodIds       String[]   @default([])
   assessment                String     @default("")
 
   @@id([courseSpecId, id])

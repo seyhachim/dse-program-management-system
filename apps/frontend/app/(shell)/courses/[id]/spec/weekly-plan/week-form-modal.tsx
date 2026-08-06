@@ -1,9 +1,19 @@
 "use client";
-
+import type { Method } from "@dse-pms/shared-types";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@dse-pms/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@dse-pms/ui";
 import type { CloForm } from "../clos-section";
-import { emptyWeek, type WeekForm, type WeeklyPlanForm } from "../weekly-plan-model";
+import {
+  emptyWeek,
+  type WeekForm,
+  type WeeklyPlanForm,
+} from "../weekly-plan-model";
 import { WeekFormFields, weekFormErrors } from "./week-form-fields";
 
 /**
@@ -20,14 +30,15 @@ export function WeekFormModal({
   weekId,
   weeks,
   clos,
+  assessmentMethods,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** null = adding a new week; otherwise the id of the week being edited. */
   weekId: string | null;
   weeks: WeeklyPlanForm;
   clos: CloForm[];
+  assessmentMethods: Method[];
   onSave: (next: WeeklyPlanForm) => void;
 }) {
   const [draft, setDraft] = useState<WeekForm | null>(null);
@@ -36,7 +47,9 @@ export function WeekFormModal({
 
   useEffect(() => {
     if (!open) return;
-    const existing = weekId ? (weeks.find((w) => w.id === weekId) ?? null) : null;
+    const existing = weekId
+      ? (weeks.find((w) => w.id === weekId) ?? null)
+      : null;
     setDraft(existing ?? emptyWeek(weeks));
     // A legacy week that already existed with zero LLOs stays optional; one that
     // already has LLOs (or is brand new) keeps the field required going forward.
@@ -47,16 +60,34 @@ export function WeekFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, weekId]);
 
-  const set = (patch: Partial<WeekForm>) => setDraft((d) => (d ? { ...d, ...patch } : d));
+  const set = (patch: Partial<WeekForm>) =>
+    setDraft((d) => (d ? { ...d, ...patch } : d));
   const toggleClo = (code: string) =>
-    setDraft((d) =>
-      d
-        ? {
-            ...d,
-            cloCodes: d.cloCodes.includes(code) ? d.cloCodes.filter((c) => c !== code) : [...d.cloCodes, code],
-          }
-        : d,
-    );
+    setDraft((d) => {
+      if (!d) return d;
+
+      const nextCloCodes = d.cloCodes.includes(code)
+        ? d.cloCodes.filter((c) => c !== code)
+        : [...d.cloCodes, code];
+
+      // Assessment methods allowed by the CLOs that remain linked.
+      const allowedAssessmentMethodIds = new Set(
+        clos
+          .filter((clo) => nextCloCodes.includes(clo.code))
+          .flatMap((clo) => clo.assessmentMethodIds),
+      );
+
+      // Preserve only selections still supported by at least one linked CLO.
+      const nextAssessmentMethodIds = d.assessmentMethodIds.filter((id) =>
+        allowedAssessmentMethodIds.has(id),
+      );
+
+      return {
+        ...d,
+        cloCodes: nextCloCodes,
+        assessmentMethodIds: nextAssessmentMethodIds,
+      };
+    });
 
   const existingAssessments = useMemo(
     () => [...new Set(weeks.map((w) => w.assessment.trim()).filter(Boolean))],
@@ -71,7 +102,9 @@ export function WeekFormModal({
       return;
     }
     const exists = weeks.some((w) => w.id === draft.id);
-    const next = exists ? weeks.map((w) => (w.id === draft.id ? draft : w)) : [...weeks, draft];
+    const next = exists
+      ? weeks.map((w) => (w.id === draft.id ? draft : w))
+      : [...weeks, draft];
     next.sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0));
     onSave(next);
     onOpenChange(false);
@@ -93,6 +126,7 @@ export function WeekFormModal({
               set={set}
               toggleClo={toggleClo}
               clos={clos}
+              assessmentMethods={assessmentMethods}
               touched={touched}
               existingAssessments={existingAssessments}
               lloRequired={lloRequired}

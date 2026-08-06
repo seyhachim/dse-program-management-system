@@ -387,6 +387,7 @@ function reassembleSpec(spec: SpecRow | null): {
         practiceHours: w.practiceHours,
         otherHours: w.otherHours,
         selfStudyHours: w.selfStudyHours,
+        assessmentMethodIds: w.assessmentMethodIds,
         assessment: w.assessment,
       })),
     };
@@ -502,6 +503,7 @@ async function syncWeeklyPlan(
       practiceHours: w.practiceHours ?? null,
       otherHours: w.otherHours ?? null,
       selfStudyHours: w.selfStudyHours ?? null,
+      assessmentMethodIds: w.assessmentMethodIds,
       assessment: w.assessment,
     })),
   });

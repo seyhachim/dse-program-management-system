@@ -373,6 +373,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
           </TabsContent>
 
           <TabsContent value="slt" className="mt-4">
+            {/* <WeeklyPlanSectionForm
+              value={weeklyPlan}
+              onChange={setWeeklyPlan}
+              courseName={
+                course ? `${course.code} - ${course.title}` : undefined
+              }
+              clos={clos}
+            /> */}
             <WeeklyPlanSectionForm
               value={weeklyPlan}
               onChange={setWeeklyPlan}
@@ -380,6 +388,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 course ? `${course.code} - ${course.title}` : undefined
               }
               clos={clos}
+              assessmentMethods={assessmentMethods}
             />
           </TabsContent>
 

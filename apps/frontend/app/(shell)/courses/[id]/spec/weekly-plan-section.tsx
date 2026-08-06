@@ -13,6 +13,7 @@ import {
   Timer,
   Trash2,
 } from "lucide-react";
+import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import type { CloForm } from "./clos-section";
 import {
@@ -42,22 +43,50 @@ export function WeeklyPlanSectionForm({
   onChange,
   courseName,
   clos = [],
+  assessmentMethods = [],
 }: {
   value: WeeklyPlanForm;
   onChange: (v: WeeklyPlanForm) => void;
   courseName?: string;
+
   /** §14 CLOs, for the modal's "Link CLOs" picker and the coverage sidebar. */
   clos?: CloForm[];
+
+  /** Assessment-method catalog already loaded by SpecClient. */
+  assessmentMethods?: Method[];
 }) {
   const cloCodes = clos.map((c) => c.code);
-  const [modal, setModal] = useState<{ open: boolean; weekId: string | null }>({
+
+  /**
+   * Resolve stored assessment method IDs to their catalog entries.
+   * This avoids repeatedly scanning the full method catalog for each table cell.
+   */
+  const assessmentMethodById = new Map(
+    assessmentMethods.map((method) => [method.id, method]),
+  );
+
+  const [modal, setModal] = useState<{
+    open: boolean;
+    weekId: string | null;
+  }>({
     open: false,
     weekId: null,
   });
-  const openAdd = () => setModal({ open: true, weekId: null });
-  const openEdit = (weekId: string) => setModal({ open: true, weekId });
+
+  const openAdd = () =>
+    setModal({
+      open: true,
+      weekId: null,
+    });
+
+  const openEdit = (weekId: string) =>
+    setModal({
+      open: true,
+      weekId,
+    });
 
   const totals = weeklyPlanFormTotals(value);
+
   const totalContactHours =
     totals.lectureHours +
     totals.tutorialHours +
@@ -66,12 +95,14 @@ export function WeeklyPlanSectionForm({
 
   const remove = (id: string) => {
     const w = value.find((x) => x.id === id);
+
     if (
       typeof window !== "undefined" &&
       !window.confirm(`Delete week ${w?.week}? This can't be undone.`)
     ) {
       return;
     }
+
     onChange(value.filter((x) => x.id !== id));
   };
 
@@ -81,13 +112,16 @@ export function WeeklyPlanSectionForm({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-foreground">Weekly Plan</h2>
+
           <p className="text-sm text-muted-foreground">
             Plan weekly topics, learning activities, SLT and link to CLOs
             {courseName ? ` for ${courseName}` : ""}.
           </p>
         </div>
+
         <Button size="sm" onClick={openAdd}>
-          <Plus className="mr-1.5 h-4 w-4" /> Add Week
+          <Plus className="mr-1.5 h-4 w-4" />
+          Add Week
         </Button>
       </div>
 
@@ -96,6 +130,7 @@ export function WeeklyPlanSectionForm({
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
+
             <h3 className="text-sm font-semibold text-foreground">
               Weekly Plan ({value.length}{" "}
               {value.length === 1 ? "Week" : "Weeks"})
@@ -107,6 +142,7 @@ export function WeeklyPlanSectionForm({
               <p className="text-sm text-muted-foreground">
                 No weeks planned yet.
               </p>
+
               <button
                 type="button"
                 onClick={openAdd}
@@ -117,36 +153,49 @@ export function WeeklyPlanSectionForm({
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[1060px] text-sm">
+              <table className="w-full min-w-[1120px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
                     <th className="w-14 px-3 py-2.5">Week</th>
+
                     <th className="px-3 py-2.5">Topic / Content</th>
+
                     <th className="px-3 py-2.5">CLOs</th>
+
                     <th className="px-3 py-2.5">Learning Activities</th>
+
                     <th className="px-3 py-2.5">LLOs</th>
+
                     <th className="px-3 py-2.5 text-center">
                       Contact Hours (L+T+P+O)
                     </th>
+
                     <th className="px-3 py-2.5 text-center">
-                      Self-Study Hours
+                      Independent Learning (NF2F)
                     </th>
+
                     <th className="px-3 py-2.5 text-center">SLT (Hours)</th>
-                    <th className="px-3 py-2.5">Assessment / Deliverables</th>
+
+                    <th className="px-3 py-2.5">Assessment</th>
+
                     <th className="px-3 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {value.map((w) => (
                     <tr
                       key={w.id}
                       className="border-b border-border/70 align-top"
                     >
+                      {/* Week */}
                       <td className="px-3 py-3">
                         <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-accent px-1.5 text-xs font-semibold text-accent-foreground">
                           {w.week || "—"}
                         </span>
                       </td>
+
+                      {/* Topic */}
                       <td className="max-w-[240px] px-3 py-3 font-medium text-foreground">
                         {w.topic || (
                           <span className="text-muted-foreground">
@@ -154,6 +203,8 @@ export function WeeklyPlanSectionForm({
                           </span>
                         )}
                       </td>
+
+                      {/* CLOs */}
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-1">
                           {w.cloCodes.length ? (
@@ -170,16 +221,18 @@ export function WeeklyPlanSectionForm({
                           )}
                         </div>
                       </td>
+
+                      {/* Learning Activities */}
                       <td className="max-w-[200px] px-3 py-3">
                         {w.activities.length ? (
                           <ul className="space-y-0.5">
-                            {w.activities.map((a) => (
+                            {w.activities.map((activity) => (
                               <li
-                                key={a}
+                                key={activity}
                                 className="flex items-center gap-1.5 text-foreground"
                               >
                                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                                {a}
+                                {activity}
                               </li>
                             ))}
                           </ul>
@@ -187,13 +240,15 @@ export function WeeklyPlanSectionForm({
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
+
+                      {/* LLOs */}
                       <td className="max-w-[220px] px-3 py-3">
                         {w.lloItems.length ? (
                           <ul className="space-y-0.5">
-                            {w.lloItems.map((llo, i) => (
-                              <li key={i} className="text-foreground">
+                            {w.lloItems.map((llo, index) => (
+                              <li key={index} className="text-foreground">
                                 <span className="font-medium text-muted-foreground">
-                                  LLO{i + 1}:
+                                  LLO{index + 1}:
                                 </span>{" "}
                                 {llo}
                               </li>
@@ -203,20 +258,54 @@ export function WeeklyPlanSectionForm({
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
+
+                      {/* Contact Hours */}
                       <td className="px-3 py-3 text-center text-foreground">
                         {weekContactHoursForm(w) || "—"}
                       </td>
+
+                      {/* Independent Learning */}
                       <td className="px-3 py-3 text-center text-foreground">
                         {w.selfStudyHours || "—"}
                       </td>
+
+                      {/* SLT */}
                       <td className="px-3 py-3 text-center font-medium text-foreground">
                         {weekSltForm(w)}
                       </td>
-                      <td className="px-3 py-3 text-foreground">
-                        {w.assessment || (
+
+                      {/* Assessment Methods */}
+                      <td className="max-w-[200px] px-3 py-3">
+                        {w.assessmentMethodIds.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {w.assessmentMethodIds.map((methodId) => {
+                              const method = assessmentMethodById.get(methodId);
+
+                              return (
+                                <span
+                                  key={methodId}
+                                  className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
+                                >
+                                  {method?.name ?? "Unknown method"}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : w.assessment ? (
+                          /*
+                           * Legacy fallback:
+                           * older saved weeks may still have only the
+                           * free-text assessment field.
+                           */
+                          <span className="text-foreground">
+                            {w.assessment}
+                          </span>
+                        ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
+
+                      {/* Actions */}
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <IconButton
@@ -225,6 +314,7 @@ export function WeeklyPlanSectionForm({
                           >
                             <Pencil className="h-4 w-4" />
                           </IconButton>
+
                           <IconButton
                             label={`Delete week ${w.week}`}
                             danger
@@ -237,19 +327,24 @@ export function WeeklyPlanSectionForm({
                     </tr>
                   ))}
                 </tbody>
+
                 <tfoot>
                   <tr className="border-t border-border bg-muted/40 text-sm font-semibold text-foreground">
                     <td colSpan={5} className="px-3 py-2.5">
                       Total ({value.length}{" "}
                       {value.length === 1 ? "Week" : "Weeks"})
                     </td>
+
                     <td className="px-3 py-2.5 text-center">
                       {totalContactHours}
                     </td>
+
                     <td className="px-3 py-2.5 text-center">
                       {totals.selfStudyHours}
                     </td>
+
                     <td className="px-3 py-2.5 text-center">{totals.slt}</td>
+
                     <td colSpan={2} className="px-3 py-2.5" />
                   </tr>
                 </tfoot>
@@ -260,7 +355,7 @@ export function WeeklyPlanSectionForm({
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             <Info className="h-3.5 w-3.5 shrink-0" />
             SLT = Contact Hours (Lecture + Tutorial + Practice + Other) +
-            Self-Study Hours
+            Independent Learning Hours (NF2F)
           </div>
         </div>
 
@@ -274,10 +369,16 @@ export function WeeklyPlanSectionForm({
 
       <WeekFormModal
         open={modal.open}
-        onOpenChange={(open) => setModal((m) => ({ ...m, open }))}
+        onOpenChange={(open) =>
+          setModal((current) => ({
+            ...current,
+            open,
+          }))
+        }
         weekId={modal.weekId}
         weeks={value}
         clos={clos}
+        assessmentMethods={assessmentMethods}
         onSave={onChange}
       />
     </div>
@@ -294,6 +395,7 @@ function CloCoverageCard({
   cloCodes: string[];
 }) {
   const coverage = cloCoverage(plan, cloCodes.length ? cloCodes : undefined);
+
   const allocations = cloSltAllocation(
     plan,
     cloCodes.length ? cloCodes : undefined,
@@ -302,9 +404,13 @@ function CloCoverageCard({
   const allocationByCode = new Map(
     allocations.map((item) => [item.code, item.sltHours]),
   );
+
   const totalClos = coverage.length;
+
   const coveredClos = coverage.filter((c) => c.weeks > 0).length;
+
   const percent = totalClos ? Math.round((coveredClos / totalClos) * 100) : 0;
+
   const courseSlt = weeklyPlanFormTotals(plan).slt;
 
   const allocatedSlt = allocations.reduce(
@@ -313,9 +419,11 @@ function CloCoverageCard({
   );
 
   const unallocatedSlt = Math.max(0, courseSlt - allocatedSlt);
+
   return (
     <Card>
       <CardHeader title="CLO Coverage" />
+
       {totalClos === 0 ? (
         <p className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
           Link CLOs to weeks to see coverage.
@@ -324,6 +432,7 @@ function CloCoverageCard({
         <>
           <div className="flex items-center gap-5">
             <Donut coverage={coverage} percent={percent} />
+
             <ul className="flex-1 space-y-1.5 text-sm">
               {coverage.map((c) => (
                 <li
@@ -333,10 +442,14 @@ function CloCoverageCard({
                   <span className="flex items-center gap-2 text-foreground">
                     <span
                       className="h-2.5 w-2.5 rounded-sm"
-                      style={{ backgroundColor: cloColor(c.code) }}
+                      style={{
+                        backgroundColor: cloColor(c.code),
+                      }}
                     />
+
                     {c.code}
                   </span>
+
                   <span className="text-right text-muted-foreground">
                     <span className="block">
                       {c.weeks} {c.weeks === 1 ? "Week" : "Weeks"}
@@ -351,6 +464,7 @@ function CloCoverageCard({
               ))}
             </ul>
           </div>
+
           <div
             className={`mt-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
               percent === 100
@@ -359,13 +473,18 @@ function CloCoverageCard({
             }`}
           >
             <CheckCircle2 className="h-4 w-4 shrink-0" />
+
             {percent === 100
               ? "All CLOs are covered in the weekly plan."
-              : `${coveredClos} of ${totalClos} CLOs covered — ${totalClos - coveredClos} still unlinked.`}
+              : `${coveredClos} of ${totalClos} CLOs covered — ${
+                  totalClos - coveredClos
+                } still unlinked.`}
           </div>
+
           <div className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Course SLT</span>
+
               <span className="font-medium text-foreground">
                 {courseSlt.toFixed(1)} h
               </span>
@@ -373,6 +492,7 @@ function CloCoverageCard({
 
             <div className="mt-1 flex items-center justify-between">
               <span className="text-muted-foreground">Allocated to CLOs</span>
+
               <span className="font-medium text-foreground">
                 {allocatedSlt.toFixed(1)} h
               </span>
@@ -406,23 +526,38 @@ function Donut({
   const stroke = 14;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
+
   const totalWeeks = coverage.reduce((sum, x) => sum + x.weeks, 0);
 
   let offset = 0;
+
   const segments =
     totalWeeks > 0
       ? coverage
           .filter((x) => x.weeks > 0)
           .map((x) => {
             const len = (x.weeks / totalWeeks) * c;
-            const seg = { code: x.code, len, offset };
+
+            const segment = {
+              code: x.code,
+              len,
+              offset,
+            };
+
             offset += len;
-            return seg;
+
+            return segment;
           })
       : [];
 
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
+    <div
+      className="relative shrink-0"
+      style={{
+        width: size,
+        height: size,
+      }}
+    >
       <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2}
@@ -432,22 +567,25 @@ function Donut({
           stroke="var(--muted)"
           strokeWidth={stroke}
         />
-        {segments.map((s) => (
+
+        {segments.map((segment) => (
           <circle
-            key={s.code}
+            key={segment.code}
             cx={size / 2}
             cy={size / 2}
             r={r}
             fill="none"
-            stroke={cloColor(s.code)}
+            stroke={cloColor(segment.code)}
             strokeWidth={stroke}
-            strokeDasharray={`${s.len} ${c - s.len}`}
-            strokeDashoffset={-s.offset}
+            strokeDasharray={`${segment.len} ${c - segment.len}`}
+            strokeDashoffset={-segment.offset}
           />
         ))}
       </svg>
+
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-lg font-bold text-foreground">{percent}%</span>
+
         <span className="text-[11px] text-muted-foreground">Covered</span>
       </div>
     </div>
@@ -458,42 +596,51 @@ function Donut({
 
 function SummaryCard({ plan }: { plan: WeeklyPlanForm }) {
   const s = weeklyPlanSummary(plan);
+
   const projectRange =
     s.projectWeeks.length === 0
       ? null
       : s.projectWeeks.length === 1
         ? `Week ${s.projectWeeks[0]}`
-        : `Week ${s.projectWeeks[0]}-${s.projectWeeks[s.projectWeeks.length - 1]}`;
+        : `Week ${s.projectWeeks[0]}-${
+            s.projectWeeks[s.projectWeeks.length - 1]
+          }`;
 
   return (
     <Card>
       <CardHeader title="Weekly Plan Summary" />
+
       <dl className="space-y-2.5 text-sm">
         <SummaryRow
           icon={<CalendarDays className="h-4 w-4" />}
           label="Total Weeks"
           value={s.totalWeeks}
         />
+
         <SummaryRow
           icon={<Clock className="h-4 w-4" />}
           label="Total Contact Hours (L+T+P+O)"
           value={s.contactHours}
         />
+
         <SummaryRow
           icon={<Timer className="h-4 w-4" />}
-          label="Total Self-Study Hours"
+          label="Total Independent Learning Hours (NF2F)"
           value={s.selfStudyHours}
         />
+
         <SummaryRow
           icon={<Clock className="h-4 w-4" />}
           label="Total SLT Hours"
           value={s.slt}
         />
+
         <SummaryRow
           icon={<ClipboardList className="h-4 w-4" />}
           label="Assessments"
           value={s.assessments}
         />
+
         <SummaryRow
           icon={<FolderKanban className="h-4 w-4" />}
           label="Project Weeks"
@@ -519,8 +666,10 @@ function SummaryRow({
     <div className="flex items-center justify-between gap-2">
       <span className="flex items-center gap-2 text-muted-foreground">
         <span className="text-muted-foreground/80">{icon}</span>
+
         {label}
       </span>
+
       <span className="font-semibold text-foreground">{value}</span>
     </div>
   );
@@ -546,6 +695,7 @@ function CardHeader({
   return (
     <div className="mb-4 flex items-center justify-between">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+
       {action}
     </div>
   );
