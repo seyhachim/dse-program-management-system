@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Copy,
   Eye,
@@ -10,7 +10,6 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { bloomStyle, withCodes, type CloForm } from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
@@ -37,32 +36,16 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 export function ClosSection({
   value,
   courseId,
-  teachingMethods,
-  assessmentMethods,
-  courseTotalSlt,
   lastSavedAt,
   onPersist,
 }: {
   value: CloForm[];
   courseId: string;
-  teachingMethods: Method[];
-  assessmentMethods: Method[];
-  /** Course's total SLT hours — CLO SLT hours must sum to this. */
-  courseTotalSlt: number | null;
   lastSavedAt: Date | null;
   /** Persist the given CLO list (whole §14 section) and sync wizard state. */
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
   const clos = withCodes(value);
-  const methodName = useMemo(() => {
-    const map = new Map(assessmentMethods.map((m) => [m.id, m.name]));
-    return (id: string) => map.get(id) ?? id;
-  }, [assessmentMethods]);
-
-  const assignedSlt = clos.reduce((s, c) => s + (Number(c.sltHours) || 0), 0);
-  const sltMismatch =
-    courseTotalSlt != null && clos.length > 0 && assignedSlt !== courseTotalSlt;
-
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
@@ -216,7 +199,6 @@ export function ClosSection({
                   <th className="py-2 pr-3">Course Learning Outcome</th>
                   <th className="py-2 pr-3">Bloom's Level</th>
                   <th className="py-2 pr-3">Mapped PLOs</th>
-                  <th className="py-2 pr-3">Assessment Methods</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
@@ -225,7 +207,7 @@ export function ClosSection({
                 {visible.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={7}
                       className="py-8 text-center text-sm text-muted-foreground"
                     >
                       No CLOs match your search.
@@ -270,11 +252,6 @@ export function ClosSection({
                           )}
                         </td>
 
-                        <td className="max-w-[220px] py-3 pr-3 text-muted-foreground">
-                          {clo.assessmentMethodIds.length
-                            ? clo.assessmentMethodIds.map(methodName).join(", ")
-                            : "—"}
-                        </td>
                         <td className="py-3 pr-3">
                           <span className="inline-flex items-center gap-1.5">
                             <span
@@ -337,9 +314,6 @@ export function ClosSection({
         courseId={courseId}
         cloCode={modal.cloCode}
         clos={clos}
-        teachingMethods={teachingMethods}
-        assessmentMethods={assessmentMethods}
-        courseTotalSlt={courseTotalSlt}
         onPersist={onPersist}
       />
     </div>

@@ -193,14 +193,12 @@ export const BLOOM_COGNITIVE = COGNITIVE_LEVELS;
 export const STATEMENT_MAX = 300;
 export const NOTES_MAX = 300;
 
-export type WizardStepId = 1 | 2 | 3 | 4 | 5;
+export type WizardStepId = 1 | 2 | 3;
 
 export const CLO_WIZARD_STEPS: { id: WizardStepId; title: string }[] = [
-  { id: 1, title: "CLO Info" },
+  { id: 1, title: "CLO & Bloom" },
   { id: 2, title: "PLO Mapping" },
-  { id: 3, title: "Teaching Methods" },
-  { id: 4, title: "Assessment" },
-  { id: 5, title: "Review" },
+  { id: 3, title: "Review" },
 ];
 
 /**
@@ -231,10 +229,6 @@ export function wizardStepComplete(
     case 2:
       return draft.mappedPlos.length > 0;
     case 3:
-      return draft.teachingMethodIds.length > 0;
-    case 4:
-      return draft.assessmentMethodIds.length > 0;
-    case 5:
       return true;
   }
 }

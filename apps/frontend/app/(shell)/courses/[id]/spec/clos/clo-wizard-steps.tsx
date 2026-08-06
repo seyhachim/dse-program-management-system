@@ -7,17 +7,9 @@ import {
   COGNITIVE_LEVELS,
   PLOS,
   PSYCHOMOTOR_LEVELS,
-  type Method,
 } from "@dse-pms/shared-types";
 import { Switch } from "@dse-pms/ui";
-import {
-  NOTES_MAX,
-  STATEMENT_MAX,
-  wizardStepComplete,
-  type CloForm,
-} from "../clo-model";
-
-import { ChipMultiSelect } from "./chip-multiselect";
+import { STATEMENT_MAX, wizardStepComplete, type CloForm } from "../clo-model";
 
 type SetPatch = (patch: Partial<CloForm>) => void;
 
@@ -58,14 +50,17 @@ export function CloStepInfo({
             statementError ? "border-status-live" : "border-border"
           }`}
         />
+
         <div className="flex items-center justify-between">
           <Hint>
             Clear and measurable statement of what students will be able to do.
           </Hint>
+
           <span className="text-xs text-muted-foreground">
             {draft.description.length} / {STATEMENT_MAX}
           </span>
         </div>
+
         {statementError ? (
           <p className="text-xs text-status-live">
             A CLO statement is required.
@@ -80,31 +75,35 @@ export function CloStepInfo({
           className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <option value="">— Select level —</option>
+
           <optgroup label="Cognitive">
-            {COGNITIVE_LEVELS.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.code} — {l.name}
+            {COGNITIVE_LEVELS.map((level) => (
+              <option key={level.code} value={level.code}>
+                {level.code} — {level.name}
               </option>
             ))}
           </optgroup>
+
           <optgroup label="Affective">
-            {AFFECTIVE_LEVELS.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.code} — {l.name}
+            {AFFECTIVE_LEVELS.map((level) => (
+              <option key={level.code} value={level.code}>
+                {level.code} — {level.name}
               </option>
             ))}
           </optgroup>
+
           <optgroup label="Psychomotor">
-            {PSYCHOMOTOR_LEVELS.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.code} — {l.name}
+            {PSYCHOMOTOR_LEVELS.map((level) => (
+              <option key={level.code} value={level.code}>
+                {level.code} — {level.name}
               </option>
             ))}
           </optgroup>
         </select>
+
         <Hint>
-          The cognitive level this CLO addresses. Pick a verb from the helper to
-          match it.
+          Select the Bloom&apos;s Taxonomy level that best represents the
+          expected learning outcome.
         </Hint>
       </Field>
 
@@ -112,12 +111,18 @@ export function CloStepInfo({
         <label className="flex items-center gap-3">
           <Switch
             checked={draft.status === "active"}
-            onCheckedChange={(v) => set({ status: v ? "active" : "inactive" })}
+            onCheckedChange={(value) =>
+              set({
+                status: value ? "active" : "inactive",
+              })
+            }
           />
+
           <span className="text-sm text-foreground">
             {draft.status === "active" ? "Active" : "Inactive"}
           </span>
         </label>
+
         <Hint>Inactive CLOs will not be used in mapping and reports.</Hint>
       </Field>
     </div>
@@ -134,13 +139,18 @@ export function CloStepPlos({
   toggle: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return PLOS;
+
+    if (!q) {
+      return PLOS;
+    }
+
     return PLOS.filter(
-      (p) =>
-        p.id.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q),
+      (plo) =>
+        plo.id.toLowerCase().includes(q) ||
+        plo.description.toLowerCase().includes(q),
     );
   }, [query]);
 
@@ -150,6 +160,7 @@ export function CloStepPlos({
         <p className="text-sm text-muted-foreground">
           Select the PLOs that this CLO contributes to.
         </p>
+
         <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
           {draft.mappedPlos.length} selected
         </span>
@@ -157,6 +168,7 @@ export function CloStepPlos({
 
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -168,6 +180,7 @@ export function CloStepPlos({
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {filtered.map((plo) => {
           const checked = draft.mappedPlos.includes(plo.id);
+
           return (
             <li key={plo.id}>
               <label
@@ -183,6 +196,7 @@ export function CloStepPlos({
                   checked={checked}
                   onChange={() => toggle(plo.id)}
                 />
+
                 <span>
                   <span className="font-medium text-foreground">{plo.id}</span>{" "}
                   <span className="text-muted-foreground">
@@ -193,6 +207,7 @@ export function CloStepPlos({
             </li>
           );
         })}
+
         {filtered.length === 0 ? (
           <li className="text-sm text-muted-foreground">
             No PLOs match your search.
@@ -203,112 +218,30 @@ export function CloStepPlos({
   );
 }
 
-/* ---------------------------------------------------- Step 3 — Learning & Teaching */
-
-export function CloStepLearning({
-  draft,
-  set,
-  teachingMethods,
-}: {
-  draft: CloForm;
-  set: SetPatch;
-  teachingMethods: Method[];
-}) {
-  return (
-    <div className="space-y-3">
-      <h4 className="text-sm font-semibold text-foreground">
-        Teaching Methods
-      </h4>
-
-      <p className="text-xs text-muted-foreground">
-        Select the teaching methods used to deliver this CLO.
-      </p>
-
-      <ChipMultiSelect
-        label="Teaching methods"
-        options={teachingMethods}
-        selectedIds={draft.teachingMethodIds}
-        onChange={(ids) => set({ teachingMethodIds: ids })}
-      />
-    </div>
-  );
-}
-
-/* -------------------------------------------------------- Step 4 — Assessment */
-
-export function CloStepAssessment({
-  draft,
-  set,
-  assessmentMethods,
-}: {
-  draft: CloForm;
-  set: SetPatch;
-  assessmentMethods: Method[];
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-foreground">
-          Assessment Methods
-        </h4>
-        <p className="text-xs text-muted-foreground">
-          Select the assessment methods that measure this CLO.
-        </p>
-        <ChipMultiSelect
-          label="Assessment methods"
-          options={assessmentMethods}
-          selectedIds={draft.assessmentMethodIds}
-          onChange={(ids) => set({ assessmentMethodIds: ids })}
-          emptyMessage="No assessment methods defined yet."
-        />
-      </div>
-
-      <Field label="Notes">
-        <textarea
-          value={draft.notes}
-          maxLength={NOTES_MAX}
-          onChange={(e) => set({ notes: e.target.value })}
-          placeholder="Add any notes or comments about this CLO…"
-          className="min-h-[80px] w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        />
-        <div className="flex justify-end">
-          <span className="text-xs text-muted-foreground">
-            {draft.notes.length} / {NOTES_MAX}
-          </span>
-        </div>
-      </Field>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ Step 5 — Review */
+/* ------------------------------------------------------------ Step 3 — Review */
 
 export function CloStepReview({
   draft,
   code,
-  teachingMethods,
-  assessmentMethods,
   onJump,
 }: {
   draft: CloForm;
   code: string;
-  teachingMethods: Method[];
-  assessmentMethods: Method[];
-  onJump: (step: 1 | 2 | 3 | 4) => void;
+  onJump: (step: 1 | 2) => void;
 }) {
-  const methodName = (list: Method[], id: string) =>
-    list.find((m) => m.id === id)?.name ?? id;
-
   return (
     <div className="space-y-4">
       <ReviewCard
-        title="CLO Information"
+        title="CLO & Bloom's Taxonomy"
         onEdit={() => onJump(1)}
         incomplete={!wizardStepComplete(1, draft)}
       >
         <ReviewRow label="Code" value={code} />
+
         <ReviewRow label="Statement" value={draft.description || "—"} />
+
         <ReviewRow label="Bloom's Level" value={draft.level || "Not set"} />
+
         <ReviewRow
           label="Status"
           value={draft.status === "active" ? "Active" : "Inactive"}
@@ -316,7 +249,7 @@ export function CloStepReview({
       </ReviewCard>
 
       <ReviewCard
-        title="Mapped PLOs"
+        title="PLO Alignment"
         onEdit={() => onJump(2)}
         incomplete={!wizardStepComplete(2, draft)}
       >
@@ -329,44 +262,11 @@ export function CloStepReview({
           }
         />
       </ReviewCard>
-
-      <ReviewCard
-        title="Teaching Methods"
-        onEdit={() => onJump(3)}
-        incomplete={!wizardStepComplete(3, draft)}
-      >
-        <ReviewRow
-          label="Teaching Methods"
-          value={
-            draft.teachingMethodIds.length
-              ? draft.teachingMethodIds
-                  .map((id) => methodName(teachingMethods, id))
-                  .join(", ")
-              : "None selected"
-          }
-        />
-      </ReviewCard>
-
-      <ReviewCard
-        title="Assessment"
-        onEdit={() => onJump(4)}
-        incomplete={!wizardStepComplete(4, draft)}
-      >
-        <ReviewRow
-          label="Assessment Methods"
-          value={
-            draft.assessmentMethodIds.length
-              ? draft.assessmentMethodIds
-                  .map((id) => methodName(assessmentMethods, id))
-                  .join(", ")
-              : "None selected"
-          }
-        />
-        <ReviewRow label="Notes" value={draft.notes || "—"} />
-      </ReviewCard>
     </div>
   );
 }
+
+/* ---------------------------------------------------------- Review components */
 
 function ReviewCard({
   title,
@@ -384,12 +284,14 @@ function ReviewCard({
       <div className="mb-2 flex items-center justify-between">
         <h4 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
           {title}
+
           {incomplete ? (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
               Incomplete
             </span>
           ) : null}
         </h4>
+
         <button
           type="button"
           onClick={onEdit}
@@ -398,6 +300,7 @@ function ReviewCard({
           Edit
         </button>
       </div>
+
       <dl className="space-y-1 text-sm">{children}</dl>
     </div>
   );
@@ -407,6 +310,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2">
       <dt className="w-36 shrink-0 text-muted-foreground">{label}</dt>
+
       <dd className="text-foreground">{value}</dd>
     </div>
   );
@@ -427,8 +331,10 @@ function Field({
     <div className="space-y-1.5">
       <span className="block text-sm font-medium text-foreground">
         {label}
+
         {required ? <span className="text-status-live"> *</span> : null}
       </span>
+
       {children}
     </div>
   );

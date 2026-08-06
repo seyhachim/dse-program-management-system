@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -60,6 +60,7 @@ import {
   type AssessmentForm,
 } from "./assessment-section";
 import { MappingSection } from "./mapping-section";
+import { TeachingLearningSection } from "./teaching-learning-section";
 import {
   EMPTY_MAPPING,
   toMappingForm,
@@ -71,19 +72,25 @@ import { OverviewTab } from "./overview-tab";
 import { CompletionSummary } from "./completion-summary";
 import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
-import { useMemo } from "react";
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
-type TabId = "overview" | "documentPreview" | SpecSectionId;
+type TabId =
+  | "overview"
+  | "teachingLearning"
+  | "documentPreview"
+  | "reviewSubmit"
+  | SpecSectionId;
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "clos", label: "CLOs" },
-  { id: "slt", label: "Weekly Plan" },
+  { id: "teachingLearning", label: "Teaching & Learning" },
   { id: "assessmentPlan", label: "Assessment" },
+  { id: "slt", label: "Weekly Plan" },
+  { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
   { id: "policy", label: "Policies" },
-  { id: "mapping", label: "Mapping" },
   { id: "documentPreview", label: "Document Preview" },
+  { id: "reviewSubmit", label: "Review & Submit" },
 ];
 
 const sectionMeta = (id: TabId) => SPEC_SECTIONS.find((s) => s.id === id);
@@ -364,10 +371,15 @@ export function SpecClient({ courseId }: { courseId: string }) {
             <ClosSection
               value={clos}
               courseId={courseId}
-              teachingMethods={teachingMethods}
-              assessmentMethods={assessmentMethods}
-              courseTotalSlt={courseTotalSlt}
               lastSavedAt={closSavedAt}
+              onPersist={persistClos}
+            />
+          </TabsContent>
+
+          <TabsContent value="teachingLearning" className="mt-4">
+            <TeachingLearningSection
+              value={clos}
+              teachingMethods={teachingMethods}
               onPersist={persistClos}
             />
           </TabsContent>
@@ -442,6 +454,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 </div>
               </SectionPanel>
             )}
+          </TabsContent>
+
+          <TabsContent value="reviewSubmit" className="mt-4">
+            <SectionPanel>
+              <ComingSoon meta={{ title: "Review & Submit" }} />
+            </SectionPanel>
           </TabsContent>
 
           {canSaveActive ? (

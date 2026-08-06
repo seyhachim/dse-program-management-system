@@ -68,7 +68,15 @@ export const studentsManifest: PluginManifest = {
   description: "Student records — CRUD, list, profile.",
   // Program Secretary maintains student/class lists (issue #101 §6); Program
   // Coordinator's proposed sidebar has no Students entry, so it's left off.
-  routes: [{ label: "Students", path: "/students", icon: "users", roles: ["admin", "program_secretary"], group: "Academic" }],
+  routes: [
+    {
+      label: "Students",
+      path: "/students",
+      icon: "users",
+      roles: ["admin", "program_secretary"],
+      group: "Academic",
+    },
+  ],
   permissions: ["students:read", "students:write"],
 };
 
@@ -98,7 +106,12 @@ export const coursesManifest: PluginManifest = {
       // route to reach it — this is QA's path to Course Specification content
       // for review (issue #101 §15); Add/Edit/Delete stay hidden via the
       // `courses:manage` permission check the page already does (PR #110).
-      roles: ["admin", "program_coordinator", "program_secretary", "qa_reviewer"],
+      roles: [
+        "admin",
+        "program_coordinator",
+        "program_secretary",
+        "qa_reviewer",
+      ],
       group: "Academic",
     },
   ],
@@ -126,7 +139,8 @@ export const lecturersManifest: PluginManifest = {
   id: "lecturers",
   name: "Lecturers",
   version: "0.1.0",
-  description: "Lecturers — Users with the lecturer role, incl. syllabus contact details.",
+  description:
+    "Lecturers — Users with the lecturer role, incl. syllabus contact details.",
   routes: [
     {
       label: "Lecturers",
@@ -148,7 +162,8 @@ export const dashboardManifest: PluginManifest = {
   id: "dashboard",
   name: "Dashboard",
   version: "0.1.0",
-  description: "Programme overview: key counts, course spec completion, offering/student status.",
+  description:
+    "Programme overview: key counts, course spec completion, offering/student status.",
   // Programme-wide roles only (PROGRAMME_WIDE_ROLES, mirrored here since this
   // manifest has no backend plugin of its own to import the constant from): the
   // dashboard aggregates totals from Students/Courses/Offerings unscoped, so a
@@ -162,6 +177,24 @@ export const dashboardManifest: PluginManifest = {
       roles: ["admin", "program_coordinator", "program_secretary"],
     },
   ],
+};
+
+export const programmeManifest: PluginManifest = {
+  id: "programme",
+  name: "Programme Management",
+  version: "0.1.0",
+  description:
+    "Programme-level academic configuration — learning outcomes, graduate competencies, and their alignment.",
+  routes: [
+    {
+      label: "Programme Management",
+      path: "/programme-management",
+      icon: "clipboard-list",
+      roles: ["admin", "program_coordinator", "program_secretary"],
+      group: "Academic",
+    },
+  ],
+  permissions: ["programme:read", "programme:write"],
 };
 
 /**
@@ -185,15 +218,9 @@ export const placeholdersManifest: PluginManifest = {
   id: "placeholders",
   name: "Placeholders",
   version: "0.1.0",
-  description: "Sidebar entries for sections not yet built — link to a coming-soon page.",
+  description:
+    "Sidebar entries for sections not yet built — link to a coming-soon page.",
   routes: [
-    {
-      label: "Programme Management",
-      path: "/programme-management",
-      icon: "clipboard-list",
-      roles: ["admin", "program_coordinator", "program_secretary"],
-      group: "Academic",
-    },
     {
       label: "Assessment Management",
       path: "/assessment-management",
@@ -219,7 +246,12 @@ export const placeholdersManifest: PluginManifest = {
       label: "Reports",
       path: "/reports",
       icon: "bar-chart",
-      roles: ["admin", "program_coordinator", "program_secretary", "qa_reviewer"],
+      roles: [
+        "admin",
+        "program_coordinator",
+        "program_secretary",
+        "qa_reviewer",
+      ],
       group: "Quality Assurance",
     },
     {
@@ -233,13 +265,41 @@ export const placeholdersManifest: PluginManifest = {
       label: "Document Library",
       path: "/document-library",
       icon: "file-text",
-      roles: ["admin", "program_coordinator", "program_secretary", "qa_reviewer"],
+      roles: [
+        "admin",
+        "program_coordinator",
+        "program_secretary",
+        "qa_reviewer",
+      ],
       group: "Quality Assurance",
     },
-    { label: "Users", path: "/users", icon: "user-cog", roles: ["admin"], group: "Admin" },
-    { label: "Settings", path: "/settings", icon: "settings", roles: ["admin"], group: "Admin" },
-    { label: "Audit Trail", path: "/audit-trail", icon: "history", roles: ["admin"], group: "Admin" },
-    { label: "Help & Support", path: "/help", icon: "help-circle", group: "footer" },
+    {
+      label: "Users",
+      path: "/users",
+      icon: "user-cog",
+      roles: ["admin"],
+      group: "Admin",
+    },
+    {
+      label: "Settings",
+      path: "/settings",
+      icon: "settings",
+      roles: ["admin"],
+      group: "Admin",
+    },
+    {
+      label: "Audit Trail",
+      path: "/audit-trail",
+      icon: "history",
+      roles: ["admin"],
+      group: "Admin",
+    },
+    {
+      label: "Help & Support",
+      path: "/help",
+      icon: "help-circle",
+      group: "footer",
+    },
   ],
 };
 
@@ -247,7 +307,8 @@ export const methodsManifest: PluginManifest = {
   id: "methods",
   name: "Methods",
   version: "0.1.0",
-  description: "Teaching & assessment method vocabulary for course specs (§14).",
+  description:
+    "Teaching & assessment method vocabulary for course specs (§14).",
   permissions: ["methods:read", "methods:write"],
 };
 
@@ -255,7 +316,8 @@ export const rubricsManifest: PluginManifest = {
   id: "rubrics",
   name: "Rubric Library",
   version: "0.1.0",
-  description: "Reusable assessment rubrics — criteria × rating-scale grids shared across courses.",
+  description:
+    "Reusable assessment rubrics — criteria × rating-scale grids shared across courses.",
   // No routes: reached from within a course's Course Specification → Assessment
   // section (Assessment → Rubric Library), not as a top-level sidebar entry.
   permissions: ["rubrics:read", "rubrics:write"],
@@ -265,7 +327,8 @@ export const authManifest: PluginManifest = {
   id: "auth",
   name: "Auth",
   version: "0.1.0",
-  description: "Identity (GET /me) and admin-only account provisioning via Supabase.",
+  description:
+    "Identity (GET /me) and admin-only account provisioning via Supabase.",
   // No routes: not a sidebar entry — account creation is embedded in the Lecturers page.
   permissions: ["accounts:create"],
 };
@@ -276,6 +339,7 @@ export const pluginManifests: PluginManifest[] = [
   coursesManifest,
   offeringsManifest,
   lecturersManifest,
+  programmeManifest,
   placeholdersManifest,
   methodsManifest,
   rubricsManifest,
@@ -289,7 +353,9 @@ export const pluginManifests: PluginManifest[] = [
  * with no `roles` restriction is open to everyone.
  */
 export function routeAllowsRole(route: PluginRoute, roles: Role[]): boolean {
-  return route.roles === undefined || route.roles.some((r) => roles.includes(r));
+  return (
+    route.roles === undefined || route.roles.some((r) => roles.includes(r))
+  );
 }
 
 /** Sidebar nav is generated automatically from plugin routes. */
@@ -298,7 +364,10 @@ export function navFromManifests(manifests: PluginManifest[]): PluginRoute[] {
 }
 
 /** Nav routes visible to a caller holding any of `roles` — the union across all of them. */
-export function navForRole(manifests: PluginManifest[], roles: Role[]): PluginRoute[] {
+export function navForRole(
+  manifests: PluginManifest[],
+  roles: Role[],
+): PluginRoute[] {
   return navFromManifests(manifests).filter((r) => routeAllowsRole(r, roles));
 }
 
@@ -313,7 +382,10 @@ export interface NavGroup {
  * group's first appearance across `manifests` — no separate priority field,
  * the manifest array order is the display order.
  */
-export function navGroupsForRole(manifests: PluginManifest[], roles: Role[]): NavGroup[] {
+export function navGroupsForRole(
+  manifests: PluginManifest[],
+  roles: Role[],
+): NavGroup[] {
   const order: (string | undefined)[] = [];
   const buckets = new Map<string | undefined, PluginRoute[]>();
   for (const route of navForRole(manifests, roles)) {

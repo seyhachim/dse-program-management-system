@@ -32,7 +32,9 @@ export function CloWizardSidebar({
   code: string;
   onInsertVerb: (verb: string) => void;
 }) {
-  const doneCount = CLO_WIZARD_STEPS.filter((s) => s.id !== 5 && wizardStepComplete(s.id as WizardStepId, draft)).length;
+  const doneCount = CLO_WIZARD_STEPS.filter(
+    (s) => s.id !== 3 && wizardStepComplete(s.id, draft),
+  ).length;
   const totalSteps = CLO_WIZARD_STEPS.length - 1;
   const percent = Math.round((doneCount / totalSteps) * 100);
   const levelName = CAP_LEVELS.find((l) => l.code === draft.level)?.name;
@@ -47,16 +49,25 @@ export function CloWizardSidebar({
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
               className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: draft.status === "active" ? "#22c55e" : "var(--muted-foreground)" }}
+              style={{
+                backgroundColor:
+                  draft.status === "active"
+                    ? "#22c55e"
+                    : "var(--muted-foreground)",
+              }}
             />
             {draft.status === "active" ? "Active" : "Inactive"}
           </span>
         </div>
         <p className="mt-2 text-sm text-foreground">
-          {draft.description.trim() || <span className="text-muted-foreground">No statement yet…</span>}
+          {draft.description.trim() || (
+            <span className="text-muted-foreground">No statement yet…</span>
+          )}
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          {draft.level ? `${draft.level} — ${levelName}` : "No Bloom's level yet"}
+          {draft.level
+            ? `${draft.level} — ${levelName}`
+            : "No Bloom's level yet"}
         </p>
       </SidebarCard>
 
@@ -83,13 +94,17 @@ export function CloWizardSidebar({
       </SidebarCard>
 
       <SidebarCard title="Bloom's Taxonomy Helper">
-        <p className="mb-2 text-xs text-muted-foreground">Click a verb to add it to the statement.</p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Click a verb to add it to the statement.
+        </p>
         <ul className="flex flex-wrap gap-1.5">
           {bloomVerbsFor(draft.level).map((verb) => (
             <li key={verb}>
               <button
                 type="button"
-                onClick={() => onInsertVerb(appendBloomVerb(draft.description, verb))}
+                onClick={() =>
+                  onInsertVerb(appendBloomVerb(draft.description, verb))
+                }
                 className="cursor-pointer rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
               >
                 {verb}
@@ -104,12 +119,14 @@ export function CloWizardSidebar({
 
 const TONE_CARD: Record<"blue" | "emerald", string> = {
   blue: "border-blue-200/70 bg-blue-50/60 dark:border-blue-900/40 dark:bg-blue-950/20",
-  emerald: "border-emerald-200/70 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20",
+  emerald:
+    "border-emerald-200/70 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20",
 };
 
 const TONE_ICON: Record<"blue" | "emerald", string> = {
   blue: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
-  emerald: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+  emerald:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
 };
 
 function SidebarCard({
@@ -124,7 +141,9 @@ function SidebarCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-lg border p-3 ${tone ? TONE_CARD[tone] : "border-border bg-muted/30"}`}>
+    <div
+      className={`rounded-lg border p-3 ${tone ? TONE_CARD[tone] : "border-border bg-muted/30"}`}
+    >
       <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {Icon ? (
           <span

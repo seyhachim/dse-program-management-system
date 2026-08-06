@@ -180,6 +180,57 @@ model Student {
   @@index([status])
 }
 
+/// Programme-level learning outcomes for the single DSE programme.
+///
+/// `code` is the stable academic identifier (for example "PLO1") and must
+/// remain compatible with existing CourseSpecClo.mappedPlos String[] values.
+/// Existing CLO mappings continue storing PLO codes; no CLO migration is
+/// required when this table is introduced.
+model ProgramLearningOutcome {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  description String
+  order       Int      @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  competencyLinks ProgramCompetencyPlo[]
+}
+
+/// Programme-level graduate competencies for the single DSE programme.
+///
+/// Competencies are managed at programme level. Course lecturers do not map
+/// CLOs directly to competencies; competency context is derived through PLOs.
+model ProgramCompetency {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  order       Int      @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ploLinks ProgramCompetencyPlo[]
+}
+
+/// Many-to-many bridge between programme competencies and PLOs.
+///
+/// A competency may be supported by multiple PLOs, and a PLO may contribute
+/// to multiple competencies.
+model ProgramCompetencyPlo {
+  competencyId String
+  ploId        String
+  createdAt    DateTime @default(now())
+
+  competency ProgramCompetency      @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  plo        ProgramLearningOutcome @relation(fields: [ploId], references: [id], onDelete: Cascade)
+
+  @@id([competencyId, ploId])
+  @@index([ploId])
+}
+
 /// Courses plugin domain model. lecturerId references a User with role = lecturer
 /// (validated at the service layer through registry.get('lecturers')).
 model Course {

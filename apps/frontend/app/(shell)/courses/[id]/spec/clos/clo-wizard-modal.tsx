@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@dse-pms/ui";
-import type { Method } from "@dse-pms/shared-types";
 import {
   CLO_WIZARD_STEPS,
   cloWizardErrors,
@@ -18,22 +17,21 @@ import {
   type CloForm,
   type WizardStepId,
 } from "../clo-model";
-import {
-  CloStepAssessment,
-  CloStepInfo,
-  CloStepLearning,
-  CloStepPlos,
-  CloStepReview,
-} from "./clo-wizard-steps";
+import { CloStepInfo, CloStepPlos, CloStepReview } from "./clo-wizard-steps";
 import { CloWizardSidebar } from "./clo-wizard-sidebar";
 import { clearCloDraft, loadCloDraft, saveCloDraft } from "./clo-draft-storage";
 
 /**
- * Popup modal for adding/editing a §14 CLO. Replaces the routed
- * /clos/add and /clos/:code/edit full pages (issue #94's wizard, later
- * moved to a page for a shareable URL) with a Dialog again, per the
- * client's request — the shareable-URL benefit is intentionally traded
- * for the simpler popup UX.
+ * Popup modal for adding/editing a §14 CLO.
+ *
+ * Step 2A responsibility:
+ * 1. CLO statement + Bloom's Taxonomy
+ * 2. PLO alignment
+ * 3. Review
+ *
+ * Teaching methods are edited from the Teaching & Learning tab.
+ * Existing teachingMethodIds / assessmentMethodIds remain part of CloForm
+ * and are preserved when the CLO is saved.
  */
 export function CloWizardModal({
   open,
@@ -41,20 +39,16 @@ export function CloWizardModal({
   courseId,
   cloCode,
   clos,
-  teachingMethods,
-  assessmentMethods,
-  courseTotalSlt,
   onPersist,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   courseId: string;
+
   /** null = adding a new CLO; otherwise the code of the CLO being edited. */
   cloCode: string | null;
+
   clos: CloForm[];
-  teachingMethods: Method[];
-  assessmentMethods: Method[];
-  courseTotalSlt: number | null;
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState<CloForm | null>(null);
@@ -66,50 +60,85 @@ export function CloWizardModal({
 
   useEffect(() => {
     if (!open) return;
+
     const base = cloCode
-      ? (clos.find((c) => c.code === cloCode) ?? emptyClo())
+      ? (clos.find((clo) => clo.code === cloCode) ?? emptyClo())
       : emptyClo();
+
     const stored = loadCloDraft(courseId, cloCode);
+
     setDraft(stored ?? base);
     setStep(1);
     setTouched(false);
     setError(null);
     setDraftSavedAt(null);
-    // Only re-seed when the dialog is opened for a given CLO, not on every
-    // `clos` change (which would clobber in-progress edits with server state).
+
+    // Only re-seed when the dialog is opened for a given CLO.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, cloCode, courseId]);
 
-  const set = (patch: Partial<CloForm>) =>
-    setDraft((d) => (d ? { ...d, ...patch } : d));
-  const toggleMappedPlo = (id: string) =>
-    setDraft((d) => {
-      if (!d) return d;
-      const has = d.mappedPlos.includes(id);
+  const set = (patch: Partial<CloForm>) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            ...patch,
+          }
+        : current,
+    );
+  };
+
+  const toggleMappedPlo = (id: string) => {
+    setDraft((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const selected = current.mappedPlos.includes(id);
+
       return {
-        ...d,
-        mappedPlos: has
-          ? d.mappedPlos.filter((x) => x !== id)
-          : [...d.mappedPlos, id],
+        ...current,
+        mappedPlos: selected
+          ? current.mappedPlos.filter((ploId) => ploId !== id)
+          : [...current.mappedPlos, id],
       };
     });
+  };
 
   const code = cloCode ?? `CLO${clos.length + 1}`;
-  const errors = draft ? cloWizardErrors(draft) : { statement: true };
+
+  const errors = draft
+    ? cloWizardErrors(draft)
+    : {
+        statement: true,
+      };
 
   const persistDraft = () => {
-    if (draft) saveCloDraft(courseId, cloCode, draft);
+    if (!draft) {
+      return;
+    }
+
+    saveCloDraft(courseId, cloCode, draft);
   };
 
   const saveDraftNow = () => {
-    if (!draft) return;
+    if (!draft) {
+      return;
+    }
+
     saveCloDraft(courseId, cloCode, draft);
     setDraftSavedAt(Date.now());
   };
 
   useEffect(() => {
-    if (!draftSavedAt) return;
-    const timer = setTimeout(() => setDraftSavedAt(null), 3000);
+    if (!draftSavedAt) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setDraftSavedAt(null);
+    }, 3000);
+
     return () => clearTimeout(timer);
   }, [draftSavedAt]);
 
@@ -118,25 +147,40 @@ export function CloWizardModal({
       setTouched(true);
       return;
     }
+
     persistDraft();
-    setStep((s) => (s < 5 ? ((s + 1) as WizardStepId) : s));
+
+    setStep((current) =>
+      current < 3 ? ((current + 1) as WizardStepId) : current,
+    );
   };
+
   const goPrev = () => {
     persistDraft();
-    setStep((s) => (s > 1 ? ((s - 1) as WizardStepId) : s));
+
+    setStep((current) =>
+      current > 1 ? ((current - 1) as WizardStepId) : current,
+    );
   };
+
   const goToStep = (id: WizardStepId) => {
     persistDraft();
     setStep(id);
   };
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) persistDraft();
+    if (!next) {
+      persistDraft();
+    }
+
     onOpenChange(next);
   };
 
   const submit = async () => {
-    if (!draft) return;
+    if (!draft) {
+      return;
+    }
+
     if (errors.statement) {
       setTouched(true);
       setStep(1);
@@ -145,15 +189,26 @@ export function CloWizardModal({
 
     setSaving(true);
     setError(null);
+
     try {
+      /*
+       * IMPORTANT:
+       * `draft` still contains teachingMethodIds and assessmentMethodIds.
+       *
+       * Editing the CLO statement, Bloom level, or PLO mappings therefore
+       * does not intentionally remove those existing relationships.
+       */
       const next = cloCode
-        ? clos.map((c) => (c.code === cloCode ? draft : c))
+        ? clos.map((clo) => (clo.code === cloCode ? draft : clo))
         : [...clos, draft];
+
       const ok = await onPersist(withCodes(next));
+
       if (!ok) {
         setError("Failed to save this CLO");
         return;
       }
+
       clearCloDraft(courseId, cloCode);
       onOpenChange(false);
     } catch {
@@ -167,7 +222,7 @@ export function CloWizardModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[1200px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[1200px]">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">{title}</DialogTitle>
         </DialogHeader>
@@ -180,17 +235,20 @@ export function CloWizardModal({
 
         {draft ? (
           <div className="overflow-hidden rounded-xl border border-border bg-card">
+            {/* ------------------------------------------------ Wizard header */}
+
             <div className="border-b border-border px-5 py-3">
               <ol className="flex items-center gap-1 overflow-x-auto">
-                {CLO_WIZARD_STEPS.map((s, i) => {
-                  const isActive = s.id === step;
-                  const isPast = s.id < step;
+                {CLO_WIZARD_STEPS.map((wizardStep, index) => {
+                  const isActive = wizardStep.id === step;
+                  const isPast = wizardStep.id < step;
+
                   return (
-                    <li key={s.id} className="flex items-center">
+                    <li key={wizardStep.id} className="flex items-center">
                       <button
                         type="button"
                         aria-current={isActive ? "step" : undefined}
-                        onClick={() => goToStep(s.id)}
+                        onClick={() => goToStep(wizardStep.id)}
                         className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                           isActive
                             ? "bg-accent text-accent-foreground"
@@ -206,11 +264,13 @@ export function CloWizardModal({
                               : "border-current"
                           }`}
                         >
-                          {s.id}
+                          {wizardStep.id}
                         </span>
-                        {s.title}
+
+                        {wizardStep.title}
                       </button>
-                      {i < CLO_WIZARD_STEPS.length - 1 ? (
+
+                      {index < CLO_WIZARD_STEPS.length - 1 ? (
                         <span aria-hidden className="mx-1 h-px w-4 bg-border" />
                       ) : null}
                     </li>
@@ -218,6 +278,8 @@ export function CloWizardModal({
                 })}
               </ol>
             </div>
+
+            {/* ------------------------------------------------ Wizard body */}
 
             <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[1fr_280px]">
               <div className="min-w-0">
@@ -229,41 +291,34 @@ export function CloWizardModal({
                     touched={touched}
                   />
                 ) : null}
+
                 {step === 2 ? (
                   <CloStepPlos draft={draft} toggle={toggleMappedPlo} />
                 ) : null}
+
                 {step === 3 ? (
-                  <CloStepLearning
-                    draft={draft}
-                    set={set}
-                    teachingMethods={teachingMethods}
-                  />
-                ) : null}
-                {step === 4 ? (
-                  <CloStepAssessment
-                    draft={draft}
-                    set={set}
-                    assessmentMethods={assessmentMethods}
-                  />
-                ) : null}
-                {step === 5 ? (
                   <CloStepReview
                     draft={draft}
                     code={code}
-                    teachingMethods={teachingMethods}
-                    assessmentMethods={assessmentMethods}
-                    onJump={setStep}
+                    onJump={(targetStep) => setStep(targetStep)}
                   />
                 ) : null}
               </div>
+
               <div className="lg:border-l lg:border-border lg:pl-6">
                 <CloWizardSidebar
                   draft={draft}
                   code={code}
-                  onInsertVerb={(next) => set({ description: next })}
+                  onInsertVerb={(next) =>
+                    set({
+                      description: next,
+                    })
+                  }
                 />
               </div>
             </div>
+
+            {/* ------------------------------------------------ Wizard footer */}
 
             <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
               <div className="flex items-center gap-2">
@@ -275,6 +330,7 @@ export function CloWizardModal({
                 >
                   Save Draft
                 </Button>
+
                 {draftSavedAt ? (
                   <span
                     aria-live="polite"
@@ -285,6 +341,7 @@ export function CloWizardModal({
                   </span>
                 ) : null}
               </div>
+
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -292,12 +349,14 @@ export function CloWizardModal({
                 >
                   Cancel
                 </Button>
+
                 {step > 1 ? (
                   <Button variant="outline" onClick={goPrev}>
                     Previous
                   </Button>
                 ) : null}
-                {step < 5 ? (
+
+                {step < 3 ? (
                   <Button onClick={goNext}>Next</Button>
                 ) : (
                   <Button onClick={submit} disabled={saving}>
