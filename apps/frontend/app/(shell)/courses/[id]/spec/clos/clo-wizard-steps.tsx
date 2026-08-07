@@ -7,6 +7,7 @@ import {
   COGNITIVE_LEVELS,
   PLOS,
   PSYCHOMOTOR_LEVELS,
+  type ProgrammeAcademicConfig,
 } from "@dse-pms/shared-types";
 import { Switch } from "@dse-pms/ui";
 import { STATEMENT_MAX, wizardStepComplete, type CloForm } from "../clo-model";
@@ -134,9 +135,11 @@ export function CloStepInfo({
 export function CloStepPlos({
   draft,
   toggle,
+  programme,
 }: {
   draft: CloForm;
   toggle: (id: string) => void;
+  programme: ProgrammeAcademicConfig | null;
 }) {
   const [query, setQuery] = useState("");
 
@@ -154,66 +157,164 @@ export function CloStepPlos({
     );
   }, [query]);
 
+  const relatedCompetencies = useMemo(() => {
+    if (!programme || draft.mappedPlos.length === 0) {
+      return [];
+    }
+
+    return programme.competencies
+      .map((competency) => {
+        const matchedPlos = competency.plos.filter((plo) =>
+          draft.mappedPlos.includes(plo.code),
+        );
+
+        return {
+          competency,
+          matchedPlos,
+        };
+      })
+      .filter((item) => item.matchedPlos.length > 0);
+  }, [programme, draft.mappedPlos]);
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Select the PLOs that this CLO contributes to.
-        </p>
+    <div className="space-y-5">
+      {/* PLO selection */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Select the PLOs that this CLO contributes to.
+          </p>
 
-        <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
-          {draft.mappedPlos.length} selected
-        </span>
-      </div>
+          <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
+            {draft.mappedPlos.length} selected
+          </span>
+        </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search PLOs…"
-          className="h-9 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        />
-      </div>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search PLOs…"
+            className="h-9 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+        </div>
 
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {filtered.map((plo) => {
-          const checked = draft.mappedPlos.includes(plo.id);
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {filtered.map((plo) => {
+            const checked = draft.mappedPlos.includes(plo.id);
 
-          return (
-            <li key={plo.id}>
-              <label
-                className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors ${
-                  checked
-                    ? "border-violet-400 bg-violet-50 dark:border-violet-700/60 dark:bg-violet-950/20"
-                    : "border-border hover:border-violet-200 hover:bg-violet-50/50 dark:hover:border-violet-800/50 dark:hover:bg-violet-950/10"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4 rounded border-border text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  checked={checked}
-                  onChange={() => toggle(plo.id)}
-                />
+            return (
+              <li key={plo.id}>
+                <label
+                  className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors ${
+                    checked
+                      ? "border-violet-400 bg-violet-50 dark:border-violet-700/60 dark:bg-violet-950/20"
+                      : "border-border hover:border-violet-200 hover:bg-violet-50/50 dark:hover:border-violet-800/50 dark:hover:bg-violet-950/10"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 rounded border-border text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    checked={checked}
+                    onChange={() => toggle(plo.id)}
+                  />
 
-                <span>
-                  <span className="font-medium text-foreground">{plo.id}</span>{" "}
-                  <span className="text-muted-foreground">
-                    {plo.description}
+                  <span>
+                    <span className="font-medium text-foreground">
+                      {plo.id}
+                    </span>{" "}
+                    <span className="text-muted-foreground">
+                      {plo.description}
+                    </span>
                   </span>
-                </span>
-              </label>
-            </li>
-          );
-        })}
+                </label>
+              </li>
+            );
+          })}
 
-        {filtered.length === 0 ? (
-          <li className="text-sm text-muted-foreground">
-            No PLOs match your search.
-          </li>
-        ) : null}
-      </ul>
+          {filtered.length === 0 ? (
+            <li className="text-sm text-muted-foreground">
+              No PLOs match your search.
+            </li>
+          ) : null}
+        </ul>
+      </div>
+
+      {/* Programme competency context */}
+      <div className="border-t border-border pt-4">
+        <div>
+          <h4 className="text-sm font-semibold text-foreground">
+            Related Program Competencies
+          </h4>
+
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Derived automatically from the selected PLOs and the programme-level
+            competency alignment.
+          </p>
+        </div>
+
+        {draft.mappedPlos.length === 0 ? (
+          <div className="mt-3 rounded-lg border border-dashed border-border p-4">
+            <p className="text-sm text-muted-foreground">
+              Select at least one PLO to see related Program Competencies.
+            </p>
+          </div>
+        ) : !programme ? (
+          <div className="mt-3 rounded-lg border border-dashed border-border p-4">
+            <p className="text-sm text-muted-foreground">
+              Programme competency information is unavailable.
+            </p>
+          </div>
+        ) : relatedCompetencies.length === 0 ? (
+          <div className="mt-3 rounded-lg border border-dashed border-border p-4">
+            <p className="text-sm text-muted-foreground">
+              No Program Competencies are currently mapped to the selected PLOs.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {relatedCompetencies.map(({ competency, matchedPlos }) => (
+              <div
+                key={competency.id}
+                className="rounded-lg border border-border bg-muted/30 p-3"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs font-semibold text-foreground">
+                    {competency.code}
+                  </span>
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {competency.name}
+                    </p>
+
+                    {competency.description ? (
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {competency.description}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">Via</span>
+
+                      {matchedPlos.map((plo) => (
+                        <span
+                          key={plo.id}
+                          className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground"
+                        >
+                          {plo.code}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

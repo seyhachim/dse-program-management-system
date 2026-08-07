@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
+import type { ProgrammeAcademicConfig } from "@dse-pms/shared-types";
 import {
   Button,
   Dialog,
@@ -39,16 +40,15 @@ export function CloWizardModal({
   courseId,
   cloCode,
   clos,
+  programme,
   onPersist,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   courseId: string;
-
-  /** null = adding a new CLO; otherwise the code of the CLO being edited. */
   cloCode: string | null;
-
   clos: CloForm[];
+  programme: ProgrammeAcademicConfig | null;
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState<CloForm | null>(null);
@@ -293,7 +293,11 @@ export function CloWizardModal({
                 ) : null}
 
                 {step === 2 ? (
-                  <CloStepPlos draft={draft} toggle={toggleMappedPlo} />
+                  <CloStepPlos
+                    draft={draft}
+                    toggle={toggleMappedPlo}
+                    programme={programme}
+                  />
                 ) : null}
 
                 {step === 3 ? (

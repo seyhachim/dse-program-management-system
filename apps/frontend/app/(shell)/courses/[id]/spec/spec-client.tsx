@@ -8,6 +8,7 @@ import {
   type Method,
   type SpecSectionId,
   type SpecSectionStatus,
+  type ProgrammeAcademicConfig,
 } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
@@ -27,7 +28,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@dse-pms/ui";
-import { ApiError } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
 import { methodsApi } from "@/lib/methods";
@@ -127,6 +128,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
+  const [programme, setProgramme] = useState<ProgrammeAcademicConfig | null>(
+    null,
+  );
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -138,10 +142,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [spec, methods, courseView] = await Promise.all([
+      const [spec, methods, courseView, programmeConfig] = await Promise.all([
         courseSpecApi.get(courseId),
         methodsApi.list(),
         coursesApi.get(courseId),
+        api.get<ProgrammeAcademicConfig>("/api/programme"),
       ]);
       setCourseInfo(
         toCourseInfoForm(
@@ -157,6 +162,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setAssessmentMethods(methods.assessment);
       setCourse(courseView);
       setCourseTotalSlt(courseView.totalSltHours ?? null);
+      setProgramme(programmeConfig);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -372,6 +378,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               value={clos}
               courseId={courseId}
               lastSavedAt={closSavedAt}
+              programme={programme}
               onPersist={persistClos}
             />
           </TabsContent>

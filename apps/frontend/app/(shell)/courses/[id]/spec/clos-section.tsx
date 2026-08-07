@@ -14,7 +14,7 @@ import { Button } from "@dse-pms/ui";
 import { bloomStyle, withCodes, type CloForm } from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
 import { CloWizardModal } from "./clos/clo-wizard-modal";
-
+import type { ProgrammeAcademicConfig } from "@dse-pms/shared-types";
 // Re-exported so the wizard can keep importing the CLO model from this section.
 export {
   EMPTY_CLOS,
@@ -37,12 +37,13 @@ export function ClosSection({
   value,
   courseId,
   lastSavedAt,
+  programme,
   onPersist,
 }: {
   value: CloForm[];
   courseId: string;
   lastSavedAt: Date | null;
-  /** Persist the given CLO list (whole §14 section) and sync wizard state. */
+  programme: ProgrammeAcademicConfig | null;
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
   const clos = withCodes(value);
@@ -314,6 +315,7 @@ export function ClosSection({
         courseId={courseId}
         cloCode={modal.cloCode}
         clos={clos}
+        programme={programme}
         onPersist={onPersist}
       />
     </div>
