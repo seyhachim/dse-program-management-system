@@ -550,6 +550,7 @@ export const WeeklyPlanRow = z.object({
   practiceHours: WeekHours.nullable().default(null),
   otherHours: WeekHours.nullable().default(null),
   selfStudyHours: WeekHours.nullable().default(null),
+  teachingMethodIds: z.array(z.string()).default([]),
   assessmentMethodIds: z.array(z.string()).default([]),
   assessment: z.string().default(""),
 });

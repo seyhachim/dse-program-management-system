@@ -91,6 +91,8 @@ test("WeeklyPlanSection coerces string hours and defaults array/optional fields"
   expect(w.cloCodes).toEqual([]);
   expect(w.lloItems).toEqual([]);
   expect(w.activities).toEqual([]);
+  expect(w.teachingMethodIds).toEqual([]);
+  expect(w.assessmentMethodIds).toEqual([]);
   expect(w.assessment).toBe("");
 });
 

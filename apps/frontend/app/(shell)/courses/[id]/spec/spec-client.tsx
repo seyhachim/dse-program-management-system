@@ -229,8 +229,35 @@ export function SpecClient({ courseId }: { courseId: string }) {
     [courseId],
   );
 
+  const persistWeeklyPlan = useCallback(
+    async (items: WeeklyPlanForm) => {
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(
+          courseId,
+          "slt",
+          toWeeklyPlanPayload(items),
+        );
+        setWeeklyPlan(items);
+        setStatus((s) => ({ ...s, slt: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError ? err.message : "Failed to save weekly plan",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
+  );
+
   const saveSection = useCallback(
-    async (sectionId: "courseInfo" | "slt" | "mapping") => {
+    async (sectionId: "courseInfo" | "mapping") => {
       setSaving(true);
       setError(null);
       try {
@@ -239,12 +266,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
             courseId,
             "courseInfo",
             toCourseInfoPayload(courseInfo),
-          );
-        } else if (sectionId === "slt") {
-          await courseSpecApi.saveSection(
-            courseId,
-            "slt",
-            toWeeklyPlanPayload(weeklyPlan),
           );
         } else if (sectionId === "mapping") {
           const refs = validRefs(clos, weeklyPlan, assessments);
@@ -268,7 +289,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
     [courseId, courseInfo, clos, weeklyPlan, assessments, mapping],
   );
 
-  const canSaveActive = activeTab === "slt" || activeTab === "mapping";
+  const canSaveActive = activeTab === "mapping";
 
   // Course Information (courseInfo) has no tab of its own — it's edited via the
   // dialog opened from the Overview tab — so "Continue Editing" needs a special
@@ -394,7 +415,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
           <TabsContent value="slt" className="mt-4">
             {/* <WeeklyPlanSectionForm
               value={weeklyPlan}
-              onChange={setWeeklyPlan}
+              onPersist={persistWeeklyPlan}
               courseName={
                 course ? `${course.code} - ${course.title}` : undefined
               }
@@ -402,11 +423,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
             /> */}
             <WeeklyPlanSectionForm
               value={weeklyPlan}
-              onChange={setWeeklyPlan}
+              onPersist={persistWeeklyPlan}
               courseName={
                 course ? `${course.code} - ${course.title}` : undefined
               }
               clos={clos}
+              teachingMethods={teachingMethods}
               assessmentMethods={assessmentMethods}
             />
           </TabsContent>
@@ -477,7 +499,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               ) : null}
               <Button
                 variant="outline"
-                onClick={() => saveSection(activeTab as "slt" | "mapping")}
+                onClick={() => saveSection("mapping")}
                 disabled={saving}
               >
                 {saving ? "Saving…" : "Save"}

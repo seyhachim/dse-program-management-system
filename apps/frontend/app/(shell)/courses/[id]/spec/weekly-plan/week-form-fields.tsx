@@ -19,6 +19,7 @@ export function WeekFormFields({
   set,
   toggleClo,
   clos,
+  teachingMethods,
   assessmentMethods,
   touched,
   existingAssessments,
@@ -28,6 +29,7 @@ export function WeekFormFields({
   set: (patch: Partial<WeekForm>) => void;
   toggleClo: (code: string) => void;
   clos: CloForm[];
+  teachingMethods: Method[];
   assessmentMethods: Method[];
   touched: boolean;
   existingAssessments: string[];
@@ -57,15 +59,41 @@ export function WeekFormFields({
       studentLearningActivities,
     });
   };
+  const linkedClos = clos.filter((clo) => draft.cloCodes.includes(clo.code));
+
+  const availableTeachingMethodIds = new Set(
+    linkedClos.flatMap((clo) => clo.teachingMethodIds),
+  );
+
+  const availableTeachingMethods = teachingMethods.filter((method) =>
+    availableTeachingMethodIds.has(method.id),
+  );
+
+  const teachingMethodCloCodes = (methodId: string) =>
+    linkedClos
+      .filter((clo) => clo.teachingMethodIds.includes(methodId))
+      .map((clo) => clo.code);
+
+  const toggleTeachingMethod = (methodId: string) => {
+    set({
+      teachingMethodIds: draft.teachingMethodIds.includes(methodId)
+        ? draft.teachingMethodIds.filter((id) => id !== methodId)
+        : [...draft.teachingMethodIds, methodId],
+    });
+  };
+
   const availableAssessmentMethodIds = new Set(
-    clos
-      .filter((clo) => draft.cloCodes.includes(clo.code))
-      .flatMap((clo) => clo.assessmentMethodIds),
+    linkedClos.flatMap((clo) => clo.assessmentMethodIds),
   );
 
   const availableAssessmentMethods = assessmentMethods.filter((method) =>
     availableAssessmentMethodIds.has(method.id),
   );
+
+  const assessmentMethodCloCodes = (methodId: string) =>
+    linkedClos
+      .filter((clo) => clo.assessmentMethodIds.includes(methodId))
+      .map((clo) => clo.code);
 
   const toggleAssessmentMethod = (methodId: string) => {
     set({
@@ -183,8 +211,62 @@ export function WeekFormFields({
         ) : null}
       </Section>
 
-      {/* 4. Student Learning Activities */}
-      <Section n={4} title="Student Activities (What students do)" required>
+      {/* 4. Teaching Methods */}
+      <Section n={4} title="Teaching Methods">
+        <p className="text-xs text-muted-foreground">
+          Suggested from the teaching methods already assigned to the CLOs linked
+          to this week. Select only the methods actually used this week.
+        </p>
+
+        {draft.cloCodes.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+            Link at least one CLO to see suggested teaching methods.
+          </div>
+        ) : availableTeachingMethods.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+            The linked CLOs do not have teaching methods assigned yet.
+          </div>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {availableTeachingMethods.map((method) => {
+              const selected = draft.teachingMethodIds.includes(method.id);
+              const sourceClos = teachingMethodCloCodes(method.id);
+
+              return (
+                <button
+                  key={method.id}
+                  type="button"
+                  onClick={() => toggleTeachingMethod(method.id)}
+                  className={`flex items-start gap-3 rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+                    selected
+                      ? "border-primary bg-primary/5 text-foreground"
+                      : "border-border bg-background text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                      selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border"
+                    }`}
+                  >
+                    {selected ? "✓" : ""}
+                  </span>
+                  <span>
+                    <span className="block font-medium">{method.name}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Suggested by {sourceClos.join(" · ")}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+
+      {/* 5. Student Learning Activities */}
+      <Section n={5} title="Student Activities (What students do)" required>
         <p className="text-xs text-muted-foreground">
           Describe the activities students will perform to achieve this week's
           LLOs.
@@ -205,8 +287,8 @@ export function WeekFormFields({
         ) : null}
       </Section>
 
-      {/* 5. Time Allocation */}
-      <Section n={5} title="Time Allocation (Hours)">
+      {/* 6. Time Allocation */}
+      <Section n={6} title="Time Allocation (Hours)">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Lecture (L)">
             <input
@@ -274,8 +356,8 @@ export function WeekFormFields({
         </div>
       </Section>
 
-      {/* 6. Assessment / Deliverables */}
-      <Section n={6} title="Assessment">
+      {/* 7. Assessment / Deliverables */}
+      <Section n={7} title="Assessment">
         <div className="space-y-3">
           <div>
             <p className="text-sm font-medium text-foreground">
@@ -322,7 +404,12 @@ export function WeekFormFields({
                       {selected ? "✓" : ""}
                     </span>
 
-                    <span className="font-medium">{method.name}</span>
+                    <span>
+                      <span className="block font-medium">{method.name}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Suggested by {assessmentMethodCloCodes(method.id).join(" · ")}
+                      </span>
+                    </span>
                   </button>
                 );
               })}

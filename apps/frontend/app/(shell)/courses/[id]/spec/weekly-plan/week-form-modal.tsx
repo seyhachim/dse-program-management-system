@@ -17,12 +17,8 @@ import {
 import { WeekFormFields, weekFormErrors } from "./week-form-fields";
 
 /**
- * Popup modal for adding/editing a §18 week. Mirrors `CloWizardModal`'s popup
- * pattern (issue #100) instead of the routed /weekly-plan/add and
- * /weekly-plan/:id/edit full pages this replaces. Unlike CLOs, saving here
- * only updates the in-memory plan via `onSave` — persistence to the backend
- * stays on the Weekly Plan tab's own Save button, same as it already is for
- * deleting a week.
+ * Popup modal for adding/editing a §18 week. Saving persists the complete
+ * Weekly Plan, and the dialog closes only after the backend save succeeds.
  */
 export function WeekFormModal({
   open,
@@ -30,6 +26,7 @@ export function WeekFormModal({
   weekId,
   weeks,
   clos,
+  teachingMethods,
   assessmentMethods,
   onSave,
 }: {
@@ -38,12 +35,14 @@ export function WeekFormModal({
   weekId: string | null;
   weeks: WeeklyPlanForm;
   clos: CloForm[];
+  teachingMethods: Method[];
   assessmentMethods: Method[];
-  onSave: (next: WeeklyPlanForm) => void;
+  onSave: (next: WeeklyPlanForm) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState<WeekForm | null>(null);
   const [lloRequired, setLloRequired] = useState(true);
   const [touched, setTouched] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -70,7 +69,13 @@ export function WeekFormModal({
         ? d.cloCodes.filter((c) => c !== code)
         : [...d.cloCodes, code];
 
-      // Assessment methods allowed by the CLOs that remain linked.
+      // Teaching/assessment methods allowed by the CLOs that remain linked.
+      const allowedTeachingMethodIds = new Set(
+        clos
+          .filter((clo) => nextCloCodes.includes(clo.code))
+          .flatMap((clo) => clo.teachingMethodIds),
+      );
+
       const allowedAssessmentMethodIds = new Set(
         clos
           .filter((clo) => nextCloCodes.includes(clo.code))
@@ -78,6 +83,10 @@ export function WeekFormModal({
       );
 
       // Preserve only selections still supported by at least one linked CLO.
+      const nextTeachingMethodIds = d.teachingMethodIds.filter((id) =>
+        allowedTeachingMethodIds.has(id),
+      );
+
       const nextAssessmentMethodIds = d.assessmentMethodIds.filter((id) =>
         allowedAssessmentMethodIds.has(id),
       );
@@ -85,6 +94,7 @@ export function WeekFormModal({
       return {
         ...d,
         cloCodes: nextCloCodes,
+        teachingMethodIds: nextTeachingMethodIds,
         assessmentMethodIds: nextAssessmentMethodIds,
       };
     });
@@ -94,7 +104,7 @@ export function WeekFormModal({
     [weeks],
   );
 
-  const submit = () => {
+  const submit = async () => {
     if (!draft) return;
     const errors = weekFormErrors(draft, lloRequired);
     if (errors.topic || errors.clos || errors.llos || errors.activities) {
@@ -106,8 +116,13 @@ export function WeekFormModal({
       ? weeks.map((w) => (w.id === draft.id ? draft : w))
       : [...weeks, draft];
     next.sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0));
-    onSave(next);
-    onOpenChange(false);
+    setSaving(true);
+    try {
+      const saved = await onSave(next);
+      if (saved) onOpenChange(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const title = weekId ? `Edit Week ${draft?.week ?? ""}` : "Add Weekly Plan";
@@ -126,6 +141,7 @@ export function WeekFormModal({
               set={set}
               toggleClo={toggleClo}
               clos={clos}
+              teachingMethods={teachingMethods}
               assessmentMethods={assessmentMethods}
               touched={touched}
               existingAssessments={existingAssessments}
@@ -136,7 +152,9 @@ export function WeekFormModal({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={submit}>Save Week</Button>
+              <Button onClick={submit} disabled={saving}>
+                {saving ? "Saving…" : "Save Week"}
+              </Button>
             </div>
           </div>
         ) : null}

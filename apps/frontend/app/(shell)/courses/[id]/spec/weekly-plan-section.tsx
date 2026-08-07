@@ -40,17 +40,21 @@ export {
 
 export function WeeklyPlanSectionForm({
   value,
-  onChange,
+  onPersist,
   courseName,
   clos = [],
+  teachingMethods = [],
   assessmentMethods = [],
 }: {
   value: WeeklyPlanForm;
-  onChange: (v: WeeklyPlanForm) => void;
+  onPersist: (v: WeeklyPlanForm) => Promise<boolean>;
   courseName?: string;
 
   /** §14 CLOs, for the modal's "Link CLOs" picker and the coverage sidebar. */
   clos?: CloForm[];
+
+  /** Teaching-method catalog already loaded by SpecClient. */
+  teachingMethods?: Method[];
 
   /** Assessment-method catalog already loaded by SpecClient. */
   assessmentMethods?: Method[];
@@ -93,7 +97,7 @@ export function WeeklyPlanSectionForm({
     totals.practiceHours +
     totals.otherHours;
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const w = value.find((x) => x.id === id);
 
     if (
@@ -103,7 +107,7 @@ export function WeeklyPlanSectionForm({
       return;
     }
 
-    onChange(value.filter((x) => x.id !== id));
+    await onPersist(value.filter((x) => x.id !== id));
   };
 
   return (
@@ -378,8 +382,9 @@ export function WeeklyPlanSectionForm({
         weekId={modal.weekId}
         weeks={value}
         clos={clos}
+        teachingMethods={teachingMethods}
         assessmentMethods={assessmentMethods}
-        onSave={onChange}
+        onSave={onPersist}
       />
     </div>
   );
