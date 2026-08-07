@@ -13,7 +13,6 @@ export type AssessmentForm = {
   mode: "individual" | "group";
   status: "active" | "inactive";
   cloCodes: string[];
-  bloomLevel: string;
   weight: string;
   dueWeek: string;
   durationWeeks: string;
@@ -21,6 +20,8 @@ export type AssessmentForm = {
   submissionMethod: string;
   instructions: string;
   rubric: string;
+  feedbackMethod: string;
+  feedbackTimeline: string;
   mappedPlos: string[];
   notes: string;
 };
@@ -41,7 +42,6 @@ export function emptyAssessment(): AssessmentForm {
     mode: "individual",
     status: "active",
     cloCodes: [],
-    bloomLevel: "",
     weight: "",
     dueWeek: "",
     durationWeeks: "",
@@ -49,6 +49,8 @@ export function emptyAssessment(): AssessmentForm {
     submissionMethod: "",
     instructions: "",
     rubric: "",
+    feedbackMethod: "",
+    feedbackTimeline: "",
     mappedPlos: [],
     notes: "",
   };
@@ -67,7 +69,6 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       mode: d.mode === "group" ? "group" : "individual",
       status: d.status === "inactive" ? "inactive" : "active",
       cloCodes: strArray(d.cloCodes),
-      bloomLevel: str(d.bloomLevel),
       weight: d.weight == null ? "" : String(d.weight),
       dueWeek: d.dueWeek == null ? "" : String(d.dueWeek),
       durationWeeks: d.durationWeeks == null ? "" : String(d.durationWeeks),
@@ -75,6 +76,8 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       submissionMethod: str(d.submissionMethod),
       instructions: str(d.instructions),
       rubric: str(d.rubric),
+      feedbackMethod: str(d.feedbackMethod),
+      feedbackTimeline: str(d.feedbackTimeline),
       mappedPlos: strArray(d.mappedPlos),
       notes: str(d.notes),
     };
@@ -92,7 +95,6 @@ export function toAssessmentPayload(items: AssessmentForm[]): AssessmentPlanSect
       mode: a.mode,
       status: a.status,
       cloCodes: a.cloCodes,
-      bloomLevel: a.bloomLevel || null,
       weight: a.weight === "" ? null : Number(a.weight),
       dueWeek: a.dueWeek === "" ? null : Number(a.dueWeek),
       durationWeeks: a.durationWeeks === "" ? null : Number(a.durationWeeks),
@@ -100,6 +102,8 @@ export function toAssessmentPayload(items: AssessmentForm[]): AssessmentPlanSect
       submissionMethod: a.submissionMethod.trim(),
       instructions: a.instructions.trim(),
       rubric: a.rubric.trim(),
+      feedbackMethod: a.feedbackMethod.trim(),
+      feedbackTimeline: a.feedbackTimeline.trim(),
       mappedPlos: a.mappedPlos,
       notes: a.notes.trim(),
     })),

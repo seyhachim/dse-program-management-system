@@ -384,12 +384,10 @@ model CourseSpecWeek {
   @@id([courseSpecId, id])
 }
 
-/// Issue #103: normalized §17 Course Assessment Plan rows (previously the
 /// `assessmentPlan` section's JSON `items` array). Same composite-key rationale as
-/// CourseSpecWeek. `type`/`bloomLevel` stay plain `String` rather than a Prisma enum,
-/// mirroring CourseSpecClo.level — both are validated against a closed vocabulary at
-/// the Zod layer already, so a DB enum would only add migration weight for no extra
-/// safety. `cloCodes`/`mappedPlos` are loose references, same as CourseSpecWeek.
+/// CourseSpecWeek. Assessment learning levels are derived from the mapped CLOs rather
+/// than duplicated on the assessment item. `cloCodes`/`mappedPlos` are loose
+/// references, same as CourseSpecWeek.
 model CourseSpecAssessmentItem {
   id               String               @default(uuid())
   courseSpecId     String
@@ -401,10 +399,11 @@ model CourseSpecAssessmentItem {
   mode             AssessmentItemMode   @default(Individual)
   status           AssessmentItemStatus @default(Active)
   cloCodes         String[]             @default([])
-  bloomLevel       String?
-  weight           Float?
-  dueWeek          Int?
-  durationWeeks    Float?
+feedbackMethod   String               @default("")
+feedbackTimeline String               @default("")
+weight           Float?
+dueWeek          Int?
+durationWeeks    Float?
   format           String               @default("")
   submissionMethod String               @default("")
   instructions     String               @default("")

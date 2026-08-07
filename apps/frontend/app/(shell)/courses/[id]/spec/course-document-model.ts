@@ -64,12 +64,13 @@ export type CourseDocumentModel = {
     description: string;
     mode: string;
     cloCodes: string[];
-    bloomLevel: string;
     weight: string;
     dueWeek: string;
     durationWeeks: string;
     format: string;
     submissionMethod: string;
+    feedbackMethod: string;
+    feedbackTimeline: string;
     mappedPlos: string[];
   }[];
 };
@@ -189,12 +190,13 @@ export function buildCourseDocument({
       description: assessment.description,
       mode: assessment.mode,
       cloCodes: assessment.cloCodes,
-      bloomLevel: assessment.bloomLevel,
       weight: assessment.weight,
       dueWeek: assessment.dueWeek,
       durationWeeks: assessment.durationWeeks,
       format: assessment.format,
       submissionMethod: assessment.submissionMethod,
+      feedbackMethod: assessment.feedbackMethod,
+      feedbackTimeline: assessment.feedbackTimeline,
       mappedPlos: assessment.mappedPlos,
     })),
   };

@@ -311,6 +311,9 @@ test("AssessmentItem coerces weight, defaults arrays/optionals, and requires a n
   expect(a.status).toBe("active");
   expect(a.cloCodes).toEqual(["CLO1"]);
   expect(a.mappedPlos).toEqual([]);
+  expect(a.feedbackMethod).toBe("");
+  expect(a.feedbackTimeline).toBe("");
+  expect("bloomLevel" in a).toBe(false);
   expect(a.dueWeek).toBeUndefined();
 
   expect(

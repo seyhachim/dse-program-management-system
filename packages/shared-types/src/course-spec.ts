@@ -55,16 +55,16 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
     state: "ready",
   },
   {
-    id: "slt",
-    title: "Weekly Plan",
-    ref: "§18",
+    id: "assessmentPlan",
+    title: "Course Assessment Plan",
+    ref: "§17",
     part: "Part 2",
     state: "ready",
   },
   {
-    id: "assessmentPlan",
-    title: "Course Assessment Plan",
-    ref: "§17",
+    id: "slt",
+    title: "Weekly Plan",
+    ref: "§18",
     part: "Part 2",
     state: "ready",
   },
@@ -625,7 +625,8 @@ export type AssessmentStatus = z.infer<typeof AssessmentStatus>;
 
 /**
  * One §17 assessment. `cloCodes` reference §14 CLOs by code and `mappedPlos` the
- * Part 1 PLOs; `bloomLevel` is the targeted C/A/P level. `weight` is a percentage
+ * Part 1 PLOs. The CLO's own `level` is the source of truth for its C/A/P level.
+ * `weight` is a percentage
  * of the final grade — the plan's weights are expected to total 100 across active
  * rows, checked in the UI rather than enforced per-row here.
  */
@@ -638,7 +639,6 @@ export const AssessmentItem = z.object({
   status: AssessmentStatus.default("active"),
   // Linking.
   cloCodes: z.array(z.string()).default([]),
-  bloomLevel: CapLevel.nullable().optional(),
   // Weighting & scheduling.
   weight: z.coerce.number().min(0).max(100).nullable().default(null),
   dueWeek: z.coerce.number().int().min(1).max(52).nullable().optional(),
@@ -648,6 +648,8 @@ export const AssessmentItem = z.object({
   submissionMethod: z.string().default(""),
   instructions: z.string().default(""),
   rubric: z.string().default(""),
+  feedbackMethod: z.string().default(""),
+  feedbackTimeline: z.string().default(""),
   // PLO mapping & notes.
   mappedPlos: z.array(PloId).default([]),
   notes: z.string().default(""),
