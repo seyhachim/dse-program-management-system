@@ -143,14 +143,20 @@ export interface CourseSpecProgress {
 }
 
 /** Completion percentage (0–100) of a course's completable spec sections. */
-export function specCompletionPercent(progress: Pick<CourseSpecProgress, "completed" | "total">): number {
-  return progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
+export function specCompletionPercent(
+  progress: Pick<CourseSpecProgress, "completed" | "total">,
+): number {
+  return progress.total
+    ? Math.round((progress.completed / progress.total) * 100)
+    : 0;
 }
 
 /** Human label for `specCompletionPercent` — backs the lecturer "My Courses" table (issue #104). */
 export type SpecCompletionLabel = "Complete" | "In progress" | "Not started";
 
-export function specCompletionLabel(progress: Pick<CourseSpecProgress, "completed" | "total">): SpecCompletionLabel {
+export function specCompletionLabel(
+  progress: Pick<CourseSpecProgress, "completed" | "total">,
+): SpecCompletionLabel {
   if (progress.total === 0 || progress.completed === 0) return "Not started";
   if (progress.completed === progress.total) return "Complete";
   return "In progress";
@@ -164,7 +170,10 @@ export function specCompletionLabel(progress: Pick<CourseSpecProgress, "complete
  *  - "needsAttention": nothing has been saved yet (critical — no content at all).
  *  - "itemsRemaining": some but not all sections are complete.
  */
-export type SpecAttentionLevel = "upToDate" | "itemsRemaining" | "needsAttention";
+export type SpecAttentionLevel =
+  | "upToDate"
+  | "itemsRemaining"
+  | "needsAttention";
 
 export interface SpecAttention {
   level: SpecAttentionLevel;
@@ -173,8 +182,10 @@ export interface SpecAttention {
 }
 
 export function specAttention(progress: CourseSpecProgress): SpecAttention {
-  if (progress.total > 0 && progress.completed === progress.total) return { level: "upToDate", items: [] };
-  if (progress.completed === 0) return { level: "needsAttention", items: progress.incompleteSections };
+  if (progress.total > 0 && progress.completed === progress.total)
+    return { level: "upToDate", items: [] };
+  if (progress.completed === 0)
+    return { level: "needsAttention", items: progress.incompleteSections };
   return { level: "itemsRemaining", items: progress.incompleteSections };
 }
 
@@ -551,6 +562,7 @@ export const WeeklyPlanRow = z.object({
   otherHours: WeekHours.nullable().default(null),
   selfStudyHours: WeekHours.nullable().default(null),
   teachingMethodIds: z.array(z.string()).default([]),
+  teachingResourceTypes: z.array(z.string()).default([]),
   assessmentMethodIds: z.array(z.string()).default([]),
   assessment: z.string().default(""),
 });

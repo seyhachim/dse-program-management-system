@@ -5,13 +5,13 @@ import type { Method } from "@dse-pms/shared-types";
 import { Progress } from "@dse-pms/ui";
 import type { WeekForm } from "../weekly-plan-model";
 import { weekSltForm } from "../weekly-plan-model";
-import { weekFormErrors } from "./week-form-fields";
+import { teachingResourceLabel, weekFormErrors } from "./week-form-fields";
 
 const STEP_TIPS: Record<number, string[]> = {
   1: ["Choose the CLOs this week contributes to.", "Teaching and assessment suggestions come from the linked CLOs."],
   2: ["Write lesson-level outcomes students should achieve by the end of this week.", "Keep each LLO observable and specific to the lesson."],
   3: ["Teaching Methods describe how learning is facilitated.", "Student Activities describe what students actually do."],
-  4: ["Include contact and independent learning time in SLT.", "Choose only assessment methods actually used this week."],
+  4: ["Include contact and independent learning time in SLT.", "Choose only assessment methods actually used this week.", "Select the teaching resources you plan to use; links are managed later in Resources."],
   5: ["Review the full alignment before saving.", "Go back to any step if something needs adjustment."],
 };
 
@@ -44,13 +44,14 @@ export function WeekWizardSidebar({ draft, step, teachingMethods, assessmentMeth
       <PreviewLine label="Activities" value={draft.studentLearningActivities.length ? `${draft.studentLearningActivities.length} defined` : "Not added yet"} />
       <PreviewLine label="SLT" value={`${weekSltForm(draft)} hours`} />
       <PreviewLine label="Assessment" value={assessmentNames.join(", ") || "Not selected yet"} />
+      <PreviewLine label="Resources" value={draft.teachingResourceTypes.map(teachingResourceLabel).join(", ") || "None selected"} />
     </SidebarCard>
 
     <SidebarCard title="Progress">
       <Progress value={percent}>
         <div className="flex w-full items-center justify-between text-xs text-muted-foreground"><span>{doneCount} of 5 steps complete</span><span>{percent}%</span></div>
       </Progress>
-      <ul className="mt-3 space-y-1.5 text-xs">{["Week & Outcomes", "Lesson Outcomes", "Teaching & Learning", "Time & Assessment", "Review"].map((label, i) => <li key={label} className="flex items-center gap-1.5"><CheckCircle2 className={`h-3.5 w-3.5 ${stepDone[i] ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/40"}`} /><span className={stepDone[i] ? "text-foreground" : "text-muted-foreground"}>{label}</span></li>)}</ul>
+      <ul className="mt-3 space-y-1.5 text-xs">{["Week & Outcomes", "Lesson Outcomes", "Teaching & Learning", "Time, Assessment & Resources", "Review"].map((label, i) => <li key={label} className="flex items-center gap-1.5"><CheckCircle2 className={`h-3.5 w-3.5 ${stepDone[i] ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/40"}`} /><span className={stepDone[i] ? "text-foreground" : "text-muted-foreground"}>{label}</span></li>)}</ul>
     </SidebarCard>
 
     <SidebarCard title="Quick Tips" icon={Lightbulb} tone="emerald">

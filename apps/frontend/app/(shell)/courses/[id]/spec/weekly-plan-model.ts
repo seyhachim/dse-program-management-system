@@ -23,6 +23,7 @@ export type WeekForm = {
   otherHours: string;
   selfStudyHours: string;
   teachingMethodIds: string[];
+  teachingResourceTypes: string[];
   assessmentMethodIds: string[];
   assessment: string;
 };
@@ -107,6 +108,7 @@ export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
     otherHours: "",
     selfStudyHours: "",
     teachingMethodIds: [],
+    teachingResourceTypes: [],
     assessmentMethodIds: [],
 
     assessment: "",
@@ -198,6 +200,7 @@ export function toWeeklyPlanForm(data: unknown): WeeklyPlanForm {
         selfStudyHours:
           d.selfStudyHours == null ? "" : String(d.selfStudyHours),
         teachingMethodIds: strArray(d.teachingMethodIds),
+        teachingResourceTypes: strArray(d.teachingResourceTypes),
         assessmentMethodIds: strArray(d.assessmentMethodIds),
         assessment: str(d.assessment),
       };
@@ -257,6 +260,7 @@ export function toWeeklyPlanPayload(form: WeeklyPlanForm): WeeklyPlanSection {
           w.selfStudyHours === "" ? null : Number(w.selfStudyHours),
 
         teachingMethodIds: w.teachingMethodIds,
+        teachingResourceTypes: w.teachingResourceTypes,
         assessmentMethodIds: w.assessmentMethodIds,
         assessment: w.assessment.trim(),
       };

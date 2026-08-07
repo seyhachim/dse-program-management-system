@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@dse-pms/ui";
 import type { CloForm } from "../clos-section";
 import { emptyWeek, weekSltForm, type WeekForm, type WeeklyPlanForm } from "../weekly-plan-model";
-import { WeekFormFields, weekFormErrors } from "./week-form-fields";
+import { WeekFormFields, teachingResourceLabel, weekFormErrors } from "./week-form-fields";
 import { clearWeekDraft, loadWeekDraft, saveWeekDraft } from "./week-draft-storage";
 import { WeekWizardSidebar } from "./week-wizard-sidebar";
 
@@ -13,7 +13,7 @@ const STEPS = [
   { id: 1, title: "Week & Outcomes", sections: [1, 2] },
   { id: 2, title: "Lesson Outcomes", sections: [3] },
   { id: 3, title: "Teaching & Learning", sections: [4, 5] },
-  { id: 4, title: "Time & Assessment", sections: [6, 7] },
+  { id: 4, title: "Time, Assessment & Resources", sections: [6, 7, 8] },
   { id: 5, title: "Review", sections: [] },
 ] as const;
 
@@ -99,6 +99,7 @@ function WeekReview({ draft, teachingMethods, assessmentMethods }: { draft: Week
     <ReviewCard label="Student Activities" value={draft.studentLearningActivities.map((x) => x.title).join(" • ") || draft.activities.join(" • ") || "—"} />
     <ReviewCard label="Time Allocation" value={`L ${draft.lectureHours || 0}h · T ${draft.tutorialHours || 0}h · P ${draft.practiceHours || 0}h · O ${draft.otherHours || 0}h · NF2F ${draft.selfStudyHours || 0}h · SLT ${weekSltForm(draft)}h`} />
     <ReviewCard label="Assessment" value={assessments.join(" • ") || draft.assessment || "—"} />
+    <ReviewCard label="Teaching Resources" value={draft.teachingResourceTypes.map(teachingResourceLabel).join(" • ") || "None selected"} />
   </div></div>;
 }
 function ReviewCard({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 text-sm text-foreground">{value}</p></div>; }

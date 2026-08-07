@@ -13,7 +13,22 @@ import type { Method } from "@dse-pms/shared-types";
 
 const TOPIC_MAX = 200;
 
-/** The six §18 form sections, shared by the Add Week / Edit Week popup modal. */
+export const TEACHING_RESOURCE_OPTIONS = [
+  { value: "LECTURE_SLIDES", label: "Lecture Slides" },
+  { value: "TEXTBOOK", label: "Textbook / Book" },
+  { value: "DATASET", label: "Dataset" },
+  { value: "VIDEO", label: "YouTube / Video" },
+  { value: "WEBSITE", label: "Website / Online Resource" },
+  { value: "SOFTWARE_TOOL", label: "Software / Tool" },
+  { value: "LAB_MATERIAL", label: "Lab Material" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
+export function teachingResourceLabel(value: string): string {
+  return TEACHING_RESOURCE_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+/** The §18 form sections, shared by the Add Week / Edit Week popup modal. */
 export function WeekFormFields({
   draft,
   set,
@@ -431,6 +446,62 @@ export function WeekFormFields({
               })}
             </div>
           )}
+        </div>
+      </Section>
+      ) : null}
+
+      {/* 8. Teaching Resources */}
+      {show(8) ? (
+      <Section n={8} title="Teaching Resources">
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Resources used for teaching this week
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Select all resource types you plan to use. Add links or files later in the Resources tab.
+            </p>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {TEACHING_RESOURCE_OPTIONS.map((resource) => {
+              const selected = draft.teachingResourceTypes.includes(resource.value);
+
+              return (
+                <button
+                  key={resource.value}
+                  type="button"
+                  onClick={() =>
+                    set({
+                      teachingResourceTypes: selected
+                        ? draft.teachingResourceTypes.filter((value) => value !== resource.value)
+                        : [...draft.teachingResourceTypes, resource.value],
+                    })
+                  }
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+                    selected
+                      ? "border-primary bg-primary/5 text-foreground"
+                      : "border-border bg-background text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <span
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                      selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border"
+                    }`}
+                  >
+                    {selected ? "✓" : ""}
+                  </span>
+                  <span className="font-medium">{resource.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <Hint>
+            Weekly Plan records what you intend to use. Resource URLs and files belong in the Resources tab.
+          </Hint>
         </div>
       </Section>
       ) : null}

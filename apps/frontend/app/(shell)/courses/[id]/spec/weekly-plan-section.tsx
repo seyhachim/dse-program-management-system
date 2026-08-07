@@ -25,6 +25,7 @@ import {
   weeklyPlanFormTotals,
   type WeeklyPlanForm,
 } from "./weekly-plan-model";
+import { teachingResourceLabel } from "./weekly-plan/week-form-fields";
 import { WeekFormModal } from "./weekly-plan/week-form-modal";
 
 // Re-exported so the wizard keeps importing the weekly-plan model from this section.
@@ -199,6 +200,10 @@ export function WeeklyPlanSectionForm({
                       "Unknown method",
                   );
 
+                  const resources = week.teachingResourceTypes.map(
+                    teachingResourceLabel,
+                  );
+
                   const assessments =
                     week.assessmentMethodIds.length > 0
                       ? week.assessmentMethodIds.map(
@@ -273,6 +278,14 @@ export function WeeklyPlanSectionForm({
                           empty="No learning activities"
                           max={2}
                         />
+
+                        <div className="mt-3">
+                          <CompactTags
+                            label="Resources"
+                            items={resources}
+                            empty="No teaching resources selected"
+                          />
+                        </div>
                       </td>
 
                       {/* Time */}
