@@ -7,5 +7,5 @@ export default async function AddAssessmentPage({
 }) {
   const { id } = await params;
 
-  return <AssessmentFormPage courseId={id} mode="add" />;
+  return <AssessmentFormPage courseId={id} assessmentId={null} />;
 }

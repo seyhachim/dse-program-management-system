@@ -1,0 +1,26 @@
+warning: LF will be replaced by CRLF in apps/backend/prisma/schema.prisma.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in apps/backend/src/plugins/courses/service.ts.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in apps/frontend/app/(shell)/courses/[id]/spec/assessment-model.ts.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in apps/frontend/app/(shell)/courses/[id]/spec/assessment/assessment-form-fields.tsx.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in apps/frontend/app/(shell)/courses/[id]/spec/assessment/assessment-form-page.tsx.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in apps/frontend/app/(shell)/courses/[id]/spec/course-document-model.ts.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in packages/shared-types/src/course-spec.test.ts.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in packages/shared-types/src/course-spec.ts.
+The file will have its original line endings in your working directory
+ apps/backend/prisma/schema.prisma                  |  17 [32m+[m[31m-[m
+ apps/backend/src/plugins/courses/service.ts        |   6 [32m+[m[31m-[m
+ .../(shell)/courses/[id]/spec/assessment-model.ts  |  12 [32m+[m[31m-[m
+ .../courses/[id]/spec/assessment/add/page.tsx      |   9 [32m+[m[31m-[m
+ .../spec/assessment/assessment-form-fields.tsx     | 604 [32m+++++[m[31m----------------[m
+ .../[id]/spec/assessment/assessment-form-page.tsx  | 110 [32m+++[m[31m-[m
+ .../courses/[id]/spec/course-document-model.ts     |   6 [32m+[m[31m-[m
+ packages/shared-types/src/course-spec.test.ts      |   3 [32m+[m
+ packages/shared-types/src/course-spec.ts           |  18 [32m+[m[31m-[m
+ 9 files changed, 281 insertions(+), 504 deletions(-)
