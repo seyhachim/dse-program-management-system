@@ -424,6 +424,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
             <WeeklyPlanSectionForm
               value={weeklyPlan}
               onPersist={persistWeeklyPlan}
+              courseId={courseId}
               courseName={
                 course ? `${course.code} - ${course.title}` : undefined
               }

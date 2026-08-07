@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  AlertTriangle,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -41,6 +42,7 @@ export {
 export function WeeklyPlanSectionForm({
   value,
   onPersist,
+  courseId,
   courseName,
   clos = [],
   teachingMethods = [],
@@ -48,6 +50,7 @@ export function WeeklyPlanSectionForm({
 }: {
   value: WeeklyPlanForm;
   onPersist: (v: WeeklyPlanForm) => Promise<boolean>;
+  courseId: string;
   courseName?: string;
 
   /** §14 CLOs, for the modal's "Link CLOs" picker and the coverage sidebar. */
@@ -65,6 +68,10 @@ export function WeeklyPlanSectionForm({
    * Resolve stored assessment method IDs to their catalog entries.
    * This avoids repeatedly scanning the full method catalog for each table cell.
    */
+  const teachingMethodById = new Map(
+    teachingMethods.map((method) => [method.id, method]),
+  );
+
   const assessmentMethodById = new Map(
     assessmentMethods.map((method) => [method.id, method]),
   );
@@ -157,199 +164,131 @@ export function WeeklyPlanSectionForm({
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[1120px] text-sm">
+              <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                    <th className="w-14 px-3 py-2.5">Week</th>
-
-                    <th className="px-3 py-2.5">Topic / Content</th>
-
-                    <th className="px-3 py-2.5">CLOs</th>
-
-                    <th className="px-3 py-2.5">Learning Activities</th>
-
-                    <th className="px-3 py-2.5">LLOs</th>
-
-                    <th className="px-3 py-2.5 text-center">
-                      Contact Hours (L+T+P+O)
-                    </th>
-
-                    <th className="px-3 py-2.5 text-center">
-                      Independent Learning (NF2F)
-                    </th>
-
-                    <th className="px-3 py-2.5 text-center">SLT (Hours)</th>
-
-                    <th className="px-3 py-2.5">Assessment</th>
-
-                    <th className="px-3 py-2.5 text-right">Actions</th>
+                    <th className="w-16 px-3 py-2.5">Week</th>
+                    <th className="min-w-[260px] px-3 py-2.5">Topic & Outcomes</th>
+                    <th className="min-w-[260px] px-3 py-2.5">Teaching & Learning</th>
+                    <th className="w-40 px-3 py-2.5">Time / SLT</th>
+                    <th className="min-w-[180px] px-3 py-2.5">Assessment</th>
+                    <th className="w-32 px-3 py-2.5">Attention</th>
+                    <th className="w-20 px-3 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {value.map((w) => (
-                    <tr
-                      key={w.id}
-                      className="border-b border-border/70 align-top"
-                    >
-                      {/* Week */}
-                      <td className="px-3 py-3">
-                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-accent px-1.5 text-xs font-semibold text-accent-foreground">
-                          {w.week || "—"}
-                        </span>
-                      </td>
+                  {value.map((w) => {
+                    const llos =
+                      w.lessonLearningOutcomes.length > 0
+                        ? w.lessonLearningOutcomes.map((llo) => llo.description).filter(Boolean)
+                        : w.lloItems.filter(Boolean);
+                    const activities =
+                      w.studentLearningActivities.length > 0
+                        ? w.studentLearningActivities.map((activity) => activity.title).filter(Boolean)
+                        : w.activities.filter(Boolean);
+                    const teaching = w.teachingMethodIds.map(
+                      (methodId) => teachingMethodById.get(methodId)?.name ?? "Unknown method",
+                    );
+                    const assessments =
+                      w.assessmentMethodIds.length > 0
+                        ? w.assessmentMethodIds.map(
+                            (methodId) => assessmentMethodById.get(methodId)?.name ?? "Unknown method",
+                          )
+                        : w.assessment
+                          ? [w.assessment]
+                          : [];
+                    const attention = weekAttention(w);
 
-                      {/* Topic */}
-                      <td className="max-w-[240px] px-3 py-3 font-medium text-foreground">
-                        {w.topic || (
-                          <span className="text-muted-foreground">
-                            Untitled
+                    return (
+                      <tr key={w.id} className="border-b border-border/70 align-top last:border-b-0">
+                        <td className="px-3 py-4">
+                          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-accent px-2 text-xs font-semibold text-accent-foreground">
+                            {w.week || "—"}
                           </span>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* CLOs */}
-                      <td className="px-3 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {w.cloCodes.length ? (
-                            w.cloCodes.map((code) => (
-                              <span
-                                key={code}
-                                className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${cloChip(code)}`}
-                              >
+                        <td className="px-3 py-4">
+                          <p className="font-semibold text-foreground">{w.topic || "Untitled week"}</p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {w.cloCodes.length > 0 ? w.cloCodes.map((code) => (
+                              <span key={code} className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${cloChip(code)}`}>
                                 {code}
                               </span>
-                            ))
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Learning Activities */}
-                      <td className="max-w-[200px] px-3 py-3">
-                        {w.activities.length ? (
-                          <ul className="space-y-0.5">
-                            {w.activities.map((activity) => (
-                              <li
-                                key={activity}
-                                className="flex items-center gap-1.5 text-foreground"
-                              >
-                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                                {activity}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-
-                      {/* LLOs */}
-                      <td className="max-w-[220px] px-3 py-3">
-                        {w.lloItems.length ? (
-                          <ul className="space-y-0.5">
-                            {w.lloItems.map((llo, index) => (
-                              <li key={index} className="text-foreground">
-                                <span className="font-medium text-muted-foreground">
-                                  LLO{index + 1}:
-                                </span>{" "}
-                                {llo}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-
-                      {/* Contact Hours */}
-                      <td className="px-3 py-3 text-center text-foreground">
-                        {weekContactHoursForm(w) || "—"}
-                      </td>
-
-                      {/* Independent Learning */}
-                      <td className="px-3 py-3 text-center text-foreground">
-                        {w.selfStudyHours || "—"}
-                      </td>
-
-                      {/* SLT */}
-                      <td className="px-3 py-3 text-center font-medium text-foreground">
-                        {weekSltForm(w)}
-                      </td>
-
-                      {/* Assessment Methods */}
-                      <td className="max-w-[200px] px-3 py-3">
-                        {w.assessmentMethodIds.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {w.assessmentMethodIds.map((methodId) => {
-                              const method = assessmentMethodById.get(methodId);
-
-                              return (
-                                <span
-                                  key={methodId}
-                                  className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
-                                >
-                                  {method?.name ?? "Unknown method"}
-                                </span>
-                              );
-                            })}
+                            )) : <span className="text-xs text-muted-foreground">No CLO linked</span>}
                           </div>
-                        ) : w.assessment ? (
-                          /*
-                           * Legacy fallback:
-                           * older saved weeks may still have only the
-                           * free-text assessment field.
-                           */
-                          <span className="text-foreground">
-                            {w.assessment}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
+                          <CompactList className="mt-2" label="LLO" items={llos} empty="No lesson outcomes" max={2} />
+                        </td>
 
-                      {/* Actions */}
-                      <td className="px-3 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <IconButton
-                            label={`Edit week ${w.week}`}
-                            onClick={() => openEdit(w.id)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </IconButton>
+                        <td className="px-3 py-4">
+                          <CompactTags label="Teaching" items={teaching} empty="No teaching method" />
+                          <CompactList className="mt-3" label="Activities" items={activities} empty="No learning activities" max={2} />
+                        </td>
 
-                          <IconButton
-                            label={`Delete week ${w.week}`}
-                            danger
-                            onClick={() => remove(w.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </IconButton>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-3 py-4">
+                          <div className="space-y-1 text-xs">
+                            <HourRow label="L" value={w.lectureHours} />
+                            <HourRow label="T" value={w.tutorialHours} />
+                            <HourRow label="P" value={w.practiceHours} />
+                            <HourRow label="O" value={w.otherHours} />
+                            <HourRow label="NF2F" value={w.selfStudyHours} />
+                          </div>
+                          <div className="mt-2 border-t border-border pt-2">
+                            <span className="text-xs text-muted-foreground">SLT</span>{" "}
+                            <span className="font-semibold text-foreground">{weekSltForm(w)} h</span>
+                          </div>
+                        </td>
+
+                        <td className="px-3 py-4">
+                          <CompactTags items={assessments} empty="No assessment" />
+                        </td>
+
+                        <td className="px-3 py-4">
+                          {attention.length === 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Complete
+                            </span>
+                          ) : (
+                            <div>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                {attention.length} {attention.length === 1 ? "item" : "items"}
+                              </span>
+                              <p className="mt-1.5 max-w-[150px] text-xs text-muted-foreground" title={attention.join(", ")}>
+                                {attention.slice(0, 2).join(", ")}{attention.length > 2 ? "…" : ""}
+                              </p>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <IconButton label={`Edit week ${w.week}`} onClick={() => openEdit(w.id)}>
+                              <Pencil className="h-4 w-4" />
+                            </IconButton>
+                            <IconButton label={`Delete week ${w.week}`} danger onClick={() => remove(w.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </IconButton>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
 
                 <tfoot>
                   <tr className="border-t border-border bg-muted/40 text-sm font-semibold text-foreground">
-                    <td colSpan={5} className="px-3 py-2.5">
-                      Total ({value.length}{" "}
-                      {value.length === 1 ? "Week" : "Weeks"})
+                    <td colSpan={3} className="px-3 py-2.5">
+                      Total ({value.length} {value.length === 1 ? "Week" : "Weeks"})
                     </td>
-
-                    <td className="px-3 py-2.5 text-center">
-                      {totalContactHours}
+                    <td className="px-3 py-2.5">
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        Contact {totalContactHours} h · NF2F {totals.selfStudyHours} h
+                      </span>
+                      <span>Total SLT {totals.slt} h</span>
                     </td>
-
-                    <td className="px-3 py-2.5 text-center">
-                      {totals.selfStudyHours}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-center">{totals.slt}</td>
-
-                    <td colSpan={2} className="px-3 py-2.5" />
+                    <td colSpan={3} className="px-3 py-2.5" />
                   </tr>
                 </tfoot>
               </table>
@@ -373,6 +312,7 @@ export function WeeklyPlanSectionForm({
 
       <WeekFormModal
         open={modal.open}
+        courseId={courseId}
         onOpenChange={(open) =>
           setModal((current) => ({
             ...current,
@@ -676,6 +616,77 @@ function SummaryRow({
       </span>
 
       <span className="font-semibold text-foreground">{value}</span>
+    </div>
+  );
+}
+
+
+function weekAttention(w: WeeklyPlanForm[number]): string[] {
+  const lloCount =
+    w.lessonLearningOutcomes.filter((llo) => llo.description.trim()).length ||
+    w.lloItems.filter((llo) => llo.trim()).length;
+  const activityCount =
+    w.studentLearningActivities.filter((activity) => activity.title.trim()).length ||
+    w.activities.filter((activity) => activity.trim()).length;
+
+  const issues: string[] = [];
+  if (!w.topic.trim()) issues.push("Topic");
+  if (w.cloCodes.length === 0) issues.push("CLO");
+  if (lloCount === 0) issues.push("LLO");
+  if (w.teachingMethodIds.length === 0) issues.push("Teaching method");
+  if (activityCount === 0) issues.push("Learning activity");
+  if (weekSltForm(w) <= 0) issues.push("Learning time");
+  if (w.assessmentMethodIds.length === 0 && !w.assessment.trim()) issues.push("Assessment");
+  return issues;
+}
+
+function CompactTags({ label, items, empty }: { label?: string; items: string[]; empty: string }) {
+  return (
+    <div>
+      {label ? <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p> : null}
+      {items.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {items.map((item, index) => (
+            <span key={`${item}-${index}`} className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : <span className="text-xs text-muted-foreground">{empty}</span>}
+    </div>
+  );
+}
+
+function CompactList({
+  label, items, empty, max, className,
+}: {
+  label: string; items: string[]; empty: string; max: number; className?: string;
+}) {
+  const visible = items.slice(0, max);
+  return (
+    <div className={className}>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      {visible.length > 0 ? (
+        <ul className="space-y-1 text-xs text-foreground">
+          {visible.map((item, index) => (
+            <li key={`${item}-${index}`} className="line-clamp-2">
+              <span className="mr-1 text-muted-foreground">•</span>{item}
+            </li>
+          ))}
+          {items.length > max ? <li className="text-muted-foreground">+{items.length - max} more</li> : null}
+        </ul>
+      ) : <span className="text-xs text-muted-foreground">{empty}</span>}
+    </div>
+  );
+}
+
+function HourRow({ label, value }: { label: string; value: string }) {
+  const hours = Number(value) || 0;
+  if (hours <= 0) return null;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{hours} h</span>
     </div>
   );
 }

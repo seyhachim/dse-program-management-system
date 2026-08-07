@@ -24,6 +24,7 @@ export function WeekFormFields({
   touched,
   existingAssessments,
   lloRequired = true,
+  visibleSections,
 }: {
   draft: WeekForm;
   set: (patch: Partial<WeekForm>) => void;
@@ -34,8 +35,10 @@ export function WeekFormFields({
   touched: boolean;
   existingAssessments: string[];
   lloRequired?: boolean;
+  visibleSections?: number[];
 }) {
   const errors = weekFormErrors(draft, lloRequired);
+  const show = (section: number) => !visibleSections || visibleSections.includes(section);
 
   const updateLessonLearningOutcomes = (
     lessonLearningOutcomes: LessonLearningOutcome[],
@@ -105,6 +108,7 @@ export function WeekFormFields({
   return (
     <div className="space-y-6">
       {/* 1. Week Information */}
+      {show(1) ? (
       <Section n={1} title="Week Information">
         <Field label="Week No." required>
           <input
@@ -142,8 +146,10 @@ export function WeekFormFields({
           </div>
         </Field>
       </Section>
+      ) : null}
 
       {/* 2. Link CLOs */}
+      {show(2) ? (
       <Section n={2} title="Link CLOs" required>
         <p className="text-xs text-muted-foreground">
           Select the CLOs that this week contributes to.
@@ -183,8 +189,10 @@ export function WeekFormFields({
           <p className="text-xs text-status-live">Link at least one CLO.</p>
         ) : null}
       </Section>
+      ) : null}
 
       {/* 3. Lesson Learning Outcomes */}
+      {show(3) ? (
       <Section
         n={3}
         title="Lesson Learning Outcomes (LLOs)"
@@ -210,8 +218,10 @@ export function WeekFormFields({
           </p>
         ) : null}
       </Section>
+      ) : null}
 
       {/* 4. Teaching Methods */}
+      {show(4) ? (
       <Section n={4} title="Teaching Methods">
         <p className="text-xs text-muted-foreground">
           Suggested from the teaching methods already assigned to the CLOs linked
@@ -264,8 +274,10 @@ export function WeekFormFields({
           </div>
         )}
       </Section>
+      ) : null}
 
       {/* 5. Student Learning Activities */}
+      {show(5) ? (
       <Section n={5} title="Student Activities (What students do)" required>
         <p className="text-xs text-muted-foreground">
           Describe the activities students will perform to achieve this week's
@@ -286,8 +298,10 @@ export function WeekFormFields({
           </p>
         ) : null}
       </Section>
+      ) : null}
 
       {/* 6. Time Allocation */}
+      {show(6) ? (
       <Section n={6} title="Time Allocation (Hours)">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Lecture (L)">
@@ -355,8 +369,10 @@ export function WeekFormFields({
           </Field>
         </div>
       </Section>
+      ) : null}
 
       {/* 7. Assessment / Deliverables */}
+      {show(7) ? (
       <Section n={7} title="Assessment">
         <div className="space-y-3">
           <div>
@@ -417,6 +433,7 @@ export function WeekFormFields({
           )}
         </div>
       </Section>
+      ) : null}
     </div>
   );
 }
