@@ -187,8 +187,7 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     sections: [{
       properties: {
         page: {
-          width: 11906,
-          height: 8391,
+          size: { width: 11906, height: 8391 },
           margin: { top: 720, bottom: 720, left: 900, right: 900 },
         },
       },
