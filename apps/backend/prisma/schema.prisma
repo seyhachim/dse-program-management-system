@@ -249,6 +249,22 @@ model ProgramCompetencyPlo {
   @@index([ploId])
 }
 
+/// Programme-level course policy baseline for the single DSE programme.
+///
+/// The singleton id is intentionally stable because this deployment serves one
+/// programme. CourseSpecPolicy remains the course-specific override/addition
+/// layer and is not replaced by this model.
+model ProgramPolicy {
+  id                        String   @id @default("dse")
+  attendancePreparation     String   @default("")
+  academicIntegrity         String   @default("")
+  assignmentsLateSubmission String   @default("")
+  examinationRules          String   @default("")
+  penaltiesConsequences     String   @default("")
+  updatedAt                 DateTime @updatedAt
+  createdAt                 DateTime @default(now())
+}
+
 /// Courses plugin domain model. lecturerId references a User with role = lecturer
 /// (validated at the service layer through registry.get('lecturers')).
 model Course {

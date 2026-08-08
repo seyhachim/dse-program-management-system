@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
   ProgramCompetencyWithPlos,
+  ProgramPolicy,
   ProgrammeAcademicConfig,
 } from "@dse-pms/shared-types";
 import {
@@ -41,6 +42,11 @@ export function ProgrammeManagementClient() {
   const [savingMapping, setSavingMapping] = useState(false);
   const [mappingError, setMappingError] = useState<string | null>(null);
 
+  const [policyDraft, setPolicyDraft] = useState<ProgramPolicy | null>(null);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [policySaved, setPolicySaved] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -49,6 +55,7 @@ export function ProgrammeManagementClient() {
       const result = await api.get<ProgrammeAcademicConfig>("/api/programme");
 
       setData(result);
+      setPolicyDraft(result.policy);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -92,6 +99,42 @@ export function ProgrammeManagementClient() {
 
       return next;
     });
+  };
+
+  const updatePolicy = (key: keyof ProgramPolicy, value: string) => {
+    setPolicyDraft((current) =>
+      current ? { ...current, [key]: value } : current,
+    );
+    setPolicySaved(false);
+  };
+
+  const savePolicy = async () => {
+    if (!policyDraft) return;
+
+    setSavingPolicy(true);
+    setPolicyError(null);
+
+    try {
+      const updated = await api.put<ProgramPolicy>(
+        "/api/programme/policies",
+        policyDraft,
+      );
+
+      setPolicyDraft(updated);
+      setData((current) =>
+        current ? { ...current, policy: updated } : current,
+      );
+      setPolicySaved(true);
+      window.setTimeout(() => setPolicySaved(false), 2500);
+    } catch (err) {
+      setPolicyError(
+        err instanceof ApiError
+          ? err.message
+          : "Failed to save programme policies",
+      );
+    } finally {
+      setSavingPolicy(false);
+    }
   };
 
   const saveMapping = async () => {
@@ -194,6 +237,8 @@ export function ProgrammeManagementClient() {
             <TabsTrigger value="plos">Programme Learning Outcomes</TabsTrigger>
 
             <TabsTrigger value="competencies">Program Competencies</TabsTrigger>
+
+            <TabsTrigger value="policies">Course Policies</TabsTrigger>
           </TabsList>
 
           <TabsContent value="plos" className="mt-4">
@@ -225,6 +270,100 @@ export function ProgrammeManagementClient() {
                   </div>
                 ))}
               </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="policies" className="mt-4">
+            <section className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-5 py-4">
+                <h3 className="font-semibold">Programme Course Policies</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Define the programme-level policy baseline that course
+                  specifications display as read-only guidance. Course-specific
+                  instructions remain separate from these rules.
+                </p>
+              </div>
+
+              {policyError ? (
+                <div className="mx-5 mt-4 rounded-lg border border-status-upcoming bg-status-upcoming-bg px-3 py-2 text-sm text-status-upcoming">
+                  {policyError}
+                </div>
+              ) : null}
+
+              {policyDraft ? (
+                <div className="space-y-4 p-5">
+                  {[
+                    [
+                      "attendancePreparation",
+                      "Attendance & Preparation",
+                      "Programme-wide expectations for attendance and preparation before class.",
+                    ],
+                    [
+                      "academicIntegrity",
+                      "Academic Integrity",
+                      "Programme-wide expectations concerning plagiarism, cheating, authorship, and academic misconduct.",
+                    ],
+                    [
+                      "assignmentsLateSubmission",
+                      "Assignments & Late Submission",
+                      "Programme-wide rules for assignment submission, deadlines, and late work.",
+                    ],
+                    [
+                      "examinationRules",
+                      "Examination Rules",
+                      "Programme-wide examination and permitted-materials requirements.",
+                    ],
+                    [
+                      "penaltiesConsequences",
+                      "Penalties & Consequences",
+                      "Programme-wide consequences and escalation rules.",
+                    ],
+                  ].map(([key, title, description]) => (
+                    <div
+                      key={key}
+                      className="rounded-xl border border-border p-5"
+                    >
+                      <h4 className="text-sm font-semibold text-foreground">
+                        {title}
+                      </h4>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {description}
+                      </p>
+                      <textarea
+                        value={policyDraft[key as keyof ProgramPolicy]}
+                        onChange={(event) =>
+                          updatePolicy(
+                            key as keyof ProgramPolicy,
+                            event.target.value,
+                          )
+                        }
+                        disabled={!canWrite || savingPolicy}
+                        rows={5}
+                        className="mt-4 w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        placeholder={`Enter the official programme policy for ${(title ?? "this policy").toLowerCase()}…`}
+                      />
+                    </div>
+                  ))}
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    {policySaved ? (
+                      <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                        Saved
+                      </span>
+                    ) : null}
+                    {canWrite ? (
+                      <Button onClick={savePolicy} disabled={savingPolicy}>
+                        {savingPolicy ? "Saving…" : "Save Programme Policies"}
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Read-only. Programme policy changes require
+                        programme:write permission.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </section>
           </TabsContent>
 

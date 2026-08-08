@@ -67,6 +67,20 @@ export type ProgramCompetencyWithPlos = z.infer<
   typeof ProgramCompetencyWithPlosSchema
 >;
 
+/** Programme-level policy baseline inherited by course specifications. */
+export const ProgramPolicySchema = z.object({
+  attendancePreparation: z.string(),
+  academicIntegrity: z.string(),
+  assignmentsLateSubmission: z.string(),
+  examinationRules: z.string(),
+  penaltiesConsequences: z.string(),
+});
+
+export type ProgramPolicy = z.infer<typeof ProgramPolicySchema>;
+
+export const UpdateProgramPolicySchema = ProgramPolicySchema;
+export type UpdateProgramPolicyInput = z.infer<typeof UpdateProgramPolicySchema>;
+
 /**
  * Programme academic configuration returned to consumers such as
  * Programme Management and Course Specification.
@@ -75,6 +89,7 @@ export const ProgrammeAcademicConfigSchema = z.object({
   title: z.string(),
   plos: z.array(ProgramLearningOutcomeSchema),
   competencies: z.array(ProgramCompetencyWithPlosSchema),
+  policy: ProgramPolicySchema,
 });
 
 export type ProgrammeAcademicConfig = z.infer<

@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { UpdateProgramCompetencyPlosSchema } from "@dse-pms/shared-types";
+import {
+  UpdateProgramCompetencyPlosSchema,
+  UpdateProgramPolicySchema,
+} from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { InvalidPloCodesError, programmeService } from "./service.ts";
@@ -18,6 +21,30 @@ export function createProgrammeRouter(): Router {
       });
     }
   });
+
+  router.put(
+    "/policies",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const parsed = UpdateProgramPolicySchema.safeParse(req.body);
+
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid programme policy",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      try {
+        res.json(await programmeService.updatePolicy(parsed.data));
+      } catch {
+        res.status(500).json({
+          error: "Could not update programme policies",
+        });
+      }
+    },
+  );
 
   router.put(
     "/competencies/:code/plos",

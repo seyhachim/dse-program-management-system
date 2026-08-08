@@ -2,7 +2,9 @@ import {
   PROGRAMME_TITLE,
   type ProgrammeAcademicConfig,
   type ProgramCompetencyWithPlos,
+  type ProgramPolicy,
   type UpdateProgramCompetencyPlosInput,
+  type UpdateProgramPolicyInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 
@@ -56,7 +58,7 @@ function toCompetencyWithPlos(
 
 export const programmeService = {
   async getAcademicConfig(): Promise<ProgrammeAcademicConfig> {
-    const [plos, competencies] = await Promise.all([
+    const [plos, competencies, policy] = await Promise.all([
       prisma.programLearningOutcome.findMany({
         where: { active: true },
         orderBy: { order: "asc" },
@@ -74,7 +76,26 @@ export const programmeService = {
         orderBy: { order: "asc" },
         select: competencySelect,
       }),
+
+      prisma.programPolicy.findUnique({
+        where: { id: "dse" },
+        select: {
+          attendancePreparation: true,
+          academicIntegrity: true,
+          assignmentsLateSubmission: true,
+          examinationRules: true,
+          penaltiesConsequences: true,
+        },
+      }),
     ]);
+
+    const programmePolicy: ProgramPolicy = {
+      attendancePreparation: policy?.attendancePreparation ?? "",
+      academicIntegrity: policy?.academicIntegrity ?? "",
+      assignmentsLateSubmission: policy?.assignmentsLateSubmission ?? "",
+      examinationRules: policy?.examinationRules ?? "",
+      penaltiesConsequences: policy?.penaltiesConsequences ?? "",
+    };
 
     return {
       title: PROGRAMME_TITLE,
@@ -90,7 +111,25 @@ export const programmeService = {
           .map((link) => link.plo)
           .sort((a, b) => a.order - b.order),
       })),
+      policy: programmePolicy,
     };
+  },
+
+  async updatePolicy(input: UpdateProgramPolicyInput): Promise<ProgramPolicy> {
+    return prisma.programPolicy
+      .upsert({
+        where: { id: "dse" },
+        create: { id: "dse", ...input },
+        update: input,
+        select: {
+          attendancePreparation: true,
+          academicIntegrity: true,
+          assignmentsLateSubmission: true,
+          examinationRules: true,
+          penaltiesConsequences: true,
+        },
+      })
+      .then((policy) => ({ ...policy }));
   },
 
   /**

@@ -1,17 +1,25 @@
-/*
-  Warnings:
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'CourseSpecReviewAction'
+    ) THEN
+        ALTER TABLE "CourseSpecReviewAction"
+        DROP CONSTRAINT IF EXISTS "CourseSpecReviewAction_actorId_fkey";
 
-  - You are about to drop the `CourseSpecReviewAction` table. If the table is not empty, all the data it contains will be lost.
+        ALTER TABLE "CourseSpecReviewAction"
+        DROP CONSTRAINT IF EXISTS "CourseSpecReviewAction_courseSpecId_fkey";
 
-*/
--- DropForeignKey
-ALTER TABLE "CourseSpecReviewAction" DROP CONSTRAINT "CourseSpecReviewAction_actorId_fkey";
+        DROP TABLE "CourseSpecReviewAction";
+    END IF;
 
--- DropForeignKey
-ALTER TABLE "CourseSpecReviewAction" DROP CONSTRAINT "CourseSpecReviewAction_courseSpecId_fkey";
-
--- DropTable
-DROP TABLE "CourseSpecReviewAction";
-
--- DropEnum
-DROP TYPE "CourseSpecReviewActionType";
+    IF EXISTS (
+        SELECT 1
+        FROM pg_type
+        WHERE typname = 'CourseSpecReviewActionType'
+    ) THEN
+        DROP TYPE "CourseSpecReviewActionType";
+    END IF;
+END $$;

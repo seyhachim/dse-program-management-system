@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { Check, Info, Loader2, Lock } from "lucide-react";
 import { Button } from "@dse-pms/ui";
-import type { PolicySection as PolicySectionValue } from "@dse-pms/shared-types";
+import type {
+  PolicySection as PolicySectionValue,
+  ProgramPolicy,
+} from "@dse-pms/shared-types";
 
 const FIELDS: {
   key: keyof PolicySectionValue;
@@ -64,9 +67,11 @@ export const EMPTY_POLICY: PolicySectionValue = {
 export function PolicySection({
   value,
   onPersist,
+  programPolicy,
   disabled = false,
 }: {
   value: PolicySectionValue;
+  programPolicy: ProgramPolicy | null;
   onPersist: (value: PolicySectionValue) => Promise<boolean>;
   disabled?: boolean;
 }) {
@@ -124,14 +129,43 @@ export function PolicySection({
               consistently across courses.
             </p>
 
-            <div className="mt-4 rounded-lg border border-border bg-background px-4 py-3">
-              <div className="flex items-start gap-2">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-5 text-muted-foreground">
-                  Programme policy content will be displayed here when it is
-                  configured by the programme.
-                </p>
-              </div>
+            <div className="mt-4 space-y-3">
+              {programPolicy ? (
+                FIELDS.map((field) => (
+                  <div
+                    key={field.key}
+                    className="rounded-lg border border-border bg-background px-4 py-3"
+                  >
+                    <div className="flex items-start gap-2">
+                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground">
+                          {field.title}
+                        </p>
+                        {programPolicy[field.key] ? (
+                          <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                            {programPolicy[field.key]}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            No programme policy has been configured yet.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-lg border border-border bg-background px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Programme policy could not be loaded. Course-specific
+                      instructions remain separate.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

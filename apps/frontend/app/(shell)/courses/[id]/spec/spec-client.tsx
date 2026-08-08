@@ -31,7 +31,6 @@ import {
 import { ApiError, api } from "@/lib/api";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
-import { useMe } from "@/lib/auth";
 import { methodsApi } from "@/lib/methods";
 import {
   CourseInfoSection,
@@ -114,7 +113,6 @@ const sectionMeta = (id: TabId) => SPEC_SECTIONS.find((s) => s.id === id);
 
 export function SpecClient({ courseId }: { courseId: string }) {
   const router = useRouter();
-  const { me } = useMe();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
@@ -219,9 +217,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setWeeklyPlan(toWeeklyPlanForm(spec.data.slt));
       setAssessments(toAssessmentForm(spec.data.assessmentPlan));
       setMapping(toMappingForm(spec.data.mapping));
-      setPolicy(
-        (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
-      );
+      setPolicy((spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY);
       setStatus(spec.status ?? {});
       setReview(spec.review);
       setTeachingMethods(methods.teaching);
@@ -359,9 +355,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         return true;
       } catch (err) {
         setError(
-          err instanceof ApiError
-            ? err.message
-            : "Failed to save course policies",
+          err instanceof ApiError ? err.message : "Failed to save course policies",
         );
         return false;
       } finally {
@@ -443,56 +437,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
     ],
   );
 
-  const canReview = me?.permissions.includes("courses:review") ?? false;
-
-  const handleRequestChanges = useCallback(
-    async (note: string) => {
-      setSaving(true);
-      setError(null);
-      try {
-        const next = await courseSpecApi.requestChanges(courseId, note);
-        setStatus(next.status ?? {});
-        setReview(next.review);
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
-        return true;
-      } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to request changes",
-        );
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [courseId],
-  );
-
-  const handleApprove = useCallback(
-    async (note: string) => {
-      setSaving(true);
-      setError(null);
-      try {
-        const next = await courseSpecApi.approve(courseId, note);
-        setStatus(next.status ?? {});
-        setReview(next.review);
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
-        return true;
-      } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Failed to approve course specification",
-        );
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [courseId],
-  );
-
   const canSaveActive = activeTab === "mapping";
 
   // Course Information (courseInfo) has no tab of its own — it's edited via the
@@ -522,8 +466,21 @@ export function SpecClient({ courseId }: { courseId: string }) {
         clos,
         weeklyPlan,
         assessments,
+        mapping,
+        teachingMethods,
+        assessmentMethods,
+        programme,
       }),
-    [courseInfo, clos, weeklyPlan, assessments],
+    [
+      courseInfo,
+      clos,
+      weeklyPlan,
+      assessments,
+      mapping,
+      teachingMethods,
+      assessmentMethods,
+      programme,
+    ],
   );
 
   return (
@@ -728,9 +685,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
                   onPreview={() => setActiveTab("documentPreview")}
                   onGoToSection={goToSection}
                   saving={saving}
-                  canReview={canReview}
-                  onRequestChanges={handleRequestChanges}
-                  onApprove={handleApprove}
                 />
               ) : null}
             </TabsContent>

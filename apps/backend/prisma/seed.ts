@@ -60,6 +60,14 @@ const users = [
   },
 ];
 
+const programmePolicy = {
+  attendancePreparation: "",
+  academicIntegrity: "",
+  assignmentsLateSubmission: "",
+  examinationRules: "",
+  penaltiesConsequences: "",
+};
+
 const students = [
   {
     name: "Ada Lovelace",
@@ -850,6 +858,21 @@ async function main() {
       },
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // Programme Policies
+  // ---------------------------------------------------------------------------
+
+  // The programme owns the policy baseline. The seed creates the singleton
+  // record but intentionally leaves its five areas empty: the uploaded sample
+  // Course Specification provides course-level policy examples, not verified
+  // programme-wide policy text. Authorized programme users can define the
+  // official baseline from Programme Management.
+  await prisma.programPolicy.upsert({
+    where: { id: "dse" },
+    update: {},
+    create: { id: "dse", ...programmePolicy },
+  });
 
   // ---------------------------------------------------------------------------
   // Teaching / Assessment Methods
