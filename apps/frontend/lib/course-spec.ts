@@ -7,13 +7,21 @@ export const courseSpecApi = {
     return api.get<CourseSpecView>(`/api/courses/${courseId}/spec`);
   },
   submit(courseId: string, note: string) {
-    return api.post<CourseSpecView>(`/api/courses/${courseId}/spec/submit`, { note });
+    return api.post<CourseSpecView>(`/api/courses/${courseId}/spec/submit`, {
+      note,
+    });
   },
   requestChanges(courseId: string, note: string) {
-    return api.post<CourseSpecView>(`/api/courses/${courseId}/spec/review/request-changes`, { note });
+    return api.post<CourseSpecView>(
+      `/api/courses/${courseId}/spec/review/request-changes`,
+      { note },
+    );
   },
   approve(courseId: string, note: string) {
-    return api.post<CourseSpecView>(`/api/courses/${courseId}/spec/review/approve`, { note });
+    return api.post<CourseSpecView>(
+      `/api/courses/${courseId}/spec/review/approve`,
+      { note },
+    );
   },
   saveSection(
     courseId: string,

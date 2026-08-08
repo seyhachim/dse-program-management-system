@@ -475,6 +475,15 @@ export const CourseInfoSection = z.object({
 });
 export type CourseInfoSection = z.infer<typeof CourseInfoSection>;
 
+export const PolicySection = z.object({
+  attendancePreparation: z.string(),
+  academicIntegrity: z.string(),
+  assignmentsLateSubmission: z.string(),
+  examinationRules: z.string(),
+  penaltiesConsequences: z.string(),
+});
+
+export type PolicySection = z.infer<typeof PolicySection>;
 /**
  * What `PUT /:id/spec/courseInfo` actually accepts. Every other Course
  * Information field is admin/assignment-derived (see `CourseInfoSection`) and

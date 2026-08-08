@@ -11,6 +11,7 @@ import {
   type LecturersServiceContract,
   type ListCoursesQuery,
   type MappingSection,
+  type PolicySection,
   type OfferingsServiceContract,
   type SpecSectionId,
   type CourseSpecReviewStatus,
@@ -102,16 +103,9 @@ export const courseService = {
     const courses = await prisma.course.findMany({
       where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
-      include: { spec: { select: { reviewStatus: true } } },
     });
     const lecturerById = await lecturerLookup();
-    return courses.map((course) => {
-      const { spec, ...courseData } = course;
-      return {
-        ...withLecturer(courseData, lecturerById),
-        reviewStatus: spec?.reviewStatus ?? "Draft",
-      };
-    });
+    return courses.map((course) => withLecturer(course, lecturerById));
   },
 
   /**
@@ -418,6 +412,8 @@ export const courseService = {
         );
       if (sectionId === "mapping")
         await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
+      if (sectionId === "policy")
+        await syncPolicy(tx, spec.id, values as PolicySection);
 
       // Every saveable section must have a normalized table to write into — enforced,
       // not just documented, so a future section added to SPEC_SECTION_SCHEMAS without
@@ -472,19 +468,6 @@ function reviewEnvelope(spec: SpecRow | null) {
     submittedAt: spec?.submittedAt?.toISOString() ?? null,
     submittedById: spec?.submittedById ?? null,
     submissionNote: spec?.submissionNote ?? "",
-    actions: (spec?.reviewActions ?? []).map((action) => ({
-      id: action.id,
-      submissionVersion: action.submissionVersion,
-      action: {
-        Submitted: "submitted",
-        Resubmitted: "resubmitted",
-        ChangesRequested: "changesRequested",
-        Approved: "approved",
-      }[action.action],
-      actorId: action.actorId,
-      note: action.note,
-      createdAt: action.createdAt.toISOString(),
-    })),
   };
 }
 
@@ -500,6 +483,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "slt",
   "assessmentPlan",
   "mapping",
+  "policy",
 ]);
 
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
@@ -512,7 +496,7 @@ const SPEC_INCLUDE = {
   weeks: { orderBy: { order: "asc" as const } },
   assessmentItems: { orderBy: { order: "asc" as const } },
   mappingCells: true,
-  reviewActions: { orderBy: { createdAt: "asc" as const } },
+  policy: true,
 } satisfies Prisma.CourseSpecInclude;
 
 type SpecRow = Prisma.CourseSpecGetPayload<{ include: typeof SPEC_INCLUDE }>;
@@ -618,6 +602,15 @@ function reassembleSpec(spec: SpecRow | null): {
         ref: cell.ref,
         strength: cell.strength,
       })),
+    };
+  }
+  if (hasSection("policy") && spec.policy) {
+    data.policy = {
+      attendancePreparation: spec.policy.attendancePreparation,
+      academicIntegrity: spec.policy.academicIntegrity,
+      assignmentsLateSubmission: spec.policy.assignmentsLateSubmission,
+      examinationRules: spec.policy.examinationRules,
+      penaltiesConsequences: spec.policy.penaltiesConsequences,
     };
   }
   return { data, status };
@@ -745,6 +738,18 @@ async function syncAssessmentPlan(
 }
 
 /** Delete-and-rebuild CourseSpecMappingCell rows for a `mapping` (CLO Alignment) section save. */
+async function syncPolicy(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  policy: PolicySection,
+) {
+  await tx.courseSpecPolicy.upsert({
+    where: { courseSpecId },
+    create: { courseSpecId, ...policy },
+    update: { ...policy },
+  });
+}
+
 async function syncMappingCells(
   tx: Prisma.TransactionClient,
   courseSpecId: string,

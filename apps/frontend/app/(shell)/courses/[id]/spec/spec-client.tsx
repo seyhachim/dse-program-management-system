@@ -30,8 +30,8 @@ import {
 } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { coursesApi, type CourseView } from "@/lib/courses";
-import { useMe } from "@/lib/auth";
 import { courseSpecApi } from "@/lib/course-spec";
+import { useMe } from "@/lib/auth";
 import { methodsApi } from "@/lib/methods";
 import {
   CourseInfoSection,
@@ -75,6 +75,8 @@ import { CompletionSummary } from "./completion-summary";
 import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
+import { EMPTY_POLICY, PolicySection } from "./policy-section";
+import type { PolicySection as PolicySectionValue } from "@dse-pms/shared-types";
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
   | "overview"
@@ -111,8 +113,8 @@ const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
 const sectionMeta = (id: TabId) => SPEC_SECTIONS.find((s) => s.id === id);
 
 export function SpecClient({ courseId }: { courseId: string }) {
-  const { me } = useMe();
   const router = useRouter();
+  const { me } = useMe();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
@@ -134,6 +136,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [assessments, setAssessments] =
     useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
+  const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
@@ -216,6 +219,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setWeeklyPlan(toWeeklyPlanForm(spec.data.slt));
       setAssessments(toAssessmentForm(spec.data.assessmentPlan));
       setMapping(toMappingForm(spec.data.mapping));
+      setPolicy(
+        (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
+      );
       setStatus(spec.status ?? {});
       setReview(spec.review);
       setTeachingMethods(methods.teaching);
@@ -334,6 +340,37 @@ export function SpecClient({ courseId }: { courseId: string }) {
     [courseId, editingLocked],
   );
 
+  const persistPolicy = useCallback(
+    async (value: PolicySectionValue) => {
+      if (editingLocked) {
+        setError(
+          "This course specification is locked while it is in the review workflow.",
+        );
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(courseId, "policy", value);
+        setPolicy(value);
+        setStatus((s) => ({ ...s, policy: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to save course policies",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, editingLocked],
+  );
+
   const submitForReview = useCallback(
     async (note: string) => {
       setSaving(true);
@@ -351,48 +388,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
             ? err.message
             : "Failed to submit course specification",
         );
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [courseId],
-  );
-
-  const requestChanges = useCallback(
-    async (note: string) => {
-      setSaving(true);
-      setError(null);
-      try {
-        const next = await courseSpecApi.requestChanges(courseId, note);
-        setStatus(next.status ?? {});
-        setReview(next.review);
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
-        return true;
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to request changes");
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [courseId],
-  );
-
-  const approveSpec = useCallback(
-    async (note: string) => {
-      setSaving(true);
-      setError(null);
-      try {
-        const next = await courseSpecApi.approve(courseId, note);
-        setStatus(next.status ?? {});
-        setReview(next.review);
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
-        return true;
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to approve course specification");
         return false;
       } finally {
         setSaving(false);
@@ -446,6 +441,56 @@ export function SpecClient({ courseId }: { courseId: string }) {
       mapping,
       editingLocked,
     ],
+  );
+
+  const canReview = me?.permissions.includes("courses:review") ?? false;
+
+  const handleRequestChanges = useCallback(
+    async (note: string) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const next = await courseSpecApi.requestChanges(courseId, note);
+        setStatus(next.status ?? {});
+        setReview(next.review);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError ? err.message : "Failed to request changes",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
+  );
+
+  const handleApprove = useCallback(
+    async (note: string) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const next = await courseSpecApi.approve(courseId, note);
+        setStatus(next.status ?? {});
+        setReview(next.review);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to approve course specification",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
   );
 
   const canSaveActive = activeTab === "mapping";
@@ -645,9 +690,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
             </TabsContent>
 
             <TabsContent value="policy" className="mt-4">
-              <SectionPanel>
-                <ComingSoon meta={sectionMeta("policy")} />
-              </SectionPanel>
+              <PolicySection
+                value={policy}
+                onPersist={persistPolicy}
+                disabled={editingLocked}
+              />
             </TabsContent>
 
             <TabsContent value="documentPreview" className="mt-4">
@@ -681,9 +728,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
                   onPreview={() => setActiveTab("documentPreview")}
                   onGoToSection={goToSection}
                   saving={saving}
-                  canReview={me?.permissions.includes("courses:review") ?? false}
-                  onRequestChanges={requestChanges}
-                  onApprove={approveSpec}
+                  canReview={canReview}
+                  onRequestChanges={handleRequestChanges}
+                  onApprove={handleApprove}
                 />
               ) : null}
             </TabsContent>

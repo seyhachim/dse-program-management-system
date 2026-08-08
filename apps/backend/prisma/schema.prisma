@@ -290,6 +290,7 @@ model CourseSpec {
   assessmentItems CourseSpecAssessmentItem[]
   mappingCells    CourseSpecMappingCell[]
   resources       CourseSpecResource[]
+  policy          CourseSpecPolicy?
   updatedAt          DateTime                   @updatedAt
   createdAt          DateTime                   @default(now())
   reviewStatus       CourseSpecReviewStatus     @default(Draft)
@@ -304,20 +305,19 @@ model CourseSpec {
   @@index([submittedById])
 }
 
-
 /// Immutable workflow events for Course Specification submission/review actions.
 /// Notes are retained so requested changes and approval decisions remain traceable
 /// across submission versions without overwriting earlier review history.
 model CourseSpecReviewAction {
-  id               String                      @id @default(uuid())
-  courseSpecId     String
-  courseSpec       CourseSpec                  @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  id                String                      @id @default(uuid())
+  courseSpecId      String
+  courseSpec        CourseSpec                  @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   submissionVersion Int
-  action           CourseSpecReviewActionType
-  actorId          String
-  actor            User                        @relation("CourseSpecReviewActor", fields: [actorId], references: [id], onDelete: Restrict)
-  note             String                      @default("")
-  createdAt        DateTime                    @default(now())
+  action            CourseSpecReviewActionType
+  actorId           String
+  actor             User                        @relation("CourseSpecReviewActor", fields: [actorId], references: [id], onDelete: Restrict)
+  note              String                      @default("")
+  createdAt         DateTime                    @default(now())
 
   @@index([courseSpecId, createdAt])
   @@index([actorId])
@@ -334,6 +334,20 @@ model CourseSpecReviewAction {
 /// its backfill was verified against production — there is no jsonb column left
 /// anywhere in this schema; any future section must land its own normalized
 /// table(s) rather than reintroducing one.
+/// §23 Course Policy. One normalized row per course specification so the five
+/// policy areas can be edited independently from other specification sections.
+model CourseSpecPolicy {
+  courseSpecId              String     @id
+  courseSpec                 CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  attendancePreparation     String     @default("")
+  academicIntegrity         String     @default("")
+  assignmentsLateSubmission String     @default("")
+  examinationRules          String     @default("")
+  penaltiesConsequences     String     @default("")
+  updatedAt                 DateTime   @updatedAt
+  createdAt                 DateTime   @default(now())
+}
+
 model CourseSpecSection {
   id           String                  @id @default(uuid())
   courseSpecId String

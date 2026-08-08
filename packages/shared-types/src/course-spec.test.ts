@@ -433,6 +433,7 @@ test("COMPLETABLE_SPEC_SECTIONS is the save-able sections, in SPEC_SECTIONS orde
     "slt",
     "assessmentPlan",
     "mapping",
+    "policy",
   ]);
 });
 
