@@ -32,6 +32,7 @@ export function OverviewTab({
   courseTotalSlt,
   onEditCourseInfo,
   onGoToTab,
+  readOnly = false,
 }: {
   courseInfo: CourseInfoForm;
   clos: CloForm[];
@@ -42,6 +43,7 @@ export function OverviewTab({
   courseTotalSlt: number | null;
   onEditCourseInfo: () => void;
   onGoToTab: (id: SpecSectionId) => void;
+  readOnly?: boolean;
 }) {
   const fillable = COMPLETABLE_SPEC_SECTIONS;
   const completed = fillable.filter((s) => status[s.id] === "complete").length;
@@ -62,8 +64,8 @@ export function OverviewTab({
           <CardHeader
             title="Course Information"
             action={
-              <Button variant="outline" size="sm" onClick={onEditCourseInfo}>
-                <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+              <Button variant="outline" size="sm" onClick={onEditCourseInfo} disabled={readOnly}>
+                <Pencil className="mr-1 h-3.5 w-3.5" /> {readOnly ? "Read-only" : "Edit"}
               </Button>
             }
           />
@@ -131,8 +133,8 @@ export function OverviewTab({
           ) : (
             <EmptyHint
               text="No course information yet."
-              action="Fill it in"
-              onClick={onEditCourseInfo}
+              action={readOnly ? undefined : "Fill it in"}
+              onClick={readOnly ? undefined : onEditCourseInfo}
             />
           )}
         </Card>

@@ -233,14 +233,38 @@ export const courseService = {
     });
     if (!spec) throw new ReferenceError("Course specification has not been started");
 
-    const incomplete = COMPLETABLE_SPEC_SECTIONS.filter(
-      (section) => !spec.sections.some(
-        (saved) => saved.sectionKey === section.id && saved.status === "Complete",
-      ),
-    );
-    if (incomplete.length > 0) {
+    const savedComplete = (sectionId: SpecSectionId) =>
+      spec.sections.some(
+        (saved) =>
+          saved.sectionKey === sectionId && saved.status === "Complete",
+      );
+
+    const activeClos = spec.clos.filter((clo) => clo.status === "Active");
+    const readinessGaps: string[] = [];
+
+    if (!savedComplete("courseInfo")) readinessGaps.push("Course Information");
+
+    if (
+      !savedComplete("clos") ||
+      activeClos.length === 0 ||
+      activeClos.some((clo) => clo.mappedPlos.length === 0)
+    ) {
+      readinessGaps.push("Course Learning Outcomes");
+    }
+
+    if (
+      activeClos.length === 0 ||
+      activeClos.some((clo) => clo.teachingMethods.length === 0)
+    ) {
+      readinessGaps.push("Teaching & Learning");
+    }
+
+    if (!savedComplete("assessmentPlan")) readinessGaps.push("Assessment");
+    if (!savedComplete("slt")) readinessGaps.push("Weekly Plan");
+
+    if (readinessGaps.length > 0) {
       throw new ReferenceError(
-        `Complete all required sections before submitting: ${incomplete.map((s) => s.title).join(", ")}`,
+        `Complete all required sections before submitting: ${readinessGaps.join(", ")}`,
       );
     }
 

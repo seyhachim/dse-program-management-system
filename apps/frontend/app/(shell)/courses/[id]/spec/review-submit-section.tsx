@@ -11,7 +11,6 @@ import {
   UserRound,
 } from "lucide-react";
 import {
-  COMPLETABLE_SPEC_SECTIONS,
   type CourseSpecReviewStatus,
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
@@ -45,10 +44,28 @@ const FLOW: CourseSpecReviewStatus[] = [
   "approved",
 ];
 
+const EDITABLE_REVIEW_STATUSES: CourseSpecReviewStatus[] = [
+  "draft",
+  "changesRequested",
+];
+
+const isEditableReviewStatus = (status: CourseSpecReviewStatus) =>
+  EDITABLE_REVIEW_STATUSES.includes(status);
+
+type ReadinessItem = {
+  id: "courseInfo" | "clos" | "teachingLearning" | "assessmentPlan" | "slt";
+  title: string;
+  complete: boolean;
+};
+
+type ReadinessSectionId = ReadinessItem["id"];
+
 export function ReviewSubmitSection({
   course,
   status,
   review,
+  cloReady,
+  teachingLearningReady,
   onSubmit,
   onPreview,
   onGoToSection,
@@ -63,21 +80,47 @@ export function ReviewSubmitSection({
     submittedById: string | null;
     submissionNote: string;
   };
+  cloReady: boolean;
+  teachingLearningReady: boolean;
   onSubmit: (note: string) => Promise<boolean>;
   onPreview: () => void;
-  onGoToSection: (id: (typeof COMPLETABLE_SPEC_SECTIONS)[number]["id"]) => void;
+  onGoToSection: (id: ReadinessSectionId) => void;
   saving: boolean;
 }) {
   const [note, setNote] = useState(review.submissionNote);
   const [submitting, setSubmitting] = useState(false);
-  const completed = useMemo(
-    () => COMPLETABLE_SPEC_SECTIONS.filter((s) => status[s.id] === "complete"),
-    [status],
+  const readinessItems = useMemo<ReadinessItem[]>(
+    () => [
+      {
+        id: "courseInfo",
+        title: "Course Information",
+        complete: status.courseInfo === "complete",
+      },
+      {
+        id: "clos",
+        title: "Course Learning Outcomes",
+        complete: cloReady,
+      },
+      {
+        id: "teachingLearning",
+        title: "Teaching & Learning",
+        complete: teachingLearningReady,
+      },
+      {
+        id: "assessmentPlan",
+        title: "Assessment",
+        complete: status.assessmentPlan === "complete",
+      },
+      {
+        id: "slt",
+        title: "Weekly Plan",
+        complete: status.slt === "complete",
+      },
+    ],
+    [status, cloReady, teachingLearningReady],
   );
-  const incomplete = useMemo(
-    () => COMPLETABLE_SPEC_SECTIONS.filter((s) => status[s.id] !== "complete"),
-    [status],
-  );
+  const completed = readinessItems.filter((item) => item.complete);
+  const incomplete = readinessItems.filter((item) => !item.complete);
   const ready = incomplete.length === 0;
   const canSubmit =
     ready &&
@@ -85,6 +128,11 @@ export function ReviewSubmitSection({
     !saving &&
     !submitting;
   const currentIndex = FLOW.indexOf(review.status);
+  const editingEnabled = isEditableReviewStatus(review.status);
+  const waitingForReview =
+    review.status === "submitted" ||
+    review.status === "underReview" ||
+    review.status === "resubmitted";
 
   const submit = async () => {
     setSubmitting(true);
@@ -95,12 +143,24 @@ export function ReviewSubmitSection({
     }
   };
 
-  const statusMessage =
-    review.status === "draft"
-      ? ready
-        ? "Your course specification is ready. Review the document, then submit it to the Head of Program."
-        : "Complete all required sections before submitting."
-      : STATUS_META[review.status].description + ".";
+  const statusMessage = (() => {
+    switch (review.status) {
+      case "draft":
+        return ready
+          ? "Your course specification is ready. Review the document, then submit it to the Head of Program."
+          : "Complete all required sections before submitting.";
+      case "submitted":
+        return "Your course specification has been submitted and is waiting for the Head of Program review.";
+      case "underReview":
+        return "Your course specification is currently under review. Editing is locked until the review is completed.";
+      case "changesRequested":
+        return "Changes have been requested. Continue editing the course specification, then resubmit it for review.";
+      case "resubmitted":
+        return "Your revised course specification has been resubmitted and is waiting for review.";
+      case "approved":
+        return "Your course specification has been approved. Editing is locked for the approved version.";
+    }
+  })();
 
   return (
     <div className="space-y-4 pb-20">
@@ -228,18 +288,21 @@ export function ReviewSubmitSection({
                 ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
               }`}
             >
-              {completed.length}/{COMPLETABLE_SPEC_SECTIONS.length} Complete
+              {completed.length}/{readinessItems.length} Complete
             </span>
           </div>
           <div className="mt-4 space-y-2">
-            {COMPLETABLE_SPEC_SECTIONS.map((section) => {
-              const done = status[section.id] === "complete";
+            {readinessItems.map((section) => {
+              const done = section.complete;
               return (
                 <button
                   key={section.id}
                   type="button"
-                  onClick={() => !done && onGoToSection(section.id)}
-                  className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-muted/50"
+                  onClick={() => editingEnabled && !done && onGoToSection(section.id)}
+                  disabled={!editingEnabled || done}
+                  className={`flex w-full items-center gap-2 rounded-md px-1 py-1 text-left ${
+                    editingEnabled && !done ? "hover:bg-muted/50" : "cursor-default"
+                  }`}
                 >
                   {done ? (
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -260,31 +323,68 @@ export function ReviewSubmitSection({
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Next Steps</p>
             <span className="text-xs font-medium text-muted-foreground">
-              {incomplete.length ? `${incomplete.length} required` : "Ready"}
+              {review.status === "draft"
+                ? incomplete.length
+                  ? `${incomplete.length} required`
+                  : "Ready"
+                : review.status === "changesRequested"
+                  ? "Action required"
+                  : review.status === "approved"
+                    ? "Complete"
+                    : "Waiting"}
             </span>
           </div>
-          {incomplete.length ? (
+
+          {review.status === "draft" && incomplete.length ? (
             <div className="mt-4 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Complete the items below before you can submit this course specification.
+              </p>
               {incomplete.slice(0, 3).map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => onGoToSection(item.id)}
-                  className="flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-left text-xs text-amber-900 hover:bg-amber-50"
+                  className="flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-left text-xs text-amber-900 transition-colors hover:bg-amber-50"
                 >
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <span className="flex-1">Complete {item.title}</span>
-                  <span>→</span>
+                  <span aria-hidden="true">→</span>
                 </button>
               ))}
               {incomplete.length > 3 ? (
                 <p className="text-xs text-muted-foreground">+ {incomplete.length - 3} more required section(s)</p>
               ) : null}
             </div>
-          ) : (
+          ) : review.status === "draft" ? (
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-800">
-              <CheckCircle2 className="mb-2 h-5 w-5" />
-              All required sections are complete. Review the document before submitting.
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="font-semibold">All required sections are complete.</p>
+                  <p className="mt-1 text-emerald-700">Review the generated document before submitting.</p>
+                </div>
+              </div>
+            </div>
+          ) : review.status === "changesRequested" ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-900">
+              <p className="font-semibold">Changes requested.</p>
+              <p className="mt-1">Review the comments and update the course specification before resubmitting.</p>
+            </div>
+          ) : review.status === "approved" ? (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-800">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="font-semibold">Course specification approved.</p>
+                  <p className="mt-1 text-emerald-700">The approved version is locked for editing.</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-blue-200/70 bg-blue-50/60 p-4 text-xs text-blue-800">
+              <p className="font-semibold">No action required from you right now.</p>
+              <p className="mt-1">The course specification is locked while it is in the review workflow.</p>
             </div>
           )}
         </section>
@@ -318,53 +418,96 @@ export function ReviewSubmitSection({
             <Send className="h-4 w-4 text-primary" />
             <p className="text-sm font-semibold text-foreground">Submission</p>
           </div>
+
           <div className="mt-4 rounded-lg bg-muted/30 p-4">
             <div className="flex items-start gap-3">
               <div className="rounded-full bg-primary/10 p-2">
-                <UserRound className="h-4 w-4 text-primary" />
+                {review.status === "approved" ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                ) : waitingForReview ? (
+                  <Clock3 className="h-4 w-4 text-primary" />
+                ) : (
+                  <UserRound className="h-4 w-4 text-primary" />
+                )}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">
-                  {ready ? "Ready to submit your course specification?" : "Complete your course specification first"}
+                  {review.status === "draft"
+                    ? ready
+                      ? "Ready to submit your course specification?"
+                      : "Complete your course specification first"
+                    : review.status === "changesRequested"
+                      ? "Changes requested — continue editing"
+                      : STATUS_META[review.status].label}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {ready
-                    ? "The current saved version will be sent to the Head of Program for review."
-                    : "Submission is disabled until all required sections are complete."}
+                  {review.status === "draft"
+                    ? ready
+                      ? "The current saved version will be sent to the Head of Program for review."
+                      : "Submission is disabled until all required sections are complete."
+                    : review.status === "changesRequested"
+                      ? "Review the requested changes, update the course specification, and resubmit when ready."
+                      : statusMessage}
                 </p>
               </div>
             </div>
-            <label className="mt-4 block">
-              <span className="text-xs font-medium text-foreground">
-                Submission note <span className="font-normal text-muted-foreground">(optional)</span>
-              </span>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Add a short note for the reviewer…"
-                className="mt-1.5 min-h-20 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                disabled={!canSubmit}
-              />
-            </label>
+
+            {editingEnabled ? (
+              <label className="mt-4 block">
+                <span className="text-xs font-medium text-foreground">
+                  Submission note <span className="font-normal text-muted-foreground">(optional)</span>
+                </span>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add a short note for the reviewer…"
+                  className="mt-1.5 min-h-20 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  disabled={!canSubmit}
+                />
+              </label>
+            ) : null}
           </div>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground">
-              {ready
-                ? "All required sections are complete."
-                : `${incomplete.length} required section${incomplete.length === 1 ? " is" : "s are"} incomplete.`}
-            </p>
-            <Button
-              onClick={submit}
-              disabled={!canSubmit}
-              title={!ready ? "Complete all required sections first" : undefined}
-            >
-              <Send className="mr-2 h-4 w-4" />
-              {submitting
-                ? "Submitting…"
-                : review.status === "changesRequested"
-                  ? "Resubmit for Review"
-                  : "Submit for Review"}
-            </Button>
+
+          {review.submittedAt ? (
+            <div className="mt-4 grid gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-xs sm:grid-cols-3">
+              <div>
+                <p className="text-muted-foreground">Submitted</p>
+                <p className="mt-0.5 font-medium text-foreground">
+                  {new Date(review.submittedAt).toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Version</p>
+                <p className="mt-0.5 font-medium text-foreground">v{review.submissionVersion || 1}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                <p className="mt-0.5 font-medium text-foreground">{STATUS_META[review.status].label}</p>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-4 rounded-lg border border-border bg-background px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              {review.status === "draft" && !ready ? (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+              ) : review.status === "approved" ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              )}
+              <p className="text-xs font-medium text-foreground">
+                {review.status === "draft"
+                  ? ready
+                    ? "Ready to submit. Use the action bar below when you are ready."
+                    : `${incomplete.length} required section${incomplete.length === 1 ? " is" : "s are"} incomplete.`
+                  : review.status === "changesRequested"
+                    ? "You can edit the course specification and resubmit after making the requested changes."
+                    : review.status === "approved"
+                      ? "This approved version is locked for editing."
+                      : "Editing and submission are locked while the course specification is in the review workflow."}
+              </p>
+            </div>
           </div>
         </section>
       </div>
@@ -376,43 +519,99 @@ export function ReviewSubmitSection({
         </div>
         <div className="mt-4 rounded-lg border border-dashed border-border p-6 text-center">
           <p className="text-sm font-medium text-foreground">
-            {review.status === "draft" ? "No review comments yet." : "Review comments will appear here when the review workflow is connected."}
+            {review.status === "draft"
+              ? "No review comments yet."
+              : review.status === "changesRequested"
+                ? "Changes were requested. Reviewer comments will appear here when available."
+                : "No review comments have been recorded yet."}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {review.status === "draft"
-              ? "Comments from the Head of Program will appear here after submission."
-              : "The current phase stores submission status; reviewer comments are not yet part of this workflow."}
+              ? "Comments from the Head of Program will appear after submission."
+              : "Reviewer comments are not yet part of the stored workflow data."}
           </p>
         </div>
       </section>
 
-      <div className="sticky bottom-3 z-10 rounded-xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur">
+      <div
+        className={`sticky bottom-3 z-10 rounded-xl border p-3 shadow-lg backdrop-blur ${
+          review.status === "approved"
+            ? "border-emerald-200 bg-card/95 dark:border-emerald-900/50"
+            : ready && editingEnabled
+              ? "border-emerald-200 bg-card/95 dark:border-emerald-900/50"
+              : "border-border bg-card/95"
+        }`}
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold text-foreground">Before you submit</p>
-            <p className="text-[11px] text-muted-foreground">
-              Review the document and make sure all required sections are complete.
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {review.status === "approved" || (ready && editingEnabled) ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              ) : (
+                <Clock3 className="h-4 w-4 shrink-0 text-primary" />
+              )}
+              <p className="text-sm font-semibold text-foreground">
+                {review.status === "draft"
+                  ? ready
+                    ? "Ready to submit"
+                    : `${incomplete.length} required section${incomplete.length === 1 ? " needs" : "s need"} attention`
+                  : review.status === "changesRequested"
+                    ? "Ready to update and resubmit"
+                    : review.status === "approved"
+                      ? "Course specification approved"
+                      : STATUS_META[review.status].label}
+              </p>
+            </div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              {review.status === "draft"
+                ? ready
+                  ? "All 5 required sections are complete. Review the document before submitting."
+                  : "Complete the required sections before submitting for review."
+                : review.status === "changesRequested"
+                  ? "Make the requested changes, then resubmit the updated version."
+                  : review.status === "approved"
+                    ? "This approved version is read-only."
+                    : "The course specification is locked while it is in the review workflow."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-              }`}
-            >
-              {completed.length}/{COMPLETABLE_SPEC_SECTIONS.length} required complete
-            </span>
+
+          <div className="flex items-center gap-2 sm:shrink-0">
+            {editingEnabled ? (
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                  ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                }`}
+              >
+                {completed.length}/{readinessItems.length} complete
+              </span>
+            ) : null}
             <Button variant="outline" onClick={onPreview}>
               <Eye className="mr-2 h-4 w-4" />
               Preview
             </Button>
-            <Button onClick={submit} disabled={!canSubmit}>
-              <Send className="mr-2 h-4 w-4" />
-              {review.status === "changesRequested" ? "Resubmit" : "Submit for Review"}
-            </Button>
+            {review.status === "draft" ? (
+              <Button onClick={submit} disabled={!canSubmit}>
+                <Send className="mr-2 h-4 w-4" />
+                {submitting ? "Submitting…" : "Submit for Review"}
+              </Button>
+            ) : review.status === "changesRequested" && incomplete.length > 0 ? (
+              <Button
+                variant="default"
+                onClick={() => onGoToSection(incomplete[0]!.id)}
+              >
+                Continue Editing
+              </Button>
+            ) : review.status === "changesRequested" ? (
+              <Button onClick={submit} disabled={saving || submitting}>
+                <Send className="mr-2 h-4 w-4" />
+                {submitting ? "Resubmitting…" : "Resubmit for Review"}
+              </Button>
+            ) : null}
           </div>
         </div>
+
       </div>
+
     </div>
   );
 }
