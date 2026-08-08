@@ -7,7 +7,7 @@ import {
   cloFocusPercent,
   WeeklyPlanSection,
   ResourcesSection,
-  ReferencesSection,
+  StudentResponsibilitySection,
   SPEC_SECTION_SCHEMAS,
   weekContactHours,
   weekSlt,
@@ -495,7 +495,6 @@ test("resources are registered as a completable §19 section and support evidenc
     items: [
       {
         id: "resource-1",
-        kind: "requiredResource",
         resourceType: "software",
         title: "Python",
         evidenceWeekIds: ["week-1", "week-3"],
@@ -504,10 +503,19 @@ test("resources are registered as a completable §19 section and support evidenc
   });
   expect(parsed.items[0]?.evidenceWeekIds).toEqual(["week-1", "week-3"]);
   expect(COMPLETABLE_SPEC_SECTIONS.some((section) => section.id === "resources")).toBe(true);
-  expect(COMPLETABLE_SPEC_SECTIONS.some((section) => section.id === "references")).toBe(false);
 });
 
 
-test("ReferencesSection accepts a required textbook", () => {
-  expect(ReferencesSection.parse({ items: [{ id: "r1", kind: "required", title: "ISLR", authors: "James et al.", publisher: "Springer", year: "2023", isbn: "978-3031387467" }] }).items).toHaveLength(1);
+test("StudentResponsibilitySection accepts ordered responsibility statements", () => {
+  const parsed = StudentResponsibilitySection.parse({
+    items: [{ id: "r1", text: "  Submit assigned work on time.  " }],
+  });
+  expect(parsed.items).toEqual([
+    { id: "r1", text: "Submit assigned work on time." },
+  ]);
+});
+
+test("Student Responsibility is a completable spec section", () => {
+  expect(SPEC_SECTION_SCHEMAS.responsibility).toBeDefined();
+  expect(COMPLETABLE_SPEC_SECTIONS.some((section) => section.id === "responsibility")).toBe(true);
 });

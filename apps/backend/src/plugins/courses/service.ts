@@ -13,7 +13,7 @@ import {
   type MappingSection,
   type PolicySection,
   type ResourcesSection,
-  type ReferencesSection,
+  type StudentResponsibilitySection,
   type OfferingsServiceContract,
   type SpecSectionId,
   type CourseSpecReviewStatus,
@@ -264,6 +264,7 @@ export const courseService = {
 
     if (!savedComplete("assessmentPlan")) readinessGaps.push("Assessment");
     if (!savedComplete("slt")) readinessGaps.push("Weekly Plan");
+    if (!savedComplete("responsibility")) readinessGaps.push("Student Responsibility");
 
     if (readinessGaps.length > 0) {
       throw new ReferenceError(
@@ -416,8 +417,12 @@ export const courseService = {
         await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
       if (sectionId === "resources")
         await syncResources(tx, spec.id, (values as ResourcesSection).items);
-      if (sectionId === "references")
-        await syncReferences(tx, spec.id, (values as ReferencesSection).items);
+      if (sectionId === "responsibility")
+        await syncStudentResponsibilities(
+          tx,
+          spec.id,
+          values as StudentResponsibilitySection,
+        );
       if (sectionId === "policy")
         await syncPolicy(tx, spec.id, values as PolicySection);
 
@@ -490,7 +495,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "assessmentPlan",
   "mapping",
   "resources",
-  "references",
+  "responsibility",
   "policy",
 ]);
 
@@ -505,7 +510,7 @@ const SPEC_INCLUDE = {
   assessmentItems: { orderBy: { order: "asc" as const } },
   mappingCells: true,
   resources: { orderBy: { order: "asc" as const } },
-  references: { orderBy: { order: "asc" as const } },
+  studentResponsibilities: { orderBy: { order: "asc" as const } },
   policy: true,
 } satisfies Prisma.CourseSpecInclude;
 
@@ -618,15 +623,9 @@ function reassembleSpec(spec: SpecRow | null): {
     data.resources = {
       items: spec.resources.map((resource) => ({
         id: resource.id,
-        kind: resource.kind,
         resourceType: resource.resourceType,
         title: resource.title,
-        authors: resource.authors,
-        publisher: resource.publisher,
-        year: resource.year,
-        isbn: resource.isbn,
         url: resource.url,
-        basedOn: resource.basedOn,
         notes: resource.notes,
         evidenceWeekIds:
           resource.evidenceWeekIds.length > 0
@@ -637,19 +636,11 @@ function reassembleSpec(spec: SpecRow | null): {
       })),
     };
   }
-  if (hasSection("references")) {
-    data.references = {
-      items: spec.references.map((reference) => ({
-        id: reference.id,
-        kind: reference.kind,
-        title: reference.title,
-        authors: reference.authors,
-        publisher: reference.publisher,
-        year: reference.year,
-        isbn: reference.isbn,
-        url: reference.url,
-        basedOn: reference.basedOn,
-        notes: reference.notes,
+  if (hasSection("responsibility")) {
+    data.responsibility = {
+      items: spec.studentResponsibilities.map((item) => ({
+        id: item.id,
+        text: item.text,
       })),
     };
   }
@@ -814,42 +805,28 @@ async function syncResources(
       courseSpecId,
       order,
       weekId: resource.evidenceWeekIds[0] ?? null,
-      kind: resource.kind,
       resourceType: resource.resourceType,
       title: resource.title,
-      authors: resource.authors,
-      publisher: resource.publisher,
-      year: resource.year,
-      isbn: resource.isbn,
       url: resource.url,
-      basedOn: resource.basedOn,
       notes: resource.notes,
       evidenceWeekIds: resource.evidenceWeekIds,
     })),
   });
 }
 
-async function syncReferences(
+async function syncStudentResponsibilities(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
-  references: ReferencesSection["items"],
+  section: StudentResponsibilitySection,
 ) {
-  await tx.courseSpecReference.deleteMany({ where: { courseSpecId } });
-  if (references.length === 0) return;
-  await tx.courseSpecReference.createMany({
-    data: references.map((reference, order) => ({
-      id: reference.id,
+  await tx.courseSpecStudentResponsibility.deleteMany({ where: { courseSpecId } });
+  if (section.items.length === 0) return;
+  await tx.courseSpecStudentResponsibility.createMany({
+    data: section.items.map((item, order) => ({
+      id: item.id,
       courseSpecId,
       order,
-      kind: reference.kind,
-      title: reference.title,
-      authors: reference.authors,
-      publisher: reference.publisher,
-      year: reference.year,
-      isbn: reference.isbn,
-      url: reference.url,
-      basedOn: reference.basedOn,
-      notes: reference.notes,
+      text: item.text.trim(),
     })),
   });
 }

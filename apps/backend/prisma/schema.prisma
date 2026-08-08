@@ -110,12 +110,12 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed      Course[]             @relation("CourseLecturer")
-  offeringsLed    Offering[]           @relation("OfferingLecturer")
-  rubricsOwned    Rubric[]             @relation("RubricOwner")
-  coLecturerOf    OfferingCoLecturer[] @relation("OfferingCoLecturer")
-  roleAssignments UserRoleAssignment[]
-  courseSpecSubmissions CourseSpec[] @relation("CourseSpecSubmittedBy")
+  coursesLed              Course[]                 @relation("CourseLecturer")
+  offeringsLed            Offering[]               @relation("OfferingLecturer")
+  rubricsOwned            Rubric[]                 @relation("RubricOwner")
+  coLecturerOf            OfferingCoLecturer[]     @relation("OfferingCoLecturer")
+  roleAssignments         UserRoleAssignment[]
+  courseSpecSubmissions   CourseSpec[]             @relation("CourseSpecSubmittedBy")
   courseSpecReviewActions CourseSpecReviewAction[] @relation("CourseSpecReviewActor")
 }
 
@@ -297,26 +297,26 @@ model Course {
 /// rows) — kept in place unused for one deploy cycle before being dropped in a
 /// follow-up migration (issue #81 phase C), same expand/contract pattern as #80.
 model CourseSpec {
-  id              String                     @id @default(uuid())
-  courseId        String                     @unique
-  course          Course                     @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  sections        CourseSpecSection[]
-  clos            CourseSpecClo[]
-  weeks           CourseSpecWeek[]
-  assessmentItems CourseSpecAssessmentItem[]
-  mappingCells    CourseSpecMappingCell[]
-  resources       CourseSpecResource[]
-  references      CourseSpecReference[]
-  policy          CourseSpecPolicy?
-  updatedAt          DateTime                   @updatedAt
-  createdAt          DateTime                   @default(now())
-  reviewStatus       CourseSpecReviewStatus     @default(Draft)
-  submissionVersion Int                        @default(0)
-  submittedAt       DateTime?
-  submittedById     String?
-  submissionNote    String                     @default("")
-  submittedBy       User?                      @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
-  reviewActions     CourseSpecReviewAction[]
+  id                      String                            @id @default(uuid())
+  courseId                String                            @unique
+  course                  Course                            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sections                CourseSpecSection[]
+  clos                    CourseSpecClo[]
+  weeks                   CourseSpecWeek[]
+  assessmentItems         CourseSpecAssessmentItem[]
+  mappingCells            CourseSpecMappingCell[]
+  resources               CourseSpecResource[]
+  studentResponsibilities CourseSpecStudentResponsibility[]
+  policy                  CourseSpecPolicy?
+  updatedAt               DateTime                          @updatedAt
+  createdAt               DateTime                          @default(now())
+  reviewStatus            CourseSpecReviewStatus            @default(Draft)
+  submissionVersion       Int                               @default(0)
+  submittedAt             DateTime?
+  submittedById           String?
+  submissionNote          String                            @default("")
+  submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewActions           CourseSpecReviewAction[]
 
   @@index([reviewStatus])
   @@index([submittedById])
@@ -326,15 +326,15 @@ model CourseSpec {
 /// Notes are retained so requested changes and approval decisions remain traceable
 /// across submission versions without overwriting earlier review history.
 model CourseSpecReviewAction {
-  id                String                      @id @default(uuid())
+  id                String                     @id @default(uuid())
   courseSpecId      String
-  courseSpec        CourseSpec                  @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  courseSpec        CourseSpec                 @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   submissionVersion Int
   action            CourseSpecReviewActionType
   actorId           String
-  actor             User                        @relation("CourseSpecReviewActor", fields: [actorId], references: [id], onDelete: Restrict)
-  note              String                      @default("")
-  createdAt         DateTime                    @default(now())
+  actor             User                       @relation("CourseSpecReviewActor", fields: [actorId], references: [id], onDelete: Restrict)
+  note              String                     @default("")
+  createdAt         DateTime                   @default(now())
 
   @@index([courseSpecId, createdAt])
   @@index([actorId])
@@ -355,7 +355,7 @@ model CourseSpecReviewAction {
 /// policy areas can be edited independently from other specification sections.
 model CourseSpecPolicy {
   courseSpecId              String     @id
-  courseSpec                 CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  courseSpec                CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   attendancePreparation     String     @default("")
   academicIntegrity         String     @default("")
   assignmentsLateSubmission String     @default("")
@@ -480,11 +480,11 @@ model CourseSpecAssessmentItem {
   mode             AssessmentItemMode   @default(Individual)
   status           AssessmentItemStatus @default(Active)
   cloCodes         String[]             @default([])
-feedbackMethod   String               @default("")
-feedbackTimeline String               @default("")
-weight           Float?
-dueWeek          Int?
-durationWeeks    Float?
+  feedbackMethod   String               @default("")
+  feedbackTimeline String               @default("")
+  weight           Float?
+  dueWeek          Int?
+  durationWeeks    Float?
   format           String               @default("")
   submissionMethod String               @default("")
   instructions     String               @default("")
@@ -515,52 +515,47 @@ model CourseSpecMappingCell {
   @@id([courseSpecId, cloCode, kind, ref])
 }
 
-/// §19 Required Resources. Each row is a lecturer-confirmed course-level
-/// requirement. `evidenceWeekIds` records optional Weekly Plan provenance rather
-/// than making §19 a duplicate of the week-specific T&L Resources column.
+/// §19 Required Resources. Each row supplies the actual material/link for a
+/// resource type planned in one §18 Weekly Plan week. `weekId` is intentionally
+/// a loose reference, matching CourseSpecMappingCell.ref: CourseSpecWeek uses a
+/// composite key and weekly-plan sync rebuilds rows, so a hard FK would cascade
+/// resource evidence during an otherwise harmless weekly-plan save.
 model CourseSpecResource {
-  id           String     @default(uuid())
-  courseSpecId String
-  courseSpec   CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
-  order        Int
+  id              String     @default(uuid())
+  courseSpecId    String
+  courseSpec      CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order           Int
   // Legacy single-week provenance is retained for safe migration/backward compatibility.
-  weekId       String?
-  resourceType String
-  kind         String     @default("requiredResource")
-  title        String     @default("")
-  authors      String     @default("")
-  publisher    String     @default("")
-  year         String     @default("")
-  isbn         String     @default("")
-  url          String     @default("")
-  basedOn      String     @default("")
-  notes        String     @default("")
-  evidenceWeekIds String[] @default([])
+  weekId          String?
+  resourceType    String
+  title           String     @default("")
+  url             String     @default("")
+  notes           String     @default("")
+  evidenceWeekIds String[]   @default([])
+
+  // Existing unified Resources metadata. Keep these fields to preserve
+  // already-stored textbook/reference data in the development database.
+  kind      String @default("OTHER")
+  authors   String @default("")
+  publisher String @default("")
+  year      String @default("")
+  isbn      String @default("")
+  basedOn   String @default("")
 
   @@id([courseSpecId, id])
   @@index([courseSpecId, weekId])
 }
 
-/// §20 References / Textbooks and Other Teaching & Learning Materials.
-/// One normalized row per reference/material so the AUN document can distinguish
-/// required references, recommended readings, and other teaching materials.
-model CourseSpecReference {
+/// §21 Student Responsibility. One ordered statement per course specification.
+model CourseSpecStudentResponsibility {
   id           String     @default(uuid())
   courseSpecId String
   courseSpec   CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   order        Int
-  kind         String
-  title        String
-  authors      String     @default("")
-  publisher    String     @default("")
-  year         String     @default("")
-  isbn         String     @default("")
-  url          String     @default("")
-  basedOn      String     @default("")
-  notes        String     @default("")
+  text         String
 
   @@id([courseSpecId, id])
-  @@index([courseSpecId, kind])
+  @@index([courseSpecId, order])
 }
 
 /// Course Offerings plugin — a course delivered in a given term, with an assigned

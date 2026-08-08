@@ -135,6 +135,15 @@ function assessmentTable(document: CourseDocumentModel) {
   return table(rows);
 }
 
+
+function resourcesTable(document: CourseDocumentModel) {
+  const rows = [new TableRow({ children: [headerCell("Type"), headerCell("Resource / Description"), headerCell("Link"), headerCell("Notes"), headerCell("Weekly Plan Evidence")] })];
+  for (const resource of document.resources) {
+    rows.push(new TableRow({ children: [cell(resource.resourceType), cell(resource.title), cell(resource.url), cell(resource.notes), cell(values(resource.evidenceWeeks))] }));
+  }
+  return table(rows);
+}
+
 function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
   const rows = [new TableRow({ children: [headerCell("Week"), headerCell("Topic"), headerCell("CLO"), headerCell("Lesson Learning Outcomes"), headerCell("Teaching Method / Activity"), headerCell("Assessment"), headerCell("Resources")] })];
   for (const week of weeks) {
@@ -181,6 +190,21 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     const chunk = document.weeklyPlan.slice(i, i + chunkSize);
     children.push(sectionTitle("18", `Course Outline / Detailed Lesson Plan — Weeks ${chunk[0]?.week ?? ""}–${chunk[chunk.length - 1]?.week ?? ""}`));
     children.push(lessonPlanTable(chunk));
+  }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(sectionTitle("19", "Required Resources to Deliver the Course"));
+  children.push(document.resources.length ? resourcesTable(document) : paragraph("No additional required resources have been confirmed."));
+  children.push(paragraph("Weekly Plan evidence is included as provenance for each confirmed requirement; it is not a quality judgment.", false, SMALL));
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(sectionTitle("21", "Student Responsibility"));
+  if (document.studentResponsibilities.length === 0) {
+    children.push(paragraph("No student responsibilities have been added.", false, SMALL));
+  } else {
+    for (const [index, item] of document.studentResponsibilities.entries()) {
+      children.push(paragraph(`${index + 1}. ${item.text}`));
+    }
   }
 
   const doc = new Document({
