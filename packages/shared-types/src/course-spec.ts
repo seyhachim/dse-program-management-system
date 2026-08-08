@@ -136,12 +136,23 @@ export const CourseSpecReviewStatus = z.enum([
 ]);
 export type CourseSpecReviewStatus = z.infer<typeof CourseSpecReviewStatus>;
 
+export const CourseSpecReviewAction = z.object({
+  id: z.string().uuid(),
+  submissionVersion: z.number().int().nonnegative(),
+  action: z.enum(["submitted", "resubmitted", "changesRequested", "approved"]),
+  actorId: z.string().uuid(),
+  note: z.string(),
+  createdAt: z.string().datetime(),
+});
+export type CourseSpecReviewAction = z.infer<typeof CourseSpecReviewAction>;
+
 export const CourseSpecReview = z.object({
   status: CourseSpecReviewStatus,
   submissionVersion: z.number().int().nonnegative(),
   submittedAt: z.string().datetime().nullable(),
   submittedById: z.string().uuid().nullable(),
   submissionNote: z.string(),
+  actions: z.array(CourseSpecReviewAction),
 });
 export type CourseSpecReview = z.infer<typeof CourseSpecReview>;
 

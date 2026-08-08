@@ -115,7 +115,7 @@ export const coursesManifest: PluginManifest = {
       group: "Academic",
     },
   ],
-  permissions: ["courses:read", "courses:write", "courses:manage"],
+  permissions: ["courses:read", "courses:write", "courses:manage", "courses:review"],
 };
 
 export const offeringsManifest: PluginManifest = {

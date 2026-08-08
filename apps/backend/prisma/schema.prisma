@@ -61,6 +61,13 @@ enum CourseSpecReviewStatus {
   Approved
 }
 
+enum CourseSpecReviewActionType {
+  Submitted
+  Resubmitted
+  ChangesRequested
+  Approved
+}
+
 /// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
 /// normalized CLO row.
 enum CloRowStatus {
@@ -109,6 +116,7 @@ model User {
   coLecturerOf    OfferingCoLecturer[] @relation("OfferingCoLecturer")
   roleAssignments UserRoleAssignment[]
   courseSpecSubmissions CourseSpec[] @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions CourseSpecReviewAction[] @relation("CourseSpecReviewActor")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -290,9 +298,29 @@ model CourseSpec {
   submittedById     String?
   submissionNote    String                     @default("")
   submittedBy       User?                      @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewActions     CourseSpecReviewAction[]
 
   @@index([reviewStatus])
   @@index([submittedById])
+}
+
+
+/// Immutable workflow events for Course Specification submission/review actions.
+/// Notes are retained so requested changes and approval decisions remain traceable
+/// across submission versions without overwriting earlier review history.
+model CourseSpecReviewAction {
+  id               String                      @id @default(uuid())
+  courseSpecId     String
+  courseSpec       CourseSpec                  @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  submissionVersion Int
+  action           CourseSpecReviewActionType
+  actorId          String
+  actor            User                        @relation("CourseSpecReviewActor", fields: [actorId], references: [id], onDelete: Restrict)
+  note             String                      @default("")
+  createdAt        DateTime                    @default(now())
+
+  @@index([courseSpecId, createdAt])
+  @@index([actorId])
 }
 
 /// Issue #81: one row per wizard section, replacing the CourseSpec.data/status

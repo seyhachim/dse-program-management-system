@@ -30,6 +30,7 @@ import {
 } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { coursesApi, type CourseView } from "@/lib/courses";
+import { useMe } from "@/lib/auth";
 import { courseSpecApi } from "@/lib/course-spec";
 import { methodsApi } from "@/lib/methods";
 import {
@@ -110,6 +111,7 @@ const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
 const sectionMeta = (id: TabId) => SPEC_SECTIONS.find((s) => s.id === id);
 
 export function SpecClient({ courseId }: { courseId: string }) {
+  const { me } = useMe();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -349,6 +351,48 @@ export function SpecClient({ courseId }: { courseId: string }) {
             ? err.message
             : "Failed to submit course specification",
         );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
+  );
+
+  const requestChanges = useCallback(
+    async (note: string) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const next = await courseSpecApi.requestChanges(courseId, note);
+        setStatus(next.status ?? {});
+        setReview(next.review);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to request changes");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
+  );
+
+  const approveSpec = useCallback(
+    async (note: string) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const next = await courseSpecApi.approve(courseId, note);
+        setStatus(next.status ?? {});
+        setReview(next.review);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to approve course specification");
         return false;
       } finally {
         setSaving(false);
@@ -637,6 +681,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
                   onPreview={() => setActiveTab("documentPreview")}
                   onGoToSection={goToSection}
                   saving={saving}
+                  canReview={me?.permissions.includes("courses:review") ?? false}
+                  onRequestChanges={requestChanges}
+                  onApprove={approveSpec}
                 />
               ) : null}
             </TabsContent>

@@ -20,6 +20,7 @@ export function CoursesClient() {
   // the spec of their assigned courses via "Syllabus", not the record itself.
   const { me } = useMe();
   const canManage = me?.permissions.includes("courses:manage") ?? false;
+  const canReview = me?.permissions.includes("courses:review") ?? false;
 
   const [search, setSearch] = useState("");
 
@@ -79,6 +80,32 @@ export function CoursesClient() {
           <span className="text-muted-foreground">—</span>
         ),
     },
+    ...(canReview
+      ? [{
+          key: "reviewStatus",
+          header: "Review",
+          render: (c: CourseView) => {
+            const status = c.reviewStatus ?? "Draft";
+            const pending = status === "Submitted" || status === "Resubmitted" || status === "UnderReview";
+            const label = status === "ChangesRequested" ? "Changes Requested" : status;
+            return (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  pending
+                    ? "bg-blue-50 text-blue-700"
+                    : status === "Approved"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : status === "ChangesRequested"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {label}
+              </span>
+            );
+          },
+        }]
+      : []),
   ];
 
   return (
@@ -105,9 +132,9 @@ export function CoursesClient() {
         actions={[
           {
             key: "syllabus",
-            label: "Syllabus",
+            label: canReview ? "Open Specification" : "Syllabus",
             icon: <FileText className="mr-1 h-3.5 w-3.5" />,
-            onClick: (c) => router.push(`/courses/${c.id}/spec`),
+            onClick: (c) => router.push(canReview ? `/courses/${c.id}/spec?tab=reviewSubmit` : `/courses/${c.id}/spec`),
           },
         ]}
         onEdit={canManage ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}

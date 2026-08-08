@@ -358,6 +358,52 @@ export function createCourseRouter(): Router {
   );
 
   // ---------------------------------------------------------------------------
+  // Course Specification Review
+  // ---------------------------------------------------------------------------
+
+  router.post(
+    "/:id/spec/review/request-changes",
+    requirePermission("courses:review"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      if (!courseId) return;
+      const reviewerId = getRequiredUserId(req, res);
+      if (!reviewerId) return;
+      if (!(await ensureCourseAccess(req, res, courseId))) return;
+
+      const note = typeof req.body?.note === "string" ? req.body.note : "";
+      try {
+        res.json(await courseService.requestSpecChanges(courseId, reviewerId, note));
+      } catch (err) {
+        res.status(errStatus(err)).json({
+          error: errMessage(err, "") ?? "Could not request changes",
+        });
+      }
+    },
+  );
+
+  router.post(
+    "/:id/spec/review/approve",
+    requirePermission("courses:review"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      if (!courseId) return;
+      const reviewerId = getRequiredUserId(req, res);
+      if (!reviewerId) return;
+      if (!(await ensureCourseAccess(req, res, courseId))) return;
+
+      const note = typeof req.body?.note === "string" ? req.body.note : "";
+      try {
+        res.json(await courseService.approveSpec(courseId, reviewerId, note));
+      } catch (err) {
+        res.status(errStatus(err)).json({
+          error: errMessage(err, "") ?? "Could not approve course specification",
+        });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
   // Save Course Specification Section
   // ---------------------------------------------------------------------------
 

@@ -275,6 +275,7 @@ const permissionTitles: Record<string, string> = {
   "courses:read": "View courses",
   "courses:write": "Edit a course's own specification",
   "courses:manage": "Create/edit/delete/reassign courses",
+  "courses:review": "Review and approve course specifications",
 
   "offerings:read": "View offerings",
   "offerings:write": "Manage enrollment for an offering",
@@ -316,6 +317,7 @@ const roleDefs: {
       "courses:read",
       "courses:write",
       "courses:manage",
+      "courses:review",
 
       "offerings:read",
       "offerings:write",
@@ -350,6 +352,7 @@ const roleDefs: {
       "courses:read",
       "courses:write",
       "courses:manage",
+      "courses:review",
 
       "offerings:read",
       "offerings:write",

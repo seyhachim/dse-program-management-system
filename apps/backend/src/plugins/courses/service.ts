@@ -102,9 +102,16 @@ export const courseService = {
     const courses = await prisma.course.findMany({
       where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
+      include: { spec: { select: { reviewStatus: true } } },
     });
     const lecturerById = await lecturerLookup();
-    return courses.map((course) => withLecturer(course, lecturerById));
+    return courses.map((course) => {
+      const { spec, ...courseData } = course;
+      return {
+        ...withLecturer(courseData, lecturerById),
+        reviewStatus: spec?.reviewStatus ?? "Draft",
+      };
+    });
   },
 
   /**
@@ -282,9 +289,80 @@ export const courseService = {
         submittedAt: new Date(),
         submittedById,
         submissionNote: note.trim(),
+        reviewActions: {
+          create: {
+            submissionVersion: nextVersion,
+            action: nextStatus === "Resubmitted" ? "Resubmitted" : "Submitted",
+            actorId: submittedById,
+            note: note.trim(),
+          },
+        },
       },
       include: SPEC_INCLUDE,
     });
+    const { data, status } = reassembleSpec(updated);
+    data.courseInfo = await buildCourseInfoPrefill(course);
+    return { courseId, data, status, review: reviewEnvelope(updated) };
+  },
+
+  async requestSpecChanges(courseId: string, reviewerId: string, note: string) {
+    const trimmedNote = note.trim();
+    if (!trimmedNote) throw new ReferenceError("A review comment is required when requesting changes");
+
+    const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
+    if (!spec) throw new ReferenceError("Course specification has not been started");
+    if (!["Submitted", "Resubmitted", "UnderReview"].includes(spec.reviewStatus)) {
+      throw new ReferenceError("This course specification is not awaiting review");
+    }
+
+    const updated = await prisma.courseSpec.update({
+      where: { courseId },
+      data: {
+        reviewStatus: "ChangesRequested",
+        reviewActions: {
+          create: {
+            submissionVersion: spec.submissionVersion,
+            action: "ChangesRequested",
+            actorId: reviewerId,
+            note: trimmedNote,
+          },
+        },
+      },
+      include: SPEC_INCLUDE,
+    });
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) throw new ReferenceError("Course not found");
+    const { data, status } = reassembleSpec(updated);
+    data.courseInfo = await buildCourseInfoPrefill(course);
+    return { courseId, data, status, review: reviewEnvelope(updated) };
+  },
+
+  async approveSpec(courseId: string, reviewerId: string, note: string) {
+    const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
+    if (!spec) throw new ReferenceError("Course specification has not been started");
+    if (!["Submitted", "Resubmitted", "UnderReview"].includes(spec.reviewStatus)) {
+      throw new ReferenceError("This course specification is not awaiting review");
+    }
+
+    const updated = await prisma.courseSpec.update({
+      where: { courseId },
+      data: {
+        reviewStatus: "Approved",
+        reviewActions: {
+          create: {
+            submissionVersion: spec.submissionVersion,
+            action: "Approved",
+            actorId: reviewerId,
+            note: note.trim(),
+          },
+        },
+      },
+      include: SPEC_INCLUDE,
+    });
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) throw new ReferenceError("Course not found");
     const { data, status } = reassembleSpec(updated);
     data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status, review: reviewEnvelope(updated) };
@@ -394,6 +472,19 @@ function reviewEnvelope(spec: SpecRow | null) {
     submittedAt: spec?.submittedAt?.toISOString() ?? null,
     submittedById: spec?.submittedById ?? null,
     submissionNote: spec?.submissionNote ?? "",
+    actions: (spec?.reviewActions ?? []).map((action) => ({
+      id: action.id,
+      submissionVersion: action.submissionVersion,
+      action: {
+        Submitted: "submitted",
+        Resubmitted: "resubmitted",
+        ChangesRequested: "changesRequested",
+        Approved: "approved",
+      }[action.action],
+      actorId: action.actorId,
+      note: action.note,
+      createdAt: action.createdAt.toISOString(),
+    })),
   };
 }
 
@@ -421,6 +512,7 @@ const SPEC_INCLUDE = {
   weeks: { orderBy: { order: "asc" as const } },
   assessmentItems: { orderBy: { order: "asc" as const } },
   mappingCells: true,
+  reviewActions: { orderBy: { createdAt: "asc" as const } },
 } satisfies Prisma.CourseSpecInclude;
 
 type SpecRow = Prisma.CourseSpecGetPayload<{ include: typeof SPEC_INCLUDE }>;

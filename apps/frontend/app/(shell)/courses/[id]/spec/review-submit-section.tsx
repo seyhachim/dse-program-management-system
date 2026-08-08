@@ -70,6 +70,9 @@ export function ReviewSubmitSection({
   onPreview,
   onGoToSection,
   saving,
+  canReview,
+  onRequestChanges,
+  onApprove,
 }: {
   course: CourseView;
   status: Record<string, SpecSectionStatus>;
@@ -79,6 +82,14 @@ export function ReviewSubmitSection({
     submittedAt: string | null;
     submittedById: string | null;
     submissionNote: string;
+    actions: {
+      id: string;
+      submissionVersion: number;
+      action: "submitted" | "resubmitted" | "changesRequested" | "approved";
+      actorId: string;
+      note: string;
+      createdAt: string;
+    }[];
   };
   cloReady: boolean;
   teachingLearningReady: boolean;
@@ -86,9 +97,14 @@ export function ReviewSubmitSection({
   onPreview: () => void;
   onGoToSection: (id: ReadinessSectionId) => void;
   saving: boolean;
+  canReview: boolean;
+  onRequestChanges: (note: string) => Promise<boolean>;
+  onApprove: (note: string) => Promise<boolean>;
 }) {
   const [note, setNote] = useState(review.submissionNote);
+  const [reviewNote, setReviewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const readinessItems = useMemo<ReadinessItem[]>(
     () => [
       {
@@ -512,25 +528,88 @@ export function ReviewSubmitSection({
         </section>
       </div>
 
+      {canReview && ["submitted", "resubmitted", "underReview"].includes(review.status) ? (
+        <section className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2">
+            <FileCheck2 className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Head of Program Review</p>
+              <p className="text-xs text-muted-foreground">Review the submitted course specification before approving it for use.</p>
+            </div>
+          </div>
+
+          <label className="mt-4 block">
+            <span className="text-xs font-medium text-foreground">Review note</span>
+            <textarea
+              value={reviewNote}
+              onChange={(e) => setReviewNote(e.target.value)}
+              placeholder="Add a comment for the lecturer. Required when requesting changes."
+              className="mt-1.5 min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              disabled={reviewing}
+            />
+          </label>
+
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                setReviewing(true);
+                const ok = await onRequestChanges(reviewNote);
+                if (ok) setReviewNote("");
+                setReviewing(false);
+              }}
+              disabled={reviewing || !reviewNote.trim()}
+            >
+              {reviewing ? "Saving…" : "Request Changes"}
+            </Button>
+            <Button
+              onClick={async () => {
+                setReviewing(true);
+                const ok = await onApprove(reviewNote);
+                if (ok) setReviewNote("");
+                setReviewing(false);
+              }}
+              disabled={reviewing}
+            >
+              {reviewing ? "Approving…" : "Approve"}
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center gap-2">
           <Clock3 className="h-4 w-4 text-primary" />
-          <p className="text-sm font-semibold text-foreground">Review Comments</p>
+          <p className="text-sm font-semibold text-foreground">Review History</p>
         </div>
-        <div className="mt-4 rounded-lg border border-dashed border-border p-6 text-center">
-          <p className="text-sm font-medium text-foreground">
-            {review.status === "draft"
-              ? "No review comments yet."
-              : review.status === "changesRequested"
-                ? "Changes were requested. Reviewer comments will appear here when available."
-                : "No review comments have been recorded yet."}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {review.status === "draft"
-              ? "Comments from the Head of Program will appear after submission."
-              : "Reviewer comments are not yet part of the stored workflow data."}
-          </p>
-        </div>
+        {review.actions.length ? (
+          <div className="mt-4 space-y-3">
+            {review.actions.map((action) => (
+              <div key={action.id} className="rounded-lg border border-border bg-background p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-foreground">
+                    {action.action === "submitted"
+                      ? "Submitted for review"
+                      : action.action === "resubmitted"
+                        ? "Resubmitted for review"
+                        : action.action === "changesRequested"
+                          ? "Changes requested"
+                          : "Approved"}
+                  </p>
+                  <span className="text-[11px] text-muted-foreground">
+                    v{action.submissionVersion} · {new Date(action.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                {action.note ? <p className="mt-1 text-sm text-muted-foreground">{action.note}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg border border-dashed border-border p-6 text-center">
+            <p className="text-sm font-medium text-foreground">No review history yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Submission and reviewer decisions will appear here.</p>
+          </div>
+        )}
       </section>
 
       <div
