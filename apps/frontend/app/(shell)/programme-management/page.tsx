@@ -6,7 +6,7 @@ export default function ProgrammeManagementPage() {
     <>
       <Topbar
         title="Programme Management"
-        subtitle="Programme learning outcomes and graduate competencies"
+        subtitle="Programme profile, learning outcomes, competencies, and course policies"
       />
 
       <main className="flex-1 overflow-y-auto p-6">

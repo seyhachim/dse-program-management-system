@@ -5,6 +5,7 @@ import type {
   ProgramCompetencyWithPlos,
   ProgramPolicy,
   ProgrammeAcademicConfig,
+  ProgrammeProfile,
 } from "@dse-pms/shared-types";
 import {
   Button,
@@ -43,6 +44,10 @@ export function ProgrammeManagementClient() {
   const [mappingError, setMappingError] = useState<string | null>(null);
 
   const [policyDraft, setPolicyDraft] = useState<ProgramPolicy | null>(null);
+  const [profileDraft, setProfileDraft] = useState<ProgrammeProfile | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [policySaved, setPolicySaved] = useState(false);
@@ -56,6 +61,7 @@ export function ProgrammeManagementClient() {
 
       setData(result);
       setPolicyDraft(result.policy);
+      setProfileDraft(result.profile);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -106,6 +112,74 @@ export function ProgrammeManagementClient() {
       current ? { ...current, [key]: value } : current,
     );
     setPolicySaved(false);
+  };
+
+  const updateProfileField = <K extends keyof ProgrammeProfile>(
+    key: K,
+    value: ProgrammeProfile[K],
+  ) => {
+    setProfileDraft((current) =>
+      current ? { ...current, [key]: value } : current,
+    );
+    setProfileSaved(false);
+  };
+
+  const updateProfileList = (
+    key: "mission" | "goals",
+    index: number,
+    value: string,
+  ) => {
+    setProfileDraft((current) => {
+      if (!current) return current;
+      const next = [...current[key]];
+      next[index] = value;
+      return { ...current, [key]: next };
+    });
+    setProfileSaved(false);
+  };
+
+  const updateProfileStructuredList = (
+    key: "educationalPhilosophy" | "peos",
+    index: number,
+    field: "code" | "title" | "description",
+    value: string,
+  ) => {
+    setProfileDraft((current) => {
+      if (!current) return current;
+      const next = current[key].map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      );
+      return { ...current, [key]: next };
+    });
+    setProfileSaved(false);
+  };
+
+  const saveProfile = async () => {
+    if (!profileDraft) return;
+
+    setSavingProfile(true);
+    setProfileError(null);
+
+    try {
+      const updated = await api.put<ProgrammeProfile>(
+        "/api/programme/profile",
+        profileDraft,
+      );
+      setProfileDraft(updated);
+      setData((current) =>
+        current ? { ...current, profile: updated } : current,
+      );
+      setProfileSaved(true);
+      window.setTimeout(() => setProfileSaved(false), 2500);
+    } catch (err) {
+      setProfileError(
+        err instanceof ApiError
+          ? err.message
+          : "Failed to save programme profile",
+      );
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const savePolicy = async () => {
@@ -234,12 +308,113 @@ export function ProgrammeManagementClient() {
 
         <Tabs defaultValue="plos">
           <TabsList>
+            <TabsTrigger value="profile">Programme Overview</TabsTrigger>
             <TabsTrigger value="plos">Programme Learning Outcomes</TabsTrigger>
 
             <TabsTrigger value="competencies">Program Competencies</TabsTrigger>
 
             <TabsTrigger value="policies">Course Policies</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="profile" className="mt-4">
+            <section className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-5 py-4">
+                <h3 className="font-semibold">Programme Overview</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  These programme-level statements drive the required Course Specification Part 1 page. They are separate from course-level data.
+                </p>
+              </div>
+
+              {profileError ? (
+                <div className="mx-5 mt-4 rounded-lg border border-status-upcoming bg-status-upcoming-bg px-3 py-2 text-sm text-status-upcoming">
+                  {profileError}
+                </div>
+              ) : null}
+
+              {profileDraft ? (
+                <div className="space-y-5 p-5">
+                  <div>
+                    <label className="text-sm font-semibold">Programme Vision</label>
+                    <textarea
+                      value={profileDraft.vision}
+                      onChange={(event) => updateProfileField("vision", event.target.value)}
+                      disabled={!canWrite || savingProfile}
+                      rows={4}
+                      className="mt-2 w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                    />
+                  </div>
+
+                  {[
+                    ["mission", "Programme Mission"],
+                    ["goals", "Programme Goals"],
+                  ].map(([key, title]) => (
+                    <div key={key} className="rounded-xl border border-border p-4">
+                      <h4 className="text-sm font-semibold">{title}</h4>
+                      <div className="mt-3 space-y-3">
+                        {profileDraft[key as "mission" | "goals"].map((item, index) => (
+                          <textarea
+                            key={`${key}-${index}`}
+                            value={item}
+                            onChange={(event) => updateProfileList(key as "mission" | "goals", index, event.target.value)}
+                            disabled={!canWrite || savingProfile}
+                            rows={3}
+                            className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {[
+                    ["educationalPhilosophy", "Programme Educational Philosophy"],
+                    ["peos", "Programme Educational Objectives (PEOs)"],
+                  ].map(([key, title]) => (
+                    <div key={key} className="rounded-xl border border-border p-4">
+                      <h4 className="text-sm font-semibold">{title}</h4>
+                      <div className="mt-3 space-y-4">
+                        {profileDraft[key as "educationalPhilosophy" | "peos"].map((item, index) => (
+                          <div key={`${key}-${index}`} className="rounded-lg border border-border p-3">
+                            <div className="grid gap-3 md:grid-cols-[90px_1fr]">
+                              <input
+                                value={item.code}
+                                onChange={(event) => updateProfileStructuredList(key as "educationalPhilosophy" | "peos", index, "code", event.target.value)}
+                                disabled={!canWrite || savingProfile}
+                                className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                              />
+                              <input
+                                value={item.title}
+                                onChange={(event) => updateProfileStructuredList(key as "educationalPhilosophy" | "peos", index, "title", event.target.value)}
+                                disabled={!canWrite || savingProfile}
+                                className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                              />
+                            </div>
+                            <textarea
+                              value={item.description}
+                              onChange={(event) => updateProfileStructuredList(key as "educationalPhilosophy" | "peos", index, "description", event.target.value)}
+                              disabled={!canWrite || savingProfile}
+                              rows={3}
+                              className="mt-3 w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex items-center justify-end gap-3 pt-1">
+                    {profileSaved ? <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Saved</span> : null}
+                    {canWrite ? (
+                      <Button onClick={saveProfile} disabled={savingProfile}>
+                        {savingProfile ? "Saving…" : "Save Programme Overview"}
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Read-only. Programme profile changes require programme:write permission.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          </TabsContent>
 
           <TabsContent value="plos" className="mt-4">
             <section className="overflow-hidden rounded-xl border border-border bg-card">

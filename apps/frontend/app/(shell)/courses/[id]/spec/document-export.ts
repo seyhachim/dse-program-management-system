@@ -3,6 +3,7 @@ import {
   BorderStyle,
   Document,
   ExternalHyperlink,
+  ImageRun,
   PageBreak,
   Packer,
   Paragraph,
@@ -84,6 +85,110 @@ function table(rows: TableRow[]) {
 
 function values(items: string[]) {
   return items.length ? items.join(", ") : "—";
+}
+
+
+function compactParagraph(value: string, bold = false, size = 15) {
+  return new Paragraph({
+    spacing: { before: 0, after: 35, line: 210 },
+    children: [text(value, bold, size)],
+  });
+}
+
+function programmeProfileCell(title: string, children: Paragraph[], columnSpan?: number) {
+  return new TableCell({
+    columnSpan,
+    verticalAlign: VerticalAlign.TOP,
+    margins: { top: 70, bottom: 70, left: 90, right: 90 },
+    children: [
+      compactParagraph(title, true, 17),
+      ...children,
+    ],
+  });
+}
+
+async function programmeProfileHeader(document: CourseDocumentModel) {
+  const response = await fetch("/rupp-logo.png");
+  if (!response.ok) throw new Error("Could not load the RUPP logo for Word export");
+  const logo = new Uint8Array(await response.arrayBuffer());
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    borders: {
+      top: { style: BorderStyle.NONE, size: 0, color: BORDER },
+      bottom: { style: BorderStyle.NONE, size: 0, color: BORDER },
+      left: { style: BorderStyle.NONE, size: 0, color: BORDER },
+      right: { style: BorderStyle.NONE, size: 0, color: BORDER },
+      insideHorizontal: { style: BorderStyle.NONE, size: 0, color: BORDER },
+      insideVertical: { style: BorderStyle.NONE, size: 0, color: BORDER },
+    },
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 16, type: WidthType.PERCENTAGE },
+            verticalAlign: VerticalAlign.TOP,
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            children: [new Paragraph({ children: [new ImageRun({ data: logo, transformation: { width: 78, height: 78 }, type: "png" })] })],
+          }),
+          new TableCell({
+            width: { size: 84, type: WidthType.PERCENTAGE },
+            verticalAlign: VerticalAlign.TOP,
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            children: [
+              centered("Royal University of Phnom Penh", true, 22),
+              centered("Faculty of Engineering", true, 19),
+              centered("Department of Information Technology Engineering", true, 19),
+              centered(document.courseInformation.programmeTitle, true, 19),
+              centered("Course Specification", true, 27),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+async function programmeProfileTable(document: CourseDocumentModel) {
+  const profile = document.programmeProfile;
+  const row = (...cells: TableCell[]) => new TableRow({ children: cells });
+
+  const mission = profile.mission.length
+    ? profile.mission.map((item, index) => compactParagraph(`Mission ${index + 1}: ${item}`, false, 15))
+    : [compactParagraph("—", false, 15)];
+  const goals = profile.goals.length
+    ? profile.goals.map((item) => compactParagraph(`• ${item}`, false, 15))
+    : [compactParagraph("• —", false, 15)];
+  const philosophy = profile.educationalPhilosophy.length
+    ? profile.educationalPhilosophy.map((item) => compactParagraph(`• ${item.code}: ${item.title}: ${item.description}`, false, 14))
+    : [compactParagraph("• —", false, 14)];
+  const peos = profile.peos.length
+    ? profile.peos.map((item) => compactParagraph(`• ${item.code}: ${item.title}: ${item.description}`, false, 15))
+    : [compactParagraph("• —", false, 15)];
+
+  return table([
+    row(
+      programmeProfileCell("PROGRAM VISION:", [compactParagraph(profile.vision || "—", false, 16)]),
+      programmeProfileCell("PROGRAM MISSION", mission),
+    ),
+    row(
+      programmeProfileCell("PROGRAM GOALS", [compactParagraph("Our program aims to:", false, 15), ...goals]),
+      programmeProfileCell("PROGRAM EDUCATIONAL PHILOSOPHY", philosophy),
+    ),
+    row(
+      new TableCell({
+        columnSpan: 2,
+        verticalAlign: VerticalAlign.TOP,
+        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+        children: [
+          compactParagraph("PROGRAM EDUCATIONAL OBJECTIVES (PEOs)", true, 17),
+          compactParagraph("What graduates are expected to achieve within 3–5 years of graduation:", false, 15),
+          ...peos,
+        ],
+      }),
+    ),
+  ]);
 }
 
 function courseInformationTable(info: CourseDocumentModel["courseInformation"]) {
@@ -205,6 +310,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   const children: (Paragraph | Table)[] = [];
   const info = document.courseInformation;
 
+  children.push(await programmeProfileHeader(document));
+  children.push(centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 22));
+  children.push(await programmeProfileTable(document));
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(centered("Royal University of Phnom Penh", true));
   children.push(centered("Faculty of Engineering", false, SMALL));
   children.push(centered("Department of Information Technology Engineering", false, SMALL));

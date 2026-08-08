@@ -68,6 +68,38 @@ const programmePolicy = {
   penaltiesConsequences: "",
 };
 
+const programmeProfile = {
+  vision:
+    "To be a leading program in Data Science and Engineering in Cambodia with regional recognition for excellence in education, research, and innovation that drives digital transformation and societal development",
+  mission: [
+    "Empower students with strong foundations in data science, engineering, and digital technologies, along with critical thinking, ethics, and problem-solving skills",
+    "Advance knowledge and innovation through high-quality research in data science, artificial intelligence, and emerging technologies that address local and regional challenges",
+    "Engage with industry and society by applying data-driven solutions to real-world problems, fostering collaboration, and contributing to Cambodia’s digital economy and sustainable development",
+  ],
+  goals: [
+    "Develop skilled graduates with strong foundations in data science and engineering.",
+    "Foster innovation, research, and problem-solving in AI and emerging technologies.",
+    "Promote ethical, responsible, and professional practice.",
+    "Strengthen collaboration with industry and society for digital transformation.",
+    "Cultivate leadership, adaptability, and lifelong learning.",
+  ],
+  educationalPhilosophy: [
+    { code: "EP1", title: "Critical Thinking and Data-Driven Decision Making", description: "Develop graduates who apply critical thinking, logical reasoning, and data-driven approaches to solve complex real-world problems and support informed decision-making." },
+    { code: "EP2", title: "Research, Innovation, and Computational Intelligence", description: "Foster strong capacity in research, innovation, and the use of computational methods, AI, and data science techniques to generate new knowledge and solutions." },
+    { code: "EP3", title: "Professional Practice and Industry Readiness", description: "Prepare graduates with strong technical competence, digital literacy, and professional skills to meet evolving industry and employability demands." },
+    { code: "EP4", title: "Societal and Regional Responsiveness", description: "Equip graduates to design data-driven solutions that address societal challenges and respond to regional development needs in Cambodia and ASEAN." },
+    { code: "EP5", title: "Intercultural Competence and Responsible Citizenship", description: "Promote intercultural understanding, teamwork, and responsible citizenship." },
+    { code: "EP6", title: "National Development, Sustainability, and Digital Transformation", description: "Encourage graduates to contribute to national development, cultural and environmental sustainability, and digital transformation through innovative data science and engineering solutions." },
+  ],
+  peos: [
+    { code: "PEO1", title: "Professional Practice", description: "Graduates will become competent professionals in data science and engineering, applying digital and analytical skills in diverse industries." },
+    { code: "PEO2", title: "Innovation & Problem Solving", description: "Graduates will demonstrate innovation, critical thinking, and problem-solving skills to design and implement data-driven solutions to real-world challenges." },
+    { code: "PEO3", title: "Communication & Collaboration", description: "Graduates will effectively collaborate and communicate with interdisciplinary teams and stakeholders in both local and international contexts." },
+    { code: "PEO4", title: "Ethics & Social Responsibility", description: "Graduates will practice with professionalism, ethics, and a commitment to social and environmental responsibility." },
+    { code: "PEO5", title: "Lifelong Learning & Leadership", description: "Graduates will pursue continuous learning, certifications, or advanced degrees and assume leadership roles in the digital economy." },
+  ],
+};
+
 const students = [
   {
     name: "Ada Lovelace",
@@ -856,6 +888,24 @@ async function main() {
         order: competency.order,
         active: true,
       },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Programme Profile
+  // ---------------------------------------------------------------------------
+
+  // Initial profile values reproduce the required institutional Course
+  // Specification Part 1. Programme users can maintain them from Programme
+  // Management after the database is migrated.
+  const existingProgrammeProfile = await prisma.programmeProfile.findUnique({
+    where: { id: "dse" },
+    select: { id: true },
+  });
+
+  if (!existingProgrammeProfile) {
+    await prisma.programmeProfile.create({
+      data: { id: "dse", ...programmeProfile },
     });
   }
 

@@ -17,6 +17,7 @@ import type { MappingForm } from "./mapping-model";
 export type CourseDocumentModel = {
   title: string;
   partTitle: string;
+  programmeProfile: ProgrammeAcademicConfig["profile"];
   courseInformation: {
     programmeTitle: string;
     courseTitle: string;
@@ -265,8 +266,15 @@ export function buildCourseDocument({
   return {
     title: COURSE_DOCUMENT_STYLE.title,
     partTitle: COURSE_DOCUMENT_STYLE.partTitle,
+    programmeProfile: programme?.profile ?? {
+      vision: "",
+      mission: [],
+      goals: [],
+      educationalPhilosophy: [],
+      peos: [],
+    },
     courseInformation: {
-      programmeTitle: PROGRAMME_TITLE,
+      programmeTitle: programme?.title ?? PROGRAMME_TITLE,
       courseTitle: courseInfo.courseTitle,
       courseCode: courseInfo.courseCode,
       credits: courseInfo.credits,

@@ -254,6 +254,20 @@ model ProgramCompetencyPlo {
 /// The singleton id is intentionally stable because this deployment serves one
 /// programme. CourseSpecPolicy remains the course-specific override/addition
 /// layer and is not replaced by this model.
+/// Programme-level profile used by the required Course Specification Part 1 cover page.
+/// The singleton keeps programme vision, mission, goals, educational philosophy,
+/// and PEOs separate from course-level policy data.
+model ProgrammeProfile {
+  id                    String   @id @default("dse")
+  vision                String   @default("")
+  mission               Json     @default("[]")
+  goals                 Json     @default("[]")
+  educationalPhilosophy Json     @default("[]")
+  peos                  Json     @default("[]")
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+}
+
 model ProgramPolicy {
   id                        String   @id @default("dse")
   attendancePreparation     String   @default("")

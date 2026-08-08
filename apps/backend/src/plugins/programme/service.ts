@@ -1,8 +1,10 @@
 import {
   PROGRAMME_TITLE,
+  ProgrammeProfileSchema,
   type ProgrammeAcademicConfig,
   type ProgramCompetencyWithPlos,
   type ProgramPolicy,
+  type ProgrammeProfile,
   type UpdateProgramCompetencyPlosInput,
   type UpdateProgramPolicyInput,
 } from "@dse-pms/shared-types";
@@ -58,7 +60,7 @@ function toCompetencyWithPlos(
 
 export const programmeService = {
   async getAcademicConfig(): Promise<ProgrammeAcademicConfig> {
-    const [plos, competencies, policy] = await Promise.all([
+    const [plos, competencies, policy, profile] = await Promise.all([
       prisma.programLearningOutcome.findMany({
         where: { active: true },
         orderBy: { order: "asc" },
@@ -87,6 +89,17 @@ export const programmeService = {
           penaltiesConsequences: true,
         },
       }),
+
+      prisma.programmeProfile.findUnique({
+        where: { id: "dse" },
+        select: {
+          vision: true,
+          mission: true,
+          goals: true,
+          educationalPhilosophy: true,
+          peos: true,
+        },
+      }),
     ]);
 
     const programmePolicy: ProgramPolicy = {
@@ -97,8 +110,17 @@ export const programmeService = {
       penaltiesConsequences: policy?.penaltiesConsequences ?? "",
     };
 
+    const programmeProfile: ProgrammeProfile = ProgrammeProfileSchema.parse({
+      vision: profile?.vision ?? "",
+      mission: profile?.mission ?? [],
+      goals: profile?.goals ?? [],
+      educationalPhilosophy: profile?.educationalPhilosophy ?? [],
+      peos: profile?.peos ?? [],
+    });
+
     return {
       title: PROGRAMME_TITLE,
+      profile: programmeProfile,
       plos,
       competencies: competencies.map((competency) => ({
         id: competency.id,
@@ -113,6 +135,23 @@ export const programmeService = {
       })),
       policy: programmePolicy,
     };
+  },
+
+  async updateProfile(input: ProgrammeProfile): Promise<ProgrammeProfile> {
+    const updated = await prisma.programmeProfile.upsert({
+      where: { id: "dse" },
+      create: { id: "dse", ...input },
+      update: input,
+      select: {
+        vision: true,
+        mission: true,
+        goals: true,
+        educationalPhilosophy: true,
+        peos: true,
+      },
+    });
+
+    return ProgrammeProfileSchema.parse(updated);
   },
 
   async updatePolicy(input: UpdateProgramPolicyInput): Promise<ProgramPolicy> {

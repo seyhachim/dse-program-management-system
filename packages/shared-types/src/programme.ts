@@ -78,6 +78,32 @@ export const ProgramPolicySchema = z.object({
 
 export type ProgramPolicy = z.infer<typeof ProgramPolicySchema>;
 
+export const ProgrammeProfileSchema = z.object({
+  vision: z.string(),
+  mission: z.array(z.string()),
+  goals: z.array(z.string()),
+  educationalPhilosophy: z.array(
+    z.object({
+      code: z.string(),
+      title: z.string(),
+      description: z.string(),
+    }),
+  ),
+  peos: z.array(
+    z.object({
+      code: z.string(),
+      title: z.string(),
+      description: z.string(),
+    }),
+  ),
+});
+
+export type ProgrammeProfile = z.infer<typeof ProgrammeProfileSchema>;
+export const UpdateProgrammeProfileSchema = ProgrammeProfileSchema;
+export type UpdateProgrammeProfileInput = z.infer<
+  typeof UpdateProgrammeProfileSchema
+>;
+
 export const UpdateProgramPolicySchema = ProgramPolicySchema;
 export type UpdateProgramPolicyInput = z.infer<typeof UpdateProgramPolicySchema>;
 
@@ -87,6 +113,7 @@ export type UpdateProgramPolicyInput = z.infer<typeof UpdateProgramPolicySchema>
  */
 export const ProgrammeAcademicConfigSchema = z.object({
   title: z.string(),
+  profile: ProgrammeProfileSchema,
   plos: z.array(ProgramLearningOutcomeSchema),
   competencies: z.array(ProgramCompetencyWithPlosSchema),
   policy: ProgramPolicySchema,

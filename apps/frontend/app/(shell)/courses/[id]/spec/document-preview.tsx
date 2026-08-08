@@ -103,6 +103,74 @@ function PageFooter({ courseCode, page }: { courseCode: string; page: number }) 
   return <div className="absolute bottom-[24px] left-[54px] right-[54px] flex justify-between border-t border-black pt-1 font-serif text-[8px]"><span>{courseCode || "Course Specification"}</span><span>{page}</span></div>;
 }
 
+function ProgrammeProfilePage({ document }: { document: CourseDocumentModel }) {
+  const profile = document.programmeProfile;
+
+  return (
+    <div className="h-full px-[62px] py-[30px] font-serif">
+      <header className="relative min-h-[128px] text-center">
+        <img
+          src="/rupp-logo.png"
+          alt="Royal University of Phnom Penh"
+          className="absolute left-0 top-0 h-[86px] w-[86px] object-contain"
+        />
+        <p className="text-[12px] font-bold leading-[1.15]">Royal University of Phnom Penh</p>
+        <p className="text-[11px] font-bold leading-[1.15]">Faculty of Engineering</p>
+        <p className="text-[11px] font-bold leading-[1.15]">Department of Information Technology Engineering</p>
+        <p className="text-[11px] font-bold leading-[1.15]">{document.courseInformation.programmeTitle}</p>
+        <p className="mt-5 text-[16px] font-bold">Course Specification</p>
+      </header>
+
+      <h1 className="mb-4 text-[14px] font-bold uppercase">PART 1: VISION, MISSION, GOALS, AND OBJECTIVES</h1>
+
+      <div className="grid grid-cols-2 border border-black text-[9px] leading-[1.25]">
+        <section className="border-b border-r border-black p-2">
+          <h2 className="text-[11px] font-bold uppercase">Program Vision:</h2>
+          <p className="mt-1">{displayValue(profile.vision)}</p>
+        </section>
+
+        <section className="border-b border-black p-2">
+          <h2 className="text-[11px] font-bold uppercase">Program Mission</h2>
+          <ol className="mt-1 space-y-1">
+            {profile.mission.length ? profile.mission.map((item, index) => (
+              <li key={`mission-${index}`}><strong>Mission {index + 1}:</strong> {item}</li>
+            )) : <li>—</li>}
+          </ol>
+        </section>
+
+        <section className="border-b border-r border-black p-2">
+          <h2 className="text-[11px] font-bold uppercase">Program Goals</h2>
+          <p className="mt-1">Our program aims to:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {profile.goals.length ? profile.goals.map((item, index) => <li key={`goal-${index}`}>{item}</li>) : <li>—</li>}
+          </ul>
+        </section>
+
+        <section className="border-b border-black p-2">
+          <h2 className="text-[11px] font-bold uppercase">Program Educational Philosophy</h2>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {profile.educationalPhilosophy.length ? profile.educationalPhilosophy.map((item) => (
+              <li key={item.code}><strong>{item.code}: {item.title}:</strong> {item.description}</li>
+            )) : <li>—</li>}
+          </ul>
+        </section>
+
+        <section className="col-span-2 p-2">
+          <h2 className="text-[11px] font-bold uppercase">Program Educational Objectives (PEOs)</h2>
+          <p className="mt-1">What graduates are expected to achieve within 3–5 years of graduation:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {profile.peos.length ? profile.peos.map((item) => (
+              <li key={item.code}><strong>{item.code}: {item.title}:</strong> {item.description}</li>
+            )) : <li>—</li>}
+          </ul>
+        </section>
+      </div>
+
+      <PageFooter courseCode={document.courseInformation.courseCode} page={1} />
+    </div>
+  );
+}
+
 function TaxonomyLegend() {
   return (
     <div className="mt-4 rounded border border-black p-2 font-serif text-[9px]">
@@ -150,19 +218,19 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
   for (let i = 0; i < document.weeklyPlan.length; i += 7) weeklyPages.push(document.weeklyPlan.slice(i, i + 7));
   if (!weeklyPages.length) weeklyPages.push([]);
 
-  const weeklyStartPage = 6;
+  const weeklyStartPage = 7;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted"><FileText className="h-5 w-5 text-muted-foreground" /></div><div><h2 className="text-base font-semibold">AUN Course Specification Preview</h2><p className="mt-1 text-sm text-muted-foreground">Preview the structured course data in the AUN-style Part 2 document layout.</p></div></div>
+        <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted"><FileText className="h-5 w-5 text-muted-foreground" /></div><div><h2 className="text-base font-semibold">AUN Course Specification Preview</h2><p className="mt-1 text-sm text-muted-foreground">Preview the required programme Part 1 cover and structured course specification.</p></div></div>
         <Button type="button" onClick={handleDownloadWord} disabled={isExporting}>{isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}{isExporting ? "Generating..." : "Download Word"}</Button>
       </div>
 
       <div className="grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
         <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
-          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Document Information</h3><dl className="mt-4 space-y-3 text-sm"><div><dt className="text-xs text-muted-foreground">Course Code</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseCode)}</dd></div><div><dt className="text-xs text-muted-foreground">Course Title</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseTitle)}</dd></div><div><dt className="text-xs text-muted-foreground">Sections</dt><dd className="mt-0.5 font-medium">1–18</dd></div><div><dt className="text-xs text-muted-foreground">Format</dt><dd className="mt-0.5 font-medium">A4 Landscape</dd></div></dl></div>
-          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Contents</h3><nav className="mt-3 space-y-1 text-sm"><a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">1–13. Course Information</a><a href="#clos" className="block rounded-md px-2 py-2 hover:bg-muted">14. CLOs</a><a href="#mapping" className="block rounded-md px-2 py-2 hover:bg-muted">15. CLO–PLO Mapping</a><a href="#slt" className="block rounded-md px-2 py-2 hover:bg-muted">16. Student Learning Time</a><a href="#assessment-plan" className="block rounded-md px-2 py-2 hover:bg-muted">17. Assessment Plan</a><a href="#lesson-plan" className="block rounded-md px-2 py-2 hover:bg-muted">18. Detailed Lesson Plan</a></nav></div>
+          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Document Information</h3><dl className="mt-4 space-y-3 text-sm"><div><dt className="text-xs text-muted-foreground">Course Code</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseCode)}</dd></div><div><dt className="text-xs text-muted-foreground">Course Title</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseTitle)}</dd></div><div><dt className="text-xs text-muted-foreground">Sections</dt><dd className="mt-0.5 font-medium">Part 1 + Sections 1–18</dd></div><div><dt className="text-xs text-muted-foreground">Format</dt><dd className="mt-0.5 font-medium">A4 Landscape</dd></div></dl></div>
+          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Contents</h3><nav className="mt-3 space-y-1 text-sm"><a href="#programme-overview" className="block rounded-md px-2 py-2 hover:bg-muted">Part 1. Programme Overview</a><a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">1–13. Course Information</a><a href="#clos" className="block rounded-md px-2 py-2 hover:bg-muted">14. CLOs</a><a href="#mapping" className="block rounded-md px-2 py-2 hover:bg-muted">15. CLO–PLO Mapping</a><a href="#slt" className="block rounded-md px-2 py-2 hover:bg-muted">16. Student Learning Time</a><a href="#assessment-plan" className="block rounded-md px-2 py-2 hover:bg-muted">17. Assessment Plan</a><a href="#lesson-plan" className="block rounded-md px-2 py-2 hover:bg-muted">18. Detailed Lesson Plan</a></nav></div>
         </aside>
 
         <main ref={viewerRef} className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40">
@@ -176,6 +244,10 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
 
           <div className="mx-auto" style={{ width: PAGE_WIDTH * zoom + VIEWER_PADDING * 2, padding: VIEWER_PADDING }}>
             <Page zoom={zoom} pageNumber={1}>
+              <div id="programme-overview" className="h-full"><ProgrammeProfilePage document={document} /></div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={2}>
               <div id="course-information" className="h-full px-[54px] py-[38px]">
                 <PageHeader document={document} />
                 <p className="mb-3 font-serif text-[12px] font-bold">{document.partTitle}</p>
@@ -191,24 +263,24 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   <tr><LabelCell number="12">Course Availability</LabelCell><ValueCell><CourseAvailability semester={info.semester} /></ValueCell><td className="border border-black bg-[#E2EEDB] px-3 py-2 align-middle font-semibold">Year</td><ValueCell>{displayValue(info.programmeYear)}</ValueCell></tr>
                   <tr><LabelCell number="13">Course Description / Synopsis</LabelCell><ValueCell colSpan={3} className="leading-[1.45]">{displayValue(info.description)}</ValueCell></tr>
                 </tbody></Table>
-                <PageFooter courseCode={info.courseCode} page={1} />
+                <PageFooter courseCode={info.courseCode} page={2} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={2}>
-              <div id="clos" className="h-full px-[54px] py-[42px]"><SectionTitle number="14">Course Learning Outcomes</SectionTitle>{document.clos.length === 0 ? <p className="font-serif text-[11px]">No Course Learning Outcomes have been added.</p> : <Table><colgroup><col className="w-[8%]" /><col className="w-[62%]" /><col className="w-[10%]" /><col className="w-[20%]" /></colgroup><thead><tr><TH>CLO</TH><TH>Description</TH><TH>C/A/P</TH><TH>PLO</TH></tr></thead><tbody>{document.clos.map((clo) => <tr key={clo.code}><TD className="font-medium">{clo.code}</TD><TD>{clo.outcome}</TD><TD>{displayValue(clo.level)}</TD><TD>{joinValues(clo.mappedPlos)}</TD></tr>)}</tbody></Table>}<TaxonomyLegend /><PageFooter courseCode={info.courseCode} page={2} /></div>
-            </Page>
-
             <Page zoom={zoom} pageNumber={3}>
-              <div id="mapping" className="h-full px-[54px] py-[42px]"><SectionTitle number="15">Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods</SectionTitle><Table><colgroup><col className="w-[8%]" /><col className="w-[15%]" /><col className="w-[9%]" /><col className="w-[34%]" /><col className="w-[34%]" /></colgroup><thead><tr><TH>CLO</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Teaching Method</TH><TH>Assessment Methods</TH></tr></thead><tbody>{document.mapping.map((row) => <tr key={row.cloCode}><TD className="font-medium">{row.cloCode}</TD><TD>{joinValues(row.ploCodes)}</TD><TD>{displayValue(row.level)}</TD><TD>{joinValues(row.teachingMethods)}</TD><TD>{joinValues(row.assessmentMethods)}</TD></tr>)}</tbody></Table><p className="mt-4 font-serif text-[9px]">The mapping shown here is generated from the current CLO, PLO, teaching-method and assessment-method records stored in the PMS. No additional alignment values are inferred for the document.</p><PageFooter courseCode={info.courseCode} page={3} /></div>
+              <div id="clos" className="h-full px-[54px] py-[42px]"><SectionTitle number="14">Course Learning Outcomes</SectionTitle>{document.clos.length === 0 ? <p className="font-serif text-[11px]">No Course Learning Outcomes have been added.</p> : <Table><colgroup><col className="w-[8%]" /><col className="w-[62%]" /><col className="w-[10%]" /><col className="w-[20%]" /></colgroup><thead><tr><TH>CLO</TH><TH>Description</TH><TH>C/A/P</TH><TH>PLO</TH></tr></thead><tbody>{document.clos.map((clo) => <tr key={clo.code}><TD className="font-medium">{clo.code}</TD><TD>{clo.outcome}</TD><TD>{displayValue(clo.level)}</TD><TD>{joinValues(clo.mappedPlos)}</TD></tr>)}</tbody></Table>}<TaxonomyLegend /><PageFooter courseCode={info.courseCode} page={3} /></div>
             </Page>
 
             <Page zoom={zoom} pageNumber={4}>
-              <div id="slt" className="h-full px-[54px] py-[42px]"><SectionTitle number="16">Distribution of Student Learning Time (SLT)</SectionTitle><Table><colgroup><col className="w-[5%]" /><col className="w-[29%]" /><col className="w-[8%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[11%]" /></colgroup><thead><tr><TH>Week</TH><TH>Course Content Outline / Topic</TH><TH>CLOs</TH><TH>L</TH><TH>T</TH><TH>P</TH><TH>O</TH><TH>Independent</TH><TH>Total SLT</TH></tr></thead><tbody>{document.weeklyPlan.map((week) => <tr key={week.id}><TD>{week.week}</TD><TD>{week.topic}</TD><TD>{joinValues(week.cloCodes)}</TD><TD>{displayValue(week.lectureHours)}</TD><TD>{displayValue(week.tutorialHours)}</TD><TD>{displayValue(week.practiceHours)}</TD><TD>{displayValue(week.otherHours)}</TD><TD>{displayValue(week.selfStudyHours)}</TD><TD>{week.sltHours ? `${week.sltHours} h` : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={3} className="font-semibold">Total SLT for Course Content</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.lectureHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.tutorialHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.practiceHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.otherHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.selfStudyHours)||0),0)}</TD><TD className="font-semibold">{document.totals.courseContentSlt} h</TD></tr></tfoot></Table><div className="mt-5 rounded border border-black p-3 font-serif text-[10px]"><p className="font-bold">Assessment SLT</p><p className="mt-1">Assessment-specific SLT is not currently stored in the course assessment records, so no assessment SLT value is invented in this preview.</p><p className="mt-2">Grand Total SLT: <strong>Not available from current structured data</strong></p></div><PageFooter courseCode={info.courseCode} page={4} /></div>
+              <div id="mapping" className="h-full px-[54px] py-[42px]"><SectionTitle number="15">Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods</SectionTitle><Table><colgroup><col className="w-[8%]" /><col className="w-[15%]" /><col className="w-[9%]" /><col className="w-[34%]" /><col className="w-[34%]" /></colgroup><thead><tr><TH>CLO</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Teaching Method</TH><TH>Assessment Methods</TH></tr></thead><tbody>{document.mapping.map((row) => <tr key={row.cloCode}><TD className="font-medium">{row.cloCode}</TD><TD>{joinValues(row.ploCodes)}</TD><TD>{displayValue(row.level)}</TD><TD>{joinValues(row.teachingMethods)}</TD><TD>{joinValues(row.assessmentMethods)}</TD></tr>)}</tbody></Table><p className="mt-4 font-serif text-[9px]">The mapping shown here is generated from the current CLO, PLO, teaching-method and assessment-method records stored in the PMS. No additional alignment values are inferred for the document.</p><PageFooter courseCode={info.courseCode} page={4} /></div>
             </Page>
 
             <Page zoom={zoom} pageNumber={5}>
-              <div id="assessment-plan" className="h-full px-[54px] py-[42px]"><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[11%]" /><col className="w-[26%]" /><col className="w-[8%]" /><col className="w-[26%]" /><col className="w-[12%]" /></colgroup><thead><tr><TH>CLOs</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Assessment &amp; Description</TH><TH>Weight (%)</TH><TH>Evaluation Definition</TH><TH>Rubric</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD><p className="font-semibold">{displayValue(assessment.name)}</p>{assessment.description ? <p className="mt-1 text-[9px] text-slate-700">{assessment.description}</p> : null}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{displayValue(assessment.evaluationDefinition)}</TD><TD>{assessment.rubricName && assessment.rubricUrl ? <Link href={assessment.rubricUrl} className="font-semibold text-blue-700 underline underline-offset-2">{assessment.rubricName} ↗</Link> : assessment.rubricName ? assessment.rubricName : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={4} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD colSpan={2}></TD></tr></tfoot></Table><p className="mt-4 font-serif text-[9px]">Assessment SLT is omitted here because the current CourseSpecAssessmentItem data model does not contain an assessment-duration/SLT field.</p><PageFooter courseCode={info.courseCode} page={5} /></div>
+              <div id="slt" className="h-full px-[54px] py-[42px]"><SectionTitle number="16">Distribution of Student Learning Time (SLT)</SectionTitle><Table><colgroup><col className="w-[5%]" /><col className="w-[29%]" /><col className="w-[8%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[11%]" /></colgroup><thead><tr><TH>Week</TH><TH>Course Content Outline / Topic</TH><TH>CLOs</TH><TH>L</TH><TH>T</TH><TH>P</TH><TH>O</TH><TH>Independent</TH><TH>Total SLT</TH></tr></thead><tbody>{document.weeklyPlan.map((week) => <tr key={week.id}><TD>{week.week}</TD><TD>{week.topic}</TD><TD>{joinValues(week.cloCodes)}</TD><TD>{displayValue(week.lectureHours)}</TD><TD>{displayValue(week.tutorialHours)}</TD><TD>{displayValue(week.practiceHours)}</TD><TD>{displayValue(week.otherHours)}</TD><TD>{displayValue(week.selfStudyHours)}</TD><TD>{week.sltHours ? `${week.sltHours} h` : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={3} className="font-semibold">Total SLT for Course Content</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.lectureHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.tutorialHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.practiceHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.otherHours)||0),0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s,w)=>s+(Number(w.selfStudyHours)||0),0)}</TD><TD className="font-semibold">{document.totals.courseContentSlt} h</TD></tr></tfoot></Table><div className="mt-5 rounded border border-black p-3 font-serif text-[10px]"><p className="font-bold">Assessment SLT</p><p className="mt-1">Assessment-specific SLT is not currently stored in the course assessment records, so no assessment SLT value is invented in this preview.</p><p className="mt-2">Grand Total SLT: <strong>Not available from current structured data</strong></p></div><PageFooter courseCode={info.courseCode} page={5} /></div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={6}>
+              <div id="assessment-plan" className="h-full px-[54px] py-[42px]"><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[11%]" /><col className="w-[26%]" /><col className="w-[8%]" /><col className="w-[26%]" /><col className="w-[12%]" /></colgroup><thead><tr><TH>CLOs</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Assessment &amp; Description</TH><TH>Weight (%)</TH><TH>Evaluation Definition</TH><TH>Rubric</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD><p className="font-semibold">{displayValue(assessment.name)}</p>{assessment.description ? <p className="mt-1 text-[9px] text-slate-700">{assessment.description}</p> : null}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{displayValue(assessment.evaluationDefinition)}</TD><TD>{assessment.rubricName && assessment.rubricUrl ? <Link href={assessment.rubricUrl} className="font-semibold text-blue-700 underline underline-offset-2">{assessment.rubricName} ↗</Link> : assessment.rubricName ? assessment.rubricName : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={4} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD colSpan={2}></TD></tr></tfoot></Table><p className="mt-4 font-serif text-[9px]">Assessment SLT is omitted here because the current CourseSpecAssessmentItem data model does not contain an assessment-duration/SLT field.</p><PageFooter courseCode={info.courseCode} page={6} /></div>
             </Page>
 
             {weeklyPages.map((weeks, index) => <Page zoom={zoom} pageNumber={weeklyStartPage + index} key={`lesson-${index}`}><div id={index === 0 ? "lesson-plan" : undefined} className="h-full px-[54px] py-[42px]"><SectionTitle number="18">Course Outline / Detailed Lesson Plan{weeklyPages.length > 1 ? ` — Weeks ${weeks[0]?.week ?? ""}–${weeks[weeks.length-1]?.week ?? ""}` : ""}</SectionTitle><Table><colgroup><col className="w-[5%]" /><col className="w-[18%]" /><col className="w-[10%]" /><col className="w-[22%]" /><col className="w-[20%]" /><col className="w-[15%]" /><col className="w-[10%]" /></colgroup><thead><tr><TH>Week</TH><TH>Topic</TH><TH>CLO</TH><TH>Lesson Learning Outcomes</TH><TH>Teaching Method / Activity</TH><TH>Assessment</TH><TH>Resources</TH></tr></thead><tbody>{weeks.map((week) => <tr key={week.id}><TD>{week.week}</TD><TD>{week.topic}</TD><TD>{joinValues(week.cloCodes)}</TD><TD>{week.lloItems.length ? week.lloItems.map((item,i)=><div key={i}>LLO{i+1}: {item}</div>) : "—"}</TD><TD>{joinValues(week.teachingMethods.length ? week.teachingMethods : week.learningActivities)}</TD><TD>{joinValues([week.assessment, ...week.assessmentMethods].filter(Boolean))}</TD><TD>{joinValues(week.resources)}</TD></tr>)}</tbody></Table><div className="mt-4 grid grid-cols-3 gap-3 font-serif text-[9px]"><div className="rounded border border-black p-2"><strong>Learning Activities</strong><p className="mt-1">{joinValues(weeks.flatMap((w)=>w.learningActivities))}</p></div><div className="rounded border border-black p-2"><strong>Active Learning Strategies</strong><p className="mt-1">{joinValues(weeks.flatMap((w)=>w.activeLearningStrategies))}</p></div><div className="rounded border border-black p-2"><strong>Teaching Resources</strong><p className="mt-1">{joinValues(weeks.flatMap((w)=>w.resources))}</p></div></div><PageFooter courseCode={info.courseCode} page={weeklyStartPage + index} /></div></Page>)}

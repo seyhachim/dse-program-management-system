@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   UpdateProgramCompetencyPlosSchema,
   UpdateProgramPolicySchema,
+  UpdateProgrammeProfileSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
@@ -21,6 +22,30 @@ export function createProgrammeRouter(): Router {
       });
     }
   });
+
+  router.put(
+    "/profile",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const parsed = UpdateProgrammeProfileSchema.safeParse(req.body);
+
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid programme profile",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      try {
+        res.json(await programmeService.updateProfile(parsed.data));
+      } catch {
+        res.status(500).json({
+          error: "Could not update programme profile",
+        });
+      }
+    },
+  );
 
   router.put(
     "/policies",
