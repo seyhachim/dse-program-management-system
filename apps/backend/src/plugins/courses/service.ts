@@ -234,7 +234,8 @@ export const courseService = {
       where: { courseId },
       include: SPEC_INCLUDE,
     });
-    if (!spec) throw new ReferenceError("Course specification has not been started");
+    if (!spec)
+      throw new ReferenceError("Course specification has not been started");
 
     const savedComplete = (sectionId: SpecSectionId) =>
       spec.sections.some(
@@ -264,7 +265,8 @@ export const courseService = {
 
     if (!savedComplete("assessmentPlan")) readinessGaps.push("Assessment");
     if (!savedComplete("slt")) readinessGaps.push("Weekly Plan");
-    if (!savedComplete("responsibility")) readinessGaps.push("Student Responsibility");
+    if (!savedComplete("responsibility"))
+      readinessGaps.push("Student Responsibility");
 
     if (readinessGaps.length > 0) {
       throw new ReferenceError(
@@ -273,11 +275,14 @@ export const courseService = {
     }
 
     if (!["Draft", "ChangesRequested"].includes(spec.reviewStatus)) {
-      throw new ReferenceError("This course specification is not ready for submission");
+      throw new ReferenceError(
+        "This course specification is not ready for submission",
+      );
     }
 
     const nextVersion = spec.submissionVersion + 1;
-    const nextStatus = spec.reviewStatus === "ChangesRequested" ? "Resubmitted" : "Submitted";
+    const nextStatus =
+      spec.reviewStatus === "ChangesRequested" ? "Resubmitted" : "Submitted";
     const updated = await prisma.courseSpec.update({
       where: { courseId },
       data: {
@@ -304,12 +309,20 @@ export const courseService = {
 
   async requestSpecChanges(courseId: string, reviewerId: string, note: string) {
     const trimmedNote = note.trim();
-    if (!trimmedNote) throw new ReferenceError("A review comment is required when requesting changes");
+    if (!trimmedNote)
+      throw new ReferenceError(
+        "A review comment is required when requesting changes",
+      );
 
     const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
-    if (!spec) throw new ReferenceError("Course specification has not been started");
-    if (!["Submitted", "Resubmitted", "UnderReview"].includes(spec.reviewStatus)) {
-      throw new ReferenceError("This course specification is not awaiting review");
+    if (!spec)
+      throw new ReferenceError("Course specification has not been started");
+    if (
+      !["Submitted", "Resubmitted", "UnderReview"].includes(spec.reviewStatus)
+    ) {
+      throw new ReferenceError(
+        "This course specification is not awaiting review",
+      );
     }
 
     const updated = await prisma.courseSpec.update({
@@ -337,9 +350,14 @@ export const courseService = {
 
   async approveSpec(courseId: string, reviewerId: string, note: string) {
     const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
-    if (!spec) throw new ReferenceError("Course specification has not been started");
-    if (!["Submitted", "Resubmitted", "UnderReview"].includes(spec.reviewStatus)) {
-      throw new ReferenceError("This course specification is not awaiting review");
+    if (!spec)
+      throw new ReferenceError("Course specification has not been started");
+    if (
+      !["Submitted", "Resubmitted", "UnderReview"].includes(spec.reviewStatus)
+    ) {
+      throw new ReferenceError(
+        "This course specification is not awaiting review",
+      );
     }
 
     const updated = await prisma.courseSpec.update({
@@ -479,6 +497,21 @@ function reviewEnvelope(spec: SpecRow | null) {
     submittedAt: spec?.submittedAt?.toISOString() ?? null,
     submittedById: spec?.submittedById ?? null,
     submissionNote: spec?.submissionNote ?? "",
+    actions: (spec?.reviewActions ?? []).map((action) => ({
+      id: action.id,
+      submissionVersion: action.submissionVersion,
+      action:
+        action.action === "Submitted"
+          ? "submitted"
+          : action.action === "Resubmitted"
+            ? "resubmitted"
+            : action.action === "ChangesRequested"
+              ? "changesRequested"
+              : "approved",
+      actorId: action.actorId,
+      note: action.note,
+      createdAt: action.createdAt.toISOString(),
+    })),
   };
 }
 
@@ -510,6 +543,9 @@ const SPEC_INCLUDE = {
   assessmentItems: { orderBy: { order: "asc" as const } },
   mappingCells: true,
   resources: { orderBy: { order: "asc" as const } },
+  reviewActions: {
+    orderBy: { createdAt: "desc" as const },
+  },
   studentResponsibilities: { orderBy: { order: "asc" as const } },
   policy: true,
 } satisfies Prisma.CourseSpecInclude;
@@ -783,16 +819,22 @@ async function syncResources(
   courseSpecId: string,
   resources: ResourcesSection["items"],
 ) {
-  const evidenceWeekIds = [...new Set(resources.flatMap((resource) => resource.evidenceWeekIds))];
+  const evidenceWeekIds = [
+    ...new Set(resources.flatMap((resource) => resource.evidenceWeekIds)),
+  ];
   if (evidenceWeekIds.length > 0) {
     const weeks = await tx.courseSpecWeek.findMany({
       where: { courseSpecId, id: { in: evidenceWeekIds } },
       select: { id: true },
     });
     const knownWeekIds = new Set(weeks.map((week) => week.id));
-    const invalidWeekId = evidenceWeekIds.find((weekId) => !knownWeekIds.has(weekId));
+    const invalidWeekId = evidenceWeekIds.find(
+      (weekId) => !knownWeekIds.has(weekId),
+    );
     if (invalidWeekId) {
-      throw new ReferenceError("Resource evidence references a week that does not belong to this course specification");
+      throw new ReferenceError(
+        "Resource evidence references a week that does not belong to this course specification",
+      );
     }
   }
 
@@ -819,7 +861,9 @@ async function syncStudentResponsibilities(
   courseSpecId: string,
   section: StudentResponsibilitySection,
 ) {
-  await tx.courseSpecStudentResponsibility.deleteMany({ where: { courseSpecId } });
+  await tx.courseSpecStudentResponsibility.deleteMany({
+    where: { courseSpecId },
+  });
   if (section.items.length === 0) return;
   await tx.courseSpecStudentResponsibility.createMany({
     data: section.items.map((item, order) => ({

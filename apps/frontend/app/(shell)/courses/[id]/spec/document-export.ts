@@ -2,6 +2,7 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  ExternalHyperlink,
   PageBreak,
   Packer,
   Paragraph,
@@ -126,21 +127,69 @@ function sltTable(document: CourseDocumentModel) {
   return table(rows);
 }
 
-function assessmentTable(document: CourseDocumentModel) {
-  const rows = [new TableRow({ children: [headerCell("CLO"), headerCell("PLO"), headerCell("Assessment"), headerCell("G/I"), headerCell("Weight %"), headerCell("C/A/P"), headerCell("Due Week"), headerCell("Format / Submission"), headerCell("Feedback")] })];
-  for (const assessment of document.assessments) {
-    rows.push(new TableRow({ children: [cell(values(assessment.cloCodes)), cell(values(assessment.mappedPlos)), cell(assessment.name), cell(assessment.mode === "group" ? "G" : "I"), cell(assessment.weight ? `${assessment.weight}%` : "—"), cell(values(assessment.capLevels)), cell(assessment.dueWeek), cell(values([assessment.format, assessment.submissionMethod].filter(Boolean))), cell(values([assessment.feedbackMethod, assessment.feedbackTimeline].filter(Boolean)))] }));
-  }
-  rows.push(new TableRow({ children: [cell("Total", { bold: true }), cell(""), cell(""), cell(""), cell(`${document.totals.assessmentWeight}%`, { bold: true }), cell(""), cell(""), cell(""), cell("")] }));
-  return table(rows);
+function rubricCell(assessment: CourseDocumentModel["assessments"][number]) {
+  if (!assessment.rubricName) return cell("");
+  if (!assessment.rubricUrl) return cell(assessment.rubricName);
+
+  const href =
+    typeof window !== "undefined"
+      ? new URL(assessment.rubricUrl, window.location.origin).toString()
+      : assessment.rubricUrl;
+
+  return new TableCell({
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 70, bottom: 70, left: 90, right: 90 },
+    children: [
+      new Paragraph({
+        spacing: { before: 0, after: 60, line: 240 },
+        children: [
+          new ExternalHyperlink({
+            link: href,
+            children: [new TextRun({ text: `${assessment.rubricName} ↗`, font: FONT, size: SMALL, color: "0563C1", underline: { type: "single" } })],
+          }),
+        ],
+      }),
+    ],
+  });
 }
 
+function assessmentTable(document: CourseDocumentModel) {
+  const rows = [new TableRow({ children: [
+    headerCell("CLOs"),
+    headerCell("PLO"),
+    headerCell("C/A/P Level"),
+    headerCell("Assessment & Description"),
+    headerCell("Weight (%)"),
+    headerCell("Evaluation Definition"),
+    headerCell("Rubric"),
+  ] })];
 
-function resourcesTable(document: CourseDocumentModel) {
-  const rows = [new TableRow({ children: [headerCell("Type"), headerCell("Resource / Description"), headerCell("Link"), headerCell("Notes"), headerCell("Weekly Plan Evidence")] })];
-  for (const resource of document.resources) {
-    rows.push(new TableRow({ children: [cell(resource.resourceType), cell(resource.title), cell(resource.url), cell(resource.notes), cell(values(resource.evidenceWeeks))] }));
+  for (const assessment of document.assessments) {
+    const assessmentDescription = assessment.description
+      ? `${assessment.name}\n${assessment.description}`
+      : assessment.name;
+
+    rows.push(new TableRow({ children: [
+      cell(values(assessment.cloCodes)),
+      cell(values(assessment.mappedPlos)),
+      cell(values(assessment.capLevels)),
+      cell(assessmentDescription),
+      cell(assessment.weight ? `${assessment.weight}%` : "—"),
+      cell(assessment.evaluationDefinition),
+      rubricCell(assessment),
+    ] }));
   }
+
+  rows.push(new TableRow({ children: [
+    cell("Total", { bold: true }),
+    cell(""),
+    cell(""),
+    cell(""),
+    cell(`${document.totals.assessmentWeight}%`, { bold: true }),
+    cell(""),
+    cell(""),
+  ] }));
+
   return table(rows);
 }
 
@@ -190,21 +239,6 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     const chunk = document.weeklyPlan.slice(i, i + chunkSize);
     children.push(sectionTitle("18", `Course Outline / Detailed Lesson Plan — Weeks ${chunk[0]?.week ?? ""}–${chunk[chunk.length - 1]?.week ?? ""}`));
     children.push(lessonPlanTable(chunk));
-  }
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(sectionTitle("19", "Required Resources to Deliver the Course"));
-  children.push(document.resources.length ? resourcesTable(document) : paragraph("No additional required resources have been confirmed."));
-  children.push(paragraph("Weekly Plan evidence is included as provenance for each confirmed requirement; it is not a quality judgment.", false, SMALL));
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(sectionTitle("21", "Student Responsibility"));
-  if (document.studentResponsibilities.length === 0) {
-    children.push(paragraph("No student responsibilities have been added.", false, SMALL));
-  } else {
-    for (const [index, item] of document.studentResponsibilities.entries()) {
-      children.push(paragraph(`${index + 1}. ${item.text}`));
-    }
   }
 
   const doc = new Document({

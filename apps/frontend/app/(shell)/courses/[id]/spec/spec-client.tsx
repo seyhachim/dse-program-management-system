@@ -9,6 +9,7 @@ import {
   type SpecSectionId,
   type SpecSectionStatus,
   type ProgrammeAcademicConfig,
+  type Rubric,
 } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
@@ -31,6 +32,7 @@ import {
 import { ApiError, api } from "@/lib/api";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
+import { rubricsApi } from "@/lib/rubrics";
 import { useMe } from "@/lib/auth";
 import { methodsApi } from "@/lib/methods";
 import {
@@ -76,10 +78,6 @@ import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
 import { EMPTY_POLICY, PolicySection } from "./policy-section";
-import { ResourcesSectionForm } from "./resources-section";
-import type { StudentResponsibilitySection as StudentResponsibilitySectionValue } from "@dse-pms/shared-types";
-import { EMPTY_STUDENT_RESPONSIBILITY, StudentResponsibilitySection } from "./student-responsibility-section";
-import { EMPTY_RESOURCES, toResourcesForm, toResourcesPayload, type ResourcesForm } from "./resources-model";
 import type { PolicySection as PolicySectionValue } from "@dse-pms/shared-types";
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
@@ -97,7 +95,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "slt", label: "Weekly Plan" },
   { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
-  { id: "responsibility", label: "Student Responsibility" },
   { id: "policy", label: "Policies" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
@@ -110,7 +107,6 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "slt",
   "mapping",
   "resources",
-  "responsibility",
   "policy",
 ]);
 
@@ -143,8 +139,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
     useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
-  const [resources, setResources] = useState<ResourcesForm>(EMPTY_RESOURCES);
-  const [responsibility, setResponsibility] = useState<StudentResponsibilitySectionValue>(EMPTY_STUDENT_RESPONSIBILITY);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
@@ -152,6 +146,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
     null,
   );
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
+  const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -212,11 +207,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [spec, methods, courseView, programmeConfig] = await Promise.all([
+      const [spec, methods, courseView, programmeConfig, rubricList] = await Promise.all([
         courseSpecApi.get(courseId),
         methodsApi.list(),
         coursesApi.get(courseId),
         api.get<ProgrammeAcademicConfig>("/api/programme"),
+        rubricsApi.list().catch(() => [] as Rubric[]),
       ]);
       setCourseInfo(
         toCourseInfoForm(
@@ -230,15 +226,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setPolicy(
         (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
       );
-      setResources(toResourcesForm(spec.data.resources));
-      setResponsibility(
-        (spec.data.responsibility as StudentResponsibilitySectionValue | undefined) ??
-          EMPTY_STUDENT_RESPONSIBILITY,
-      );
       setStatus(spec.status ?? {});
       setReview(spec.review);
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
+      setRubrics(rubricList);
       setCourse(courseView);
       setCourseTotalSlt(courseView.totalSltHours ?? null);
       setProgramme(programmeConfig);
@@ -345,63 +337,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setError(
           err instanceof ApiError ? err.message : "Failed to save weekly plan",
         );
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [courseId, editingLocked],
-  );
-
-  const persistResources = useCallback(
-    async (items: ResourcesForm) => {
-      if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
-        return false;
-      }
-      setSaving(true);
-      setError(null);
-      try {
-        const payload = toResourcesPayload(items, weeklyPlan);
-        await courseSpecApi.saveSection(courseId, "resources", payload);
-        setResources(items);
-        setStatus((current) => ({ ...current, resources: "complete" }));
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
-        return true;
-      } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Failed to save required resources",
-        );
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [courseId, editingLocked, weeklyPlan],
-  );
-
-  const persistResponsibility = useCallback(
-    async (value: StudentResponsibilitySectionValue) => {
-      if (editingLocked) {
-        setError("This course specification is locked while it is in the review workflow.");
-        return false;
-      }
-      setSaving(true);
-      setError(null);
-      try {
-        await courseSpecApi.saveSection(courseId, "responsibility", value);
-        setResponsibility(value);
-        setStatus((current) => ({ ...current, responsibility: "complete" }));
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
-        return true;
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to save student responsibility");
         return false;
       } finally {
         setSaving(false);
@@ -589,24 +524,24 @@ export function SpecClient({ courseId }: { courseId: string }) {
     () =>
       buildCourseDocument({
         courseInfo,
+        courseId,
         clos,
         weeklyPlan,
         assessments,
+        rubrics,
         mapping,
-        resources,
-        responsibility,
         teachingMethods,
         assessmentMethods,
         programme,
       }),
     [
       courseInfo,
+      courseId,
       clos,
       weeklyPlan,
       assessments,
+      rubrics,
       mapping,
-      resources,
-      responsibility,
       teachingMethods,
       assessmentMethods,
       programme,
@@ -771,19 +706,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
             </TabsContent>
 
             <TabsContent value="resources" className="mt-4">
-              <ResourcesSectionForm
-                value={resources}
-                weeklyPlan={weeklyPlan}
-                onPersist={persistResources}
-              />
-            </TabsContent>
-
-            <TabsContent value="responsibility" className="mt-4">
-              <StudentResponsibilitySection
-                value={responsibility}
-                onPersist={persistResponsibility}
-                disabled={editingLocked}
-              />
+              <SectionPanel>
+                <ComingSoon meta={sectionMeta("resources")} />
+              </SectionPanel>
             </TabsContent>
 
             <TabsContent value="policy" className="mt-4">

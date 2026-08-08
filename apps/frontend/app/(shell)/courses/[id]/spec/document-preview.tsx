@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, FileText, Loader2, Maximize2, Minus, Plus } from "lucide-react";
 import { Button } from "@dse-pms/ui";
@@ -160,8 +161,8 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
 
       <div className="grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
         <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
-          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Document Information</h3><dl className="mt-4 space-y-3 text-sm"><div><dt className="text-xs text-muted-foreground">Course Code</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseCode)}</dd></div><div><dt className="text-xs text-muted-foreground">Course Title</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseTitle)}</dd></div><div><dt className="text-xs text-muted-foreground">Sections</dt><dd className="mt-0.5 font-medium">1–19</dd></div><div><dt className="text-xs text-muted-foreground">Format</dt><dd className="mt-0.5 font-medium">A4 Landscape</dd></div></dl></div>
-          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Contents</h3><nav className="mt-3 space-y-1 text-sm"><a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">1–13. Course Information</a><a href="#clos" className="block rounded-md px-2 py-2 hover:bg-muted">14. CLOs</a><a href="#mapping" className="block rounded-md px-2 py-2 hover:bg-muted">15. CLO–PLO Mapping</a><a href="#slt" className="block rounded-md px-2 py-2 hover:bg-muted">16. Student Learning Time</a><a href="#assessment-plan" className="block rounded-md px-2 py-2 hover:bg-muted">17. Assessment Plan</a><a href="#lesson-plan" className="block rounded-md px-2 py-2 hover:bg-muted">18. Detailed Lesson Plan</a><a href="#student-responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">21. Student Responsibility</a></nav></div>
+          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Document Information</h3><dl className="mt-4 space-y-3 text-sm"><div><dt className="text-xs text-muted-foreground">Course Code</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseCode)}</dd></div><div><dt className="text-xs text-muted-foreground">Course Title</dt><dd className="mt-0.5 font-medium">{displayValue(info.courseTitle)}</dd></div><div><dt className="text-xs text-muted-foreground">Sections</dt><dd className="mt-0.5 font-medium">1–18</dd></div><div><dt className="text-xs text-muted-foreground">Format</dt><dd className="mt-0.5 font-medium">A4 Landscape</dd></div></dl></div>
+          <div className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Contents</h3><nav className="mt-3 space-y-1 text-sm"><a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">1–13. Course Information</a><a href="#clos" className="block rounded-md px-2 py-2 hover:bg-muted">14. CLOs</a><a href="#mapping" className="block rounded-md px-2 py-2 hover:bg-muted">15. CLO–PLO Mapping</a><a href="#slt" className="block rounded-md px-2 py-2 hover:bg-muted">16. Student Learning Time</a><a href="#assessment-plan" className="block rounded-md px-2 py-2 hover:bg-muted">17. Assessment Plan</a><a href="#lesson-plan" className="block rounded-md px-2 py-2 hover:bg-muted">18. Detailed Lesson Plan</a></nav></div>
         </aside>
 
         <main ref={viewerRef} className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40">
@@ -207,51 +208,10 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             </Page>
 
             <Page zoom={zoom} pageNumber={5}>
-              <div id="assessment-plan" className="h-full px-[54px] py-[42px]"><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[7%]" /><col className="w-[10%]" /><col className="w-[23%]" /><col className="w-[9%]" /><col className="w-[8%]" /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[15%]" /><col className="w-[10%]" /></colgroup><thead><tr><TH>CLO</TH><TH>PLO</TH><TH>Assessment</TH><TH>Group / Individual</TH><TH>Weight %</TH><TH>C/A/P</TH><TH>Due Week</TH><TH>Format / Submission</TH><TH>Feedback</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{displayValue(assessment.name)}</TD><TD>{assessment.mode === "group" ? "G" : "I"}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD>{displayValue(assessment.dueWeek)}</TD><TD>{joinValues([assessment.format, assessment.submissionMethod].filter(Boolean))}</TD><TD>{joinValues([assessment.feedbackMethod, assessment.feedbackTimeline].filter(Boolean))}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={4} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD colSpan={4}></TD></tr></tfoot></Table><p className="mt-4 font-serif text-[9px]">Assessment SLT is omitted here because the current CourseSpecAssessmentItem data model does not contain an assessment-duration/SLT field.</p><PageFooter courseCode={info.courseCode} page={5} /></div>
+              <div id="assessment-plan" className="h-full px-[54px] py-[42px]"><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[11%]" /><col className="w-[26%]" /><col className="w-[8%]" /><col className="w-[26%]" /><col className="w-[12%]" /></colgroup><thead><tr><TH>CLOs</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Assessment &amp; Description</TH><TH>Weight (%)</TH><TH>Evaluation Definition</TH><TH>Rubric</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD><p className="font-semibold">{displayValue(assessment.name)}</p>{assessment.description ? <p className="mt-1 text-[9px] text-slate-700">{assessment.description}</p> : null}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{displayValue(assessment.evaluationDefinition)}</TD><TD>{assessment.rubricName && assessment.rubricUrl ? <Link href={assessment.rubricUrl} className="font-semibold text-blue-700 underline underline-offset-2">{assessment.rubricName} ↗</Link> : assessment.rubricName ? assessment.rubricName : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={4} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD colSpan={2}></TD></tr></tfoot></Table><p className="mt-4 font-serif text-[9px]">Assessment SLT is omitted here because the current CourseSpecAssessmentItem data model does not contain an assessment-duration/SLT field.</p><PageFooter courseCode={info.courseCode} page={5} /></div>
             </Page>
 
             {weeklyPages.map((weeks, index) => <Page zoom={zoom} pageNumber={weeklyStartPage + index} key={`lesson-${index}`}><div id={index === 0 ? "lesson-plan" : undefined} className="h-full px-[54px] py-[42px]"><SectionTitle number="18">Course Outline / Detailed Lesson Plan{weeklyPages.length > 1 ? ` — Weeks ${weeks[0]?.week ?? ""}–${weeks[weeks.length-1]?.week ?? ""}` : ""}</SectionTitle><Table><colgroup><col className="w-[5%]" /><col className="w-[18%]" /><col className="w-[10%]" /><col className="w-[22%]" /><col className="w-[20%]" /><col className="w-[15%]" /><col className="w-[10%]" /></colgroup><thead><tr><TH>Week</TH><TH>Topic</TH><TH>CLO</TH><TH>Lesson Learning Outcomes</TH><TH>Teaching Method / Activity</TH><TH>Assessment</TH><TH>Resources</TH></tr></thead><tbody>{weeks.map((week) => <tr key={week.id}><TD>{week.week}</TD><TD>{week.topic}</TD><TD>{joinValues(week.cloCodes)}</TD><TD>{week.lloItems.length ? week.lloItems.map((item,i)=><div key={i}>LLO{i+1}: {item}</div>) : "—"}</TD><TD>{joinValues(week.teachingMethods.length ? week.teachingMethods : week.learningActivities)}</TD><TD>{joinValues([week.assessment, ...week.assessmentMethods].filter(Boolean))}</TD><TD>{joinValues(week.resources)}</TD></tr>)}</tbody></Table><div className="mt-4 grid grid-cols-3 gap-3 font-serif text-[9px]"><div className="rounded border border-black p-2"><strong>Learning Activities</strong><p className="mt-1">{joinValues(weeks.flatMap((w)=>w.learningActivities))}</p></div><div className="rounded border border-black p-2"><strong>Active Learning Strategies</strong><p className="mt-1">{joinValues(weeks.flatMap((w)=>w.activeLearningStrategies))}</p></div><div className="rounded border border-black p-2"><strong>Teaching Resources</strong><p className="mt-1">{joinValues(weeks.flatMap((w)=>w.resources))}</p></div></div><PageFooter courseCode={info.courseCode} page={weeklyStartPage + index} /></div></Page>)}
-
-            <Page zoom={zoom} pageNumber={weeklyStartPage + weeklyPages.length}>
-              <div id="resources" className="h-full px-[54px] py-[42px]">
-                <SectionTitle number="19">Required Resources to Deliver the Course</SectionTitle>
-                {document.resources.length === 0 ? (
-                  <p className="font-serif text-[11px]">No additional required resources have been confirmed.</p>
-                ) : (
-                  <Table>
-                    <colgroup><col className="w-[18%]" /><col className="w-[30%]" /><col className="w-[24%]" /><col className="w-[18%]" /><col className="w-[10%]" /></colgroup>
-                    <thead><tr><TH>Type</TH><TH>Resource / Description</TH><TH>Link</TH><TH>Notes</TH><TH>Weekly Plan Evidence</TH></tr></thead>
-                    <tbody>{document.resources.map((resource) => (
-                      <tr key={resource.id}>
-                        <TD>{displayValue(resource.resourceType)}</TD>
-                        <TD>{displayValue(resource.title)}</TD>
-                        <TD>{resource.url ? resource.url : "—"}</TD>
-                        <TD>{displayValue(resource.notes)}</TD>
-                        <TD>{joinValues(resource.evidenceWeeks)}</TD>
-                      </tr>
-                    ))}</tbody>
-                  </Table>
-                )}
-                <p className="mt-4 font-serif text-[9px]">Resources listed here are lecturer-confirmed requirements. Weekly Plan evidence is shown only as provenance for the requirement; it is not a quality judgment.</p>
-                <PageFooter courseCode={info.courseCode} page={weeklyStartPage + weeklyPages.length} />
-              </div>
-            </Page>
-
-            <Page zoom={zoom} pageNumber={weeklyStartPage + weeklyPages.length + 1}>
-              <div id="student-responsibility" className="h-full px-[54px] py-[42px]">
-                <SectionTitle number="21">Student Responsibility</SectionTitle>
-                {document.studentResponsibilities.length === 0 ? (
-                  <p className="font-serif text-[11px]">No student responsibilities have been added.</p>
-                ) : (
-                  <ol className="list-decimal space-y-3 pl-6 font-serif text-[11px] leading-[1.5]">
-                    {document.studentResponsibilities.map((item) => (
-                      <li key={item.id} className="pl-1">{item.text}</li>
-                    ))}
-                  </ol>
-                )}
-                <PageFooter courseCode={info.courseCode} page={weeklyStartPage + weeklyPages.length + 1} />
-              </div>
-            </Page>
           </div>
         </main>
       </div>

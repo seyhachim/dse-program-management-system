@@ -4,14 +4,15 @@ import {
   semesterLabel,
   type Method,
   type ProgrammeAcademicConfig,
+  type Rubric,
 } from "@dse-pms/shared-types";
+
 
 import type { CourseInfoForm } from "./course-info-section";
 import type { CloForm } from "./clo-model";
 import { weekContactHoursForm, weekSltForm, type WeeklyPlanForm } from "./weekly-plan-model";
 import type { AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
-import type { ResourcesForm } from "./resources-model";
 
 export type CourseDocumentModel = {
   title: string;
@@ -70,18 +71,6 @@ export type CourseDocumentModel = {
     sltHours: string;
     assessment: string;
   }[];
-  resources: {
-    id: string;
-    resourceType: string;
-    title: string;
-    url: string;
-    notes: string;
-    evidenceWeeks: string[];
-  }[];
-  studentResponsibilities: {
-    id: string;
-    text: string;
-  }[];
   assessments: {
     id: string;
     name: string;
@@ -98,6 +87,9 @@ export type CourseDocumentModel = {
     submissionMethod: string;
     feedbackMethod: string;
     feedbackTimeline: string;
+    evaluationDefinition: string;
+    rubricName: string;
+    rubricUrl: string;
   }[];
   totals: {
     courseContentSlt: number;
@@ -118,15 +110,15 @@ export const COURSE_DOCUMENT_STYLE = {
 
 type BuildCourseDocumentInput = {
   courseInfo: CourseInfoForm;
+  courseId: string;
   clos: CloForm[];
   weeklyPlan: WeeklyPlanForm;
   assessments: AssessmentForm[];
+  rubrics?: Rubric[];
   mapping: MappingForm;
-  resources: ResourcesForm;
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
   programme?: ProgrammeAcademicConfig | null;
-  responsibility?: { items: { id: string; text: string }[] };
 };
 
 type CourseType = "Basic" | "Core" | "Elective" | "Specialization" | "MoeysHeip";
@@ -151,12 +143,12 @@ function unique(values: string[]): string[] {
 
 export function buildCourseDocument({
   courseInfo,
+  courseId,
   clos,
   weeklyPlan,
   assessments,
+  rubrics = [],
   mapping: _mapping,
-  resources,
-  responsibility = { items: [] },
   teachingMethods = [],
   assessmentMethods = [],
   programme = null,
@@ -178,19 +170,6 @@ export function buildCourseDocument({
     sltHours: clo.sltHours,
     teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
     assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
-  }));
-
-  const weekById = new Map(weeklyPlan.map((week) => [week.id, week]));
-  const documentResources = resources.map((resource) => ({
-    id: resource.id,
-    resourceType: resource.resourceType,
-    title: resource.title,
-    url: resource.url,
-    notes: resource.notes,
-    evidenceWeeks: resource.evidenceWeekIds
-      .map((weekId) => weekById.get(weekId))
-      .filter((week): week is WeeklyPlanForm[number] => Boolean(week))
-      .map((week) => `Week ${week.week}${week.topic ? ` — ${week.topic}` : ""}`),
   }));
 
   const documentWeeks = weeklyPlan.map((week) => {
@@ -228,6 +207,8 @@ export function buildCourseDocument({
     };
   });
 
+  const rubricById = new Map(rubrics.map((rubric) => [rubric.id, rubric]));
+
   const documentAssessments = assessments
     .filter((assessment) => assessment.status === "active")
     .map((assessment) => ({
@@ -256,6 +237,11 @@ export function buildCourseDocument({
       submissionMethod: assessment.submissionMethod,
       feedbackMethod: assessment.feedbackMethod,
       feedbackTimeline: assessment.feedbackTimeline,
+      evaluationDefinition: rubricById.get(assessment.rubric)?.description ?? "",
+      rubricName: rubricById.get(assessment.rubric)?.name ?? "",
+      rubricUrl: assessment.rubric
+        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
+        : "",
     }));
 
   const documentMapping = activeClos.map((clo) => ({
@@ -298,8 +284,6 @@ export function buildCourseDocument({
     clos: documentClos,
     mapping: documentMapping,
     weeklyPlan: documentWeeks,
-    resources: documentResources,
-    studentResponsibilities: (responsibility?.items ?? []).map((item) => ({ id: item.id, text: item.text })),
     assessments: documentAssessments,
     totals: {
       courseContentSlt,
