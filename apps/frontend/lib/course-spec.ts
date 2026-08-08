@@ -6,6 +6,9 @@ export const courseSpecApi = {
   get(courseId: string): Promise<CourseSpecView> {
     return api.get<CourseSpecView>(`/api/courses/${courseId}/spec`);
   },
+  submit(courseId: string, note: string) {
+    return api.post<CourseSpecView>(`/api/courses/${courseId}/spec/submit`, { note });
+  },
   saveSection(
     courseId: string,
     sectionId: SpecSectionId,

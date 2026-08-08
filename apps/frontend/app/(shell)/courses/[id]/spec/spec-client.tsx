@@ -73,6 +73,7 @@ import { OverviewTab } from "./overview-tab";
 import { CompletionSummary } from "./completion-summary";
 import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
+import { ReviewSubmitSection } from "./review-submit-section";
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
   | "overview"
@@ -117,6 +118,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   );
   const [course, setCourse] = useState<CourseView | null>(null);
   const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
+  const [review, setReview] = useState<NonNullable<Awaited<ReturnType<typeof courseSpecApi.get>>["review"]> | null>(null);
   const [courseInfo, setCourseInfo] =
     useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
@@ -158,6 +160,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setAssessments(toAssessmentForm(spec.data.assessmentPlan));
       setMapping(toMappingForm(spec.data.mapping));
       setStatus(spec.status ?? {});
+      setReview(spec.review);
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
       setCourse(courseView);
@@ -248,6 +251,27 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setError(
           err instanceof ApiError ? err.message : "Failed to save weekly plan",
         );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
+  );
+
+  const submitForReview = useCallback(
+    async (note: string) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const next = await courseSpecApi.submit(courseId, note);
+        setStatus(next.status ?? {});
+        setReview(next.review);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to submit course specification");
         return false;
       } finally {
         setSaving(false);
@@ -488,9 +512,17 @@ export function SpecClient({ courseId }: { courseId: string }) {
           </TabsContent>
 
           <TabsContent value="reviewSubmit" className="mt-4">
-            <SectionPanel>
-              <ComingSoon meta={{ title: "Review & Submit" }} />
-            </SectionPanel>
+            {course && review ? (
+              <ReviewSubmitSection
+                course={course}
+                status={status}
+                review={review}
+                onSubmit={submitForReview}
+                onPreview={() => setActiveTab("documentPreview")}
+                onGoToSection={goToSection}
+                saving={saving}
+              />
+            ) : null}
           </TabsContent>
 
           {canSaveActive ? (

@@ -13,6 +13,7 @@ import {
   type MappingSection,
   type OfferingsServiceContract,
   type SpecSectionId,
+  type CourseSpecReviewStatus,
   type UpdateCourseInput,
   type WeeklyPlanSection,
 } from "@dse-pms/shared-types";
@@ -219,7 +220,50 @@ export const courseService = {
     });
     const { data, status } = reassembleSpec(spec);
     data.courseInfo = await buildCourseInfoPrefill(course);
-    return { courseId, data, status };
+    return { courseId, data, status, review: reviewEnvelope(spec) };
+  },
+
+  async submitSpec(courseId: string, submittedById: string, note: string) {
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) throw new ReferenceError("Course not found");
+
+    const spec = await prisma.courseSpec.findUnique({
+      where: { courseId },
+      include: SPEC_INCLUDE,
+    });
+    if (!spec) throw new ReferenceError("Course specification has not been started");
+
+    const incomplete = COMPLETABLE_SPEC_SECTIONS.filter(
+      (section) => !spec.sections.some(
+        (saved) => saved.sectionKey === section.id && saved.status === "Complete",
+      ),
+    );
+    if (incomplete.length > 0) {
+      throw new ReferenceError(
+        `Complete all required sections before submitting: ${incomplete.map((s) => s.title).join(", ")}`,
+      );
+    }
+
+    if (!["Draft", "ChangesRequested"].includes(spec.reviewStatus)) {
+      throw new ReferenceError("This course specification is not ready for submission");
+    }
+
+    const nextVersion = spec.submissionVersion + 1;
+    const nextStatus = spec.reviewStatus === "ChangesRequested" ? "Resubmitted" : "Submitted";
+    const updated = await prisma.courseSpec.update({
+      where: { courseId },
+      data: {
+        reviewStatus: nextStatus,
+        submissionVersion: nextVersion,
+        submittedAt: new Date(),
+        submittedById,
+        submissionNote: note.trim(),
+      },
+      include: SPEC_INCLUDE,
+    });
+    const { data, status } = reassembleSpec(updated);
+    data.courseInfo = await buildCourseInfoPrefill(course);
+    return { courseId, data, status, review: reviewEnvelope(updated) };
   },
 
   /**
@@ -306,9 +350,28 @@ export const courseService = {
     });
     const { data, status } = reassembleSpec(spec);
     data.courseInfo = await buildCourseInfoPrefill(course);
-    return { courseId, data, status };
+    return { courseId, data, status, review: reviewEnvelope(spec) };
   },
 } satisfies CoursesServiceContract & Record<string, unknown>;
+
+function reviewEnvelope(spec: SpecRow | null) {
+  const statusMap: Record<string, CourseSpecReviewStatus> = {
+    Draft: "draft",
+    Submitted: "submitted",
+    UnderReview: "underReview",
+    ChangesRequested: "changesRequested",
+    Resubmitted: "resubmitted",
+    Approved: "approved",
+  };
+
+  return {
+    status: statusMap[spec?.reviewStatus ?? "Draft"],
+    submissionVersion: spec?.submissionVersion ?? 0,
+    submittedAt: spec?.submittedAt?.toISOString() ?? null,
+    submittedById: spec?.submittedById ?? null,
+    submissionNote: spec?.submissionNote ?? "",
+  };
+}
 
 /**
  * Every saveable section — its payload lives entirely in its own normalized table

@@ -112,6 +112,16 @@ export function createCourseRouter(): Router {
     res.json(spec);
   });
 
+  router.post("/:id/spec/submit", requirePermission("courses:write"), async (req, res) => {
+    if (!(await ensureCourseAccess(req, res, req.params.id!))) return;
+    const note = typeof req.body?.note === "string" ? req.body.note : "";
+    try {
+      res.json(await courseService.submitSpec(req.params.id!, req.user!.id, note));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err, "") ?? "Could not submit course specification" });
+    }
+  });
+
   router.put("/:id/spec/:sectionId", requirePermission("courses:write"), async (req, res) => {
     // A lecturer may only fill in the spec for a course they're assigned to;
     // admins can edit any course's spec.

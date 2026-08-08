@@ -126,6 +126,25 @@ export type SpecSectionId = (typeof SPEC_SECTIONS)[number]["id"];
 export const SpecSectionStatus = z.enum(["draft", "complete"]);
 export type SpecSectionStatus = z.infer<typeof SpecSectionStatus>;
 
+export const CourseSpecReviewStatus = z.enum([
+  "draft",
+  "submitted",
+  "underReview",
+  "changesRequested",
+  "resubmitted",
+  "approved",
+]);
+export type CourseSpecReviewStatus = z.infer<typeof CourseSpecReviewStatus>;
+
+export const CourseSpecReview = z.object({
+  status: CourseSpecReviewStatus,
+  submissionVersion: z.number().int().nonnegative(),
+  submittedAt: z.string().datetime().nullable(),
+  submittedById: z.string().uuid().nullable(),
+  submissionNote: z.string(),
+});
+export type CourseSpecReview = z.infer<typeof CourseSpecReview>;
+
 /** How many of a course's "ready" wizard sections are marked complete — backs the programme dashboard. */
 export interface CourseSpecProgress {
   courseId: string;
@@ -621,6 +640,26 @@ export function weeklyPlanTotals(section: WeeklyPlanSection) {
     },
   );
 }
+/* --------------------------------------- §19 Required Resources */
+
+export const CourseResourceItem = z.object({
+  id: z.string().min(1),
+  weekId: z.string().min(1),
+  resourceType: z.string().min(1),
+  title: z.string().default(""),
+  url: z
+    .union([z.literal(""), z.string().url("Enter a valid URL")])
+    .default(""),
+  notes: z.string().default(""),
+});
+
+export type CourseResourceItem = z.infer<typeof CourseResourceItem>;
+
+export const ResourcesSection = z.object({
+  items: z.array(CourseResourceItem).default([]),
+});
+
+export type ResourcesSection = z.infer<typeof ResourcesSection>;
 
 /* --------------------------------------- §17 Course Assessment Plan */
 
@@ -817,5 +856,6 @@ export const CourseSpecSchema = z.object({
   courseId: z.string().uuid(),
   data: z.record(z.string(), z.unknown()),
   status: z.record(z.string(), SpecSectionStatus),
+  review: CourseSpecReview,
 });
 export type CourseSpecView = z.infer<typeof CourseSpecSchema>;

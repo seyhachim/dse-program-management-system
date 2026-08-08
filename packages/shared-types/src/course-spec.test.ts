@@ -6,6 +6,7 @@ import {
   cloFocusCode,
   cloFocusPercent,
   WeeklyPlanSection,
+  ResourcesSection,
   SPEC_SECTION_SCHEMAS,
   weekContactHours,
   weekSlt,
@@ -467,4 +468,20 @@ test("specAttention is needsAttention (critical) when nothing has been saved yet
 test("specAttention is itemsRemaining, carrying the incomplete sections, when partially complete", () => {
   const sections = [{ id: "mapping" as const, title: "CLO Alignment Mapping" }];
   expect(specAttention(progress(4, 5, sections))).toEqual({ level: "itemsRemaining", items: sections });
+});
+
+
+test("ResourcesSection accepts week resource material links", () => {
+  const parsed = ResourcesSection.parse({
+    items: [
+      {
+        id: "resource-1",
+        weekId: "week-1",
+        resourceType: "LECTURE_SLIDES",
+        title: "Week 1 slides",
+        url: "https://example.com/slides",
+      },
+    ],
+  });
+  expect(parsed.items[0]?.notes).toBe("");
 });

@@ -52,6 +52,15 @@ enum CourseSpecSectionStatus {
   Complete
 }
 
+enum CourseSpecReviewStatus {
+  Draft
+  Submitted
+  UnderReview
+  ChangesRequested
+  Resubmitted
+  Approved
+}
+
 /// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
 /// normalized CLO row.
 enum CloRowStatus {
@@ -99,6 +108,7 @@ model User {
   rubricsOwned    Rubric[]             @relation("RubricOwner")
   coLecturerOf    OfferingCoLecturer[] @relation("OfferingCoLecturer")
   roleAssignments UserRoleAssignment[]
+  courseSpecSubmissions CourseSpec[] @relation("CourseSpecSubmittedBy")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -271,8 +281,18 @@ model CourseSpec {
   weeks           CourseSpecWeek[]
   assessmentItems CourseSpecAssessmentItem[]
   mappingCells    CourseSpecMappingCell[]
-  updatedAt       DateTime                   @updatedAt
-  createdAt       DateTime                   @default(now())
+  resources       CourseSpecResource[]
+  updatedAt          DateTime                   @updatedAt
+  createdAt          DateTime                   @default(now())
+  reviewStatus       CourseSpecReviewStatus     @default(Draft)
+  submissionVersion Int                        @default(0)
+  submittedAt       DateTime?
+  submittedById     String?
+  submissionNote    String                     @default("")
+  submittedBy       User?                      @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+
+  @@index([reviewStatus])
+  @@index([submittedById])
 }
 
 /// Issue #81: one row per wizard section, replacing the CourseSpec.data/status
@@ -434,6 +454,26 @@ model CourseSpecMappingCell {
   strength     Int
 
   @@id([courseSpecId, cloCode, kind, ref])
+}
+
+/// §19 Required Resources. Each row supplies the actual material/link for a
+/// resource type planned in one §18 Weekly Plan week. `weekId` is intentionally
+/// a loose reference, matching CourseSpecMappingCell.ref: CourseSpecWeek uses a
+/// composite key and weekly-plan sync rebuilds rows, so a hard FK would cascade
+/// resource evidence during an otherwise harmless weekly-plan save.
+model CourseSpecResource {
+  id           String     @default(uuid())
+  courseSpecId String
+  courseSpec   CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order        Int
+  weekId       String
+  resourceType String
+  title        String     @default("")
+  url          String     @default("")
+  notes        String     @default("")
+
+  @@id([courseSpecId, id])
+  @@index([courseSpecId, weekId])
 }
 
 /// Course Offerings plugin — a course delivered in a given term, with an assigned
