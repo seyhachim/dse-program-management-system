@@ -155,7 +155,7 @@ export function WeeklyPlanSectionForm({
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[1260px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
                   <th className="w-16 px-3 py-2.5">Week</th>
@@ -171,6 +171,10 @@ export function WeeklyPlanSectionForm({
                   <th className="w-40 px-3 py-2.5">Time / SLT</th>
 
                   <th className="min-w-[180px] px-3 py-2.5">Assessment</th>
+
+                  <th className="min-w-[280px] px-3 py-2.5">
+                    Alignment Evidence
+                  </th>
 
                   <th className="w-32 px-3 py-2.5">Attention</th>
 
@@ -320,6 +324,18 @@ export function WeeklyPlanSectionForm({
                         />
                       </td>
 
+                      {/* Constructive alignment evidence */}
+                      <td className="px-3 py-4">
+                        <WeekAlignmentSummary
+                          cloCodes={week.cloCodes}
+                          llos={llos}
+                          teaching={teaching}
+                          activities={activities}
+                          assessments={assessments}
+                          resources={resources}
+                        />
+                      </td>
+
                       {/* Attention */}
                       <td className="px-3 py-4">
                         {attention.length === 0 ? (
@@ -386,7 +402,7 @@ export function WeeklyPlanSectionForm({
                     <span>Total SLT {totals.slt} h</span>
                   </td>
 
-                  <td colSpan={3} className="px-3 py-2.5" />
+                  <td colSpan={4} className="px-3 py-2.5" />
                 </tr>
               </tfoot>
             </table>
@@ -896,6 +912,79 @@ function attentionLabel(issue: string): string {
     default:
       return issue;
   }
+}
+
+/* ================================================================
+   Weekly Constructive Alignment Evidence
+   ================================================================ */
+
+function WeekAlignmentSummary({
+  cloCodes,
+  llos,
+  teaching,
+  activities,
+  assessments,
+  resources,
+}: {
+  cloCodes: string[];
+  llos: string[];
+  teaching: string[];
+  activities: string[];
+  assessments: string[];
+  resources: string[];
+}) {
+  const coreEvidence = [
+    { label: "CLO", ready: cloCodes.length > 0 },
+    { label: "LLO", ready: llos.length > 0 },
+    { label: "Teaching", ready: teaching.length > 0 },
+    { label: "Activity", ready: activities.length > 0 },
+    { label: "Assessment", ready: assessments.length > 0 },
+  ];
+
+  const complete = coreEvidence.every((item) => item.ready);
+  const missing = coreEvidence
+    .filter((item) => !item.ready)
+    .map((item) => item.label);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1">
+        {coreEvidence.map((item, index) => (
+          <div key={item.label} className="flex items-center gap-1">
+            <span
+              className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
+                item.ready
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+                  : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
+              }`}
+            >
+              {item.ready ? "✓" : "○"} {item.label}
+            </span>
+
+            {index < coreEvidence.length - 1 ? (
+              <span className="text-[10px] text-muted-foreground">→</span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {complete ? (
+        <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+          Core alignment evidence is present for this week.
+        </p>
+      ) : (
+        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+          Evidence not yet established for: {missing.join(", ")}.
+        </p>
+      )}
+
+      {resources.length > 0 ? (
+        <p className="text-[10px] text-muted-foreground">
+          Supporting resources: {resources.join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /* ================================================================
