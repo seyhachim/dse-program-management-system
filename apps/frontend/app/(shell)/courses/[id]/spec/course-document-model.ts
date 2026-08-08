@@ -11,6 +11,7 @@ import type { CloForm } from "./clo-model";
 import { weekContactHoursForm, weekSltForm, type WeeklyPlanForm } from "./weekly-plan-model";
 import type { AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
+import type { ResourcesForm } from "./resources-model";
 
 export type CourseDocumentModel = {
   title: string;
@@ -69,6 +70,26 @@ export type CourseDocumentModel = {
     sltHours: string;
     assessment: string;
   }[];
+  resources: {
+    id: string;
+    resourceType: string;
+    title: string;
+    url: string;
+    notes: string;
+    evidenceWeeks: string[];
+  }[];
+  references: {
+    id: string;
+    kind: "required" | "recommended" | "other";
+    title: string;
+    authors: string;
+    publisher: string;
+    year: string;
+    isbn: string;
+    url: string;
+    basedOn: string;
+    notes: string;
+  }[];
   assessments: {
     id: string;
     name: string;
@@ -109,6 +130,7 @@ type BuildCourseDocumentInput = {
   weeklyPlan: WeeklyPlanForm;
   assessments: AssessmentForm[];
   mapping: MappingForm;
+  resources: ResourcesForm;
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
   programme?: ProgrammeAcademicConfig | null;
@@ -140,6 +162,7 @@ export function buildCourseDocument({
   weeklyPlan,
   assessments,
   mapping: _mapping,
+  resources,
   teachingMethods = [],
   assessmentMethods = [],
   programme = null,
@@ -162,6 +185,42 @@ export function buildCourseDocument({
     teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
     assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
   }));
+
+  const weekById = new Map(weeklyPlan.map((week) => [week.id, week]));
+  const evidenceWeeks = (weekIds: string[]) => weekIds
+    .map((weekId) => weekById.get(weekId))
+    .filter((week): week is WeeklyPlanForm[number] => Boolean(week))
+    .map((week) => `Week ${week.week}${week.topic ? ` — ${week.topic}` : ""}`);
+
+  // §19 contains only confirmed delivery requirements. Other resource kinds
+  // project into §20, while legacy CourseSpecReference rows are preserved.
+  const documentResources = resources
+    .filter((resource) => resource.kind === "requiredResource")
+    .map((resource) => ({
+      id: resource.id,
+      resourceType: resource.resourceType,
+      title: resource.title,
+      url: resource.url,
+      notes: resource.notes,
+      evidenceWeeks: evidenceWeeks(resource.evidenceWeekIds),
+    }));
+
+  const resourceReferences = resources
+    .filter((resource) => resource.kind !== "requiredResource")
+    .map((resource) => ({
+      id: resource.id,
+      kind: resource.kind === "requiredTextbook" ? "required" as const : resource.kind === "recommendedReading" ? "recommended" as const : "other" as const,
+      title: resource.title,
+      authors: resource.authors,
+      publisher: resource.publisher,
+      year: resource.year,
+      isbn: resource.isbn,
+      url: resource.url,
+      basedOn: resource.basedOn,
+      notes: resource.notes,
+    }));
+
+  const documentReferences = resourceReferences;
 
   const documentWeeks = weeklyPlan.map((week) => {
     const contact = weekContactHoursForm(week);
@@ -268,6 +327,8 @@ export function buildCourseDocument({
     clos: documentClos,
     mapping: documentMapping,
     weeklyPlan: documentWeeks,
+    resources: documentResources,
+    references: documentReferences,
     assessments: documentAssessments,
     totals: {
       courseContentSlt,

@@ -12,6 +12,8 @@ import {
   type ListCoursesQuery,
   type MappingSection,
   type PolicySection,
+  type ResourcesSection,
+  type ReferencesSection,
   type OfferingsServiceContract,
   type SpecSectionId,
   type CourseSpecReviewStatus,
@@ -412,6 +414,10 @@ export const courseService = {
         );
       if (sectionId === "mapping")
         await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
+      if (sectionId === "resources")
+        await syncResources(tx, spec.id, (values as ResourcesSection).items);
+      if (sectionId === "references")
+        await syncReferences(tx, spec.id, (values as ReferencesSection).items);
       if (sectionId === "policy")
         await syncPolicy(tx, spec.id, values as PolicySection);
 
@@ -483,6 +489,8 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "slt",
   "assessmentPlan",
   "mapping",
+  "resources",
+  "references",
   "policy",
 ]);
 
@@ -496,6 +504,8 @@ const SPEC_INCLUDE = {
   weeks: { orderBy: { order: "asc" as const } },
   assessmentItems: { orderBy: { order: "asc" as const } },
   mappingCells: true,
+  resources: { orderBy: { order: "asc" as const } },
+  references: { orderBy: { order: "asc" as const } },
   policy: true,
 } satisfies Prisma.CourseSpecInclude;
 
@@ -601,6 +611,45 @@ function reassembleSpec(spec: SpecRow | null): {
         kind: cell.kind === "Assessment" ? "assessment" : "week",
         ref: cell.ref,
         strength: cell.strength,
+      })),
+    };
+  }
+  if (hasSection("resources")) {
+    data.resources = {
+      items: spec.resources.map((resource) => ({
+        id: resource.id,
+        kind: resource.kind,
+        resourceType: resource.resourceType,
+        title: resource.title,
+        authors: resource.authors,
+        publisher: resource.publisher,
+        year: resource.year,
+        isbn: resource.isbn,
+        url: resource.url,
+        basedOn: resource.basedOn,
+        notes: resource.notes,
+        evidenceWeekIds:
+          resource.evidenceWeekIds.length > 0
+            ? resource.evidenceWeekIds
+            : resource.weekId
+              ? [resource.weekId]
+              : [],
+      })),
+    };
+  }
+  if (hasSection("references")) {
+    data.references = {
+      items: spec.references.map((reference) => ({
+        id: reference.id,
+        kind: reference.kind,
+        title: reference.title,
+        authors: reference.authors,
+        publisher: reference.publisher,
+        year: reference.year,
+        isbn: reference.isbn,
+        url: reference.url,
+        basedOn: reference.basedOn,
+        notes: reference.notes,
       })),
     };
   }
@@ -738,6 +787,73 @@ async function syncAssessmentPlan(
 }
 
 /** Delete-and-rebuild CourseSpecMappingCell rows for a `mapping` (CLO Alignment) section save. */
+async function syncResources(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  resources: ResourcesSection["items"],
+) {
+  const evidenceWeekIds = [...new Set(resources.flatMap((resource) => resource.evidenceWeekIds))];
+  if (evidenceWeekIds.length > 0) {
+    const weeks = await tx.courseSpecWeek.findMany({
+      where: { courseSpecId, id: { in: evidenceWeekIds } },
+      select: { id: true },
+    });
+    const knownWeekIds = new Set(weeks.map((week) => week.id));
+    const invalidWeekId = evidenceWeekIds.find((weekId) => !knownWeekIds.has(weekId));
+    if (invalidWeekId) {
+      throw new ReferenceError("Resource evidence references a week that does not belong to this course specification");
+    }
+  }
+
+  await tx.courseSpecResource.deleteMany({ where: { courseSpecId } });
+  if (resources.length === 0) return;
+
+  await tx.courseSpecResource.createMany({
+    data: resources.map((resource, order) => ({
+      id: resource.id,
+      courseSpecId,
+      order,
+      weekId: resource.evidenceWeekIds[0] ?? null,
+      kind: resource.kind,
+      resourceType: resource.resourceType,
+      title: resource.title,
+      authors: resource.authors,
+      publisher: resource.publisher,
+      year: resource.year,
+      isbn: resource.isbn,
+      url: resource.url,
+      basedOn: resource.basedOn,
+      notes: resource.notes,
+      evidenceWeekIds: resource.evidenceWeekIds,
+    })),
+  });
+}
+
+async function syncReferences(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  references: ReferencesSection["items"],
+) {
+  await tx.courseSpecReference.deleteMany({ where: { courseSpecId } });
+  if (references.length === 0) return;
+  await tx.courseSpecReference.createMany({
+    data: references.map((reference, order) => ({
+      id: reference.id,
+      courseSpecId,
+      order,
+      kind: reference.kind,
+      title: reference.title,
+      authors: reference.authors,
+      publisher: reference.publisher,
+      year: reference.year,
+      isbn: reference.isbn,
+      url: reference.url,
+      basedOn: reference.basedOn,
+      notes: reference.notes,
+    })),
+  });
+}
+
 async function syncPolicy(
   tx: Prisma.TransactionClient,
   courseSpecId: string,

@@ -4,14 +4,12 @@ import { SemesterSchema } from "./offerings.ts";
 
 /**
  * Course Specification wizard contract. The full RUPP syllabus (Part 2 §1–25) is
- * captured as one JSON document per course. This module defines:
+ * captured through the CourseSpec API envelope. Section payloads are stored in
+ * normalized tables on the backend; this module defines:
  *  - the ordered SECTION registry that drives the wizard stepper,
  *  - reference constants (Bloom-style level guides, legends) for the inline guides
  *    and dropdowns, and
- *  - per-section input schemas (Phase 1: Course Information §1–13).
- *
- * Storage lives in the CourseSpec table: `data[sectionId]` holds a section's content,
- * `status[sectionId]` tracks draft/complete so a lecturer can save and resume.
+ *  - per-section input schemas.
  */
 
 /* ------------------------------------------------------------------ sections */
@@ -77,10 +75,10 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
   },
   {
     id: "resources",
-    title: "Required Resources",
-    ref: "§19",
+    title: "Resources",
+    ref: "§19–20",
     part: "Part 2",
-    state: "soon",
+    state: "ready",
   },
   {
     id: "references",
@@ -662,15 +660,38 @@ export function weeklyPlanTotals(section: WeeklyPlanSection) {
 }
 /* --------------------------------------- §19 Required Resources */
 
+export const CourseResourceKind = z.enum([
+  "requiredResource",
+  "requiredTextbook",
+  "recommendedReading",
+  "lecturerSlides",
+  "lectureNotes",
+  "dataset",
+  "labMaterial",
+  "assignmentMaterial",
+  "projectMaterial",
+  "otherMaterial",
+]);
+export type CourseResourceKind = z.infer<typeof CourseResourceKind>;
+
 export const CourseResourceItem = z.object({
   id: z.string().min(1),
-  weekId: z.string().min(1),
+  /** Controlled course-level category. */
+  kind: CourseResourceKind.default("requiredResource"),
+  /** Original/weekly-plan resource label retained as provenance. */
   resourceType: z.string().min(1),
   title: z.string().default(""),
+  authors: z.string().default(""),
+  publisher: z.string().default(""),
+  year: z.string().default(""),
+  isbn: z.string().default(""),
   url: z
     .union([z.literal(""), z.string().url("Enter a valid URL")])
     .default(""),
+  basedOn: z.string().default(""),
   notes: z.string().default(""),
+  /** Weekly-plan evidence supporting why this resource is required/used. */
+  evidenceWeekIds: z.array(z.string().min(1)).default([]),
 });
 
 export type CourseResourceItem = z.infer<typeof CourseResourceItem>;
@@ -680,6 +701,32 @@ export const ResourcesSection = z.object({
 });
 
 export type ResourcesSection = z.infer<typeof ResourcesSection>;
+
+/* --------------------------------------- §20 References / Textbooks */
+
+export const ReferenceKind = z.enum(["required", "recommended", "other"]);
+export type ReferenceKind = z.infer<typeof ReferenceKind>;
+
+export const CourseReferenceItem = z.object({
+  id: z.string().min(1),
+  kind: ReferenceKind,
+  title: z.string().min(1),
+  authors: z.string().default(""),
+  publisher: z.string().default(""),
+  year: z.string().default(""),
+  isbn: z.string().default(""),
+  url: z.union([z.literal(""), z.string().url("Enter a valid URL")]).default(""),
+  basedOn: z.string().default(""),
+  notes: z.string().default(""),
+});
+
+export type CourseReferenceItem = z.infer<typeof CourseReferenceItem>;
+
+export const ReferencesSection = z.object({
+  items: z.array(CourseReferenceItem).default([]),
+});
+
+export type ReferencesSection = z.infer<typeof ReferencesSection>;
 
 /* --------------------------------------- §17 Course Assessment Plan */
 
@@ -857,6 +904,7 @@ export const SPEC_SECTION_SCHEMAS: Partial<
   slt: WeeklyPlanSection,
   assessmentPlan: AssessmentPlanSection,
   mapping: MappingSection,
+  resources: ResourcesSection,
 };
 
 /**

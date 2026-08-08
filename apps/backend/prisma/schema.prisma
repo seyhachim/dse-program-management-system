@@ -306,6 +306,7 @@ model CourseSpec {
   assessmentItems CourseSpecAssessmentItem[]
   mappingCells    CourseSpecMappingCell[]
   resources       CourseSpecResource[]
+  references      CourseSpecReference[]
   policy          CourseSpecPolicy?
   updatedAt          DateTime                   @updatedAt
   createdAt          DateTime                   @default(now())
@@ -514,24 +515,52 @@ model CourseSpecMappingCell {
   @@id([courseSpecId, cloCode, kind, ref])
 }
 
-/// §19 Required Resources. Each row supplies the actual material/link for a
-/// resource type planned in one §18 Weekly Plan week. `weekId` is intentionally
-/// a loose reference, matching CourseSpecMappingCell.ref: CourseSpecWeek uses a
-/// composite key and weekly-plan sync rebuilds rows, so a hard FK would cascade
-/// resource evidence during an otherwise harmless weekly-plan save.
+/// §19 Required Resources. Each row is a lecturer-confirmed course-level
+/// requirement. `evidenceWeekIds` records optional Weekly Plan provenance rather
+/// than making §19 a duplicate of the week-specific T&L Resources column.
 model CourseSpecResource {
   id           String     @default(uuid())
   courseSpecId String
   courseSpec   CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   order        Int
-  weekId       String
+  // Legacy single-week provenance is retained for safe migration/backward compatibility.
+  weekId       String?
   resourceType String
+  kind         String     @default("requiredResource")
   title        String     @default("")
+  authors      String     @default("")
+  publisher    String     @default("")
+  year         String     @default("")
+  isbn         String     @default("")
   url          String     @default("")
+  basedOn      String     @default("")
   notes        String     @default("")
+  evidenceWeekIds String[] @default([])
 
   @@id([courseSpecId, id])
   @@index([courseSpecId, weekId])
+}
+
+/// §20 References / Textbooks and Other Teaching & Learning Materials.
+/// One normalized row per reference/material so the AUN document can distinguish
+/// required references, recommended readings, and other teaching materials.
+model CourseSpecReference {
+  id           String     @default(uuid())
+  courseSpecId String
+  courseSpec   CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order        Int
+  kind         String
+  title        String
+  authors      String     @default("")
+  publisher    String     @default("")
+  year         String     @default("")
+  isbn         String     @default("")
+  url          String     @default("")
+  basedOn      String     @default("")
+  notes        String     @default("")
+
+  @@id([courseSpecId, id])
+  @@index([courseSpecId, kind])
 }
 
 /// Course Offerings plugin — a course delivered in a given term, with an assigned

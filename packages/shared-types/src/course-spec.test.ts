@@ -7,6 +7,7 @@ import {
   cloFocusPercent,
   WeeklyPlanSection,
   ResourcesSection,
+  ReferencesSection,
   SPEC_SECTION_SCHEMAS,
   weekContactHours,
   weekSlt,
@@ -485,4 +486,28 @@ test("ResourcesSection accepts week resource material links", () => {
     ],
   });
   expect(parsed.items[0]?.notes).toBe("");
+});
+
+
+test("resources are registered as a completable §19 section and support evidence week provenance", () => {
+  expect(SPEC_SECTION_SCHEMAS.resources).toBe(ResourcesSection);
+  const parsed = ResourcesSection.parse({
+    items: [
+      {
+        id: "resource-1",
+        kind: "requiredResource",
+        resourceType: "software",
+        title: "Python",
+        evidenceWeekIds: ["week-1", "week-3"],
+      },
+    ],
+  });
+  expect(parsed.items[0]?.evidenceWeekIds).toEqual(["week-1", "week-3"]);
+  expect(COMPLETABLE_SPEC_SECTIONS.some((section) => section.id === "resources")).toBe(true);
+  expect(COMPLETABLE_SPEC_SECTIONS.some((section) => section.id === "references")).toBe(false);
+});
+
+
+test("ReferencesSection accepts a required textbook", () => {
+  expect(ReferencesSection.parse({ items: [{ id: "r1", kind: "required", title: "ISLR", authors: "James et al.", publisher: "Springer", year: "2023", isbn: "978-3031387467" }] }).items).toHaveLength(1);
 });
