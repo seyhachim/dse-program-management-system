@@ -113,6 +113,7 @@ function ProgrammeProfilePage({ document }: { document: CourseDocumentModel }) {
           src="/rupp-logo.png"
           alt="Royal University of Phnom Penh"
           className="absolute left-0 top-0 h-[86px] w-[86px] object-contain"
+          style={{ width: "86px", height: "86px", maxWidth: "86px", maxHeight: "86px", objectFit: "contain", display: "block" }}
         />
         <p className="text-[12px] font-bold leading-[1.15]">Royal University of Phnom Penh</p>
         <p className="text-[11px] font-bold leading-[1.15]">Faculty of Engineering</p>
