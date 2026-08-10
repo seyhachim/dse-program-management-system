@@ -116,6 +116,11 @@ export const COURSE_DOCUMENT_STYLE = {
     link: "#0563C1",
   },
 
+  // Backward-compatible aliases for existing renderers. These remain part of
+  // the same configuration until the preview/export consumers are migrated.
+  labelBackground: "#E2EEDB",
+  borderColor: "#000000",
+
   fontSize: {
     body: 10,
     small: 9,
