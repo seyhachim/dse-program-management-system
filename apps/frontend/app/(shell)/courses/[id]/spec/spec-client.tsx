@@ -619,20 +619,21 @@ export function SpecClient({ courseId }: { courseId: string }) {
             <div className="rounded-xl border border-border bg-card p-1.5 shadow-sm">
               <TabsList
                 variant="line"
-                className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0"
+                className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {TABS.map((t) => (
                   <TabsTrigger
                     key={t.id}
                     value={t.id}
                     className="
-          shrink-0 rounded-lg px-3 py-2 text-sm font-medium
-          text-muted-foreground transition-all
-          hover:bg-muted/60 hover:text-foreground
-          data-[state=active]:bg-primary
-          data-[state=active]:text-primary-foreground
-          data-[state=active]:shadow-sm
-        "
+                      shrink-0 rounded-lg px-3 py-2 text-sm font-medium
+                      text-muted-foreground transition-all duration-200
+                      hover:bg-muted/60 hover:text-foreground
+                      data-[state=active]:bg-primary
+                      data-[state=active]:text-primary-foreground
+                      data-[state=active]:font-semibold
+                      data-[state=active]:shadow-sm
+                    "
                   >
                     {t.label}
                   </TabsTrigger>
