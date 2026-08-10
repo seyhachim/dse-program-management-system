@@ -234,15 +234,15 @@ async function programmeProfileTable(document: CourseDocumentModel) {
     row(
       programmeProfileCell("PROGRAM VISION:", [
         compactParagraph(profile.vision || "—", false, 18),
-      ]),
-      programmeProfileCell("PROGRAM MISSION", mission),
+      ], 34),
+      programmeProfileCell("PROGRAM MISSION", mission, 66),
     ),
     row(
       programmeProfileCell("PROGRAM GOALS", [
         compactParagraph("Our program aims to:", false, 18),
         ...goals,
-      ]),
-      programmeProfileCell("PROGRAM EDUCATIONAL PHILOSOPHY", philosophy),
+      ], 34),
+      programmeProfileCell("PROGRAM EDUCATIONAL PHILOSOPHY", philosophy, 66),
     ),
     row(
       new TableCell({
