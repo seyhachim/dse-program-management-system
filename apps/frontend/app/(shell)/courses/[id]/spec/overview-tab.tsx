@@ -64,8 +64,14 @@ export function OverviewTab({
           <CardHeader
             title="Course Information"
             action={
-              <Button variant="outline" size="sm" onClick={onEditCourseInfo} disabled={readOnly}>
-                <Pencil className="mr-1 h-3.5 w-3.5" /> {readOnly ? "Read-only" : "Edit"}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onEditCourseInfo}
+                disabled={readOnly}
+              >
+                <Pencil className="mr-1 h-3.5 w-3.5" />{" "}
+                {readOnly ? "Read-only" : "Edit"}
               </Button>
             }
           />
@@ -162,11 +168,18 @@ export function OverviewTab({
           ) : (
             <ul className="space-y-2">
               {clos.slice(0, 5).map((clo) => (
-                <li key={clo.code} className="flex gap-3 text-sm">
-                  <span className="mt-0.5 shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
+                <li key={clo.code} className="flex items-start gap-3 text-sm">
+                  <span
+                    className="
+          mt-0.5 inline-flex min-w-12 shrink-0 items-center justify-center
+          rounded-full bg-accent px-2.5 py-1
+          text-xs font-semibold leading-none text-accent-foreground
+        "
+                  >
                     {clo.code}
                   </span>
-                  <span className="text-foreground">
+
+                  <span className="min-w-0 flex-1 leading-5 text-foreground">
                     {clo.description || "—"}
                   </span>
                 </li>
