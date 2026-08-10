@@ -504,7 +504,7 @@ function Field({
   return (
     <div className={full ? "sm:col-span-2" : undefined}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-foreground">
+      <dd className="mt-1.5 text-foreground">
         {value || <span className="text-muted-foreground">—</span>}
       </dd>
     </div>
