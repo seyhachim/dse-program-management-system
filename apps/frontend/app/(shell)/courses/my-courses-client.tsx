@@ -14,8 +14,8 @@ import {
   type Semester,
 } from "@dse-pms/shared-types";
 import {
-  CompletionRing,
   DataTable,
+  Progress,
   Input,
   Select,
   SelectContent,
@@ -44,8 +44,19 @@ interface MyCourseRow {
 
 /** Fallback progress when a course has no spec-progress entry yet (shouldn't happen — every
  * course in scope gets one from listSpecProgress — but keeps the join total). */
-function emptyProgress(courseId: string, code: string, title: string): CourseSpecProgress {
-  return { courseId, code, title, completed: 0, total: 0, incompleteSections: [] };
+function emptyProgress(
+  courseId: string,
+  code: string,
+  title: string,
+): CourseSpecProgress {
+  return {
+    courseId,
+    code,
+    title,
+    completed: 0,
+    total: 0,
+    incompleteSections: [],
+  };
 }
 
 /**
@@ -72,11 +83,16 @@ export function MyCoursesClient() {
     setLoading(true);
     setError(null);
     try {
-      const [offeringsRes, progressRes] = await Promise.all([offeringsApi.list(), coursesApi.specProgress()]);
+      const [offeringsRes, progressRes] = await Promise.all([
+        offeringsApi.list(),
+        coursesApi.specProgress(),
+      ]);
       setOfferings(offeringsRes);
       setSpecProgress(progressRes);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load your courses");
+      setError(
+        err instanceof ApiError ? err.message : "Failed to load your courses",
+      );
     } finally {
       setLoading(false);
     }
@@ -86,7 +102,10 @@ export function MyCoursesClient() {
     load();
   }, [load]);
 
-  const progressByCourse = useMemo(() => new Map(specProgress.map((p) => [p.courseId, p])), [specProgress]);
+  const progressByCourse = useMemo(
+    () => new Map(specProgress.map((p) => [p.courseId, p])),
+    [specProgress],
+  );
 
   const rows: MyCourseRow[] = useMemo(() => {
     if (!me) return [];
@@ -94,8 +113,11 @@ export function MyCoursesClient() {
       .filter((o) => o.course != null)
       .map((o) => {
         const course = o.course!;
-        const role: MyCourseRow["role"] = o.lecturer?.id === me.id ? "Primary" : "Co-Lecturer";
-        const progress = progressByCourse.get(course.id) ?? emptyProgress(course.id, course.code, course.title);
+        const role: MyCourseRow["role"] =
+          o.lecturer?.id === me.id ? "Primary" : "Co-Lecturer";
+        const progress =
+          progressByCourse.get(course.id) ??
+          emptyProgress(course.id, course.code, course.title);
         return { offering: o, role, progress };
       });
   }, [offerings, progressByCourse, me]);
@@ -104,18 +126,29 @@ export function MyCoursesClient() {
   // field exists in the schema, so `term` (the existing period field) doubles as
   // the Academic Year filter, per issue #104's "use existing academic-period/term
   // fields" constraint.
-  const terms = useMemo(() => [...new Set(offerings.map((o) => o.term))].sort().reverse(), [offerings]);
+  const terms = useMemo(
+    () => [...new Set(offerings.map((o) => o.term))].sort().reverse(),
+    [offerings],
+  );
   const studyYears = useMemo(
-    () => [...new Set(offerings.map((o) => o.programmeYear).filter((y): y is number => y != null))].sort(
-      (a, b) => a - b,
-    ),
+    () =>
+      [
+        ...new Set(
+          offerings
+            .map((o) => o.programmeYear)
+            .filter((y): y is number => y != null),
+        ),
+      ].sort((a, b) => a - b),
     [offerings],
   );
 
   // base-ui's <Select.Value> renders the raw `value` unless the Root gets an
   // `items` map (value -> label) — without it the trigger shows the ALL
   // sentinel literally instead of "All".
-  const termItems: Record<string, string> = { [ALL]: "All", ...Object.fromEntries(terms.map((t) => [t, t])) };
+  const termItems: Record<string, string> = {
+    [ALL]: "All",
+    ...Object.fromEntries(terms.map((t) => [t, t])),
+  };
   const semesterItems: Record<string, string> = {
     [ALL]: "All",
     ...Object.fromEntries(SEMESTERS.map((s) => [s, semesterLabel(s)])),
@@ -128,13 +161,61 @@ export function MyCoursesClient() {
   const filtered = rows.filter((r) => {
     if (term !== ALL && r.offering.term !== term) return false;
     if (semester !== ALL && r.offering.semester !== semester) return false;
-    if (studyYear !== ALL && String(r.offering.programmeYear ?? "") !== studyYear) return false;
+    if (
+      studyYear !== ALL &&
+      String(r.offering.programmeYear ?? "") !== studyYear
+    )
+      return false;
     if (search) {
       const q = search.trim().toLowerCase();
-      const haystack = `${r.offering.course?.code ?? ""} ${r.offering.course?.title ?? ""}`.toLowerCase();
+      const haystack =
+        `${r.offering.course?.code ?? ""} ${r.offering.course?.title ?? ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
     }
     return true;
+  });
+
+  // Keep the existing course rows, but order them by study year so DataTable's
+  // group headers produce stable Year 1 → Year 6 clusters. Offerings without a
+  // programme year are kept at the end rather than being assigned to a year.
+  const groupedRows = [...filtered].sort((a, b) => {
+    // 1. Study Year
+    const yearA = a.offering.programmeYear;
+    const yearB = b.offering.programmeYear;
+
+    if (yearA == null && yearB == null) {
+      // 2. Semester for courses without a study year
+      const semesterOrder: Record<string, number> = {
+        First: 1,
+        Second: 2,
+      };
+
+      const semesterA = semesterOrder[a.offering.semester ?? ""] ?? 99;
+      const semesterB = semesterOrder[b.offering.semester ?? ""] ?? 99;
+
+      if (semesterA !== semesterB) return semesterA - semesterB;
+
+      return a.offering.course!.code.localeCompare(b.offering.course!.code);
+    }
+
+    if (yearA == null) return 1;
+    if (yearB == null) return -1;
+
+    if (yearA !== yearB) return yearA - yearB;
+
+    // 2. Semester
+    const semesterOrder: Record<string, number> = {
+      First: 1,
+      Second: 2,
+    };
+
+    const semesterA = semesterOrder[a.offering.semester ?? ""] ?? 99;
+    const semesterB = semesterOrder[b.offering.semester ?? ""] ?? 99;
+
+    if (semesterA !== semesterB) return semesterA - semesterB;
+
+    // 3. Course Code
+    return a.offering.course!.code.localeCompare(b.offering.course!.code);
   });
 
   const columns: DataTableColumn<MyCourseRow>[] = [
@@ -143,8 +224,12 @@ export function MyCoursesClient() {
       header: "Course",
       render: (r) => (
         <div>
-          <div className="font-medium text-foreground">{r.offering.course?.code}</div>
-          <div className="text-xs text-muted-foreground">{r.offering.course?.title}</div>
+          <div className="font-medium text-foreground">
+            {r.offering.course?.code}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {r.offering.course?.title}
+          </div>
         </div>
       ),
     },
@@ -156,8 +241,12 @@ export function MyCoursesClient() {
           <div className="text-foreground">{r.offering.term}</div>
           {r.offering.programmeYear != null || r.offering.semester ? (
             <div className="text-xs text-muted-foreground">
-              {r.offering.programmeYear != null ? `Year ${r.offering.programmeYear}` : ""}
-              {r.offering.programmeYear != null && r.offering.semester ? " · " : ""}
+              {r.offering.programmeYear != null
+                ? `Year ${r.offering.programmeYear}`
+                : ""}
+              {r.offering.programmeYear != null && r.offering.semester
+                ? " · "
+                : ""}
               {r.offering.semester ? semesterLabel(r.offering.semester) : ""}
             </div>
           ) : null}
@@ -169,7 +258,13 @@ export function MyCoursesClient() {
       header: "Role",
       render: (r) => (
         <div>
-          <div className={r.role === "Primary" ? "font-medium text-status-tournament" : "font-medium text-primary"}>
+          <div
+            className={
+              r.role === "Primary"
+                ? "font-medium text-status-tournament"
+                : "font-medium text-primary"
+            }
+          >
             {r.role}
           </div>
           <div className="text-xs text-muted-foreground">Lecturer</div>
@@ -180,7 +275,13 @@ export function MyCoursesClient() {
       key: "students",
       header: "Students",
       render: (r) => (
-        <span className={r.offering.enrolledCount >= r.offering.capacity ? "font-medium text-warning" : undefined}>
+        <span
+          className={
+            r.offering.enrolledCount >= r.offering.capacity
+              ? "font-medium text-warning"
+              : undefined
+          }
+        >
           {r.offering.enrolledCount} / {r.offering.capacity}
         </span>
       ),
@@ -203,7 +304,11 @@ export function MyCoursesClient() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Academic Year">
-            <Select items={termItems} value={term} onValueChange={(v) => setTerm(v ?? ALL)}>
+            <Select
+              items={termItems}
+              value={term}
+              onValueChange={(v) => setTerm(v ?? ALL)}
+            >
               <SelectTrigger className="w-36">
                 <SelectValue />
               </SelectTrigger>
@@ -221,7 +326,9 @@ export function MyCoursesClient() {
             <Select
               items={semesterItems}
               value={semester}
-              onValueChange={(v) => setSemester((v ?? ALL) as Semester | typeof ALL)}
+              onValueChange={(v) =>
+                setSemester((v ?? ALL) as Semester | typeof ALL)
+              }
             >
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -237,7 +344,11 @@ export function MyCoursesClient() {
             </Select>
           </Field>
           <Field label="Study Year">
-            <Select items={studyYearItems} value={studyYear} onValueChange={(v) => setStudyYear(v ?? ALL)}>
+            <Select
+              items={studyYearItems}
+              value={studyYear}
+              onValueChange={(v) => setStudyYear(v ?? ALL)}
+            >
               <SelectTrigger className="w-28">
                 <SelectValue />
               </SelectTrigger>
@@ -270,13 +381,19 @@ export function MyCoursesClient() {
 
         <DataTable
           columns={columns}
-          rows={filtered}
+          rows={groupedRows}
           getRowId={(r) => r.offering.id}
+          groupBy={(r) =>
+            r.offering.programmeYear != null
+              ? `Year ${r.offering.programmeYear}`
+              : "Study year not set"
+          }
           actions={[
             {
               key: "manage",
               label: "Manage",
-              onClick: (r) => router.push(`/courses/${r.offering.course!.id}/spec`),
+              onClick: (r) =>
+                router.push(`/courses/${r.offering.course!.id}/spec`),
             },
           ]}
           loading={loading}
@@ -289,7 +406,13 @@ export function MyCoursesClient() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -304,11 +427,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function SpecStatusCell({ progress }: { progress: CourseSpecProgress }) {
   const percent = specCompletionPercent(progress);
   const label = specCompletionLabel(progress);
-  const color = label === "Complete" ? "var(--success)" : label === "In progress" ? "var(--warning)" : "var(--inactive)";
+
+  const indicatorClassName =
+    label === "Complete"
+      ? "!bg-[var(--success)]"
+      : label === "In progress"
+        ? "!bg-[var(--warning)]"
+        : "!bg-[var(--inactive)]";
+
   return (
-    <div className="flex flex-col items-center gap-1">
-      <CompletionRing value={percent} size={56} strokeWidth={6} color={color} showLabel={false} />
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="mx-auto flex w-24 flex-col gap-1">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium tabular-nums text-foreground">
+          {percent}%
+        </span>
+      </div>
+      <Progress
+        value={percent}
+        className="w-full"
+        indicatorClassName={indicatorClassName}
+      />
     </div>
   );
 }
@@ -325,7 +464,9 @@ function AttentionCell({ progress }: { progress: CourseSpecProgress }) {
         <CheckCircle2 className="h-4 w-4 shrink-0" />
         <span className="flex flex-col leading-tight">
           <span>Up to date</span>
-          <span className="text-xs font-normal text-muted-foreground">All good</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            All good
+          </span>
         </span>
       </span>
     );
@@ -333,18 +474,24 @@ function AttentionCell({ progress }: { progress: CourseSpecProgress }) {
 
   const critical = attention.level === "needsAttention";
   const count = attention.items.length;
-  const label = critical ? "Needs attention" : `${count} item${count === 1 ? "" : "s"}`;
+  const label = critical
+    ? "Needs attention"
+    : `${count} item${count === 1 ? "" : "s"}`;
   const sub = critical ? "No content yet" : "Need attention";
   const Icon = critical ? AlertCircle : AlertTriangle;
   const tone = critical ? "text-error" : "text-warning";
 
   return (
     <Tooltip>
-      <TooltipTrigger className={`inline-flex items-center gap-1.5 text-sm font-medium ${tone}`}>
+      <TooltipTrigger
+        className={`inline-flex items-center gap-1.5 text-sm font-medium ${tone}`}
+      >
         <Icon className="h-4 w-4 shrink-0" />
         <span className="flex flex-col items-start leading-tight">
           <span>{label}</span>
-          <span className="text-xs font-normal text-muted-foreground">{sub}</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            {sub}
+          </span>
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" align="start" className="inline-block w-max">
@@ -375,24 +522,30 @@ function AttentionLegend() {
           i
         </span>
         <span>
-          Course Spec shows the completion of required Course Specification sections. Attention highlights items
-          that require your action.
+          Course Spec shows the completion of required Course Specification
+          sections. Attention highlights items that require your action.
         </span>
       </div>
       <div className="flex items-center gap-1.5 text-success">
         <CheckCircle2 className="h-4 w-4" />
         <span className="font-medium">Up to date</span>
-        <span className="text-muted-foreground">— All required items are complete</span>
+        <span className="text-muted-foreground">
+          — All required items are complete
+        </span>
       </div>
       <div className="flex items-center gap-1.5 text-warning">
         <AlertTriangle className="h-4 w-4" />
         <span className="font-medium">Need attention</span>
-        <span className="text-muted-foreground">— Some items are incomplete</span>
+        <span className="text-muted-foreground">
+          — Some items are incomplete
+        </span>
       </div>
       <div className="flex items-center gap-1.5 text-error">
         <AlertCircle className="h-4 w-4" />
         <span className="font-medium">Needs attention</span>
-        <span className="text-muted-foreground">— Critical items are missing</span>
+        <span className="text-muted-foreground">
+          — Critical items are missing
+        </span>
       </div>
     </div>
   );
