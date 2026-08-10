@@ -22,11 +22,12 @@ import {
 } from "./course-document-model";
 
 const FONT = COURSE_DOCUMENT_STYLE.fontFamily;
-const BODY = 18;
-const SMALL = 16;
-const HEADING = 24;
-const BORDER = "000000";
+const BODY = COURSE_DOCUMENT_STYLE.fontSize.body * 2;
+const SMALL = COURSE_DOCUMENT_STYLE.fontSize.small * 2;
+const HEADING = COURSE_DOCUMENT_STYLE.fontSize.heading * 2;
+const BORDER = COURSE_DOCUMENT_STYLE.borderColor.replace("#", "");
 const LABEL = COURSE_DOCUMENT_STYLE.labelBackground.replace("#", "");
+const TABLE_HEADER = COURSE_DOCUMENT_STYLE.colors.tableHeaderBackground.replace("#", "");
 
 const borders = {
   top: { style: BorderStyle.SINGLE, size: 4, color: BORDER },
@@ -37,13 +38,22 @@ const borders = {
   insideVertical: { style: BorderStyle.SINGLE, size: 4, color: BORDER },
 };
 
+const noBorders = {
+  top: { style: BorderStyle.NONE, size: 0, color: BORDER },
+  bottom: { style: BorderStyle.NONE, size: 0, color: BORDER },
+  left: { style: BorderStyle.NONE, size: 0, color: BORDER },
+  right: { style: BorderStyle.NONE, size: 0, color: BORDER },
+  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: BORDER },
+  insideVertical: { style: BorderStyle.NONE, size: 0, color: BORDER },
+};
+
 function text(text: string, bold = false, size = BODY) {
   return new TextRun({ text, bold, font: FONT, size });
 }
 
 function paragraph(value: string, bold = false, size = BODY) {
   return new Paragraph({
-    spacing: { before: 0, after: 60, line: 240 },
+    spacing: { before: 0, after: 40, line: 220 },
     children: [text(value, bold, size)],
   });
 }
@@ -51,14 +61,14 @@ function paragraph(value: string, bold = false, size = BODY) {
 function centered(value: string, bold = false, size = BODY) {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 40 },
+    spacing: { before: 0, after: 20 },
     children: [text(value, bold, size)],
   });
 }
 
 function sectionTitle(number: string, title: string) {
   return new Paragraph({
-    spacing: { before: 120, after: 100 },
+    spacing: { before: 80, after: 80 },
     children: [text(`${number}. ${title}`, true, HEADING)],
   });
 }
@@ -73,13 +83,18 @@ function cell(
       : undefined,
     shading: options?.shade ? { fill: options.shade } : undefined,
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 70, bottom: 70, left: 90, right: 90 },
+    margins: {
+      top: 55,
+      bottom: 55,
+      left: 70,
+      right: 70,
+    },
     children: [paragraph(value || "—", options?.bold ?? false, SMALL)],
   });
 }
 
 function headerCell(value: string) {
-  return cell(value, { bold: true, shade: "F2F2F2" });
+  return cell(value, { bold: true, shade: TABLE_HEADER });
 }
 
 function table(rows: TableRow[]) {
@@ -95,9 +110,9 @@ function values(items: string[]) {
   return items.length ? items.join(", ") : "—";
 }
 
-function compactParagraph(value: string, bold = false, size = 15) {
+function compactParagraph(value: string, bold = false, size = 18) {
   return new Paragraph({
-    spacing: { before: 0, after: 35, line: 210 },
+    spacing: { before: 0, after: 18, line: 220 },
     children: [text(value, bold, size)],
   });
 }
@@ -110,8 +125,16 @@ function programmeProfileCell(
   return new TableCell({
     columnSpan,
     verticalAlign: VerticalAlign.TOP,
-    margins: { top: 70, bottom: 70, left: 90, right: 90 },
-    children: [compactParagraph(title, true, 17), ...children],
+    margins: {
+      top: 45,
+      bottom: 45,
+      left: 70,
+      right: 70,
+    },
+    children: [
+      compactParagraph(title, true, 20),
+      ...children,
+    ],
   });
 }
 
@@ -124,14 +147,7 @@ async function programmeProfileHeader(document: CourseDocumentModel) {
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     layout: TableLayoutType.FIXED,
-    borders: {
-      top: { style: BorderStyle.NONE, size: 0, color: BORDER },
-      bottom: { style: BorderStyle.NONE, size: 0, color: BORDER },
-      left: { style: BorderStyle.NONE, size: 0, color: BORDER },
-      right: { style: BorderStyle.NONE, size: 0, color: BORDER },
-      insideHorizontal: { style: BorderStyle.NONE, size: 0, color: BORDER },
-      insideVertical: { style: BorderStyle.NONE, size: 0, color: BORDER },
-    },
+    borders: noBorders,
     rows: [
       new TableRow({
         children: [
@@ -141,6 +157,7 @@ async function programmeProfileHeader(document: CourseDocumentModel) {
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
             children: [
               new Paragraph({
+                spacing: { before: 0, after: 0 },
                 children: [
                   new ImageRun({
                     data: logo,
@@ -155,7 +172,7 @@ async function programmeProfileHeader(document: CourseDocumentModel) {
             ],
           }),
           new TableCell({
-            width: { size: 84, type: WidthType.PERCENTAGE },
+            width: { size: 68, type: WidthType.PERCENTAGE },
             verticalAlign: VerticalAlign.TOP,
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
             children: [
@@ -167,8 +184,14 @@ async function programmeProfileHeader(document: CourseDocumentModel) {
                 19,
               ),
               centered(document.courseInformation.programmeTitle, true, 19),
-              centered("Course Specification", true, 27),
+              centered("Course Specification", true, 28),
             ],
+          }),
+          new TableCell({
+            width: { size: 16, type: WidthType.PERCENTAGE },
+            verticalAlign: VerticalAlign.TOP,
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            children: [new Paragraph({ children: [] })],
           }),
         ],
       }),
@@ -182,41 +205,41 @@ async function programmeProfileTable(document: CourseDocumentModel) {
 
   const mission = profile.mission.length
     ? profile.mission.map((item, index) =>
-        compactParagraph(`Mission ${index + 1}: ${item}`, false, 15),
+        compactParagraph(`Mission ${index + 1}: ${item}`, false, 18),
       )
-    : [compactParagraph("—", false, 15)];
+    : [compactParagraph("—", false, 18)];
   const goals = profile.goals.length
-    ? profile.goals.map((item) => compactParagraph(`• ${item}`, false, 15))
-    : [compactParagraph("• —", false, 15)];
+    ? profile.goals.map((item) => compactParagraph(`• ${item}`, false, 18))
+    : [compactParagraph("• —", false, 18)];
   const philosophy = profile.educationalPhilosophy.length
     ? profile.educationalPhilosophy.map((item) =>
         compactParagraph(
           `• ${item.code}: ${item.title}: ${item.description}`,
           false,
-          14,
+          17,
         ),
       )
-    : [compactParagraph("• —", false, 14)];
+    : [compactParagraph("• —", false, 17)];
   const peos = profile.peos.length
     ? profile.peos.map((item) =>
         compactParagraph(
           `• ${item.code}: ${item.title}: ${item.description}`,
           false,
-          15,
+          18,
         ),
       )
-    : [compactParagraph("• —", false, 15)];
+    : [compactParagraph("• —", false, 18)];
 
   return table([
     row(
       programmeProfileCell("PROGRAM VISION:", [
-        compactParagraph(profile.vision || "—", false, 16),
+        compactParagraph(profile.vision || "—", false, 18),
       ]),
       programmeProfileCell("PROGRAM MISSION", mission),
     ),
     row(
       programmeProfileCell("PROGRAM GOALS", [
-        compactParagraph("Our program aims to:", false, 15),
+        compactParagraph("Our program aims to:", false, 18),
         ...goals,
       ]),
       programmeProfileCell("PROGRAM EDUCATIONAL PHILOSOPHY", philosophy),
@@ -225,13 +248,13 @@ async function programmeProfileTable(document: CourseDocumentModel) {
       new TableCell({
         columnSpan: 2,
         verticalAlign: VerticalAlign.TOP,
-        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+        margins: { top: 45, bottom: 45, left: 70, right: 70 },
         children: [
-          compactParagraph("PROGRAM EDUCATIONAL OBJECTIVES (PEOs)", true, 17),
+          compactParagraph("PROGRAM EDUCATIONAL OBJECTIVES (PEOs)", true, 20),
           compactParagraph(
             "What graduates are expected to achieve within 3–5 years of graduation:",
             false,
-            15,
+            18,
           ),
           ...peos,
         ],
@@ -452,10 +475,10 @@ function rubricCell(assessment: CourseDocumentModel["assessments"][number]) {
 
   return new TableCell({
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 70, bottom: 70, left: 90, right: 90 },
+    margins: { top: 55, bottom: 55, left: 70, right: 70 },
     children: [
       new Paragraph({
-        spacing: { before: 0, after: 60, line: 240 },
+        spacing: { before: 0, after: 40, line: 220 },
         children: [
           new ExternalHyperlink({
             link: href,
@@ -464,7 +487,7 @@ function rubricCell(assessment: CourseDocumentModel["assessments"][number]) {
                 text: `${assessment.rubricName} ↗`,
                 font: FONT,
                 size: SMALL,
-                color: "0563C1",
+                color: COURSE_DOCUMENT_STYLE.colors.link.replace("#", ""),
                 underline: { type: "single" },
               }),
             ],
@@ -577,9 +600,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   const children: (Paragraph | Table)[] = [];
   const info = document.courseInformation;
 
+  // Page 1 is the fixed programme-profile cover layout. Content still comes
+  // exclusively from the existing DSE PMS document model.
   children.push(await programmeProfileHeader(document));
   children.push(
-    centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 22),
+    centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 24),
   );
   children.push(await programmeProfileTable(document));
 
@@ -657,8 +682,16 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
       {
         properties: {
           page: {
-            size: { width: 11906, height: 8391 },
-            margin: { top: 720, bottom: 720, left: 900, right: 900 },
+            size: {
+              width: COURSE_DOCUMENT_STYLE.page.word.widthTwips,
+              height: COURSE_DOCUMENT_STYLE.page.word.heightTwips,
+            },
+            margin: {
+              top: COURSE_DOCUMENT_STYLE.page.word.marginTopTwips,
+              bottom: COURSE_DOCUMENT_STYLE.page.word.marginBottomTwips,
+              left: COURSE_DOCUMENT_STYLE.page.word.marginLeftTwips,
+              right: COURSE_DOCUMENT_STYLE.page.word.marginRightTwips,
+            },
           },
         },
         children,
