@@ -7,7 +7,6 @@ import {
   type Rubric,
 } from "@dse-pms/shared-types";
 
-
 import type { CourseInfoForm } from "./course-info-section";
 import type { CloForm } from "./clo-model";
 import { weekContactHoursForm, weekSltForm, type WeeklyPlanForm } from "./weekly-plan-model";
@@ -100,10 +99,79 @@ export type CourseDocumentModel = {
   };
 };
 
+/**
+ * Single source of truth for Course Specification presentation.
+ *
+ * Keep content/data decisions out of this object. It only controls how the
+ * same CourseDocumentModel is presented in the browser preview and Word export.
+ * Font sizes are expressed in points so both renderers use the same unit.
+ */
 export const COURSE_DOCUMENT_STYLE = {
-  labelBackground: "#E2EEDB",
-  borderColor: "#000000",
   fontFamily: "Arial",
+
+  colors: {
+    labelBackground: "#E2EEDB",
+    tableHeaderBackground: "#F2F2F2",
+    border: "#000000",
+    link: "#0563C1",
+  },
+
+  fontSize: {
+    body: 10,
+    small: 9,
+    compact: 8,
+    heading: 14,
+    title: 16,
+    institution: 11,
+    faculty: 10,
+    programme: 10,
+    footer: 8,
+    profileBody: 9,
+    profileHeading: 11,
+  },
+
+  lineHeight: {
+    body: 1.3,
+    compact: 1.25,
+    profile: 1.25,
+  },
+
+  spacing: {
+    paragraphAfterPt: 3,
+    centeredAfterPt: 2,
+    sectionBeforePt: 6,
+    sectionAfterPt: 5,
+    tableCellVerticalPt: 3.5,
+    tableCellHorizontalPt: 4.5,
+  },
+
+  page: {
+    orientation: "landscape",
+    preview: {
+      width: 1123,
+      height: 794,
+      paddingX: 54,
+      paddingY: 42,
+      programmePaddingX: 62,
+      programmePaddingY: 30,
+      footerBottom: 24,
+      footerHorizontal: 54,
+    },
+    word: {
+      widthTwips: 11906,
+      heightTwips: 8391,
+      marginTopTwips: 720,
+      marginBottomTwips: 720,
+      marginLeftTwips: 900,
+      marginRightTwips: 900,
+    },
+  },
+
+  logo: {
+    width: 86,
+    height: 86,
+  },
+
   title: "COURSE SPECIFICATION",
   partTitle: "PART 2: COURSE DETAILS",
   courseInfoTitle: "Course Information",
