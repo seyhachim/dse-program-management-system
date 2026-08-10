@@ -111,7 +111,7 @@ export type CourseDocumentModel = {
  * Font sizes are expressed in points so both renderers use the same unit.
  */
 export const COURSE_DOCUMENT_STYLE = {
-  fontFamily: "Arial",
+  fontFamily: "Times New Roman",
 
   colors: {
     labelBackground: "#E2EEDB",
@@ -120,8 +120,7 @@ export const COURSE_DOCUMENT_STYLE = {
     link: "#0563C1",
   },
 
-  // Backward-compatible aliases for existing renderers. These remain part of
-  // the same configuration until the preview/export consumers are migrated.
+  // Backward-compatible aliases for existing renderers.
   labelBackground: "#E2EEDB",
   borderColor: "#000000",
 
@@ -130,28 +129,28 @@ export const COURSE_DOCUMENT_STYLE = {
     small: 9,
     compact: 8,
     heading: 14,
-    title: 16,
+    title: 14,
     institution: 11,
     faculty: 10,
     programme: 10,
     footer: 8,
     profileBody: 9,
-    profileHeading: 11,
+    profileHeading: 10,
   },
 
   lineHeight: {
-    body: 1.3,
-    compact: 1.25,
-    profile: 1.25,
+    body: 1.25,
+    compact: 1.2,
+    profile: 1.2,
   },
 
   spacing: {
-    paragraphAfterPt: 3,
-    centeredAfterPt: 2,
-    sectionBeforePt: 6,
-    sectionAfterPt: 5,
-    tableCellVerticalPt: 3.5,
-    tableCellHorizontalPt: 4.5,
+    paragraphAfterPt: 2,
+    centeredAfterPt: 1,
+    sectionBeforePt: 4,
+    sectionAfterPt: 4,
+    tableCellVerticalPt: 3,
+    tableCellHorizontalPt: 4,
   },
 
   page: {
@@ -161,24 +160,24 @@ export const COURSE_DOCUMENT_STYLE = {
       height: 794,
       paddingX: 54,
       paddingY: 42,
-      programmePaddingX: 62,
-      programmePaddingY: 30,
+      programmePaddingX: 54,
+      programmePaddingY: 42,
       footerBottom: 24,
       footerHorizontal: 54,
     },
     word: {
       widthTwips: 11906,
       heightTwips: 8391,
-      marginTopTwips: 720,
-      marginBottomTwips: 720,
-      marginLeftTwips: 900,
-      marginRightTwips: 900,
+      marginTopTwips: 650,
+      marginBottomTwips: 650,
+      marginLeftTwips: 800,
+      marginRightTwips: 800,
     },
   },
 
   logo: {
-    width: 48,
-    height: 48,
+    width: 90,
+    height: 90,
   },
 
   title: "COURSE SPECIFICATION",
