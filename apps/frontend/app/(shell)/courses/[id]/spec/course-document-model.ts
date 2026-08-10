@@ -9,7 +9,11 @@ import {
 
 import type { CourseInfoForm } from "./course-info-section";
 import type { CloForm } from "./clo-model";
-import { weekContactHoursForm, weekSltForm, type WeeklyPlanForm } from "./weekly-plan-model";
+import {
+  weekContactHoursForm,
+  weekSltForm,
+  type WeeklyPlanForm,
+} from "./weekly-plan-model";
 import type { AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 
@@ -173,8 +177,8 @@ export const COURSE_DOCUMENT_STYLE = {
   },
 
   logo: {
-    width: 86,
-    height: 86,
+    width: 48,
+    height: 48,
   },
 
   title: "COURSE SPECIFICATION",
@@ -195,11 +199,18 @@ type BuildCourseDocumentInput = {
   programme?: ProgrammeAcademicConfig | null;
 };
 
-type CourseType = "Basic" | "Core" | "Elective" | "Specialization" | "MoeysHeip";
+type CourseType =
+  | "Basic"
+  | "Core"
+  | "Elective"
+  | "Specialization"
+  | "MoeysHeip";
 type Semester = "First" | "Second";
 
 function isCourseType(value: string): value is CourseType {
-  return ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"].includes(value);
+  return ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"].includes(
+    value,
+  );
 }
 
 function isSemester(value: string): value is Semester {
@@ -267,8 +278,13 @@ export function buildCourseDocument({
       learningActivities:
         learningActivities.length > 0 ? learningActivities : week.activities,
       teachingMethods: methodNames(week.teachingMethodIds, teachingMethods),
-      activeLearningStrategies: week.studentLearningActivities.map((activity) => activity.title),
-      assessmentMethods: methodNames(week.assessmentMethodIds, assessmentMethods),
+      activeLearningStrategies: week.studentLearningActivities.map(
+        (activity) => activity.title,
+      ),
+      assessmentMethods: methodNames(
+        week.assessmentMethodIds,
+        assessmentMethods,
+      ),
       resources: week.teachingResourceTypes,
       lectureHours: week.lectureHours,
       tutorialHours: week.tutorialHours,
@@ -296,7 +312,8 @@ export function buildCourseDocument({
         assessment.mappedPlos.length > 0
           ? assessment.mappedPlos
           : assessment.cloCodes.flatMap(
-              (code) => activeClos.find((clo) => clo.code === code)?.mappedPlos ?? [],
+              (code) =>
+                activeClos.find((clo) => clo.code === code)?.mappedPlos ?? [],
             ),
       ),
       capLevels: unique(
@@ -311,7 +328,8 @@ export function buildCourseDocument({
       submissionMethod: assessment.submissionMethod,
       feedbackMethod: assessment.feedbackMethod,
       feedbackTimeline: assessment.feedbackTimeline,
-      evaluationDefinition: rubricById.get(assessment.rubric)?.description ?? "",
+      evaluationDefinition:
+        rubricById.get(assessment.rubric)?.description ?? "",
       rubricName: rubricById.get(assessment.rubric)?.name ?? "",
       rubricUrl: assessment.rubric
         ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
@@ -357,8 +375,12 @@ export function buildCourseDocument({
       email: courseInfo.email,
       telephone: courseInfo.telephone,
       otherLecturers: courseInfo.otherLecturers,
-      courseType: isCourseType(courseInfo.courseType) ? courseTypeLabel(courseInfo.courseType) : "",
-      semester: isSemester(courseInfo.semester) ? semesterLabel(courseInfo.semester) : "",
+      courseType: isCourseType(courseInfo.courseType)
+        ? courseTypeLabel(courseInfo.courseType)
+        : "",
+      semester: isSemester(courseInfo.semester)
+        ? semesterLabel(courseInfo.semester)
+        : "",
       programmeYear: courseInfo.programmeYear,
       description: courseInfo.description,
     },
