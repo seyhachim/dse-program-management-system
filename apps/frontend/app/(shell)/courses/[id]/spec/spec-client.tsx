@@ -207,13 +207,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [spec, methods, courseView, programmeConfig, rubricList] = await Promise.all([
-        courseSpecApi.get(courseId),
-        methodsApi.list(),
-        coursesApi.get(courseId),
-        api.get<ProgrammeAcademicConfig>("/api/programme"),
-        rubricsApi.list().catch(() => [] as Rubric[]),
-      ]);
+      const [spec, methods, courseView, programmeConfig, rubricList] =
+        await Promise.all([
+          courseSpecApi.get(courseId),
+          methodsApi.list(),
+          coursesApi.get(courseId),
+          api.get<ProgrammeAcademicConfig>("/api/programme"),
+          rubricsApi.list().catch(() => [] as Rubric[]),
+        ]);
       setCourseInfo(
         toCourseInfoForm(
           spec.data.courseInfo as Record<string, unknown> | undefined,
@@ -615,13 +616,29 @@ export function SpecClient({ courseId }: { courseId: string }) {
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as TabId)}
           >
-            <TabsList variant="line" className="w-full justify-start ">
-              {TABS.map((t) => (
-                <TabsTrigger key={t.id} value={t.id}>
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="rounded-xl border border-border bg-card p-1.5 shadow-sm">
+              <TabsList
+                variant="line"
+                className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0"
+              >
+                {TABS.map((t) => (
+                  <TabsTrigger
+                    key={t.id}
+                    value={t.id}
+                    className="
+          shrink-0 rounded-lg px-3 py-2 text-sm font-medium
+          text-muted-foreground transition-all
+          hover:bg-muted/60 hover:text-foreground
+          data-[state=active]:bg-primary
+          data-[state=active]:text-primary-foreground
+          data-[state=active]:shadow-sm
+        "
+                  >
+                    {t.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
 
             <TabsContent value="overview" className="mt-4">
               <OverviewTab
