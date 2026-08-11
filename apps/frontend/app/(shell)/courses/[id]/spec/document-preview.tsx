@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ChevronDown,
   Download,
   FileText,
   Loader2,
@@ -11,7 +12,13 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
-import { Button } from "@dse-pms/ui";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@dse-pms/ui";
 import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
@@ -52,11 +59,11 @@ function Page({
   const scaledHeight = PAGE_HEIGHT * zoom;
   return (
     <div
-      className="relative mx-auto"
+      className="relative mx-auto print:break-after-page print:last:break-after-auto"
       style={{ width: scaledWidth, height: scaledHeight + PAGE_GAP }}
     >
       <article
-        className="absolute left-0 top-0 overflow-hidden bg-white text-black shadow-md ring-1 ring-black/5"
+        className="absolute left-0 top-0 overflow-hidden bg-white text-black shadow-md ring-1 ring-black/5 lining-nums"
         style={{
           width: PAGE_WIDTH,
           height: PAGE_HEIGHT,
@@ -68,7 +75,7 @@ function Page({
         {children}
       </article>
       <div
-        className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground"
+        className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground print:hidden"
         style={{ top: scaledHeight + 8 }}
       >
         Page {pageNumber}
@@ -127,7 +134,7 @@ function ValueCell({
 function Checkbox({ checked }: { checked: boolean }) {
   return (
     <span
-      className="inline-block w-4 text-center font-serif"
+      className="inline-block w-4 text-center"
       aria-hidden="true"
     >
       {checked ? "☒" : "☐"}
@@ -165,7 +172,7 @@ function Table({
   return (
     <table
       className={[
-        "w-full table-fixed border-collapse font-serif text-[10px] leading-[1.3]",
+        "w-full table-fixed border-collapse text-[10px] leading-[1.3]",
         className,
       ].join(" ")}
     >
@@ -229,7 +236,7 @@ function SectionTitle({
   children: ReactNode;
 }) {
   return (
-    <h2 className="mb-3 font-serif text-[15px] font-bold">
+    <h2 className="mb-3 text-[15px] font-bold">
       {number}. {children}
     </h2>
   );
@@ -237,7 +244,7 @@ function SectionTitle({
 
 function PageHeader({ document }: { document: CourseDocumentModel }) {
   return (
-    <header className="mb-4 text-center font-serif">
+    <header className="mb-4 text-center">
       <p className="text-[11px] font-bold">Royal University of Phnom Penh</p>
       <p className="text-[10px]">Faculty of Engineering</p>
       <p className="text-[10px]">
@@ -259,7 +266,7 @@ function PageFooter({
   page: number;
 }) {
   return (
-    <div className="absolute bottom-[24px] left-[54px] right-[54px] flex justify-between border-t border-black pt-1 font-serif text-[8px]">
+    <div className="absolute bottom-[24px] left-[54px] right-[54px] flex justify-between border-t border-black pt-1 text-[8px]">
       <span>{courseCode || "Course Specification"}</span>
       <span>{page}</span>
     </div>
@@ -273,7 +280,7 @@ function ProgrammeProfilePage({ document }: { document: CourseDocumentModel }) {
 
   return (
     <div
-      className="h-full font-serif"
+      className="h-full"
       style={{
         paddingLeft: `${preview.programmePaddingX}px`,
         paddingRight: `${preview.programmePaddingX}px`,
@@ -284,8 +291,9 @@ function ProgrammeProfilePage({ document }: { document: CourseDocumentModel }) {
         <img
           src="/rupp-logo.png"
           alt="Royal University of Phnom Penh"
-          className="absolute left-0 top-0 object-contain"
+          className="absolute top-0 object-contain"
           style={{
+            left: `-${logo.width * 0.152}px`,
             width: `${logo.width}px`,
             height: `${logo.height}px`,
             maxWidth: `${logo.width}px`,
@@ -309,15 +317,14 @@ function ProgrammeProfilePage({ document }: { document: CourseDocumentModel }) {
         <p className="mt-2 text-[13px] font-bold">Course Specification</p>
       </header>
 
-      <h1 className="mb-2 ml-[4%] text-[13px] font-bold uppercase">
+      <h1 className="mb-2 text-[13px] font-bold uppercase">
         PART 1: VISION, MISSION, GOALS, AND OBJECTIVES
       </h1>
 
       <div
-        className="mx-auto grid border border-black text-[10px] leading-[1.2]"
+        className="grid w-full border border-black text-[10px] leading-[1.2]"
         style={{
           gridTemplateColumns: "34% 66%",
-          width: "90%",
         }}
       >
         <section className="border-b border-r border-black p-2">
@@ -408,7 +415,7 @@ function ProgrammeProfilePage({ document }: { document: CourseDocumentModel }) {
 }
 function TaxonomyLegend() {
   return (
-    <div className="mt-4 rounded border border-black p-2 font-serif text-[9px]">
+    <div className="mt-4 rounded border border-black p-2 text-[9px]">
       <p className="font-bold">Levels in Learning Domain</p>
       <div className="mt-1 grid grid-cols-3 gap-3">
         <div>
@@ -505,7 +512,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     if (!viewer) return;
     const availableWidth = viewer.clientWidth - VIEWER_PADDING * 2;
     if (availableWidth <= 0) return;
-    setZoom(Math.max(MIN_ZOOM, Math.min(availableWidth / PAGE_WIDTH, 1)));
+    setZoom(
+      Math.max(MIN_ZOOM, Math.min(availableWidth / PAGE_WIDTH, MAX_ZOOM)),
+    );
   }, []);
 
   useEffect(() => {
@@ -527,6 +536,20 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleDownloadPdf = () => {
+    const previousZoom = zoom;
+    const restoreZoom = () => {
+      setZoom(previousZoom);
+      window.removeEventListener("afterprint", restoreZoom);
+    };
+    window.addEventListener("afterprint", restoreZoom);
+    // Print at 1:1 scale so each page matches the fixed @page size in
+    // globals.css exactly; wait a couple of frames for that layout to
+    // commit before the print dialog captures the page.
+    setZoom(1);
+    requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
   };
 
   const weeklyPages: CourseDocumentModel["weeklyPlan"][] = [];
@@ -557,22 +580,39 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             </p>
           </div>
         </div>
-        <Button
-          type="button"
-          onClick={handleDownloadWord}
-          disabled={isExporting}
-        >
-          {isExporting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="mr-2 h-4 w-4" />
-          )}
-          {isExporting ? "Generating..." : "Download Word"}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button type="button" disabled={isExporting} />}
+          >
+            {isExporting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            {isExporting ? "Generating..." : "Download"}
+            <ChevronDown className="ml-1.5 h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={handleDownloadWord}
+              disabled={isExporting}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download Word
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownloadPdf}>
+              <Download className="h-3.5 w-3.5" />
+              Download PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <div className="grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
-        <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
+      <div
+        id="course-spec-viewer-shell"
+        className="grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)] print:h-auto print:grid-cols-1"
+      >
+        <aside className="min-h-0 space-y-4 overflow-y-auto pr-1 print:hidden">
           <div className="rounded-lg border bg-card p-4">
             <h3 className="text-sm font-semibold">Document Information</h3>
             <dl className="mt-4 space-y-3 text-sm">
@@ -675,9 +715,10 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
 
         <main
           ref={viewerRef}
-          className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40"
+          id="course-spec-viewer"
+          className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40 print:overflow-visible print:rounded-none print:border-0"
         >
-          <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
+          <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur print:hidden">
             <button
               type="button"
               onClick={() =>
@@ -717,6 +758,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
           </div>
 
           <div
+            id="course-spec-print-root"
             className="mx-auto"
             style={{
               width: PAGE_WIDTH * zoom + VIEWER_PADDING * 2,
@@ -735,7 +777,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 className="h-full px-[54px] py-[38px]"
               >
                 <PageHeader document={document} />
-                <p className="mb-3 font-serif text-[12px] font-bold">
+                <p className="mb-3 text-[12px] font-bold">
                   {document.partTitle}
                 </p>
                 <Table>
@@ -826,7 +868,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   Course Learning Outcomes
                 </SectionTitle>
                 {document.clos.length === 0 ? (
-                  <p className="font-serif text-[11px]">
+                  <p className="text-[11px]">
                     No Course Learning Outcomes have been added.
                   </p>
                 ) : (
@@ -869,7 +911,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   Learning Outcomes, Teaching Methods and Assessment Methods
                 </SectionTitle>
                 <CloPloMatrix mapping={document.mapping} mode="percent" />
-                <p className="mt-3 font-serif text-[9px] leading-[1.5]">
+                <p className="mt-3 text-[9px] leading-[1.5]">
                   <strong>Fully (F)</strong> indicates a focus of more than 50%
                   of the total SLT on this PLO, <strong>Moderate (M)</strong>{" "}
                   indicates a focus of 31%–50% of the total SLT, and{" "}
@@ -879,7 +921,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 <div className="mt-4">
                   <CloPloMatrix mapping={document.mapping} mode="hours" />
                 </div>
-                <p className="mt-3 font-serif text-[9px]">
+                <p className="mt-3 text-[9px]">
                   1 Credit = 40 Student Learning Time (SLT)
                 </p>
                 <PageFooter courseCode={info.courseCode} page={4} />
@@ -920,7 +962,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                     ))}
                   </tbody>
                 </Table>
-                <p className="mt-4 font-serif text-[9px]">
+                <p className="mt-4 text-[9px]">
                   The mapping shown here is generated from the current CLO, PLO,
                   teaching-method and assessment-method records stored in the
                   PMS. No additional alignment values are inferred for the
@@ -1016,7 +1058,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                     </tr>
                   </tfoot>
                 </Table>
-                <div className="mt-5 rounded border border-black p-3 font-serif text-[10px]">
+                <div className="mt-5 rounded border border-black p-3 text-[10px]">
                   <p className="font-bold">Assessment SLT</p>
                   <p className="mt-1">
                     Assessment-specific SLT is not currently stored in the
@@ -1110,7 +1152,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                     </tr>
                   </tfoot>
                 </Table>
-                <p className="mt-4 font-serif text-[9px]">
+                <p className="mt-4 text-[9px]">
                   Assessment SLT is omitted here because the current
                   CourseSpecAssessmentItem data model does not contain an
                   assessment-duration/SLT field.
@@ -1203,7 +1245,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                       ))}
                     </tbody>
                   </Table>
-                  <div className="mt-4 grid grid-cols-3 gap-3 font-serif text-[9px]">
+                  <div className="mt-4 grid grid-cols-3 gap-3 text-[9px]">
                     <div className="rounded border border-black p-2">
                       <strong>Learning Activities</strong>
                       <p className="mt-1">
@@ -1239,7 +1281,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   Required Resources to Deliver the Course
                 </SectionTitle>
                 {document.resources.length === 0 ? (
-                  <p className="font-serif text-[11px]">
+                  <p className="text-[11px]">
                     No required resources have been confirmed.
                   </p>
                 ) : (
@@ -1278,11 +1320,11 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <div id="responsibility" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="21">Student Responsibility</SectionTitle>
                 {document.responsibilities.length === 0 ? (
-                  <p className="font-serif text-[11px]">
+                  <p className="text-[11px]">
                     No student responsibilities have been recorded.
                   </p>
                 ) : (
-                  <ul className="list-disc space-y-1.5 pl-5 font-serif text-[11px] leading-[1.4]">
+                  <ul className="list-disc space-y-1.5 pl-5 text-[11px] leading-[1.4]">
                     {document.responsibilities.map((item, index) => (
                       <li key={index}>{item}</li>
                     ))}
@@ -1298,7 +1340,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             <Page zoom={zoom} pageNumber={policyPage}>
               <div id="policy" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="23">Course Policy</SectionTitle>
-                <div className="space-y-3 font-serif text-[11px] leading-[1.4]">
+                <div className="space-y-3 text-[11px] leading-[1.4]">
                   {[
                     ["Attendance & Preparation", document.policy.attendancePreparation],
                     ["Academic Integrity", document.policy.academicIntegrity],

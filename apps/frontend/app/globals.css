@@ -195,3 +195,44 @@ html {
 html.dark {
   color-scheme: dark;
 }
+
+/**
+ * "Download PDF" on the course-spec document preview
+ * (app/(shell)/courses/[id]/spec/document-preview.tsx) works by calling
+ * window.print() and letting the user pick "Save as PDF" — no PDF library
+ * needed since the preview is already laid out for print. This block hides
+ * everything else on the page (shell sidebar, toolbars, aside) and forces
+ * the printed page size to match the doc's fixed landscape-letter layout
+ * (COURSE_DOCUMENT_STYLE.page.preview: 1056x816px = 11in x 8.5in @ 96dpi,
+ * the same dimensions the Word export uses).
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #course-spec-print-root,
+  #course-spec-print-root * {
+    visibility: visible;
+  }
+
+  #course-spec-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: auto !important;
+    padding: 0 !important;
+  }
+
+  [data-slot="sidebar-inset"],
+  #course-spec-viewer-shell,
+  #course-spec-viewer {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  @page {
+    size: 11in 8.5in;
+    margin: 0;
+  }
+}
