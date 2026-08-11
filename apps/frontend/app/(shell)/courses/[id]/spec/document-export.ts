@@ -16,6 +16,7 @@ import {
   WidthType,
 } from "docx";
 
+import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
@@ -373,6 +374,41 @@ function mappingTable(document: CourseDocumentModel) {
   return table(rows);
 }
 
+function cloPloMatrixTable(
+  document: CourseDocumentModel,
+  mode: "percent" | "hours",
+) {
+  const rows = [
+    new TableRow({
+      children: [
+        headerCell("CLO"),
+        ...PLOS.map((plo) => headerCell(plo.id)),
+      ],
+    }),
+  ];
+  for (const row of document.mapping) {
+    rows.push(
+      new TableRow({
+        children: [
+          cell(row.cloCode, { bold: true }),
+          ...PLOS.map((plo) => {
+            if (!row.ploCodes.includes(plo.id)) return cell("");
+            if (mode === "percent") {
+              return cell(
+                row.focusCode && row.focusPercent != null
+                  ? `${row.focusCode} (${row.focusPercent}%)`
+                  : "—",
+              );
+            }
+            return cell(row.sltHours || "—");
+          }),
+        ],
+      }),
+    );
+  }
+  return table(rows);
+}
+
 function sltTable(document: CourseDocumentModel) {
   const rows = [
     new TableRow({
@@ -506,6 +542,7 @@ function assessmentTable(document: CourseDocumentModel) {
         headerCell("PLO"),
         headerCell("C/A/P Level"),
         headerCell("Assessment & Description"),
+        headerCell("G/I"),
         headerCell("Weight (%)"),
         headerCell("Evaluation Definition"),
         headerCell("Rubric"),
@@ -525,6 +562,7 @@ function assessmentTable(document: CourseDocumentModel) {
           cell(values(assessment.mappedPlos)),
           cell(values(assessment.capLevels)),
           cell(assessmentDescription),
+          cell(assessment.mode === "group" ? "G" : "I"),
           cell(assessment.weight ? `${assessment.weight}%` : "—"),
           cell(assessment.evaluationDefinition),
           rubricCell(assessment),
@@ -537,6 +575,7 @@ function assessmentTable(document: CourseDocumentModel) {
     new TableRow({
       children: [
         cell("Total", { bold: true }),
+        cell(""),
         cell(""),
         cell(""),
         cell(""),
@@ -555,6 +594,7 @@ function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
     new TableRow({
       children: [
         headerCell("Week"),
+        headerCell("Hour (L/T/P/O)"),
         headerCell("Topic"),
         headerCell("CLO"),
         headerCell("Lesson Learning Outcomes"),
@@ -569,6 +609,16 @@ function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
       new TableRow({
         children: [
           cell(week.week),
+          cell(
+            [
+              week.lectureHours,
+              week.tutorialHours,
+              week.practiceHours,
+              week.otherHours,
+            ]
+              .map((h) => h || "0")
+              .join("/"),
+          ),
           cell(week.topic),
           cell(values(week.cloCodes)),
           cell(
@@ -589,6 +639,83 @@ function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
             ),
           ),
           cell(values(week.resources)),
+        ],
+      }),
+    );
+  }
+  return table(rows);
+}
+
+function resourcesTable(resources: CourseDocumentModel["resources"]) {
+  const rows = [
+    new TableRow({
+      children: [
+        headerCell("Resource Type"),
+        headerCell("Resource Name / Description"),
+        headerCell("Link"),
+        headerCell("Notes"),
+      ],
+    }),
+  ];
+  for (const resource of resources) {
+    rows.push(
+      new TableRow({
+        children: [
+          cell(resource.resourceType),
+          cell(resource.title),
+          cell(resource.url),
+          cell(resource.notes),
+        ],
+      }),
+    );
+  }
+  return table(rows);
+}
+
+function bulletedList(items: string[]) {
+  return items.map(
+    (item) =>
+      new Paragraph({
+        bullet: { level: 0 },
+        spacing: { before: 0, after: 60, line: 220 },
+        children: [text(item, false, SMALL)],
+      }),
+  );
+}
+
+function policyParagraphs(policy: CourseDocumentModel["policy"]) {
+  const sections: [string, string][] = [
+    ["Attendance & Preparation", policy.attendancePreparation],
+    ["Academic Integrity", policy.academicIntegrity],
+    ["Homework & Assignments", policy.assignmentsLateSubmission],
+    ["Examinations", policy.examinationRules],
+    ["Penalties", policy.penaltiesConsequences],
+  ];
+  return sections.flatMap(([label, value]) => [
+    paragraph(label, true, SMALL),
+    paragraph(value || "—", false, SMALL),
+  ]);
+}
+
+function ratingScaleTable() {
+  const rows = [
+    new TableRow({
+      children: [
+        headerCell("Letter Grade"),
+        headerCell("Grade Point"),
+        headerCell("Score"),
+        headerCell("Explanation"),
+      ],
+    }),
+  ];
+  for (const grade of LETTER_GRADES) {
+    rows.push(
+      new TableRow({
+        children: [
+          cell(grade.grade),
+          cell(grade.point),
+          cell(grade.score),
+          cell(grade.label),
         ],
       }),
     );
@@ -638,6 +765,26 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
       "Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods",
     ),
   );
+  children.push(
+    paragraph("Programme Learning Outcomes — Percentages", true, SMALL),
+  );
+  children.push(cloPloMatrixTable(document, "percent"));
+  children.push(
+    paragraph(
+      "Fully (F) indicates a focus of more than 50% of the total SLT on this PLO, Moderate (M) indicates a focus of 31%–50% of the total SLT, and Partial (P) indicates a focus of less than 30% of the total SLT on the PLO.",
+      false,
+      SMALL,
+    ),
+  );
+  children.push(
+    paragraph(
+      "Programme Learning Outcomes — Total Hours for Student Learning Time (SLT)",
+      true,
+      SMALL,
+    ),
+  );
+  children.push(cloPloMatrixTable(document, "hours"));
+  children.push(paragraph("1 Credit = 40 Student Learning Time (SLT)", false, SMALL));
   children.push(mappingTable(document));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
@@ -676,6 +823,36 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     );
     children.push(lessonPlanTable(chunk));
   }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    sectionTitle("19", "Required Resources to Deliver the Course"),
+  );
+  if (document.resources.length === 0) {
+    children.push(
+      paragraph("No required resources have been confirmed.", false, SMALL),
+    );
+  } else {
+    children.push(resourcesTable(document.resources));
+  }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(sectionTitle("21", "Student Responsibility"));
+  if (document.responsibilities.length === 0) {
+    children.push(
+      paragraph("No student responsibilities have been recorded.", false, SMALL),
+    );
+  } else {
+    children.push(...bulletedList(document.responsibilities));
+  }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(sectionTitle("23", "Course Policy"));
+  children.push(...policyParagraphs(document.policy));
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(sectionTitle("24", "Rating Scale"));
+  children.push(ratingScaleTable());
 
   const doc = new Document({
     sections: [

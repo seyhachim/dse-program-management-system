@@ -106,7 +106,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
     title: "Course Policy",
     ref: "§23",
     part: "Part 2",
-    state: "soon",
+    state: "ready",
   },
   {
     id: "ratingScale",
@@ -873,6 +873,7 @@ export const SPEC_SECTION_SCHEMAS: Partial<
   mapping: MappingSection,
   resources: ResourcesSection,
   responsibility: StudentResponsibilitySection,
+  policy: PolicySection,
 };
 
 /**

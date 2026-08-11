@@ -431,9 +431,11 @@ test("COMPLETABLE_SPEC_SECTIONS is the save-able sections, in SPEC_SECTIONS orde
   expect(COMPLETABLE_SPEC_SECTIONS.map((s) => s.id)).toEqual([
     "courseInfo",
     "clos",
-    "slt",
     "assessmentPlan",
+    "slt",
     "mapping",
+    "resources",
+    "responsibility",
     "policy",
   ]);
 });
