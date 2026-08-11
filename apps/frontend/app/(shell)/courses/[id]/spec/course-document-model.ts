@@ -2,9 +2,13 @@ import {
   PROGRAMME_TITLE,
   courseTypeLabel,
   semesterLabel,
+  cloFocusCode,
+  cloFocusPercent,
   type Method,
+  type PolicySection as PolicySectionValue,
   type ProgrammeAcademicConfig,
   type Rubric,
+  type StudentResponsibilitySection as StudentResponsibilityValue,
 } from "@dse-pms/shared-types";
 
 import type { CourseInfoForm } from "./course-info-section";
@@ -16,6 +20,7 @@ import {
 } from "./weekly-plan-model";
 import type { AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
+import type { ResourcesForm } from "./resources-model";
 
 export type CourseDocumentModel = {
   title: string;
@@ -54,6 +59,8 @@ export type CourseDocumentModel = {
     teachingMethods: string[];
     assessmentMethods: string[];
     sltHours: string;
+    focusPercent: number | null;
+    focusCode: string;
   }[];
   weeklyPlan: {
     id: string;
@@ -75,6 +82,21 @@ export type CourseDocumentModel = {
     sltHours: string;
     assessment: string;
   }[];
+  resources: {
+    id: string;
+    resourceType: string;
+    title: string;
+    url: string;
+    notes: string;
+  }[];
+  responsibilities: string[];
+  policy: {
+    attendancePreparation: string;
+    academicIntegrity: string;
+    assignmentsLateSubmission: string;
+    examinationRules: string;
+    penaltiesConsequences: string;
+  };
   assessments: {
     id: string;
     name: string;
@@ -197,6 +219,18 @@ type BuildCourseDocumentInput = {
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
   programme?: ProgrammeAcademicConfig | null;
+  resources?: ResourcesForm;
+  responsibility?: StudentResponsibilityValue;
+  policy?: PolicySectionValue;
+  courseTotalSlt?: number | null;
+};
+
+const EMPTY_POLICY_VALUES: PolicySectionValue = {
+  attendancePreparation: "",
+  academicIntegrity: "",
+  assignmentsLateSubmission: "",
+  examinationRules: "",
+  penaltiesConsequences: "",
 };
 
 type CourseType =
@@ -237,6 +271,10 @@ export function buildCourseDocument({
   teachingMethods = [],
   assessmentMethods = [],
   programme = null,
+  resources = [],
+  responsibility,
+  policy,
+  courseTotalSlt = null,
 }: BuildCourseDocumentInput): CourseDocumentModel {
   const ploByCode = new Map(
     (programme?.plos ?? []).map((plo) => [plo.code, plo.description]),
@@ -336,14 +374,25 @@ export function buildCourseDocument({
         : "",
     }));
 
-  const documentMapping = activeClos.map((clo) => ({
-    cloCode: clo.code,
-    ploCodes: clo.mappedPlos,
-    level: clo.level,
-    teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
-    assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
-    sltHours: clo.sltHours,
-  }));
+  const documentMapping = activeClos.map((clo) => {
+    const focusPercent = cloFocusPercent(
+      clo.sltHours ? Number(clo.sltHours) : null,
+      courseTotalSlt,
+    );
+    return {
+      cloCode: clo.code,
+      ploCodes: clo.mappedPlos,
+      level: clo.level,
+      teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
+      assessmentMethods: methodNames(
+        clo.assessmentMethodIds,
+        assessmentMethods,
+      ),
+      sltHours: clo.sltHours,
+      focusPercent,
+      focusCode: cloFocusCode(focusPercent) ?? "",
+    };
+  });
 
   const courseContentSlt = documentWeeks.reduce(
     (sum, week) => sum + (Number(week.sltHours) || 0),
@@ -387,6 +436,17 @@ export function buildCourseDocument({
     clos: documentClos,
     mapping: documentMapping,
     weeklyPlan: documentWeeks,
+    resources: resources.map((resource) => ({
+      id: resource.id,
+      resourceType: resource.resourceType,
+      title: resource.title,
+      url: resource.url,
+      notes: resource.notes,
+    })),
+    responsibilities: (responsibility?.items ?? [])
+      .map((item) => item.text.trim())
+      .filter(Boolean),
+    policy: policy ?? EMPTY_POLICY_VALUES,
     assessments: documentAssessments,
     totals: {
       courseContentSlt,

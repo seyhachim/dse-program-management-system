@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  SPEC_SECTIONS,
   type Method,
   type SpecSectionId,
   type SpecSectionStatus,
@@ -78,7 +77,21 @@ import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
 import { EMPTY_POLICY, PolicySection } from "./policy-section";
-import type { PolicySection as PolicySectionValue } from "@dse-pms/shared-types";
+import type {
+  PolicySection as PolicySectionValue,
+  StudentResponsibilitySection as StudentResponsibilityValue,
+} from "@dse-pms/shared-types";
+import { ResourcesSectionForm } from "./resources-section";
+import {
+  EMPTY_RESOURCES,
+  toResourcesForm,
+  toResourcesPayload,
+  type ResourcesForm,
+} from "./resources-model";
+import {
+  EMPTY_STUDENT_RESPONSIBILITY,
+  StudentResponsibilitySection,
+} from "./student-responsibility-section";
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
   | "overview"
@@ -95,6 +108,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "slt", label: "Weekly Plan" },
   { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
+  { id: "responsibility", label: "Responsibility" },
   { id: "policy", label: "Policies" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
@@ -107,12 +121,11 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "slt",
   "mapping",
   "resources",
+  "responsibility",
   "policy",
 ]);
 
 const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
-
-const sectionMeta = (id: TabId) => SPEC_SECTIONS.find((s) => s.id === id);
 
 export function SpecClient({ courseId }: { courseId: string }) {
   const router = useRouter();
@@ -139,6 +152,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
     useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
+  const [resources, setResources] = useState<ResourcesForm>(EMPTY_RESOURCES);
+  const [responsibility, setResponsibility] =
+    useState<StudentResponsibilityValue>(EMPTY_STUDENT_RESPONSIBILITY);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
@@ -226,6 +242,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setMapping(toMappingForm(spec.data.mapping));
       setPolicy(
         (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
+      );
+      setResources(toResourcesForm(spec.data.resources));
+      setResponsibility(
+        (spec.data.responsibility as
+          | StudentResponsibilityValue
+          | undefined) ?? EMPTY_STUDENT_RESPONSIBILITY,
       );
       setStatus(spec.status ?? {});
       setReview(spec.review);
@@ -368,6 +390,70 @@ export function SpecClient({ courseId }: { courseId: string }) {
           err instanceof ApiError
             ? err.message
             : "Failed to save course policies",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, editingLocked],
+  );
+
+  const persistResources = useCallback(
+    async (items: ResourcesForm) => {
+      if (editingLocked) {
+        setError(
+          "This course specification is locked while it is in the review workflow.",
+        );
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(
+          courseId,
+          "resources",
+          toResourcesPayload(items, weeklyPlan),
+        );
+        setResources(items);
+        setStatus((s) => ({ ...s, resources: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError ? err.message : "Failed to save resources",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, editingLocked, weeklyPlan],
+  );
+
+  const persistResponsibility = useCallback(
+    async (value: StudentResponsibilityValue) => {
+      if (editingLocked) {
+        setError(
+          "This course specification is locked while it is in the review workflow.",
+        );
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(courseId, "responsibility", value);
+        setResponsibility(value);
+        setStatus((s) => ({ ...s, responsibility: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to save student responsibility",
         );
         return false;
       } finally {
@@ -534,6 +620,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
         teachingMethods,
         assessmentMethods,
         programme,
+        resources,
+        responsibility,
+        policy,
+        courseTotalSlt,
       }),
     [
       courseInfo,
@@ -546,6 +636,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
       teachingMethods,
       assessmentMethods,
       programme,
+      resources,
+      responsibility,
+      policy,
+      courseTotalSlt,
     ],
   );
 
@@ -724,9 +818,19 @@ export function SpecClient({ courseId }: { courseId: string }) {
             </TabsContent>
 
             <TabsContent value="resources" className="mt-4">
-              <SectionPanel>
-                <ComingSoon meta={sectionMeta("resources")} />
-              </SectionPanel>
+              <ResourcesSectionForm
+                value={resources}
+                weeklyPlan={weeklyPlan}
+                onPersist={persistResources}
+              />
+            </TabsContent>
+
+            <TabsContent value="responsibility" className="mt-4">
+              <StudentResponsibilitySection
+                value={responsibility}
+                onPersist={persistResponsibility}
+                disabled={editingLocked}
+              />
             </TabsContent>
 
             <TabsContent value="policy" className="mt-4">
@@ -839,18 +943,3 @@ function SectionPanel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ComingSoon({ meta }: { meta?: { title: string; ref?: string } }) {
-  return (
-    <div className="py-10 text-center">
-      <p className="text-sm font-medium text-foreground">
-        {meta?.title}{" "}
-        <span className="text-muted-foreground">({meta?.ref})</span>
-      </p>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        This section is coming in a later phase. The full syllabus structure is
-        shown here so you can see the whole document — for now, fill in{" "}
-        <strong>Course Information</strong>, CLOs, Weekly Plan, and Mapping.
-      </p>
-    </div>
-  );
-}

@@ -12,6 +12,7 @@ import {
   Plus,
 } from "lucide-react";
 import { Button } from "@dse-pms/ui";
+import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
@@ -176,12 +177,18 @@ function Table({
 function TH({
   children,
   className = "",
+  colSpan,
+  rowSpan,
 }: {
   children: ReactNode;
   className?: string;
+  colSpan?: number;
+  rowSpan?: number;
 }) {
   return (
     <th
+      colSpan={colSpan}
+      rowSpan={rowSpan}
       className={[
         "border border-black bg-slate-50 px-2 py-1.5 text-left align-middle font-semibold break-words",
         className,
@@ -430,6 +437,63 @@ function TaxonomyLegend() {
   );
 }
 
+function CloPloMatrix({
+  mapping,
+  mode,
+}: {
+  mapping: CourseDocumentModel["mapping"];
+  mode: "percent" | "hours";
+}) {
+  return (
+    <Table>
+      <colgroup>
+        <col className="w-[6%]" />
+        {PLOS.map((plo) => (
+          <col key={plo.id} className="w-[9.4%]" />
+        ))}
+      </colgroup>
+      <thead>
+        <tr>
+          <TH rowSpan={2}>CLO</TH>
+          <TH colSpan={PLOS.length}>
+            Programme Learning Outcomes —{" "}
+            {mode === "percent"
+              ? "Percentages"
+              : "Total Hours for Student Learning Time (SLT)"}
+          </TH>
+        </tr>
+        <tr>
+          {PLOS.map((plo) => (
+            <TH key={plo.id} className="text-center">
+              {plo.id}
+            </TH>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {mapping.map((row) => (
+          <tr key={row.cloCode}>
+            <TD className="font-medium">{row.cloCode}</TD>
+            {PLOS.map((plo) => {
+              if (!row.ploCodes.includes(plo.id))
+                return <TD key={plo.id} className="text-center" />;
+              return (
+                <TD key={plo.id} className="text-center">
+                  {mode === "percent"
+                    ? row.focusCode && row.focusPercent != null
+                      ? `${row.focusCode} (${row.focusPercent}%)`
+                      : "—"
+                    : displayValue(row.sltHours)}
+                </TD>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
 export function DocumentPreview({ document }: DocumentPreviewProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -470,7 +534,11 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     weeklyPages.push(document.weeklyPlan.slice(i, i + 7));
   if (!weeklyPages.length) weeklyPages.push([]);
 
-  const weeklyStartPage = 7;
+  const weeklyStartPage = 8;
+  const resourcesPage = weeklyStartPage + weeklyPages.length;
+  const responsibilityPage = resourcesPage + 1;
+  const policyPage = responsibilityPage + 1;
+  const ratingScalePage = policyPage + 1;
 
   return (
     <div className="space-y-4">
@@ -522,7 +590,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Sections</dt>
-                <dd className="mt-0.5 font-medium">Part 1 + Sections 1–18</dd>
+                <dd className="mt-0.5 font-medium">
+                  Part 1 + Sections 1–19, 21, 24
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Format</dt>
@@ -574,6 +644,30 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 className="block rounded-md px-2 py-2 hover:bg-muted"
               >
                 18. Detailed Lesson Plan
+              </a>
+              <a
+                href="#resources"
+                className="block rounded-md px-2 py-2 hover:bg-muted"
+              >
+                19. Required Resources
+              </a>
+              <a
+                href="#responsibility"
+                className="block rounded-md px-2 py-2 hover:bg-muted"
+              >
+                21. Student Responsibility
+              </a>
+              <a
+                href="#policy"
+                className="block rounded-md px-2 py-2 hover:bg-muted"
+              >
+                23. Course Policy
+              </a>
+              <a
+                href="#rating-scale"
+                className="block rounded-md px-2 py-2 hover:bg-muted"
+              >
+                24. Rating Scale
               </a>
             </nav>
           </div>
@@ -774,6 +868,29 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   Mapping of the Course Learning Outcomes to the Programme
                   Learning Outcomes, Teaching Methods and Assessment Methods
                 </SectionTitle>
+                <CloPloMatrix mapping={document.mapping} mode="percent" />
+                <p className="mt-3 font-serif text-[9px] leading-[1.5]">
+                  <strong>Fully (F)</strong> indicates a focus of more than 50%
+                  of the total SLT on this PLO, <strong>Moderate (M)</strong>{" "}
+                  indicates a focus of 31%–50% of the total SLT, and{" "}
+                  <strong>Partial (P)</strong> indicates a focus of less than
+                  30% of the total SLT on the PLO.
+                </p>
+                <div className="mt-4">
+                  <CloPloMatrix mapping={document.mapping} mode="hours" />
+                </div>
+                <p className="mt-3 font-serif text-[9px]">
+                  1 Credit = 40 Student Learning Time (SLT)
+                </p>
+                <PageFooter courseCode={info.courseCode} page={4} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={5}>
+              <div className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="15">
+                  Mapping of the Course Learning Outcomes (continued)
+                </SectionTitle>
                 <Table>
                   <colgroup>
                     <col className="w-[8%]" />
@@ -809,11 +926,11 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   PMS. No additional alignment values are inferred for the
                   document.
                 </p>
-                <PageFooter courseCode={info.courseCode} page={4} />
+                <PageFooter courseCode={info.courseCode} page={5} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={5}>
+            <Page zoom={zoom} pageNumber={6}>
               <div id="slt" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="16">
                   Distribution of Student Learning Time (SLT)
@@ -911,22 +1028,23 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                     <strong>Not available from current structured data</strong>
                   </p>
                 </div>
-                <PageFooter courseCode={info.courseCode} page={5} />
+                <PageFooter courseCode={info.courseCode} page={6} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={6}>
+            <Page zoom={zoom} pageNumber={7}>
               <div id="assessment-plan" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="17">Course Assessment Plan</SectionTitle>
                 <Table>
                   <colgroup>
+                    <col className="w-[7%]" />
                     <col className="w-[8%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[11%]" />
-                    <col className="w-[26%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[26%]" />
-                    <col className="w-[12%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[23%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[24%]" />
+                    <col className="w-[14%]" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -934,6 +1052,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                       <TH>PLO</TH>
                       <TH>C/A/P Level</TH>
                       <TH>Assessment &amp; Description</TH>
+                      <TH>G/I</TH>
                       <TH>Weight (%)</TH>
                       <TH>Evaluation Definition</TH>
                       <TH>Rubric</TH>
@@ -954,6 +1073,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                               {assessment.description}
                             </p>
                           ) : null}
+                        </TD>
+                        <TD className="text-center">
+                          {assessment.mode === "group" ? "G" : "I"}
                         </TD>
                         <TD>
                           {assessment.weight ? `${assessment.weight}%` : "—"}
@@ -978,7 +1100,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <TD colSpan={4} className="font-semibold">
+                      <TD colSpan={5} className="font-semibold">
                         Total Weightage
                       </TD>
                       <TD className="font-semibold">
@@ -993,7 +1115,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   CourseSpecAssessmentItem data model does not contain an
                   assessment-duration/SLT field.
                 </p>
-                <PageFooter courseCode={info.courseCode} page={6} />
+                <PageFooter courseCode={info.courseCode} page={7} />
               </div>
             </Page>
 
@@ -1016,16 +1138,18 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   <Table>
                     <colgroup>
                       <col className="w-[5%]" />
-                      <col className="w-[18%]" />
-                      <col className="w-[10%]" />
-                      <col className="w-[22%]" />
+                      <col className="w-[9%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[8%]" />
                       <col className="w-[20%]" />
+                      <col className="w-[18%]" />
                       <col className="w-[15%]" />
                       <col className="w-[10%]" />
                     </colgroup>
                     <thead>
                       <tr>
                         <TH>Week</TH>
+                        <TH>Hour (L/T/P/O)</TH>
                         <TH>Topic</TH>
                         <TH>CLO</TH>
                         <TH>Lesson Learning Outcomes</TH>
@@ -1038,6 +1162,16 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                       {weeks.map((week) => (
                         <tr key={week.id}>
                           <TD>{week.week}</TD>
+                          <TD>
+                            {[
+                              week.lectureHours,
+                              week.tutorialHours,
+                              week.practiceHours,
+                              week.otherHours,
+                            ]
+                              .map((h) => h || "0")
+                              .join("/")}
+                          </TD>
                           <TD>{week.topic}</TD>
                           <TD>{joinValues(week.cloCodes)}</TD>
                           <TD>
@@ -1098,6 +1232,130 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 </div>
               </Page>
             ))}
+
+            <Page zoom={zoom} pageNumber={resourcesPage}>
+              <div id="resources" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="19">
+                  Required Resources to Deliver the Course
+                </SectionTitle>
+                {document.resources.length === 0 ? (
+                  <p className="font-serif text-[11px]">
+                    No required resources have been confirmed.
+                  </p>
+                ) : (
+                  <Table>
+                    <colgroup>
+                      <col className="w-[18%]" />
+                      <col className="w-[27%]" />
+                      <col className="w-[25%]" />
+                      <col className="w-[30%]" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <TH>Resource Type</TH>
+                        <TH>Resource Name / Description</TH>
+                        <TH>Link</TH>
+                        <TH>Notes</TH>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {document.resources.map((resource) => (
+                        <tr key={resource.id}>
+                          <TD>{displayValue(resource.resourceType)}</TD>
+                          <TD>{displayValue(resource.title)}</TD>
+                          <TD>{displayValue(resource.url)}</TD>
+                          <TD>{displayValue(resource.notes)}</TD>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                )}
+                <PageFooter courseCode={info.courseCode} page={resourcesPage} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={responsibilityPage}>
+              <div id="responsibility" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="21">Student Responsibility</SectionTitle>
+                {document.responsibilities.length === 0 ? (
+                  <p className="font-serif text-[11px]">
+                    No student responsibilities have been recorded.
+                  </p>
+                ) : (
+                  <ul className="list-disc space-y-1.5 pl-5 font-serif text-[11px] leading-[1.4]">
+                    {document.responsibilities.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+                <PageFooter
+                  courseCode={info.courseCode}
+                  page={responsibilityPage}
+                />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={policyPage}>
+              <div id="policy" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="23">Course Policy</SectionTitle>
+                <div className="space-y-3 font-serif text-[11px] leading-[1.4]">
+                  {[
+                    ["Attendance & Preparation", document.policy.attendancePreparation],
+                    ["Academic Integrity", document.policy.academicIntegrity],
+                    [
+                      "Homework & Assignments",
+                      document.policy.assignmentsLateSubmission,
+                    ],
+                    ["Examinations", document.policy.examinationRules],
+                    ["Penalties", document.policy.penaltiesConsequences],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <p className="font-bold">{label}</p>
+                      <p className="mt-0.5 whitespace-pre-wrap">
+                        {displayValue(value)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <PageFooter courseCode={info.courseCode} page={policyPage} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={ratingScalePage}>
+              <div id="rating-scale" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="24">Rating Scale</SectionTitle>
+                <Table>
+                  <colgroup>
+                    <col className="w-[25%]" />
+                    <col className="w-[25%]" />
+                    <col className="w-[25%]" />
+                    <col className="w-[25%]" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <TH>Letter Grade</TH>
+                      <TH>Grade Point</TH>
+                      <TH>Score</TH>
+                      <TH>Explanation</TH>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {LETTER_GRADES.map((grade) => (
+                      <tr key={grade.grade}>
+                        <TD className="text-center">{grade.grade}</TD>
+                        <TD className="text-center">{grade.point}</TD>
+                        <TD className="text-center">{grade.score}</TD>
+                        <TD>{grade.label}</TD>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+                <PageFooter
+                  courseCode={info.courseCode}
+                  page={ratingScalePage}
+                />
+              </div>
+            </Page>
           </div>
         </main>
       </div>
