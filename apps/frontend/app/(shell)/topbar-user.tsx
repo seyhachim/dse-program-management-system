@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { ChevronDown, LogOut, Moon, Sun } from "lucide-react";
+import { ChevronDown, LogOut, Moon, Settings, Sun } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +72,12 @@ export function TopbarUser() {
           <p className="capitalize text-muted-foreground">{rolesOf(me.roles)}</p>
         </div>
         <DropdownMenuSeparator />
+        {me.roles.includes("lecturer") ? (
+          <DropdownMenuItem onClick={() => router.push("/account-settings")}>
+            <Settings />
+            Account Settings
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             {mounted && resolvedTheme === "dark" ? <Moon /> : <Sun />}

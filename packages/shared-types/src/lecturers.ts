@@ -29,6 +29,17 @@ export type CreateLecturerInput = z.infer<typeof CreateLecturerInput>;
 export const UpdateLecturerInput = CreateLecturerInput.partial();
 export type UpdateLecturerInput = z.infer<typeof UpdateLecturerInput>;
 
+/** Fields a signed-in lecturer may change on their own profile. */
+export const UpdateMyLecturerProfileInput = z
+  .object({
+    name: z.string().trim().min(1, "Name is required").max(200),
+    title: z.string().trim().max(100).nullable(),
+    qualification: z.string().trim().max(500).nullable(),
+    phone: z.string().trim().max(50).nullable(),
+  })
+  .strict();
+export type UpdateMyLecturerProfileInput = z.infer<typeof UpdateMyLecturerProfileInput>;
+
 export const ListLecturersQuery = z.object({
   search: z.string().trim().optional(),
 });

@@ -4,6 +4,7 @@ import type {
   LecturersServiceContract,
   ListLecturersQuery,
   UpdateLecturerInput,
+  UpdateMyLecturerProfileInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
@@ -53,6 +54,16 @@ export const lecturerService = {
       where: { id, ...isLecturer },
       select: lecturerSelect,
     });
+  },
+
+  async updateOwnProfile(userId: string, input: UpdateMyLecturerProfileInput) {
+    // The target comes exclusively from req.user.id. The client never chooses it.
+    const existing = await prisma.user.findFirst({
+      where: { id: userId, ...isLecturer },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundError("Lecturer profile not found");
+    return prisma.user.update({ where: { id: userId }, data: input, select: lecturerSelect });
   },
 
   async create(input: CreateLecturerInput) {

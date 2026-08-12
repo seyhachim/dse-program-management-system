@@ -14,6 +14,7 @@ export default function AuthCallbackPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"checking" | "ready" | "invalid">("checking");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,6 +35,10 @@ export default function AuthCallbackPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const { error } = await getSupabase().auth.updateUser({ password });
@@ -74,6 +79,17 @@ export default function AuthCallbackPage() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  minLength={8}
+                  required
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-foreground">Confirm new password</span>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   minLength={8}
                   required
                 />
