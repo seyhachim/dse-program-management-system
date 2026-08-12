@@ -32,7 +32,7 @@ function fetchMe(): Promise<MeResponse> {
 }
 
 /** Drop the cached `/me` result and tell every mounted `useMe()` to refetch. */
-function invalidateMe() {
+export function invalidateMe() {
   mePromise = null;
   meListeners.forEach((listener) => listener());
 }

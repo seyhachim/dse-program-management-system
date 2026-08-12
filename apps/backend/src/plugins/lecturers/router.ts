@@ -1,5 +1,10 @@
 import { Router } from "express";
-import { CreateLecturerInput, ListLecturersQuery, UpdateLecturerInput } from "@dse-pms/shared-types";
+import {
+  CreateLecturerInput,
+  ListLecturersQuery,
+  UpdateLecturerInput,
+  UpdateMyLecturerProfileInput,
+} from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { lecturerService, NotFoundError } from "./service.ts";
@@ -8,6 +13,30 @@ import { lecturerService, NotFoundError } from "./service.ts";
 export function createLecturerRouter(): Router {
   const router = Router();
   router.use(requireAuth);
+
+  // Keep /me before /:id. Both operations derive the record ID from the
+  // verified bearer token, so one lecturer cannot select another target.
+  router.get("/me", async (req, res) => {
+    const lecturer = await lecturerService.getById(req.user!.id);
+    if (!lecturer) {
+      res.status(404).json({ error: "Lecturer profile not found" });
+      return;
+    }
+    res.json(lecturer);
+  });
+
+  router.patch("/me", async (req, res) => {
+    const parsed = UpdateMyLecturerProfileInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await lecturerService.updateOwnProfile(req.user!.id, parsed.data));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err) ?? "Could not update lecturer profile" });
+    }
+  });
 
   router.get("/", requirePermission("lecturers:read"), async (req, res) => {
     const parsed = ListLecturersQuery.safeParse(req.query);

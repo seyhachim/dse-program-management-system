@@ -1,7 +1,18 @@
-import type { CreateLecturerInput, Lecturer, UpdateLecturerInput } from "@dse-pms/shared-types";
+import type {
+  CreateLecturerInput,
+  Lecturer,
+  UpdateLecturerInput,
+  UpdateMyLecturerProfileInput,
+} from "@dse-pms/shared-types";
 import { api } from "./api";
 
 export const lecturersApi = {
+  me(): Promise<Lecturer> {
+    return api.get<Lecturer>("/api/lecturers/me");
+  },
+  updateMe(input: UpdateMyLecturerProfileInput): Promise<Lecturer> {
+    return api.patch<Lecturer>("/api/lecturers/me", input);
+  },
   list(search?: string): Promise<Lecturer[]> {
     const qs = search ? `?search=${encodeURIComponent(search)}` : "";
     return api.get<Lecturer[]>(`/api/lecturers${qs}`);

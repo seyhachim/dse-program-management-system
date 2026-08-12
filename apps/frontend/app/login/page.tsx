@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button, Input } from "@dse-pms/ui";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
@@ -62,6 +63,11 @@ export default function LoginPage() {
               required
             />
           </label>
+          <div className="text-right">
+            <Link className="text-sm text-primary hover:underline" href="/forgot-password">
+              Forgot password?
+            </Link>
+          </div>
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-foreground">Password</span>
             <Input
