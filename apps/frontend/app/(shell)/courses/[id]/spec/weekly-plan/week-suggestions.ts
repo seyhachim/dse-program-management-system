@@ -39,7 +39,9 @@ export function buildWeekSuggestions({
   const cloMethodIds = new Set(linkedClos.flatMap((clo) => clo.teachingMethodIds));
   const courseMethodIds = new Set(profile?.teachingMethodIds ?? []);
   const preferredMethodIds = new Set(
-    [...cloMethodIds].filter((id) => courseMethodIds.size === 0 || courseMethodIds.has(id)),
+    [...cloMethodIds].filter(
+      (id) => courseMethodIds.size === 0 || courseMethodIds.has(id),
+    ),
   );
 
   const teachingMethodSuggestions = teachingMethods.filter((method) =>
@@ -48,16 +50,23 @@ export function buildWeekSuggestions({
 
   const activeLearningStrategies = (profile?.activeLearningStrategyIds ?? [])
     .map((id) => strategyById.get(id))
-    .filter((strategy): strategy is { id: string; label: string } => Boolean(strategy));
+    .filter(
+      (strategy): strategy is { id: string; label: string } => Boolean(strategy),
+    );
 
   const weekNumber = Number(week);
   const assessmentSuggestions = assessments.filter((assessment) => {
     if (assessment.status !== "active") return false;
-    if (assessment.cloCodes.length > 0 && !assessment.cloCodes.some((code) => cloCodes.includes(code))) {
+    if (!assessment.dueWeek || Number(assessment.dueWeek) !== weekNumber) {
       return false;
     }
-    if (!assessment.dueWeek) return true;
-    return Number(assessment.dueWeek) === weekNumber;
+    if (
+      assessment.cloCodes.length > 0 &&
+      !assessment.cloCodes.some((code) => cloCodes.includes(code))
+    ) {
+      return false;
+    }
+    return true;
   });
 
   return {
