@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Lightbulb, Loader2, Plus } from "lucide-react";
 import type { Method, StudentLearningActivity } from "@dse-pms/shared-types";
@@ -43,7 +44,9 @@ export function WeekSuggestionsPanel({
     setError(null);
 
     Promise.all([
-      teachingLearningApi.get(courseId).catch(() => EMPTY_TEACHING_LEARNING_PROFILE),
+      teachingLearningApi
+        .get(courseId)
+        .catch(() => EMPTY_TEACHING_LEARNING_PROFILE),
       courseSpecApi.get(courseId),
     ])
       .then(([teachingLearning, spec]) => {
@@ -84,18 +87,12 @@ export function WeekSuggestionsPanel({
   };
 
   const addActivity = (title: string) => {
-    const exists = draft.studentLearningActivities.some(
-      (activity) => activity.title.toLowerCase() === title.toLowerCase(),
-    );
-    if (exists) return;
-    const activity: StudentLearningActivity = {
-      id: crypto.randomUUID(),
-      title,
-      description: "Suggested from the course Teaching & Learning strategy.",
-      lloIds: [],
-    };
+    if (hasActivity(draft, title)) return;
     set({
-      studentLearningActivities: [...draft.studentLearningActivities, activity],
+      studentLearningActivities: [
+        ...draft.studentLearningActivities,
+        makeSuggestedActivity(title),
+      ],
     });
   };
 
@@ -106,9 +103,7 @@ export function WeekSuggestionsPanel({
   };
 
   const addTechnology = (technology: string) => {
-    const mapped = technology === "LMS" || technology === "Discussion Forum"
-      ? "WEBSITE"
-      : "SOFTWARE_TOOL";
+    const mapped = technologyResourceType(technology);
     if (!draft.teachingResourceTypes.includes(mapped)) {
       set({ teachingResourceTypes: [...draft.teachingResourceTypes, mapped] });
     }
@@ -126,28 +121,20 @@ export function WeekSuggestionsPanel({
       ]),
     ];
 
-    const newActivities = suggestions.activeLearningStrategies
-      .filter(
-        (strategy) =>
-          !draft.studentLearningActivities.some(
-            (activity) => activity.title.toLowerCase() === strategy.label.toLowerCase(),
-          ),
-      )
-      .map<StudentLearningActivity>((strategy) => ({
-        id: crypto.randomUUID(),
-        title: strategy.label,
-        description: "Suggested from the course Teaching & Learning strategy.",
-        lloIds: [],
-      }));
-
-    const resourceValues = [
-      ...suggestions.resourceTypes.map((type) => WEEK_RESOURCE_TYPE_MAP[type]).filter(Boolean),
-      ...suggestions.technologyTypes.map((technology) =>
-        technology === "LMS" || technology === "Discussion Forum"
-          ? "WEBSITE"
-          : "SOFTWARE_TOOL",
-      ),
+    const suggestedActivityTitles = [
+      ...suggestions.activeLearningStrategies.map((strategy) => strategy.label),
+      ...suggestions.independentLearningTypes,
     ];
+    const newActivities = suggestedActivityTitles
+      .filter((title) => !hasActivity(draft, title))
+      .map(makeSuggestedActivity);
+
+    const mappedResourceTypes = suggestions.resourceTypes
+      .map((type) => WEEK_RESOURCE_TYPE_MAP[type])
+      .filter((value): value is string => Boolean(value));
+    const mappedTechnologyTypes = suggestions.technologyTypes.map(
+      technologyResourceType,
+    );
 
     set({
       teachingMethodIds,
@@ -156,7 +143,11 @@ export function WeekSuggestionsPanel({
         ...newActivities,
       ],
       teachingResourceTypes: [
-        ...new Set([...draft.teachingResourceTypes, ...resourceValues]),
+        ...new Set([
+          ...draft.teachingResourceTypes,
+          ...mappedResourceTypes,
+          ...mappedTechnologyTypes,
+        ]),
       ],
       assessment: suggestions.assessments[0]?.name ?? draft.assessment,
     });
@@ -170,14 +161,22 @@ export function WeekSuggestionsPanel({
             <Lightbulb className="h-4 w-4" />
           </span>
           <div>
-            <h4 className="text-sm font-semibold text-foreground">Course Suggestions</h4>
+            <h4 className="text-sm font-semibold text-foreground">
+              Course Suggestions
+            </h4>
             <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-              From Teaching & Learning, linked CLOs, and Assessment. Use only what fits this week.
+              From Teaching &amp; Learning, linked CLOs, and Assessment. Use only
+              what fits this week.
             </p>
           </div>
         </div>
         {suggestionCount > 0 ? (
-          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={useAll}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs"
+            onClick={useAll}
+          >
             Use all
           </Button>
         ) : null}
@@ -195,7 +194,8 @@ export function WeekSuggestionsPanel({
         </p>
       ) : suggestionCount === 0 ? (
         <p className="mt-4 text-xs text-muted-foreground">
-          No matching suggestions yet. Add course-level choices in Teaching & Learning or schedule assessments.
+          No matching suggestions yet. Add course-level choices in Teaching &amp;
+          Learning or schedule assessments.
         </p>
       ) : (
         <div className="mt-4 space-y-4">
@@ -215,9 +215,7 @@ export function WeekSuggestionsPanel({
               <SuggestionChip
                 key={strategy.id}
                 label={strategy.label}
-                used={draft.studentLearningActivities.some(
-                  (activity) => activity.title.toLowerCase() === strategy.label.toLowerCase(),
-                )}
+                used={hasActivity(draft, strategy.label)}
                 onUse={() => addActivity(strategy.label)}
               />
             ))}
@@ -228,22 +226,22 @@ export function WeekSuggestionsPanel({
               <SuggestionChip
                 key={item}
                 label={item}
-                used={draft.studentLearningActivities.some(
-                  (activity) => activity.title.toLowerCase() === item.toLowerCase(),
-                )}
+                used={hasActivity(draft, item)}
                 onUse={() => addActivity(item)}
               />
             ))}
           </SuggestionGroup>
 
-          <SuggestionGroup title="Resources">
+          <SuggestionGroup title="Resources & tools">
             {suggestions.resourceTypes.map((item) => (
               <SuggestionChip
                 key={item}
                 label={item}
                 used={Boolean(
                   WEEK_RESOURCE_TYPE_MAP[item] &&
-                    draft.teachingResourceTypes.includes(WEEK_RESOURCE_TYPE_MAP[item]),
+                    draft.teachingResourceTypes.includes(
+                      WEEK_RESOURCE_TYPE_MAP[item],
+                    ),
                 )}
                 onUse={() => addResource(item)}
               />
@@ -253,20 +251,18 @@ export function WeekSuggestionsPanel({
                 key={item}
                 label={item}
                 used={draft.teachingResourceTypes.includes(
-                  item === "LMS" || item === "Discussion Forum"
-                    ? "WEBSITE"
-                    : "SOFTWARE_TOOL",
+                  technologyResourceType(item),
                 )}
                 onUse={() => addTechnology(item)}
               />
             ))}
           </SuggestionGroup>
 
-          <SuggestionGroup title="Assessment">
+          <SuggestionGroup title="Assessment due this week">
             {suggestions.assessments.map((assessment) => (
               <SuggestionChip
                 key={assessment.id}
-                label={`${assessment.name}${assessment.dueWeek ? ` · Week ${assessment.dueWeek}` : ""}${assessment.weight ? ` · ${assessment.weight}%` : ""}`}
+                label={`${assessment.name}${assessment.weight ? ` · ${assessment.weight}%` : ""}`}
                 used={draft.assessment === assessment.name}
                 onUse={() => addAssessment(assessment)}
               />
@@ -278,7 +274,34 @@ export function WeekSuggestionsPanel({
   );
 }
 
-function SuggestionGroup({ title, children }: { title: string; children: React.ReactNode }) {
+function hasActivity(draft: WeekForm, title: string) {
+  return draft.studentLearningActivities.some(
+    (activity) => activity.title.toLowerCase() === title.toLowerCase(),
+  );
+}
+
+function makeSuggestedActivity(title: string): StudentLearningActivity {
+  return {
+    id: crypto.randomUUID(),
+    title,
+    description: "Suggested from the course Teaching & Learning strategy.",
+    lloIds: [],
+  };
+}
+
+function technologyResourceType(technology: string) {
+  return technology === "LMS" || technology === "Discussion Forum"
+    ? "WEBSITE"
+    : "SOFTWARE_TOOL";
+}
+
+function SuggestionGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   const items = Array.isArray(children) ? children.filter(Boolean) : children;
   if (Array.isArray(items) && items.length === 0) return null;
   return (
