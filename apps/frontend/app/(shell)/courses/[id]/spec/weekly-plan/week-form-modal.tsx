@@ -7,6 +7,7 @@ import type { CloForm } from "../clos-section";
 import { emptyWeek, weekSltForm, type WeekForm, type WeeklyPlanForm } from "../weekly-plan-model";
 import { WeekFormFields, teachingResourceLabel, weekFormErrors } from "./week-form-fields";
 import { clearWeekDraft, loadWeekDraft, saveWeekDraft } from "./week-draft-storage";
+import { WeekSuggestionsPanel } from "./week-suggestions-panel";
 import { WeekWizardSidebar } from "./week-wizard-sidebar";
 
 const STEPS = [
@@ -76,9 +77,12 @@ export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clo
       <DialogHeader><DialogTitle className="text-lg font-bold">{title}</DialogTitle></DialogHeader>
       {draft ? <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3"><ol className="flex items-center gap-1 overflow-x-auto">{STEPS.map((s, index) => <li key={s.id} className="flex items-center"><button type="button" aria-current={s.id === step ? "step" : undefined} onClick={() => goToStep(s.id)} className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${s.id === step ? "bg-accent text-accent-foreground" : s.id < step ? "text-foreground hover:bg-muted" : "text-muted-foreground hover:bg-muted"}`}><span className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] ${s.id === step ? "border-accent-foreground" : "border-current"}`}>{s.id}</span>{s.title}</button>{index < STEPS.length - 1 ? <span aria-hidden className="mx-1 h-px w-4 bg-border" /> : null}</li>)}</ol></div>
-        <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[1fr_280px]">
+        <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[1fr_320px]">
           <div className="min-w-0">{step < 5 ? <WeekFormFields draft={draft} set={set} toggleClo={toggleClo} clos={clos} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} touched={touched} existingAssessments={existingAssessments} lloRequired={lloRequired} visibleSections={[...(STEPS[step - 1]?.sections ?? [])]} /> : <WeekReview draft={draft} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} />}</div>
-          <div className="lg:border-l lg:border-border lg:pl-6"><WeekWizardSidebar draft={draft} step={step} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} lloRequired={lloRequired} /></div>
+          <div className="space-y-4 lg:border-l lg:border-border lg:pl-6">
+            <WeekSuggestionsPanel courseId={courseId} draft={draft} set={set} clos={clos} teachingMethods={teachingMethods} />
+            <WeekWizardSidebar draft={draft} step={step} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} lloRequired={lloRequired} />
+          </div>
         </div>
         <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
           <div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={saveDraftNow} className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60">Save Draft</Button>{draftSavedAt ? <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" />Draft saved on this device</span> : null}</div>
