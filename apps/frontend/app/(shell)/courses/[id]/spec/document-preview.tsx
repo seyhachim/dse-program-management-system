@@ -25,6 +25,7 @@ import {
   type CourseDocumentModel,
 } from "./course-document-model";
 import { exportCourseSpecWord } from "./document-export";
+import { exportCourseSpecPdf } from "./document-pdf-export";
 
 const PAGE_WIDTH = COURSE_DOCUMENT_STYLE.page.preview.width;
 const PAGE_HEIGHT = COURSE_DOCUMENT_STYLE.page.preview.height;
@@ -59,10 +60,11 @@ function Page({
   const scaledHeight = PAGE_HEIGHT * zoom;
   return (
     <div
-      className="relative mx-auto print:break-after-page print:last:break-after-auto"
+      className="relative mx-auto"
       style={{ width: scaledWidth, height: scaledHeight + PAGE_GAP }}
     >
       <article
+        data-doc-page
         className="absolute left-0 top-0 overflow-hidden bg-white text-black shadow-md ring-1 ring-black/5 lining-nums"
         style={{
           width: PAGE_WIDTH,
@@ -75,7 +77,7 @@ function Page({
         {children}
       </article>
       <div
-        className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground print:hidden"
+        className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground"
         style={{ top: scaledHeight + 8 }}
       >
         Page {pageNumber}
@@ -503,6 +505,7 @@ function CloPloMatrix({
 
 export function DocumentPreview({ document }: DocumentPreviewProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
+  const printRootRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const info = document.courseInformation;
@@ -538,18 +541,17 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     }
   };
 
-  const handleDownloadPdf = () => {
-    const previousZoom = zoom;
-    const restoreZoom = () => {
-      setZoom(previousZoom);
-      window.removeEventListener("afterprint", restoreZoom);
-    };
-    window.addEventListener("afterprint", restoreZoom);
-    // Print at 1:1 scale so each page matches the fixed @page size in
-    // globals.css exactly; wait a couple of frames for that layout to
-    // commit before the print dialog captures the page.
-    setZoom(1);
-    requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+  const handleDownloadPdf = async () => {
+    if (isExporting) return;
+    try {
+      setIsExporting(true);
+      const printRoot = printRootRef.current;
+      if (printRoot) await exportCourseSpecPdf(printRoot, info.courseCode);
+    } catch (error) {
+      console.error("Failed to export Course Specification PDF:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const weeklyPages: CourseDocumentModel["weeklyPlan"][] = [];
@@ -600,7 +602,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <Download className="h-3.5 w-3.5" />
               Download Word
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDownloadPdf}>
+            <DropdownMenuItem onClick={handleDownloadPdf} disabled={isExporting}>
               <Download className="h-3.5 w-3.5" />
               Download PDF
             </DropdownMenuItem>
@@ -608,11 +610,8 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
         </DropdownMenu>
       </div>
 
-      <div
-        id="course-spec-viewer-shell"
-        className="grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)] print:h-auto print:grid-cols-1"
-      >
-        <aside className="min-h-0 space-y-4 overflow-y-auto pr-1 print:hidden">
+      <div className="grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
+        <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
           <div className="rounded-lg border bg-card p-4">
             <h3 className="text-sm font-semibold">Document Information</h3>
             <dl className="mt-4 space-y-3 text-sm">
@@ -715,10 +714,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
 
         <main
           ref={viewerRef}
-          id="course-spec-viewer"
-          className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40 print:overflow-visible print:rounded-none print:border-0"
+          className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40"
         >
-          <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur print:hidden">
+          <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
             <button
               type="button"
               onClick={() =>
@@ -758,7 +756,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
           </div>
 
           <div
-            id="course-spec-print-root"
+            ref={printRootRef}
             className="mx-auto"
             style={{
               width: PAGE_WIDTH * zoom + VIEWER_PADDING * 2,
