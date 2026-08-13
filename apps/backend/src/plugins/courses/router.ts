@@ -10,6 +10,7 @@ import { requireAuth } from "../../core/auth/middleware.ts";
 import { PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
+import { overlayCourseSpecTeachingAssignment } from "./teaching-assignment.ts";
 
 /**
  * Get a required route parameter.
@@ -316,6 +317,17 @@ export function createCourseRouter(): Router {
         });
         return;
       }
+
+      const lecturerScope = req.user!.roles.some((role) =>
+        PROGRAMME_WIDE_ROLES.includes(role),
+      )
+        ? undefined
+        : req.user!.id;
+      await overlayCourseSpecTeachingAssignment(
+        spec,
+        courseId,
+        lecturerScope,
+      );
 
       res.json(spec);
     },
