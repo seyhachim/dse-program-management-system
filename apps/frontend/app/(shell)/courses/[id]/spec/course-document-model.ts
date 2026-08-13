@@ -4,6 +4,7 @@ import {
   semesterLabel,
   cloFocusCode,
   cloFocusPercent,
+  rubricScaleSummary,
   type Method,
   type PolicySection as PolicySectionValue,
   type ProgrammeAcademicConfig,
@@ -13,11 +14,7 @@ import {
 
 import type { CourseInfoForm } from "./course-info-section";
 import type { CloForm } from "./clo-model";
-import {
-  weekContactHoursForm,
-  weekSltForm,
-  type WeeklyPlanForm,
-} from "./weekly-plan-model";
+import { weekContactHoursForm, weekSltForm, type WeeklyPlanForm } from "./weekly-plan-model";
 import type { AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 import type { ResourcesForm } from "./resources-model";
@@ -25,6 +22,7 @@ import type { ResourcesForm } from "./resources-model";
 export type CourseDocumentModel = {
   title: string;
   partTitle: string;
+  documentDate: string;
   programmeProfile: ProgrammeAcademicConfig["profile"];
   courseInformation: {
     programmeTitle: string;
@@ -88,6 +86,12 @@ export type CourseDocumentModel = {
     title: string;
     url: string;
     notes: string;
+    kind: string;
+    authors: string;
+    publisher: string;
+    year: string;
+    isbn: string;
+    basedOn: string;
   }[];
   responsibilities: string[];
   policy: {
@@ -109,43 +113,41 @@ export type CourseDocumentModel = {
     weight: string;
     dueWeek: string;
     durationWeeks: string;
+    assessmentCategory: "continuous" | "final";
+    topicNumbers: number[];
+    physicalHours: string;
+    onlineHours: string;
+    independentHours: string;
+    totalSltHours: number | null;
     format: string;
     submissionMethod: string;
     feedbackMethod: string;
     feedbackTimeline: string;
     evaluationDefinition: string;
     rubricName: string;
+    rubricScoring: string;
     rubricUrl: string;
   }[];
   totals: {
     courseContentSlt: number;
+    continuousAssessmentSlt: number | null;
+    finalAssessmentSlt: number | null;
     assessmentSlt: number | null;
     grandSlt: number | null;
     assessmentWeight: number;
   };
 };
 
-/**
- * Single source of truth for Course Specification presentation.
- *
- * Keep content/data decisions out of this object. It only controls how the
- * same CourseDocumentModel is presented in the browser preview and Word export.
- * Font sizes are expressed in points so both renderers use the same unit.
- */
 export const COURSE_DOCUMENT_STYLE = {
   fontFamily: "Times New Roman",
-
   colors: {
     labelBackground: "#E2EEDB",
-    tableHeaderBackground: "#F2F2F2",
+    tableHeaderBackground: "#E2EEDB",
     border: "#000000",
     link: "#0563C1",
   },
-
-  // Backward-compatible aliases for existing renderers.
   labelBackground: "#E2EEDB",
   borderColor: "#000000",
-
   fontSize: {
     body: 10,
     small: 9,
@@ -159,13 +161,7 @@ export const COURSE_DOCUMENT_STYLE = {
     profileBody: 9,
     profileHeading: 10,
   },
-
-  lineHeight: {
-    body: 1.25,
-    compact: 1.2,
-    profile: 1.2,
-  },
-
+  lineHeight: { body: 1.25, compact: 1.2, profile: 1.2 },
   spacing: {
     paragraphAfterPt: 2,
     centeredAfterPt: 1,
@@ -174,7 +170,6 @@ export const COURSE_DOCUMENT_STYLE = {
     tableCellVerticalPt: 3,
     tableCellHorizontalPt: 4,
   },
-
   page: {
     orientation: "landscape",
     preview: {
@@ -197,13 +192,8 @@ export const COURSE_DOCUMENT_STYLE = {
       marginRightTwips: 720,
     },
   },
-
-  logo: {
-    width: 90,
-    height: 90,
-  },
-
-  title: "COURSE SPECIFICATION",
+  logo: { width: 90, height: 90 },
+  title: "Course Specification",
   partTitle: "PART 2: COURSE DETAILS",
   courseInfoTitle: "Course Information",
 } as const;
@@ -223,6 +213,7 @@ type BuildCourseDocumentInput = {
   responsibility?: StudentResponsibilityValue;
   policy?: PolicySectionValue;
   courseTotalSlt?: number | null;
+  documentDate?: string;
 };
 
 const EMPTY_POLICY_VALUES: PolicySectionValue = {
@@ -233,31 +224,41 @@ const EMPTY_POLICY_VALUES: PolicySectionValue = {
   penaltiesConsequences: "",
 };
 
-type CourseType =
-  | "Basic"
-  | "Core"
-  | "Elective"
-  | "Specialization"
-  | "MoeysHeip";
+type CourseType = "Basic" | "Core" | "Elective" | "Specialization" | "MoeysHeip";
 type Semester = "First" | "Second";
 
 function isCourseType(value: string): value is CourseType {
-  return ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"].includes(
-    value,
-  );
+  return ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"].includes(value);
 }
-
 function isSemester(value: string): value is Semester {
   return value === "First" || value === "Second";
 }
-
 function methodNames(ids: string[], methods: Method[]): string[] {
   const names = new Map(methods.map((method) => [method.id, method.name]));
   return ids.map((id) => names.get(id) ?? id).filter(Boolean);
 }
-
 function unique(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.trim().length > 0))];
+}
+function numericOrNull(value: string): number | null {
+  if (!value.trim()) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+function assessmentSlt(values: {
+  physicalHours: string;
+  onlineHours: string;
+  independentHours: string;
+}): number | null {
+  const physical = numericOrNull(values.physicalHours);
+  const online = numericOrNull(values.onlineHours);
+  const independent = numericOrNull(values.independentHours);
+  if (physical == null && online == null && independent == null) return null;
+  return (physical ?? 0) + (online ?? 0) + (independent ?? 0);
+}
+function sumKnown(values: Array<number | null>): number | null {
+  const known = values.filter((value): value is number => value != null);
+  return known.length ? known.reduce((sum, value) => sum + value, 0) : null;
 }
 
 export function buildCourseDocument({
@@ -275,11 +276,9 @@ export function buildCourseDocument({
   responsibility,
   policy,
   courseTotalSlt = null,
+  documentDate = "",
 }: BuildCourseDocumentInput): CourseDocumentModel {
-  const ploByCode = new Map(
-    (programme?.plos ?? []).map((plo) => [plo.code, plo.description]),
-  );
-
+  const ploByCode = new Map((programme?.plos ?? []).map((plo) => [plo.code, plo.description]));
   const activeClos = clos.filter((clo) => clo.status === "active");
 
   const documentClos = activeClos.map((clo) => ({
@@ -287,9 +286,7 @@ export function buildCourseDocument({
     outcome: clo.description,
     level: clo.level,
     mappedPlos: clo.mappedPlos,
-    mappedPloDescriptions: clo.mappedPlos
-      .map((code) => ploByCode.get(code) ?? "")
-      .filter(Boolean),
+    mappedPloDescriptions: clo.mappedPlos.map((code) => ploByCode.get(code) ?? "").filter(Boolean),
     sltHours: clo.sltHours,
     teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
     assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
@@ -299,30 +296,19 @@ export function buildCourseDocument({
     const contact = weekContactHoursForm(week);
     const slt = weekSltForm(week);
     const learningActivities = week.studentLearningActivities.map((activity) =>
-      activity.description.trim()
-        ? `${activity.title}: ${activity.description}`
-        : activity.title,
+      activity.description.trim() ? `${activity.title}: ${activity.description}` : activity.title,
     );
-    const lloItems = week.lessonLearningOutcomes
-      .map((llo) => llo.description.trim())
-      .filter(Boolean);
-
+    const lloItems = week.lessonLearningOutcomes.map((llo) => llo.description.trim()).filter(Boolean);
     return {
       id: week.id,
       week: week.week,
       topic: week.topic,
       cloCodes: week.cloCodes,
       lloItems,
-      learningActivities:
-        learningActivities.length > 0 ? learningActivities : week.activities,
+      learningActivities: learningActivities.length ? learningActivities : week.activities,
       teachingMethods: methodNames(week.teachingMethodIds, teachingMethods),
-      activeLearningStrategies: week.studentLearningActivities.map(
-        (activity) => activity.title,
-      ),
-      assessmentMethods: methodNames(
-        week.assessmentMethodIds,
-        assessmentMethods,
-      ),
+      activeLearningStrategies: week.studentLearningActivities.map((activity) => activity.title),
+      assessmentMethods: methodNames(week.assessmentMethodIds, assessmentMethods),
       resources: week.teachingResourceTypes,
       lectureHours: week.lectureHours,
       tutorialHours: week.tutorialHours,
@@ -336,76 +322,84 @@ export function buildCourseDocument({
   });
 
   const rubricById = new Map(rubrics.map((rubric) => [rubric.id, rubric]));
-
   const documentAssessments = assessments
     .filter((assessment) => assessment.status === "active")
-    .map((assessment) => ({
-      id: assessment.id,
-      name: assessment.name,
-      type: assessment.type,
-      description: assessment.description,
-      mode: assessment.mode,
-      cloCodes: assessment.cloCodes,
-      mappedPlos: unique(
-        assessment.mappedPlos.length > 0
-          ? assessment.mappedPlos
-          : assessment.cloCodes.flatMap(
-              (code) =>
-                activeClos.find((clo) => clo.code === code)?.mappedPlos ?? [],
-            ),
-      ),
-      capLevels: unique(
-        assessment.cloCodes.map(
-          (code) => activeClos.find((clo) => clo.code === code)?.level ?? "",
+    .map((assessment) => {
+      const rubric = rubricById.get(assessment.rubric);
+      return {
+        id: assessment.id,
+        name: assessment.name,
+        type: assessment.type,
+        description: assessment.description,
+        mode: assessment.mode,
+        cloCodes: assessment.cloCodes,
+        mappedPlos: unique(
+          assessment.mappedPlos.length
+            ? assessment.mappedPlos
+            : assessment.cloCodes.flatMap(
+                (code) => activeClos.find((clo) => clo.code === code)?.mappedPlos ?? [],
+              ),
         ),
-      ),
-      weight: assessment.weight,
-      dueWeek: assessment.dueWeek,
-      durationWeeks: assessment.durationWeeks,
-      format: assessment.format,
-      submissionMethod: assessment.submissionMethod,
-      feedbackMethod: assessment.feedbackMethod,
-      feedbackTimeline: assessment.feedbackTimeline,
-      evaluationDefinition:
-        rubricById.get(assessment.rubric)?.description ?? "",
-      rubricName: rubricById.get(assessment.rubric)?.name ?? "",
-      rubricUrl: assessment.rubric
-        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
-        : "",
-    }));
+        capLevels: unique(
+          assessment.cloCodes.map(
+            (code) => activeClos.find((clo) => clo.code === code)?.level ?? "",
+          ),
+        ),
+        weight: assessment.weight,
+        dueWeek: assessment.dueWeek,
+        durationWeeks: assessment.durationWeeks,
+        assessmentCategory: assessment.assessmentCategory,
+        topicNumbers: assessment.topicNumbers,
+        physicalHours: assessment.physicalHours,
+        onlineHours: assessment.onlineHours,
+        independentHours: assessment.independentHours,
+        totalSltHours: assessmentSlt(assessment),
+        format: assessment.format,
+        submissionMethod: assessment.submissionMethod,
+        feedbackMethod: assessment.feedbackMethod,
+        feedbackTimeline: assessment.feedbackTimeline,
+        evaluationDefinition: rubric?.description ?? "",
+        rubricName: rubric?.name ?? "",
+        rubricScoring: rubric ? rubricScaleSummary(rubric.levels) : "",
+        rubricUrl: assessment.rubric
+          ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
+          : "",
+      };
+    });
 
   const documentMapping = activeClos.map((clo) => {
-    const focusPercent = cloFocusPercent(
-      clo.sltHours ? Number(clo.sltHours) : null,
-      courseTotalSlt,
-    );
+    const focusPercent = cloFocusPercent(clo.sltHours ? Number(clo.sltHours) : null, courseTotalSlt);
     return {
       cloCode: clo.code,
       ploCodes: clo.mappedPlos,
       level: clo.level,
       teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
-      assessmentMethods: methodNames(
-        clo.assessmentMethodIds,
-        assessmentMethods,
-      ),
+      assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
       sltHours: clo.sltHours,
       focusPercent,
       focusCode: cloFocusCode(focusPercent) ?? "",
     };
   });
 
-  const courseContentSlt = documentWeeks.reduce(
-    (sum, week) => sum + (Number(week.sltHours) || 0),
-    0,
+  const courseContentSlt = documentWeeks.reduce((sum, week) => sum + (Number(week.sltHours) || 0), 0);
+  const assessmentWeight = documentAssessments.reduce((sum, assessment) => sum + (Number(assessment.weight) || 0), 0);
+  const continuousAssessmentSlt = sumKnown(
+    documentAssessments
+      .filter((assessment) => assessment.assessmentCategory === "continuous")
+      .map((assessment) => assessment.totalSltHours),
   );
-  const assessmentWeight = documentAssessments.reduce(
-    (sum, assessment) => sum + (Number(assessment.weight) || 0),
-    0,
+  const finalAssessmentSlt = sumKnown(
+    documentAssessments
+      .filter((assessment) => assessment.assessmentCategory === "final")
+      .map((assessment) => assessment.totalSltHours),
   );
+  const assessmentSlt = sumKnown(documentAssessments.map((assessment) => assessment.totalSltHours));
+  const calculatedGrand = assessmentSlt == null ? null : courseContentSlt + assessmentSlt;
 
   return {
     title: COURSE_DOCUMENT_STYLE.title,
     partTitle: COURSE_DOCUMENT_STYLE.partTitle,
+    documentDate,
     programmeProfile: programme?.profile ?? {
       vision: "",
       mission: [],
@@ -424,12 +418,8 @@ export function buildCourseDocument({
       email: courseInfo.email,
       telephone: courseInfo.telephone,
       otherLecturers: courseInfo.otherLecturers,
-      courseType: isCourseType(courseInfo.courseType)
-        ? courseTypeLabel(courseInfo.courseType)
-        : "",
-      semester: isSemester(courseInfo.semester)
-        ? semesterLabel(courseInfo.semester)
-        : "",
+      courseType: isCourseType(courseInfo.courseType) ? courseTypeLabel(courseInfo.courseType) : "",
+      semester: isSemester(courseInfo.semester) ? semesterLabel(courseInfo.semester) : "",
       programmeYear: courseInfo.programmeYear,
       description: courseInfo.description,
     },
@@ -442,16 +432,22 @@ export function buildCourseDocument({
       title: resource.title,
       url: resource.url,
       notes: resource.notes,
+      kind: resource.kind,
+      authors: resource.authors,
+      publisher: resource.publisher,
+      year: resource.year,
+      isbn: resource.isbn,
+      basedOn: resource.basedOn,
     })),
-    responsibilities: (responsibility?.items ?? [])
-      .map((item) => item.text.trim())
-      .filter(Boolean),
+    responsibilities: (responsibility?.items ?? []).map((item) => item.text.trim()).filter(Boolean),
     policy: policy ?? EMPTY_POLICY_VALUES,
     assessments: documentAssessments,
     totals: {
       courseContentSlt,
-      assessmentSlt: null,
-      grandSlt: null,
+      continuousAssessmentSlt,
+      finalAssessmentSlt,
+      assessmentSlt,
+      grandSlt: courseTotalSlt ?? calculatedGrand,
       assessmentWeight,
     },
   };
