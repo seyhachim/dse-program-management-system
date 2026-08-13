@@ -1,10 +1,5 @@
 import type { AssessmentPlanSection } from "@dse-pms/shared-types";
 
-/**
- * An assessment (§17) held as a form model for input binding; converted on save by
- * the wizard. Numeric fields are kept as strings so empty inputs stay empty rather
- * than 0, matching the CLO / Weekly Plan form models.
- */
 export type AssessmentForm = {
   id: string;
   name: string;
@@ -24,15 +19,25 @@ export type AssessmentForm = {
   feedbackTimeline: string;
   mappedPlos: string[];
   notes: string;
+  assessmentCategory: "continuous" | "final";
+  topicNumbers: number[];
+  physicalSltHours: string;
+  onlineSltHours: string;
+  independentSltHours: string;
 };
 
 export const EMPTY_ASSESSMENTS: AssessmentForm[] = [];
-
 const uuid = () => globalThis.crypto.randomUUID();
 const str = (v: unknown) => (v == null ? "" : String(v));
-const strArray = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
+const strArray = (v: unknown) =>
+  Array.isArray(v) ? v.map((x) => String(x)) : [];
+const numberArray = (v: unknown) =>
+  Array.isArray(v)
+    ? v
+        .map((x) => Number(x))
+        .filter((x) => Number.isInteger(x) && x >= 1 && x <= 15)
+    : [];
 
-/** A fresh, empty assessment. */
 export function emptyAssessment(): AssessmentForm {
   return {
     id: uuid(),
@@ -53,10 +58,14 @@ export function emptyAssessment(): AssessmentForm {
     feedbackTimeline: "",
     mappedPlos: [],
     notes: "",
+    assessmentCategory: "continuous",
+    topicNumbers: [],
+    physicalSltHours: "",
+    onlineSltHours: "",
+    independentSltHours: "",
   };
 }
 
-/** Map the API's §17 payload into the string-based form model. */
 export function toAssessmentForm(data: unknown): AssessmentForm[] {
   const items = (data as { items?: unknown[] } | undefined)?.items ?? [];
   return items.map((raw) => {
@@ -80,11 +89,25 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       feedbackTimeline: str(d.feedbackTimeline),
       mappedPlos: strArray(d.mappedPlos),
       notes: str(d.notes),
+      assessmentCategory: d.assessmentCategory === "final" ? "final" : "continuous",
+      topicNumbers: numberArray(d.topicNumbers),
+      physicalSltHours:
+        d.physicalSltHours == null ? "" : String(d.physicalSltHours),
+      onlineSltHours: d.onlineSltHours == null ? "" : String(d.onlineSltHours),
+      independentSltHours:
+        d.independentSltHours == null ? "" : String(d.independentSltHours),
     };
   });
 }
 
-/** Convert the form model into the AssessmentPlanSection payload the API validates. */
+export function assessmentSltHours(a: AssessmentForm): number {
+  return (
+    (Number(a.physicalSltHours) || 0) +
+    (Number(a.onlineSltHours) || 0) +
+    (Number(a.independentSltHours) || 0)
+  );
+}
+
 export function toAssessmentPayload(items: AssessmentForm[]): AssessmentPlanSection {
   return {
     items: items.map((a) => ({
@@ -106,33 +129,40 @@ export function toAssessmentPayload(items: AssessmentForm[]): AssessmentPlanSect
       feedbackTimeline: a.feedbackTimeline.trim(),
       mappedPlos: a.mappedPlos,
       notes: a.notes.trim(),
+      assessmentCategory: a.assessmentCategory,
+      topicNumbers: a.topicNumbers,
+      physicalSltHours:
+        a.physicalSltHours === "" ? null : Number(a.physicalSltHours),
+      onlineSltHours:
+        a.onlineSltHours === "" ? null : Number(a.onlineSltHours),
+      independentSltHours:
+        a.independentSltHours === "" ? null : Number(a.independentSltHours),
     })),
   } as AssessmentPlanSection;
 }
 
-/** Total weight (%) across active assessments — the plan should sum to 100. */
 export function assessmentTotalWeight(items: AssessmentForm[]): number {
   return items
     .filter((a) => a.status === "active")
     .reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
 }
 
-/* ------------------------------------------------------------- type badge palette */
-
-/** Chip colours for an assessment type badge, keyed by type. */
 const TYPE_CHIPS: Record<string, string> = {
-  Assignment: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
+  Assignment:
+    "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
   Quiz: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
   Exam: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
   Lab: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
   Project: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-  Presentation: "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300",
+  Presentation:
+    "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300",
   Report: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
-  "Peer Evaluation": "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300",
-  Participation: "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
+  "Peer Evaluation":
+    "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300",
+  Participation:
+    "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
 };
 
-/** Tailwind chip classes for an assessment type. */
 export function assessmentTypeChip(type: string): string {
   return TYPE_CHIPS[type] ?? "bg-muted text-muted-foreground";
 }
