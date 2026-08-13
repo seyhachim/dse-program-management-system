@@ -107,8 +107,9 @@ export interface OfferingView {
   programmeYear: number | null;
   otherLecturers: string | null;
   // programmeId backs the router's programme-scope access check (issue #147) —
-  // not otherwise used by the frontend today.
-  course: { id: string; code: string; title: string; programmeId: string | null } | null;
+  // not otherwise used by the frontend today. Every Course has exactly one
+  // programme (issue #150 phase C); only the whole `course` object is nullable.
+  course: { id: string; code: string; title: string; programmeId: string } | null;
   lecturer: {
     id: string;
     name: string;

@@ -25,7 +25,8 @@ export interface CourseRef {
   title: string;
   lecturerId: string | null;
   // Backs programme-scope access checks in offerings/router.ts (issue #147).
-  programmeId: string | null;
+  // Every Course has exactly one programme (issue #150 phase C).
+  programmeId: string;
 }
 
 export interface LecturerRef {
