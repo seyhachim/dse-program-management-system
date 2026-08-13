@@ -7,7 +7,6 @@ import { lecturersApi } from "@/lib/lecturers";
 import { authApi, useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { LecturerForm, type LecturerFormValues } from "./lecturer-form";
-import { CreateAccountForm, type CreateAccountValues } from "./create-account-form";
 
 export function LecturersClient() {
   const [rows, setRows] = useState<Lecturer[]>([]);
@@ -18,16 +17,15 @@ export function LecturersClient() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Creating/editing/deleting a lecturer record needs `lecturers:write`
   // (admin, program_coordinator); provisioning a login needs `accounts:create`
-  // (admin only).
+  // (admin only). The unified form keeps those permission boundaries intact.
   const { me } = useMe();
   const canWrite = me?.permissions.includes("lecturers:write") ?? false;
   const canCreateAccount = me?.permissions.includes("accounts:create") ?? false;
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,27 +44,29 @@ export function LecturersClient() {
     return () => clearTimeout(t);
   }, [load]);
 
-  const handleInvite = async (values: CreateAccountValues) => {
-    setInviting(true);
+  const handleSubmit = async (values: LecturerFormValues, giveDseAccess: boolean) => {
+    setSubmitting(true);
     setError(null);
     setNotice(null);
     try {
-      await authApi.createAccount(values);
-      setAccountOpen(false);
-      setNotice(`Invite sent to ${values.email}.`);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create account");
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const handleSubmit = async (values: LecturerFormValues) => {
-    setSubmitting(true);
-    try {
-      if (editing) await lecturersApi.update(editing.id, values);
-      else await lecturersApi.create(values);
+      if (editing) {
+        await lecturersApi.update(editing.id, values);
+        setNotice(`${values.name} updated.`);
+      } else if (giveDseAccess) {
+        // Account provisioning is admin-only on the backend. It upserts the
+        // lecturer User by email and assigns the lecturer role; then we persist
+        // the syllabus/contact fields on that same User row.
+        const account = await authApi.createAccount({
+          name: values.name,
+          email: values.email,
+          role: "lecturer",
+        });
+        await lecturersApi.update(account.id, values);
+        setNotice(`Lecturer added and invitation sent to ${values.email}.`);
+      } else {
+        await lecturersApi.create(values);
+        setNotice(`${values.name} added without DSE access.`);
+      }
       setFormOpen(false);
       setEditing(null);
       await load();
@@ -77,8 +77,25 @@ export function LecturersClient() {
     }
   };
 
+  const handleInvite = async (lecturer: Lecturer) => {
+    setInvitingId(lecturer.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await authApi.createAccount({ name: lecturer.name, email: lecturer.email, role: "lecturer" });
+      setNotice(`Invitation sent to ${lecturer.email}.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to invite lecturer");
+    } finally {
+      setInvitingId(null);
+    }
+  };
+
   const handleDelete = async (lecturer: Lecturer) => {
     if (!confirm(`Delete ${lecturer.name}?`)) return;
+    setError(null);
+    setNotice(null);
     try {
       await lecturersApi.remove(lecturer.id);
       await load();
@@ -111,42 +128,50 @@ export function LecturersClient() {
       render: (l) => (l.phone ? l.phone : <span className="text-muted-foreground">—</span>),
     },
     {
-      key: "role",
-      header: "Role",
-      render: () => <StatusBadge tone="tournament" label="Lecturer" icon={false} />,
+      key: "accountAccess",
+      header: "Account",
+      render: (l) =>
+        l.accountAccess === "has_access" ? (
+          <StatusBadge tone="live" label="Has access" icon={false} />
+        ) : (
+          <div className="flex items-center gap-2">
+            <StatusBadge tone="upcoming" label="No access" icon={false} />
+            {canCreateAccount ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={invitingId === l.id}
+                onClick={() => handleInvite(l)}
+              >
+                {invitingId === l.id ? "Inviting…" : "Invite to DSE"}
+              </Button>
+            ) : null}
+          </div>
+        ),
     },
   ];
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Lecturers are Users with the <code className="text-foreground">lecturer</code> role. Their
-        qualification and telephone auto-fill the instructor block on course syllabi.
+        Add each lecturer once. Admins can send DSE access during creation; program coordinators can maintain the academic profile without provisioning a login.
       </p>
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1">
-          <TableToolbar
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search lecturers…"
-            addLabel={canWrite ? "Add Lecturer" : undefined}
-            onAdd={
-              canWrite
-                ? () => {
-                    setEditing(null);
-                    setFormOpen(true);
-                  }
-                : undefined
-            }
-          />
-        </div>
-        {canCreateAccount ? (
-          <Button variant="outline" onClick={() => setAccountOpen(true)}>
-            Create login account
-          </Button>
-        ) : null}
-      </div>
+      <TableToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search lecturers…"
+        addLabel={canWrite ? "Add Lecturer" : undefined}
+        onAdd={
+          canWrite
+            ? () => {
+                setEditing(null);
+                setFormOpen(true);
+              }
+            : undefined
+        }
+      />
 
       {error ? (
         <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
@@ -186,13 +211,7 @@ export function LecturersClient() {
         editing={editing}
         onSubmit={handleSubmit}
         submitting={submitting}
-      />
-
-      <CreateAccountForm
-        open={accountOpen}
-        onOpenChange={setAccountOpen}
-        onSubmit={handleInvite}
-        submitting={inviting}
+        canGrantAccess={canCreateAccount}
       />
     </div>
   );
