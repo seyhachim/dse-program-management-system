@@ -3,10 +3,15 @@ import type { Method } from "@dse-pms/shared-types";
 import { Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@dse-pms/ui";
+import {
+  teachingLearningApi,
+  type WeekProjectProgress,
+} from "@/lib/teaching-learning";
 import type { CloForm } from "../clos-section";
 import { emptyWeek, weekSltForm, type WeekForm, type WeeklyPlanForm } from "../weekly-plan-model";
 import { WeekFormFields, teachingResourceLabel, weekFormErrors } from "./week-form-fields";
 import { clearWeekDraft, loadWeekDraft, saveWeekDraft } from "./week-draft-storage";
+import { ProjectProgressFields } from "./project-progress-fields";
 import { WeekSuggestionsPanel } from "./week-suggestions-panel";
 import { WeekWizardSidebar } from "./week-wizard-sidebar";
 
@@ -18,6 +23,14 @@ const STEPS = [
   { id: 5, title: "Review", sections: [] },
 ] as const;
 
+const emptyProjectProgress = (weekId: string): WeekProjectProgress => ({
+  weekId,
+  milestone: "",
+  expectedProgress: "",
+  deliverable: "",
+  status: "planned",
+});
+
 export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clos, teachingMethods, assessmentMethods, onSave }: {
   open: boolean; onOpenChange: (open: boolean) => void; courseId: string; weekId: string | null; weeks: WeeklyPlanForm; clos: CloForm[]; teachingMethods: Method[]; assessmentMethods: Method[]; onSave: (next: WeeklyPlanForm) => Promise<boolean>;
 }) {
@@ -27,14 +40,45 @@ export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clo
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(1);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [projectBasedLearning, setProjectBasedLearning] = useState(false);
+  const [projectProgress, setProjectProgress] = useState<WeekProjectProgress | null>(null);
+  const [projectError, setProjectError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     const existing = weekId ? (weeks.find((w) => w.id === weekId) ?? null) : null;
     const localDraft = loadWeekDraft(courseId, weekId);
-    setDraft(localDraft ?? existing ?? emptyWeek(weeks));
+    const nextDraft = localDraft ?? existing ?? emptyWeek(weeks);
+    setDraft(nextDraft);
     setLloRequired(!existing || existing.lloItems.length > 0);
-    setTouched(false); setStep(1); setDraftSavedAt(localDraft ? new Date() : null);
+    setTouched(false);
+    setStep(1);
+    setDraftSavedAt(localDraft ? new Date() : null);
+    setProjectProgress(emptyProjectProgress(nextDraft.id));
+    setProjectError(null);
+
+    Promise.all([
+      teachingLearningApi.get(courseId),
+      teachingLearningApi.getWeekProjectProgress(courseId, nextDraft.id),
+    ])
+      .then(([profile, progress]) => {
+        if (cancelled) return;
+        setProjectBasedLearning(
+          profile.activeLearningStrategyIds.includes("project-based-learning"),
+        );
+        setProjectProgress(progress);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProjectBasedLearning(false);
+          setProjectProgress(emptyProjectProgress(nextDraft.id));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, weekId, courseId]);
 
@@ -68,7 +112,32 @@ export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clo
     const next = exists ? weeks.map((w) => (w.id === draft.id ? draft : w)) : [...weeks, draft];
     next.sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0));
     setSaving(true);
-    try { const saved = await onSave(next); if (saved) { clearWeekDraft(courseId, weekId); onOpenChange(false); } } finally { setSaving(false); }
+    setProjectError(null);
+    try {
+      const saved = await onSave(next);
+      if (!saved) return;
+
+      if (projectBasedLearning && projectProgress) {
+        try {
+          await teachingLearningApi.saveWeekProjectProgress(courseId, draft.id, {
+            milestone: projectProgress.milestone.trim(),
+            expectedProgress: projectProgress.expectedProgress.trim(),
+            deliverable: projectProgress.deliverable.trim(),
+            status: projectProgress.status,
+          });
+        } catch {
+          setProjectError(
+            "The week was saved, but project progress could not be saved. Please try Save Week again.",
+          );
+          return;
+        }
+      }
+
+      clearWeekDraft(courseId, weekId);
+      onOpenChange(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const title = weekId ? `Edit Week ${draft?.week ?? ""}` : "Add Weekly Plan";
@@ -78,7 +147,24 @@ export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clo
       {draft ? <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3"><ol className="flex items-center gap-1 overflow-x-auto">{STEPS.map((s, index) => <li key={s.id} className="flex items-center"><button type="button" aria-current={s.id === step ? "step" : undefined} onClick={() => goToStep(s.id)} className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${s.id === step ? "bg-accent text-accent-foreground" : s.id < step ? "text-foreground hover:bg-muted" : "text-muted-foreground hover:bg-muted"}`}><span className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] ${s.id === step ? "border-accent-foreground" : "border-current"}`}>{s.id}</span>{s.title}</button>{index < STEPS.length - 1 ? <span aria-hidden className="mx-1 h-px w-4 bg-border" /> : null}</li>)}</ol></div>
         <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[1fr_320px]">
-          <div className="min-w-0">{step < 5 ? <WeekFormFields draft={draft} set={set} toggleClo={toggleClo} clos={clos} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} touched={touched} existingAssessments={existingAssessments} lloRequired={lloRequired} visibleSections={[...(STEPS[step - 1]?.sections ?? [])]} /> : <WeekReview draft={draft} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} />}</div>
+          <div className="min-w-0">
+            {step < 5 ? <WeekFormFields draft={draft} set={set} toggleClo={toggleClo} clos={clos} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} touched={touched} existingAssessments={existingAssessments} lloRequired={lloRequired} visibleSections={[...(STEPS[step - 1]?.sections ?? [])]} /> : <WeekReview draft={draft} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} projectBasedLearning={projectBasedLearning} projectProgress={projectProgress} />}
+            {step === 3 && projectBasedLearning && projectProgress ? (
+              <ProjectProgressFields
+                value={projectProgress}
+                onChange={(patch) =>
+                  setProjectProgress((current) =>
+                    current ? { ...current, ...patch } : current,
+                  )
+                }
+              />
+            ) : null}
+            {projectError ? (
+              <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+                {projectError}
+              </p>
+            ) : null}
+          </div>
           <div className="space-y-4 lg:border-l lg:border-border lg:pl-6">
             <WeekSuggestionsPanel courseId={courseId} draft={draft} set={set} clos={clos} teachingMethods={teachingMethods} />
             <WeekWizardSidebar draft={draft} step={step} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} lloRequired={lloRequired} />
@@ -93,9 +179,17 @@ export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clo
   </Dialog>;
 }
 
-function WeekReview({ draft, teachingMethods, assessmentMethods }: { draft: WeekForm; teachingMethods: Method[]; assessmentMethods: Method[] }) {
+function WeekReview({ draft, teachingMethods, assessmentMethods, projectBasedLearning, projectProgress }: { draft: WeekForm; teachingMethods: Method[]; assessmentMethods: Method[]; projectBasedLearning: boolean; projectProgress: WeekProjectProgress | null }) {
   const teaching = teachingMethods.filter((m) => draft.teachingMethodIds.includes(m.id)).map((m) => m.name);
   const assessments = assessmentMethods.filter((m) => draft.assessmentMethodIds.includes(m.id)).map((m) => m.name);
+  const projectSummary = projectProgress
+    ? [
+        projectProgress.milestone,
+        projectProgress.expectedProgress,
+        projectProgress.deliverable,
+        projectProgress.status.replace("_", " "),
+      ].filter(Boolean).join(" • ")
+    : "—";
   return <div className="space-y-5"><div><h3 className="text-base font-semibold text-foreground">Review Week {draft.week}</h3><p className="text-sm text-muted-foreground">Review the constructive alignment before saving this week.</p></div><div className="grid gap-3 sm:grid-cols-2">
     <ReviewCard label="Topic" value={draft.topic || "—"} /><ReviewCard label="CLOs" value={draft.cloCodes.join(" · ") || "—"} />
     <ReviewCard label="Lesson Learning Outcomes" value={draft.lessonLearningOutcomes.map((x) => x.description).filter(Boolean).join(" • ") || "—"} />
@@ -104,6 +198,7 @@ function WeekReview({ draft, teachingMethods, assessmentMethods }: { draft: Week
     <ReviewCard label="Time Allocation" value={`L ${draft.lectureHours || 0}h · T ${draft.tutorialHours || 0}h · P ${draft.practiceHours || 0}h · O ${draft.otherHours || 0}h · NF2F ${draft.selfStudyHours || 0}h · SLT ${weekSltForm(draft)}h`} />
     <ReviewCard label="Assessment" value={assessments.join(" • ") || draft.assessment || "—"} />
     <ReviewCard label="Teaching Resources" value={draft.teachingResourceTypes.map(teachingResourceLabel).join(" • ") || "None selected"} />
+    {projectBasedLearning ? <ReviewCard label="Project Progress" value={projectSummary || "Not planned yet"} /> : null}
   </div></div>;
 }
 function ReviewCard({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 text-sm text-foreground">{value}</p></div>; }
