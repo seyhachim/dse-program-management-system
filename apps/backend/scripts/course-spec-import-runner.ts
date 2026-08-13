@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { spawn } from "bun";
@@ -37,6 +37,25 @@ function normalizeCanonicalJson(value: JsonObject): JsonObject {
   return { ...value, assessments };
 }
 
+async function createRuntimeImporter(): Promise<string> {
+  const sourcePath = "scripts/course-spec-import.ts";
+  const runtimePath = "scripts/.course-spec-import-runtime.ts";
+  const source = await readFile(sourcePath, "utf8");
+  const marker =
+    "  });\n\n  return { file, courseCode, action: existingCourse?.spec ? \"replaced\" : \"created\", warnings };";
+  const replacement =
+    "  }, { maxWait: 10_000, timeout: 60_000 });\n\n  return { file, courseCode, action: existingCourse?.spec ? \"replaced\" : \"created\", warnings };";
+
+  if (!source.includes(marker)) {
+    throw new Error(
+      "Could not apply importer transaction timeout guard; course-spec-import.ts changed unexpectedly",
+    );
+  }
+
+  await writeFile(runtimePath, source.replace(marker, replacement));
+  return runtimePath;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const positional = argv.filter((arg) => !arg.startsWith("--"));
@@ -49,6 +68,7 @@ async function main() {
 
   const requestedCourse = optionValue(argv, "--course")?.toUpperCase();
   const temp = await mkdtemp(join(tmpdir(), "dse-course-spec-import-"));
+  let runtimeImporter: string | null = null;
 
   try {
     const candidates = await walkJsonFiles(input);
@@ -91,8 +111,9 @@ async function main() {
       (arg, index) => index !== argv.indexOf(input) && !arg.startsWith("--course="),
     );
 
+    runtimeImporter = await createRuntimeImporter();
     const child = spawn({
-      cmd: ["bun", "scripts/course-spec-import.ts", temp, ...forwarded],
+      cmd: ["bun", runtimeImporter, temp, ...forwarded],
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
@@ -101,6 +122,7 @@ async function main() {
     process.exitCode = exitCode;
   } finally {
     await rm(temp, { recursive: true, force: true });
+    if (runtimeImporter) await unlink(runtimeImporter).catch(() => undefined);
   }
 }
 
