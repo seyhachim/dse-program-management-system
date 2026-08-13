@@ -356,6 +356,8 @@ model CourseSpec {
   resources               CourseSpecResource[]
   studentResponsibilities CourseSpecStudentResponsibility[]
   policy                  CourseSpecPolicy?
+  teachingLearning        CourseSpecTeachingLearning?
+  weekProjectProgress     CourseSpecWeekProjectProgress[]
   updatedAt               DateTime                          @updatedAt
   createdAt               DateTime                          @default(now())
   reviewStatus            CourseSpecReviewStatus            @default(Draft)
@@ -413,6 +415,48 @@ model CourseSpecPolicy {
   createdAt                 DateTime   @default(now())
 }
 
+/// Course-level Teaching & Learning strategy (issue #137). Written
+/// exclusively via raw SQL (`teaching-learning/service.ts`'s `$queryRaw`/
+/// `$executeRaw`), never through the Prisma client — declared here anyway so
+/// `prisma migrate dev`'s schema diff doesn't see a real, populated table as
+/// drift to delete (issue #150 caught this the hard way: the auto-generated
+/// migration for an unrelated column change proposed dropping this table).
+/// `updatedAt` matches the migration's actual `DEFAULT CURRENT_TIMESTAMP`
+/// column default — not `@updatedAt`, which Prisma only manages client-side
+/// and would never apply here since nothing writes through the client.
+model CourseSpecTeachingLearning {
+  courseSpecId              String     @id
+  courseSpec                CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  philosophyTags            String[]   @default([])
+  philosophyStatement       String     @default("")
+  teachingMethodIds         String[]   @default([])
+  activeLearningStrategyIds String[]   @default([])
+  independentLearningTypes  String[]   @default([])
+  resourceTypes             String[]   @default([])
+  technologyTypes           String[]   @default([])
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @default(now())
+}
+
+/// Optional Project-Based Learning progress attached to a Weekly Plan row.
+/// Same raw-SQL-only situation as `CourseSpecTeachingLearning` above — see
+/// its comment. References `CourseSpec` only, not `CourseSpecWeek`, because
+/// Weekly Plan saves rebuild `CourseSpecWeek` rows; `weekId` is the stable
+/// client-generated id.
+model CourseSpecWeekProjectProgress {
+  courseSpecId     String
+  weekId           String
+  courseSpec       CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  milestone        String     @default("")
+  expectedProgress String     @default("")
+  deliverable      String     @default("")
+  status           String     @default("planned")
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @default(now())
+
+  @@id([courseSpecId, weekId])
+}
+
 model CourseSpecSection {
   id           String                  @id @default(uuid())
   courseSpecId String
@@ -436,19 +480,19 @@ model CourseSpecSection {
 /// `order` on reassembly, so there's exactly one source of truth for position
 /// instead of a stored value that could drift from it.
 model CourseSpecClo {
-  id                String                          @default(uuid())
-  courseSpecId      String
-  courseSpec        CourseSpec                      @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
-  order             Int
-  description       String
-  level             String?
-  mappedPlos        String[]                        @default([])
-  sltHours          Int?
-  status            CloRowStatus                    @default(Active)
-  notes             String                          @default("")
-  teachingMethods   CourseSpecCloTeachingMethod[]
-  activeLearningStrategyIds String[]                @default([])
-  assessmentMethods CourseSpecCloAssessmentMethod[]
+  id                        String                          @default(uuid())
+  courseSpecId              String
+  courseSpec                CourseSpec                      @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order                     Int
+  description               String
+  level                     String?
+  mappedPlos                String[]                        @default([])
+  sltHours                  Int?
+  status                    CloRowStatus                    @default(Active)
+  notes                     String                          @default("")
+  teachingMethods           CourseSpecCloTeachingMethod[]
+  activeLearningStrategyIds String[]                        @default([])
+  assessmentMethods         CourseSpecCloAssessmentMethod[]
 
   @@id([courseSpecId, id])
 }
