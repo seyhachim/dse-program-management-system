@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateLecturerInput, type Lecturer } from "@dse-pms/shared-types";
@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Switch,
 } from "@dse-pms/ui";
 
 export type LecturerFormValues = {
@@ -27,13 +28,22 @@ interface LecturerFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing?: Lecturer | null;
-  onSubmit: (values: LecturerFormValues) => Promise<void>;
+  onSubmit: (values: LecturerFormValues, giveDseAccess: boolean) => Promise<void>;
   submitting?: boolean;
+  canGrantAccess?: boolean;
 }
 
 const empty: LecturerFormValues = { name: "", email: "", title: "", qualification: "", phone: "" };
 
-export function LecturerForm({ open, onOpenChange, editing, onSubmit, submitting }: LecturerFormProps) {
+export function LecturerForm({
+  open,
+  onOpenChange,
+  editing,
+  onSubmit,
+  submitting,
+  canGrantAccess = false,
+}: LecturerFormProps) {
+  const [giveDseAccess, setGiveDseAccess] = useState(true);
   const {
     register,
     handleSubmit,
@@ -46,6 +56,7 @@ export function LecturerForm({ open, onOpenChange, editing, onSubmit, submitting
 
   useEffect(() => {
     if (open) {
+      setGiveDseAccess(true);
       reset(
         editing
           ? {
@@ -68,19 +79,22 @@ export function LecturerForm({ open, onOpenChange, editing, onSubmit, submitting
           <DialogDescription>
             {editing
               ? "Update the lecturer's details. Qualification and phone appear on course syllabi."
-              : "Add a new lecturer (a User with the lecturer role)."}
+              : "Add the lecturer's academic profile and, if needed, invite them to access DSE."}
           </DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={handleSubmit(async (values) => {
             // Send undefined for blank optionals so they store as null, not "".
-            await onSubmit({
-              ...values,
-              title: values.title || undefined,
-              qualification: values.qualification || undefined,
-              phone: values.phone || undefined,
-            });
+            await onSubmit(
+              {
+                ...values,
+                title: values.title || undefined,
+                qualification: values.qualification || undefined,
+                phone: values.phone || undefined,
+              },
+              !editing && canGrantAccess && giveDseAccess,
+            );
           })}
           className="space-y-4"
         >
@@ -100,12 +114,34 @@ export function LecturerForm({ open, onOpenChange, editing, onSubmit, submitting
             <Input placeholder="096 5321 532 (optional)" {...register("phone")} />
           </Field>
 
+          {!editing && canGrantAccess ? (
+            <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/30 p-4">
+              <div className="space-y-1 pr-4">
+                <div className="text-sm font-medium text-foreground">Give this lecturer access to DSE</div>
+                <div className="text-xs leading-5 text-muted-foreground">
+                  Send an invitation email so they can set their password and sign in. Turn this off for a profile-only lecturer.
+                </div>
+              </div>
+              <Switch
+                checked={giveDseAccess}
+                onCheckedChange={setGiveDseAccess}
+                aria-label="Give this lecturer access to DSE"
+              />
+            </div>
+          ) : null}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Saving…" : editing ? "Save changes" : "Add lecturer"}
+              {submitting
+                ? "Saving…"
+                : editing
+                  ? "Save changes"
+                  : canGrantAccess && giveDseAccess
+                    ? "Add lecturer & send invite"
+                    : "Add lecturer"}
             </Button>
           </DialogFooter>
         </form>

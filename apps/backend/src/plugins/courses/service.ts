@@ -1,5 +1,6 @@
 import {
   COMPLETABLE_SPEC_SECTIONS,
+  teachingLearningIsReady,
   type AssessmentPlanSection,
   type ClosSection,
   type CourseInfoInput,
@@ -19,6 +20,7 @@ import {
   type CourseSpecReviewStatus,
   type UpdateCourseInput,
   type WeeklyPlanSection,
+  type TeachingLearningProfile,
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
@@ -593,6 +595,7 @@ function reassembleSpec(spec: SpecRow | null): {
         mappedPlos: clo.mappedPlos,
         sltHours: clo.sltHours,
         teachingMethodIds: clo.teachingMethods.map((t) => t.teachingMethodId),
+        activeLearningStrategyIds: clo.activeLearningStrategyIds,
         assessmentMethodIds: clo.assessmentMethods.map(
           (a) => a.assessmentMethodId,
         ),
@@ -721,6 +724,7 @@ async function syncClos(
     status:
       item.status === "inactive" ? ("Inactive" as const) : ("Active" as const),
     notes: item.notes,
+    activeLearningStrategyIds: item.activeLearningStrategyIds,
   }));
   if (cloRows.length > 0) await tx.courseSpecClo.createMany({ data: cloRows });
 
@@ -743,6 +747,35 @@ async function syncClos(
   );
   if (assessmentRows.length > 0)
     await tx.courseSpecCloAssessmentMethod.createMany({ data: assessmentRows });
+
+  const profiles = await tx.$queryRaw<TeachingLearningProfile[]>(Prisma.sql`
+    SELECT
+      "philosophyTags",
+      "philosophyStatement",
+      "teachingMethodIds",
+      "activeLearningStrategyIds",
+      "independentLearningTypes",
+      "resourceTypes",
+      "technologyTypes"
+    FROM "CourseSpecTeachingLearning"
+    WHERE "courseSpecId" = ${courseSpecId}
+    LIMIT 1
+  `);
+  const profile = profiles[0];
+  if (profile) {
+    const ready = teachingLearningIsReady(profile, items);
+    await tx.courseSpecSection.upsert({
+      where: {
+        courseSpecId_sectionKey: { courseSpecId, sectionKey: "teachingLearning" },
+      },
+      create: {
+        courseSpecId,
+        sectionKey: "teachingLearning",
+        status: ready ? "Complete" : "Draft",
+      },
+      update: { status: ready ? "Complete" : "Draft" },
+    });
+  }
 }
 
 /** Delete-and-rebuild CourseSpecWeek rows for an `slt` (§18 Weekly Plan) section save. */

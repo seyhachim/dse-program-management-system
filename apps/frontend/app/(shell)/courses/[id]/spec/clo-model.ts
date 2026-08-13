@@ -16,6 +16,7 @@ export type CloForm = {
   mappedPlos: string[];
   sltHours: string;
   teachingMethodIds: string[];
+  activeLearningStrategyIds: string[];
   assessmentMethodIds: string[];
   status: "active" | "inactive";
   notes: string;
@@ -33,6 +34,7 @@ export function emptyClo(): CloForm {
     mappedPlos: [],
     sltHours: "",
     teachingMethodIds: [],
+    activeLearningStrategyIds: [],
     assessmentMethodIds: [],
     status: "active",
     notes: "",
@@ -89,6 +91,7 @@ export function toClosForm(data: unknown, legacyMapping?: unknown): CloForm[] {
         teachingMethodIds: teachingMethodIds.length
           ? teachingMethodIds
           : asStrArray(legacy?.teachingMethodIds),
+        activeLearningStrategyIds: asStrArray(d.activeLearningStrategyIds),
         assessmentMethodIds: asStrArray(d.assessmentMethodIds),
         status: d.status === "inactive" ? "inactive" : "active",
         notes: asStr(d.notes),
@@ -108,6 +111,7 @@ export function toClosPayload(items: CloForm[]) {
       mappedPlos: f.mappedPlos,
       sltHours: f.sltHours ? Number(f.sltHours) : null,
       teachingMethodIds: f.teachingMethodIds,
+      activeLearningStrategyIds: f.activeLearningStrategyIds,
       assessmentMethodIds: f.assessmentMethodIds,
       status: f.status,
       notes: f.notes.trim(),

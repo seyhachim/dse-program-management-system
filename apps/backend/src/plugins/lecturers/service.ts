@@ -17,9 +17,10 @@ import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
  * editing UI; they return the same richer shape (incl. syllabus contact fields).
  */
 
-/** Fields exposed for a lecturer — a superset of the lean cross-plugin ref. */
+/** Fields exposed for a lecturer — authId is only used to derive accountAccess. */
 const lecturerSelect = {
   id: true,
+  authId: true,
   name: true,
   email: true,
   title: true,
@@ -27,13 +28,27 @@ const lecturerSelect = {
   phone: true,
 } as const;
 
+type LecturerRow = Awaited<ReturnType<typeof selectLecturerRow>>;
+
+function selectLecturerRow(id: string) {
+  return prisma.user.findUnique({ where: { id }, select: lecturerSelect });
+}
+
+function presentLecturer(row: NonNullable<LecturerRow>) {
+  const { authId, ...lecturer } = row;
+  return {
+    ...lecturer,
+    accountAccess: authId ? ("has_access" as const) : ("no_access" as const),
+  };
+}
+
 /** A User holding the "lecturer" role, per UserRoleAssignment (issue #77 phase C). */
 const isLecturer = { roleAssignments: { some: { role: { slug: "lecturer" } } } } as const;
 
 export const lecturerService = {
-  list(query: ListLecturersQuery = {}) {
+  async list(query: ListLecturersQuery = {}) {
     const { search } = query;
-    return prisma.user.findMany({
+    const rows = await prisma.user.findMany({
       where: {
         ...isLecturer,
         ...(search
@@ -48,13 +63,15 @@ export const lecturerService = {
       select: lecturerSelect,
       orderBy: { name: "asc" },
     });
+    return rows.map(presentLecturer);
   },
 
-  getById(id: string) {
-    return prisma.user.findFirst({
+  async getById(id: string) {
+    const row = await prisma.user.findFirst({
       where: { id, ...isLecturer },
       select: lecturerSelect,
     });
+    return row ? presentLecturer(row) : null;
   },
 
   async updateOwnProfile(userId: string, input: UpdateMyLecturerProfileInput) {
@@ -64,11 +81,12 @@ export const lecturerService = {
       select: { id: true },
     });
     if (!existing) throw new NotFoundError("Lecturer profile not found");
-    return prisma.user.update({ where: { id: userId }, data: input, select: lecturerSelect });
+    const row = await prisma.user.update({ where: { id: userId }, data: input, select: lecturerSelect });
+    return presentLecturer(row);
   },
 
   async create(input: CreateLecturerInput) {
-    const user = await prisma.user.create({
+    const row = await prisma.user.create({
       data: input,
       select: lecturerSelect,
     });
@@ -77,19 +95,20 @@ export const lecturerService = {
     // just by seed.ts.
     const role = await prisma.role.findUniqueOrThrow({ where: { slug: "lecturer" } });
     await prisma.userRoleAssignment.upsert({
-      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      where: { userId_roleId: { userId: row.id, roleId: role.id } },
       update: {},
-      create: { userId: user.id, roleId: role.id, programmeId: DEFAULT_PROGRAMME_ID },
+      create: { userId: row.id, roleId: role.id, programmeId: DEFAULT_PROGRAMME_ID },
     });
 
-    return user;
+    return presentLecturer(row);
   },
 
   async update(id: string, input: UpdateLecturerInput) {
     // Scope the update to lecturers so this endpoint can't mutate admins/students.
     const existing = await prisma.user.findFirst({ where: { id, ...isLecturer }, select: { id: true } });
     if (!existing) throw new NotFoundError("Lecturer not found");
-    return prisma.user.update({ where: { id }, data: input, select: lecturerSelect });
+    const row = await prisma.user.update({ where: { id }, data: input, select: lecturerSelect });
+    return presentLecturer(row);
   },
 
   async remove(id: string) {
