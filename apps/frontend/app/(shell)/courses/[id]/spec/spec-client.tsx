@@ -9,6 +9,8 @@ import {
   type SpecSectionStatus,
   type ProgrammeAcademicConfig,
   type Rubric,
+  teachingLearningIsReady,
+  type TeachingLearningProfile,
 } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
@@ -34,6 +36,10 @@ import { courseSpecApi } from "@/lib/course-spec";
 import { rubricsApi } from "@/lib/rubrics";
 import { useMe } from "@/lib/auth";
 import { methodsApi } from "@/lib/methods";
+import {
+  EMPTY_TEACHING_LEARNING_PROFILE,
+  teachingLearningApi,
+} from "@/lib/teaching-learning";
 import {
   CourseInfoSection,
   EMPTY_COURSE_INFO,
@@ -158,6 +164,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
+  const [teachingLearningProfile, setTeachingLearningProfile] =
+    useState<TeachingLearningProfile>(EMPTY_TEACHING_LEARNING_PROFILE);
   const [programme, setProgramme] = useState<ProgrammeAcademicConfig | null>(
     null,
   );
@@ -186,13 +194,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
     [activeClos],
   );
 
-  // Teaching & Learning is complete when every active CLO has
-  // at least one teaching method assigned.
   const teachingLearningReady = useMemo(
-    () =>
-      activeClos.length > 0 &&
-      activeClos.every((clo) => clo.teachingMethodIds.length > 0),
-    [activeClos],
+    () => teachingLearningIsReady(teachingLearningProfile, clos),
+    [teachingLearningProfile, clos],
   );
   const setActiveTab = useCallback(
     (id: TabId) => {
@@ -223,14 +227,25 @@ export function SpecClient({ courseId }: { courseId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [spec, methods, courseView, programmeConfig, rubricList] =
+      const [
+        spec,
+        methods,
+        courseView,
+        programmeConfig,
+        rubricList,
+        teachingLearningProfile,
+      ] =
         await Promise.all([
           courseSpecApi.get(courseId),
           methodsApi.list(),
           coursesApi.get(courseId),
           api.get<ProgrammeAcademicConfig>("/api/programme"),
           rubricsApi.list().catch(() => [] as Rubric[]),
+          teachingLearningApi
+            .get(courseId)
+            .catch(() => EMPTY_TEACHING_LEARNING_PROFILE),
         ]);
+      setTeachingLearningProfile(teachingLearningProfile);
       setCourseInfo(
         toCourseInfoForm(
           spec.data.courseInfo as Record<string, unknown> | undefined,
@@ -770,6 +785,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 value={clos}
                 teachingMethods={teachingMethods}
                 onPersist={persistClos}
+                onProfileSaved={setTeachingLearningProfile}
               />
             </TabsContent>
 
@@ -942,4 +958,3 @@ function SectionPanel({ children }: { children: React.ReactNode }) {
     </section>
   );
 }
-

@@ -520,11 +520,46 @@ export const CloItem = z.object({
   mappedPlos: z.array(PloId).default([]),
   sltHours: z.coerce.number().int().min(0).max(1000).nullable().optional(),
   teachingMethodIds: z.array(z.string()).default([]),
+  activeLearningStrategyIds: z.array(z.string()).default([]),
   assessmentMethodIds: z.array(z.string()).default([]),
   status: CloStatus.default("active"),
   notes: z.string().default(""),
 });
 export type CloItem = z.infer<typeof CloItem>;
+
+export const TeachingLearningProfile = z.object({
+  philosophyTags: z.array(z.string()).default([]),
+  philosophyStatement: z.string().default(""),
+  teachingMethodIds: z.array(z.string()).default([]),
+  activeLearningStrategyIds: z.array(z.string()).default([]),
+  independentLearningTypes: z.array(z.string()).default([]),
+  resourceTypes: z.array(z.string()).default([]),
+  technologyTypes: z.array(z.string()).default([]),
+});
+export type TeachingLearningProfile = z.infer<typeof TeachingLearningProfile>;
+
+export type TeachingLearningCloSupport = Pick<
+  CloItem,
+  "status" | "teachingMethodIds"
+>;
+
+export function teachingLearningIsReady(
+  profile: TeachingLearningProfile,
+  clos: TeachingLearningCloSupport[],
+): boolean {
+  const activeClos = clos.filter((clo) => clo.status === "active");
+  const hasPhilosophy =
+    profile.philosophyTags.length > 0 ||
+    profile.philosophyStatement.trim().length > 0;
+
+  return (
+    hasPhilosophy &&
+    profile.teachingMethodIds.length > 0 &&
+    profile.activeLearningStrategyIds.length > 0 &&
+    activeClos.length > 0 &&
+    activeClos.every((clo) => clo.teachingMethodIds.length > 0)
+  );
+}
 
 export const ClosSection = z.object({
   items: z.array(CloItem),
