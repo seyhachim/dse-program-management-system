@@ -24,9 +24,6 @@ function normalizeCanonicalJson(value: JsonObject): JsonObject {
     ? value.assessments.map((raw) => {
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
         const item = { ...(raw as JsonObject) };
-        // Legacy DOCX extraction may leave the I/G cell blank. The importer
-        // already treats non-group values as Individual, so normalize null here
-        // instead of failing Zod validation before import rules can run.
         if (item.mode == null || String(item.mode).trim() === "") {
           item.mode = "individual";
         }
@@ -41,14 +38,17 @@ async function createRuntimeImporter(): Promise<string> {
   const sourcePath = "scripts/course-spec-import.ts";
   const runtimePath = "scripts/.course-spec-import-runtime.ts";
   const source = await readFile(sourcePath, "utf8");
-  const marker =
-    "  });\n\n  return { file, courseCode, action: existingCourse?.spec ? \"replaced\" : \"created\", warnings };";
-  const replacement =
-    "  }, { maxWait: 10_000, timeout: 60_000 });\n\n  return { file, courseCode, action: existingCourse?.spec ? \"replaced\" : \"created\", warnings };";
+  const marker = "const prisma = new PrismaClient();";
+  const replacement = `const prisma = new PrismaClient({
+  transactionOptions: {
+    maxWait: 10_000,
+    timeout: 60_000,
+  },
+});`;
 
   if (!source.includes(marker)) {
     throw new Error(
-      "Could not apply importer transaction timeout guard; course-spec-import.ts changed unexpectedly",
+      "Could not apply importer Prisma transaction options; expected PrismaClient constructor was not found",
     );
   }
 
@@ -82,7 +82,6 @@ async function main() {
       try {
         raw = JSON.parse(await readFile(file, "utf8")) as JsonObject;
       } catch {
-        // Preserve malformed JSON so the core importer reports it normally.
         await writeFile(join(temp, name), await readFile(file, "utf8"));
         selected += 1;
         continue;
