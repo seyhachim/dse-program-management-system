@@ -5,6 +5,7 @@ import { PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { teachingLearningService } from "./service.ts";
+import { weekProjectProgressService } from "./project-progress-service.ts";
 
 const TeachingLearningInput = z.object({
   philosophyTags: z.array(z.string()).default([]),
@@ -14,6 +15,14 @@ const TeachingLearningInput = z.object({
   independentLearningTypes: z.array(z.string()).default([]),
   resourceTypes: z.array(z.string()).default([]),
   technologyTypes: z.array(z.string()).default([]),
+});
+
+const WeekProjectProgressInput = z.object({
+  weekId: z.string().min(1),
+  milestone: z.string().default(""),
+  expectedProgress: z.string().default(""),
+  deliverable: z.string().default(""),
+  status: z.enum(["planned", "in_progress", "completed"]).default("planned"),
 });
 
 type CoursesAccessService = {
@@ -82,6 +91,53 @@ async function ensureEditable(
 export function createTeachingLearningRouter(): Router {
   const router = Router();
   router.use(requireAuth);
+
+  router.get(
+    "/:courseId/project-progress/:weekId",
+    requirePermission("courses:read"),
+    async (req, res) => {
+      const id = courseId(req, res);
+      if (!id) return;
+      if (!(await ensureCourseAccess(req, res, id))) return;
+      const weekId = req.params.weekId;
+      if (!weekId) {
+        res.status(400).json({ error: "weekId is required" });
+        return;
+      }
+
+      res.json(await weekProjectProgressService.get(id, weekId));
+    },
+  );
+
+  router.put(
+    "/:courseId/project-progress/:weekId",
+    requirePermission("courses:write"),
+    async (req, res) => {
+      const id = courseId(req, res);
+      if (!id) return;
+      if (!(await ensureCourseAccess(req, res, id))) return;
+      if (!(await ensureEditable(req, res, id))) return;
+      const weekId = req.params.weekId;
+      if (!weekId) {
+        res.status(400).json({ error: "weekId is required" });
+        return;
+      }
+
+      const parsed = WeekProjectProgressInput.safeParse({
+        ...req.body,
+        weekId,
+      });
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid body",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      res.json(await weekProjectProgressService.save(id, parsed.data));
+    },
+  );
 
   router.get(
     "/:courseId",
