@@ -10,7 +10,7 @@ import {
 } from "@dse-pms/shared-types";
 import { Switch } from "@dse-pms/ui";
 import type { CloForm } from "../clo-model";
-import type { AssessmentForm } from "../assessment-model";
+import { assessmentSltHours, type AssessmentForm } from "../assessment-model";
 
 const DESCRIPTION_MAX = 500;
 const INSTRUCTIONS_MAX = 500;
@@ -50,65 +50,42 @@ export function AssessmentFormFields({
   const nameError = touched && draft.name.trim().length === 0;
   const selectedRubric = rubrics.find((rubric) => rubric.id === draft.rubric);
   const missingRubric = draft.rubric !== "" && !selectedRubric;
+  const slt = assessmentSltHours(draft);
+
+  const toggleTopic = (topic: number) => {
+    set({
+      topicNumbers: draft.topicNumbers.includes(topic)
+        ? draft.topicNumbers.filter((value) => value !== topic)
+        : [...draft.topicNumbers, topic].sort((a, b) => a - b),
+    });
+  };
 
   return (
     <div className="space-y-4">
       <Section n={1} title="Assessment Information">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field
-            label="Assessment Name"
-            required
-            error={nameError ? "An assessment name is required." : undefined}
-          >
-            <input
-              value={draft.name}
-              onChange={(event) => set({ name: event.target.value })}
-              placeholder="e.g. Final Project"
-              className={inputCls(nameError)}
-            />
+          <Field label="Assessment Name" required error={nameError ? "An assessment name is required." : undefined}>
+            <input value={draft.name} onChange={(event) => set({ name: event.target.value })} placeholder="e.g. Final Project" className={inputCls(nameError)} />
           </Field>
-
           <Field label="Assessment Type" required>
-            <select
-              value={draft.type}
-              onChange={(event) => set({ type: event.target.value })}
-              className={selectCls}
-            >
-              {ASSESSMENT_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
+            <select value={draft.type} onChange={(event) => set({ type: event.target.value })} className={selectCls}>
+              {ASSESSMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
           </Field>
-
           <Field label="Group / Individual" required>
-            <select
-              value={draft.mode}
-              onChange={(event) => set({ mode: event.target.value as AssessmentForm["mode"] })}
-              className={selectCls}
-            >
+            <select value={draft.mode} onChange={(event) => set({ mode: event.target.value as AssessmentForm["mode"] })} className={selectCls}>
               <option value="individual">Individual</option>
               <option value="group">Group</option>
             </select>
           </Field>
-
           <Field label="Status" required>
             <label className="flex h-9 items-center gap-3 rounded-lg border border-border px-3">
-              <Switch
-                checked={draft.status === "active"}
-                onCheckedChange={(value) => set({ status: value ? "active" : "inactive" })}
-              />
+              <Switch checked={draft.status === "active"} onCheckedChange={(value) => set({ status: value ? "active" : "inactive" })} />
               <span className="text-sm text-foreground">{draft.status === "active" ? "Active" : "Inactive"}</span>
             </label>
           </Field>
-
           <Field label="Assessment Task / Description" className="md:col-span-2 xl:col-span-3">
-            <textarea
-              value={draft.description}
-              maxLength={DESCRIPTION_MAX}
-              onChange={(event) => set({ description: event.target.value })}
-              placeholder="Describe what students are expected to do…"
-              className={textareaCls}
-            />
+            <textarea value={draft.description} maxLength={DESCRIPTION_MAX} onChange={(event) => set({ description: event.target.value })} placeholder="Describe what students are expected to do…" className={textareaCls} />
             <Counter value={draft.description.length} max={DESCRIPTION_MAX} />
           </Field>
         </div>
@@ -141,13 +118,19 @@ export function AssessmentFormFields({
         </div>
       </Section>
 
-      <Section n={3} title="Weight & Schedule" subtitle="Define how much this assessment contributes to the final grade and when it is expected.">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <Section n={3} title="Weight, Topic Coverage & Assessment SLT" subtitle="These fields feed the official §16 and §17 template tables directly.">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Assessment Weight (%)" required>
             <div className="flex">
               <input type="number" min={0} max={100} value={draft.weight} onChange={(event) => set({ weight: event.target.value })} placeholder="e.g. 35" className={`${inputCls(false)} rounded-r-none`} />
               <span className="inline-flex h-9 items-center rounded-r-lg border border-l-0 border-border bg-muted/40 px-3 text-sm text-muted-foreground">%</span>
             </div>
+          </Field>
+          <Field label="Assessment Category" required>
+            <select value={draft.assessmentCategory} onChange={(event) => set({ assessmentCategory: event.target.value as AssessmentForm["assessmentCategory"] })} className={selectCls}>
+              <option value="continuous">Continuous Assessment</option>
+              <option value="final">Final Assessment</option>
+            </select>
           </Field>
           <Field label="Due Week" optional>
             <select value={draft.dueWeek} onChange={(event) => set({ dueWeek: event.target.value })} className={selectCls}>
@@ -162,21 +145,43 @@ export function AssessmentFormFields({
             </div>
           </Field>
         </div>
-        <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-muted-foreground">The total weight of all assessments should equal 100%.</div>
+
+        <Field label="Topic Coverage (official §17 columns 1–15)" optional>
+          <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 xl:grid-cols-15">
+            {Array.from({ length: 15 }, (_, index) => index + 1).map((topic) => (
+              <label key={topic} className={`flex cursor-pointer items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium ${draft.topicNumbers.includes(topic) ? "border-accent bg-accent/10 text-accent-foreground" : "border-border text-muted-foreground"}`}>
+                <input type="checkbox" checked={draft.topicNumbers.includes(topic)} onChange={() => toggleTopic(topic)} className="sr-only" />
+                {topic}
+              </label>
+            ))}
+          </div>
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <Field label="F2F Physical SLT (hours)" optional>
+            <input type="number" min={0} step="0.5" value={draft.physicalHours} onChange={(event) => set({ physicalHours: event.target.value })} placeholder="e.g. 4" className={inputCls(false)} />
+          </Field>
+          <Field label="Online / Synchronous SLT" optional>
+            <input type="number" min={0} step="0.5" value={draft.onlineHours} onChange={(event) => set({ onlineHours: event.target.value })} placeholder="e.g. 0" className={inputCls(false)} />
+          </Field>
+          <Field label="Independent SLT" optional>
+            <input type="number" min={0} step="0.5" value={draft.independentHours} onChange={(event) => set({ independentHours: event.target.value })} placeholder="e.g. 4" className={inputCls(false)} />
+          </Field>
+          <Field label="Total Assessment SLT">
+            <div className="flex h-9 items-center rounded-lg border border-border bg-muted/30 px-3 text-sm font-semibold text-foreground">
+              {slt == null ? "—" : `${slt} h`}
+            </div>
+          </Field>
+        </div>
+        <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-muted-foreground">The total weight of all active assessments should equal 100%. Assessment SLT is only calculated from values entered here; the system does not invent missing hours.</div>
       </Section>
 
       <Section n={4} title="Marking & Rubric">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
           <Field label="Rubric">
-            <select
-              value={draft.rubric}
-              onChange={(event) => set({ rubric: event.target.value })}
-              className={selectCls}
-            >
+            <select value={draft.rubric} onChange={(event) => set({ rubric: event.target.value })} className={selectCls}>
               <option value="">— No rubric —</option>
-              {rubrics.map((rubric) => (
-                <option key={rubric.id} value={rubric.id}>{rubric.name} ({rubric.type})</option>
-              ))}
+              {rubrics.map((rubric) => <option key={rubric.id} value={rubric.id}>{rubric.name} ({rubric.type})</option>)}
               {missingRubric ? <option value={draft.rubric}>Selected rubric (no longer in library)</option> : null}
             </select>
           </Field>
@@ -184,7 +189,6 @@ export function AssessmentFormFields({
             <Link href={`/courses/${courseId}/spec/assessment/rubrics`} className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted">Rubric Library</Link>
           </div>
         </div>
-
         {selectedRubric ? (
           <div className="rounded-lg border border-border bg-muted/15">
             <div className="border-b border-border px-4 py-3">
@@ -200,9 +204,7 @@ export function AssessmentFormFields({
               ))}
             </div>
           </div>
-        ) : (
-          <Hint>Select an existing rubric if this assessment uses one.</Hint>
-        )}
+        ) : <Hint>Select an existing rubric if this assessment uses one.</Hint>}
       </Section>
 
       <Section n={5} title="Submission & Instructions">
@@ -254,27 +256,11 @@ const selectCls = `${inputBase} border-border`;
 const textareaCls = "min-h-[92px] w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
 function Section({ n, title, subtitle, children }: { n: number; title: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-4 md:p-5">
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold text-accent-foreground">{n}. {title}</h2>
-        {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
-      </div>
-      <div className="space-y-4">{children}</div>
-    </section>
-  );
+  return <section className="rounded-xl border border-border bg-card p-4 md:p-5"><div className="mb-4"><h2 className="text-sm font-semibold text-accent-foreground">{n}. {title}</h2>{subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}</div><div className="space-y-4">{children}</div></section>;
 }
 
 function Field({ label, required, optional, error, className, children }: { label: string; required?: boolean; optional?: boolean; error?: string; className?: string; children: React.ReactNode }) {
-  return (
-    <div className={`space-y-1.5 ${className ?? ""}`}>
-      <span className="block text-xs font-semibold text-foreground">
-        {label}{required ? <span className="text-status-live"> *</span> : null}{optional ? <span className="font-normal text-muted-foreground"> (Optional)</span> : null}
-      </span>
-      {children}
-      {error ? <p className="text-xs text-status-live">{error}</p> : null}
-    </div>
-  );
+  return <div className={`space-y-1.5 ${className ?? ""}`}><span className="block text-xs font-semibold text-foreground">{label}{required ? <span className="text-status-live"> *</span> : null}{optional ? <span className="font-normal text-muted-foreground"> (Optional)</span> : null}</span>{children}{error ? <p className="text-xs text-status-live">{error}</p> : null}</div>;
 }
 
 function Hint({ children }: { children: React.ReactNode }) { return <p className="text-xs text-muted-foreground">{children}</p>; }
