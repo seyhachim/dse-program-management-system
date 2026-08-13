@@ -191,9 +191,11 @@ model RolePermission {
 model UserRoleAssignment {
   userId      String
   roleId      String
-  // Issue #143 phase A: nullable, backfilled to "dse", not yet enforced. PK
-  // stays (userId, roleId) — allowing the same role in multiple programmes
-  // needs a composite-PK change, deferred to phase B/C.
+  // Permanently nullable — null means a global grant (today, only `admin`;
+  // see `core/auth/token.ts`'s `hasAnyRoleInProgramme`), not un-backfilled
+  // data (issue #147 phase B). PK stays (userId, roleId): allowing the same
+  // role in multiple programmes would need a composite-PK change, closed as
+  // not-needed in #150 phase C since no second programme exists to require it.
   programmeId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -321,10 +323,11 @@ model Course {
   // Admin-entered total Student Learning Time for the course (hours). Independent of
   // §16 — always a direct input, never derived. Used as the §15 Focus % denominator.
   totalSltHours Int?
-  // Issue #143 phase A: nullable, backfilled to "dse", not yet enforced.
+  // Issue #150 phase C: every Course belongs to exactly one programme — unlike
+  // UserRoleAssignment.programmeId, null here never had a meaning to preserve.
   // Restrict, not SetNull — see UserRoleAssignment.programme for why.
-  programmeId   String?
-  programme     Programme?  @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  programmeId   String
+  programme     Programme   @relation(fields: [programmeId], references: [id], onDelete: Restrict)
   createdAt     DateTime    @default(now())
 
   offerings Offering[]

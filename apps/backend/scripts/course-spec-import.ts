@@ -3,6 +3,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
 
 const prisma = new PrismaClient();
 
@@ -562,6 +563,9 @@ async function importOne(
         courseType: prismaCourseType(doc.course.courseType),
         totalSltHours: grandTotalSlt(doc),
         lecturerId: lecturer.id,
+        // Only programme that exists yet — matches every other Course
+        // creation path (courses/service.ts, prisma/seed.ts).
+        programmeId: DEFAULT_PROGRAMME_ID,
       },
       update: {
         title: doc.course.title,
