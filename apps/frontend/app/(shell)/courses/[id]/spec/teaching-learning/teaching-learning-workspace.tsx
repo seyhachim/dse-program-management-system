@@ -76,7 +76,9 @@ export function TeachingLearningWorkspace({
         setTechnologyTypes(profile.technologyTypes);
       } catch {
         if (!cancelled) {
-          setProfileError("Could not load the saved Teaching & Learning profile.");
+          setProfileError(
+            "Could not load the saved Teaching & Learning profile.",
+          );
         }
       } finally {
         if (!cancelled) setProfileLoading(false);
@@ -96,11 +98,12 @@ export function TeachingLearningWorkspace({
     [clos],
   );
 
-  const completion = [
+  const completion: [boolean, boolean, boolean, boolean, boolean] = [
     philosophyTags.length > 0 || philosophyStatement.trim().length > 0,
     courseMethodIds.length > 0,
     strategyIds.length > 0,
-    independentLearning.length + resourceTypes.length + technologyTypes.length > 0,
+    independentLearning.length + resourceTypes.length + technologyTypes.length >
+      0,
     clos.length > 0 && coveredClos === clos.length,
   ];
   const completeCount = completion.filter(Boolean).length;
@@ -116,10 +119,7 @@ export function TeachingLearningWorkspace({
         : [...values, id],
     );
 
-  const updateMethods = async (
-    cloId: string,
-    teachingMethodIds: string[],
-  ) => {
+  const updateMethods = async (cloId: string, teachingMethodIds: string[]) => {
     const next = clos.map((clo) =>
       clo.id === cloId ? { ...clo, teachingMethodIds } : clo,
     );
@@ -164,7 +164,9 @@ export function TeachingLearningWorkspace({
       setProfileSaved(true);
       window.setTimeout(() => setProfileSaved(false), 2500);
     } catch {
-      setProfileError("Teaching & Learning could not be saved. Please try again.");
+      setProfileError(
+        "Teaching & Learning could not be saved. Please try again.",
+      );
     } finally {
       setProfileSaving(false);
     }
@@ -277,8 +279,8 @@ export function TeachingLearningWorkspace({
       >
         <div className="mb-3 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <Lightbulb className="h-4 w-4" />
-          Clustered for quick selection so lecturers do not need to scan one long
-          list.
+          Clustered for quick selection so lecturers do not need to scan one
+          long list.
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {ACTIVE_LEARNING_CLUSTERS.map((cluster) => (
@@ -411,8 +413,8 @@ export function TeachingLearningWorkspace({
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
           Teaching &amp; Learning defines the course-level approach. Assessment
           defines how learning is measured. Weekly Plan will use both as
-          contextual suggestions while the lecturer decides what actually happens
-          each week.
+          contextual suggestions while the lecturer decides what actually
+          happens each week.
         </p>
       </div>
 
