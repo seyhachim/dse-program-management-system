@@ -137,6 +137,23 @@ model Role {
   userAssignments UserRoleAssignment[]
 }
 
+/// Issue #143 phase A: additive-only. A programme a role assignment or course
+/// can be scoped to. Seeded with a single `"dse"` row today (matching the id
+/// convention ProgrammeProfile/ProgramPolicy already use) — nothing yet reads
+/// or enforces this scope; that's phase B. Deliberately not FK'd to
+/// ProgrammeProfile/ProgramPolicy/PLOs in this phase — see issue #143.
+model Programme {
+  id        String   @id
+  code      String   @unique
+  name      String
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roleAssignments UserRoleAssignment[]
+  courses         Course[]
+}
+
 model Permission {
   id          String   @id @default(uuid())
   slug        String   @unique
@@ -172,16 +189,25 @@ model RolePermission {
 /// sole authorization/role source of truth (`core/auth/middleware.ts`,
 /// `core/permissions/index.ts`, `lecturers/service.ts`).
 model UserRoleAssignment {
-  userId    String
-  roleId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  userId      String
+  roleId      String
+  // Issue #143 phase A: nullable, backfilled to "dse", not yet enforced. PK
+  // stays (userId, roleId) — allowing the same role in multiple programmes
+  // needs a composite-PK change, deferred to phase B/C.
+  programmeId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  // Restrict, not SetNull: a Programme is never expected to be deleted while
+  // rows reference it — silently orphaning assignments to NULL would hide a
+  // real data problem rather than surface it.
+  programme Programme? @relation(fields: [programmeId], references: [id], onDelete: Restrict)
 
   @@id([userId, roleId])
   @@index([roleId])
+  @@index([programmeId])
 }
 
 /// Students plugin domain model.
@@ -295,12 +321,17 @@ model Course {
   // Admin-entered total Student Learning Time for the course (hours). Independent of
   // §16 — always a direct input, never derived. Used as the §15 Focus % denominator.
   totalSltHours Int?
+  // Issue #143 phase A: nullable, backfilled to "dse", not yet enforced.
+  // Restrict, not SetNull — see UserRoleAssignment.programme for why.
+  programmeId   String?
+  programme     Programme?  @relation(fields: [programmeId], references: [id], onDelete: Restrict)
   createdAt     DateTime    @default(now())
 
   offerings Offering[]
   spec      CourseSpec?
 
   @@index([lecturerId])
+  @@index([programmeId])
 }
 
 /// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a

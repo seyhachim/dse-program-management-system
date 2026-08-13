@@ -8,6 +8,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
+import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 
 /**
  * Lecturers = Users with role "lecturer". `list`/`getById` are the public
@@ -78,7 +79,7 @@ export const lecturerService = {
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
       update: {},
-      create: { userId: user.id, roleId: role.id },
+      create: { userId: user.id, roleId: role.id, programmeId: DEFAULT_PROGRAMME_ID },
     });
 
     return user;

@@ -23,6 +23,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
+import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 
 /**
  * Courses business logic. The lecturer relationship is validated through the
@@ -190,7 +191,9 @@ export const courseService = {
 
   async create(input: CreateCourseInput) {
     await assertLecturerExists(input.lecturerId);
-    const course = await prisma.course.create({ data: input });
+    const course = await prisma.course.create({
+      data: { ...input, programmeId: DEFAULT_PROGRAMME_ID },
+    });
     return withLecturer(course, await lecturerLookup());
   },
 

@@ -3,6 +3,7 @@ import type { CreateAccountInput } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { permissionsForRoles } from "../../core/permissions/index.ts";
 import type { Role } from "../../core/auth/token.ts";
+import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 
 /**
  * Auth service: admin-only account provisioning. Creates a Supabase auth
@@ -103,7 +104,7 @@ export const authService = {
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
       update: {},
-      create: { userId: user.id, roleId: role.id },
+      create: { userId: user.id, roleId: role.id, programmeId: DEFAULT_PROGRAMME_ID },
     });
     await prisma.userRoleAssignment.deleteMany({
       where: { userId: user.id, roleId: { not: role.id } },

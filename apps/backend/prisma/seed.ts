@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PLOS, pluginManifests } from "@dse-pms/shared-types";
 import { syncNormalizedRubricTables } from "../src/plugins/rubrics/service.ts";
+import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
 
 /**
  * Seeds dev users (incl. several lecturers), students, courses, offerings and a
@@ -800,6 +801,7 @@ async function main() {
       create: {
         userId: user.id,
         roleId: role.id,
+        programmeId: DEFAULT_PROGRAMME_ID,
       },
     });
 
@@ -962,6 +964,7 @@ async function main() {
       credits: c.credits,
       prerequisites: c.prerequisites,
       courseType: c.courseType,
+      programmeId: DEFAULT_PROGRAMME_ID,
     };
 
     await prisma.course.upsert({
