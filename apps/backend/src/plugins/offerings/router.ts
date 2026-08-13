@@ -6,7 +6,7 @@ import {
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
-import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
+import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { CapacityError, offeringService, ReferenceError } from "./service.ts";
 
@@ -33,8 +33,10 @@ export function createOfferingRouter(): Router {
       return;
     }
     // A lecturer may only fetch an offering they're assigned to (issue #104);
-    // programme-wide roles may fetch any.
-    if (!req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r))) {
+    // a caller holding a programme-wide role for the offering's own course's
+    // programme (globally, or scoped to that programme — issue #147) may
+    // fetch any offering in it.
+    if (!hasAnyRoleInProgramme(req.user!, PROGRAMME_WIDE_ROLES, offering.course?.programmeId ?? null)) {
       const isAssigned =
         offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
       if (!isAssigned) {
@@ -61,6 +63,7 @@ export function createOfferingRouter(): Router {
   });
 
   router.patch("/:id", requirePermission("offerings:manage"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res, "update"))) return;
     const parsed = UpdateOfferingInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -74,6 +77,7 @@ export function createOfferingRouter(): Router {
   });
 
   router.delete("/:id", requirePermission("offerings:manage"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res, "delete"))) return;
     try {
       await offeringService.remove(req.params.id!);
       res.status(204).end();
@@ -124,20 +128,26 @@ export function createOfferingRouter(): Router {
 const OFFERING_ROSTER_WIDE_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"];
 
 /**
- * True (and untouched response) if the caller may manage this offering's
- * roster: a programme-wide role, the primary lecturer, or an assigned
- * co-lecturer (#79).
+ * True (and untouched response) if the caller may manage this offering —
+ * scheduling (PATCH/DELETE) or its roster (enroll/unenroll): a programme-wide
+ * role scoped to the offering's own course's programme (issue #147), the
+ * primary lecturer, or an assigned co-lecturer (#79). `courses:manage`'s
+ * `program_coordinator`/`program_secretary`/`admin` set matches
+ * `OFFERING_ROSTER_WIDE_ROLES` exactly, so this is the right guard for both.
  */
 async function assertOwnOfferingOrAdmin(
   req: import("express").Request,
   res: import("express").Response,
+  action = "manage enrollment for",
 ): Promise<boolean> {
-  if (req.user!.roles.some((r) => OFFERING_ROSTER_WIDE_ROLES.includes(r))) return true;
   const offering = await offeringService.getById(req.params.id!);
+  if (hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, offering?.course?.programmeId ?? null)) {
+    return true;
+  }
   const isAssigned =
     offering?.lecturer?.id === req.user!.id || offering?.coLecturers.some((c) => c.id === req.user!.id);
   if (!isAssigned) {
-    res.status(403).json({ error: "You can only manage enrollment for your own offerings" });
+    res.status(403).json({ error: `You can only ${action} your own offerings` });
     return false;
   }
   return true;

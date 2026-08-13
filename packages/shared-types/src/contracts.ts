@@ -24,6 +24,8 @@ export interface CourseRef {
   code: string;
   title: string;
   lecturerId: string | null;
+  // Backs programme-scope access checks in offerings/router.ts (issue #147).
+  programmeId: string | null;
 }
 
 export interface LecturerRef {

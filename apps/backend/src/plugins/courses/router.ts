@@ -7,7 +7,7 @@ import {
   type SpecSectionId,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
-import { PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
+import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
 import { overlayCourseSpecTeachingAssignment } from "./teaching-assignment.ts";
@@ -67,18 +67,15 @@ function getOwnerScope(req: Request, res: Response): string | undefined | null {
 }
 
 /**
- * A lecturer may only see/edit courses they're assigned to;
- * programme-wide roles may access any course.
+ * A lecturer may only see/edit courses they're assigned to; a caller holding
+ * a programme-wide role for the course's own programme (globally, or scoped
+ * to that specific programme — issue #147) may access any course in it.
  */
 async function ensureCourseAccess(
   req: Request,
   res: Response,
   courseId: string,
 ): Promise<boolean> {
-  if (req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r))) {
-    return true;
-  }
-
   const course = await courseService.getById(courseId);
 
   if (!course) {
@@ -86,6 +83,10 @@ async function ensureCourseAccess(
       error: "Course not found",
     });
     return false;
+  }
+
+  if (hasAnyRoleInProgramme(req.user!, PROGRAMME_WIDE_ROLES, course.programmeId)) {
+    return true;
   }
 
   const userId = req.user?.id;
@@ -120,7 +121,12 @@ async function ensureSpecEditable(
   res: Response,
   courseId: string,
 ): Promise<boolean> {
-  if (req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r))) {
+  // Caller already passed ensureCourseAccess for this same course (its sole
+  // caller), so the course is known to exist — re-fetch just its programmeId
+  // rather than threading the earlier lookup through, matching this file's
+  // existing per-check independent-fetch style.
+  const course = await courseService.getById(courseId);
+  if (course && hasAnyRoleInProgramme(req.user!, PROGRAMME_WIDE_ROLES, course.programmeId)) {
     return true;
   }
 
@@ -250,6 +256,10 @@ export function createCourseRouter(): Router {
         return;
       }
 
+      if (!(await ensureCourseAccess(req, res, courseId))) {
+        return;
+      }
+
       const parsed = UpdateCourseInput.safeParse(req.body);
 
       if (!parsed.success) {
@@ -277,6 +287,10 @@ export function createCourseRouter(): Router {
       const courseId = getRequiredParam(req, res, "id");
 
       if (!courseId) {
+        return;
+      }
+
+      if (!(await ensureCourseAccess(req, res, courseId))) {
         return;
       }
 
@@ -318,8 +332,13 @@ export function createCourseRouter(): Router {
         return;
       }
 
-      const lecturerScope = req.user!.roles.some((role) =>
-        PROGRAMME_WIDE_ROLES.includes(role),
+      // Not a security boundary (ensureCourseAccess already gated this
+      // course) — just which Offering's teaching-assignment data to overlay.
+      const course = await courseService.getById(courseId);
+      const lecturerScope = hasAnyRoleInProgramme(
+        req.user!,
+        PROGRAMME_WIDE_ROLES,
+        course?.programmeId ?? null,
       )
         ? undefined
         : req.user!.id;

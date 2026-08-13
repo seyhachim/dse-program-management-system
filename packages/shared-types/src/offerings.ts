@@ -106,7 +106,9 @@ export interface OfferingView {
   semester: Semester | null;
   programmeYear: number | null;
   otherLecturers: string | null;
-  course: { id: string; code: string; title: string } | null;
+  // programmeId backs the router's programme-scope access check (issue #147) —
+  // not otherwise used by the frontend today.
+  course: { id: string; code: string; title: string; programmeId: string | null } | null;
   lecturer: {
     id: string;
     name: string;

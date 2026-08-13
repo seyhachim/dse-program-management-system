@@ -26,13 +26,23 @@ function parseRole(): Role {
 async function main() {
   const role = parseRole();
   // Query through the join table (issue #77 phase B is the enforcement source
-  // of truth now), not the legacy `role` enum column.
-  const user = await prisma.user.findFirst({ where: { roleAssignments: { some: { role: { slug: role } } } } });
+  // of truth now), not the legacy `role` enum column. programmeId comes along
+  // on the same row (issue #147) so the minted token carries real scope.
+  const user = await prisma.user.findFirst({
+    where: { roleAssignments: { some: { role: { slug: role } } } },
+    include: { roleAssignments: { where: { role: { slug: role } }, select: { programmeId: true } } },
+  });
   if (!user) {
     console.error(`No seeded user with role "${role}". Run \`bun run seed\` first.`);
     process.exit(1);
   }
-  const token = signToken({ id: user.id, email: user.email, roles: [role] });
+  const programmeId = user.roleAssignments[0]?.programmeId ?? null;
+  const token = signToken({
+    id: user.id,
+    email: user.email,
+    roles: [role],
+    programmeRoles: [{ role, programmeId }],
+  });
   // Print only the token on the last line so it's easy to copy/pipe.
   console.error(`Token for ${user.email} (${role}), valid 7d:\n`);
   console.log(token);
