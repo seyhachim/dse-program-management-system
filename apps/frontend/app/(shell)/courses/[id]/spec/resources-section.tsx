@@ -50,6 +50,12 @@ export function ResourcesSectionForm({
         url: "",
         notes: "",
         evidenceWeekIds,
+        kind: "DELIVERY",
+        authors: "",
+        publisher: "",
+        year: "",
+        isbn: "",
+        basedOn: "",
       },
     ]);
   };
@@ -155,59 +161,28 @@ export function ResourcesSectionForm({
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <label className="space-y-1">
                   <span className="text-xs font-medium text-foreground">Resource Type</span>
-                  <input
-                    value={item.resourceType}
-                    onChange={(event) => updateItem(item.id, { resourceType: event.target.value })}
-                    placeholder="e.g. Software, Facility, Platform"
-                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                  />
+                  <input value={item.resourceType} onChange={(event) => updateItem(item.id, { resourceType: event.target.value })} placeholder="e.g. Software, Facility, Platform" className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
                 </label>
-
                 <label className="space-y-1">
                   <span className="text-xs font-medium text-foreground">Resource Name / Description</span>
-                  <input
-                    value={item.title}
-                    onChange={(event) => updateItem(item.id, { title: event.target.value })}
-                    placeholder="e.g. Computer laboratory with Python environment"
-                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                  />
+                  <input value={item.title} onChange={(event) => updateItem(item.id, { title: event.target.value })} placeholder="e.g. Computer laboratory with Python environment" className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
                 </label>
-
                 <label className="space-y-1 md:col-span-2">
                   <span className="text-xs font-medium text-foreground">Link (optional)</span>
                   <div className="flex gap-2">
-                    <input
-                      type="url"
-                      value={item.url}
-                      onChange={(event) => updateItem(item.id, { url: event.target.value })}
-                      placeholder="https://..."
-                      className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                    />
-                    {item.url ? (
-                      <a href={item.url} target="_blank" rel="noreferrer" aria-label="Open resource link" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground">
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    ) : null}
+                    <input type="url" value={item.url} onChange={(event) => updateItem(item.id, { url: event.target.value })} placeholder="https://..." className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
+                    {item.url ? <a href={item.url} target="_blank" rel="noreferrer" aria-label="Open resource link" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a> : null}
                   </div>
                 </label>
-
                 <label className="space-y-1 md:col-span-2">
                   <span className="text-xs font-medium text-foreground">Notes</span>
-                  <textarea
-                    value={item.notes}
-                    onChange={(event) => updateItem(item.id, { notes: event.target.value })}
-                    placeholder="Availability, access requirements, version, or other delivery notes"
-                    className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-                  />
+                  <textarea value={item.notes} onChange={(event) => updateItem(item.id, { notes: event.target.value })} placeholder="Availability, access requirements, version, or other delivery notes" className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
                 </label>
               </div>
 
               {weeklyPlan.length > 0 ? (
                 <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
                   <p className="text-xs font-semibold text-foreground">Evidence from Weekly Plan</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Select the weeks that support why this resource is required. This is provenance, not an automatic quality judgment.
-                  </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {weeklyPlan.map((week) => {
                       const checked = item.evidenceWeekIds.includes(week.id);
@@ -226,10 +201,6 @@ export function ResourcesSectionForm({
           ))}
         </div>
       )}
-
-      <div className="rounded-lg border border-blue-200/70 bg-blue-50/50 px-3 py-2 text-xs text-muted-foreground dark:border-blue-900/40 dark:bg-blue-950/20">
-        Weekly Plan provides candidate evidence. §19 records the lecturer-confirmed resources required to deliver the course. If evidence is missing, the system should surface that gap for review rather than infer poor teaching quality.
-      </div>
     </div>
   );
 }
