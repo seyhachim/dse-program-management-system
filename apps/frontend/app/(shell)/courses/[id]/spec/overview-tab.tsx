@@ -125,7 +125,7 @@ export function OverviewTab({
               <Field label="Telephone" value={courseInfo.telephone} />
 
               <Field
-                label="Other Course Lecturer(s)"
+                label="Co-Lecturer(s)"
                 value={courseInfo.otherLecturers}
                 full
               />
