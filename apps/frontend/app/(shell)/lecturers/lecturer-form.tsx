@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Switch,
 } from "@dse-pms/ui";
 
 export type LecturerFormValues = {
@@ -114,20 +115,19 @@ export function LecturerForm({
           </Field>
 
           {!editing && canGrantAccess ? (
-            <label className="flex items-start gap-3 rounded-lg border p-3">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-input"
+            <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/30 p-4">
+              <div className="space-y-1 pr-4">
+                <div className="text-sm font-medium text-foreground">Give this lecturer access to DSE</div>
+                <div className="text-xs leading-5 text-muted-foreground">
+                  Send an invitation email so they can set their password and sign in. Turn this off for a profile-only lecturer.
+                </div>
+              </div>
+              <Switch
                 checked={giveDseAccess}
-                onChange={(event) => setGiveDseAccess(event.target.checked)}
+                onCheckedChange={setGiveDseAccess}
+                aria-label="Give this lecturer access to DSE"
               />
-              <span className="space-y-1">
-                <span className="block text-sm font-medium text-foreground">Give this lecturer access to DSE</span>
-                <span className="block text-xs text-muted-foreground">
-                  Sends an invitation email so they can set their password and sign in. Turn this off for a profile-only lecturer.
-                </span>
-              </span>
-            </label>
+            </div>
           ) : null}
 
           <DialogFooter>
