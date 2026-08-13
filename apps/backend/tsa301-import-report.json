@@ -1,0 +1,23 @@
+{
+  "summary": {
+    "mode": "commit",
+    "total": 1,
+    "ready": 0,
+    "created": 0,
+    "replaced": 1,
+    "skipped": 0,
+    "blocked": 0,
+    "failed": 0
+  },
+  "results": [
+    {
+      "file": "C:\\Users\\seyha\\AppData\\Local\\Temp\\dse-course-spec-import-RkAnHG\\TSA301.json",
+      "courseCode": "TSA301",
+      "action": "replaced",
+      "warnings": [
+        "Lecturer not found: Chim Seyha <chim.seyha@rupp.edu.kh>",
+        "Semester/programme year were not imported because the Offering model requires a real term"
+      ]
+    }
+  ]
+}
