@@ -16,7 +16,7 @@ import {
   WidthType,
 } from "docx";
 
-import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
+import { LETTER_GRADES, PLOS, referenceKindLabel } from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
@@ -705,6 +705,42 @@ function resourcesTable(resources: CourseDocumentModel["resources"]) {
   return table(rows, w);
 }
 
+function referenceCitation(reference: CourseDocumentModel["references"][number]): string {
+  const parts = [
+    reference.authors,
+    reference.year ? `(${reference.year})` : "",
+    reference.title,
+    reference.publisher,
+  ].filter(Boolean);
+  return parts.length ? parts.join(". ") : "—";
+}
+
+function referencesTable(references: CourseDocumentModel["references"]) {
+  // Matches the preview's <colgroup> for §20 references (13/45/12/15/15).
+  const w = colWidths([13, 45, 12, 15, 15]);
+  const headers = ["Kind", "Citation", "ISBN", "Link", "Notes"];
+  const rows = [
+    new TableRow({
+      children: headers.map((h, i) => headerCell(h, w[i])),
+    }),
+  ];
+  for (const reference of references) {
+    const rowValues = [
+      referenceKindLabel(reference.kind),
+      referenceCitation(reference),
+      reference.isbn,
+      reference.url,
+      reference.notes,
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+      }),
+    );
+  }
+  return table(rows, w);
+}
+
 function bulletedList(items: string[]) {
   return items.map(
     (item) =>
@@ -861,6 +897,16 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     );
   } else {
     children.push(resourcesTable(document.resources));
+  }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(sectionTitle("20", "References / Textbooks"));
+  if (document.references.length === 0) {
+    children.push(
+      paragraph("No references have been recorded.", false, SMALL),
+    );
+  } else {
+    children.push(referencesTable(document.references));
   }
 
   children.push(new Paragraph({ children: [new PageBreak()] }));

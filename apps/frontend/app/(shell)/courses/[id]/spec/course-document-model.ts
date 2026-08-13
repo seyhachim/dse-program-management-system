@@ -21,6 +21,7 @@ import {
 import type { AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 import type { ResourcesForm } from "./resources-model";
+import type { ReferencesForm } from "./references-model";
 
 export type CourseDocumentModel = {
   title: string;
@@ -87,6 +88,18 @@ export type CourseDocumentModel = {
     resourceType: string;
     title: string;
     url: string;
+    notes: string;
+  }[];
+  references: {
+    id: string;
+    kind: string;
+    title: string;
+    authors: string;
+    publisher: string;
+    year: string;
+    isbn: string;
+    url: string;
+    basedOn: string;
     notes: string;
   }[];
   responsibilities: string[];
@@ -220,6 +233,7 @@ type BuildCourseDocumentInput = {
   assessmentMethods?: Method[];
   programme?: ProgrammeAcademicConfig | null;
   resources?: ResourcesForm;
+  references?: ReferencesForm;
   responsibility?: StudentResponsibilityValue;
   policy?: PolicySectionValue;
   courseTotalSlt?: number | null;
@@ -272,6 +286,7 @@ export function buildCourseDocument({
   assessmentMethods = [],
   programme = null,
   resources = [],
+  references = [],
   responsibility,
   policy,
   courseTotalSlt = null,
@@ -442,6 +457,18 @@ export function buildCourseDocument({
       title: resource.title,
       url: resource.url,
       notes: resource.notes,
+    })),
+    references: references.map((reference) => ({
+      id: reference.id,
+      kind: reference.kind,
+      title: reference.title,
+      authors: reference.authors,
+      publisher: reference.publisher,
+      year: reference.year,
+      isbn: reference.isbn,
+      url: reference.url,
+      basedOn: reference.basedOn,
+      notes: reference.notes,
     })),
     responsibilities: (responsibility?.items ?? [])
       .map((item) => item.text.trim())
