@@ -14,6 +14,12 @@ export const LecturerSchema = z.object({
   title: z.string().nullable().optional(),
   qualification: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
+  /**
+   * Whether this lecturer profile is linked to a provisioned Supabase Auth
+   * identity. We intentionally do not label this "active" vs "invited" because
+   * the app does not persist a reliable invite-acceptance state yet.
+   */
+  accountAccess: z.enum(["has_access", "no_access"]),
 });
 export type Lecturer = z.infer<typeof LecturerSchema>;
 
