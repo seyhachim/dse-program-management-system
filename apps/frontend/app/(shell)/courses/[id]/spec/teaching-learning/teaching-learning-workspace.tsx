@@ -10,7 +10,10 @@ import {
   Loader2,
   Save,
 } from "lucide-react";
-import type { Method } from "@dse-pms/shared-types";
+import {
+  teachingLearningIsReady,
+  type Method,
+} from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ChipMultiSelect } from "../clos/chip-multiselect";
 import { withCodes, type CloForm } from "../clo-model";
@@ -30,10 +33,12 @@ export function TeachingLearningWorkspace({
   value,
   teachingMethods,
   onPersist,
+  onProfileSaved,
 }: {
   value: CloForm[];
   teachingMethods: Method[];
   onPersist: (items: CloForm[]) => Promise<boolean>;
+  onProfileSaved?: (profile: TeachingLearningProfile) => void;
 }) {
   const params = useParams<{ id: string }>();
   const courseId = params.id;
@@ -94,8 +99,22 @@ export function TeachingLearningWorkspace({
   }, [courseId]);
 
   const coveredClos = useMemo(
-    () => clos.filter((clo) => clo.teachingMethodIds.length > 0).length,
+    () =>
+      clos.filter(
+        (clo) => clo.status === "active" && clo.teachingMethodIds.length > 0,
+      ).length,
     [clos],
+  );
+  const activeClos = useMemo(
+    () => clos.filter((clo) => clo.status === "active"),
+    [clos],
+  );
+  const strategyOptions = useMemo(
+    () =>
+      ACTIVE_LEARNING_CLUSTERS.flatMap((cluster) => cluster.strategies).map(
+        (strategy) => ({ id: strategy.id, name: strategy.label }),
+      ),
+    [],
   );
 
   const completion: [boolean, boolean, boolean, boolean, boolean] = [
@@ -104,7 +123,7 @@ export function TeachingLearningWorkspace({
     strategyIds.length > 0,
     independentLearning.length + resourceTypes.length + technologyTypes.length >
       0,
-    clos.length > 0 && coveredClos === clos.length,
+    activeClos.length > 0 && coveredClos === activeClos.length,
   ];
   const completeCount = completion.filter(Boolean).length;
 
@@ -119,9 +138,15 @@ export function TeachingLearningWorkspace({
         : [...values, id],
     );
 
-  const updateMethods = async (cloId: string, teachingMethodIds: string[]) => {
+  const updateCloSupport = async (
+    cloId: string,
+    patch: Pick<
+      Partial<CloForm>,
+      "teachingMethodIds" | "activeLearningStrategyIds"
+    >,
+  ) => {
     const next = clos.map((clo) =>
-      clo.id === cloId ? { ...clo, teachingMethodIds } : clo,
+      clo.id === cloId ? { ...clo, ...patch } : clo,
     );
     setSavingCloId(cloId);
     setSavedCloId(null);
@@ -161,6 +186,7 @@ export function TeachingLearningWorkspace({
       setIndependentLearning(saved.independentLearningTypes);
       setResourceTypes(saved.resourceTypes);
       setTechnologyTypes(saved.technologyTypes);
+      onProfileSaved?.(saved);
       setProfileSaved(true);
       window.setTimeout(() => setProfileSaved(false), 2500);
     } catch {
@@ -363,7 +389,7 @@ export function TeachingLearningWorkspace({
               key={clo.id}
               className="rounded-xl border border-border bg-background p-4"
             >
-              <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.9fr)_minmax(360px,1.4fr)_150px] xl:items-center">
+              <div className="grid gap-4 xl:grid-cols-[minmax(220px,0.8fr)_minmax(300px,1fr)_minmax(300px,1fr)_140px] xl:items-start">
                 <div className="flex items-start gap-2.5">
                   <span className="rounded-md bg-muted px-2 py-1 text-xs font-bold">
                     {clo.code}
@@ -374,8 +400,21 @@ export function TeachingLearningWorkspace({
                   label={`Teaching methods for ${clo.code}`}
                   options={teachingMethods}
                   selectedIds={clo.teachingMethodIds}
-                  onChange={(ids) => void updateMethods(clo.id, ids)}
+                  onChange={(ids) =>
+                    void updateCloSupport(clo.id, { teachingMethodIds: ids })
+                  }
                   emptyMessage="No teaching methods defined yet."
+                />
+                <ChipMultiSelect
+                  label={`Active learning for ${clo.code}`}
+                  options={strategyOptions}
+                  selectedIds={clo.activeLearningStrategyIds}
+                  onChange={(ids) =>
+                    void updateCloSupport(clo.id, {
+                      activeLearningStrategyIds: ids,
+                    })
+                  }
+                  emptyMessage="No active-learning strategies defined yet."
                 />
                 <div className="flex justify-end">
                   {savingCloId === clo.id ? (
@@ -388,6 +427,12 @@ export function TeachingLearningWorkspace({
                       good
                       icon={<Check className="h-4 w-4" />}
                       text="Saved"
+                    />
+                  ) : clo.status === "inactive" ? (
+                    <Status
+                      good
+                      icon={<CircleCheck className="h-4 w-4" />}
+                      text="Inactive"
                     />
                   ) : clo.teachingMethodIds.length ? (
                     <Status
@@ -419,6 +464,22 @@ export function TeachingLearningWorkspace({
       </div>
 
       <div className="sticky bottom-3 flex items-center justify-end gap-3 rounded-xl border border-border bg-background/95 p-3 shadow-sm backdrop-blur">
+        {!teachingLearningIsReady(
+          {
+            philosophyTags,
+            philosophyStatement,
+            teachingMethodIds: courseMethodIds,
+            activeLearningStrategyIds: strategyIds,
+            independentLearningTypes: independentLearning,
+            resourceTypes,
+            technologyTypes,
+          },
+          clos,
+        ) ? (
+          <span className="mr-auto text-xs text-amber-600 dark:text-amber-400">
+            Complete philosophy, methods, active learning, and teaching support for every active CLO.
+          </span>
+        ) : null}
         {profileSaved ? (
           <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
             <CircleCheck className="h-4 w-4" /> Saved to database

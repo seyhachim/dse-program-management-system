@@ -1,21 +1,17 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
+import { TeachingLearningProfile } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
-import { PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
+import {
+  PROGRAMME_WIDE_ROLES,
+  type Role,
+} from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { teachingLearningService } from "./service.ts";
 import { weekProjectProgressService } from "./project-progress-service.ts";
 
-const TeachingLearningInput = z.object({
-  philosophyTags: z.array(z.string()).default([]),
-  philosophyStatement: z.string().default(""),
-  teachingMethodIds: z.array(z.string()).default([]),
-  activeLearningStrategyIds: z.array(z.string()).default([]),
-  independentLearningTypes: z.array(z.string()).default([]),
-  resourceTypes: z.array(z.string()).default([]),
-  technologyTypes: z.array(z.string()).default([]),
-});
+export const TeachingLearningInput = TeachingLearningProfile.strict();
 
 const WeekProjectProgressInput = z.object({
   weekId: z.string().min(1),
@@ -46,7 +42,7 @@ async function ensureCourseAccess(
   res: Response,
   id: string,
 ): Promise<boolean> {
-  if (req.user!.roles.some((role) => PROGRAMME_WIDE_ROLES.includes(role))) {
+  if (hasProgrammeWideRole(req.user!.roles)) {
     return true;
   }
 
@@ -70,7 +66,7 @@ async function ensureEditable(
   res: Response,
   id: string,
 ): Promise<boolean> {
-  if (req.user!.roles.some((role) => PROGRAMME_WIDE_ROLES.includes(role))) {
+  if (hasProgrammeWideRole(req.user!.roles)) {
     return true;
   }
 
@@ -78,7 +74,7 @@ async function ensureEditable(
   const spec = await courses.getSpec(id);
   const reviewStatus = spec?.review?.status;
 
-  if (reviewStatus && !["draft", "changesRequested"].includes(reviewStatus)) {
+  if (!isEditableReviewStatus(reviewStatus)) {
     res.status(409).json({
       error: "Course specification is locked while it is in the review workflow",
     });
@@ -86,6 +82,14 @@ async function ensureEditable(
   }
 
   return true;
+}
+
+export function hasProgrammeWideRole(roles: Role[]): boolean {
+  return roles.some((role) => PROGRAMME_WIDE_ROLES.includes(role));
+}
+
+export function isEditableReviewStatus(status?: string): boolean {
+  return !status || status === "draft" || status === "changesRequested";
 }
 
 export function createTeachingLearningRouter(): Router {

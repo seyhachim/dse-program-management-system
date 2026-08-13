@@ -48,7 +48,20 @@ export function buildWeekSuggestions({
     preferredMethodIds.has(method.id),
   );
 
-  const activeLearningStrategies = (profile?.activeLearningStrategyIds ?? [])
+  const cloStrategyIds = new Set(
+    linkedClos.flatMap((clo) => clo.activeLearningStrategyIds),
+  );
+  const courseStrategyIds = new Set(
+    profile?.activeLearningStrategyIds ?? [],
+  );
+  const preferredStrategyIds =
+    cloStrategyIds.size > 0
+      ? [...cloStrategyIds].filter(
+          (id) => courseStrategyIds.size === 0 || courseStrategyIds.has(id),
+        )
+      : [...courseStrategyIds];
+
+  const activeLearningStrategies = preferredStrategyIds
     .map((id) => strategyById.get(id))
     .filter(
       (strategy): strategy is { id: string; label: string } => Boolean(strategy),

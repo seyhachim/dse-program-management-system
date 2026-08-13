@@ -413,6 +413,7 @@ model CourseSpecClo {
   status            CloRowStatus                    @default(Active)
   notes             String                          @default("")
   teachingMethods   CourseSpecCloTeachingMethod[]
+  activeLearningStrategyIds String[]                @default([])
   assessmentMethods CourseSpecCloAssessmentMethod[]
 
   @@id([courseSpecId, id])

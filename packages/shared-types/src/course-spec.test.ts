@@ -25,6 +25,8 @@ import {
   specAttention,
   specCompletionLabel,
   specCompletionPercent,
+  TeachingLearningProfile,
+  teachingLearningIsReady,
 } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
@@ -35,7 +37,43 @@ test("CloItem defaults method id arrays to []", () => {
     description: "Do the thing",
   });
   expect(parsed.teachingMethodIds).toEqual([]);
+  expect(parsed.activeLearningStrategyIds).toEqual([]);
   expect(parsed.assessmentMethodIds).toEqual([]);
+});
+
+test("CloItem preserves active-learning strategy ids", () => {
+  const parsed = CloItem.parse({
+    id: "clo-1",
+    code: "CLO1",
+    description: "Do the thing",
+    activeLearningStrategyIds: ["peer-review"],
+  });
+  expect(parsed.activeLearningStrategyIds).toEqual(["peer-review"]);
+});
+
+test("Teaching & Learning readiness applies every required rule to active CLOs", () => {
+  const readyProfile = TeachingLearningProfile.parse({
+    philosophyTags: ["applied"],
+    teachingMethodIds: ["lab"],
+    activeLearningStrategyIds: ["coding-exercise"],
+  });
+  const supportedClos = [
+    { status: "active" as const, teachingMethodIds: ["lab"] },
+    { status: "inactive" as const, teachingMethodIds: [] },
+  ];
+
+  expect(teachingLearningIsReady(readyProfile, supportedClos)).toBe(true);
+  expect(
+    teachingLearningIsReady(
+      { ...readyProfile, activeLearningStrategyIds: [] },
+      supportedClos,
+    ),
+  ).toBe(false);
+  expect(
+    teachingLearningIsReady(readyProfile, [
+      { status: "active", teachingMethodIds: [] },
+    ]),
+  ).toBe(false);
 });
 
 test("CloItem preserves provided SLT hours and method ids", () => {

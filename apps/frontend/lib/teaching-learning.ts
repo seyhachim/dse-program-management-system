@@ -1,14 +1,7 @@
 import { api } from "./api";
+import type { TeachingLearningProfile } from "@dse-pms/shared-types";
 
-export type TeachingLearningProfile = {
-  philosophyTags: string[];
-  philosophyStatement: string;
-  teachingMethodIds: string[];
-  activeLearningStrategyIds: string[];
-  independentLearningTypes: string[];
-  resourceTypes: string[];
-  technologyTypes: string[];
-};
+export type { TeachingLearningProfile } from "@dse-pms/shared-types";
 
 export type WeekProjectProgress = {
   weekId: string;

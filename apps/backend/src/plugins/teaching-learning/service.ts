@@ -1,15 +1,9 @@
 import { Prisma } from "@prisma/client";
+import {
+  teachingLearningIsReady,
+  type TeachingLearningProfile,
+} from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
-
-export type TeachingLearningProfile = {
-  philosophyTags: string[];
-  philosophyStatement: string;
-  teachingMethodIds: string[];
-  activeLearningStrategyIds: string[];
-  independentLearningTypes: string[];
-  resourceTypes: string[];
-  technologyTypes: string[];
-};
 
 export const EMPTY_TEACHING_LEARNING_PROFILE: TeachingLearningProfile = {
   philosophyTags: [],
@@ -101,6 +95,23 @@ export const teachingLearningService = {
         "updatedAt" = CURRENT_TIMESTAMP
     `);
 
+    const clos = await prisma.courseSpecClo.findMany({
+      where: { courseSpecId: spec.id },
+      select: {
+        status: true,
+        teachingMethods: { select: { teachingMethodId: true } },
+      },
+    });
+    const ready = teachingLearningIsReady(
+      value,
+      clos.map((clo) => ({
+        status: clo.status === "Inactive" ? "inactive" : "active",
+        teachingMethodIds: clo.teachingMethods.map(
+          (method) => method.teachingMethodId,
+        ),
+      })),
+    );
+
     await prisma.courseSpecSection.upsert({
       where: {
         courseSpecId_sectionKey: {
@@ -111,9 +122,9 @@ export const teachingLearningService = {
       create: {
         courseSpecId: spec.id,
         sectionKey: "teachingLearning",
-        status: "Complete",
+        status: ready ? "Complete" : "Draft",
       },
-      update: { status: "Complete" },
+      update: { status: ready ? "Complete" : "Draft" },
     });
 
     return this.get(courseId);
