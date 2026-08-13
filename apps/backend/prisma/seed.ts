@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PLOS, pluginManifests } from "@dse-pms/shared-types";
 import { syncNormalizedRubricTables } from "../src/plugins/rubrics/service.ts";
 import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
+import { defaultProgrammeIdForRole } from "../src/core/auth/token.ts";
 
 /**
  * Seeds dev users (incl. several lecturers), students, courses, offerings and a
@@ -801,7 +802,7 @@ async function main() {
       create: {
         userId: user.id,
         roleId: role.id,
-        programmeId: DEFAULT_PROGRAMME_ID,
+        programmeId: defaultProgrammeIdForRole(roleSlug),
       },
     });
 

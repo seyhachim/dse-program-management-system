@@ -86,7 +86,9 @@ async function toView(
     otherLecturers: offering.otherLecturers,
     enrolledCount: offering.enrollments.length,
     createdAt: offering.createdAt.toISOString(),
-    course: course ? { id: course.id, code: course.code, title: course.title } : null,
+    course: course
+      ? { id: course.id, code: course.code, title: course.title, programmeId: course.programmeId }
+      : null,
     // Full instructor block for the syllabus Course Details (§6–9).
     lecturer: lecturer
       ? {
