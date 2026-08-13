@@ -12,7 +12,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "seed": "bun prisma/seed.ts",
-    "course-spec:import": "bun scripts/course-spec-import.ts",
+    "course-spec:import": "bun scripts/course-spec-import-runner.ts",
     "gen-token": "bun scripts/gen-token.ts",
     "test": "bun test"
   },
