@@ -16,6 +16,11 @@ export type AssessmentForm = {
   weight: string;
   dueWeek: string;
   durationWeeks: string;
+  assessmentCategory: "continuous" | "final";
+  topicNumbers: number[];
+  physicalHours: string;
+  onlineHours: string;
+  independentHours: string;
   format: string;
   submissionMethod: string;
   instructions: string;
@@ -30,7 +35,14 @@ export const EMPTY_ASSESSMENTS: AssessmentForm[] = [];
 
 const uuid = () => globalThis.crypto.randomUUID();
 const str = (v: unknown) => (v == null ? "" : String(v));
-const strArray = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
+const strArray = (v: unknown) =>
+  Array.isArray(v) ? v.map((x) => String(x)) : [];
+const numberArray = (v: unknown) =>
+  Array.isArray(v)
+    ? v
+        .map((x) => Number(x))
+        .filter((x) => Number.isInteger(x) && x >= 1 && x <= 15)
+    : [];
 
 /** A fresh, empty assessment. */
 export function emptyAssessment(): AssessmentForm {
@@ -45,6 +57,11 @@ export function emptyAssessment(): AssessmentForm {
     weight: "",
     dueWeek: "",
     durationWeeks: "",
+    assessmentCategory: "continuous",
+    topicNumbers: [],
+    physicalHours: "",
+    onlineHours: "",
+    independentHours: "",
     format: "",
     submissionMethod: "",
     instructions: "",
@@ -71,7 +88,16 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       cloCodes: strArray(d.cloCodes),
       weight: d.weight == null ? "" : String(d.weight),
       dueWeek: d.dueWeek == null ? "" : String(d.dueWeek),
-      durationWeeks: d.durationWeeks == null ? "" : String(d.durationWeeks),
+      durationWeeks:
+        d.durationWeeks == null ? "" : String(d.durationWeeks),
+      assessmentCategory:
+        d.assessmentCategory === "final" ? "final" : "continuous",
+      topicNumbers: numberArray(d.topicNumbers),
+      physicalHours:
+        d.physicalHours == null ? "" : String(d.physicalHours),
+      onlineHours: d.onlineHours == null ? "" : String(d.onlineHours),
+      independentHours:
+        d.independentHours == null ? "" : String(d.independentHours),
       format: str(d.format),
       submissionMethod: str(d.submissionMethod),
       instructions: str(d.instructions),
@@ -84,8 +110,14 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
   });
 }
 
+function numberOrNull(value: string): number | null {
+  return value.trim() === "" ? null : Number(value);
+}
+
 /** Convert the form model into the AssessmentPlanSection payload the API validates. */
-export function toAssessmentPayload(items: AssessmentForm[]): AssessmentPlanSection {
+export function toAssessmentPayload(
+  items: AssessmentForm[],
+): AssessmentPlanSection {
   return {
     items: items.map((a) => ({
       id: a.id,
@@ -95,9 +127,14 @@ export function toAssessmentPayload(items: AssessmentForm[]): AssessmentPlanSect
       mode: a.mode,
       status: a.status,
       cloCodes: a.cloCodes,
-      weight: a.weight === "" ? null : Number(a.weight),
-      dueWeek: a.dueWeek === "" ? null : Number(a.dueWeek),
-      durationWeeks: a.durationWeeks === "" ? null : Number(a.durationWeeks),
+      weight: numberOrNull(a.weight),
+      dueWeek: numberOrNull(a.dueWeek),
+      durationWeeks: numberOrNull(a.durationWeeks),
+      assessmentCategory: a.assessmentCategory,
+      topicNumbers: [...a.topicNumbers].sort((a, b) => a - b),
+      physicalHours: numberOrNull(a.physicalHours),
+      onlineHours: numberOrNull(a.onlineHours),
+      independentHours: numberOrNull(a.independentHours),
       format: a.format.trim(),
       submissionMethod: a.submissionMethod.trim(),
       instructions: a.instructions.trim(),
@@ -117,19 +154,31 @@ export function assessmentTotalWeight(items: AssessmentForm[]): number {
     .reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
 }
 
+/** Explicit assessment SLT. No value is invented when all three components are blank. */
+export function assessmentSltHours(item: AssessmentForm): number | null {
+  const values = [item.physicalHours, item.onlineHours, item.independentHours];
+  if (values.every((value) => value.trim() === "")) return null;
+  return values.reduce((sum, value) => sum + (Number(value) || 0), 0);
+}
+
 /* ------------------------------------------------------------- type badge palette */
 
 /** Chip colours for an assessment type badge, keyed by type. */
 const TYPE_CHIPS: Record<string, string> = {
-  Assignment: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
+  Assignment:
+    "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
   Quiz: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
   Exam: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
   Lab: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-  Project: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-  Presentation: "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300",
+  Project:
+    "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+  Presentation:
+    "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300",
   Report: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
-  "Peer Evaluation": "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300",
-  Participation: "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
+  "Peer Evaluation":
+    "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300",
+  Participation:
+    "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
 };
 
 /** Tailwind chip classes for an assessment type. */
