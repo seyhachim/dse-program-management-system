@@ -308,7 +308,9 @@ function compactWordCell(
 }
 
 function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
-  const bodyW = colWidths([7, 58, 8, 9, 9, 9]);
+  // Match the official §14 geometry: 66% CLO+description, 8.3% PLO,
+  // and 25.7% split evenly across C/A/P.
+  const bodyW = colWidths([7, 59, 8.3, 8.57, 8.57, 8.56]);
   const descriptionWidth = bodyW[0]! + bodyW[1]!;
   const domainWidth = bodyW[3]! + bodyW[4]! + bodyW[5]!;
 
@@ -322,11 +324,11 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
           shading: { fill: LABEL },
           borders: noBottomBorder,
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 30, bottom: 12, left: 45, right: 45 },
+          margins: { top: 50, bottom: 24, left: 45, right: 45 },
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
-              spacing: { before: 0, after: 0, line: 205 },
+              spacing: { before: 0, after: 0, line: 215 },
               children: [text("Description of the course learning outcomes – CLOs At the end of the course, students will be able to:", false, SMALL)],
             }),
           ],
@@ -336,7 +338,7 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
           shading: { fill: LABEL },
           borders: noBottomBorder,
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 30, bottom: 12, left: 35, right: 35 },
+          margins: { top: 50, bottom: 24, left: 35, right: 35 },
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -350,12 +352,22 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
           width: { size: domainWidth, type: WidthType.DXA },
           shading: { fill: LABEL },
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 24, bottom: 24, left: 30, right: 30 },
+          margins: { top: 12, bottom: 12, left: 22, right: 22 },
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
               spacing: { before: 0, after: 0, line: 205 },
-              children: [text("Levels in Learning Domain:\nKnowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)],
+              children: [text("Levels in Learning Domain:", false, SMALL)],
+            }),
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0, line: 205 },
+              children: [text("Knowledge (Cognitive-C), Attitude", false, SMALL)],
+            }),
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0, line: 205 },
+              children: [text("(Affective-A), Skills (Psychomotor-P)", false, SMALL)],
             }),
           ],
         }),
@@ -369,14 +381,14 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
           width: { size: descriptionWidth, type: WidthType.DXA },
           shading: { fill: LABEL },
           borders: noTopBorder,
-          margins: { top: 0, bottom: 18, left: 45, right: 45 },
+          margins: { top: 0, bottom: 26, left: 45, right: 45 },
           children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
         }),
         new TableCell({
           width: { size: bodyW[2]!, type: WidthType.DXA },
           shading: { fill: LABEL },
           borders: noTopBorder,
-          margins: { top: 0, bottom: 18, left: 35, right: 35 },
+          margins: { top: 0, bottom: 26, left: 35, right: 35 },
           children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
         }),
         ...(["C", "A", "P"] as const).map((label, index) =>
@@ -384,7 +396,7 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
             width: { size: bodyW[index + 3]!, type: WidthType.DXA },
             shading: { fill: LABEL },
             verticalAlign: VerticalAlign.CENTER,
-            margins: { top: 18, bottom: 18, left: 18, right: 18 },
+            margins: { top: 24, bottom: 24, left: 18, right: 18 },
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
