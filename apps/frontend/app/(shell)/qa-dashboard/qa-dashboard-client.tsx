@@ -15,12 +15,14 @@ import {
   QA_PILOT_REQUIREMENT_CODES,
   type CreateQaCycleInput,
   type CreateQaEvidenceInput,
+  type QaAnalysisReviewView,
   type QaDashboardView,
   type QaEvidenceAnalysisView,
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
+import { QaAnalysisReviewPanel } from "./qa-analysis-review-panel";
 
 const PROGRAMME_ID = "dse";
 const pilotRequirementCodes = new Set<string>(QA_PILOT_REQUIREMENT_CODES);
@@ -46,6 +48,7 @@ export function QaDashboardClient() {
   const canWrite = me?.permissions.includes("qa:write") ?? false;
   const [data, setData] = useState<QaDashboardView | null>(null);
   const [analyses, setAnalyses] = useState<QaEvidenceAnalysisView[]>([]);
+  const [reviews, setReviews] = useState<QaAnalysisReviewView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCycleForm, setShowCycleForm] = useState(false);
@@ -69,13 +72,19 @@ export function QaDashboardClient() {
 
       if (dashboard.selectedCycle) {
         const historyQuery = new URLSearchParams({ programmeId: PROGRAMME_ID });
-        setAnalyses(
-          await api.get<QaEvidenceAnalysisView[]>(
+        const [analysisHistory, reviewHistory] = await Promise.all([
+          api.get<QaEvidenceAnalysisView[]>(
             `/api/qa/cycles/${dashboard.selectedCycle.id}/analyses?${historyQuery}`,
           ),
-        );
+          api.get<QaAnalysisReviewView[]>(
+            `/api/qa/cycles/${dashboard.selectedCycle.id}/reviews?${historyQuery}`,
+          ),
+        ]);
+        setAnalyses(analysisHistory);
+        setReviews(reviewHistory);
       } else {
         setAnalyses([]);
+        setReviews([]);
       }
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load QA readiness");
@@ -106,6 +115,15 @@ export function QaDashboardClient() {
     }
     return latest;
   }, [analyses]);
+  const reviewsByAnalysis = useMemo(() => {
+    const grouped = new Map<string, QaAnalysisReviewView[]>();
+    for (const review of reviews) {
+      const list = grouped.get(review.analysisId) ?? [];
+      list.push(review);
+      grouped.set(review.analysisId, list);
+    }
+    return grouped;
+  }, [reviews]);
 
   async function createCycle() {
     setSaving(true);
@@ -312,11 +330,17 @@ export function QaDashboardClient() {
                       {analysis ? (
                         <div className="mt-3 rounded-xl border border-border bg-muted/30 p-3 text-sm">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-medium">Latest deterministic evidence analysis</span>
+                            <span className="font-medium">Latest evidence analysis</span>
                             <span className="text-xs text-muted-foreground">{analysis.engine} · v{analysis.engineVersion} · {analysis.sources.length} source snapshot{analysis.sources.length === 1 ? "" : "s"}</span>
                           </div>
                           <p className="mt-2 text-muted-foreground">{analysis.explanation}</p>
                           {analysis.uncertaintyNote ? <p className="mt-2 text-xs text-muted-foreground">{analysis.uncertaintyNote}</p> : null}
+                          <QaAnalysisReviewPanel
+                            analysis={analysis}
+                            reviews={reviewsByAnalysis.get(analysis.id) ?? []}
+                            canWrite={canWrite}
+                            onReviewed={() => load(data.selectedCycle!.id)}
+                          />
                         </div>
                       ) : isPilot ? (
                         <p className="mt-2 text-xs text-muted-foreground">No deterministic evidence analysis has been run for this pilot requirement yet.</p>
