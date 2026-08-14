@@ -2,7 +2,6 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
-  ExternalHyperlink,
   ImageRun,
   PageBreak,
   Packer,
@@ -1053,96 +1052,163 @@ function grandTotalSltTable(document: CourseDocumentModel) {
   });
 }
 
-function rubricCell(
-  assessment: CourseDocumentModel["assessments"][number],
-  width?: number,
-) {
-  if (!assessment.rubricName) return cell("", { width });
-  if (!assessment.rubricUrl) return cell(assessment.rubricName, { width });
-  const href =
-    typeof window !== "undefined"
-      ? new URL(assessment.rubricUrl, window.location.origin).toString()
-      : assessment.rubricUrl;
-  return new TableCell({
-    width: width ? { size: width, type: WidthType.DXA } : undefined,
-    verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 55, bottom: 55, left: 70, right: 70 },
-    children: [
-      new Paragraph({
-        spacing: { before: 0, after: 40, line: 220 },
-        children: [
-          new ExternalHyperlink({
-            link: href,
-            children: [
-              new TextRun({
-                text: `${assessment.rubricName} ↗`,
-                font: FONT,
-                size: SMALL,
-                color: COURSE_DOCUMENT_STYLE.colors.link.replace("#", ""),
-                underline: { type: "single" },
-              }),
-            ],
-          }),
-        ],
-      }),
-    ],
-  });
-}
+function assessmentPlanTable(document: CourseDocumentModel) {
+  const topicWeights = Array.from({ length: 15 }, () => 2.1);
+  const w = colWidths([4.5, 4.5, 21.5, 8, 6, 4.5, 5.5, ...topicWeights, 7, 7]);
+  const topicWidth = w.slice(7, 22).reduce((sum, width) => sum + width, 0);
 
-function assessmentTable(document: CourseDocumentModel) {
-  const w = colWidths([7, 8, 10, 23, 7, 7, 24, 14]);
-  const headers = [
-    "CLOs",
-    "PLO",
-    "C/A/P Level",
-    "Assessment & Description",
-    "G/I",
-    "Weight (%)",
-    "Evaluation Definition",
-    "Rubric",
+  const rows: TableRow[] = [
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("CLO", w[0]!, { bottom: false }),
+        headerMergeCell("PLO", w[1]!, { bottom: false }),
+        headerMergeCell("Assessment", w[2]!, { bottom: false }),
+        headerMergeCell("Group (G) /\nIndividual (I)", w[3]!, { bottom: false }),
+        headerMergeCell("Weight\n%", w[4]!, { bottom: false }),
+        headerMergeCell("SLT", w[5]!, { bottom: false }),
+        headerMergeCell("C/A/P\nLevel", w[6]!, { bottom: false }),
+        headerMergeCell("Topic", topicWidth, { columnSpan: 15 }),
+        headerMergeCell("Total\nWeight\n(%)", w[22]!, { bottom: false }),
+        headerMergeCell("Total\nSLT", w[23]!, { bottom: false }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("", w[0]!, { top: false }),
+        headerMergeCell("", w[1]!, { top: false }),
+        headerMergeCell("", w[2]!, { top: false }),
+        headerMergeCell("", w[3]!, { top: false }),
+        headerMergeCell("", w[4]!, { top: false }),
+        headerMergeCell("", w[5]!, { top: false }),
+        headerMergeCell("", w[6]!, { top: false }),
+        ...Array.from({ length: 15 }, (_, index) =>
+          headerMergeCell(String(index + 1), w[index + 7]!),
+        ),
+        headerMergeCell("", w[22]!, { top: false }),
+        headerMergeCell("", w[23]!, { top: false }),
+      ],
+    }),
   ];
-  const rows = [
-    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
-  ];
+
+  const groupTotals = new Map<string, { weight: number; slt: number }>();
   for (const assessment of document.assessments) {
-    const assessmentDescription = assessment.description
-      ? `${assessment.name}\n${assessment.description}`
-      : assessment.name;
+    const key = [...assessment.cloCodes].sort().join("|") || assessment.id;
+    const current = groupTotals.get(key) ?? { weight: 0, slt: 0 };
+    current.weight += Number(assessment.weight) || 0;
+    current.slt += assessment.totalSltHours;
+    groupTotals.set(key, current);
+  }
+
+  const seenGroups = new Set<string>();
+  for (const assessment of document.assessments) {
+    const key = [...assessment.cloCodes].sort().join("|") || assessment.id;
+    const firstInGroup = !seenGroups.has(key);
+    seenGroups.add(key);
+    const totals = groupTotals.get(key) ?? { weight: 0, slt: 0 };
+
     rows.push(
       new TableRow({
+        cantSplit: true,
         children: [
-          cell(values(assessment.cloCodes), { width: w[0] }),
-          cell(values(assessment.mappedPlos), { width: w[1] }),
-          cell(values(assessment.capLevels), { width: w[2] }),
-          cell(assessmentDescription, { width: w[3] }),
-          cell(assessment.mode === "group" ? "G" : "I", { width: w[4] }),
-          cell(assessment.weight ? `${assessment.weight}%` : "—", {
-            width: w[5],
+          compactWordCell(
+            firstInGroup ? assessment.cloCodes.join(", ") : "",
+            w[0]!,
+            AlignmentType.CENTER,
+          ),
+          compactWordCell(
+            firstInGroup ? assessment.mappedPlos.join(", ") : "",
+            w[1]!,
+            AlignmentType.CENTER,
+          ),
+          compactWordCell(assessment.name, w[2]!),
+          compactWordCell(
+            assessment.mode === "group" ? "G" : "I",
+            w[3]!,
+            AlignmentType.CENTER,
+          ),
+          compactWordCell(cleanSltValue(assessment.weight), w[4]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(assessment.totalSltHours), w[5]!, AlignmentType.CENTER),
+          compactWordCell(assessment.capLevels.join(", "), w[6]!, AlignmentType.CENTER),
+          ...Array.from({ length: 15 }, (_, index) => {
+            const topic = index + 1;
+            return compactWordCell(
+              assessment.topicNumbers.includes(topic) ? "✓" : "",
+              w[index + 7]!,
+              AlignmentType.CENTER,
+            );
           }),
-          cell(assessment.evaluationDefinition, { width: w[6] }),
-          rubricCell(assessment, w[7]),
+          compactWordCell(
+            firstInGroup && totals.weight > 0 ? String(totals.weight) : "",
+            w[22]!,
+            AlignmentType.CENTER,
+          ),
+          compactWordCell(
+            firstInGroup && totals.slt > 0 ? String(totals.slt) : "",
+            w[23]!,
+            AlignmentType.CENTER,
+          ),
         ],
       }),
     );
   }
+
+  const prefixWidth = w.slice(0, 4).reduce((sum, width) => sum + width, 0);
+  const footerTopicWidth = w.slice(7, 22).reduce((sum, width) => sum + width, 0);
   rows.push(
     new TableRow({
+      cantSplit: true,
       children: [
-        cell("Total", { bold: true, width: w[0] }),
-        cell("", { width: w[1] }),
-        cell("", { width: w[2] }),
-        cell("", { width: w[3] }),
-        cell("", { width: w[4] }),
-        cell(`${document.totals.assessmentWeight}%`, {
-          bold: true,
-          width: w[5],
+        new TableCell({
+          columnSpan: 4,
+          width: { size: prefixWidth, type: WidthType.DXA },
+          margins: { top: 24, bottom: 24, left: 30, right: 30 },
+          children: [new Paragraph({ children: [] })],
         }),
-        cell("", { width: w[6] }),
-        cell("", { width: w[7] }),
+        compactWordCell(
+          cleanSltValue(document.totals.assessmentWeight),
+          w[4]!,
+          AlignmentType.CENTER,
+          true,
+        ),
+        compactWordCell("", w[5]!, AlignmentType.CENTER),
+        compactWordCell("", w[6]!, AlignmentType.CENTER),
+        new TableCell({
+          columnSpan: 15,
+          width: { size: footerTopicWidth, type: WidthType.DXA },
+          margins: { top: 24, bottom: 24, left: 30, right: 30 },
+          children: [new Paragraph({ children: [] })],
+        }),
+        compactWordCell(
+          cleanSltValue(document.totals.assessmentWeight),
+          w[22]!,
+          AlignmentType.CENTER,
+        ),
+        new TableCell({
+          width: { size: w[23]!, type: WidthType.DXA },
+          shading: { fill: "F4B183" },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 28, bottom: 28, left: 48, right: 48 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0, line: 205 },
+              children: [text(String(document.totals.assessmentSlt), true, SMALL)],
+            }),
+          ],
+        }),
       ],
     }),
   );
-  return table(rows, w);
+
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: w,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows,
+  });
 }
 
 function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
@@ -1316,12 +1382,7 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(
     sectionBox([
       sectionTitle("17", "Course Assessment Plan"),
-      assessmentTable(document),
-      paragraph(
-        "Assessment SLT is omitted because the current assessment data model does not contain an assessment-SLT field.",
-        false,
-        SMALL,
-      ),
+      assessmentPlanTable(document),
     ]),
   );
 
