@@ -10,6 +10,7 @@ import {
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import { requireMethodVocabularyManager } from "./policy.ts";
 import { methodService } from "./service.ts";
 
 function idParam(value: string | undefined): string | null {
@@ -31,12 +32,14 @@ export function createMethodRouter(): Router {
     res.json(await methodService.listManaged());
   });
 
-  // Programme-management catalogue: includes archived entries.
-  router.get("/managed", requirePermission("programme:write"), async (_req, res) => {
+  // Programme-management catalogue: includes archived entries and is restricted
+  // to Admin / Head of Programme so non-manager roles cannot inspect the
+  // management surface and then attempt direct write calls.
+  router.get("/managed", requireMethodVocabularyManager, async (_req, res) => {
     res.json(await methodService.listManaged());
   });
 
-  router.post("/teaching", requirePermission("programme:write"), async (req, res) => {
+  router.post("/teaching", requireMethodVocabularyManager, async (req, res) => {
     const parsed = CreateMethodInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -50,7 +53,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/teaching/:id", requirePermission("programme:write"), async (req, res) => {
+  router.put("/teaching/:id", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = UpdateMethodInput.safeParse(req.body);
     if (!id || !parsed.success) {
@@ -64,7 +67,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/teaching/:id/active", requirePermission("programme:write"), async (req, res) => {
+  router.put("/teaching/:id/active", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = SetVocabularyActiveInput.safeParse(req.body);
     if (!id || !parsed.success) {
@@ -78,7 +81,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.post("/assessment", requirePermission("programme:write"), async (req, res) => {
+  router.post("/assessment", requireMethodVocabularyManager, async (req, res) => {
     const parsed = CreateMethodInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -92,7 +95,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/assessment/:id", requirePermission("programme:write"), async (req, res) => {
+  router.put("/assessment/:id", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = UpdateMethodInput.safeParse(req.body);
     if (!id || !parsed.success) {
@@ -106,7 +109,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/assessment/:id/active", requirePermission("programme:write"), async (req, res) => {
+  router.put("/assessment/:id/active", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = SetVocabularyActiveInput.safeParse(req.body);
     if (!id || !parsed.success) {
@@ -120,7 +123,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.post("/active-learning/clusters", requirePermission("programme:write"), async (req, res) => {
+  router.post("/active-learning/clusters", requireMethodVocabularyManager, async (req, res) => {
     const parsed = CreateActiveLearningClusterInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -133,7 +136,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/active-learning/clusters/:id", requirePermission("programme:write"), async (req, res) => {
+  router.put("/active-learning/clusters/:id", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = UpdateActiveLearningClusterInput.safeParse(req.body);
     if (!id || !parsed.success) {
@@ -147,7 +150,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/active-learning/clusters/:id/active", requirePermission("programme:write"), async (req, res) => {
+  router.put("/active-learning/clusters/:id/active", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = SetVocabularyActiveInput.safeParse(req.body);
     if (!id || !parsed.success) {
@@ -161,7 +164,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.post("/active-learning/strategies", requirePermission("programme:write"), async (req, res) => {
+  router.post("/active-learning/strategies", requireMethodVocabularyManager, async (req, res) => {
     const parsed = CreateActiveLearningStrategyInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -174,7 +177,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/active-learning/strategies/:id", requirePermission("programme:write"), async (req, res) => {
+  router.put("/active-learning/strategies/:id", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = UpdateActiveLearningStrategyInput.safeParse(req.body);
     if (!id || !parsed.success) {
@@ -188,7 +191,7 @@ export function createMethodRouter(): Router {
     }
   });
 
-  router.put("/active-learning/strategies/:id/active", requirePermission("programme:write"), async (req, res) => {
+  router.put("/active-learning/strategies/:id/active", requireMethodVocabularyManager, async (req, res) => {
     const id = idParam(req.params.id);
     const parsed = SetVocabularyActiveInput.safeParse(req.body);
     if (!id || !parsed.success) {

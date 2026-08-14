@@ -93,6 +93,13 @@ import {
   toResourcesPayload,
   type ResourcesForm,
 } from "./resources-model";
+import { ReferencesSectionForm } from "./references-section";
+import {
+  EMPTY_REFERENCES,
+  toReferencesForm,
+  toReferencesPayload,
+  type ReferencesForm,
+} from "./references-model";
 import {
   EMPTY_STUDENT_RESPONSIBILITY,
   StudentResponsibilitySection,
@@ -113,6 +120,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "slt", label: "Weekly Plan" },
   { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
+  { id: "references", label: "References" },
   { id: "responsibility", label: "Responsibility" },
   { id: "policy", label: "Policies" },
   { id: "documentPreview", label: "Document Preview" },
@@ -126,6 +134,7 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "slt",
   "mapping",
   "resources",
+  "references",
   "responsibility",
   "policy",
 ]);
@@ -158,6 +167,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
   const [resources, setResources] = useState<ResourcesForm>(EMPTY_RESOURCES);
+  const [references, setReferences] =
+    useState<ReferencesForm>(EMPTY_REFERENCES);
   const [responsibility, setResponsibility] =
     useState<StudentResponsibilityValue>(EMPTY_STUDENT_RESPONSIBILITY);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
@@ -258,6 +269,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
       );
       setResources(toResourcesForm(spec.data.resources));
+      setReferences(toReferencesForm(spec.data.references));
       setResponsibility(
         (spec.data.responsibility as
           | StudentResponsibilityValue
@@ -444,6 +456,39 @@ export function SpecClient({ courseId }: { courseId: string }) {
       }
     },
     [courseId, editingLocked, weeklyPlan],
+  );
+
+  const persistReferences = useCallback(
+    async (items: ReferencesForm) => {
+      if (editingLocked) {
+        setError(
+          "This course specification is locked while it is in the review workflow.",
+        );
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(
+          courseId,
+          "references",
+          toReferencesPayload(items),
+        );
+        setReferences(items);
+        setStatus((s) => ({ ...s, references: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError ? err.message : "Failed to save references",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, editingLocked],
   );
 
   const persistResponsibility = useCallback(
@@ -635,6 +680,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         assessmentMethods,
         programme,
         resources,
+        references,
         responsibility,
         policy,
         courseTotalSlt,
@@ -651,6 +697,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       assessmentMethods,
       programme,
       resources,
+      references,
       responsibility,
       policy,
       courseTotalSlt,
@@ -833,6 +880,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 value={resources}
                 weeklyPlan={weeklyPlan}
                 onPersist={persistResources}
+              />
+            </TabsContent>
+
+            <TabsContent value="references" className="mt-4">
+              <ReferencesSectionForm
+                value={references}
+                onPersist={persistReferences}
               />
             </TabsContent>
 

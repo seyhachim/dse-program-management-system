@@ -767,11 +767,19 @@ model CourseSpecMappingCell {
 /// a loose reference, matching CourseSpecMappingCell.ref: CourseSpecWeek uses a
 /// composite key and weekly-plan sync rebuilds rows, so a hard FK would cascade
 /// resource evidence during an otherwise harmless weekly-plan save.
+/// Table backs two distinct sections, discriminated by `section`: §19 Required
+/// Resources (`Resource`, the historical default — `resourceType`/`evidenceWeekIds`
+/// are meaningful only here) and §20 References/Textbooks (`Reference` — the
+/// `kind`/`authors`/`publisher`/`year`/`isbn`/`basedOn` bibliographic columns,
+/// dormant since the `unify_course_spec_resources` migrations, are meaningful only
+/// here). Every sync/read must filter by `section` — see `syncResources`/
+/// `syncReferences` in courses/service.ts.
 model CourseSpecResource {
-  id              String     @default(uuid())
+  id              String                    @default(uuid())
   courseSpecId    String
-  courseSpec      CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  courseSpec      CourseSpec                @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   order           Int
+  section         CourseSpecResourceSection @default(Resource)
   // Legacy single-week provenance is retained for safe migration/backward compatibility.
   weekId          String?
   resourceType    String
@@ -791,6 +799,14 @@ model CourseSpecResource {
 
   @@id([courseSpecId, id])
   @@index([courseSpecId, weekId])
+  @@index([courseSpecId, section])
+}
+
+/// Discriminates which wizard section a `CourseSpecResource` row belongs to —
+/// added when §20 was wired up to reuse the same table as §19 (issue #122).
+enum CourseSpecResourceSection {
+  Resource
+  Reference
 }
 
 /// §21 Student Responsibility. One ordered statement per course specification.

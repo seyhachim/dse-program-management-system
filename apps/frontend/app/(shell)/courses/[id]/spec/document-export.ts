@@ -15,7 +15,11 @@ import {
   WidthType,
 } from "docx";
 
-import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
+import {
+  LETTER_GRADES,
+  PLOS,
+  referenceKindLabel,
+} from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
@@ -1390,6 +1394,52 @@ function resourcesTable(resources: CourseDocumentModel["resources"]) {
   return table(rows, w);
 }
 
+function referenceCitation(
+  reference: CourseDocumentModel["references"][number],
+): string {
+  const parts = [
+    reference.authors,
+    reference.year ? `(${reference.year})` : "",
+    reference.title,
+    reference.publisher,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(". ") : "—";
+}
+
+function referencesTable(references: CourseDocumentModel["references"]) {
+  const w = colWidths([13, 45, 12, 15, 15]);
+  const headers = ["Kind", "Citation", "ISBN", "Link", "Notes"];
+
+  const rows = [
+    new TableRow({
+      children: headers.map((header, index) =>
+        headerCell(header, w[index]),
+      ),
+    }),
+  ];
+
+  for (const reference of references) {
+    const rowValues = [
+      referenceKindLabel(reference.kind),
+      referenceCitation(reference),
+      reference.isbn,
+      reference.url,
+      reference.notes,
+    ];
+
+    rows.push(
+      new TableRow({
+        children: rowValues.map((value, index) =>
+          cell(value, { width: w[index] }),
+        ),
+      }),
+    );
+  }
+
+  return table(rows, w);
+}
+
 function bulletedList(items: string[]) {
   return items.map(
     (item) =>
@@ -1514,6 +1564,22 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
             ),
           ]
         : [resourcesTable(document.resources)]),
+    ]),
+  );
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    sectionBox([
+      sectionTitle("20", "References / Textbooks"),
+      ...(document.references.length === 0
+        ? [
+            paragraph(
+              "No references have been recorded.",
+              false,
+              SMALL,
+            ),
+          ]
+        : [referencesTable(document.references)]),
     ]),
   );
 
