@@ -769,63 +769,288 @@ function officialCloPloMatrixTable(
   });
 }
 
-function sltTable(document: CourseDocumentModel) {
-  const w = colWidths([5, 29, 8, 7, 7, 7, 7, 9, 11]);
-  const headers = [
-    "Week",
-    "Course Content / Topic",
-    "CLOs",
-    "L",
-    "T",
-    "P",
-    "O",
-    "Independent",
-    "Total SLT",
+function cleanSltValue(value: string | number | null | undefined) {
+  if (value == null || value === "") return "";
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric === 0) return "";
+  return String(value);
+}
+
+function headerMergeCell(
+  value: string,
+  width: number,
+  options?: {
+    columnSpan?: number;
+    top?: boolean;
+    bottom?: boolean;
+    bold?: boolean;
+  },
+) {
+  const top = options?.top ?? true;
+  const bottom = options?.bottom ?? true;
+  return new TableCell({
+    width: { size: width, type: WidthType.DXA },
+    columnSpan: options?.columnSpan,
+    shading: { fill: LABEL },
+    borders:
+      top && bottom
+        ? undefined
+        : top
+          ? noBottomBorder
+          : bottom
+            ? noTopBorder
+            : { ...noTopBorder, ...noBottomBorder },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 20, bottom: 20, left: 22, right: 22 },
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0, line: 205 },
+        children: value ? [text(value, options?.bold ?? false, SMALL)] : [],
+      }),
+    ],
+  });
+}
+
+function topicSltCell(week: string, topic: string, width: number) {
+  return new TableCell({
+    width: { size: width, type: WidthType.DXA },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 24, bottom: 24, left: 45, right: 45 },
+    children: [
+      new Paragraph({
+        spacing: { before: 0, after: 0, line: 205 },
+        children: [
+          text(`Topic ${week}: `, true, SMALL),
+          text(topic, false, SMALL),
+        ],
+      }),
+    ],
+  });
+}
+
+function courseContentSltTable(document: CourseDocumentModel) {
+  const w = colWidths([3, 38, 5, 4, 4, 4, 4, 4, 4, 4, 4, 11, 7]);
+  const contentWidth = w[0]! + w[1]!;
+  const activityWidth = w.slice(3, 12).reduce((sum, width) => sum + width, 0);
+  const f2fWidth = w.slice(3, 11).reduce((sum, width) => sum + width, 0);
+  const physicalWidth = w.slice(3, 7).reduce((sum, width) => sum + width, 0);
+  const onlineWidth = w.slice(7, 11).reduce((sum, width) => sum + width, 0);
+
+  const rows: TableRow[] = [
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("Course Content Outline and subtopics", contentWidth, { columnSpan: 2, bottom: false }),
+        headerMergeCell("CLOs", w[2]!, { bottom: false }),
+        headerMergeCell("Learning and Teaching Activities", activityWidth, { columnSpan: 9 }),
+        headerMergeCell("Total\nSLT", w[12]!, { bottom: false }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("", contentWidth, { columnSpan: 2, top: false, bottom: false }),
+        headerMergeCell("", w[2]!, { top: false, bottom: false }),
+        headerMergeCell("Face to Face (F2F)", f2fWidth, { columnSpan: 8 }),
+        headerMergeCell("NF2F\nIndependent Learning\n(Asynchronous)", w[11]!, { bottom: false }),
+        headerMergeCell("", w[12]!, { top: false, bottom: false }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("", contentWidth, { columnSpan: 2, top: false, bottom: false }),
+        headerMergeCell("", w[2]!, { top: false, bottom: false }),
+        headerMergeCell("Physical", physicalWidth, { columnSpan: 4 }),
+        headerMergeCell("Online/Technology-mediated\n(Synchronous)", onlineWidth, { columnSpan: 4 }),
+        headerMergeCell("", w[11]!, { top: false, bottom: false }),
+        headerMergeCell("", w[12]!, { top: false, bottom: false }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("", contentWidth, { columnSpan: 2, top: false }),
+        headerMergeCell("", w[2]!, { top: false }),
+        ...(["L", "T", "P", "O", "L", "T", "P", "O"] as const).map((label, index) =>
+          headerMergeCell(label, w[index + 3]!),
+        ),
+        headerMergeCell("", w[11]!, { top: false }),
+        headerMergeCell("", w[12]!, { top: false }),
+      ],
+    }),
   ];
-  const rows = [
-    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
-  ];
-  const sumOf = (key: keyof CourseDocumentModel["weeklyPlan"][number]) =>
-    String(
-      document.weeklyPlan.reduce((s, week) => s + (Number(week[key]) || 0), 0),
-    );
+
   for (const week of document.weeklyPlan) {
-    const rowValues = [
-      week.week,
-      week.topic,
-      values(week.cloCodes),
-      week.lectureHours,
-      week.tutorialHours,
-      week.practiceHours,
-      week.otherHours,
-      week.selfStudyHours,
-      week.sltHours ? `${week.sltHours} h` : "—",
-    ];
     rows.push(
       new TableRow({
-        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+        cantSplit: true,
+        children: [
+          compactWordCell(week.week, w[0]!, AlignmentType.CENTER),
+          topicSltCell(week.week, week.topic, w[1]!),
+          compactWordCell(week.cloCodes.join(", "), w[2]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(week.lectureHours), w[3]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(week.tutorialHours), w[4]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(week.practiceHours), w[5]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(week.otherHours), w[6]!, AlignmentType.CENTER),
+          compactWordCell("", w[7]!, AlignmentType.CENTER),
+          compactWordCell("", w[8]!, AlignmentType.CENTER),
+          compactWordCell("", w[9]!, AlignmentType.CENTER),
+          compactWordCell("", w[10]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(week.selfStudyHours), w[11]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(week.sltHours), w[12]!, AlignmentType.CENTER),
+        ],
       }),
     );
   }
+
+  const labelWidth = w.slice(0, 12).reduce((sum, width) => sum + width, 0);
   rows.push(
     new TableRow({
+      cantSplit: true,
       children: [
-        cell("Total", { bold: true, width: w[0] }),
-        cell("Course Content SLT", { bold: true, width: w[1] }),
-        cell("", { width: w[2] }),
-        cell(sumOf("lectureHours"), { bold: true, width: w[3] }),
-        cell(sumOf("tutorialHours"), { bold: true, width: w[4] }),
-        cell(sumOf("practiceHours"), { bold: true, width: w[5] }),
-        cell(sumOf("otherHours"), { bold: true, width: w[6] }),
-        cell(sumOf("selfStudyHours"), { bold: true, width: w[7] }),
-        cell(`${document.totals.courseContentSlt} h`, {
-          bold: true,
-          width: w[8],
+        new TableCell({
+          columnSpan: 12,
+          width: { size: labelWidth, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 24, bottom: 24, left: 45, right: 45 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              spacing: { before: 0, after: 0 },
+              children: [text("Total SLT for Course Content", true, SMALL)],
+            }),
+          ],
         }),
+        compactWordCell(String(document.totals.courseContentSlt), w[12]!, AlignmentType.CENTER),
       ],
     }),
   );
-  return table(rows, w);
+
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: w,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows,
+  });
+}
+
+function assessmentSltTable(
+  document: CourseDocumentModel,
+  category: "continuous" | "final",
+) {
+  const w = colWidths([3, 38, 6, 16, 19, 13, 5]);
+  const nameWidth = w[0]! + w[1]!;
+  const f2fWidth = w[3]! + w[4]!;
+  const label = category === "continuous" ? "Continuous Assessment" : "Final Assessment";
+  const assessments = document.assessments.filter((assessment) => assessment.assessmentCategory === category);
+  const categoryTotal =
+    category === "continuous"
+      ? document.totals.continuousAssessmentSlt
+      : document.totals.finalAssessmentSlt;
+
+  const rows: TableRow[] = [
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell(label, nameWidth, { columnSpan: 2, bottom: false }),
+        headerMergeCell("%", w[2]!, { bottom: false }),
+        headerMergeCell("Face to Face (F2F)", f2fWidth, { columnSpan: 2 }),
+        headerMergeCell("NF2F\nIndependent Learning\n(Asynchronous)", w[5]!, { bottom: false }),
+        headerMergeCell("Total\nSLT", w[6]!, { bottom: false }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("", nameWidth, { columnSpan: 2, top: false }),
+        headerMergeCell("", w[2]!, { top: false }),
+        headerMergeCell("Physical", w[3]!),
+        headerMergeCell("Online/Technology-mediated\n(Synchronous)", w[4]!),
+        headerMergeCell("", w[5]!, { top: false }),
+        headerMergeCell("", w[6]!, { top: false }),
+      ],
+    }),
+  ];
+
+  assessments.forEach((assessment, index) => {
+    rows.push(
+      new TableRow({
+        cantSplit: true,
+        children: [
+          compactWordCell(String(index + 1), w[0]!, AlignmentType.CENTER),
+          compactWordCell(assessment.name, w[1]!),
+          compactWordCell(cleanSltValue(assessment.weight), w[2]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(assessment.physicalSltHours), w[3]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(assessment.onlineSltHours), w[4]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(assessment.independentSltHours), w[5]!, AlignmentType.CENTER),
+          compactWordCell(cleanSltValue(assessment.totalSltHours), w[6]!, AlignmentType.CENTER),
+        ],
+      }),
+    );
+  });
+
+  const totalLabelWidth = w.slice(0, 6).reduce((sum, width) => sum + width, 0);
+  rows.push(
+    new TableRow({
+      cantSplit: true,
+      children: [
+        new TableCell({
+          columnSpan: 6,
+          width: { size: totalLabelWidth, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 24, bottom: 24, left: 45, right: 45 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              spacing: { before: 0, after: 0 },
+              children: [text(`Total SLT for ${label}`, true, SMALL)],
+            }),
+          ],
+        }),
+        compactWordCell(String(categoryTotal), w[6]!, AlignmentType.CENTER),
+      ],
+    }),
+  );
+
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: w,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows,
+  });
+}
+
+function grandTotalSltTable(document: CourseDocumentModel) {
+  const w = colWidths([93, 7]);
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: w,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows: [
+      new TableRow({
+        cantSplit: true,
+        children: [
+          new TableCell({
+            width: { size: w[0]!, type: WidthType.DXA },
+            margins: { top: 24, bottom: 24, left: 45, right: 45 },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                spacing: { before: 0, after: 0 },
+                children: [text("Grand Total SLT", true, SMALL)],
+              }),
+            ],
+          }),
+          compactWordCell(String(document.totals.grandSlt), w[1]!, AlignmentType.CENTER, true),
+        ],
+      }),
+    ],
+  });
 }
 
 function rubricCell(
@@ -1076,12 +1301,14 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(
     sectionBox([
       sectionTitle("16", "Distribution of Student Learning Time (SLT)"),
-      sltTable(document),
-      paragraph(
-        "Assessment-specific SLT is not currently stored in the course assessment records and is therefore not inferred.",
-        false,
-        SMALL,
-      ),
+      paragraph("* Lecture (L), Tutoring (T), Practice (P), Other (O)", false, SMALL),
+      courseContentSltTable(document),
+      new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }),
+      assessmentSltTable(document, "continuous"),
+      new Paragraph({ spacing: { before: 70, after: 0 }, children: [] }),
+      assessmentSltTable(document, "final"),
+      new Paragraph({ spacing: { before: 45, after: 0 }, children: [] }),
+      grandTotalSltTable(document),
     ]),
   );
 
