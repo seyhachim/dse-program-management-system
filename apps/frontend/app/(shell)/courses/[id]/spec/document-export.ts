@@ -659,72 +659,114 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
   return [title, subtitle, mainTable, legendCaption, legendTable];
 }
 
-function mappingTable(document: CourseDocumentModel) {
-  const w = colWidths([8, 15, 9, 34, 34]);
-  const rows = [
-    new TableRow({
-      children: [
-        headerCell("CLO", w[0]),
-        headerCell("PLO", w[1]),
-        headerCell("C/A/P Level", w[2]),
-        headerCell("Teaching Method", w[3]),
-        headerCell("Assessment Methods", w[4]),
-      ],
-    }),
-  ];
-  for (const row of document.mapping) {
-    const rowValues = [
-      row.cloCode,
-      values(row.ploCodes),
-      row.level,
-      values(row.teachingMethods),
-      values(row.assessmentMethods),
-    ];
-    rows.push(
-      new TableRow({
-        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
-      }),
-    );
-  }
-  return table(rows, w);
-}
-
-function cloPloMatrixTable(
+function officialCloPloMatrixTable(
   document: CourseDocumentModel,
   mode: "percent" | "hours",
 ) {
-  const w = colWidths([6, ...PLOS.map(() => 9.4)]);
-  const rows = [
+  const w = colWidths([7, ...PLOS.map(() => 9.3)]);
+  const ploWidth = w.slice(1).reduce((sum, width) => sum + width, 0);
+  const matrixTitle =
+    mode === "hours"
+      ? "Programme Learning Outcomes – Total Hours for Student Learning Time (SLT) including learning and assessment"
+      : "Programme Learning Outcomes – Percentages";
+
+  const rows: TableRow[] = [
     new TableRow({
+      cantSplit: true,
       children: [
-        headerCell("CLO", w[0]),
-        ...PLOS.map((plo, i) => headerCell(plo.id, w[i + 1])),
+        new TableCell({
+          width: { size: w[0]!, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          borders: noBottomBorder,
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 34, bottom: 15, left: 28, right: 28 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0 },
+              children: [text("CLO", false, SMALL)],
+            }),
+          ],
+        }),
+        new TableCell({
+          columnSpan: 10,
+          width: { size: ploWidth, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 34, bottom: 34, left: 30, right: 30 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0, line: 210 },
+              children: [text(matrixTitle, false, SMALL)],
+            }),
+          ],
+        }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        new TableCell({
+          width: { size: w[0]!, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          borders: noTopBorder,
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 0, bottom: 24, left: 28, right: 28 },
+          children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
+        }),
+        ...PLOS.map((plo, index) =>
+          new TableCell({
+            width: { size: w[index + 1]!, type: WidthType.DXA },
+            shading: { fill: LABEL },
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 22, bottom: 22, left: 18, right: 18 },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 0 },
+                children: [
+                  text(plo.id === "PLO9" ? "PLO 9" : plo.id, false, SMALL),
+                ],
+              }),
+            ],
+          }),
+        ),
       ],
     }),
   ];
+
   for (const row of document.mapping) {
     rows.push(
       new TableRow({
+        cantSplit: true,
         children: [
-          cell(row.cloCode, { bold: true, width: w[0] }),
-          ...PLOS.map((plo, i) => {
-            const width = w[i + 1];
-            if (!row.ploCodes.includes(plo.id)) return cell("", { width });
-            if (mode === "percent") {
-              return cell(
-                row.focusCode && row.focusPercent != null
-                  ? `${row.focusCode} (${row.focusPercent}%)`
-                  : "—",
-                { width },
-              );
+          compactWordCell(row.cloCode, w[0]!, AlignmentType.CENTER),
+          ...PLOS.map((plo, index) => {
+            const width = w[index + 1]!;
+            if (!row.ploCodes.includes(plo.id)) {
+              return compactWordCell("", width, AlignmentType.CENTER);
             }
-            return cell(row.sltHours || "—", { width });
+            const value =
+              mode === "percent"
+                ? row.focusCode && row.focusPercent != null
+                  ? `${row.focusCode} (${row.focusPercent}%)`
+                  : ""
+                : row.sltHours || "";
+            return compactWordCell(value, width, AlignmentType.CENTER);
           }),
         ],
       }),
     );
   }
-  return table(rows, w);
+
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: w,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows,
+  });
 }
 
 function sltTable(document: CourseDocumentModel) {
@@ -1019,21 +1061,14 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
         "15",
         "Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods",
       ),
-      paragraph("Programme Learning Outcomes — Percentages", true, SMALL),
-      cloPloMatrixTable(document, "percent"),
+      officialCloPloMatrixTable(document, "hours"),
+      paragraph("1 Credit = 40 Student Learning Time (SLT)", false, SMALL),
+      officialCloPloMatrixTable(document, "percent"),
       paragraph(
         "Fully (F) indicates a focus of more than 50% of the total SLT on this PLO, Moderate (M) indicates a focus of 31%–50% of the total SLT, and Partial (P) indicates a focus of less than 30% of the total SLT on the PLO.",
         false,
         SMALL,
       ),
-      paragraph(
-        "Programme Learning Outcomes — Total Hours for Student Learning Time (SLT)",
-        true,
-        SMALL,
-      ),
-      cloPloMatrixTable(document, "hours"),
-      paragraph("1 Credit = 40 Student Learning Time (SLT)", false, SMALL),
-      mappingTable(document),
     ]),
   );
 
