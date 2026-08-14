@@ -222,12 +222,51 @@ model QaRequirement {
   title       String
   order       Int
 
-  evidence    QaEvidence[]
-  assessments QaRequirementAssessment[]
+  evidence     QaEvidence[]
+  assessments  QaRequirementAssessment[]
+  expectations QaQualityExpectation[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
   @@index([code])
+}
+
+/// Framework-level operational interpretation of a QA requirement. Expectations
+/// are reusable across programmes; programme/cycle evidence remains in QaEvidence.
+model QaQualityExpectation {
+  id            String        @id
+  requirementId String
+  requirement   QaRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  statement     String
+  purpose       String        @default("")
+  order         Int
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now())
+
+  expectedEvidence QaExpectedEvidence[]
+
+  @@unique([requirementId, order])
+  @@index([requirementId, active])
+}
+
+/// Evidence forms that may support one quality expectation. Role and sourceDomain
+/// stay as constrained strings in SQL so the catalogue can evolve independently
+/// of Prisma enum migrations while shared Zod contracts provide API validation.
+model QaExpectedEvidence {
+  id            String               @id
+  expectationId String
+  expectation   QaQualityExpectation @relation(fields: [expectationId], references: [id], onDelete: Cascade)
+  evidenceType  String
+  description   String
+  role          String
+  sourceDomain  String
+  order         Int
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @default(now())
+
+  @@unique([expectationId, order])
+  @@index([sourceDomain])
 }
 
 /// One programme's self-assessment/reporting window against a framework version.

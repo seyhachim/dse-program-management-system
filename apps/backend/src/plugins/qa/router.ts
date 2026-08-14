@@ -53,6 +53,14 @@ export function createQaRouter(): Router {
   const router = Router();
   router.use(requireAuth);
 
+  router.get("/knowledge", requirePermission("qa:read"), async (_req, res) => {
+    try {
+      res.json(await qaService.getKnowledge());
+    } catch (error) {
+      sendDomainError(res, error);
+    }
+  });
+
   router.get("/dashboard", requirePermission("qa:read"), async (req, res) => {
     const parsed = DashboardQuery.safeParse(req.query);
     if (!parsed.success) {
