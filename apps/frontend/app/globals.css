@@ -195,3 +195,9 @@ html {
 html.dark {
   color-scheme: dark;
 }
+
+/* Course Specification page 2 starts directly with PART 2: COURSE DETAILS.
+   The institutional/course title block already appears on the cover page. */
+#course-information > header {
+  display: none;
+}
