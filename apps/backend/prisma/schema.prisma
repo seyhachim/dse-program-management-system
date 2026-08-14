@@ -371,12 +371,14 @@ model QaEvidenceAnalysis {
   uncertaintyNote String                     @default("")
   engine          String
   engineVersion   String
+  promptVersion   String                     @default("")
   createdAt       DateTime                   @default(now())
   sources         QaEvidenceAnalysisSource[]
 
   @@index([programmeId, cycleId, createdAt])
   @@index([requirementId, createdAt])
   @@index([expectationId, createdAt])
+  @@index([engine, promptVersion])
 }
 
 /// Immutable snapshot of a source used by one analysis run. Structured entity
