@@ -11,16 +11,19 @@ import {
   Plus,
   ShieldCheck,
 } from "lucide-react";
-import type {
-  CreateQaCycleInput,
-  CreateQaEvidenceInput,
-  QaDashboardView,
+import {
+  QA_PILOT_REQUIREMENT_CODES,
+  type CreateQaCycleInput,
+  type CreateQaEvidenceInput,
+  type QaDashboardView,
+  type QaEvidenceAnalysisView,
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 
 const PROGRAMME_ID = "dse";
+const pilotRequirementCodes = new Set<string>(QA_PILOT_REQUIREMENT_CODES);
 
 const emptyCycle = {
   title: "DSE AUN-QA Self-Assessment 2026",
@@ -42,11 +45,13 @@ export function QaDashboardClient() {
   const { me } = useMe();
   const canWrite = me?.permissions.includes("qa:write") ?? false;
   const [data, setData] = useState<QaDashboardView | null>(null);
+  const [analyses, setAnalyses] = useState<QaEvidenceAnalysisView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCycleForm, setShowCycleForm] = useState(false);
   const [cycleDraft, setCycleDraft] = useState(emptyCycle);
   const [saving, setSaving] = useState(false);
+  const [analysingRequirement, setAnalysingRequirement] = useState<string | null>(null);
   const [evidenceFor, setEvidenceFor] = useState<string | null>(null);
   const [evidenceDraft, setEvidenceDraft] = useState(emptyEvidence);
   const [assessmentFor, setAssessmentFor] = useState<string | null>(null);
@@ -59,7 +64,19 @@ export function QaDashboardClient() {
     try {
       const query = new URLSearchParams({ programmeId: PROGRAMME_ID });
       if (cycleId) query.set("cycleId", cycleId);
-      setData(await api.get<QaDashboardView>(`/api/qa/dashboard?${query}`));
+      const dashboard = await api.get<QaDashboardView>(`/api/qa/dashboard?${query}`);
+      setData(dashboard);
+
+      if (dashboard.selectedCycle) {
+        const historyQuery = new URLSearchParams({ programmeId: PROGRAMME_ID });
+        setAnalyses(
+          await api.get<QaEvidenceAnalysisView[]>(
+            `/api/qa/cycles/${dashboard.selectedCycle.id}/analyses?${historyQuery}`,
+          ),
+        );
+      } else {
+        setAnalyses([]);
+      }
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load QA readiness");
     } finally {
@@ -82,6 +99,13 @@ export function QaDashboardClient() {
     }
     return counts;
   }, [data]);
+  const latestAnalysisByRequirement = useMemo(() => {
+    const latest = new Map<string, QaEvidenceAnalysisView>();
+    for (const analysis of analyses) {
+      if (!latest.has(analysis.requirementCode)) latest.set(analysis.requirementCode, analysis);
+    }
+    return latest;
+  }, [analyses]);
 
   async function createCycle() {
     setSaving(true);
@@ -123,6 +147,23 @@ export function QaDashboardClient() {
       setError(caught instanceof ApiError ? caught.message : "Could not add evidence");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function analyseEvidence(requirementCode: string) {
+    if (!data?.selectedCycle) return;
+    setAnalysingRequirement(requirementCode);
+    setError(null);
+    try {
+      await api.post<QaEvidenceAnalysisView[]>(
+        `/api/qa/cycles/${data.selectedCycle.id}/requirements/${requirementCode}/analysis`,
+        { programmeId: PROGRAMME_ID },
+      );
+      await load(data.selectedCycle.id);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Could not analyse QA evidence");
+    } finally {
+      setAnalysingRequirement(null);
     }
   }
 
@@ -176,7 +217,7 @@ export function QaDashboardClient() {
               {data.selectedCycle?.title ?? "Start an assessment cycle"}
             </h2>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Coverage shows available internal evidence. Ratings are human-entered self-assessments and are not official accreditation scores.
+              Coverage shows manually attached internal evidence. Rule analysis is an advisory evidence check; human self-ratings remain separate and are not official accreditation scores.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -251,6 +292,8 @@ export function QaDashboardClient() {
                 {criterion.requirements.map((requirement) => {
                   const evidenceCount = evidenceCountByRequirement.get(requirement.code) ?? 0;
                   const assessment = assessmentByRequirement.get(requirement.code);
+                  const analysis = latestAnalysisByRequirement.get(requirement.code);
+                  const isPilot = pilotRequirementCodes.has(requirement.code);
                   return (
                     <div key={requirement.code} className="p-4 md:px-5">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -258,11 +301,26 @@ export function QaDashboardClient() {
                         <p className="min-w-0 flex-1 text-sm font-medium">{requirement.title}</p>
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusPill complete={evidenceCount > 0} completeText={`${evidenceCount} evidence`} emptyText="No evidence" />
+                          {isPilot ? <AnalysisPill analysis={analysis} /> : null}
                           <StatusPill complete={assessment?.rating != null} completeText={`Rating ${assessment?.rating}/7`} emptyText="Not rated" />
+                          {canWrite && isPilot ? <Button size="sm" variant="outline" disabled={analysingRequirement === requirement.code} onClick={() => void analyseEvidence(requirement.code)}>{analysingRequirement === requirement.code ? "Analysing…" : "Analyse evidence"}</Button> : null}
                           {canWrite ? <Button size="sm" variant="outline" onClick={() => { setEvidenceFor(evidenceFor === requirement.code ? null : requirement.code); setAssessmentFor(null); }}>Add evidence</Button> : null}
                           {canWrite ? <Button size="sm" variant="outline" onClick={() => openAssessment(requirement.code)}>Self-assess</Button> : null}
                         </div>
                       </div>
+
+                      {analysis ? (
+                        <div className="mt-3 rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium">Latest deterministic evidence analysis</span>
+                            <span className="text-xs text-muted-foreground">{analysis.engine} · v{analysis.engineVersion} · {analysis.sources.length} source snapshot{analysis.sources.length === 1 ? "" : "s"}</span>
+                          </div>
+                          <p className="mt-2 text-muted-foreground">{analysis.explanation}</p>
+                          {analysis.uncertaintyNote ? <p className="mt-2 text-xs text-muted-foreground">{analysis.uncertaintyNote}</p> : null}
+                        </div>
+                      ) : isPilot ? (
+                        <p className="mt-2 text-xs text-muted-foreground">No deterministic evidence analysis has been run for this pilot requirement yet.</p>
+                      ) : null}
 
                       {evidenceFor === requirement.code ? (
                         <div className="mt-4 grid gap-3 rounded-xl border border-border bg-muted/30 p-4 md:grid-cols-2">
@@ -311,6 +369,19 @@ function Metric({ label, value, note }: { label: string; value: string | number;
 
 function StatusPill({ complete, completeText, emptyText }: { complete: boolean; completeText: string; emptyText: string }) {
   return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${complete ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>{complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}{complete ? completeText : emptyText}</span>;
+}
+
+function AnalysisPill({ analysis }: { analysis?: QaEvidenceAnalysisView }) {
+  if (!analysis) {
+    return <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">Not analysed</span>;
+  }
+  if (analysis.state === "evidenceIdentified") {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />Evidence identified</span>;
+  }
+  if (analysis.state === "potentialEvidenceGap") {
+    return <span className="inline-flex rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300">Potential evidence gap</span>;
+  }
+  return <span className="inline-flex rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-800 dark:text-sky-300">Expert review required</span>;
 }
 
 function ErrorNotice({ message }: { message: string }) {
