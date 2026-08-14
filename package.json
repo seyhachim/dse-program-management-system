@@ -12,9 +12,9 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
     "db:migrate": "bun run --cwd apps/backend db:migrate",
+    "db:migrate:deploy": "bun run --cwd apps/backend db:migrate:deploy",
+    "db:generate": "bun run --cwd apps/backend db:generate",
     "seed": "bun run --cwd apps/backend seed",
     "gen-token": "bun run --cwd apps/backend gen-token"
   },
