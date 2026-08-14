@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@dse-pms/ui";
 import { Topbar } from "../../topbar";
 import { TeachingVocabularyClient } from "./teaching-vocabulary-client";
 
@@ -13,9 +12,12 @@ export default function TeachingLearningVocabularyPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mb-5">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/programme-management">← Back to Programme Management</Link>
-          </Button>
+          <Link
+            href="/programme-management"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-medium transition-colors hover:bg-input/50"
+          >
+            ← Back to Programme Management
+          </Link>
         </div>
         <TeachingVocabularyClient />
       </main>
