@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   CreateOfferingInput,
   EnrollInput,
+  ListLecturerWorkloadQuery,
   ListOfferingsQuery,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
@@ -24,6 +25,16 @@ export function createOfferingRouter(): Router {
     // co-lecturer) — issue #104. Programme-wide roles see everything.
     const ownerScope = req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r)) ? undefined : req.user!.id;
     res.json(await offeringService.list(parsed.data, ownerScope));
+  });
+
+  // Must stay before /:id so "workload" is never interpreted as an offering id.
+  router.get("/workload/me", requirePermission("offerings:read"), async (req, res) => {
+    const parsed = ListLecturerWorkloadQuery.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+      return;
+    }
+    res.json(await offeringService.workloadForLecturer(req.user!.id, parsed.data));
   });
 
   router.get("/:id", requirePermission("offerings:read"), async (req, res) => {
@@ -164,7 +175,7 @@ function handleError(err: unknown, res: import("express").Response, fallback: st
   }
   const code = (err as { code?: string }).code;
   if (code === "P2002") {
-    res.status(409).json({ error: "An offering for that course and term already exists" });
+    res.status(409).json({ error: "That course, term, and class section already exist" });
     return;
   }
   if (code === "P2025") {

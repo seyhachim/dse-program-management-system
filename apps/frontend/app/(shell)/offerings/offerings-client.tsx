@@ -69,10 +69,11 @@ export function OfferingsClient() {
 
         if (yearCompare !== 0) return yearCompare;
 
-        // 3. Course code
-        return String(a.course?.code ?? "").localeCompare(
+        // 3. Course code, then class/section.
+        const courseCompare = String(a.course?.code ?? "").localeCompare(
           String(b.course?.code ?? ""),
         );
+        return courseCompare || a.sectionCode.localeCompare(b.sectionCode);
       });
 
       setRows(offerings);
@@ -98,7 +99,7 @@ export function OfferingsClient() {
   }, []);
 
   const handleDelete = async (offering: OfferingView) => {
-    if (!confirm(`Delete ${offering.course?.code} · ${offering.term}?`)) return;
+    if (!confirm(`Delete ${offering.course?.code} · Class ${offering.sectionCode} · ${offering.term}?`)) return;
     try {
       await offeringsApi.remove(offering.id);
       await load();
@@ -142,6 +143,25 @@ export function OfferingsClient() {
         ),
     },
     { key: "term", header: "Term", render: (o) => o.term },
+    { key: "section", header: "Class", render: (o) => `Class ${o.sectionCode}` },
+    {
+      key: "schedule",
+      header: "Room & Time",
+      render: (o) =>
+        o.meetings.length ? (
+          <div className="space-y-0.5 text-xs">
+            {o.meetings.map((meeting) => (
+              <div key={meeting.id}>
+                <span className="font-medium text-foreground">{meeting.dayOfWeek.slice(0, 3)}</span>{" "}
+                {meeting.startTime}–{meeting.endTime}
+                {meeting.room ? ` · ${meeting.room}` : ""}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="text-muted-foreground">Not scheduled</span>
+        ),
+    },
     {
       key: "availability",
       header: "Availability",

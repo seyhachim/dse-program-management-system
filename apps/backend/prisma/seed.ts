@@ -1036,9 +1036,10 @@ async function main() {
   if (cs101) {
     const offering = await prisma.offering.upsert({
       where: {
-        courseId_term: {
+        courseId_term_sectionCode: {
           courseId: cs101.id,
           term: "2025-Fall",
+          sectionCode: "A",
         },
       },
       update: {
@@ -1049,6 +1050,7 @@ async function main() {
       create: {
         courseId: cs101.id,
         term: "2025-Fall",
+        sectionCode: "A",
         capacity: 30,
         status: "Active",
         lecturerId: cs101.lecturerId,

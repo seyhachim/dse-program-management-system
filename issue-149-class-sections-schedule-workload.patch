@@ -1,0 +1,1539 @@
+diff --git a/apps/backend/prisma/migrations/20260813120000_add_offering_sections/migration.sql b/apps/backend/prisma/migrations/20260813120000_add_offering_sections/migration.sql
+new file mode 100644
+index 0000000..84d8382
+--- /dev/null
++++ b/apps/backend/prisma/migrations/20260813120000_add_offering_sections/migration.sql
+@@ -0,0 +1,7 @@
++-- Existing offerings become Class A. Future terms may have A, B, and further
++-- sections of the same course without duplicating the shared course spec.
++ALTER TABLE "Offering" ADD COLUMN "sectionCode" TEXT NOT NULL DEFAULT 'A';
++
++DROP INDEX "Offering_courseId_term_key";
++CREATE UNIQUE INDEX "Offering_courseId_term_sectionCode_key"
++  ON "Offering"("courseId", "term", "sectionCode");
+diff --git a/apps/backend/prisma/migrations/20260813133000_add_offering_meetings/migration.sql b/apps/backend/prisma/migrations/20260813133000_add_offering_meetings/migration.sql
+new file mode 100644
+index 0000000..41168b6
+--- /dev/null
++++ b/apps/backend/prisma/migrations/20260813133000_add_offering_meetings/migration.sql
+@@ -0,0 +1,22 @@
++-- Recurring room/time schedule for each class offering. Existing offerings are
++-- intentionally left with no meetings; their planned workload continues to use
++-- course-spec contact hours until an administrator adds a timetable.
++CREATE TABLE "OfferingMeeting" (
++  "id" TEXT NOT NULL,
++  "offeringId" TEXT NOT NULL,
++  "dayOfWeek" TEXT NOT NULL,
++  "startTime" TEXT NOT NULL,
++  "endTime" TEXT NOT NULL,
++  "room" TEXT,
++  "activityType" TEXT NOT NULL DEFAULT 'Lecture',
++
++  CONSTRAINT "OfferingMeeting_pkey" PRIMARY KEY ("id")
++);
++
++CREATE INDEX "OfferingMeeting_offeringId_dayOfWeek_startTime_idx"
++  ON "OfferingMeeting"("offeringId", "dayOfWeek", "startTime");
++
++ALTER TABLE "OfferingMeeting"
++  ADD CONSTRAINT "OfferingMeeting_offeringId_fkey"
++  FOREIGN KEY ("offeringId") REFERENCES "Offering"("id")
++  ON DELETE CASCADE ON UPDATE CASCADE;
+diff --git a/apps/backend/prisma/schema.prisma b/apps/backend/prisma/schema.prisma
+index 9273a94..fb5070f 100644
+--- a/apps/backend/prisma/schema.prisma
++++ b/apps/backend/prisma/schema.prisma
+@@ -614,6 +614,7 @@ model Offering {
+   lecturerId     String?
+   lecturer       User?          @relation("OfferingLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
+   term           String
++  sectionCode    String         @default("A")
+   capacity       Int            @default(30)
+   status         OfferingStatus @default(Planned)
+   // Syllabus §12 Course Availability — optional, filled on the course spec form.
+@@ -625,12 +626,28 @@ model Offering {
+ 
+   enrollments Enrollment[]
+   coLecturers OfferingCoLecturer[]
++  meetings    OfferingMeeting[]
+ 
+-  @@unique([courseId, term])
++  @@unique([courseId, term, sectionCode])
+   @@index([status])
+   @@index([lecturerId])
+ }
+ 
++/// A recurring weekly class session. Duration is derived from startTime/endTime
++/// by the API so stored schedule data has one source of truth.
++model OfferingMeeting {
++  id           String   @id @default(uuid())
++  offeringId   String
++  offering     Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
++  dayOfWeek    String
++  startTime    String
++  endTime      String
++  room         String?
++  activityType String   @default("Lecture")
++
++  @@index([offeringId, dayOfWeek, startTime])
++}
++
+ /// Join table (issue #79, supersedes #73's Course-level table): co-lecturers are
+ /// existing lecturer Users assigned to an Offering (a course delivered in a given
+ /// term) alongside its primary `Offering.lecturerId`, distinct from
+diff --git a/apps/backend/prisma/seed.ts b/apps/backend/prisma/seed.ts
+index dbe18dc..24976b5 100644
+--- a/apps/backend/prisma/seed.ts
++++ b/apps/backend/prisma/seed.ts
+@@ -1036,9 +1036,10 @@ async function main() {
+   if (cs101) {
+     const offering = await prisma.offering.upsert({
+       where: {
+-        courseId_term: {
++        courseId_term_sectionCode: {
+           courseId: cs101.id,
+           term: "2025-Fall",
++          sectionCode: "A",
+         },
+       },
+       update: {
+@@ -1049,6 +1050,7 @@ async function main() {
+       create: {
+         courseId: cs101.id,
+         term: "2025-Fall",
++        sectionCode: "A",
+         capacity: 30,
+         status: "Active",
+         lecturerId: cs101.lecturerId,
+diff --git a/apps/backend/src/plugins/courses/service.ts b/apps/backend/src/plugins/courses/service.ts
+index 16b26a2..984af97 100644
+--- a/apps/backend/src/plugins/courses/service.ts
++++ b/apps/backend/src/plugins/courses/service.ts
+@@ -186,6 +186,40 @@ export const courseService = {
+     return prisma.course.findUnique({ where: { id } });
+   },
+ 
++  // Part of CoursesServiceContract — workload consumers need only scheduled
++  // contact hours, never CourseSpec's storage details or self-study time.
++  async weeklyContactHours(courseId: string) {
++    const spec = await prisma.courseSpec.findUnique({
++      where: { courseId },
++      select: {
++        weeks: {
++          orderBy: { order: "asc" },
++          select: {
++            week: true,
++            lectureHours: true,
++            tutorialHours: true,
++            practiceHours: true,
++            otherHours: true,
++          },
++        },
++      },
++    });
++    return (spec?.weeks ?? []).map((week) => {
++      const lectureHours = week.lectureHours ?? 0;
++      const tutorialHours = week.tutorialHours ?? 0;
++      const practiceHours = week.practiceHours ?? 0;
++      const otherHours = week.otherHours ?? 0;
++      return {
++        week: week.week,
++        lectureHours,
++        tutorialHours,
++        practiceHours,
++        otherHours,
++        totalContactHours: lectureHours + tutorialHours + practiceHours + otherHours,
++      };
++    });
++  },
++
+   async getDetailed(id: string) {
+     const course = await prisma.course.findUnique({ where: { id } });
+     return course ? withLecturer(course, await lecturerLookup()) : null;
+diff --git a/apps/backend/src/plugins/offerings/router.ts b/apps/backend/src/plugins/offerings/router.ts
+index 1372ae2..440518a 100644
+--- a/apps/backend/src/plugins/offerings/router.ts
++++ b/apps/backend/src/plugins/offerings/router.ts
+@@ -2,6 +2,7 @@ import { Router } from "express";
+ import {
+   CreateOfferingInput,
+   EnrollInput,
++  ListLecturerWorkloadQuery,
+   ListOfferingsQuery,
+   UpdateOfferingInput,
+ } from "@dse-pms/shared-types";
+@@ -26,6 +27,16 @@ export function createOfferingRouter(): Router {
+     res.json(await offeringService.list(parsed.data, ownerScope));
+   });
+ 
++  // Must stay before /:id so "workload" is never interpreted as an offering id.
++  router.get("/workload/me", requirePermission("offerings:read"), async (req, res) => {
++    const parsed = ListLecturerWorkloadQuery.safeParse(req.query);
++    if (!parsed.success) {
++      res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
++      return;
++    }
++    res.json(await offeringService.workloadForLecturer(req.user!.id, parsed.data));
++  });
++
+   router.get("/:id", requirePermission("offerings:read"), async (req, res) => {
+     const offering = await offeringService.getById(req.params.id!);
+     if (!offering) {
+@@ -164,7 +175,7 @@ function handleError(err: unknown, res: import("express").Response, fallback: st
+   }
+   const code = (err as { code?: string }).code;
+   if (code === "P2002") {
+-    res.status(409).json({ error: "An offering for that course and term already exists" });
++    res.status(409).json({ error: "That course, term, and class section already exist" });
+     return;
+   }
+   if (code === "P2025") {
+diff --git a/apps/backend/src/plugins/offerings/service.ts b/apps/backend/src/plugins/offerings/service.ts
+index 45290d3..b5b713e 100644
+--- a/apps/backend/src/plugins/offerings/service.ts
++++ b/apps/backend/src/plugins/offerings/service.ts
+@@ -1,17 +1,21 @@
+ import {
+   coLecturerViolation,
+   type CoursesServiceContract,
++  type CourseWeeklyContactHoursRef,
+   type CreateOfferingInput,
+   type EnrollInput,
+   type LecturerRef,
+   type LecturersServiceContract,
+   type ListOfferingsQuery,
++  type ListLecturerWorkloadQuery,
++  type LecturerWorkloadSummary,
+   type OfferingView,
+   type StudentsServiceContract,
+   type UpdateOfferingInput,
+ } from "@dse-pms/shared-types";
+ import { prisma } from "../../core/db/prisma.ts";
+ import { registry } from "../../core/plugins/registry.ts";
++import { summarizeLecturerWorkload } from "./workload.ts";
+ 
+ /**
+  * Course Offerings — the architectural proof point. An offering owns only its own
+@@ -43,8 +47,15 @@ async function lecturerLookup(): Promise<Map<string, LecturerRef>> {
+ const withRelations = {
+   enrollments: { select: { studentId: true } },
+   coLecturers: { select: { lecturerId: true } },
++  meetings: true,
+ } as const;
+ 
++function meetingDurationHours(startTime: string, endTime: string): number {
++  const [startHour, startMinute] = startTime.split(":").map(Number) as [number, number];
++  const [endHour, endMinute] = endTime.split(":").map(Number) as [number, number];
++  return ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60;
++}
++
+ /**
+  * Assemble an enriched OfferingView by joining across plugins via the registry.
+  * `lecturerById` is looked up once by the caller (not per offering row) so that
+@@ -56,6 +67,7 @@ async function toView(
+     courseId: string;
+     lecturerId: string | null;
+     term: string;
++    sectionCode: string;
+     capacity: number;
+     status: OfferingView["status"];
+     semester: OfferingView["semester"];
+@@ -64,6 +76,14 @@ async function toView(
+     createdAt: Date;
+     enrollments: { studentId: string }[];
+     coLecturers: { lecturerId: string }[];
++    meetings: {
++      id: string;
++      dayOfWeek: string;
++      startTime: string;
++      endTime: string;
++      room: string | null;
++      activityType: string;
++    }[];
+   },
+   lecturerById: Map<string, LecturerRef>,
+ ): Promise<OfferingView> {
+@@ -79,11 +99,18 @@ async function toView(
+   return {
+     id: offering.id,
+     term: offering.term,
++    sectionCode: offering.sectionCode,
+     status: offering.status,
+     capacity: offering.capacity,
+     semester: offering.semester,
+     programmeYear: offering.programmeYear,
+     otherLecturers: offering.otherLecturers,
++    meetings: offering.meetings.map((meeting) => ({
++      ...meeting,
++      dayOfWeek: meeting.dayOfWeek as OfferingView["meetings"][number]["dayOfWeek"],
++      activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
++      durationHours: meetingDurationHours(meeting.startTime, meeting.endTime),
++    })),
+     enrolledCount: offering.enrollments.length,
+     createdAt: offering.createdAt.toISOString(),
+     course: course
+@@ -134,7 +161,7 @@ export const offeringService = {
+   },
+ 
+   async create(input: CreateOfferingInput): Promise<OfferingView> {
+-    const { coLecturerIds, ...offeringInput } = input;
++    const { coLecturerIds, meetings, ...offeringInput } = input;
+     // Validate cross-plugin references through the registry.
+     if (!(await courses().getById(offeringInput.courseId))) {
+       throw new ReferenceError("Course does not exist");
+@@ -147,6 +174,7 @@ export const offeringService = {
+       data: {
+         courseId: offeringInput.courseId,
+         term: offeringInput.term,
++        sectionCode: offeringInput.sectionCode,
+         lecturerId: offeringInput.lecturerId ?? null,
+         capacity: offeringInput.capacity,
+         status: offeringInput.status,
+@@ -156,6 +184,14 @@ export const offeringService = {
+         coLecturers: coLecturerIds?.length
+           ? { create: coLecturerIds.map((lecturerId) => ({ lecturerId })) }
+           : undefined,
++        meetings: meetings.length
++          ? {
++              create: meetings.map((meeting) => ({
++                ...meeting,
++                room: meeting.room || null,
++              })),
++            }
++          : undefined,
+       },
+       include: withRelations,
+     });
+@@ -163,7 +199,7 @@ export const offeringService = {
+   },
+ 
+   async update(id: string, input: UpdateOfferingInput): Promise<OfferingView> {
+-    const { coLecturerIds, ...offeringInput } = input;
++    const { coLecturerIds, meetings, ...offeringInput } = input;
+     if (offeringInput.lecturerId && !(await lecturers().getById(offeringInput.lecturerId))) {
+       throw new ReferenceError("Assigned lecturer does not exist");
+     }
+@@ -193,10 +229,25 @@ export const offeringService = {
+           });
+         }
+       }
++      if (meetings !== undefined) {
++        await tx.offeringMeeting.deleteMany({ where: { offeringId: id } });
++        if (meetings.length) {
++          await tx.offeringMeeting.createMany({
++            data: meetings.map((meeting) => ({
++              offeringId: id,
++              ...meeting,
++              room: meeting.room || null,
++            })),
++          });
++        }
++      }
+       return tx.offering.update({
+         where: { id },
+         data: {
+           ...(offeringInput.term !== undefined ? { term: offeringInput.term } : {}),
++          ...(offeringInput.sectionCode !== undefined
++            ? { sectionCode: offeringInput.sectionCode }
++            : {}),
+           ...(offeringInput.lecturerId !== undefined ? { lecturerId: offeringInput.lecturerId } : {}),
+           ...(offeringInput.capacity !== undefined ? { capacity: offeringInput.capacity } : {}),
+           ...(offeringInput.status !== undefined ? { status: offeringInput.status } : {}),
+@@ -231,6 +282,78 @@ export const offeringService = {
+     return rows.map((r) => r.courseId);
+   },
+ 
++  /** Weekly teaching workload for the signed-in lecturer across assigned classes. */
++  async workloadForLecturer(
++    lecturerId: string,
++    query: ListLecturerWorkloadQuery,
++  ): Promise<LecturerWorkloadSummary> {
++    const assignments = await prisma.offering.findMany({
++      where: {
++        ...(query.term ? { term: query.term } : {}),
++        OR: [{ lecturerId }, { coLecturers: { some: { lecturerId } } }],
++      },
++      select: {
++        id: true,
++        courseId: true,
++        lecturerId: true,
++        term: true,
++        sectionCode: true,
++        meetings: {
++          select: {
++            id: true,
++            dayOfWeek: true,
++            startTime: true,
++            endTime: true,
++            room: true,
++            activityType: true,
++          },
++        },
++      },
++      orderBy: [{ term: "desc" }, { sectionCode: "asc" }],
++    });
++
++    const courseCache = new Map<
++      string,
++      Promise<{
++        course: Awaited<ReturnType<CoursesServiceContract["getById"]>>;
++        weeks: CourseWeeklyContactHoursRef[];
++      }>
++    >();
++    const courseData = (courseId: string) => {
++      let cached = courseCache.get(courseId);
++      if (!cached) {
++        cached = Promise.all([
++          courses().getById(courseId),
++          courses().weeklyContactHours(courseId),
++        ]).then(([course, weeks]) => ({ course, weeks }));
++        courseCache.set(courseId, cached);
++      }
++      return cached;
++    };
++
++    const enriched = (
++      await Promise.all(
++        assignments.map(async (assignment) => {
++          const { course, weeks } = await courseData(assignment.courseId);
++          return course
++            ? {
++                ...assignment,
++                meetings: assignment.meetings.map((meeting) => ({
++                  ...meeting,
++                  dayOfWeek: meeting.dayOfWeek as OfferingView["meetings"][number]["dayOfWeek"],
++                  activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
++                })),
++                course,
++                weeks,
++              }
++            : null;
++        }),
++      )
++    ).filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null);
++
++    return summarizeLecturerWorkload(lecturerId, enriched);
++  },
++
+   async enroll(id: string, input: EnrollInput): Promise<OfferingView> {
+     const offering = await prisma.offering.findUnique({ where: { id }, include: withRelations });
+     if (!offering) throw new ReferenceError("Offering not found");
+diff --git a/apps/backend/src/plugins/offerings/workload.test.ts b/apps/backend/src/plugins/offerings/workload.test.ts
+new file mode 100644
+index 0000000..51a8340
+--- /dev/null
++++ b/apps/backend/src/plugins/offerings/workload.test.ts
+@@ -0,0 +1,83 @@
++import { expect, test } from "bun:test";
++import { summarizeLecturerWorkload, type WorkloadAssignment } from "./workload.ts";
++
++const LECTURER_ID = "11111111-1111-1111-1111-111111111111";
++
++function assignment(sectionCode: string, lecturerId: string | null = LECTURER_ID): WorkloadAssignment {
++  return {
++    id: `offering-${sectionCode}`,
++    lecturerId,
++    term: "2026-Fall",
++    sectionCode,
++    course: {
++      id: "33333333-3333-3333-3333-333333333333",
++      code: "DSE301",
++      title: "Data Engineering",
++      lecturerId: null,
++      programmeId: null,
++    },
++    weeks: [
++      {
++        week: 1,
++        lectureHours: 2,
++        tutorialHours: 1,
++        practiceHours: 0,
++        otherHours: 0,
++        totalContactHours: 3,
++      },
++    ],
++    meetings: [],
++  };
++}
++
++test("two classes multiply the same course contact hours", () => {
++  const result = summarizeLecturerWorkload(LECTURER_ID, [assignment("A"), assignment("B")]);
++
++  expect(result.totalHours).toBe(6);
++  expect(result.peakWeeklyHours).toBe(6);
++  expect(result.weeklyTotals).toEqual([
++    { term: "2026-Fall", week: 1, totalContactHours: 6 },
++  ]);
++  expect(result.rows.map((row) => row.sectionCode)).toEqual(["A", "B"]);
++  expect(result.rows.every((row) => row.totalContactHours === 3)).toBe(true);
++});
++
++test("scheduled weekly workload is calculated from class meeting duration", () => {
++  const classA = assignment("A");
++  classA.meetings = [
++    {
++      id: "meeting-a",
++      dayOfWeek: "Monday",
++      startTime: "08:00",
++      endTime: "10:00",
++      room: "A203",
++      activityType: "Lecture",
++    },
++  ];
++  const classB = assignment("B");
++  classB.meetings = [
++    {
++      id: "meeting-b",
++      dayOfWeek: "Tuesday",
++      startTime: "13:00",
++      endTime: "14:30",
++      room: "B105",
++      activityType: "Practice",
++    },
++  ];
++
++  const result = summarizeLecturerWorkload(LECTURER_ID, [classA, classB]);
++  expect(result.scheduledWeeklyHours).toBe(3.5);
++  expect(result.scheduleRows.map((row) => row.durationHours)).toEqual([2, 1.5]);
++  expect(result.scheduleRows.map((row) => row.room)).toEqual(["A203", "B105"]);
++});
++
++test("co-lecturers count at full workload and are labelled explicitly", () => {
++  const result = summarizeLecturerWorkload(LECTURER_ID, [
++    assignment("A", "22222222-2222-2222-2222-222222222222"),
++  ]);
++
++  expect(result.totalHours).toBe(3);
++  expect(result.coLecturerAssumption).toBe("full");
++  expect(result.rows[0]?.role).toBe("Co-Lecturer");
++});
+diff --git a/apps/backend/src/plugins/offerings/workload.ts b/apps/backend/src/plugins/offerings/workload.ts
+new file mode 100644
+index 0000000..d1e5e07
+--- /dev/null
++++ b/apps/backend/src/plugins/offerings/workload.ts
+@@ -0,0 +1,110 @@
++import type {
++  CourseRef,
++  CourseWeeklyContactHoursRef,
++  LecturerWorkloadSummary,
++  MeetingActivityType,
++  MeetingDay,
++} from "@dse-pms/shared-types";
++import { MEETING_DAYS } from "@dse-pms/shared-types";
++
++export interface WorkloadAssignment {
++  id: string;
++  lecturerId: string | null;
++  term: string;
++  sectionCode: string;
++  course: CourseRef;
++  weeks: CourseWeeklyContactHoursRef[];
++  meetings: {
++    id: string;
++    dayOfWeek: MeetingDay;
++    startTime: string;
++    endTime: string;
++    room: string | null;
++    activityType: MeetingActivityType;
++  }[];
++}
++
++function durationHours(startTime: string, endTime: string): number {
++  const [startHour, startMinute] = startTime.split(":").map(Number) as [number, number];
++  const [endHour, endMinute] = endTime.split(":").map(Number) as [number, number];
++  return ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60;
++}
++
++/** Pure workload calculation kept separate from database/registry I/O for testing. */
++export function summarizeLecturerWorkload(
++  lecturerId: string,
++  assignments: WorkloadAssignment[],
++): LecturerWorkloadSummary {
++  const scheduleRows = assignments
++    .flatMap((assignment) =>
++      assignment.meetings.map((meeting) => ({
++        meetingId: meeting.id,
++        offeringId: assignment.id,
++        course: {
++          id: assignment.course.id,
++          code: assignment.course.code,
++          title: assignment.course.title,
++        },
++        term: assignment.term,
++        sectionCode: assignment.sectionCode,
++        role: assignment.lecturerId === lecturerId ? "Primary" as const : "Co-Lecturer" as const,
++        ...meeting,
++        durationHours: durationHours(meeting.startTime, meeting.endTime),
++      })),
++    )
++    .sort(
++      (a, b) =>
++        MEETING_DAYS.indexOf(a.dayOfWeek) - MEETING_DAYS.indexOf(b.dayOfWeek) ||
++        a.startTime.localeCompare(b.startTime) ||
++        a.course.code.localeCompare(b.course.code) ||
++        a.sectionCode.localeCompare(b.sectionCode),
++    );
++
++  const rows = assignments
++    .flatMap((assignment) =>
++      assignment.weeks.map((week) => ({
++        offeringId: assignment.id,
++        course: {
++          id: assignment.course.id,
++          code: assignment.course.code,
++          title: assignment.course.title,
++        },
++        term: assignment.term,
++        sectionCode: assignment.sectionCode,
++        role: assignment.lecturerId === lecturerId ? "Primary" as const : "Co-Lecturer" as const,
++        ...week,
++      })),
++    )
++    .sort(
++      (a, b) =>
++        a.week - b.week ||
++        a.course.code.localeCompare(b.course.code) ||
++        a.sectionCode.localeCompare(b.sectionCode),
++    );
++
++  const totalsByWeek = new Map<string, { term: string; week: number; totalContactHours: number }>();
++  for (const row of rows) {
++    const key = `${row.term}\u0000${row.week}`;
++    const total = totalsByWeek.get(key) ?? {
++      term: row.term,
++      week: row.week,
++      totalContactHours: 0,
++    };
++    total.totalContactHours += row.totalContactHours;
++    totalsByWeek.set(key, total);
++  }
++  const weeklyTotals = [...totalsByWeek.values()].sort(
++    (a, b) => b.term.localeCompare(a.term) || a.week - b.week,
++  );
++
++  return {
++    scheduleRows,
++    scheduledWeeklyHours:
++      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
++    rows,
++    weeklyTotals,
++    peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
++    totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
++    coLecturerAssumption: "full",
++  };
++}
+diff --git a/apps/frontend/app/(shell)/courses/course-teaching-assignment.tsx b/apps/frontend/app/(shell)/courses/course-teaching-assignment.tsx
+index 05193ab..8f4e30b 100644
+--- a/apps/frontend/app/(shell)/courses/course-teaching-assignment.tsx
++++ b/apps/frontend/app/(shell)/courses/course-teaching-assignment.tsx
+@@ -25,50 +25,54 @@ export function CourseTeachingAssignment({ courseId }: { courseId: string }) {
+     };
+   }, []);
+ 
+-  const offering = useMemo(
++  const courseOfferings = useMemo(
+     () =>
+       offerings
+         .filter((item) => item.course?.id === courseId)
+-        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0] ?? null,
++        .sort(
++          (a, b) =>
++            b.term.localeCompare(a.term) || a.sectionCode.localeCompare(b.sectionCode),
++        ),
+     [courseId, offerings],
+   );
+ 
+-  if (!me || !offering) return null;
+-
+-  const isPrimary = offering.lecturer?.id === me.id;
+-  const isCoLecturer = offering.coLecturers.some((lecturer) => lecturer.id === me.id);
+-  const role = isPrimary ? "Primary" : isCoLecturer ? "Co-Lecturer" : null;
+-  const coLecturerNames = offering.coLecturers.map((lecturer) => lecturer.name).filter(Boolean);
++  if (!me || courseOfferings.length === 0) return null;
+ 
+   return (
+     <section className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+-      <div className="flex flex-wrap items-center justify-between gap-3">
+-        <div>
+-          <div className="flex flex-wrap items-center gap-2">
+-            <p className="text-sm font-semibold text-foreground">Teaching Assignment</p>
+-            {role ? <TeachingRoleBadge role={role} /> : null}
+-          </div>
+-          <p className="mt-1 text-xs text-muted-foreground">
+-            {offering.term}
+-            {offering.programmeYear != null ? ` · Year ${offering.programmeYear}` : ""}
+-            {offering.semester ? ` · ${semesterLabel(offering.semester)}` : ""}
+-          </p>
+-        </div>
+-
+-        <div className="grid min-w-0 gap-2 text-sm sm:grid-cols-2 sm:gap-6">
+-          <div>
+-            <p className="text-xs font-medium text-muted-foreground">Primary Lecturer</p>
+-            <p className="mt-0.5 font-medium text-foreground">
+-              {offering.lecturer?.name || "Not assigned"}
+-            </p>
+-          </div>
+-          <div>
+-            <p className="text-xs font-medium text-muted-foreground">Co-Lecturer(s)</p>
+-            <p className="mt-0.5 text-foreground">
+-              {coLecturerNames.length ? coLecturerNames.join(", ") : "None assigned"}
+-            </p>
+-          </div>
+-        </div>
++      <p className="mb-3 text-sm font-semibold text-foreground">Teaching Assignments</p>
++      <div className="space-y-3">
++        {courseOfferings.map((offering) => {
++          const isPrimary = offering.lecturer?.id === me.id;
++          const isCoLecturer = offering.coLecturers.some((lecturer) => lecturer.id === me.id);
++          const role = isPrimary ? "Primary" : isCoLecturer ? "Co-Lecturer" : null;
++          const coLecturerNames = offering.coLecturers.map((lecturer) => lecturer.name).filter(Boolean);
++          return (
++            <div key={offering.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0">
++              <div>
++                <div className="flex flex-wrap items-center gap-2">
++                  <p className="font-medium text-foreground">Class {offering.sectionCode}</p>
++                  {role ? <TeachingRoleBadge role={role} /> : null}
++                </div>
++                <p className="mt-1 text-xs text-muted-foreground">
++                  {offering.term}
++                  {offering.programmeYear != null ? ` · Year ${offering.programmeYear}` : ""}
++                  {offering.semester ? ` · ${semesterLabel(offering.semester)}` : ""}
++                </p>
++              </div>
++              <div className="grid min-w-0 gap-2 text-sm sm:grid-cols-2 sm:gap-6">
++                <div>
++                  <p className="text-xs font-medium text-muted-foreground">Primary Lecturer</p>
++                  <p className="mt-0.5 font-medium text-foreground">{offering.lecturer?.name || "Not assigned"}</p>
++                </div>
++                <div>
++                  <p className="text-xs font-medium text-muted-foreground">Co-Lecturer(s)</p>
++                  <p className="mt-0.5 text-foreground">{coLecturerNames.length ? coLecturerNames.join(", ") : "None assigned"}</p>
++                </div>
++              </div>
++            </div>
++          );
++        })}
+       </div>
+     </section>
+   );
+diff --git a/apps/frontend/app/(shell)/courses/my-courses-client.tsx b/apps/frontend/app/(shell)/courses/my-courses-client.tsx
+index 6415f22..7a9350d 100644
+--- a/apps/frontend/app/(shell)/courses/my-courses-client.tsx
++++ b/apps/frontend/app/(shell)/courses/my-courses-client.tsx
+@@ -10,6 +10,9 @@ import {
+   specCompletionLabel,
+   specCompletionPercent,
+   type CourseSpecProgress,
++  type LecturerScheduleRow,
++  type LecturerWorkloadRow,
++  type LecturerWorkloadSummary,
+   type OfferingView,
+   type Semester,
+ } from "@dse-pms/shared-types";
+@@ -29,7 +32,7 @@ import {
+   type DataTableColumn,
+ } from "@dse-pms/ui";
+ import { coursesApi } from "@/lib/courses";
+-import { offeringsApi } from "@/lib/offerings";
++import { offeringsApi, workloadForTerm } from "@/lib/offerings";
+ import { useMe } from "@/lib/auth";
+ import { ApiError } from "@/lib/api";
+ 
+@@ -71,6 +74,15 @@ export function MyCoursesClient() {
+ 
+   const [offerings, setOfferings] = useState<OfferingView[]>([]);
+   const [specProgress, setSpecProgress] = useState<CourseSpecProgress[]>([]);
++  const [workload, setWorkload] = useState<LecturerWorkloadSummary>({
++    scheduleRows: [],
++    scheduledWeeklyHours: 0,
++    rows: [],
++    weeklyTotals: [],
++    peakWeeklyHours: 0,
++    totalHours: 0,
++    coLecturerAssumption: "full",
++  });
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+ 
+@@ -83,12 +95,14 @@ export function MyCoursesClient() {
+     setLoading(true);
+     setError(null);
+     try {
+-      const [offeringsRes, progressRes] = await Promise.all([
++      const [offeringsRes, progressRes, workloadRes] = await Promise.all([
+         offeringsApi.list(),
+         coursesApi.specProgress(),
++        offeringsApi.workload(),
+       ]);
+       setOfferings(offeringsRes);
+       setSpecProgress(progressRes);
++      setWorkload(workloadRes);
+     } catch (err) {
+       setError(
+         err instanceof ApiError ? err.message : "Failed to load your courses",
+@@ -218,6 +232,8 @@ export function MyCoursesClient() {
+     return a.offering.course!.code.localeCompare(b.offering.course!.code);
+   });
+ 
++  const visibleWorkload = workloadForTerm(workload, term === ALL ? null : term);
++
+   const columns: DataTableColumn<MyCourseRow>[] = [
+     {
+       key: "course",
+@@ -253,6 +269,11 @@ export function MyCoursesClient() {
+         </div>
+       ),
+     },
++    {
++      key: "section",
++      header: "Class",
++      render: (r) => `Class ${r.offering.sectionCode}`,
++    },
+     {
+       key: "role",
+       header: "Role",
+@@ -379,6 +400,11 @@ export function MyCoursesClient() {
+           </div>
+         ) : null}
+ 
++        <WorkloadSummary
++          summary={visibleWorkload}
++          term={term === ALL ? null : term}
++        />
++
+         <DataTable
+           columns={columns}
+           rows={groupedRows}
+@@ -406,6 +432,131 @@ export function MyCoursesClient() {
+   );
+ }
+ 
++function WorkloadSummary({
++  summary,
++  term,
++}: {
++  summary: LecturerWorkloadSummary;
++  term: string | null;
++}) {
++  const scheduleColumns: DataTableColumn<LecturerScheduleRow>[] = [
++    { key: "day", header: "Day", render: (row) => row.dayOfWeek },
++    {
++      key: "time",
++      header: "Time",
++      render: (row) => `${row.startTime}–${row.endTime}`,
++    },
++    {
++      key: "course",
++      header: "Course & Class",
++      render: (row) => (
++        <div>
++          <div className="font-medium text-foreground">
++            {row.course.code} · Class {row.sectionCode}
++          </div>
++          <div className="text-xs text-muted-foreground">{row.activityType} · {row.role}</div>
++        </div>
++      ),
++    },
++    {
++      key: "room",
++      header: "Room",
++      render: (row) => row.room || <span className="text-muted-foreground">—</span>,
++    },
++    {
++      key: "duration",
++      header: "Duration",
++      align: "right",
++      render: (row) => <span className="font-medium tabular-nums">{row.durationHours}h</span>,
++    },
++  ];
++  const columns: DataTableColumn<LecturerWorkloadRow>[] = [
++    {
++      key: "week",
++      header: "Week",
++      render: (row) => `Week ${row.week}`,
++    },
++    {
++      key: "course",
++      header: "Course",
++      render: (row) => (
++        <div>
++          <div className="font-medium text-foreground">{row.course.code}</div>
++          <div className="text-xs text-muted-foreground">{row.course.title}</div>
++        </div>
++      ),
++    },
++    { key: "class", header: "Class", render: (row) => `Class ${row.sectionCode}` },
++    { key: "role", header: "Role", render: (row) => row.role },
++    {
++      key: "contact",
++      header: "L / T / P / O",
++      render: (row) =>
++        `${row.lectureHours} / ${row.tutorialHours} / ${row.practiceHours} / ${row.otherHours}`,
++    },
++    {
++      key: "total",
++      header: "Hours",
++      align: "right",
++      render: (row) => <span className="font-medium tabular-nums">{row.totalContactHours}</span>,
++    },
++  ];
++
++  return (
++    <section className="space-y-3 rounded-xl border border-border bg-card p-4">
++      <div className="flex flex-wrap items-start justify-between gap-3">
++        <div>
++          <h2 className="font-semibold text-foreground">Weekly Teaching Workload</h2>
++          <p className="text-xs text-muted-foreground">
++            Actual timetable hours plus planned course-spec contact hours; self-study is excluded.
++          </p>
++        </div>
++        <div className="text-right">
++          <p className="text-2xl font-semibold tabular-nums text-foreground">
++            {summary.scheduleRows.length
++              ? `${summary.scheduledWeeklyHours} scheduled hours/week`
++              : `${summary.peakWeeklyHours} planned hours/week`}
++          </p>
++          <p className="text-xs text-muted-foreground">
++            {summary.scheduleRows.length ? `${summary.peakWeeklyHours}h planned peak · ` : ""}
++            {term ?? "all terms"} · {summary.totalHours} planned term hours
++          </p>
++        </div>
++      </div>
++      <div className="space-y-2">
++        <h3 className="text-sm font-medium text-foreground">My Weekly Timetable</h3>
++        <DataTable
++          columns={scheduleColumns}
++          rows={summary.scheduleRows}
++          getRowId={(row) => row.meetingId}
++          loading={false}
++          emptyMessage="No room or meeting time has been scheduled yet."
++        />
++      </div>
++      {summary.weeklyTotals.length ? (
++        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
++          {summary.weeklyTotals.map((week) => (
++            <span key={`${week.term}-${week.week}`} className="rounded-md bg-muted px-2 py-1">
++              {term ? "" : `${week.term} · `}Week {week.week}: {week.totalContactHours}h
++            </span>
++          ))}
++        </div>
++      ) : null}
++      <h3 className="text-sm font-medium text-foreground">Planned Contact Hours by Teaching Week</h3>
++      <DataTable
++        columns={columns}
++        rows={summary.rows}
++        getRowId={(row) => `${row.offeringId}-${row.week}`}
++        loading={false}
++        emptyMessage="No weekly contact hours are scheduled for this selection."
++      />
++      <p className="text-xs text-muted-foreground">
++        Co-lecturer assignments currently count at full workload.
++      </p>
++    </section>
++  );
++}
++
+ function Field({
+   label,
+   children,
+diff --git a/apps/frontend/app/(shell)/offerings/offering-form-fields.tsx b/apps/frontend/app/(shell)/offerings/offering-form-fields.tsx
+index e66a636..b046b98 100644
+--- a/apps/frontend/app/(shell)/offerings/offering-form-fields.tsx
++++ b/apps/frontend/app/(shell)/offerings/offering-form-fields.tsx
+@@ -1,10 +1,18 @@
+ "use client";
+ 
+-import { Controller, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
+-import { OFFERING_STATUSES, type Lecturer, type Semester } from "@dse-pms/shared-types";
++import { Controller, useFieldArray, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
++import {
++  MEETING_ACTIVITY_TYPES,
++  MEETING_DAYS,
++  OFFERING_STATUSES,
++  type Lecturer,
++  type OfferingMeetingInput,
++  type Semester,
++} from "@dse-pms/shared-types";
+ import type { CourseView } from "@/lib/courses";
+ import {
+   Input,
++  Button,
+   Select,
+   SelectContent,
+   SelectItem,
+@@ -16,6 +24,8 @@ import { LecturerChecklist } from "./lecturer-checklist";
+ export type OfferingFormValues = {
+   courseId: string;
+   term: string;
++  sectionCode: string;
++  meetings: OfferingMeetingInput[];
+   lecturerId?: string | null;
+   // Existing lecturer users assigned alongside the primary lecturer (issue #79).
+   coLecturerIds?: string[];
+@@ -84,6 +94,14 @@ export function OfferingFormFields({
+   };
+   // The primary lecturer can't also be picked as a co-lecturer.
+   const coLecturerOptions = lecturers.filter((l) => l.id !== lecturerId);
++  const { fields: meetingFields, append: appendMeeting, remove: removeMeeting } = useFieldArray({
++    control,
++    name: "meetings",
++  });
++  const dayItems = Object.fromEntries(MEETING_DAYS.map((day) => [day, day]));
++  const activityItems = Object.fromEntries(
++    MEETING_ACTIVITY_TYPES.map((activity) => [activity, activity]),
++  );
+ 
+   return (
+     <div className="space-y-4">
+@@ -112,9 +130,93 @@ export function OfferingFormFields({
+           )}
+         />
+       </Field>
+-      <Field label="Term" error={errors.term?.message}>
+-        <Input placeholder="2025-Fall" {...register("term")} />
+-      </Field>
++      <div className="grid grid-cols-2 gap-3">
++        <Field label="Term" error={errors.term?.message}>
++          <Input placeholder="2025-Fall" {...register("term")} />
++        </Field>
++        <Field label="Class / Section" error={errors.sectionCode?.message}>
++          <Input placeholder="A" maxLength={12} {...register("sectionCode")} />
++        </Field>
++      </div>
++      <fieldset className="space-y-3 rounded-lg border border-border p-4">
++        <div className="flex items-start justify-between gap-3">
++          <div>
++            <legend className="text-sm font-semibold text-foreground">Weekly Class Schedule</legend>
++            <p className="text-xs text-muted-foreground">
++              Add each recurring session. Duration is calculated from its start and end time.
++            </p>
++          </div>
++          <Button
++            type="button"
++            variant="outline"
++            size="sm"
++            onClick={() => appendMeeting({
++              dayOfWeek: "Monday",
++              startTime: "08:00",
++              endTime: "09:00",
++              room: "",
++              activityType: "Lecture",
++            })}
++          >
++            Add session
++          </Button>
++        </div>
++        {meetingFields.length === 0 ? (
++          <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
++            No timetable added yet. Planned workload will still come from the course specification.
++          </p>
++        ) : null}
++        {meetingFields.map((meeting, index) => (
++          <div key={meeting.id} className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
++            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
++              <Field label="Day" error={errors.meetings?.[index]?.dayOfWeek?.message}>
++                <Controller
++                  control={control}
++                  name={`meetings.${index}.dayOfWeek`}
++                  render={({ field }) => (
++                    <Select items={dayItems} value={field.value} onValueChange={field.onChange}>
++                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
++                      <SelectContent>
++                        {MEETING_DAYS.map((day) => <SelectItem key={day} value={day}>{day}</SelectItem>)}
++                      </SelectContent>
++                    </Select>
++                  )}
++                />
++              </Field>
++              <Field label="Start" error={errors.meetings?.[index]?.startTime?.message}>
++                <Input type="time" {...register(`meetings.${index}.startTime`)} />
++              </Field>
++              <Field label="End" error={errors.meetings?.[index]?.endTime?.message}>
++                <Input type="time" {...register(`meetings.${index}.endTime`)} />
++              </Field>
++              <Field label="Room" error={errors.meetings?.[index]?.room?.message}>
++                <Input placeholder="A203" maxLength={80} {...register(`meetings.${index}.room`)} />
++              </Field>
++              <Field label="Activity" error={errors.meetings?.[index]?.activityType?.message}>
++                <Controller
++                  control={control}
++                  name={`meetings.${index}.activityType`}
++                  render={({ field }) => (
++                    <Select items={activityItems} value={field.value} onValueChange={field.onChange}>
++                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
++                      <SelectContent>
++                        {MEETING_ACTIVITY_TYPES.map((activity) => (
++                          <SelectItem key={activity} value={activity}>{activity}</SelectItem>
++                        ))}
++                      </SelectContent>
++                    </Select>
++                  )}
++                />
++              </Field>
++            </div>
++            <div className="flex justify-end">
++              <Button type="button" variant="ghost" size="sm" onClick={() => removeMeeting(index)}>
++                Remove session
++              </Button>
++            </div>
++          </div>
++        ))}
++      </fieldset>
+       <div className="grid grid-cols-2 gap-3">
+         <Field label="Semester (§12)">
+           <Select
+diff --git a/apps/frontend/app/(shell)/offerings/offering-form-page.tsx b/apps/frontend/app/(shell)/offerings/offering-form-page.tsx
+index e60e962..df12713 100644
+--- a/apps/frontend/app/(shell)/offerings/offering-form-page.tsx
++++ b/apps/frontend/app/(shell)/offerings/offering-form-page.tsx
+@@ -31,6 +31,8 @@ const BACK_HREF = "/offerings";
+ const emptyDefaults: OfferingFormValues = {
+   courseId: "",
+   term: "",
++  sectionCode: "A",
++  meetings: [],
+   lecturerId: null,
+   coLecturerIds: [],
+   capacity: 30,
+@@ -85,6 +87,11 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null })
+           reset({
+             courseId: offering.course?.id ?? "",
+             term: offering.term,
++            sectionCode: offering.sectionCode,
++            meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, room, ...meeting }) => ({
++              ...meeting,
++              room: room ?? "",
++            })),
+             lecturerId: offering.lecturer?.id ?? null,
+             coLecturerIds: offering.coLecturers.map((l) => l.id),
+             capacity: offering.capacity,
+diff --git a/apps/frontend/app/(shell)/offerings/offerings-client.tsx b/apps/frontend/app/(shell)/offerings/offerings-client.tsx
+index 4bf5e5f..5e63233 100644
+--- a/apps/frontend/app/(shell)/offerings/offerings-client.tsx
++++ b/apps/frontend/app/(shell)/offerings/offerings-client.tsx
+@@ -69,10 +69,11 @@ export function OfferingsClient() {
+ 
+         if (yearCompare !== 0) return yearCompare;
+ 
+-        // 3. Course code
+-        return String(a.course?.code ?? "").localeCompare(
++        // 3. Course code, then class/section.
++        const courseCompare = String(a.course?.code ?? "").localeCompare(
+           String(b.course?.code ?? ""),
+         );
++        return courseCompare || a.sectionCode.localeCompare(b.sectionCode);
+       });
+ 
+       setRows(offerings);
+@@ -98,7 +99,7 @@ export function OfferingsClient() {
+   }, []);
+ 
+   const handleDelete = async (offering: OfferingView) => {
+-    if (!confirm(`Delete ${offering.course?.code} · ${offering.term}?`)) return;
++    if (!confirm(`Delete ${offering.course?.code} · Class ${offering.sectionCode} · ${offering.term}?`)) return;
+     try {
+       await offeringsApi.remove(offering.id);
+       await load();
+@@ -142,6 +143,25 @@ export function OfferingsClient() {
+         ),
+     },
+     { key: "term", header: "Term", render: (o) => o.term },
++    { key: "section", header: "Class", render: (o) => `Class ${o.sectionCode}` },
++    {
++      key: "schedule",
++      header: "Room & Time",
++      render: (o) =>
++        o.meetings.length ? (
++          <div className="space-y-0.5 text-xs">
++            {o.meetings.map((meeting) => (
++              <div key={meeting.id}>
++                <span className="font-medium text-foreground">{meeting.dayOfWeek.slice(0, 3)}</span>{" "}
++                {meeting.startTime}–{meeting.endTime}
++                {meeting.room ? ` · ${meeting.room}` : ""}
++              </div>
++            ))}
++          </div>
++        ) : (
++          <span className="text-muted-foreground">Not scheduled</span>
++        ),
++    },
+     {
+       key: "availability",
+       header: "Availability",
+diff --git a/apps/frontend/lib/offerings.test.ts b/apps/frontend/lib/offerings.test.ts
+new file mode 100644
+index 0000000..9ebdece
+--- /dev/null
++++ b/apps/frontend/lib/offerings.test.ts
+@@ -0,0 +1,71 @@
++import { expect, test } from "bun:test";
++import type { LecturerWorkloadSummary } from "@dse-pms/shared-types";
++import { workloadForTerm } from "./offerings";
++
++const summary: LecturerWorkloadSummary = {
++  scheduleRows: [
++    {
++      meetingId: "meeting-a",
++      offeringId: "offering-a",
++      course: { id: "course", code: "DSE301", title: "Data Engineering" },
++      term: "2026-Fall",
++      sectionCode: "A",
++      role: "Primary",
++      dayOfWeek: "Monday",
++      startTime: "08:00",
++      endTime: "10:00",
++      room: "A203",
++      activityType: "Lecture",
++      durationHours: 2,
++    },
++  ],
++  scheduledWeeklyHours: 2,
++  rows: [
++    {
++      offeringId: "offering-a",
++      course: { id: "course", code: "DSE301", title: "Data Engineering" },
++      term: "2026-Fall",
++      sectionCode: "A",
++      role: "Primary",
++      week: 1,
++      lectureHours: 2,
++      tutorialHours: 1,
++      practiceHours: 0,
++      otherHours: 0,
++      totalContactHours: 3,
++    },
++    {
++      offeringId: "offering-b",
++      course: { id: "course", code: "DSE301", title: "Data Engineering" },
++      term: "2027-Spring",
++      sectionCode: "B",
++      role: "Primary",
++      week: 1,
++      lectureHours: 2,
++      tutorialHours: 1,
++      practiceHours: 0,
++      otherHours: 0,
++      totalContactHours: 3,
++    },
++  ],
++  weeklyTotals: [
++    { term: "2027-Spring", week: 1, totalContactHours: 3 },
++    { term: "2026-Fall", week: 1, totalContactHours: 3 },
++  ],
++  peakWeeklyHours: 3,
++  totalHours: 6,
++  coLecturerAssumption: "full",
++};
++
++test("selected term filters workload rows and recalculates the total", () => {
++  const filtered = workloadForTerm(summary, "2026-Fall");
++  expect(filtered.rows).toHaveLength(1);
++  expect(filtered.rows[0]?.sectionCode).toBe("A");
++  expect(filtered.totalHours).toBe(3);
++  expect(filtered.peakWeeklyHours).toBe(3);
++  expect(filtered.weeklyTotals).toEqual([
++    { term: "2026-Fall", week: 1, totalContactHours: 3 },
++  ]);
++  expect(filtered.scheduledWeeklyHours).toBe(2);
++  expect(filtered.scheduleRows).toHaveLength(1);
++});
+diff --git a/apps/frontend/lib/offerings.ts b/apps/frontend/lib/offerings.ts
+index 96b3fcc..af91a46 100644
+--- a/apps/frontend/lib/offerings.ts
++++ b/apps/frontend/lib/offerings.ts
+@@ -1,5 +1,6 @@
+ import type {
+   CreateOfferingInput,
++  LecturerWorkloadSummary,
+   OfferingStatus,
+   OfferingView,
+   UpdateOfferingInput,
+@@ -10,6 +11,10 @@ export const offeringsApi = {
+   list(): Promise<OfferingView[]> {
+     return api.get<OfferingView[]>("/api/offerings");
+   },
++  workload(term?: string): Promise<LecturerWorkloadSummary> {
++    const query = term ? `?term=${encodeURIComponent(term)}` : "";
++    return api.get<LecturerWorkloadSummary>(`/api/offerings/workload/me${query}`);
++  },
+   get(id: string): Promise<OfferingView> {
+     return api.get<OfferingView>(`/api/offerings/${id}`);
+   },
+@@ -30,6 +35,30 @@ export const offeringsApi = {
+   },
+ };
+ 
++/** Apply the My Courses term selection to a server-provided workload summary. */
++export function workloadForTerm(
++  summary: LecturerWorkloadSummary,
++  term: string | null,
++): LecturerWorkloadSummary {
++  const scheduleRows = term
++    ? summary.scheduleRows.filter((row) => row.term === term)
++    : summary.scheduleRows;
++  const rows = term ? summary.rows.filter((row) => row.term === term) : summary.rows;
++  const weeklyTotals = term
++    ? summary.weeklyTotals.filter((week) => week.term === term)
++    : summary.weeklyTotals;
++  return {
++    scheduleRows,
++    scheduledWeeklyHours:
++      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
++    rows,
++    weeklyTotals,
++    peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
++    totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
++    coLecturerAssumption: summary.coLecturerAssumption,
++  };
++}
++
+ /** Map an offering status to a StatusBadge tone. */
+ export function offeringTone(status: OfferingStatus): "live" | "upcoming" | "neutral" {
+   if (status === "Active") return "live";
+diff --git a/packages/shared-types/src/contracts.ts b/packages/shared-types/src/contracts.ts
+index 4fa8c76..4177823 100644
+--- a/packages/shared-types/src/contracts.ts
++++ b/packages/shared-types/src/contracts.ts
+@@ -45,6 +45,16 @@ export interface StudentsServiceContract {
+ 
+ export interface CoursesServiceContract {
+   getById(id: string): Promise<CourseRef | null>;
++  weeklyContactHours(courseId: string): Promise<CourseWeeklyContactHoursRef[]>;
++}
++
++export interface CourseWeeklyContactHoursRef {
++  week: number;
++  lectureHours: number;
++  tutorialHours: number;
++  practiceHours: number;
++  otherHours: number;
++  totalContactHours: number;
+ }
+ 
+ export interface LecturersServiceContract {
+diff --git a/packages/shared-types/src/offerings.test.ts b/packages/shared-types/src/offerings.test.ts
+index 2f0c3d6..e526d5b 100644
+--- a/packages/shared-types/src/offerings.test.ts
++++ b/packages/shared-types/src/offerings.test.ts
+@@ -1,5 +1,11 @@
+ import { expect, test } from "bun:test";
+-import { coLecturerViolation, CreateOfferingInput, UpdateOfferingInput } from "./offerings.ts";
++import {
++  coLecturerViolation,
++  CreateOfferingInput,
++  OfferingMeetingInput,
++  SectionCodeSchema,
++  UpdateOfferingInput,
++} from "./offerings.ts";
+ 
+ const A = "11111111-1111-1111-1111-111111111111";
+ const B = "22222222-2222-2222-2222-222222222222";
+@@ -58,3 +64,44 @@ test("UpdateOfferingInput applies the same invariant on a partial patch", () =>
+   expect(UpdateOfferingInput.safeParse({ coLecturerIds: [B] }).success).toBe(true);
+   expect(UpdateOfferingInput.safeParse({}).success).toBe(true);
+ });
++
++test("class section defaults to A for backward-compatible create requests", () => {
++  const parsed = CreateOfferingInput.parse({ courseId: COURSE, term: "2026-Fall" });
++  expect(parsed.sectionCode).toBe("A");
++});
++
++test("class section is trimmed and normalized to uppercase", () => {
++  expect(SectionCodeSchema.parse(" b-2 ")).toBe("B-2");
++});
++
++test("class section rejects spaces and punctuation", () => {
++  expect(SectionCodeSchema.safeParse("Class B").success).toBe(false);
++  expect(SectionCodeSchema.safeParse("B!").success).toBe(false);
++});
++
++test("meeting validation accepts room/time and derives no user-entered duration", () => {
++  const meeting = OfferingMeetingInput.parse({
++    dayOfWeek: "Monday",
++    startTime: "08:00",
++    endTime: "10:30",
++    room: "A203",
++    activityType: "Lecture",
++  });
++  expect(meeting.room).toBe("A203");
++  expect("duration" in meeting).toBe(false);
++});
++
++test("meeting validation rejects invalid and reversed times", () => {
++  expect(OfferingMeetingInput.safeParse({
++    dayOfWeek: "Monday",
++    startTime: "10:00",
++    endTime: "09:00",
++    activityType: "Lecture",
++  }).success).toBe(false);
++  expect(OfferingMeetingInput.safeParse({
++    dayOfWeek: "Monday",
++    startTime: "8am",
++    endTime: "10:00",
++    activityType: "Lecture",
++  }).success).toBe(false);
++});
+diff --git a/packages/shared-types/src/offerings.ts b/packages/shared-types/src/offerings.ts
+index ca1a7a9..65d71a7 100644
+--- a/packages/shared-types/src/offerings.ts
++++ b/packages/shared-types/src/offerings.ts
+@@ -15,6 +15,73 @@ export const SEMESTERS = ["First", "Second"] as const;
+ export const SemesterSchema = z.enum(SEMESTERS);
+ export type Semester = z.infer<typeof SemesterSchema>;
+ 
++/** Short, stable class label within a course and term (for example A or B2). */
++export const SectionCodeSchema = z
++  .string()
++  .trim()
++  .min(1, "Class / section is required")
++  .max(12, "Class / section must be 12 characters or fewer")
++  .regex(/^[A-Za-z0-9-]+$/, "Use letters, numbers, or hyphens only")
++  .transform((value) => value.toUpperCase());
++export type SectionCode = z.infer<typeof SectionCodeSchema>;
++
++export const MEETING_DAYS = [
++  "Monday",
++  "Tuesday",
++  "Wednesday",
++  "Thursday",
++  "Friday",
++  "Saturday",
++  "Sunday",
++] as const;
++export const MeetingDaySchema = z.enum(MEETING_DAYS);
++export type MeetingDay = z.infer<typeof MeetingDaySchema>;
++
++export const MEETING_ACTIVITY_TYPES = [
++  "Lecture",
++  "Tutorial",
++  "Practice",
++  "Lab",
++  "Other",
++] as const;
++export const MeetingActivityTypeSchema = z.enum(MEETING_ACTIVITY_TYPES);
++export type MeetingActivityType = z.infer<typeof MeetingActivityTypeSchema>;
++
++const MeetingTimeSchema = z
++  .string()
++  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid 24-hour time");
++
++/** One recurring weekly timetable entry for a class offering. */
++export const OfferingMeetingInput = z
++  .object({
++    dayOfWeek: MeetingDaySchema,
++    startTime: MeetingTimeSchema,
++    endTime: MeetingTimeSchema,
++    room: z.string().trim().max(80, "Room must be 80 characters or fewer").optional(),
++    activityType: MeetingActivityTypeSchema.default("Lecture"),
++  })
++  .superRefine((meeting, ctx) => {
++    if (meeting.endTime <= meeting.startTime) {
++      ctx.addIssue({
++        code: z.ZodIssueCode.custom,
++        message: "End time must be after start time",
++        path: ["endTime"],
++      });
++    }
++  });
++export type OfferingMeetingInput = z.infer<typeof OfferingMeetingInput>;
++
++export interface OfferingMeetingView {
++  id: string;
++  dayOfWeek: MeetingDay;
++  startTime: string;
++  endTime: string;
++  room: string | null;
++  activityType: MeetingActivityType;
++  /** Derived from start/end time; callers never enter duration separately. */
++  durationHours: number;
++}
++
+ /** Human label for a semester value (falls back to a dash when unset). */
+ export function semesterLabel(semester: Semester | null | undefined): string {
+   if (semester === "First") return "1st Semester";
+@@ -62,6 +129,10 @@ function refineCoLecturers(data: CoLecturerAssignment, ctx: z.RefinementCtx): vo
+ const OfferingInputShape = z.object({
+   courseId: z.string().uuid("A course is required"),
+   term: z.string().min(1, "Term is required"),
++  // Default keeps older API clients compatible while the database migration
++  // backfills every existing offering as Class A.
++  sectionCode: SectionCodeSchema.default("A"),
++  meetings: z.array(OfferingMeetingInput).max(20, "Use at most 20 weekly meetings").default([]),
+   lecturerId: z.string().uuid().nullable().optional(),
+   // Existing lecturer users assigned alongside the primary lecturer (issue #79).
+   // Distinct from otherLecturers (per-term free text) — untouched here.
+@@ -89,6 +160,11 @@ export const ListOfferingsQuery = z.object({
+ });
+ export type ListOfferingsQuery = z.infer<typeof ListOfferingsQuery>;
+ 
++export const ListLecturerWorkloadQuery = z.object({
++  term: z.string().trim().min(1).optional(),
++});
++export type ListLecturerWorkloadQuery = z.infer<typeof ListLecturerWorkloadQuery>;
++
+ /** Body for POST /api/offerings/:id/enrollments */
+ export const EnrollInput = z.object({
+   studentIds: z.array(z.string().uuid()).min(1, "Select at least one student"),
+@@ -99,6 +175,7 @@ export type EnrollInput = z.infer<typeof EnrollInput>;
+ export interface OfferingView {
+   id: string;
+   term: string;
++  sectionCode: string;
+   status: OfferingStatus;
+   capacity: number;
+   enrolledCount: number;
+@@ -106,6 +183,7 @@ export interface OfferingView {
+   semester: Semester | null;
+   programmeYear: number | null;
+   otherLecturers: string | null;
++  meetings: OfferingMeetingView[];
+   // programmeId backs the router's programme-scope access check (issue #147) —
+   // not otherwise used by the frontend today.
+   course: { id: string; code: string; title: string; programmeId: string | null } | null;
+@@ -121,3 +199,45 @@ export interface OfferingView {
+   coLecturers: LecturerRef[];
+   students: { id: string; name: string; studentId: string }[];
+ }
++
++export interface LecturerWorkloadRow {
++  offeringId: string;
++  course: { id: string; code: string; title: string };
++  term: string;
++  sectionCode: string;
++  role: "Primary" | "Co-Lecturer";
++  week: number;
++  lectureHours: number;
++  tutorialHours: number;
++  practiceHours: number;
++  otherHours: number;
++  totalContactHours: number;
++}
++
++export interface LecturerScheduleRow {
++  meetingId: string;
++  offeringId: string;
++  course: { id: string; code: string; title: string };
++  term: string;
++  sectionCode: string;
++  role: "Primary" | "Co-Lecturer";
++  dayOfWeek: MeetingDay;
++  startTime: string;
++  endTime: string;
++  room: string | null;
++  activityType: MeetingActivityType;
++  durationHours: number;
++}
++
++export interface LecturerWorkloadSummary {
++  /** Actual recurring timetable used for the lecturer's weekly scheduled load. */
++  scheduleRows: LecturerScheduleRow[];
++  scheduledWeeklyHours: number;
++  rows: LecturerWorkloadRow[];
++  weeklyTotals: { term: string; week: number; totalContactHours: number }[];
++  peakWeeklyHours: number;
++  /** Sum across every returned teaching week; useful for term-level reporting. */
++  totalHours: number;
++  /** Until workload-sharing rules are configured, each co-lecturer counts fully. */
++  coLecturerAssumption: "full";
++}
