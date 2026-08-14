@@ -596,8 +596,8 @@ model CourseSpecAssessmentItem {
 /// Issue #103: normalized CLO Alignment Mapping cells (previously the `mapping`
 /// section's sparse JSON `cells` array). No synthetic id needed — the
 /// `(cloCode, kind, ref)` triple is already the cell's natural, unique identity
-/// (a lecturer can only rate one strength per CLO × week/assessment pair), so it's
-/// the composite PK directly. `ref` (a CourseSpecWeek or CourseSpecAssessmentItem
+/// (a lecturer can only rate one strength per CLO × week/assessment pair), so
+/// it's the composite PK directly. `ref` (a CourseSpecWeek or CourseSpecAssessmentItem
 /// id, depending on `kind`) has no DB FK — it's polymorphic across two possible
 /// parent tables, and, like `cloCode`, was already an unenforced loose reference
 /// before this migration (mapping-model.ts's `reconcileCells` is the only place
@@ -730,13 +730,14 @@ model Enrollment {
   @@index([studentId])
 }
 
-/// §15 teaching-method vocabulary. Global and shared across all courses; grows
-/// as lecturers add methods from the course-spec form. Names are unique so an
-/// add of an existing name reuses the row.
+/// §15 teaching-method vocabulary. Global and shared across all courses.
+/// Programme managers can archive entries without invalidating historical CLO links.
 model TeachingMethod {
   id        String                        @id @default(uuid())
   name      String                        @unique
+  active    Boolean                       @default(true)
   createdAt DateTime                      @default(now())
+  updatedAt DateTime                      @updatedAt
   cloLinks  CourseSpecCloTeachingMethod[]
 }
 
@@ -744,8 +745,40 @@ model TeachingMethod {
 model AssessmentMethod {
   id        String                          @id @default(uuid())
   name      String                          @unique
+  active    Boolean                         @default(true)
   createdAt DateTime                        @default(now())
+  updatedAt DateTime                        @updatedAt
   cloLinks  CourseSpecCloAssessmentMethod[]
+}
+
+/// Programme-managed grouping for active-learning strategies. IDs intentionally use
+/// the existing frontend slugs (for example "practice") so migration is lossless.
+model ActiveLearningCluster {
+  id          String                   @id
+  name        String
+  description String                   @default("")
+  sortOrder   Int                      @default(0)
+  active      Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  strategies  ActiveLearningStrategy[]
+
+  @@index([active, sortOrder])
+}
+
+/// Programme-managed active-learning vocabulary. `id` is the stable slug already
+/// stored by CourseSpecTeachingLearning and CourseSpecClo, so existing specs need no rewrite.
+model ActiveLearningStrategy {
+  id        String                @id
+  name      String
+  clusterId String
+  cluster   ActiveLearningCluster @relation(fields: [clusterId], references: [id], onDelete: Restrict)
+  sortOrder Int                   @default(0)
+  active    Boolean               @default(true)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([clusterId, active, sortOrder])
 }
 
 /// Rubric Library — a reusable assessment grid shared across courses. `levelRows`
