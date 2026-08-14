@@ -49,7 +49,10 @@ export function createStudentPortalRouter(): Router {
     try { res.status(201).json(await studentPortalService.submitFeedback(req.user!.id, req.params.offeringId!, parsed.data)); } catch (error) { handleError(error, res); }
   });
 
-  router.post("/manage/announcements", requirePermission("offerings:write"), async (req, res) => {
+  router.get("/manage/offerings", requirePermission("courses:write"), async (req, res) => {
+    try { res.json(await studentPortalService.deliveryOfferings(req.user!.id, programmeWide(req.user!.roles))); } catch (error) { handleError(error, res); }
+  });
+  router.post("/manage/announcements", requirePermission("courses:write"), async (req, res) => {
     const parsed = PublishAnnouncementInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid announcement", details: parsed.error.flatten() });
     try { res.status(201).json(await studentPortalService.publishAnnouncement(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
@@ -59,7 +62,7 @@ export function createStudentPortalRouter(): Router {
     if (!parsed.success) return void res.status(400).json({ error: "Invalid result", details: parsed.error.flatten() });
     try { res.json(await studentPortalService.publishResult(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
   });
-  router.put("/manage/deadlines", requirePermission("offerings:write"), async (req, res) => {
+  router.put("/manage/deadlines", requirePermission("courses:write"), async (req, res) => {
     const parsed = SetAssessmentDeadlineInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid deadline", details: parsed.error.flatten() });
     try { res.json(await studentPortalService.setDeadline(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }

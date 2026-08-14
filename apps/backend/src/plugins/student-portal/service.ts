@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import type {
+  CourseDeliveryOffering,
   CourseFeedbackInput,
+  CourseFeedbackSummary,
   PortalAnnouncement,
   PortalCloAchievement,
   PortalCourseDetail,
@@ -112,6 +114,69 @@ export function calculateCloAchievements(
         evidenceCount: evidence.length,
       };
     });
+}
+
+const FEEDBACK_MINIMUM_RESPONSES = 3;
+
+type FeedbackSummaryRow = {
+  overallRating: number;
+  teachingClarityRating: number;
+  assessmentClarityRating: number;
+  workload: string;
+  positiveComment: string;
+  improvementComment: string;
+};
+
+export function summarizeAnonymousFeedback(
+  rows: FeedbackSummaryRow[],
+  minimumResponses = FEEDBACK_MINIMUM_RESPONSES,
+): CourseFeedbackSummary {
+  const workload = { light: 0, appropriate: 0, heavy: 0 };
+  for (const row of rows) {
+    if (row.workload === "light" || row.workload === "appropriate" || row.workload === "heavy") {
+      workload[row.workload] += 1;
+    }
+  }
+
+  const available = rows.length >= minimumResponses;
+  if (!available) {
+    return {
+      responseCount: rows.length,
+      minimumResponses,
+      available: false,
+      averages: null,
+      workload: { light: 0, appropriate: 0, heavy: 0 },
+      positiveComments: [],
+      improvementComments: [],
+    };
+  }
+
+  const average = (values: number[]) =>
+    Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+  return {
+    responseCount: rows.length,
+    minimumResponses,
+    available: true,
+    averages: {
+      overall: average(rows.map((row) => row.overallRating)),
+      teachingClarity: average(rows.map((row) => row.teachingClarityRating)),
+      assessmentClarity: average(rows.map((row) => row.assessmentClarityRating)),
+    },
+    workload,
+    positiveComments: rows.map((row) => row.positiveComment.trim()).filter(Boolean),
+    improvementComments: rows.map((row) => row.improvementComment.trim()).filter(Boolean),
+  };
+}
+
+export function deliveryOfferingScope(userId: string, programmeWide: boolean) {
+  return programmeWide
+    ? {}
+    : {
+        OR: [
+          { lecturerId: userId },
+          { coLecturers: { some: { lecturerId: userId } } },
+        ],
+      };
 }
 
 function approvedSpec(row: EnrollmentRow) {
@@ -261,7 +326,14 @@ function announcementsFrom(rows: EnrollmentRow[]): PortalAnnouncement[] {
 async function assertOfferingEditor(offeringId: string, userId: string, programmeWide: boolean) {
   const offering = await prisma.offering.findUnique({
     where: { id: offeringId },
-    include: { coLecturers: true, course: { select: { spec: { select: { id: true } } } } },
+    include: {
+      coLecturers: true,
+      course: {
+        select: {
+          spec: { select: { id: true, assessmentItems: { select: { id: true } } } },
+        },
+      },
+    },
   });
   if (!offering) throw new PortalNotFoundError("Offering not found");
   const assigned = offering.lecturerId === userId || offering.coLecturers.some((item) => item.lecturerId === userId);
@@ -270,6 +342,87 @@ async function assertOfferingEditor(offeringId: string, userId: string, programm
 }
 
 export const studentPortalService = {
+  async deliveryOfferings(userId: string, programmeWide: boolean): Promise<CourseDeliveryOffering[]> {
+    const offerings = await prisma.offering.findMany({
+      where: deliveryOfferingScope(userId, programmeWide),
+      include: {
+        course: {
+          include: {
+            spec: {
+              include: { assessmentItems: { orderBy: { order: "asc" } } },
+            },
+          },
+        },
+        enrollments: {
+          include: {
+            student: { select: { id: true, studentId: true, name: true } },
+            results: true,
+          },
+          orderBy: { student: { name: "asc" } },
+        },
+        assessmentDeadlines: true,
+        announcements: {
+          include: { author: { select: { name: true } } },
+          orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
+        },
+        feedbackResponses: { orderBy: { createdAt: "asc" } },
+      },
+      orderBy: [{ term: "desc" }, { course: { code: "asc" } }, { sectionCode: "asc" }],
+    });
+
+    return offerings.map((offering) => {
+      const spec = offering.course.spec;
+      const deadlines = new Map(
+        offering.assessmentDeadlines.map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+      );
+      return {
+        offeringId: offering.id,
+        courseId: offering.courseId,
+        code: offering.course.code,
+        title: offering.course.title,
+        term: offering.term,
+        sectionCode: offering.sectionCode,
+        status: offering.status,
+        specificationStatus: spec?.reviewStatus ?? null,
+        studentCount: offering.enrollments.length,
+        assessments: (spec?.assessmentItems ?? [])
+          .filter((assessment) => assessment.status === "Active")
+          .map((assessment) => ({
+            id: assessment.id,
+            name: assessment.name,
+            type: assessment.type,
+            weight: assessment.weight,
+            dueWeek: assessment.dueWeek,
+            dueAt: deadlines.get(assessment.id)?.toISOString() ?? null,
+            results: offering.enrollments.map((enrollment) => {
+              const result = enrollment.results.find(
+                (item) => item.courseSpecId === spec?.id && item.assessmentItemId === assessment.id,
+              );
+              return {
+                enrollmentId: enrollment.id,
+                studentId: enrollment.student.id,
+                studentCode: enrollment.student.studentId,
+                studentName: enrollment.student.name,
+                score: result?.score ?? null,
+                maxScore: result?.maxScore ?? null,
+                feedback: result?.feedback ?? "",
+                publishedAt: result?.publishedAt?.toISOString() ?? null,
+              };
+            }),
+          })),
+        announcements: offering.announcements.map((announcement) => ({
+          id: announcement.id,
+          title: announcement.title,
+          body: announcement.body,
+          pinned: announcement.pinned,
+          authorName: announcement.author.name,
+          publishedAt: announcement.publishedAt?.toISOString() ?? null,
+        })),
+        feedback: summarizeAnonymousFeedback(offering.feedbackResponses),
+      };
+    });
+  },
+
   async courses(userId: string): Promise<PortalCourseSummary[]> {
     return (await enrolledRows(userId)).map(toSummary);
   },
@@ -377,19 +530,23 @@ export const studentPortalService = {
 
   async setDeadline(authorId: string, programmeWide: boolean, input: SetAssessmentDeadlineInput) {
     const offering = await assertOfferingEditor(input.offeringId, authorId, programmeWide);
-    if (!offering.course.spec?.id) throw new PortalNotFoundError("Course specification not found");
+    const spec = offering.course.spec;
+    if (!spec?.id) throw new PortalNotFoundError("Course specification not found");
+    if (!spec.assessmentItems.some((assessment) => assessment.id === input.assessmentItemId)) {
+      throw new PortalNotFoundError("Assessment not found");
+    }
     return prisma.offeringAssessmentDeadline.upsert({
       where: {
         offeringId_courseSpecId_assessmentItemId: {
           offeringId: input.offeringId,
-          courseSpecId: offering.course.spec.id,
+          courseSpecId: spec.id,
           assessmentItemId: input.assessmentItemId,
         },
       },
       update: { dueAt: new Date(input.dueAt) },
       create: {
         offeringId: input.offeringId,
-        courseSpecId: offering.course.spec.id,
+        courseSpecId: spec.id,
         assessmentItemId: input.assessmentItemId,
         dueAt: new Date(input.dueAt),
       },

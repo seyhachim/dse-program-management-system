@@ -15,6 +15,7 @@ import {
   Home,
   ChartNoAxesCombined,
   LibraryBig,
+  Megaphone,
   Presentation,
   RefreshCw,
   Settings,
@@ -61,6 +62,7 @@ export const iconMap: Record<string, LucideIcon> = {
   home: Home,
   chart: ChartNoAxesCombined,
   bell: Bell,
+  megaphone: Megaphone,
 };
 
 /** All nav routes, or — when roles are given — only those the caller's roles may see. */
