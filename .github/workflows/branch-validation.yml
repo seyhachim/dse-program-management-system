@@ -8,6 +8,20 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dse?schema=public
       AUTH_MODE: dev
@@ -24,4 +38,7 @@ jobs:
       - run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
       - run: bun run typecheck
       - run: bun test
+      - run: bun run --cwd apps/backend db:migrate:deploy
+      - run: bun run --cwd apps/backend seed
+      - run: bun apps/backend/scripts/qa-evidence-smoke.ts
       - run: bun run build
