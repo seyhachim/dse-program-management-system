@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleAlert, Pencil } from "lucide-react";
 import {
   COMPLETABLE_SPEC_SECTIONS,
   FOCUS_LEVELS,
@@ -52,6 +52,8 @@ export function OverviewTab({
   const percent = fillable.length
     ? Math.round((completed / fillable.length) * 100)
     : 0;
+  const unfinished = fillable.filter((s) => status[s.id] !== "complete");
+  const nextSection = unfinished[0];
 
   const deliverables = weeklyPlan.filter((w) => w.assessment.trim());
   const planTotals = weeklyPlanFormTotals(weeklyPlan);
@@ -367,32 +369,94 @@ export function OverviewTab({
       </div>
 
       <div className="space-y-4">
-        {/* Completeness */}
+        {/* Specification readiness */}
         <Card>
-          <CardHeader title="Course Specification Completeness" />
-          <div className="flex flex-col items-center gap-4">
+          <CardHeader title="Specification Readiness" />
+          <div className="flex items-center gap-4">
             <CompletionRing value={percent} />
-            <dl className="w-full space-y-1.5 text-sm">
-              <LegendRow
-                color="var(--status-live)"
-                label="Completed"
-                value={completed}
-                total={fillable.length}
-              />
-              <LegendRow
-                color="var(--status-upcoming)"
-                label="In Progress"
-                value={inProgress}
-                total={fillable.length}
-              />
-              <LegendRow
-                color="var(--muted-foreground)"
-                label="Missing"
-                value={missing}
-                total={fillable.length}
-              />
-            </dl>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">
+                {completed} of {fillable.length} required sections ready
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {missing > 0
+                  ? `${missing} not started and ${inProgress} in progress.`
+                  : inProgress > 0
+                    ? `${inProgress} section${inProgress === 1 ? "" : "s"} still in progress.`
+                    : "All required sections are complete."}
+              </p>
+            </div>
           </div>
+
+          {nextSection ? (
+            <div className="mt-5 rounded-lg border border-amber-200/80 bg-amber-50/70 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+              <div className="flex items-start gap-2">
+                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                    Recommended next step
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">
+                    {nextSection.title}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {status[nextSection.id] === "draft"
+                      ? "Continue this section and mark it complete."
+                      : "Add the required information to start this section."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onGoToTab(nextSection.id as SpecSectionId)}
+                    className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-foreground hover:underline"
+                  >
+                    {status[nextSection.id] === "draft" ? "Continue" : "Start section"}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 flex items-start gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Ready for review
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  All required sections are complete. Review the document before submission.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {unfinished.length > 1 ? (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Also needs attention
+              </p>
+              <ul className="space-y-2">
+                {unfinished.slice(1, 4).map((section) => (
+                  <li key={section.id}>
+                    <button
+                      type="button"
+                      onClick={() => onGoToTab(section.id as SpecSectionId)}
+                      className="flex w-full items-center justify-between gap-3 text-left text-sm hover:text-accent-foreground"
+                    >
+                      <span className="truncate text-foreground">{section.title}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {status[section.id] === "draft" ? "In progress" : "Not started"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {unfinished.length > 4 ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  +{unfinished.length - 4} more section{unfinished.length - 4 === 1 ? "" : "s"}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </Card>
 
         {/* Quick actions */}
@@ -532,33 +596,6 @@ function EmptyHint({
           {action}
         </button>
       ) : null}
-    </div>
-  );
-}
-
-function LegendRow({
-  color,
-  label,
-  value,
-  total,
-}: {
-  color: string;
-  label: string;
-  value: number;
-  total: number;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="flex items-center gap-2 text-muted-foreground">
-        <span
-          className="h-2 w-2 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-        {label}
-      </span>
-      <span className="font-medium text-foreground">
-        {value} / {total}
-      </span>
     </div>
   );
 }
