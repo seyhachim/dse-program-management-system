@@ -31,6 +31,27 @@ test("a caller with multiple roles sees the union of both roles' routes", () => 
   expect(routes).toContain("/students"); // program_secretary route
 });
 
+test("Lecturer gets the cross-course workspace routes and other roles do not", () => {
+  const lecturerRoutes = navForRole(pluginManifests, ["lecturer"]);
+  const paths = lecturerRoutes.map((r) => r.path);
+
+  expect(paths).toContain("/courses");
+  expect(paths).toContain("/my-tasks");
+  expect(paths).toContain("/teaching-schedule");
+  expect(paths).toContain("/templates-guides");
+
+  expect(lecturerRoutes.find((r) => r.path === "/my-tasks")?.group).toBe("Academic");
+  expect(lecturerRoutes.find((r) => r.path === "/teaching-schedule")?.group).toBe("Academic");
+  expect(lecturerRoutes.find((r) => r.path === "/templates-guides")?.group).toBe("Resources");
+
+  for (const role of ["admin", "program_coordinator", "program_secretary", "qa_reviewer", "student"] as const) {
+    const rolePaths = navForRole(pluginManifests, [role]).map((r) => r.path);
+    expect(rolePaths).not.toContain("/my-tasks");
+    expect(rolePaths).not.toContain("/teaching-schedule");
+    expect(rolePaths).not.toContain("/templates-guides");
+  }
+});
+
 test("QA Reviewer lands on its own QA Dashboard, not the general Dashboard, and has no admin-only routes", () => {
   const routes = navForRole(pluginManifests, ["qa_reviewer"]);
   expect(routes.some((r) => r.path === "/students")).toBe(false);
