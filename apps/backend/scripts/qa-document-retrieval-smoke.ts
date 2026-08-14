@@ -111,7 +111,7 @@ try {
       evidenceType: "curriculum-mapping",
       expectation: {
         active: true,
-        requirement: { code: "2.2", criterion: { frameworkId: "aun-qa-programme-v4" } },
+        requirement: { code: "2.4", criterion: { frameworkId: "aun-qa-programme-v4" } },
       },
     },
     select: { id: true },
