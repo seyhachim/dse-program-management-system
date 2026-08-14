@@ -1,0 +1,328 @@
+import {
+  AUN_QA_V4_ID,
+  type CreateQaCycleInput,
+  type CreateQaEvidenceInput,
+  type QaCycleView,
+  type QaDashboardView,
+  type QaEvidenceView,
+  type QaSelfAssessmentView,
+  type UpsertQaSelfAssessmentInput,
+} from "@dse-pms/shared-types";
+import { prisma } from "../../core/db/prisma.ts";
+
+const cycleStatus = {
+  Draft: "draft",
+  Active: "active",
+  UnderReview: "underReview",
+  Closed: "closed",
+} as const;
+
+const evidenceKind = {
+  SystemLink: "systemLink",
+  ExternalLink: "externalLink",
+  Document: "document",
+} as const;
+
+const evidenceStatus = {
+  Draft: "draft",
+  Ready: "ready",
+  Reviewed: "reviewed",
+} as const;
+
+const toDbEvidenceKind = {
+  systemLink: "SystemLink",
+  externalLink: "ExternalLink",
+  document: "Document",
+} as const;
+
+const toDbEvidenceStatus = {
+  draft: "Draft",
+  ready: "Ready",
+  reviewed: "Reviewed",
+} as const;
+
+function toCycleView(cycle: {
+  id: string;
+  programmeId: string;
+  title: string;
+  reportingStart: Date;
+  reportingEnd: Date;
+  status: keyof typeof cycleStatus;
+  createdAt: Date;
+}): QaCycleView {
+  return {
+    id: cycle.id,
+    programmeId: cycle.programmeId,
+    title: cycle.title,
+    reportingStart: cycle.reportingStart.toISOString(),
+    reportingEnd: cycle.reportingEnd.toISOString(),
+    status: cycleStatus[cycle.status],
+    createdAt: cycle.createdAt.toISOString(),
+  };
+}
+
+function toEvidenceView(evidence: {
+  id: string;
+  requirement: { code: string };
+  title: string;
+  description: string;
+  kind: keyof typeof evidenceKind;
+  sourceUrl: string | null;
+  sourceRef: string;
+  reportingPeriod: string;
+  status: keyof typeof evidenceStatus;
+  createdAt: Date;
+}): QaEvidenceView {
+  return {
+    id: evidence.id,
+    requirementCode: evidence.requirement.code,
+    title: evidence.title,
+    description: evidence.description,
+    kind: evidenceKind[evidence.kind],
+    sourceUrl: evidence.sourceUrl,
+    sourceRef: evidence.sourceRef,
+    reportingPeriod: evidence.reportingPeriod,
+    status: evidenceStatus[evidence.status],
+    createdAt: evidence.createdAt.toISOString(),
+  };
+}
+
+export class QaResourceNotFoundError extends Error {}
+export class QaScopeMismatchError extends Error {}
+
+export const qaService = {
+  async getDashboard(
+    programmeId: string,
+    cycleId?: string,
+  ): Promise<QaDashboardView> {
+    const framework = await prisma.qaFramework.findUnique({
+      where: { id: AUN_QA_V4_ID },
+      include: {
+        criteria: {
+          orderBy: { order: "asc" },
+          include: {
+            requirements: { orderBy: { order: "asc" } },
+          },
+        },
+      },
+    });
+
+    if (!framework) {
+      throw new QaResourceNotFoundError(
+        "AUN-QA v4 catalogue is not installed. Run the database seed.",
+      );
+    }
+
+    const cycles = await prisma.qaAssessmentCycle.findMany({
+      where: { programmeId, frameworkId: framework.id },
+      orderBy: [{ reportingEnd: "desc" }, { createdAt: "desc" }],
+    });
+
+    const selected = cycleId
+      ? cycles.find((cycle) => cycle.id === cycleId)
+      : cycles.find((cycle) => cycle.status === "Active") ?? cycles[0];
+
+    if (cycleId && !selected) {
+      throw new QaResourceNotFoundError("QA assessment cycle not found");
+    }
+
+    const [evidenceRows, assessmentRows] = selected
+      ? await Promise.all([
+          prisma.qaEvidence.findMany({
+            where: { programmeId, cycleId: selected.id },
+            orderBy: { createdAt: "desc" },
+            include: { requirement: { select: { code: true } } },
+          }),
+          prisma.qaRequirementAssessment.findMany({
+            where: { programmeId, cycleId: selected.id },
+            orderBy: { requirement: { code: "asc" } },
+            include: {
+              requirement: { select: { code: true } },
+              reviewer: { select: { name: true } },
+            },
+          }),
+        ])
+      : [[], []];
+
+    const evidenceCodes = new Set(evidenceRows.map((row) => row.requirement.code));
+    const reviewedCodes = new Set(
+      evidenceRows
+        .filter((row) => row.status === "Reviewed")
+        .map((row) => row.requirement.code),
+    );
+    const ratedCodes = new Set(
+      assessmentRows
+        .filter((row) => row.rating !== null)
+        .map((row) => row.requirement.code),
+    );
+
+    const criteria = framework.criteria.map((criterion) => {
+      const requirements = criterion.requirements.map((requirement) => ({
+        code: requirement.code,
+        title: requirement.title,
+      }));
+      const codes = requirements.map((requirement) => requirement.code);
+      return {
+        code: criterion.code,
+        title: criterion.title,
+        summary: criterion.summary,
+        requirements,
+        total: requirements.length,
+        evidenceCovered: codes.filter((code) => evidenceCodes.has(code)).length,
+        rated: codes.filter((code) => ratedCodes.has(code)).length,
+        reviewedEvidence: codes.filter((code) => reviewedCodes.has(code)).length,
+      };
+    });
+
+    const selfAssessments: QaSelfAssessmentView[] = assessmentRows.map((row) => ({
+      requirementCode: row.requirement.code,
+      rating: row.rating,
+      narrative: row.narrative,
+      reviewerName: row.reviewer?.name ?? "Unknown reviewer",
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+
+    return {
+      programmeId,
+      framework: {
+        id: framework.id,
+        name: framework.name,
+        version: framework.version,
+        sourceUrl: framework.sourceUrl,
+      },
+      cycles: cycles.map(toCycleView),
+      selectedCycle: selected ? toCycleView(selected) : null,
+      criteria,
+      totals: {
+        requirements: criteria.reduce((sum, item) => sum + item.total, 0),
+        evidenceCovered: evidenceCodes.size,
+        rated: ratedCodes.size,
+        reviewedEvidence: reviewedCodes.size,
+      },
+      evidence: evidenceRows.map(toEvidenceView),
+      selfAssessments,
+    };
+  },
+
+  async createCycle(input: CreateQaCycleInput, userId: string): Promise<QaCycleView> {
+    const [programme, framework] = await Promise.all([
+      prisma.programme.findUnique({ where: { id: input.programmeId }, select: { id: true } }),
+      prisma.qaFramework.findUnique({ where: { id: AUN_QA_V4_ID }, select: { id: true } }),
+    ]);
+    if (!programme || !framework) {
+      throw new QaResourceNotFoundError("Programme or AUN-QA framework not found");
+    }
+
+    const created = await prisma.qaAssessmentCycle.create({
+      data: {
+        programmeId: input.programmeId,
+        frameworkId: framework.id,
+        title: input.title,
+        reportingStart: input.reportingStart,
+        reportingEnd: input.reportingEnd,
+        status: "Active",
+        createdById: userId,
+      },
+    });
+    return toCycleView(created);
+  },
+
+  async createEvidence(
+    cycleId: string,
+    input: CreateQaEvidenceInput,
+    userId: string,
+  ): Promise<QaEvidenceView> {
+    const [cycle, requirement] = await Promise.all([
+      prisma.qaAssessmentCycle.findUnique({
+        where: { id: cycleId },
+        select: { programmeId: true, frameworkId: true },
+      }),
+      prisma.qaRequirement.findFirst({
+        where: {
+          code: input.requirementCode,
+          criterion: { frameworkId: AUN_QA_V4_ID },
+        },
+        select: { id: true },
+      }),
+    ]);
+    if (!cycle || !requirement) {
+      throw new QaResourceNotFoundError("QA cycle or requirement not found");
+    }
+    if (cycle.programmeId !== input.programmeId || cycle.frameworkId !== AUN_QA_V4_ID) {
+      throw new QaScopeMismatchError("Evidence does not belong to this programme cycle");
+    }
+
+    const created = await prisma.qaEvidence.create({
+      data: {
+        programmeId: input.programmeId,
+        cycleId,
+        requirementId: requirement.id,
+        title: input.title,
+        description: input.description,
+        kind: toDbEvidenceKind[input.kind],
+        sourceUrl: input.sourceUrl || null,
+        sourceRef: input.sourceRef,
+        reportingPeriod: input.reportingPeriod,
+        status: toDbEvidenceStatus[input.status],
+        createdById: userId,
+      },
+      include: { requirement: { select: { code: true } } },
+    });
+    return toEvidenceView(created);
+  },
+
+  async upsertSelfAssessment(
+    cycleId: string,
+    requirementCode: string,
+    input: UpsertQaSelfAssessmentInput,
+    userId: string,
+  ): Promise<QaSelfAssessmentView> {
+    const [cycle, requirement] = await Promise.all([
+      prisma.qaAssessmentCycle.findUnique({
+        where: { id: cycleId },
+        select: { programmeId: true, frameworkId: true },
+      }),
+      prisma.qaRequirement.findFirst({
+        where: { code: requirementCode, criterion: { frameworkId: AUN_QA_V4_ID } },
+        select: { id: true, code: true },
+      }),
+    ]);
+    if (!cycle || !requirement) {
+      throw new QaResourceNotFoundError("QA cycle or requirement not found");
+    }
+    if (cycle.programmeId !== input.programmeId || cycle.frameworkId !== AUN_QA_V4_ID) {
+      throw new QaScopeMismatchError("Self-assessment does not belong to this programme cycle");
+    }
+
+    const saved = await prisma.qaRequirementAssessment.upsert({
+      where: {
+        cycleId_requirementId: { cycleId, requirementId: requirement.id },
+      },
+      update: {
+        programmeId: input.programmeId,
+        rating: input.rating,
+        narrative: input.narrative,
+        reviewerId: userId,
+      },
+      create: {
+        programmeId: input.programmeId,
+        cycleId,
+        requirementId: requirement.id,
+        rating: input.rating,
+        narrative: input.narrative,
+        reviewerId: userId,
+      },
+      include: { reviewer: { select: { name: true } } },
+    });
+
+    return {
+      requirementCode: requirement.code,
+      rating: saved.rating,
+      narrative: saved.narrative,
+      reviewerName: saved.reviewer?.name ?? "Unknown reviewer",
+      updatedAt: saved.updatedAt.toISOString(),
+    };
+  },
+};
+
+export type QaService = typeof qaService;

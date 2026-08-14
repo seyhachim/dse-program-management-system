@@ -96,6 +96,25 @@ enum MappingComponentKind {
   Assessment
 }
 
+enum QaCycleStatus {
+  Draft
+  Active
+  UnderReview
+  Closed
+}
+
+enum QaEvidenceKind {
+  SystemLink
+  ExternalLink
+  Document
+}
+
+enum QaEvidenceStatus {
+  Draft
+  Ready
+  Reviewed
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -110,15 +129,18 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed              Course[]                 @relation("CourseLecturer")
-  offeringsLed            Offering[]               @relation("OfferingLecturer")
-  rubricsOwned            Rubric[]                 @relation("RubricOwner")
-  coLecturerOf            OfferingCoLecturer[]     @relation("OfferingCoLecturer")
+  coursesLed              Course[]                  @relation("CourseLecturer")
+  offeringsLed            Offering[]                @relation("OfferingLecturer")
+  rubricsOwned            Rubric[]                  @relation("RubricOwner")
+  coLecturerOf            OfferingCoLecturer[]      @relation("OfferingCoLecturer")
   roleAssignments         UserRoleAssignment[]
-  courseSpecSubmissions   CourseSpec[]             @relation("CourseSpecSubmittedBy")
-  courseSpecReviewActions CourseSpecReviewAction[] @relation("CourseSpecReviewActor")
+  courseSpecSubmissions   CourseSpec[]              @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions CourseSpecReviewAction[]  @relation("CourseSpecReviewActor")
   studentProfile          Student?
-  announcementsAuthored   CourseAnnouncement[]     @relation("AnnouncementAuthor")
+  announcementsAuthored   CourseAnnouncement[]      @relation("AnnouncementAuthor")
+  qaCyclesCreated         QaAssessmentCycle[]       @relation("QaCycleCreator")
+  qaEvidenceCreated       QaEvidence[]              @relation("QaEvidenceCreator")
+  qaAssessmentsReviewed   QaRequirementAssessment[] @relation("QaAssessmentReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -154,6 +176,129 @@ model Programme {
 
   roleAssignments UserRoleAssignment[]
   courses         Course[]
+  qaCycles        QaAssessmentCycle[]
+  qaEvidence      QaEvidence[]
+  qaAssessments   QaRequirementAssessment[]
+}
+
+/// Versioned quality-assurance catalogue. Framework content is seeded from the
+/// shared AUN-QA v4 catalogue; programme work belongs to assessment cycles below.
+model QaFramework {
+  id        String   @id
+  code      String
+  name      String
+  version   String
+  sourceUrl String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  criteria QaCriterion[]
+  cycles   QaAssessmentCycle[]
+
+  @@unique([code, version])
+}
+
+model QaCriterion {
+  id          String      @id
+  frameworkId String
+  framework   QaFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  code        String
+  title       String
+  summary     String
+  order       Int
+
+  requirements QaRequirement[]
+
+  @@unique([frameworkId, code])
+  @@unique([frameworkId, order])
+}
+
+model QaRequirement {
+  id          String      @id
+  criterionId String
+  criterion   QaCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  code        String
+  title       String
+  order       Int
+
+  evidence    QaEvidence[]
+  assessments QaRequirementAssessment[]
+
+  @@unique([criterionId, code])
+  @@unique([criterionId, order])
+  @@index([code])
+}
+
+/// One programme's self-assessment/reporting window against a framework version.
+model QaAssessmentCycle {
+  id             String        @id @default(uuid())
+  programmeId    String
+  programme      Programme     @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  frameworkId    String
+  framework      QaFramework   @relation(fields: [frameworkId], references: [id], onDelete: Restrict)
+  title          String
+  reportingStart DateTime
+  reportingEnd   DateTime
+  status         QaCycleStatus @default(Draft)
+  createdById    String?
+  createdBy      User?         @relation("QaCycleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  evidence    QaEvidence[]
+  assessments QaRequirementAssessment[]
+
+  @@index([programmeId, status])
+  @@index([frameworkId])
+}
+
+/// Verifiable evidence for one requirement. Direct programme ownership makes
+/// scope explicit and supports efficient fail-closed authorisation checks.
+model QaEvidence {
+  id              String            @id @default(uuid())
+  programmeId     String
+  programme       Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId         String
+  cycle           QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId   String
+  requirement     QaRequirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  title           String
+  description     String            @default("")
+  kind            QaEvidenceKind
+  sourceUrl       String?
+  sourceRef       String            @default("")
+  reportingPeriod String            @default("")
+  status          QaEvidenceStatus  @default(Draft)
+  createdById     String?
+  createdBy       User?             @relation("QaEvidenceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([programmeId, cycleId])
+  @@index([requirementId])
+  @@index([status])
+}
+
+/// Human-entered, justified self-rating. It is deliberately not derived from
+/// evidence coverage and must never be presented as an official AUN-QA result.
+model QaRequirementAssessment {
+  programmeId   String
+  programme     Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId       String
+  cycle         QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId String
+  requirement   QaRequirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  rating        Int?
+  narrative     String            @default("")
+  reviewerId    String?
+  reviewer      User?             @relation("QaAssessmentReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@id([cycleId, requirementId])
+  @@index([programmeId, cycleId])
+  @@index([reviewerId])
 }
 
 model Permission {

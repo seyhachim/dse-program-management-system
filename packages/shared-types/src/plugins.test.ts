@@ -61,6 +61,13 @@ test("QA Reviewer lands on its own QA Dashboard, not the general Dashboard, and 
   expect(routes.some((r) => r.path === "/qa-dashboard")).toBe(true);
 });
 
+test("QA Dashboard is provided by the real QA plugin with explicit permissions", () => {
+  const qa = pluginManifests.find((manifest) => manifest.id === "qa");
+  expect(qa).toBeDefined();
+  expect(qa?.routes?.some((route) => route.path === "/qa-dashboard")).toBe(true);
+  expect(qa?.permissions).toEqual(["qa:read", "qa:write"]);
+});
+
 test("QA Reviewer can reach Course Specification content for review, and its own QA sections", () => {
   const routes = navForRole(pluginManifests, ["qa_reviewer"]).map((r) => r.path);
   expect(routes).toContain("/courses");

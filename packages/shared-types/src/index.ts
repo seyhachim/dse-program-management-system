@@ -10,3 +10,4 @@ export * from "./course-spec.ts";
 export * from "./methods.ts";
 export * from "./rubrics.ts";
 export * from "./student-portal.ts";
+export * from "./qa.ts";
