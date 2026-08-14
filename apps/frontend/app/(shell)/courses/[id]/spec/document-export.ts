@@ -33,7 +33,10 @@ const SMALL = COURSE_DOCUMENT_STYLE.fontSize.small * 2;
 const HEADING = COURSE_DOCUMENT_STYLE.fontSize.heading * 2;
 const BORDER = COURSE_DOCUMENT_STYLE.borderColor.replace("#", "");
 const LABEL = COURSE_DOCUMENT_STYLE.labelBackground.replace("#", "");
-const TABLE_HEADER = COURSE_DOCUMENT_STYLE.colors.tableHeaderBackground.replace("#", "");
+const TABLE_HEADER = COURSE_DOCUMENT_STYLE.colors.tableHeaderBackground.replace(
+  "#",
+  "",
+);
 
 const borders = {
   top: { style: BorderStyle.SINGLE, size: 4, color: BORDER },
@@ -89,7 +92,9 @@ function sectionTitle(number: string, title: string) {
 
 function colWidths(weights: number[]): number[] {
   const total = weights.reduce((a, b) => a + b, 0);
-  const widths = weights.map((w) => Math.floor((w / total) * CONTENT_WIDTH_TWIPS));
+  const widths = weights.map((w) =>
+    Math.floor((w / total) * CONTENT_WIDTH_TWIPS),
+  );
   const distributed = widths.reduce((a, b) => a + b, 0);
   widths[widths.length - 1]! += CONTENT_WIDTH_TWIPS - distributed;
   return widths;
@@ -105,7 +110,9 @@ function cell(
   },
 ) {
   return new TableCell({
-    width: options?.width ? { size: options.width, type: WidthType.DXA } : undefined,
+    width: options?.width
+      ? { size: options.width, type: WidthType.DXA }
+      : undefined,
     columnSpan: options?.columnSpan,
     shading: options?.shade ? { fill: options.shade } : undefined,
     verticalAlign: VerticalAlign.CENTER,
@@ -172,7 +179,8 @@ function programmeProfileCell(title: string, children: Paragraph[]) {
 
 async function programmeProfileHeader(document: CourseDocumentModel) {
   const response = await fetch("/rupp-logo.png");
-  if (!response.ok) throw new Error("Could not load the RUPP logo for Word export");
+  if (!response.ok)
+    throw new Error("Could not load the RUPP logo for Word export");
   const logo = new Uint8Array(await response.arrayBuffer());
   const sideWidth = Math.round(CONTENT_WIDTH_TWIPS * 0.16);
   const centerWidth = CONTENT_WIDTH_TWIPS - sideWidth * 2;
@@ -212,7 +220,11 @@ async function programmeProfileHeader(document: CourseDocumentModel) {
             children: [
               centered("Royal University of Phnom Penh", true, 22),
               centered("Faculty of Engineering", true, 19),
-              centered("Department of Information Technology Engineering", true, 19),
+              centered(
+                "Department of Information Technology Engineering",
+                true,
+                19,
+              ),
               centered(document.courseInformation.programmeTitle, true, 19),
               centered("Course Specification", true, 28),
             ],
@@ -233,16 +245,30 @@ async function programmeProfileTable(document: CourseDocumentModel) {
   const profile = document.programmeProfile;
   const row = (...cells: TableCell[]) => new TableRow({ children: cells });
   const mission = profile.mission.length
-    ? profile.mission.map((item, index) => compactParagraph(`Mission ${index + 1}: ${item}`, false, 18))
+    ? profile.mission.map((item, index) =>
+        compactParagraph(`Mission ${index + 1}: ${item}`, false, 18),
+      )
     : [compactParagraph("—", false, 18)];
   const goals = profile.goals.length
     ? profile.goals.map((item) => compactParagraph(`• ${item}`, false, 18))
     : [compactParagraph("• —", false, 18)];
   const philosophy = profile.educationalPhilosophy.length
-    ? profile.educationalPhilosophy.map((item) => compactParagraph(`• ${item.code}: ${item.title}: ${item.description}`, false, 17))
+    ? profile.educationalPhilosophy.map((item) =>
+        compactParagraph(
+          `• ${item.code}: ${item.title}: ${item.description}`,
+          false,
+          17,
+        ),
+      )
     : [compactParagraph("• —", false, 17)];
   const peos = profile.peos.length
-    ? profile.peos.map((item) => compactParagraph(`• ${item.code}: ${item.title}: ${item.description}`, false, 18))
+    ? profile.peos.map((item) =>
+        compactParagraph(
+          `• ${item.code}: ${item.title}: ${item.description}`,
+          false,
+          18,
+        ),
+      )
     : [compactParagraph("• —", false, 18)];
   const leftWidth = Math.round(CONTENT_WIDTH_TWIPS * 0.34);
   const rightWidth = CONTENT_WIDTH_TWIPS - leftWidth;
@@ -250,11 +276,16 @@ async function programmeProfileTable(document: CourseDocumentModel) {
   return table(
     [
       row(
-        programmeProfileCell("PROGRAM VISION:", [compactParagraph(profile.vision || "—", false, 18)]),
+        programmeProfileCell("PROGRAM VISION:", [
+          compactParagraph(profile.vision || "—", false, 18),
+        ]),
         programmeProfileCell("PROGRAM MISSION", mission),
       ),
       row(
-        programmeProfileCell("PROGRAM GOALS", [compactParagraph("Our program aims to:", false, 18), ...goals]),
+        programmeProfileCell("PROGRAM GOALS", [
+          compactParagraph("Our program aims to:", false, 18),
+          ...goals,
+        ]),
         programmeProfileCell("PROGRAM EDUCATIONAL PHILOSOPHY", philosophy),
       ),
       row(
@@ -264,7 +295,11 @@ async function programmeProfileTable(document: CourseDocumentModel) {
           margins: { top: 45, bottom: 45, left: 70, right: 70 },
           children: [
             compactParagraph("PROGRAM EDUCATIONAL OBJECTIVES (PEOs)", true, 20),
-            compactParagraph("What graduates are expected to achieve within 3–5 years of graduation:", false, 18),
+            compactParagraph(
+              "What graduates are expected to achieve within 3–5 years of graduation:",
+              false,
+              18,
+            ),
             ...peos,
           ],
         }),
@@ -274,7 +309,9 @@ async function programmeProfileTable(document: CourseDocumentModel) {
   );
 }
 
-function courseInformationTable(info: CourseDocumentModel["courseInformation"]) {
+function courseInformationTable(
+  info: CourseDocumentModel["courseInformation"],
+) {
   const row = (...cells: TableCell[]) => new TableRow({ children: cells });
   const w = colWidths([28, 24, 16, 32]);
   const labelValueRow = (label: string, value: string) =>
@@ -282,7 +319,12 @@ function courseInformationTable(info: CourseDocumentModel["courseInformation"]) 
       cell(label, { bold: true, shade: LABEL, width: w[0] }),
       cell(value, { width: w[1]! + w[2]! + w[3]!, columnSpan: 3 }),
     );
-  const fourCellRow = (label1: string, value1: string, label2: string, value2: string) =>
+  const fourCellRow = (
+    label1: string,
+    value1: string,
+    label2: string,
+    value2: string,
+  ) =>
     row(
       cell(label1, { bold: true, shade: LABEL, width: w[0] }),
       cell(value1, { width: w[1] }),
@@ -294,13 +336,28 @@ function courseInformationTable(info: CourseDocumentModel["courseInformation"]) 
     [
       labelValueRow("1. Programme Title", info.programmeTitle),
       labelValueRow("2. Course Title", info.courseTitle),
-      fourCellRow("3. Course Code", info.courseCode, "4. No. of Credits", info.credits),
+      fourCellRow(
+        "3. Course Code",
+        info.courseCode,
+        "4. No. of Credits",
+        info.credits,
+      ),
       labelValueRow("5. Pre-requisites (If any)", info.prerequisites),
-      fourCellRow("6. Course Instructor", info.instructor, "7. Qualification", info.qualification),
+      fourCellRow(
+        "6. Course Instructor",
+        info.instructor,
+        "7. Qualification",
+        info.qualification,
+      ),
       fourCellRow("8. Email", info.email, "9. Telephone No.", info.telephone),
       labelValueRow("10. Other Course Lecturer(s)", info.otherLecturers),
       labelValueRow("11. Course Type", info.courseType),
-      fourCellRow("12. Course Availability", info.semester, "Year", info.programmeYear),
+      fourCellRow(
+        "12. Course Availability",
+        info.semester,
+        "Year",
+        info.programmeYear,
+      ),
       labelValueRow("13. Course Description / Synopsis", info.description),
     ],
     w,
@@ -319,7 +376,7 @@ function levelParts(level: string) {
 function compactWordCell(
   value: string,
   width: number,
-  alignment: AlignmentType = AlignmentType.LEFT,
+  alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT,
   bold = false,
 ) {
   return new TableCell({
@@ -356,7 +413,13 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
             new Paragraph({
               alignment: AlignmentType.CENTER,
               spacing: { before: 0, after: 0, line: 210 },
-              children: [text("Description of the course learning outcomes – CLOs At the end of the course, students will be able to:", false, SMALL)],
+              children: [
+                text(
+                  "Description of the course learning outcomes – CLOs At the end of the course, students will be able to:",
+                  false,
+                  SMALL,
+                ),
+              ],
             }),
           ],
         }),
@@ -405,29 +468,34 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
           shading: { fill: LABEL },
           borders: noTopBorder,
           margins: { top: 0, bottom: 28, left: 45, right: 45 },
-          children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
+          children: [
+            new Paragraph({ spacing: { before: 0, after: 0 }, children: [] }),
+          ],
         }),
         new TableCell({
           width: { size: bodyW[2]!, type: WidthType.DXA },
           shading: { fill: LABEL },
           borders: noTopBorder,
           margins: { top: 0, bottom: 28, left: 35, right: 35 },
-          children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
+          children: [
+            new Paragraph({ spacing: { before: 0, after: 0 }, children: [] }),
+          ],
         }),
-        ...(["C", "A", "P"] as const).map((label, index) =>
-          new TableCell({
-            width: { size: bodyW[index + 3]!, type: WidthType.DXA },
-            shading: { fill: LABEL },
-            verticalAlign: VerticalAlign.CENTER,
-            margins: { top: 20, bottom: 20, left: 18, right: 18 },
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { before: 0, after: 0 },
-                children: [text(label, false, SMALL)],
-              }),
-            ],
-          }),
+        ...(["C", "A", "P"] as const).map(
+          (label, index) =>
+            new TableCell({
+              width: { size: bodyW[index + 3]!, type: WidthType.DXA },
+              shading: { fill: LABEL },
+              verticalAlign: VerticalAlign.CENTER,
+              margins: { top: 20, bottom: 20, left: 18, right: 18 },
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  spacing: { before: 0, after: 0 },
+                  children: [text(label, false, SMALL)],
+                }),
+              ],
+            }),
         ),
       ],
     }),
@@ -442,7 +510,11 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
           children: [
             compactWordCell(clo.code, bodyW[0]!, AlignmentType.CENTER),
             compactWordCell(clo.outcome, bodyW[1]!),
-            compactWordCell(values(clo.mappedPlos), bodyW[2]!, AlignmentType.CENTER),
+            compactWordCell(
+              values(clo.mappedPlos),
+              bodyW[2]!,
+              AlignmentType.CENTER,
+            ),
             compactWordCell(domain.c, bodyW[3]!, AlignmentType.CENTER),
             compactWordCell(domain.a, bodyW[4]!, AlignmentType.CENTER),
             compactWordCell(domain.p, bodyW[5]!, AlignmentType.CENTER),
@@ -458,7 +530,13 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
             columnSpan: 6,
             width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
             margins: { top: 35, bottom: 35, left: 50, right: 50 },
-            children: [paragraph("No Course Learning Outcomes have been added.", false, SMALL)],
+            children: [
+              paragraph(
+                "No Course Learning Outcomes have been added.",
+                false,
+                SMALL,
+              ),
+            ],
           }),
         ],
       }),
@@ -474,13 +552,47 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
   });
 
   const taxonomyData: [string, [string, string, string][]][] = [
-    ["Cognitive", [["1", "Remembering", "C1"], ["2", "Understanding", "C2"], ["3", "Applying", "C3"], ["4", "Analyzing", "C4"], ["5", "Evaluating", "C5"], ["6", "Creating", "C6"]]],
-    ["Affective", [["1", "Receiving", "A1"], ["2", "Responding", "A2"], ["3", "Valuing", "A3"], ["4", "Organizing", "A4"], ["5", "Internationalizing", "A5"]]],
-    ["Psychomotor", [["1", "Perception", "P1"], ["2", "Set", "P2"], ["3", "Guided Response", "P3"], ["4", "Mechanism", "P4"], ["5", "Complex over response", "P5"], ["6", "Adaptation", "P6"], ["7", "Origination", "P7"]]],
+    [
+      "Cognitive",
+      [
+        ["1", "Remembering", "C1"],
+        ["2", "Understanding", "C2"],
+        ["3", "Applying", "C3"],
+        ["4", "Analyzing", "C4"],
+        ["5", "Evaluating", "C5"],
+        ["6", "Creating", "C6"],
+      ],
+    ],
+    [
+      "Affective",
+      [
+        ["1", "Receiving", "A1"],
+        ["2", "Responding", "A2"],
+        ["3", "Valuing", "A3"],
+        ["4", "Organizing", "A4"],
+        ["5", "Internationalizing", "A5"],
+      ],
+    ],
+    [
+      "Psychomotor",
+      [
+        ["1", "Perception", "P1"],
+        ["2", "Set", "P2"],
+        ["3", "Guided Response", "P3"],
+        ["4", "Mechanism", "P4"],
+        ["5", "Complex over response", "P5"],
+        ["6", "Adaptation", "P6"],
+        ["7", "Origination", "P7"],
+      ],
+    ],
   ];
   const legendW = colWidths([1, 1, 1]);
   const legendCells = taxonomyData.map(([title, entries], domainIndex) => {
-    const innerW = [Math.round(legendW[domainIndex]! * 0.12), Math.round(legendW[domainIndex]! * 0.75), 0];
+    const innerW = [
+      Math.round(legendW[domainIndex]! * 0.12),
+      Math.round(legendW[domainIndex]! * 0.75),
+      0,
+    ];
     innerW[2] = legendW[domainIndex]! - innerW[0]! - innerW[1]!;
     const inner = new Table({
       width: { size: legendW[domainIndex]!, type: WidthType.DXA },
@@ -568,16 +680,26 @@ function mappingTable(document: CourseDocumentModel) {
       values(row.teachingMethods),
       values(row.assessmentMethods),
     ];
-    rows.push(new TableRow({ children: rowValues.map((v, i) => cell(v, { width: w[i] })) }));
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+      }),
+    );
   }
   return table(rows, w);
 }
 
-function cloPloMatrixTable(document: CourseDocumentModel, mode: "percent" | "hours") {
+function cloPloMatrixTable(
+  document: CourseDocumentModel,
+  mode: "percent" | "hours",
+) {
   const w = colWidths([6, ...PLOS.map(() => 9.4)]);
   const rows = [
     new TableRow({
-      children: [headerCell("CLO", w[0]), ...PLOS.map((plo, i) => headerCell(plo.id, w[i + 1]))],
+      children: [
+        headerCell("CLO", w[0]),
+        ...PLOS.map((plo, i) => headerCell(plo.id, w[i + 1])),
+      ],
     }),
   ];
   for (const row of document.mapping) {
@@ -590,7 +712,9 @@ function cloPloMatrixTable(document: CourseDocumentModel, mode: "percent" | "hou
             if (!row.ploCodes.includes(plo.id)) return cell("", { width });
             if (mode === "percent") {
               return cell(
-                row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "—",
+                row.focusCode && row.focusPercent != null
+                  ? `${row.focusCode} (${row.focusPercent}%)`
+                  : "—",
                 { width },
               );
             }
@@ -605,10 +729,24 @@ function cloPloMatrixTable(document: CourseDocumentModel, mode: "percent" | "hou
 
 function sltTable(document: CourseDocumentModel) {
   const w = colWidths([5, 29, 8, 7, 7, 7, 7, 9, 11]);
-  const headers = ["Week", "Course Content / Topic", "CLOs", "L", "T", "P", "O", "Independent", "Total SLT"];
-  const rows = [new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) })];
+  const headers = [
+    "Week",
+    "Course Content / Topic",
+    "CLOs",
+    "L",
+    "T",
+    "P",
+    "O",
+    "Independent",
+    "Total SLT",
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
   const sumOf = (key: keyof CourseDocumentModel["weeklyPlan"][number]) =>
-    String(document.weeklyPlan.reduce((s, week) => s + (Number(week[key]) || 0), 0));
+    String(
+      document.weeklyPlan.reduce((s, week) => s + (Number(week[key]) || 0), 0),
+    );
   for (const week of document.weeklyPlan) {
     const rowValues = [
       week.week,
@@ -621,7 +759,11 @@ function sltTable(document: CourseDocumentModel) {
       week.selfStudyHours,
       week.sltHours ? `${week.sltHours} h` : "—",
     ];
-    rows.push(new TableRow({ children: rowValues.map((v, i) => cell(v, { width: w[i] })) }));
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+      }),
+    );
   }
   rows.push(
     new TableRow({
@@ -634,14 +776,20 @@ function sltTable(document: CourseDocumentModel) {
         cell(sumOf("practiceHours"), { bold: true, width: w[5] }),
         cell(sumOf("otherHours"), { bold: true, width: w[6] }),
         cell(sumOf("selfStudyHours"), { bold: true, width: w[7] }),
-        cell(`${document.totals.courseContentSlt} h`, { bold: true, width: w[8] }),
+        cell(`${document.totals.courseContentSlt} h`, {
+          bold: true,
+          width: w[8],
+        }),
       ],
     }),
   );
   return table(rows, w);
 }
 
-function rubricCell(assessment: CourseDocumentModel["assessments"][number], width?: number) {
+function rubricCell(
+  assessment: CourseDocumentModel["assessments"][number],
+  width?: number,
+) {
   if (!assessment.rubricName) return cell("", { width });
   if (!assessment.rubricUrl) return cell(assessment.rubricName, { width });
   const href =
@@ -686,7 +834,9 @@ function assessmentTable(document: CourseDocumentModel) {
     "Evaluation Definition",
     "Rubric",
   ];
-  const rows = [new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) })];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
   for (const assessment of document.assessments) {
     const assessmentDescription = assessment.description
       ? `${assessment.name}\n${assessment.description}`
@@ -699,7 +849,9 @@ function assessmentTable(document: CourseDocumentModel) {
           cell(values(assessment.capLevels), { width: w[2] }),
           cell(assessmentDescription, { width: w[3] }),
           cell(assessment.mode === "group" ? "G" : "I", { width: w[4] }),
-          cell(assessment.weight ? `${assessment.weight}%` : "—", { width: w[5] }),
+          cell(assessment.weight ? `${assessment.weight}%` : "—", {
+            width: w[5],
+          }),
           cell(assessment.evaluationDefinition, { width: w[6] }),
           rubricCell(assessment, w[7]),
         ],
@@ -714,7 +866,10 @@ function assessmentTable(document: CourseDocumentModel) {
         cell("", { width: w[2] }),
         cell("", { width: w[3] }),
         cell("", { width: w[4] }),
-        cell(`${document.totals.assessmentWeight}%`, { bold: true, width: w[5] }),
+        cell(`${document.totals.assessmentWeight}%`, {
+          bold: true,
+          width: w[5],
+        }),
         cell("", { width: w[6] }),
         cell("", { width: w[7] }),
       ],
@@ -735,32 +890,65 @@ function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
     "Assessment",
     "Resources",
   ];
-  const rows = [new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) })];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
   for (const week of weeks) {
     const rowValues = [
       week.week,
-      [week.lectureHours, week.tutorialHours, week.practiceHours, week.otherHours]
+      [
+        week.lectureHours,
+        week.tutorialHours,
+        week.practiceHours,
+        week.otherHours,
+      ]
         .map((h) => h || "0")
         .join("/"),
       week.topic,
       values(week.cloCodes),
-      week.lloItems.length ? week.lloItems.map((v, i) => `LLO${i + 1}: ${v}`).join("\n") : "—",
-      values(week.teachingMethods.length ? week.teachingMethods : week.learningActivities),
+      week.lloItems.length
+        ? week.lloItems.map((v, i) => `LLO${i + 1}: ${v}`).join("\n")
+        : "—",
+      values(
+        week.teachingMethods.length
+          ? week.teachingMethods
+          : week.learningActivities,
+      ),
       values([week.assessment, ...week.assessmentMethods].filter(Boolean)),
       values(week.resources),
     ];
-    rows.push(new TableRow({ children: rowValues.map((v, i) => cell(v, { width: w[i] })) }));
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+      }),
+    );
   }
   return table(rows, w);
 }
 
 function resourcesTable(resources: CourseDocumentModel["resources"]) {
   const w = colWidths([18, 27, 25, 30]);
-  const headers = ["Resource Type", "Resource Name / Description", "Link", "Notes"];
-  const rows = [new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) })];
+  const headers = [
+    "Resource Type",
+    "Resource Name / Description",
+    "Link",
+    "Notes",
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
   for (const resource of resources) {
-    const rowValues = [resource.resourceType, resource.title, resource.url, resource.notes];
-    rows.push(new TableRow({ children: rowValues.map((v, i) => cell(v, { width: w[i] })) }));
+    const rowValues = [
+      resource.resourceType,
+      resource.title,
+      resource.url,
+      resource.notes,
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+      }),
+    );
   }
   return table(rows, w);
 }
@@ -793,10 +981,16 @@ function policyParagraphs(policy: CourseDocumentModel["policy"]) {
 function ratingScaleTable() {
   const w = colWidths([25, 25, 25, 25]);
   const headers = ["Letter Grade", "Grade Point", "Score", "Explanation"];
-  const rows = [new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) })];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
   for (const grade of LETTER_GRADES) {
     const rowValues = [grade.grade, grade.point, grade.score, grade.label];
-    rows.push(new TableRow({ children: rowValues.map((v, i) => cell(v, { width: w[i] })) }));
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+      }),
+    );
   }
   return table(rows, w);
 }
@@ -806,7 +1000,9 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   const info = document.courseInformation;
 
   children.push(await programmeProfileHeader(document));
-  children.push(centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 24));
+  children.push(
+    centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 24),
+  );
   children.push(await programmeProfileTable(document));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
@@ -814,7 +1010,7 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(paragraph("Course Information", true));
   children.push(courseInformationTable(info));
 
-  children.push(...cloSection(document));
+  children.push(sectionBox(cloSection(document)));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
@@ -830,7 +1026,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
         false,
         SMALL,
       ),
-      paragraph("Programme Learning Outcomes — Total Hours for Student Learning Time (SLT)", true, SMALL),
+      paragraph(
+        "Programme Learning Outcomes — Total Hours for Student Learning Time (SLT)",
+        true,
+        SMALL,
+      ),
       cloPloMatrixTable(document, "hours"),
       paragraph("1 Credit = 40 Student Learning Time (SLT)", false, SMALL),
       mappingTable(document),
@@ -883,7 +1083,13 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     sectionBox([
       sectionTitle("19", "Required Resources to Deliver the Course"),
       ...(document.resources.length === 0
-        ? [paragraph("No required resources have been confirmed.", false, SMALL)]
+        ? [
+            paragraph(
+              "No required resources have been confirmed.",
+              false,
+              SMALL,
+            ),
+          ]
         : [resourcesTable(document.resources)]),
     ]),
   );
@@ -893,14 +1099,23 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     sectionBox([
       sectionTitle("21", "Student Responsibility"),
       ...(document.responsibilities.length === 0
-        ? [paragraph("No student responsibilities have been recorded.", false, SMALL)]
+        ? [
+            paragraph(
+              "No student responsibilities have been recorded.",
+              false,
+              SMALL,
+            ),
+          ]
         : bulletedList(document.responsibilities)),
     ]),
   );
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
-    sectionBox([sectionTitle("23", "Course Policy"), ...policyParagraphs(document.policy)]),
+    sectionBox([
+      sectionTitle("23", "Course Policy"),
+      ...policyParagraphs(document.policy),
+    ]),
   );
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
