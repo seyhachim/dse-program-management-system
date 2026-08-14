@@ -1,0 +1,44 @@
+name: Branch validation
+
+on:
+  push:
+    branches:
+      - agent/issue-189-qa-document-retrieval
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dse?schema=public
+      AUTH_MODE: dev
+      JWT_SECRET: ci-only-secret
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_AUTH_MODE: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run --cwd apps/backend db:generate
+      - run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run --cwd apps/backend db:migrate:deploy
+      - run: bun run --cwd apps/backend seed
+      - run: bun apps/backend/scripts/qa-document-retrieval-smoke.ts
+      - run: bun run build
