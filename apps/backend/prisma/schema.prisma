@@ -563,27 +563,32 @@ model CourseSpecWeek {
 /// than duplicated on the assessment item. `cloCodes`/`mappedPlos` are loose
 /// references, same as CourseSpecWeek.
 model CourseSpecAssessmentItem {
-  id               String               @default(uuid())
-  courseSpecId     String
-  courseSpec       CourseSpec           @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
-  order            Int
-  name             String
-  type             String
-  description      String               @default("")
-  mode             AssessmentItemMode   @default(Individual)
-  status           AssessmentItemStatus @default(Active)
-  cloCodes         String[]             @default([])
-  feedbackMethod   String               @default("")
-  feedbackTimeline String               @default("")
-  weight           Float?
-  dueWeek          Int?
-  durationWeeks    Float?
-  format           String               @default("")
-  submissionMethod String               @default("")
-  instructions     String               @default("")
-  rubric           String               @default("")
-  mappedPlos       String[]             @default([])
-  notes            String               @default("")
+  id                      String               @default(uuid())
+  courseSpecId            String
+  courseSpec              CourseSpec           @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order                   Int
+  name                    String
+  type                    String
+  description             String               @default("")
+  mode                    AssessmentItemMode   @default(Individual)
+  status                  AssessmentItemStatus @default(Active)
+  cloCodes                String[]             @default([])
+  assessmentCategory      String               @default("continuous")
+  topicNumbers            Int[]                @default([])
+  physicalSltHours        Float?
+  onlineSltHours          Float?
+  independentSltHours     Float?
+  feedbackMethod          String               @default("")
+  feedbackTimeline        String               @default("")
+  weight                  Float?
+  dueWeek                 Int?
+  durationWeeks           Float?
+  format                  String               @default("")
+  submissionMethod        String               @default("")
+  instructions            String               @default("")
+  rubric                  String               @default("")
+  mappedPlos              String[]             @default([])
+  notes                   String               @default("")
 
   @@id([courseSpecId, id])
 }
