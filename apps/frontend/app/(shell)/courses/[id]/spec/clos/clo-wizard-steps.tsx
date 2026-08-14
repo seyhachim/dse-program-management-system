@@ -69,7 +69,7 @@ export function CloStepInfo({
         ) : null}
       </Field>
 
-      <Field label="Bloom's Taxonomy Level">
+      <Field label="C/A/P Taxonomy Level">
         <select
           value={draft.level}
           onChange={(e) => set({ level: e.target.value })}
@@ -103,7 +103,7 @@ export function CloStepInfo({
         </select>
 
         <Hint>
-          Select the Bloom&apos;s Taxonomy level that best represents the
+          Select the learning domain and taxonomy level that best represent the
           expected learning outcome.
         </Hint>
       </Field>
@@ -333,7 +333,7 @@ export function CloStepReview({
   return (
     <div className="space-y-4">
       <ReviewCard
-        title="CLO & Bloom's Taxonomy"
+        title="CLO & C/A/P Taxonomy"
         onEdit={() => onJump(1)}
         incomplete={!wizardStepComplete(1, draft)}
       >
@@ -341,7 +341,7 @@ export function CloStepReview({
 
         <ReviewRow label="Statement" value={draft.description || "—"} />
 
-        <ReviewRow label="Bloom's Level" value={draft.level || "Not set"} />
+        <ReviewRow label="C/A/P Level" value={draft.level || "Not set"} />
 
         <ReviewRow
           label="Status"
