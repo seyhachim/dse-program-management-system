@@ -2,9 +2,13 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import {
   CreateQaCycleSchema,
+  CreateQaDocumentSchema,
   CreateQaEvidenceSchema,
+  QaDocumentListQuerySchema,
+  QaDocumentScopeSchema,
   QaEvidenceAnalysisHistoryQuerySchema,
   QaEvidenceCandidatesQuerySchema,
+  ReplaceQaDocumentSchema,
   RunQaDeterministicAnalysisSchema,
   UpsertQaSelfAssessmentSchema,
 } from "@dse-pms/shared-types";
@@ -17,6 +21,17 @@ import {
   QaAnalysisScopeMismatchError,
   listQaEvidenceAnalyses,
 } from "./analysis/service.ts";
+import { QaEmbeddingProviderError } from "./documents/embedding.ts";
+import {
+  QaDocumentEmbeddingUnavailableError,
+  QaDocumentResourceNotFoundError,
+  QaDocumentScopeMismatchError,
+  createQaDocument,
+  deleteQaDocument,
+  listQaDocuments,
+  refreshQaDocumentEmbeddings,
+  replaceQaDocument,
+} from "./documents/service.ts";
 import {
   QaEvidenceCandidateResourceNotFoundError,
   getQaEvidenceCandidates,
@@ -53,16 +68,26 @@ function ensureProgrammeScope(
 function sendDomainError(res: Response, error: unknown): void {
   if (
     error instanceof QaResourceNotFoundError ||
-    error instanceof QaAnalysisResourceNotFoundError
+    error instanceof QaAnalysisResourceNotFoundError ||
+    error instanceof QaDocumentResourceNotFoundError
   ) {
     res.status(404).json({ error: error.message });
     return;
   }
   if (
     error instanceof QaScopeMismatchError ||
-    error instanceof QaAnalysisScopeMismatchError
+    error instanceof QaAnalysisScopeMismatchError ||
+    error instanceof QaDocumentScopeMismatchError
   ) {
     res.status(409).json({ error: error.message });
+    return;
+  }
+  if (error instanceof QaDocumentEmbeddingUnavailableError) {
+    res.status(503).json({ error: error.message });
+    return;
+  }
+  if (error instanceof QaEmbeddingProviderError) {
+    res.status(502).json({ error: error.message });
     return;
   }
   res.status(500).json({ error: "Could not complete the QA operation" });
@@ -75,6 +100,94 @@ export function createQaRouter(): Router {
   router.get("/knowledge", requirePermission("qa:read"), async (_req, res) => {
     try {
       res.json(await qaService.getKnowledge());
+    } catch (error) {
+      sendDomainError(res, error);
+    }
+  });
+
+  router.get("/documents", requirePermission("qa:read"), async (req, res) => {
+    const parsed = QaDocumentListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid QA document query", details: parsed.error.flatten() });
+      return;
+    }
+    if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+    try {
+      res.json(await listQaDocuments(parsed.data.programmeId, parsed.data.documentType));
+    } catch (error) {
+      sendDomainError(res, error);
+    }
+  });
+
+  router.post("/documents", requirePermission("qa:write"), async (req, res) => {
+    const parsed = CreateQaDocumentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid QA document", details: parsed.error.flatten() });
+      return;
+    }
+    if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+    try {
+      res.status(201).json(await createQaDocument(parsed.data));
+    } catch (error) {
+      sendDomainError(res, error);
+    }
+  });
+
+  router.put("/documents/:documentId", requirePermission("qa:write"), async (req, res) => {
+    const documentId = req.params.documentId;
+    const parsed = ReplaceQaDocumentSchema.safeParse(req.body);
+    if (!documentId || !parsed.success) {
+      res.status(400).json({
+        error: "Invalid QA document replacement",
+        details: parsed.success ? undefined : parsed.error.flatten(),
+      });
+      return;
+    }
+    if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+    try {
+      res.json(await replaceQaDocument(documentId, parsed.data));
+    } catch (error) {
+      sendDomainError(res, error);
+    }
+  });
+
+  router.delete("/documents/:documentId", requirePermission("qa:write"), async (req, res) => {
+    const documentId = req.params.documentId;
+    const parsed = QaDocumentScopeSchema.safeParse(req.query);
+    if (!documentId || !parsed.success) {
+      res.status(400).json({
+        error: "Invalid QA document delete request",
+        details: parsed.success ? undefined : parsed.error.flatten(),
+      });
+      return;
+    }
+    if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+    try {
+      await deleteQaDocument(documentId, parsed.data.programmeId);
+      res.status(204).end();
+    } catch (error) {
+      sendDomainError(res, error);
+    }
+  });
+
+  router.post("/documents/:documentId/embeddings", requirePermission("qa:write"), async (req, res) => {
+    const documentId = req.params.documentId;
+    const parsed = QaDocumentScopeSchema.safeParse(req.body);
+    if (!documentId || !parsed.success) {
+      res.status(400).json({
+        error: "Invalid QA document embedding request",
+        details: parsed.success ? undefined : parsed.error.flatten(),
+      });
+      return;
+    }
+    if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+    try {
+      res.json(await refreshQaDocumentEmbeddings(documentId, parsed.data.programmeId));
     } catch (error) {
       sendDomainError(res, error);
     }
@@ -96,6 +209,7 @@ export function createQaRouter(): Router {
         await getQaEvidenceCandidates(
           parsed.data.programmeId,
           parsed.data.expectedEvidenceId,
+          { topK: parsed.data.topK },
         ),
       );
     } catch (error) {

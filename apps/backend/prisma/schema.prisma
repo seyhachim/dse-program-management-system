@@ -186,6 +186,7 @@ model Programme {
   qaEvidence      QaEvidence[]
   qaAssessments   QaRequirementAssessment[]
   qaAnalyses      QaEvidenceAnalysis[]
+  qaDocuments     QaDocument[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -403,6 +404,50 @@ model QaEvidenceAnalysisSource {
   @@unique([analysisId, candidateKey])
   @@index([qaEvidenceId])
   @@index([entityType, entityId])
+}
+
+/// Programme-scoped QA document metadata. Text content is normalized into
+/// chunks below so retrieval can preserve page/section provenance independently.
+model QaDocument {
+  id             String            @id @default(uuid())
+  programmeId    String
+  programme      Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  title          String
+  documentType   String
+  sourceUrl      String?
+  sourceRef      String            @default("")
+  version        String            @default("1")
+  reportingStart DateTime?
+  reportingEnd   DateTime?
+  contentHash    String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  chunks         QaDocumentChunk[]
+
+  @@index([programmeId, documentType])
+  @@index([programmeId, reportingEnd])
+}
+
+/// Stable chunk provenance for QA document retrieval. Embeddings are stored as
+/// PostgreSQL float arrays so the pilot does not require pgvector; ranking is
+/// performed application-side at the current programme-scale volume.
+model QaDocumentChunk {
+  id             String     @id
+  documentId     String
+  document       QaDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIndex     Int
+  pageNumber     Int?
+  sectionLabel   String     @default("")
+  startOffset    Int
+  endOffset      Int
+  text           String
+  embedding      Float[]    @default([])
+  embeddingModel String     @default("")
+  createdAt      DateTime   @default(now())
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@index([embeddingModel])
 }
 
 model Permission {
