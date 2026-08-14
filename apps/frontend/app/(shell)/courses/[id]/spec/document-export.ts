@@ -1092,20 +1092,34 @@ function assessmentPlanTable(document: CourseDocumentModel) {
     }),
   ];
 
+  const baseGroupKeys = document.assessments.map((assessment) => {
+    const cloKey = [...assessment.cloCodes].sort().join("|");
+    const ploKey = [...assessment.mappedPlos].sort().join("|");
+    return cloKey || ploKey ? `${cloKey}::${ploKey}` : assessment.id;
+  });
+
+  let runIndex = -1;
+  let previousBaseKey: string | null = null;
+  const rowGroupKeys = baseGroupKeys.map((baseKey) => {
+    if (baseKey !== previousBaseKey) {
+      runIndex += 1;
+      previousBaseKey = baseKey;
+    }
+    return `${runIndex}::${baseKey}`;
+  });
+
   const groupTotals = new Map<string, { weight: number; slt: number }>();
-  for (const assessment of document.assessments) {
-    const key = [...assessment.cloCodes].sort().join("|") || assessment.id;
+  document.assessments.forEach((assessment, index) => {
+    const key = rowGroupKeys[index]!;
     const current = groupTotals.get(key) ?? { weight: 0, slt: 0 };
     current.weight += Number(assessment.weight) || 0;
     current.slt += assessment.totalSltHours;
     groupTotals.set(key, current);
-  }
+  });
 
-  const seenGroups = new Set<string>();
-  for (const assessment of document.assessments) {
-    const key = [...assessment.cloCodes].sort().join("|") || assessment.id;
-    const firstInGroup = !seenGroups.has(key);
-    seenGroups.add(key);
+  document.assessments.forEach((assessment, index) => {
+    const key = rowGroupKeys[index]!;
+    const firstInGroup = index === 0 || rowGroupKeys[index - 1] !== key;
     const totals = groupTotals.get(key) ?? { weight: 0, slt: 0 };
 
     rows.push(
@@ -1131,11 +1145,11 @@ function assessmentPlanTable(document: CourseDocumentModel) {
           compactWordCell(cleanSltValue(assessment.weight), w[4]!, AlignmentType.CENTER),
           compactWordCell(cleanSltValue(assessment.totalSltHours), w[5]!, AlignmentType.CENTER),
           compactWordCell(assessment.capLevels.join(", "), w[6]!, AlignmentType.CENTER),
-          ...Array.from({ length: 15 }, (_, index) => {
-            const topic = index + 1;
+          ...Array.from({ length: 15 }, (_, topicIndex) => {
+            const topic = topicIndex + 1;
             return compactWordCell(
               assessment.topicNumbers.includes(topic) ? "✓" : "",
-              w[index + 7]!,
+              w[topicIndex + 7]!,
               AlignmentType.CENTER,
             );
           }),
@@ -1152,7 +1166,7 @@ function assessmentPlanTable(document: CourseDocumentModel) {
         ],
       }),
     );
-  }
+  });
 
   const prefixWidth = w.slice(0, 4).reduce((sum, width) => sum + width, 0);
   const footerTopicWidth = w.slice(7, 22).reduce((sum, width) => sum + width, 0);
