@@ -1,3 +1,4 @@
+// Temporary branch-only database smoke test; removed before merge.
 import {
   QA_STRUCTURED_EVIDENCE_TYPES,
   type QaQualityExpectationView,
