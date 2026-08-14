@@ -31,6 +31,8 @@ const BACK_HREF = "/offerings";
 const emptyDefaults: OfferingFormValues = {
   courseId: "",
   term: "",
+  sectionCode: "A",
+  meetings: [],
   lecturerId: null,
   coLecturerIds: [],
   capacity: 30,
@@ -85,6 +87,11 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
           reset({
             courseId: offering.course?.id ?? "",
             term: offering.term,
+            sectionCode: offering.sectionCode,
+            meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, room, ...meeting }) => ({
+              ...meeting,
+              room: room ?? "",
+            })),
             lecturerId: offering.lecturer?.id ?? null,
             coLecturerIds: offering.coLecturers.map((l) => l.id),
             capacity: offering.capacity,

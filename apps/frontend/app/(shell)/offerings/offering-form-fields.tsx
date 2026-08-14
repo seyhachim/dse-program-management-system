@@ -1,10 +1,18 @@
 "use client";
 
-import { Controller, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
-import { OFFERING_STATUSES, type Lecturer, type Semester } from "@dse-pms/shared-types";
+import { Controller, useFieldArray, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
+import {
+  MEETING_ACTIVITY_TYPES,
+  MEETING_DAYS,
+  OFFERING_STATUSES,
+  type Lecturer,
+  type OfferingMeetingInput,
+  type Semester,
+} from "@dse-pms/shared-types";
 import type { CourseView } from "@/lib/courses";
 import {
   Input,
+  Button,
   Select,
   SelectContent,
   SelectItem,
@@ -16,6 +24,8 @@ import { LecturerChecklist } from "./lecturer-checklist";
 export type OfferingFormValues = {
   courseId: string;
   term: string;
+  sectionCode: string;
+  meetings: OfferingMeetingInput[];
   lecturerId?: string | null;
   // Existing lecturer users assigned alongside the primary lecturer (issue #79).
   coLecturerIds?: string[];
@@ -84,6 +94,14 @@ export function OfferingFormFields({
   };
   // The primary lecturer can't also be picked as a co-lecturer.
   const coLecturerOptions = lecturers.filter((l) => l.id !== lecturerId);
+  const { fields: meetingFields, append: appendMeeting, remove: removeMeeting } = useFieldArray({
+    control,
+    name: "meetings",
+  });
+  const dayItems = Object.fromEntries(MEETING_DAYS.map((day) => [day, day]));
+  const activityItems = Object.fromEntries(
+    MEETING_ACTIVITY_TYPES.map((activity) => [activity, activity]),
+  );
 
   return (
     <div className="space-y-4">
@@ -112,9 +130,93 @@ export function OfferingFormFields({
           )}
         />
       </Field>
-      <Field label="Term" error={errors.term?.message}>
-        <Input placeholder="2025-Fall" {...register("term")} />
-      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Term" error={errors.term?.message}>
+          <Input placeholder="2025-Fall" {...register("term")} />
+        </Field>
+        <Field label="Class / Section" error={errors.sectionCode?.message}>
+          <Input placeholder="A" maxLength={12} {...register("sectionCode")} />
+        </Field>
+      </div>
+      <fieldset className="space-y-3 rounded-lg border border-border p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <legend className="text-sm font-semibold text-foreground">Weekly Class Schedule</legend>
+            <p className="text-xs text-muted-foreground">
+              Add each recurring session. Duration is calculated from its start and end time.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => appendMeeting({
+              dayOfWeek: "Monday",
+              startTime: "08:00",
+              endTime: "09:00",
+              room: "",
+              activityType: "Lecture",
+            })}
+          >
+            Add session
+          </Button>
+        </div>
+        {meetingFields.length === 0 ? (
+          <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+            No timetable added yet. Planned workload will still come from the course specification.
+          </p>
+        ) : null}
+        {meetingFields.map((meeting, index) => (
+          <div key={meeting.id} className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Field label="Day" error={errors.meetings?.[index]?.dayOfWeek?.message}>
+                <Controller
+                  control={control}
+                  name={`meetings.${index}.dayOfWeek`}
+                  render={({ field }) => (
+                    <Select items={dayItems} value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {MEETING_DAYS.map((day) => <SelectItem key={day} value={day}>{day}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field label="Start" error={errors.meetings?.[index]?.startTime?.message}>
+                <Input type="time" {...register(`meetings.${index}.startTime`)} />
+              </Field>
+              <Field label="End" error={errors.meetings?.[index]?.endTime?.message}>
+                <Input type="time" {...register(`meetings.${index}.endTime`)} />
+              </Field>
+              <Field label="Room" error={errors.meetings?.[index]?.room?.message}>
+                <Input placeholder="A203" maxLength={80} {...register(`meetings.${index}.room`)} />
+              </Field>
+              <Field label="Activity" error={errors.meetings?.[index]?.activityType?.message}>
+                <Controller
+                  control={control}
+                  name={`meetings.${index}.activityType`}
+                  render={({ field }) => (
+                    <Select items={activityItems} value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {MEETING_ACTIVITY_TYPES.map((activity) => (
+                          <SelectItem key={activity} value={activity}>{activity}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+            </div>
+            <div className="flex justify-end">
+              <Button type="button" variant="ghost" size="sm" onClick={() => removeMeeting(index)}>
+                Remove session
+              </Button>
+            </div>
+          </div>
+        ))}
+      </fieldset>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Semester (§12)">
           <Select

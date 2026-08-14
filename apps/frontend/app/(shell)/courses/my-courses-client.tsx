@@ -10,6 +10,9 @@ import {
   specCompletionLabel,
   specCompletionPercent,
   type CourseSpecProgress,
+  type LecturerScheduleRow,
+  type LecturerWorkloadRow,
+  type LecturerWorkloadSummary,
   type OfferingView,
   type Semester,
 } from "@dse-pms/shared-types";
@@ -29,7 +32,7 @@ import {
   type DataTableColumn,
 } from "@dse-pms/ui";
 import { coursesApi } from "@/lib/courses";
-import { offeringsApi } from "@/lib/offerings";
+import { offeringsApi, workloadForTerm } from "@/lib/offerings";
 import { useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 
@@ -71,6 +74,15 @@ export function MyCoursesClient() {
 
   const [offerings, setOfferings] = useState<OfferingView[]>([]);
   const [specProgress, setSpecProgress] = useState<CourseSpecProgress[]>([]);
+  const [workload, setWorkload] = useState<LecturerWorkloadSummary>({
+    scheduleRows: [],
+    scheduledWeeklyHours: 0,
+    rows: [],
+    weeklyTotals: [],
+    peakWeeklyHours: 0,
+    totalHours: 0,
+    coLecturerAssumption: "full",
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,12 +95,14 @@ export function MyCoursesClient() {
     setLoading(true);
     setError(null);
     try {
-      const [offeringsRes, progressRes] = await Promise.all([
+      const [offeringsRes, progressRes, workloadRes] = await Promise.all([
         offeringsApi.list(),
         coursesApi.specProgress(),
+        offeringsApi.workload(),
       ]);
       setOfferings(offeringsRes);
       setSpecProgress(progressRes);
+      setWorkload(workloadRes);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Failed to load your courses",
@@ -218,6 +232,8 @@ export function MyCoursesClient() {
     return a.offering.course!.code.localeCompare(b.offering.course!.code);
   });
 
+  const visibleWorkload = workloadForTerm(workload, term === ALL ? null : term);
+
   const columns: DataTableColumn<MyCourseRow>[] = [
     {
       key: "course",
@@ -252,6 +268,11 @@ export function MyCoursesClient() {
           ) : null}
         </div>
       ),
+    },
+    {
+      key: "section",
+      header: "Class",
+      render: (r) => `Class ${r.offering.sectionCode}`,
     },
     {
       key: "role",
@@ -379,6 +400,11 @@ export function MyCoursesClient() {
           </div>
         ) : null}
 
+        <WorkloadSummary
+          summary={visibleWorkload}
+          term={term === ALL ? null : term}
+        />
+
         <DataTable
           columns={columns}
           rows={groupedRows}
@@ -403,6 +429,131 @@ export function MyCoursesClient() {
         <AttentionLegend />
       </div>
     </TooltipProvider>
+  );
+}
+
+function WorkloadSummary({
+  summary,
+  term,
+}: {
+  summary: LecturerWorkloadSummary;
+  term: string | null;
+}) {
+  const scheduleColumns: DataTableColumn<LecturerScheduleRow>[] = [
+    { key: "day", header: "Day", render: (row) => row.dayOfWeek },
+    {
+      key: "time",
+      header: "Time",
+      render: (row) => `${row.startTime}–${row.endTime}`,
+    },
+    {
+      key: "course",
+      header: "Course & Class",
+      render: (row) => (
+        <div>
+          <div className="font-medium text-foreground">
+            {row.course.code} · Class {row.sectionCode}
+          </div>
+          <div className="text-xs text-muted-foreground">{row.activityType} · {row.role}</div>
+        </div>
+      ),
+    },
+    {
+      key: "room",
+      header: "Room",
+      render: (row) => row.room || <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: "duration",
+      header: "Duration",
+      align: "right",
+      render: (row) => <span className="font-medium tabular-nums">{row.durationHours}h</span>,
+    },
+  ];
+  const columns: DataTableColumn<LecturerWorkloadRow>[] = [
+    {
+      key: "week",
+      header: "Week",
+      render: (row) => `Week ${row.week}`,
+    },
+    {
+      key: "course",
+      header: "Course",
+      render: (row) => (
+        <div>
+          <div className="font-medium text-foreground">{row.course.code}</div>
+          <div className="text-xs text-muted-foreground">{row.course.title}</div>
+        </div>
+      ),
+    },
+    { key: "class", header: "Class", render: (row) => `Class ${row.sectionCode}` },
+    { key: "role", header: "Role", render: (row) => row.role },
+    {
+      key: "contact",
+      header: "L / T / P / O",
+      render: (row) =>
+        `${row.lectureHours} / ${row.tutorialHours} / ${row.practiceHours} / ${row.otherHours}`,
+    },
+    {
+      key: "total",
+      header: "Hours",
+      align: "right",
+      render: (row) => <span className="font-medium tabular-nums">{row.totalContactHours}</span>,
+    },
+  ];
+
+  return (
+    <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-foreground">Weekly Teaching Workload</h2>
+          <p className="text-xs text-muted-foreground">
+            Actual timetable hours plus planned course-spec contact hours; self-study is excluded.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-semibold tabular-nums text-foreground">
+            {summary.scheduleRows.length
+              ? `${summary.scheduledWeeklyHours} scheduled hours/week`
+              : `${summary.peakWeeklyHours} planned hours/week`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {summary.scheduleRows.length ? `${summary.peakWeeklyHours}h planned peak · ` : ""}
+            {term ?? "all terms"} · {summary.totalHours} planned term hours
+          </p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-foreground">My Weekly Timetable</h3>
+        <DataTable
+          columns={scheduleColumns}
+          rows={summary.scheduleRows}
+          getRowId={(row) => row.meetingId}
+          loading={false}
+          emptyMessage="No room or meeting time has been scheduled yet."
+        />
+      </div>
+      {summary.weeklyTotals.length ? (
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {summary.weeklyTotals.map((week) => (
+            <span key={`${week.term}-${week.week}`} className="rounded-md bg-muted px-2 py-1">
+              {term ? "" : `${week.term} · `}Week {week.week}: {week.totalContactHours}h
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <h3 className="text-sm font-medium text-foreground">Planned Contact Hours by Teaching Week</h3>
+      <DataTable
+        columns={columns}
+        rows={summary.rows}
+        getRowId={(row) => `${row.offeringId}-${row.week}`}
+        loading={false}
+        emptyMessage="No weekly contact hours are scheduled for this selection."
+      />
+      <p className="text-xs text-muted-foreground">
+        Co-lecturer assignments currently count at full workload.
+      </p>
+    </section>
   );
 }
 

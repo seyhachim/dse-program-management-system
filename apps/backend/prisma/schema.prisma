@@ -661,6 +661,7 @@ model Offering {
   lecturerId     String?
   lecturer       User?          @relation("OfferingLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
   term           String
+  sectionCode    String         @default("A")
   capacity       Int            @default(30)
   status         OfferingStatus @default(Planned)
   // Syllabus §12 Course Availability — optional, filled on the course spec form.
@@ -672,10 +673,26 @@ model Offering {
 
   enrollments Enrollment[]
   coLecturers OfferingCoLecturer[]
+  meetings    OfferingMeeting[]
 
-  @@unique([courseId, term])
+  @@unique([courseId, term, sectionCode])
   @@index([status])
   @@index([lecturerId])
+}
+
+/// A recurring weekly class session. Duration is derived from startTime/endTime
+/// by the API so stored schedule data has one source of truth.
+model OfferingMeeting {
+  id           String   @id @default(uuid())
+  offeringId   String
+  offering     Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  dayOfWeek    String
+  startTime    String
+  endTime      String
+  room         String?
+  activityType String   @default("Lecture")
+
+  @@index([offeringId, dayOfWeek, startTime])
 }
 
 /// Join table (issue #79, supersedes #73's Course-level table): co-lecturers are

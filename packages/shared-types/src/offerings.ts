@@ -15,6 +15,73 @@ export const SEMESTERS = ["First", "Second"] as const;
 export const SemesterSchema = z.enum(SEMESTERS);
 export type Semester = z.infer<typeof SemesterSchema>;
 
+/** Short, stable class label within a course and term (for example A or B2). */
+export const SectionCodeSchema = z
+  .string()
+  .trim()
+  .min(1, "Class / section is required")
+  .max(12, "Class / section must be 12 characters or fewer")
+  .regex(/^[A-Za-z0-9-]+$/, "Use letters, numbers, or hyphens only")
+  .transform((value) => value.toUpperCase());
+export type SectionCode = z.infer<typeof SectionCodeSchema>;
+
+export const MEETING_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+export const MeetingDaySchema = z.enum(MEETING_DAYS);
+export type MeetingDay = z.infer<typeof MeetingDaySchema>;
+
+export const MEETING_ACTIVITY_TYPES = [
+  "Lecture",
+  "Tutorial",
+  "Practice",
+  "Lab",
+  "Other",
+] as const;
+export const MeetingActivityTypeSchema = z.enum(MEETING_ACTIVITY_TYPES);
+export type MeetingActivityType = z.infer<typeof MeetingActivityTypeSchema>;
+
+const MeetingTimeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid 24-hour time");
+
+/** One recurring weekly timetable entry for a class offering. */
+export const OfferingMeetingInput = z
+  .object({
+    dayOfWeek: MeetingDaySchema,
+    startTime: MeetingTimeSchema,
+    endTime: MeetingTimeSchema,
+    room: z.string().trim().max(80, "Room must be 80 characters or fewer").optional(),
+    activityType: MeetingActivityTypeSchema.default("Lecture"),
+  })
+  .superRefine((meeting, ctx) => {
+    if (meeting.endTime <= meeting.startTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End time must be after start time",
+        path: ["endTime"],
+      });
+    }
+  });
+export type OfferingMeetingInput = z.infer<typeof OfferingMeetingInput>;
+
+export interface OfferingMeetingView {
+  id: string;
+  dayOfWeek: MeetingDay;
+  startTime: string;
+  endTime: string;
+  room: string | null;
+  activityType: MeetingActivityType;
+  /** Derived from start/end time; callers never enter duration separately. */
+  durationHours: number;
+}
+
 /** Human label for a semester value (falls back to a dash when unset). */
 export function semesterLabel(semester: Semester | null | undefined): string {
   if (semester === "First") return "1st Semester";
@@ -62,6 +129,10 @@ function refineCoLecturers(data: CoLecturerAssignment, ctx: z.RefinementCtx): vo
 const OfferingInputShape = z.object({
   courseId: z.string().uuid("A course is required"),
   term: z.string().min(1, "Term is required"),
+  // Default keeps older API clients compatible while the database migration
+  // backfills every existing offering as Class A.
+  sectionCode: SectionCodeSchema.default("A"),
+  meetings: z.array(OfferingMeetingInput).max(20, "Use at most 20 weekly meetings").default([]),
   lecturerId: z.string().uuid().nullable().optional(),
   // Existing lecturer users assigned alongside the primary lecturer (issue #79).
   // Distinct from otherLecturers (per-term free text) — untouched here.
@@ -89,6 +160,11 @@ export const ListOfferingsQuery = z.object({
 });
 export type ListOfferingsQuery = z.infer<typeof ListOfferingsQuery>;
 
+export const ListLecturerWorkloadQuery = z.object({
+  term: z.string().trim().min(1).optional(),
+});
+export type ListLecturerWorkloadQuery = z.infer<typeof ListLecturerWorkloadQuery>;
+
 /** Body for POST /api/offerings/:id/enrollments */
 export const EnrollInput = z.object({
   studentIds: z.array(z.string().uuid()).min(1, "Select at least one student"),
@@ -99,6 +175,7 @@ export type EnrollInput = z.infer<typeof EnrollInput>;
 export interface OfferingView {
   id: string;
   term: string;
+  sectionCode: string;
   status: OfferingStatus;
   capacity: number;
   enrolledCount: number;
@@ -106,6 +183,7 @@ export interface OfferingView {
   semester: Semester | null;
   programmeYear: number | null;
   otherLecturers: string | null;
+  meetings: OfferingMeetingView[];
   // programmeId backs the router's programme-scope access check (issue #147) —
   // not otherwise used by the frontend today. Every Course has exactly one
   // programme (issue #150 phase C); only the whole `course` object is nullable.
@@ -121,4 +199,46 @@ export interface OfferingView {
   // Existing lecturer users assigned alongside the primary lecturer (issue #79).
   coLecturers: LecturerRef[];
   students: { id: string; name: string; studentId: string }[];
+}
+
+export interface LecturerWorkloadRow {
+  offeringId: string;
+  course: { id: string; code: string; title: string };
+  term: string;
+  sectionCode: string;
+  role: "Primary" | "Co-Lecturer";
+  week: number;
+  lectureHours: number;
+  tutorialHours: number;
+  practiceHours: number;
+  otherHours: number;
+  totalContactHours: number;
+}
+
+export interface LecturerScheduleRow {
+  meetingId: string;
+  offeringId: string;
+  course: { id: string; code: string; title: string };
+  term: string;
+  sectionCode: string;
+  role: "Primary" | "Co-Lecturer";
+  dayOfWeek: MeetingDay;
+  startTime: string;
+  endTime: string;
+  room: string | null;
+  activityType: MeetingActivityType;
+  durationHours: number;
+}
+
+export interface LecturerWorkloadSummary {
+  /** Actual recurring timetable used for the lecturer's weekly scheduled load. */
+  scheduleRows: LecturerScheduleRow[];
+  scheduledWeeklyHours: number;
+  rows: LecturerWorkloadRow[];
+  weeklyTotals: { term: string; week: number; totalContactHours: number }[];
+  peakWeeklyHours: number;
+  /** Sum across every returned teaching week; useful for term-level reporting. */
+  totalHours: number;
+  /** Until workload-sharing rules are configured, each co-lecturer counts fully. */
+  coLecturerAssumption: "full";
 }
