@@ -102,6 +102,7 @@ export async function runDeterministicQaAnalysis(
         uncertaintyNote,
         engine: "deterministic-rules",
         engineVersion: QA_DETERMINISTIC_RULE_VERSION,
+        promptVersion: "",
         sources: sourceSnapshots(findings),
       }),
     );

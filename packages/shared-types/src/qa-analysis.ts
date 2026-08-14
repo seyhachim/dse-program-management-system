@@ -42,6 +42,7 @@ export const CreateQaEvidenceAnalysisSchema = z.object({
   uncertaintyNote: z.string().trim().max(5000).default(""),
   engine: z.string().trim().min(1).max(100),
   engineVersion: z.string().trim().min(1).max(100),
+  promptVersion: z.string().trim().max(100).default(""),
   sources: z.array(CreateQaEvidenceAnalysisSourceSchema).max(500).default([]),
 }).superRefine((value, ctx) => {
   const keys = new Set<string>();
@@ -98,6 +99,7 @@ export interface QaEvidenceAnalysisView {
   uncertaintyNote: string;
   engine: string;
   engineVersion: string;
+  promptVersion: string;
   createdAt: string;
   sources: QaEvidenceAnalysisSourceView[];
 }
