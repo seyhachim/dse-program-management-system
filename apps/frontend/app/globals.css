@@ -201,3 +201,96 @@ html.dark {
 #course-information > header {
   display: none;
 }
+
+/* §14 mirrors the official template: one merged green section label on the
+   left and the CLO rows immediately on the right. The source data stays the
+   same; this only changes document presentation. */
+#clos {
+  display: grid;
+  grid-template-columns: 27% 73%;
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+}
+
+#clos > h2 {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 18% 82%;
+  margin: 0;
+  border: 1px solid #000;
+  border-right: 0;
+  background: #e2eedb;
+  padding: 0;
+  font-size: 0;
+  font-weight: 400;
+}
+
+#clos > h2::before,
+#clos > h2::after {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 6px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+#clos > h2::before {
+  content: "14.";
+  justify-content: center;
+  border-right: 1px solid #000;
+}
+
+#clos > h2::after {
+  content: "Course Learning Outcomes";
+  font-weight: 600;
+}
+
+#clos > table {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+#clos > table thead {
+  display: none;
+}
+
+#clos > table col:nth-child(1) {
+  width: 11% !important;
+}
+
+#clos > table col:nth-child(2) {
+  width: 78% !important;
+}
+
+#clos > table col:nth-child(3) {
+  width: 11% !important;
+}
+
+#clos > table col:nth-child(4),
+#clos > table tr > :nth-child(4) {
+  display: none;
+}
+
+#clos > table td {
+  padding: 7px 8px;
+  vertical-align: top;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+#clos > table td:first-child,
+#clos > table td:nth-child(3) {
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+#clos > div:not(.absolute) {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
