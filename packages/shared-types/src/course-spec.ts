@@ -85,7 +85,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
     title: "References / Textbooks",
     ref: "§20",
     part: "Part 2",
-    state: "soon",
+    state: "ready",
   },
   {
     id: "responsibility",
@@ -715,6 +715,55 @@ export const ResourcesSection = z.object({
 
 export type ResourcesSection = z.infer<typeof ResourcesSection>;
 
+/* --------------------------------------- §20 References / Textbooks */
+
+/**
+ * A reference's citation kind — matches the values already live in
+ * `CourseSpecResource.kind` for rows carried forward from the abandoned
+ * `CourseSpecReference` table (see the `unify_course_spec_resources` and
+ * `preserve_legacy_course_spec_references` migrations).
+ */
+export const REFERENCE_KINDS = ["REQUIRED", "RECOMMENDED", "OTHER"] as const;
+export const ReferenceKind = z.enum(REFERENCE_KINDS);
+export type ReferenceKind = z.infer<typeof ReferenceKind>;
+
+/** Human label for a reference kind. */
+export function referenceKindLabel(kind: string): string {
+  switch (kind) {
+    case "REQUIRED":
+      return "Required";
+    case "RECOMMENDED":
+      return "Recommended";
+    case "OTHER":
+      return "Other";
+    default:
+      return kind;
+  }
+}
+
+export const CourseReferenceItem = z.object({
+  id: z.string().min(1),
+  kind: ReferenceKind.default("REQUIRED"),
+  title: z.string().trim().min(1, "A title is required"),
+  authors: z.string().default(""),
+  publisher: z.string().default(""),
+  year: z.string().default(""),
+  isbn: z.string().default(""),
+  url: z
+    .union([z.literal(""), z.string().url("Enter a valid URL")])
+    .default(""),
+  basedOn: z.string().default(""),
+  notes: z.string().default(""),
+});
+
+export type CourseReferenceItem = z.infer<typeof CourseReferenceItem>;
+
+export const ReferencesSection = z.object({
+  items: z.array(CourseReferenceItem).default([]),
+});
+
+export type ReferencesSection = z.infer<typeof ReferencesSection>;
+
 /* --------------------------------------- §21 Student Responsibility */
 
 export const StudentResponsibilityItem = z.object({
@@ -907,6 +956,7 @@ export const SPEC_SECTION_SCHEMAS: Partial<
   assessmentPlan: AssessmentPlanSection,
   mapping: MappingSection,
   resources: ResourcesSection,
+  references: ReferencesSection,
   responsibility: StudentResponsibilitySection,
   policy: PolicySection,
 };

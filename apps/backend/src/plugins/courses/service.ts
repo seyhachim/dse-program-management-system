@@ -13,6 +13,7 @@ import {
   type ListCoursesQuery,
   type MappingSection,
   type PolicySection,
+  type ReferencesSection,
   type ResourcesSection,
   type StudentResponsibilitySection,
   type OfferingsServiceContract,
@@ -474,6 +475,8 @@ export const courseService = {
         await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
       if (sectionId === "resources")
         await syncResources(tx, spec.id, (values as ResourcesSection).items);
+      if (sectionId === "references")
+        await syncReferences(tx, spec.id, (values as ReferencesSection).items);
       if (sectionId === "responsibility")
         await syncStudentResponsibilities(
           tx,
@@ -567,6 +570,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "assessmentPlan",
   "mapping",
   "resources",
+  "references",
   "responsibility",
   "policy",
 ]);
@@ -697,19 +701,39 @@ function reassembleSpec(spec: SpecRow | null): {
   }
   if (hasSection("resources")) {
     data.resources = {
-      items: spec.resources.map((resource) => ({
-        id: resource.id,
-        resourceType: resource.resourceType,
-        title: resource.title,
-        url: resource.url,
-        notes: resource.notes,
-        evidenceWeekIds:
-          resource.evidenceWeekIds.length > 0
-            ? resource.evidenceWeekIds
-            : resource.weekId
-              ? [resource.weekId]
-              : [],
-      })),
+      items: spec.resources
+        .filter((resource) => resource.section === "Resource")
+        .map((resource) => ({
+          id: resource.id,
+          resourceType: resource.resourceType,
+          title: resource.title,
+          url: resource.url,
+          notes: resource.notes,
+          evidenceWeekIds:
+            resource.evidenceWeekIds.length > 0
+              ? resource.evidenceWeekIds
+              : resource.weekId
+                ? [resource.weekId]
+                : [],
+        })),
+    };
+  }
+  if (hasSection("references")) {
+    data.references = {
+      items: spec.resources
+        .filter((resource) => resource.section === "Reference")
+        .map((resource) => ({
+          id: resource.id,
+          kind: resource.kind,
+          title: resource.title,
+          authors: resource.authors,
+          publisher: resource.publisher,
+          year: resource.year,
+          isbn: resource.isbn,
+          url: resource.url,
+          basedOn: resource.basedOn,
+          notes: resource.notes,
+        })),
     };
   }
   if (hasSection("responsibility")) {
@@ -883,7 +907,12 @@ async function syncAssessmentPlan(
   });
 }
 
-/** Delete-and-rebuild CourseSpecMappingCell rows for a `mapping` (CLO Alignment) section save. */
+/**
+ * Delete-and-rebuild CourseSpecResource rows for a `resources` (§19) section
+ * save. Scoped to `section: "Resource"` — CourseSpecResource also backs §20
+ * References (`section: "Reference"`), and an unscoped delete here would wipe
+ * out that section's rows on every §19 save.
+ */
 async function syncResources(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
@@ -908,7 +937,9 @@ async function syncResources(
     }
   }
 
-  await tx.courseSpecResource.deleteMany({ where: { courseSpecId } });
+  await tx.courseSpecResource.deleteMany({
+    where: { courseSpecId, section: "Resource" },
+  });
   if (resources.length === 0) return;
 
   await tx.courseSpecResource.createMany({
@@ -916,12 +947,48 @@ async function syncResources(
       id: resource.id,
       courseSpecId,
       order,
+      section: "Resource",
       weekId: resource.evidenceWeekIds[0] ?? null,
       resourceType: resource.resourceType,
       title: resource.title,
       url: resource.url,
       notes: resource.notes,
       evidenceWeekIds: resource.evidenceWeekIds,
+    })),
+  });
+}
+
+/**
+ * Delete-and-rebuild CourseSpecResource rows for a `references` (§20) section
+ * save, scoped to `section: "Reference"` — see {@link syncResources}. §20 has
+ * no Weekly Plan evidence linkage, unlike §19.
+ */
+async function syncReferences(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  references: ReferencesSection["items"],
+) {
+  await tx.courseSpecResource.deleteMany({
+    where: { courseSpecId, section: "Reference" },
+  });
+  if (references.length === 0) return;
+
+  await tx.courseSpecResource.createMany({
+    data: references.map((reference, order) => ({
+      id: reference.id,
+      courseSpecId,
+      order,
+      section: "Reference",
+      resourceType: "",
+      kind: reference.kind,
+      title: reference.title,
+      authors: reference.authors,
+      publisher: reference.publisher,
+      year: reference.year,
+      isbn: reference.isbn,
+      url: reference.url,
+      basedOn: reference.basedOn,
+      notes: reference.notes,
     })),
   });
 }

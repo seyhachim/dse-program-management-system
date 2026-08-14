@@ -19,7 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@dse-pms/ui";
-import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
+import {
+  LETTER_GRADES,
+  PLOS,
+  referenceKindLabel,
+} from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
@@ -45,6 +49,19 @@ function displayValue(value: string | number | null | undefined): string {
 
 function joinValues(values: string[]): string {
   return values.length ? values.join(", ") : "—";
+}
+
+function referenceCitation(
+  reference: CourseDocumentModel["references"][number],
+): string {
+  const parts = [
+    reference.authors,
+    reference.year ? `(${reference.year})` : "",
+    reference.title,
+    reference.publisher,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(". ") : "—";
 }
 
 function Page({
@@ -591,7 +608,8 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
 
   const weeklyStartPage = 8;
   const resourcesPage = weeklyStartPage + weeklyPages.length;
-  const responsibilityPage = resourcesPage + 1;
+  const referencesPage = resourcesPage + 1;
+  const responsibilityPage = referencesPage + 1;
   const policyPage = responsibilityPage + 1;
   const ratingScalePage = policyPage + 1;
 
@@ -660,7 +678,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <div>
                 <dt className="text-xs text-muted-foreground">Sections</dt>
                 <dd className="mt-0.5 font-medium">
-                  Part 1 + Sections 1–19, 21, 24
+                  Part 1 + Sections 1–21, 24
                 </dd>
               </div>
               <div>
@@ -695,6 +713,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               </a>
               <a href="#resources" className="block rounded-md px-2 py-2 hover:bg-muted">
                 19. Required Resources
+              </a>
+              <a href="#references" className="block rounded-md px-2 py-2 hover:bg-muted">
+                20. References / Textbooks
               </a>
               <a href="#responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">
                 21. Student Responsibility
@@ -919,6 +940,53 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 <SectionTitle number="19">Required Resources to Deliver the Course</SectionTitle>
                 {document.resources.length === 0 ? <p className="text-[11px]">No required resources have been confirmed.</p> : <Table><colgroup><col className="w-[18%]" /><col className="w-[27%]" /><col className="w-[25%]" /><col className="w-[30%]" /></colgroup><thead><tr><TH>Resource Type</TH><TH>Resource Name / Description</TH><TH>Link</TH><TH>Notes</TH></tr></thead><tbody>{document.resources.map((resource) => (<tr key={resource.id}><TD>{displayValue(resource.resourceType)}</TD><TD>{displayValue(resource.title)}</TD><TD>{displayValue(resource.url)}</TD><TD>{displayValue(resource.notes)}</TD></tr>))}</tbody></Table>}
                 <PageFooter courseCode={info.courseCode} page={resourcesPage} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={referencesPage}>
+              <div id="references" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="20">References / Textbooks</SectionTitle>
+
+                {document.references.length === 0 ? (
+                  <p className="text-[11px]">
+                    No references have been recorded.
+                  </p>
+                ) : (
+                  <Table>
+                    <colgroup>
+                      <col className="w-[13%]" />
+                      <col className="w-[45%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <TH>Kind</TH>
+                        <TH>Citation</TH>
+                        <TH>ISBN</TH>
+                        <TH>Link</TH>
+                        <TH>Notes</TH>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {document.references.map((reference) => (
+                        <tr key={reference.id}>
+                          <TD>{referenceKindLabel(reference.kind)}</TD>
+                          <TD>{referenceCitation(reference)}</TD>
+                          <TD>{displayValue(reference.isbn)}</TD>
+                          <TD>{displayValue(reference.url)}</TD>
+                          <TD>{displayValue(reference.notes)}</TD>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                )}
+
+                <PageFooter
+                  courseCode={info.courseCode}
+                  page={referencesPage}
+                />
               </div>
             </Page>
 
