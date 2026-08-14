@@ -12,6 +12,9 @@ export const methodsApi = {
   list(): Promise<MethodsResponse> {
     return api.get<MethodsResponse>("/api/methods");
   },
+  catalog(): Promise<ManagedMethodsResponse> {
+    return api.get<ManagedMethodsResponse>("/api/methods/catalog");
+  },
   listManaged(): Promise<ManagedMethodsResponse> {
     return api.get<ManagedMethodsResponse>("/api/methods/managed");
   },
