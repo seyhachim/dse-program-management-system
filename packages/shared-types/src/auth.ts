@@ -7,10 +7,10 @@ import { z } from "zod";
  * path (issue #101 follow-up) — deliberately not the full `Role` enum:
  * - `admin` is excluded — minting a new admin login stays a manual/seed-only
  *   action, not something exposed through this form.
- * - `student` is excluded — students are provisioned via "Add Student" on the
- *   Students page, which creates a roster profile, not a login account.
+ * - `student` requires a roster profile with the same email; account
+ *   provisioning links that profile to the invited User.
  */
-export const INVITABLE_ROLES = ["lecturer", "program_coordinator", "program_secretary", "qa_reviewer"] as const;
+export const INVITABLE_ROLES = ["lecturer", "program_coordinator", "program_secretary", "qa_reviewer", "student"] as const;
 export const CreateAccountInput = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("A valid email is required"),

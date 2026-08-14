@@ -71,6 +71,18 @@ export const authService = {
    * already exists for the email, it is linked/updated rather than duplicated.
    */
   async createAccount(input: CreateAccountInput) {
+    const studentProfile = input.role === "student"
+      ? await prisma.student.findUnique({ where: { email: input.email } })
+      : null;
+    if (input.role === "student" && !studentProfile) {
+      throw new ProvisioningError(
+        "Create the student roster profile with this email before sending a portal invite",
+      );
+    }
+    if (studentProfile?.userId) {
+      throw new ProvisioningError("This student already has a linked portal account");
+    }
+
     const admin = getAdminClient();
     const redirectTo = process.env.SUPABASE_INVITE_REDIRECT_URL;
 
@@ -108,6 +120,13 @@ export const authService = {
     await prisma.userRoleAssignment.deleteMany({
       where: { userId: user.id, roleId: { not: role.id } },
     });
+
+    if (studentProfile) {
+      await prisma.student.update({
+        where: { id: studentProfile.id },
+        data: { userId: user.id },
+      });
+    }
 
     return { ...user, role: role.slug, roles: [role.slug] };
   },

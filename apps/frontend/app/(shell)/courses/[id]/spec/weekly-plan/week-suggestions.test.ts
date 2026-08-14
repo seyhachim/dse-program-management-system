@@ -69,6 +69,11 @@ const assessment = {
   feedbackTimeline: "",
   mappedPlos: [],
   notes: "",
+  assessmentCategory: "continuous",
+  topicNumbers: [],
+  physicalSltHours: "",
+  onlineSltHours: "",
+  independentSltHours: "",
 } satisfies AssessmentForm;
 
 test("weekly suggestions use only support mapped to the selected CLO", () => {

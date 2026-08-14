@@ -36,13 +36,13 @@ test("CreateAccountInput rejects admin (manual/seed-only, not self-service invit
   expect(result.success).toBe(false);
 });
 
-test("CreateAccountInput rejects student (provisioned via Add Student, not an invite)", () => {
+test("CreateAccountInput accepts student portal invites", () => {
   const result = CreateAccountInput.safeParse({
     name: "Ada",
     email: "ada@dse.dev",
     role: "student",
   });
-  expect(result.success).toBe(false);
+  expect(result.success).toBe(true);
 });
 
 test("CreateAccountInput accepts the programme/QA roles added for issue #101", () => {

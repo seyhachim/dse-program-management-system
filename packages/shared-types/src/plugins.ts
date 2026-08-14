@@ -211,6 +211,24 @@ export const dashboardManifest: PluginManifest = {
   ],
 };
 
+/** Student-only learning-information portal. All backend reads are scoped to
+ * the authenticated student's enrollments; this manifest controls navigation,
+ * not the authorization boundary. */
+export const studentPortalManifest: PluginManifest = {
+  id: "student-portal",
+  name: "Student Portal",
+  version: "0.1.0",
+  description: "Enrolled courses, schedule, approved learning information, results, and feedback.",
+  routes: [
+    { label: "Home", path: "/portal", icon: "home", roles: ["student"] },
+    { label: "My Courses", path: "/portal/courses", icon: "book", roles: ["student"], group: "Learning" },
+    { label: "Schedule", path: "/portal/schedule", icon: "calendar", roles: ["student"], group: "Learning" },
+    { label: "Results", path: "/portal/results", icon: "chart", roles: ["student"], group: "Progress" },
+    { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },
+  ],
+  permissions: ["student-portal:read", "student-portal:feedback"],
+};
+
 export const programmeManifest: PluginManifest = {
   id: "programme",
   name: "Programme Management",
@@ -366,6 +384,7 @@ export const authManifest: PluginManifest = {
 };
 
 export const pluginManifests: PluginManifest[] = [
+  studentPortalManifest,
   dashboardManifest,
   studentsManifest,
   coursesManifest,
