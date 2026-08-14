@@ -138,12 +138,66 @@ function recoverAssessmentSlt(doc: JsonObject): Map<string, AssessmentSlt> {
   return result;
 }
 
+type CourseContentSlt = {
+  lecture: number | null;
+  tutorial: number | null;
+  practice: number | null;
+  other: number | null;
+  independent: number | null;
+  total: number | null;
+};
+
+function sumNullable(a: number | null, b: number | null): number | null {
+  if (a == null && b == null) return null;
+  return (a ?? 0) + (b ?? 0);
+}
+
+function recoverCourseContentSlt(doc: JsonObject): Map<number, CourseContentSlt> {
+  const result = new Map<number, CourseContentSlt>();
+  const slt = (doc.studentLearningTime ?? {}) as JsonObject;
+  const tables = collectTables(slt.rawTables ?? slt);
+
+  for (const rows of tables) {
+    const text = rows.flat().join(" ").toLowerCase();
+    if (!text.includes("course content outline") || !text.includes("total slt")) {
+      continue;
+    }
+
+    for (const row of rows) {
+      const topicCell = clean(row[1]);
+      const match = topicCell.match(/^Topic\s*(\d+)\s*:/i);
+      if (!match) continue;
+      const topicNumber = Number(match[1]);
+      if (!Number.isInteger(topicNumber) || topicNumber < 1) continue;
+
+      result.set(topicNumber, {
+        lecture: sumNullable(numeric(row[3]), numeric(row[7])),
+        tutorial: sumNullable(numeric(row[4]), numeric(row[8])),
+        practice: sumNullable(numeric(row[5]), numeric(row[9])),
+        other: sumNullable(numeric(row[6]), numeric(row[10])),
+        independent: numeric(row[11]),
+        total: numeric(row[12]),
+      });
+    }
+  }
+
+  return result;
+}
+
 function assessmentItems(doc: JsonObject): JsonObject[] {
   return Array.isArray(doc.assessments)
     ? doc.assessments.filter(
-        (item): item is JsonObject => !!item && typeof item === "object" && !Array.isArray(item),
+        (item): item is JsonObject =>
+          !!item && typeof item === "object" && !Array.isArray(item),
       )
     : [];
+}
+
+function topicNumberFromTitle(value: string): number | null {
+  const match = clean(value).match(/\bTopic\s*(\d+)\s*:/i);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 async function processFile(file: string, options: Options) {
@@ -158,6 +212,7 @@ async function processFile(file: string, options: Options) {
       spec: {
         include: {
           clos: { orderBy: { order: "asc" } },
+          weeks: { orderBy: { order: "asc" } },
           assessmentItems: { orderBy: { order: "asc" } },
         },
       },
@@ -168,6 +223,7 @@ async function processFile(file: string, options: Options) {
   }
 
   const cloSlt = recoverCloSltHours(doc);
+  const contentSlt = recoverCourseContentSlt(doc);
   const sltByAssessment = recoverAssessmentSlt(doc);
   const sourceAssessments = assessmentItems(doc);
 
@@ -198,6 +254,19 @@ async function processFile(file: string, options: Options) {
     id: clo.id,
     hours: cloSlt.get(`CLO${index + 1}`) ?? null,
   }));
+
+  const weekUpdates = stored.spec.weeks
+    .map((week) => {
+      const topicNumber = topicNumberFromTitle(week.topic);
+      if (topicNumber == null) return null;
+      const recovered = contentSlt.get(topicNumber);
+      if (!recovered) return null;
+      return {
+        id: week.id,
+        ...recovered,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item != null);
 
   if (options.commit) {
     await prisma.$transaction(async (tx) => {
@@ -230,6 +299,23 @@ async function processFile(file: string, options: Options) {
           data: { sltHours: Math.round(update.hours) },
         });
       }
+      for (const update of weekUpdates) {
+        await tx.courseSpecWeek.update({
+          where: {
+            courseSpecId_id: {
+              courseSpecId: stored.spec!.id,
+              id: update.id,
+            },
+          },
+          data: {
+            lectureHours: update.lecture,
+            tutorialHours: update.tutorial,
+            practiceHours: update.practice,
+            otherHours: update.other,
+            selfStudyHours: update.independent,
+          },
+        });
+      }
     });
   }
 
@@ -245,6 +331,11 @@ async function processFile(file: string, options: Options) {
     ).length,
     topicMappedCount: updates.filter((item) => item.topicNumbers.length > 0).length,
     cloSltCount: cloUpdates.filter((item) => item.hours != null).length,
+    courseContentMappedCount: weekUpdates.length,
+    courseContentSltHours: [...contentSlt.values()].reduce(
+      (sum, item) => sum + (item.total ?? 0),
+      0,
+    ),
   };
 }
 
