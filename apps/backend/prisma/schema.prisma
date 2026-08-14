@@ -117,6 +117,8 @@ model User {
   roleAssignments         UserRoleAssignment[]
   courseSpecSubmissions   CourseSpec[]             @relation("CourseSpecSubmittedBy")
   courseSpecReviewActions CourseSpecReviewAction[] @relation("CourseSpecReviewActor")
+  studentProfile          Student?
+  announcementsAuthored   CourseAnnouncement[]     @relation("AnnouncementAuthor")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -220,6 +222,8 @@ model Student {
   studentId String        @unique
   status    StudentStatus @default(Active)
   createdAt DateTime      @default(now())
+  userId    String?       @unique
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   enrollments Enrollment[]
 
@@ -563,32 +567,32 @@ model CourseSpecWeek {
 /// than duplicated on the assessment item. `cloCodes`/`mappedPlos` are loose
 /// references, same as CourseSpecWeek.
 model CourseSpecAssessmentItem {
-  id                      String               @default(uuid())
-  courseSpecId            String
-  courseSpec              CourseSpec           @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
-  order                   Int
-  name                    String
-  type                    String
-  description             String               @default("")
-  mode                    AssessmentItemMode   @default(Individual)
-  status                  AssessmentItemStatus @default(Active)
-  cloCodes                String[]             @default([])
-  assessmentCategory      String               @default("continuous")
-  topicNumbers            Int[]                @default([])
-  physicalSltHours        Float?
-  onlineSltHours          Float?
-  independentSltHours     Float?
-  feedbackMethod          String               @default("")
-  feedbackTimeline        String               @default("")
-  weight                  Float?
-  dueWeek                 Int?
-  durationWeeks           Float?
-  format                  String               @default("")
-  submissionMethod        String               @default("")
-  instructions            String               @default("")
-  rubric                  String               @default("")
-  mappedPlos              String[]             @default([])
-  notes                   String               @default("")
+  id                  String               @default(uuid())
+  courseSpecId        String
+  courseSpec          CourseSpec           @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  order               Int
+  name                String
+  type                String
+  description         String               @default("")
+  mode                AssessmentItemMode   @default(Individual)
+  status              AssessmentItemStatus @default(Active)
+  cloCodes            String[]             @default([])
+  assessmentCategory  String               @default("continuous")
+  topicNumbers        Int[]                @default([])
+  physicalSltHours    Float?
+  onlineSltHours      Float?
+  independentSltHours Float?
+  feedbackMethod      String               @default("")
+  feedbackTimeline    String               @default("")
+  weight              Float?
+  dueWeek             Int?
+  durationWeeks       Float?
+  format              String               @default("")
+  submissionMethod    String               @default("")
+  instructions        String               @default("")
+  rubric              String               @default("")
+  mappedPlos          String[]             @default([])
+  notes               String               @default("")
 
   @@id([courseSpecId, id])
 }
@@ -676,9 +680,12 @@ model Offering {
   otherLecturers String?
   createdAt      DateTime       @default(now())
 
-  enrollments Enrollment[]
-  coLecturers OfferingCoLecturer[]
-  meetings    OfferingMeeting[]
+  enrollments         Enrollment[]
+  coLecturers         OfferingCoLecturer[]
+  meetings            OfferingMeeting[]
+  assessmentDeadlines OfferingAssessmentDeadline[]
+  announcements       CourseAnnouncement[]
+  feedbackResponses   CourseFeedback[]
 
   @@unique([courseId, term, sectionCode])
   @@index([status])
@@ -719,15 +726,89 @@ model OfferingCoLecturer {
 
 /// Join model linking a Student to an Offering (enrollment).
 model Enrollment {
-  id         String   @id @default(uuid())
+  id         String             @id @default(uuid())
   offeringId String
-  offering   Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  offering   Offering           @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   studentId  String
-  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  student    Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime           @default(now())
+  results    AssessmentResult[]
 
   @@unique([offeringId, studentId])
   @@index([studentId])
+}
+
+/// An exact, section-specific deadline that overrides the course specification's
+/// week-level due date. Assessment ids remain stable inside one CourseSpec.
+model OfferingAssessmentDeadline {
+  id               String   @id @default(uuid())
+  offeringId       String
+  offering         Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  courseSpecId     String
+  assessmentItemId String
+  dueAt            DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([offeringId, courseSpecId, assessmentItemId])
+  @@index([offeringId, dueAt])
+}
+
+/// A result is visible to a student only after `publishedAt` is set. The
+/// enrollment relation is the authorization boundary for all portal reads.
+model AssessmentResult {
+  id               String     @id @default(uuid())
+  enrollmentId     String
+  enrollment       Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  courseSpecId     String
+  assessmentItemId String
+  score            Float
+  maxScore         Float
+  feedback         String     @default("")
+  publishedAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([enrollmentId, courseSpecId, assessmentItemId])
+  @@index([enrollmentId, publishedAt])
+}
+
+/// Section-level notices. Draft notices have a null `publishedAt` and never
+/// appear in student portal reads.
+model CourseAnnouncement {
+  id          String    @id @default(uuid())
+  offeringId  String
+  offering    Offering  @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  title       String
+  body        String
+  pinned      Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([offeringId, publishedAt])
+}
+
+/// Anonymous-to-staff course feedback. `responseKeyHash` is a one-way HMAC
+/// generated from the authenticated student and offering; it prevents duplicate
+/// submissions without storing a student/user foreign key on the response.
+model CourseFeedback {
+  id                      String   @id @default(uuid())
+  offeringId              String
+  offering                Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  responseKeyHash         String
+  overallRating           Int
+  teachingClarityRating   Int
+  assessmentClarityRating Int
+  workload                String
+  positiveComment         String   @default("")
+  improvementComment      String   @default("")
+  createdAt               DateTime @default(now())
+
+  @@unique([offeringId, responseKeyHash])
+  @@index([offeringId, createdAt])
 }
 
 /// §15 teaching-method vocabulary. Global and shared across all courses.

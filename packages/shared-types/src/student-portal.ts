@@ -1,0 +1,172 @@
+import { z } from "zod";
+import type { MeetingActivityType, MeetingDay } from "./offerings.ts";
+
+export interface PortalLecturer {
+  id: string;
+  name: string;
+  email: string;
+  title: string | null;
+}
+
+export interface PortalMeeting {
+  id: string;
+  dayOfWeek: MeetingDay;
+  startTime: string;
+  endTime: string;
+  room: string | null;
+  activityType: MeetingActivityType;
+}
+
+export interface PortalAssessmentResult {
+  assessmentItemId: string;
+  score: number;
+  maxScore: number;
+  percentage: number;
+  feedback: string;
+  publishedAt: string;
+}
+
+export type CloAchievementStatus =
+  | "achieved"
+  | "developing"
+  | "needs-attention"
+  | "not-enough-evidence";
+
+export interface PortalCloAchievement {
+  code: string;
+  description: string;
+  percentage: number | null;
+  status: CloAchievementStatus;
+  evidenceCount: number;
+}
+
+export interface PortalCourseSummary {
+  offeringId: string;
+  enrollmentId: string;
+  courseId: string;
+  code: string;
+  title: string;
+  description: string | null;
+  credits: number | null;
+  term: string;
+  sectionCode: string;
+  lecturer: PortalLecturer | null;
+  coLecturers: PortalLecturer[];
+  meetings: PortalMeeting[];
+  specAvailable: boolean;
+  nextAssessment: {
+    id: string;
+    name: string;
+    dueAt: string | null;
+    dueWeek: number | null;
+  } | null;
+}
+
+export interface PortalCourseDetail extends PortalCourseSummary {
+  clos: Array<{
+    code: string;
+    description: string;
+    level: string | null;
+    mappedPlos: string[];
+  }>;
+  weeks: Array<{
+    id: string;
+    week: number;
+    topic: string;
+    cloCodes: string[];
+    learningOutcomes: string[];
+    activities: string[];
+  }>;
+  assessments: Array<{
+    id: string;
+    name: string;
+    type: string;
+    description: string;
+    mode: "individual" | "group";
+    cloCodes: string[];
+    weight: number | null;
+    dueAt: string | null;
+    dueWeek: number | null;
+    format: string;
+    submissionMethod: string;
+    instructions: string;
+    rubric: string;
+    result: PortalAssessmentResult | null;
+  }>;
+  resources: Array<{
+    id: string;
+    resourceType: string;
+    title: string;
+    url: string;
+    notes: string;
+  }>;
+  achievements: PortalCloAchievement[];
+  overallAchievement: number | null;
+  feedbackSubmitted: boolean;
+}
+
+export interface PortalAnnouncement {
+  id: string;
+  offeringId: string;
+  courseCode: string;
+  courseTitle: string;
+  sectionCode: string;
+  title: string;
+  body: string;
+  pinned: boolean;
+  authorName: string;
+  publishedAt: string;
+}
+
+export interface StudentPortalHome {
+  student: { id: string; name: string; studentId: string; email: string };
+  courses: PortalCourseSummary[];
+  upcomingAssessments: Array<{
+    offeringId: string;
+    courseCode: string;
+    assessmentId: string;
+    name: string;
+    dueAt: string | null;
+    dueWeek: number | null;
+    weight: number | null;
+  }>;
+  announcements: PortalAnnouncement[];
+  overallAchievement: number | null;
+}
+
+export const CourseFeedbackInput = z.object({
+  overallRating: z.coerce.number().int().min(1).max(5),
+  teachingClarityRating: z.coerce.number().int().min(1).max(5),
+  assessmentClarityRating: z.coerce.number().int().min(1).max(5),
+  workload: z.enum(["light", "appropriate", "heavy"]),
+  positiveComment: z.string().trim().max(2000).default(""),
+  improvementComment: z.string().trim().max(2000).default(""),
+});
+export type CourseFeedbackInput = z.infer<typeof CourseFeedbackInput>;
+
+export const PublishAnnouncementInput = z.object({
+  offeringId: z.string().uuid(),
+  title: z.string().trim().min(1).max(160),
+  body: z.string().trim().min(1).max(10000),
+  pinned: z.boolean().default(false),
+});
+export type PublishAnnouncementInput = z.infer<typeof PublishAnnouncementInput>;
+
+export const PublishAssessmentResultInput = z.object({
+  enrollmentId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+}).refine((value) => value.score <= value.maxScore, {
+  message: "Score cannot exceed maximum score",
+  path: ["score"],
+});
+export type PublishAssessmentResultInput = z.infer<typeof PublishAssessmentResultInput>;
+
+export const SetAssessmentDeadlineInput = z.object({
+  offeringId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+  dueAt: z.string().datetime(),
+});
+export type SetAssessmentDeadlineInput = z.infer<typeof SetAssessmentDeadlineInput>;

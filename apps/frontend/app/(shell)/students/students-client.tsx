@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { UserPlus } from "lucide-react";
 import type { Student } from "@dse-pms/shared-types";
 import {
   DataTable,
+  Button,
   StatusBadge,
   Switch,
   TableToolbar,
@@ -12,8 +14,10 @@ import {
 import { statusTone, studentsApi } from "@/lib/students";
 import { ApiError } from "@/lib/api";
 import { StudentForm, type StudentFormValues } from "./student-form";
+import { authApi, useMe } from "@/lib/auth";
 
 export function StudentsClient() {
+  const { me } = useMe();
   const [rows, setRows] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +29,8 @@ export function StudentsClient() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +86,23 @@ export function StudentsClient() {
     }
   };
 
+  const handleInvite = async () => {
+    const student = rows.find((row) => row.id === selectedIds[0]);
+    if (!student || selectedIds.length !== 1) return;
+    if (!confirm(`Send a student portal invitation to ${student.email}?`)) return;
+    setInviting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await authApi.createAccount({ name: student.name, email: student.email, role: "student" });
+      setNotice(`Portal invitation sent to ${student.email}.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to send portal invitation");
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const columns: DataTableColumn<Student>[] = [
     {
       key: "name",
@@ -120,6 +143,23 @@ export function StudentsClient() {
           setFormOpen(true);
         }}
       />
+
+      {me?.permissions.includes("accounts:create") ? (
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            Select one student to provision their secure portal login.
+          </p>
+          <Button variant="outline" disabled={selectedIds.length !== 1 || inviting} onClick={handleInvite}>
+            <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
+          </Button>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+          {notice}
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
