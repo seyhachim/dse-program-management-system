@@ -1,9 +1,15 @@
 import { expect, test } from "bun:test";
-import { summarizeLecturerWorkload, type WorkloadAssignment } from "./workload.ts";
+import {
+  summarizeLecturerWorkload,
+  type WorkloadAssignment,
+} from "./workload.ts";
 
 const LECTURER_ID = "11111111-1111-1111-1111-111111111111";
 
-function assignment(sectionCode: string, lecturerId: string | null = LECTURER_ID): WorkloadAssignment {
+function assignment(
+  sectionCode: string,
+  lecturerId: string | null = LECTURER_ID,
+): WorkloadAssignment {
   return {
     id: `offering-${sectionCode}`,
     lecturerId,
@@ -14,7 +20,7 @@ function assignment(sectionCode: string, lecturerId: string | null = LECTURER_ID
       code: "DSE301",
       title: "Data Engineering",
       lecturerId: null,
-      programmeId: null,
+      programmeId: "dse",
     },
     weeks: [
       {
@@ -31,7 +37,10 @@ function assignment(sectionCode: string, lecturerId: string | null = LECTURER_ID
 }
 
 test("two classes multiply the same course contact hours", () => {
-  const result = summarizeLecturerWorkload(LECTURER_ID, [assignment("A"), assignment("B")]);
+  const result = summarizeLecturerWorkload(LECTURER_ID, [
+    assignment("A"),
+    assignment("B"),
+  ]);
 
   expect(result.totalHours).toBe(6);
   expect(result.peakWeeklyHours).toBe(6);
