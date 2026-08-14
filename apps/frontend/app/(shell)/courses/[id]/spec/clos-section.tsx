@@ -74,15 +74,29 @@ export function ClosSection({
   const openAdd = () => setModal({ open: true, cloCode: null });
   const openEdit = (code: string) => setModal({ open: true, cloCode: code });
 
-  const duplicate = (index: number) => {
+  const duplicate = async (index: number) => {
     const src = clos[index];
     if (!src) return;
-    const next = [
+
+    const copy: CloForm = {
+      ...src,
+      id: globalThis.crypto.randomUUID(),
+      code: "",
+    };
+
+    const next = withCodes([
       ...clos.slice(0, index + 1),
-      { ...src, code: "" },
+      copy,
       ...clos.slice(index + 1),
-    ];
-    onPersist(withCodes(next));
+    ]);
+    const duplicated = next[index + 1];
+    const ok = await onPersist(next);
+
+    setNotice(
+      ok
+        ? `${duplicated?.code ?? "CLO"} was created.`
+        : "Could not duplicate the CLO.",
+    );
   };
 
   const remove = (index: number) => {
