@@ -72,6 +72,7 @@ function analysisToView(analysis: {
   uncertaintyNote: string;
   engine: string;
   engineVersion: string;
+  promptVersion: string;
   createdAt: Date;
   requirement: { code: string };
   sources: Array<Parameters<typeof sourceToView>[0]>;
@@ -89,6 +90,7 @@ function analysisToView(analysis: {
     uncertaintyNote: analysis.uncertaintyNote,
     engine: analysis.engine,
     engineVersion: analysis.engineVersion,
+    promptVersion: analysis.promptVersion,
     createdAt: analysis.createdAt.toISOString(),
     sources: analysis.sources.map(sourceToView),
   };
@@ -171,6 +173,7 @@ export async function createQaEvidenceAnalysis(
       uncertaintyNote: input.uncertaintyNote,
       engine: input.engine,
       engineVersion: input.engineVersion,
+      promptVersion: input.promptVersion,
       sources: {
         create: input.sources.map((source) => ({
           sourceKind: source.sourceKind,
