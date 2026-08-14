@@ -1,10 +1,15 @@
 import {
   AUN_QA_V4_ID,
+  QA_PILOT_REQUIREMENT_CODES,
   type CreateQaCycleInput,
   type CreateQaEvidenceInput,
   type QaCycleView,
   type QaDashboardView,
+  type QaEvidenceSourceDomain,
   type QaEvidenceView,
+  type QaExpectedEvidenceRole,
+  type QaKnowledgeView,
+  type QaQualityExpectationView,
   type QaSelfAssessmentView,
   type UpsertQaSelfAssessmentInput,
 } from "@dse-pms/shared-types";
@@ -87,10 +92,99 @@ function toEvidenceView(evidence: {
   };
 }
 
+type QaKnowledgeRow = {
+  frameworkId: string;
+  frameworkVersion: string;
+  requirementCode: string;
+  expectationId: string;
+  statement: string;
+  purpose: string;
+  expectationOrder: number;
+  evidenceId: string | null;
+  evidenceType: string | null;
+  evidenceDescription: string | null;
+  evidenceRole: string | null;
+  sourceDomain: string | null;
+  evidenceOrder: number | null;
+};
+
 export class QaResourceNotFoundError extends Error {}
 export class QaScopeMismatchError extends Error {}
 
 export const qaService = {
+  async getKnowledge(): Promise<QaKnowledgeView> {
+    const rows = await prisma.$queryRaw<QaKnowledgeRow[]>`
+      SELECT
+        f.id AS "frameworkId",
+        f.version AS "frameworkVersion",
+        r.code AS "requirementCode",
+        e.id AS "expectationId",
+        e.statement,
+        e.purpose,
+        e."order" AS "expectationOrder",
+        x.id AS "evidenceId",
+        x."evidenceType",
+        x.description AS "evidenceDescription",
+        x.role AS "evidenceRole",
+        x."sourceDomain",
+        x."order" AS "evidenceOrder"
+      FROM "QaQualityExpectation" e
+      JOIN "QaRequirement" r ON r.id = e."requirementId"
+      JOIN "QaCriterion" c ON c.id = r."criterionId"
+      JOIN "QaFramework" f ON f.id = c."frameworkId"
+      LEFT JOIN "QaExpectedEvidence" x ON x."expectationId" = e.id
+      WHERE f.id = ${AUN_QA_V4_ID} AND e.active = true
+      ORDER BY c."order", r."order", e."order", x."order"
+    `;
+
+    if (rows.length === 0) {
+      throw new QaResourceNotFoundError(
+        "AUN-QA expectation knowledge is not installed. Apply database migrations.",
+      );
+    }
+
+    const expectations = new Map<string, QaQualityExpectationView>();
+    for (const row of rows) {
+      let expectation = expectations.get(row.expectationId);
+      if (!expectation) {
+        expectation = {
+          id: row.expectationId,
+          requirementCode: row.requirementCode,
+          statement: row.statement,
+          purpose: row.purpose,
+          order: row.expectationOrder,
+          expectedEvidence: [],
+        };
+        expectations.set(row.expectationId, expectation);
+      }
+
+      if (
+        row.evidenceId &&
+        row.evidenceType &&
+        row.evidenceDescription &&
+        row.evidenceRole &&
+        row.sourceDomain &&
+        row.evidenceOrder !== null
+      ) {
+        expectation.expectedEvidence.push({
+          id: row.evidenceId,
+          evidenceType: row.evidenceType,
+          description: row.evidenceDescription,
+          role: row.evidenceRole as QaExpectedEvidenceRole,
+          sourceDomain: row.sourceDomain as QaEvidenceSourceDomain,
+          order: row.evidenceOrder,
+        });
+      }
+    }
+
+    return {
+      frameworkId: rows[0]!.frameworkId,
+      frameworkVersion: rows[0]!.frameworkVersion,
+      pilotRequirementCodes: QA_PILOT_REQUIREMENT_CODES,
+      expectations: [...expectations.values()],
+    };
+  },
+
   async getDashboard(
     programmeId: string,
     cycleId?: string,
