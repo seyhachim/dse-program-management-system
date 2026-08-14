@@ -4,7 +4,10 @@ import { z } from "zod";
 export const MethodSchema = z.object({
   id: z.string(),
   name: z.string(),
-  active: z.boolean().default(true),
+  // Optional at the shared-contract boundary so older fixtures/consumers that
+  // predate managed vocabulary remain source-compatible. The live methods API
+  // always returns a boolean; consumers should treat only `false` as archived.
+  active: z.boolean().optional(),
 });
 export type Method = z.infer<typeof MethodSchema>;
 
@@ -78,10 +81,16 @@ export type UpdateActiveLearningStrategyInput = z.infer<typeof UpdateActiveLearn
 export const MethodsResponse = z.object({
   teaching: z.array(MethodSchema),
   assessment: z.array(MethodSchema),
-  activeLearningClusters: z.array(ActiveLearningClusterSchema),
+  // Optional for source compatibility with pre-feature mocks/responses. New API
+  // responses include this field; clients use an empty/fallback catalogue if absent.
+  activeLearningClusters: z.array(ActiveLearningClusterSchema).optional(),
 });
 export type MethodsResponse = z.infer<typeof MethodsResponse>;
 
 /** Admin/programme-management response including archived entries. */
-export const ManagedMethodsResponse = MethodsResponse;
+export const ManagedMethodsResponse = z.object({
+  teaching: z.array(MethodSchema),
+  assessment: z.array(MethodSchema),
+  activeLearningClusters: z.array(ActiveLearningClusterSchema),
+});
 export type ManagedMethodsResponse = z.infer<typeof ManagedMethodsResponse>;
