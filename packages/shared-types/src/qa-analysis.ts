@@ -62,7 +62,12 @@ export const QaEvidenceAnalysisHistoryQuerySchema = z.object({
   requirementCode: z.string().regex(/^\d\.\d$/).optional(),
 });
 
+export const RunQaDeterministicAnalysisSchema = z.object({
+  programmeId: z.string().trim().min(1),
+});
+
 export type CreateQaEvidenceAnalysisInput = z.infer<typeof CreateQaEvidenceAnalysisSchema>;
+export type RunQaDeterministicAnalysisInput = z.infer<typeof RunQaDeterministicAnalysisSchema>;
 
 export interface QaEvidenceAnalysisSourceView {
   id: string;

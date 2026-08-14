@@ -5,11 +5,13 @@ import {
   CreateQaEvidenceSchema,
   QaEvidenceAnalysisHistoryQuerySchema,
   QaEvidenceCandidatesQuerySchema,
+  RunQaDeterministicAnalysisSchema,
   UpsertQaSelfAssessmentSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type AuthUser } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import { runDeterministicQaAnalysis } from "./analysis/deterministic-engine.ts";
 import {
   QaAnalysisResourceNotFoundError,
   QaAnalysisScopeMismatchError,
@@ -129,6 +131,36 @@ export function createQaRouter(): Router {
       sendDomainError(res, error);
     }
   });
+
+  router.post(
+    "/cycles/:cycleId/requirements/:requirementCode/analysis",
+    requirePermission("qa:write"),
+    async (req, res) => {
+      const cycleId = req.params.cycleId;
+      const requirementCode = req.params.requirementCode;
+      const parsed = RunQaDeterministicAnalysisSchema.safeParse(req.body);
+      if (!cycleId || !requirementCode || !/^\d\.\d$/.test(requirementCode) || !parsed.success) {
+        res.status(400).json({
+          error: "Invalid deterministic QA analysis request",
+          details: parsed.success ? undefined : parsed.error.flatten(),
+        });
+        return;
+      }
+      if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+      try {
+        res.status(201).json(
+          await runDeterministicQaAnalysis(
+            parsed.data.programmeId,
+            cycleId,
+            requirementCode,
+          ),
+        );
+      } catch (error) {
+        sendDomainError(res, error);
+      }
+    },
+  );
 
   router.get("/dashboard", requirePermission("qa:read"), async (req, res) => {
     const parsed = DashboardQuery.safeParse(req.query);
