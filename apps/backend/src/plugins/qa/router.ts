@@ -3,11 +3,16 @@ import { z } from "zod";
 import {
   CreateQaCycleSchema,
   CreateQaEvidenceSchema,
+  QaEvidenceCandidatesQuerySchema,
   UpsertQaSelfAssessmentSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type AuthUser } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import {
+  QaEvidenceCandidateResourceNotFoundError,
+  getQaEvidenceCandidates,
+} from "./evidence/service.ts";
 import {
   QaResourceNotFoundError,
   QaScopeMismatchError,
@@ -57,6 +62,33 @@ export function createQaRouter(): Router {
     try {
       res.json(await qaService.getKnowledge());
     } catch (error) {
+      sendDomainError(res, error);
+    }
+  });
+
+  router.get("/evidence-candidates", requirePermission("qa:read"), async (req, res) => {
+    const parsed = QaEvidenceCandidatesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Invalid QA evidence candidate query",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+    if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+    try {
+      res.json(
+        await getQaEvidenceCandidates(
+          parsed.data.programmeId,
+          parsed.data.expectedEvidenceId,
+        ),
+      );
+    } catch (error) {
+      if (error instanceof QaEvidenceCandidateResourceNotFoundError) {
+        res.status(404).json({ error: error.message });
+        return;
+      }
       sendDomainError(res, error);
     }
   });
