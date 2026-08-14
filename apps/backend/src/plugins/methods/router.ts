@@ -20,9 +20,15 @@ export function createMethodRouter(): Router {
   const router = Router();
   router.use(requireAuth);
 
-  // Lecturer-facing catalogue: active entries only.
+  // Lecturer-facing catalogue for new selections: active entries only.
   router.get("/", requirePermission("methods:read"), async (_req, res) => {
     res.json(await methodService.list());
+  });
+
+  // Read-only complete catalogue lets existing course specs resolve labels for
+  // vocabulary that was archived after the spec was authored.
+  router.get("/catalog", requirePermission("methods:read"), async (_req, res) => {
+    res.json(await methodService.listManaged());
   });
 
   // Programme-management catalogue: includes archived entries.
