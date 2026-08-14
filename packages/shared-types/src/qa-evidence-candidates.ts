@@ -32,12 +32,11 @@ export interface QaEvidenceCandidateResultView {
 export const QaEvidenceCandidatesQuerySchema = z.object({
   programmeId: z.string().trim().min(1),
   expectedEvidenceId: z.string().trim().min(1).max(200),
+  topK: z.coerce.number().int().min(1).max(50).default(10),
 });
 
 /**
- * Evidence types that #186 can retrieve deterministically from current DSE-PMS
- * tables. Types not listed here remain explicit unsupported sources rather than
- * being interpreted as missing evidence.
+ * Evidence types #186 can retrieve deterministically from current DSE-PMS tables.
  */
 export const QA_STRUCTURED_EVIDENCE_TYPES = [
   "programme-outcomes",
@@ -67,13 +66,18 @@ export const QA_STRUCTURED_EVIDENCE_TYPES = [
   "teaching-assignments",
 ] as const;
 
-export const QA_EXPLICITLY_UNSUPPORTED_EVIDENCE_TYPES = [
+/** Evidence types #189 can retrieve semantically from programme QA documents. */
+export const QA_SEMANTIC_EVIDENCE_TYPES = [
   "published-outcomes",
-  "clo-achievement",
   "programme-outcome-analysis",
   "curriculum-mapping",
   "teaching-review-records",
-  "rubrics",
   "plo-synthesis",
   "supporting-cv",
+] as const;
+
+/** Evidence types whose source model is still not safe/available after #189. */
+export const QA_EXPLICITLY_UNSUPPORTED_EVIDENCE_TYPES = [
+  "clo-achievement",
+  "rubrics",
 ] as const;
