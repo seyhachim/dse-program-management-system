@@ -118,6 +118,38 @@ export const coursesManifest: PluginManifest = {
   permissions: ["courses:read", "courses:write", "courses:manage", "courses:review"],
 };
 
+/** Lecturer-focused cross-course workspace navigation (issue #158). */
+export const lecturerWorkspaceManifest: PluginManifest = {
+  id: "lecturer-workspace",
+  name: "Lecturer Workspace",
+  version: "0.1.0",
+  description:
+    "Cross-course lecturer workspace for tasks, teaching schedule, and reusable guidance.",
+  routes: [
+    {
+      label: "My Tasks",
+      path: "/my-tasks",
+      icon: "check-square",
+      roles: ["lecturer"],
+      group: "Academic",
+    },
+    {
+      label: "Teaching Schedule",
+      path: "/teaching-schedule",
+      icon: "calendar",
+      roles: ["lecturer"],
+      group: "Academic",
+    },
+    {
+      label: "Templates & Guides",
+      path: "/templates-guides",
+      icon: "library",
+      roles: ["lecturer"],
+      group: "Resources",
+    },
+  ],
+};
+
 export const offeringsManifest: PluginManifest = {
   id: "offerings",
   name: "Course Offerings",
@@ -337,6 +369,7 @@ export const pluginManifests: PluginManifest[] = [
   dashboardManifest,
   studentsManifest,
   coursesManifest,
+  lecturerWorkspaceManifest,
   offeringsManifest,
   lecturersManifest,
   programmeManifest,
