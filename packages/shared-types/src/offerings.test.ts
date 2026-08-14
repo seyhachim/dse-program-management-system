@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { coLecturerViolation, CreateOfferingInput, UpdateOfferingInput } from "./offerings.ts";
+import {
+  coLecturerViolation,
+  CreateOfferingInput,
+  OfferingMeetingInput,
+  SectionCodeSchema,
+  UpdateOfferingInput,
+} from "./offerings.ts";
 
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
@@ -57,4 +63,45 @@ test("UpdateOfferingInput applies the same invariant on a partial patch", () => 
   expect(UpdateOfferingInput.safeParse({ lecturerId: A, coLecturerIds: [A] }).success).toBe(false);
   expect(UpdateOfferingInput.safeParse({ coLecturerIds: [B] }).success).toBe(true);
   expect(UpdateOfferingInput.safeParse({}).success).toBe(true);
+});
+
+test("class section defaults to A for backward-compatible create requests", () => {
+  const parsed = CreateOfferingInput.parse({ courseId: COURSE, term: "2026-Fall" });
+  expect(parsed.sectionCode).toBe("A");
+});
+
+test("class section is trimmed and normalized to uppercase", () => {
+  expect(SectionCodeSchema.parse(" b-2 ")).toBe("B-2");
+});
+
+test("class section rejects spaces and punctuation", () => {
+  expect(SectionCodeSchema.safeParse("Class B").success).toBe(false);
+  expect(SectionCodeSchema.safeParse("B!").success).toBe(false);
+});
+
+test("meeting validation accepts room/time and derives no user-entered duration", () => {
+  const meeting = OfferingMeetingInput.parse({
+    dayOfWeek: "Monday",
+    startTime: "08:00",
+    endTime: "10:30",
+    room: "A203",
+    activityType: "Lecture",
+  });
+  expect(meeting.room).toBe("A203");
+  expect("duration" in meeting).toBe(false);
+});
+
+test("meeting validation rejects invalid and reversed times", () => {
+  expect(OfferingMeetingInput.safeParse({
+    dayOfWeek: "Monday",
+    startTime: "10:00",
+    endTime: "09:00",
+    activityType: "Lecture",
+  }).success).toBe(false);
+  expect(OfferingMeetingInput.safeParse({
+    dayOfWeek: "Monday",
+    startTime: "8am",
+    endTime: "10:00",
+    activityType: "Lecture",
+  }).success).toBe(false);
 });

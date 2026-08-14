@@ -78,7 +78,6 @@ import {
   type MappingForm,
 } from "./mapping-model";
 import { OverviewTab } from "./overview-tab";
-import { CompletionSummary } from "./completion-summary";
 import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
@@ -747,10 +746,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
           {error}
         </div>
       ) : null}
-
-      {loading ? null : (
-        <CompletionSummary status={status} onContinue={goToSection} />
-      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>

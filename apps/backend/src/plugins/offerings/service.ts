@@ -1,17 +1,21 @@
 import {
   coLecturerViolation,
   type CoursesServiceContract,
+  type CourseWeeklyContactHoursRef,
   type CreateOfferingInput,
   type EnrollInput,
   type LecturerRef,
   type LecturersServiceContract,
   type ListOfferingsQuery,
+  type ListLecturerWorkloadQuery,
+  type LecturerWorkloadSummary,
   type OfferingView,
   type StudentsServiceContract,
   type UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
+import { summarizeLecturerWorkload } from "./workload.ts";
 
 /**
  * Course Offerings — the architectural proof point. An offering owns only its own
@@ -43,7 +47,14 @@ async function lecturerLookup(): Promise<Map<string, LecturerRef>> {
 const withRelations = {
   enrollments: { select: { studentId: true } },
   coLecturers: { select: { lecturerId: true } },
+  meetings: true,
 } as const;
+
+function meetingDurationHours(startTime: string, endTime: string): number {
+  const [startHour, startMinute] = startTime.split(":").map(Number) as [number, number];
+  const [endHour, endMinute] = endTime.split(":").map(Number) as [number, number];
+  return ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60;
+}
 
 /**
  * Assemble an enriched OfferingView by joining across plugins via the registry.
@@ -56,6 +67,7 @@ async function toView(
     courseId: string;
     lecturerId: string | null;
     term: string;
+    sectionCode: string;
     capacity: number;
     status: OfferingView["status"];
     semester: OfferingView["semester"];
@@ -64,6 +76,14 @@ async function toView(
     createdAt: Date;
     enrollments: { studentId: string }[];
     coLecturers: { lecturerId: string }[];
+    meetings: {
+      id: string;
+      dayOfWeek: string;
+      startTime: string;
+      endTime: string;
+      room: string | null;
+      activityType: string;
+    }[];
   },
   lecturerById: Map<string, LecturerRef>,
 ): Promise<OfferingView> {
@@ -79,11 +99,18 @@ async function toView(
   return {
     id: offering.id,
     term: offering.term,
+    sectionCode: offering.sectionCode,
     status: offering.status,
     capacity: offering.capacity,
     semester: offering.semester,
     programmeYear: offering.programmeYear,
     otherLecturers: offering.otherLecturers,
+    meetings: offering.meetings.map((meeting) => ({
+      ...meeting,
+      dayOfWeek: meeting.dayOfWeek as OfferingView["meetings"][number]["dayOfWeek"],
+      activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
+      durationHours: meetingDurationHours(meeting.startTime, meeting.endTime),
+    })),
     enrolledCount: offering.enrollments.length,
     createdAt: offering.createdAt.toISOString(),
     course: course
@@ -134,7 +161,7 @@ export const offeringService = {
   },
 
   async create(input: CreateOfferingInput): Promise<OfferingView> {
-    const { coLecturerIds, ...offeringInput } = input;
+    const { coLecturerIds, meetings, ...offeringInput } = input;
     // Validate cross-plugin references through the registry.
     if (!(await courses().getById(offeringInput.courseId))) {
       throw new ReferenceError("Course does not exist");
@@ -147,6 +174,7 @@ export const offeringService = {
       data: {
         courseId: offeringInput.courseId,
         term: offeringInput.term,
+        sectionCode: offeringInput.sectionCode,
         lecturerId: offeringInput.lecturerId ?? null,
         capacity: offeringInput.capacity,
         status: offeringInput.status,
@@ -156,6 +184,14 @@ export const offeringService = {
         coLecturers: coLecturerIds?.length
           ? { create: coLecturerIds.map((lecturerId) => ({ lecturerId })) }
           : undefined,
+        meetings: meetings.length
+          ? {
+              create: meetings.map((meeting) => ({
+                ...meeting,
+                room: meeting.room || null,
+              })),
+            }
+          : undefined,
       },
       include: withRelations,
     });
@@ -163,7 +199,7 @@ export const offeringService = {
   },
 
   async update(id: string, input: UpdateOfferingInput): Promise<OfferingView> {
-    const { coLecturerIds, ...offeringInput } = input;
+    const { coLecturerIds, meetings, ...offeringInput } = input;
     if (offeringInput.lecturerId && !(await lecturers().getById(offeringInput.lecturerId))) {
       throw new ReferenceError("Assigned lecturer does not exist");
     }
@@ -193,10 +229,25 @@ export const offeringService = {
           });
         }
       }
+      if (meetings !== undefined) {
+        await tx.offeringMeeting.deleteMany({ where: { offeringId: id } });
+        if (meetings.length) {
+          await tx.offeringMeeting.createMany({
+            data: meetings.map((meeting) => ({
+              offeringId: id,
+              ...meeting,
+              room: meeting.room || null,
+            })),
+          });
+        }
+      }
       return tx.offering.update({
         where: { id },
         data: {
           ...(offeringInput.term !== undefined ? { term: offeringInput.term } : {}),
+          ...(offeringInput.sectionCode !== undefined
+            ? { sectionCode: offeringInput.sectionCode }
+            : {}),
           ...(offeringInput.lecturerId !== undefined ? { lecturerId: offeringInput.lecturerId } : {}),
           ...(offeringInput.capacity !== undefined ? { capacity: offeringInput.capacity } : {}),
           ...(offeringInput.status !== undefined ? { status: offeringInput.status } : {}),
@@ -229,6 +280,78 @@ export const offeringService = {
       distinct: ["courseId"],
     });
     return rows.map((r) => r.courseId);
+  },
+
+  /** Weekly teaching workload for the signed-in lecturer across assigned classes. */
+  async workloadForLecturer(
+    lecturerId: string,
+    query: ListLecturerWorkloadQuery,
+  ): Promise<LecturerWorkloadSummary> {
+    const assignments = await prisma.offering.findMany({
+      where: {
+        ...(query.term ? { term: query.term } : {}),
+        OR: [{ lecturerId }, { coLecturers: { some: { lecturerId } } }],
+      },
+      select: {
+        id: true,
+        courseId: true,
+        lecturerId: true,
+        term: true,
+        sectionCode: true,
+        meetings: {
+          select: {
+            id: true,
+            dayOfWeek: true,
+            startTime: true,
+            endTime: true,
+            room: true,
+            activityType: true,
+          },
+        },
+      },
+      orderBy: [{ term: "desc" }, { sectionCode: "asc" }],
+    });
+
+    const courseCache = new Map<
+      string,
+      Promise<{
+        course: Awaited<ReturnType<CoursesServiceContract["getById"]>>;
+        weeks: CourseWeeklyContactHoursRef[];
+      }>
+    >();
+    const courseData = (courseId: string) => {
+      let cached = courseCache.get(courseId);
+      if (!cached) {
+        cached = Promise.all([
+          courses().getById(courseId),
+          courses().weeklyContactHours(courseId),
+        ]).then(([course, weeks]) => ({ course, weeks }));
+        courseCache.set(courseId, cached);
+      }
+      return cached;
+    };
+
+    const enriched = (
+      await Promise.all(
+        assignments.map(async (assignment) => {
+          const { course, weeks } = await courseData(assignment.courseId);
+          return course
+            ? {
+                ...assignment,
+                meetings: assignment.meetings.map((meeting) => ({
+                  ...meeting,
+                  dayOfWeek: meeting.dayOfWeek as OfferingView["meetings"][number]["dayOfWeek"],
+                  activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
+                })),
+                course,
+                weeks,
+              }
+            : null;
+        }),
+      )
+    ).filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null);
+
+    return summarizeLecturerWorkload(lecturerId, enriched);
   },
 
   async enroll(id: string, input: EnrollInput): Promise<OfferingView> {

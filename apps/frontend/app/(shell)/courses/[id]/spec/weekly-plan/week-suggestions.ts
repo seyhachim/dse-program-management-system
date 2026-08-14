@@ -1,8 +1,7 @@
-import type { Method } from "@dse-pms/shared-types";
+import type { ActiveLearningCluster, Method } from "@dse-pms/shared-types";
 import type { TeachingLearningProfile } from "@/lib/teaching-learning";
 import type { CloForm } from "../clo-model";
 import type { AssessmentForm } from "../assessment-model";
-import { ACTIVE_LEARNING_CLUSTERS } from "../teaching-learning/strategy-catalog";
 
 export type WeekSuggestions = {
   teachingMethods: Method[];
@@ -13,18 +12,12 @@ export type WeekSuggestions = {
   assessments: AssessmentForm[];
 };
 
-const strategyById = new Map(
-  ACTIVE_LEARNING_CLUSTERS.flatMap((cluster) => cluster.strategies).map((strategy) => [
-    strategy.id,
-    strategy,
-  ]),
-);
-
 export function buildWeekSuggestions({
   week,
   cloCodes,
   clos,
   teachingMethods,
+  activeLearningClusters,
   profile,
   assessments,
 }: {
@@ -32,6 +25,7 @@ export function buildWeekSuggestions({
   cloCodes: string[];
   clos: CloForm[];
   teachingMethods: Method[];
+  activeLearningClusters: ActiveLearningCluster[];
   profile: TeachingLearningProfile | null;
   assessments: AssessmentForm[];
 }): WeekSuggestions {
@@ -48,6 +42,11 @@ export function buildWeekSuggestions({
     preferredMethodIds.has(method.id),
   );
 
+  const strategyById = new Map(
+    activeLearningClusters
+      .flatMap((cluster) => cluster.strategies)
+      .map((strategy) => [strategy.id, strategy] as const),
+  );
   const cloStrategyIds = new Set(
     linkedClos.flatMap((clo) => clo.activeLearningStrategyIds),
   );
@@ -63,9 +62,8 @@ export function buildWeekSuggestions({
 
   const activeLearningStrategies = preferredStrategyIds
     .map((id) => strategyById.get(id))
-    .filter(
-      (strategy): strategy is { id: string; label: string } => Boolean(strategy),
-    );
+    .filter((strategy) => Boolean(strategy))
+    .map((strategy) => ({ id: strategy!.id, label: strategy!.name }));
 
   const weekNumber = Number(week);
   const assessmentSuggestions = assessments.filter((assessment) => {

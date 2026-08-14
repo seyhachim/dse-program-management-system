@@ -18,7 +18,7 @@ import {
   weekSltForm,
   type WeeklyPlanForm,
 } from "./weekly-plan-model";
-import type { AssessmentForm } from "./assessment-model";
+import { assessmentSltHours, type AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 import type { ResourcesForm } from "./resources-model";
 import type { ReferencesForm } from "./references-model";
@@ -129,11 +129,19 @@ export type CourseDocumentModel = {
     evaluationDefinition: string;
     rubricName: string;
     rubricUrl: string;
+    assessmentCategory: "continuous" | "final";
+    topicNumbers: number[];
+    physicalSltHours: string;
+    onlineSltHours: string;
+    independentSltHours: string;
+    totalSltHours: number;
   }[];
   totals: {
     courseContentSlt: number;
-    assessmentSlt: number | null;
-    grandSlt: number | null;
+    continuousAssessmentSlt: number;
+    finalAssessmentSlt: number;
+    assessmentSlt: number;
+    grandSlt: number;
     assessmentWeight: number;
   };
 };
@@ -150,7 +158,7 @@ export const COURSE_DOCUMENT_STYLE = {
 
   colors: {
     labelBackground: "#E2EEDB",
-    tableHeaderBackground: "#F2F2F2",
+    tableHeaderBackground: "#E2EEDB",
     border: "#000000",
     link: "#0563C1",
   },
@@ -387,6 +395,12 @@ export function buildCourseDocument({
       rubricUrl: assessment.rubric
         ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
         : "",
+      assessmentCategory: assessment.assessmentCategory,
+      topicNumbers: assessment.topicNumbers,
+      physicalSltHours: assessment.physicalSltHours,
+      onlineSltHours: assessment.onlineSltHours,
+      independentSltHours: assessment.independentSltHours,
+      totalSltHours: assessmentSltHours(assessment),
     }));
 
   const documentMapping = activeClos.map((clo) => {
@@ -409,10 +423,18 @@ export function buildCourseDocument({
     };
   });
 
-  const courseContentSlt = documentWeeks.reduce(
+  const weeklyPlanSlt = documentWeeks.reduce(
     (sum, week) => sum + (Number(week.sltHours) || 0),
     0,
   );
+  const continuousAssessmentSlt = documentAssessments
+    .filter((assessment) => assessment.assessmentCategory === "continuous")
+    .reduce((sum, assessment) => sum + assessment.totalSltHours, 0);
+  const finalAssessmentSlt = documentAssessments
+    .filter((assessment) => assessment.assessmentCategory === "final")
+    .reduce((sum, assessment) => sum + assessment.totalSltHours, 0);
+  const assessmentSlt = continuousAssessmentSlt + finalAssessmentSlt;
+  const courseContentSlt = weeklyPlanSlt;
   const assessmentWeight = documentAssessments.reduce(
     (sum, assessment) => sum + (Number(assessment.weight) || 0),
     0,
@@ -477,8 +499,10 @@ export function buildCourseDocument({
     assessments: documentAssessments,
     totals: {
       courseContentSlt,
-      assessmentSlt: null,
-      grandSlt: null,
+      continuousAssessmentSlt,
+      finalAssessmentSlt,
+      assessmentSlt,
+      grandSlt: courseContentSlt + assessmentSlt,
       assessmentWeight,
     },
   };

@@ -46,6 +46,16 @@ export interface StudentsServiceContract {
 
 export interface CoursesServiceContract {
   getById(id: string): Promise<CourseRef | null>;
+  weeklyContactHours(courseId: string): Promise<CourseWeeklyContactHoursRef[]>;
+}
+
+export interface CourseWeeklyContactHoursRef {
+  week: number;
+  lectureHours: number;
+  tutorialHours: number;
+  practiceHours: number;
+  otherHours: number;
+  totalContactHours: number;
 }
 
 export interface LecturersServiceContract {

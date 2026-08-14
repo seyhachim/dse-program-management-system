@@ -187,6 +187,40 @@ export const courseService = {
     return prisma.course.findUnique({ where: { id } });
   },
 
+  // Part of CoursesServiceContract — workload consumers need only scheduled
+  // contact hours, never CourseSpec's storage details or self-study time.
+  async weeklyContactHours(courseId: string) {
+    const spec = await prisma.courseSpec.findUnique({
+      where: { courseId },
+      select: {
+        weeks: {
+          orderBy: { order: "asc" },
+          select: {
+            week: true,
+            lectureHours: true,
+            tutorialHours: true,
+            practiceHours: true,
+            otherHours: true,
+          },
+        },
+      },
+    });
+    return (spec?.weeks ?? []).map((week) => {
+      const lectureHours = week.lectureHours ?? 0;
+      const tutorialHours = week.tutorialHours ?? 0;
+      const practiceHours = week.practiceHours ?? 0;
+      const otherHours = week.otherHours ?? 0;
+      return {
+        week: week.week,
+        lectureHours,
+        tutorialHours,
+        practiceHours,
+        otherHours,
+        totalContactHours: lectureHours + tutorialHours + practiceHours + otherHours,
+      };
+    });
+  },
+
   async getDetailed(id: string) {
     const course = await prisma.course.findUnique({ where: { id } });
     return course ? withLecturer(course, await lecturerLookup()) : null;

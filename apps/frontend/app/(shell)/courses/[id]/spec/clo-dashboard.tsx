@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import {
+  AFFECTIVE_LEVELS,
+  PSYCHOMOTOR_LEVELS,
+} from "@dse-pms/shared-types";
+import {
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
@@ -11,7 +15,12 @@ import {
   Lightbulb,
   Target,
 } from "lucide-react";
-import { BLOOM_COGNITIVE, bloomStyle, type CloForm } from "./clo-model";
+import {
+  CAP_DOMAINS,
+  BLOOM_COGNITIVE,
+  capDomainCounts,
+  type CloForm,
+} from "./clo-model";
 
 const GOOD_CLOS = [
   "Specific and clear",
@@ -36,16 +45,29 @@ export function ClosDashboard({ clos }: { clos: CloForm[] }) {
   const inactive = total - active;
   const activePercent = total ? Math.round((active / total) * 100) : 0;
 
-  // Distribution across the six cognitive Bloom levels; anything else is "Other".
-  const distribution = BLOOM_COGNITIVE.map((l) => ({
-    ...bloomStyle(l.code),
-    count: clos.filter((c) => c.level === l.code).length,
+  const domainCounts = capDomainCounts(clos.map((clo) => clo.level));
+  const distribution = CAP_DOMAINS.map((domain) => ({
+    ...domain,
+    count: domainCounts[domain.code],
   }));
-  const otherCount = total - distribution.reduce((s, d) => s + d.count, 0);
+  const classified = distribution.reduce(
+    (sum, domain) => sum + domain.count,
+    0,
+  );
+  const unclassifiedCount = domainCounts.unclassified;
   const segments = [
     ...distribution,
-    ...(otherCount > 0
-      ? [{ name: "Other", dot: "#94a3b8", bar: "#94a3b8", chip: "", count: otherCount }]
+    ...(unclassifiedCount > 0
+      ? [
+          {
+            code: "U",
+            name: "Unclassified",
+            dot: "#94a3b8",
+            bar: "#94a3b8",
+            chip: "",
+            count: unclassifiedCount,
+          },
+        ]
       : []),
   ];
 
@@ -63,7 +85,14 @@ export function ClosDashboard({ clos }: { clos: CloForm[] }) {
         </div>
 
         <div className="mt-5">
-          <h4 className="mb-2 text-xs font-semibold text-foreground">Bloom's Taxonomy Distribution</h4>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-1">
+            <h4 className="text-xs font-semibold text-foreground">
+              C/A/P Domain Distribution
+            </h4>
+            <span className="text-[11px] text-muted-foreground">
+              {classified} of {total} classified
+            </span>
+          </div>
           <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
             {total === 0
               ? null
@@ -71,17 +100,27 @@ export function ClosDashboard({ clos }: { clos: CloForm[] }) {
                   .filter((s) => s.count > 0)
                   .map((s) => (
                     <div
-                      key={s.name}
-                      style={{ width: `${(s.count / total) * 100}%`, backgroundColor: s.bar }}
+                      key={s.code}
+                      style={{
+                        width: `${(s.count / total) * 100}%`,
+                        backgroundColor: s.bar,
+                      }}
                       title={`${s.name}: ${s.count}`}
                     />
                   ))}
           </div>
           <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
             {segments.map((s) => (
-              <li key={s.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: s.dot }} />
-                {s.name} ({total ? Math.round((s.count / total) * 100) : 0}%)
+              <li
+                key={s.code}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              >
+                <span
+                  className="h-2 w-2 rounded-sm"
+                  style={{ backgroundColor: s.dot }}
+                />
+                {s.name} — {s.count} CLO{s.count === 1 ? "" : "s"} ·{" "}
+                {total ? Math.round((s.count / total) * 100) : 0}%
               </li>
             ))}
           </ul>
@@ -143,17 +182,39 @@ function QuickTips() {
         onClick={() => setShowLevels((v) => !v)}
         className="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-300/70 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100/60 dark:text-amber-300 dark:hover:bg-amber-900/30"
       >
-        <BookOpen className="h-4 w-4" /> View Bloom's Taxonomy
+        <BookOpen className="h-4 w-4" /> View C/A/P Taxonomy
       </button>
       {showLevels ? (
-        <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-          {BLOOM_COGNITIVE.map((l) => (
-            <li key={l.code} className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: bloomStyle(l.code).dot }} />
-              <span className="font-medium text-foreground">{l.name}</span> — {l.code}
-            </li>
-          ))}
-        </ul>
+        <div className="mt-3 space-y-3 text-xs text-muted-foreground">
+          {CAP_DOMAINS.map((domain) => {
+            const levels =
+              domain.code === "C"
+                ? BLOOM_COGNITIVE
+                : domain.code === "A"
+                  ? AFFECTIVE_LEVELS
+                  : PSYCHOMOTOR_LEVELS;
+            return (
+              <div key={domain.code}>
+                <p className="mb-1 font-semibold text-foreground">
+                  {domain.name} ({domain.code})
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {levels.map((level) => (
+                    <li
+                      key={level.code}
+                      className="rounded-full border border-border bg-background/50 px-2 py-0.5"
+                    >
+                      <span className="font-semibold text-foreground">
+                        {level.code}
+                      </span>{" "}
+                      {level.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
       ) : null}
     </section>
   );

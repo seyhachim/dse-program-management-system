@@ -118,6 +118,38 @@ export const coursesManifest: PluginManifest = {
   permissions: ["courses:read", "courses:write", "courses:manage", "courses:review"],
 };
 
+/** Lecturer-focused cross-course workspace navigation (issue #158). */
+export const lecturerWorkspaceManifest: PluginManifest = {
+  id: "lecturer-workspace",
+  name: "Lecturer Workspace",
+  version: "0.1.0",
+  description:
+    "Cross-course lecturer workspace for tasks, teaching schedule, and reusable guidance.",
+  routes: [
+    {
+      label: "My Tasks",
+      path: "/my-tasks",
+      icon: "check-square",
+      roles: ["lecturer"],
+      group: "Academic",
+    },
+    {
+      label: "Teaching Schedule",
+      path: "/teaching-schedule",
+      icon: "calendar",
+      roles: ["lecturer"],
+      group: "Academic",
+    },
+    {
+      label: "Templates & Guides",
+      path: "/templates-guides",
+      icon: "library",
+      roles: ["lecturer"],
+      group: "Resources",
+    },
+  ],
+};
+
 export const offeringsManifest: PluginManifest = {
   id: "offerings",
   name: "Course Offerings",
@@ -177,6 +209,24 @@ export const dashboardManifest: PluginManifest = {
       roles: ["admin", "program_coordinator", "program_secretary"],
     },
   ],
+};
+
+/** Student-only learning-information portal. All backend reads are scoped to
+ * the authenticated student's enrollments; this manifest controls navigation,
+ * not the authorization boundary. */
+export const studentPortalManifest: PluginManifest = {
+  id: "student-portal",
+  name: "Student Portal",
+  version: "0.1.0",
+  description: "Enrolled courses, schedule, approved learning information, results, and feedback.",
+  routes: [
+    { label: "Home", path: "/portal", icon: "home", roles: ["student"] },
+    { label: "My Courses", path: "/portal/courses", icon: "book", roles: ["student"], group: "Learning" },
+    { label: "Schedule", path: "/portal/schedule", icon: "calendar", roles: ["student"], group: "Learning" },
+    { label: "Results", path: "/portal/results", icon: "chart", roles: ["student"], group: "Progress" },
+    { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },
+  ],
+  permissions: ["student-portal:read", "student-portal:feedback"],
 };
 
 export const programmeManifest: PluginManifest = {
@@ -334,9 +384,11 @@ export const authManifest: PluginManifest = {
 };
 
 export const pluginManifests: PluginManifest[] = [
+  studentPortalManifest,
   dashboardManifest,
   studentsManifest,
   coursesManifest,
+  lecturerWorkspaceManifest,
   offeringsManifest,
   lecturersManifest,
   programmeManifest,

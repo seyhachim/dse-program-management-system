@@ -1,5 +1,5 @@
 import * as React from "react";
-import { GripVertical, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { cn } from "../lib/cn.ts";
 import { Checkbox } from "./ui/checkbox.tsx";
 
@@ -40,6 +40,10 @@ export interface DataTableProps<T> {
   groupBy?: (row: T) => string;
   /** Optional custom group header renderer. */
   renderGroupHeader?: (group: string, rows: T[]) => React.ReactNode;
+  /** Optional controlled expandable-row support. */
+  isRowExpanded?: (row: T) => boolean;
+  onToggleRow?: (row: T) => void;
+  renderExpandedRow?: (row: T) => React.ReactNode;
 }
 
 const alignClass = {
@@ -64,8 +68,14 @@ export function DataTable<T>({
   emptyMessage = "No records found.",
   groupBy,
   renderGroupHeader,
+  isRowExpanded,
+  onToggleRow,
+  renderExpandedRow,
 }: DataTableProps<T>) {
   const hasActions = Boolean(onEdit || onDelete || actions.length > 0);
+  const expandable = Boolean(
+    isRowExpanded && onToggleRow && renderExpandedRow,
+  );
   const selected = new Set(selectedIds);
   const allSelected =
     rows.length > 0 && rows.every((r) => selected.has(getRowId(r)));
@@ -80,7 +90,8 @@ export function DataTable<T>({
     onSelectedChange?.([...next]);
   };
 
-  const leadingCols = (dragHandle ? 1 : 0) + (selectable ? 1 : 0);
+  const leadingCols =
+    (expandable ? 1 : 0) + (dragHandle ? 1 : 0) + (selectable ? 1 : 0);
   const totalCols = leadingCols + columns.length + (hasActions ? 1 : 0);
 
   return (
@@ -88,6 +99,7 @@ export function DataTable<T>({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {expandable ? <th className="w-10 px-3 py-3" /> : null}
             {dragHandle ? <th className="w-8 px-3 py-3" /> : null}
             {selectable ? (
               <th className="w-10 px-3 py-3">
@@ -165,13 +177,32 @@ export function DataTable<T>({
                       </tr>,
                     ]
                   : []),
-                ...groupRows.map((row) => {
+                ...groupRows.flatMap((row) => {
                   const id = getRowId(row);
-                  return (
+                  const expanded = expandable && isRowExpanded!(row);
+                  return [
                     <tr
                       key={id}
                       className="border-b border-border/60 last:border-0 hover:bg-muted/50"
                     >
+                      {expandable ? (
+                        <td className="px-3 py-3 align-top">
+                          <button
+                            type="button"
+                            onClick={() => onToggleRow!(row)}
+                            aria-label={expanded ? "Collapse row" : "Expand row"}
+                            aria-expanded={expanded}
+                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          >
+                            <ChevronRight
+                              className={cn(
+                                "h-4 w-4 transition-transform",
+                                expanded && "rotate-90",
+                              )}
+                            />
+                          </button>
+                        </td>
+                      ) : null}
                       {dragHandle ? (
                         <td className="px-3 py-3 text-muted-foreground">
                           <GripVertical
@@ -209,7 +240,7 @@ export function DataTable<T>({
                                 key={action.key}
                                 onClick={() => action.onClick(row)}
                                 className={cn(
-                                  "rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium hover:bg-muted",
+                                  "inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium hover:bg-muted",
                                   action.tone === "danger"
                                     ? "text-status-live"
                                     : "text-foreground",
@@ -240,8 +271,20 @@ export function DataTable<T>({
                           </div>
                         </td>
                       ) : null}
-                    </tr>
-                  );
+                    </tr>,
+                    ...(expanded
+                      ? [
+                          <tr
+                            key={`${id}-expanded`}
+                            className="border-b border-border/60 bg-muted/20"
+                          >
+                            <td colSpan={totalCols} className="px-4 py-4">
+                              {renderExpandedRow!(row)}
+                            </td>
+                          </tr>,
+                        ]
+                      : []),
+                  ];
                 }),
               ]);
             })()

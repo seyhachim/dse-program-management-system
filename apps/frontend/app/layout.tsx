@@ -1,11 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Inter } from "next/font/google";
-import { cn } from "@dse-pms/ui";
 import { ThemeProvider } from "@/lib/theme-provider";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const geistHeading = Geist({ subsets: ["latin"], variable: "--font-heading" });
 
 export const metadata: Metadata = {
   title: "DSE-PMS",
@@ -17,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("font-sans", inter.variable, geistHeading.variable)}
+      className="font-sans"
     >
       <body>
         <ThemeProvider>{children}</ThemeProvider>
