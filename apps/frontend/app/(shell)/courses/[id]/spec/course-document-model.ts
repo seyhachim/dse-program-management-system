@@ -419,14 +419,7 @@ export function buildCourseDocument({
     .filter((assessment) => assessment.assessmentCategory === "final")
     .reduce((sum, assessment) => sum + assessment.totalSltHours, 0);
   const assessmentSlt = continuousAssessmentSlt + finalAssessmentSlt;
-  const authoritativeCourseTotal =
-    courseTotalSlt != null && Number.isFinite(courseTotalSlt) && courseTotalSlt > 0
-      ? courseTotalSlt
-      : null;
-  const courseContentSlt =
-    authoritativeCourseTotal != null && authoritativeCourseTotal >= assessmentSlt
-      ? authoritativeCourseTotal - assessmentSlt
-      : weeklyPlanSlt;
+  const courseContentSlt = weeklyPlanSlt;
   const assessmentWeight = documentAssessments.reduce(
     (sum, assessment) => sum + (Number(assessment.weight) || 0),
     0,
@@ -482,7 +475,7 @@ export function buildCourseDocument({
       continuousAssessmentSlt,
       finalAssessmentSlt,
       assessmentSlt,
-      grandSlt: authoritativeCourseTotal ?? courseContentSlt + assessmentSlt,
+      grandSlt: courseContentSlt + assessmentSlt,
       assessmentWeight,
     },
   };
