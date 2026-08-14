@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message != 'chore: patch issue 187 Prisma schema'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,11 +17,14 @@ jobs:
           ref: agent/issue-187-qa-analysis-provenance
       - name: Patch schema
         run: python .github/patch-issue-187-schema.py
-      - name: Commit schema patch
+      - name: Commit schema patch if changed
         run: |
           git config user.name "seyhachim"
           git config user.email "32429415+seyhachim@users.noreply.github.com"
           git add apps/backend/prisma/schema.prisma
-          git diff --cached --quiet && exit 0
+          if git diff --cached --quiet; then
+            echo "Schema already patched."
+            exit 0
+          fi
           git commit -m "chore: patch issue 187 Prisma schema"
           git push origin HEAD:agent/issue-187-qa-analysis-provenance
