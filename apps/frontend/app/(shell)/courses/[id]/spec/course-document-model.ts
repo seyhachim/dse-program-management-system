@@ -408,7 +408,7 @@ export function buildCourseDocument({
     };
   });
 
-  const courseContentSlt = documentWeeks.reduce(
+  const weeklyPlanSlt = documentWeeks.reduce(
     (sum, week) => sum + (Number(week.sltHours) || 0),
     0,
   );
@@ -419,6 +419,14 @@ export function buildCourseDocument({
     .filter((assessment) => assessment.assessmentCategory === "final")
     .reduce((sum, assessment) => sum + assessment.totalSltHours, 0);
   const assessmentSlt = continuousAssessmentSlt + finalAssessmentSlt;
+  const authoritativeCourseTotal =
+    courseTotalSlt != null && Number.isFinite(courseTotalSlt) && courseTotalSlt > 0
+      ? courseTotalSlt
+      : null;
+  const courseContentSlt =
+    authoritativeCourseTotal != null && authoritativeCourseTotal >= assessmentSlt
+      ? authoritativeCourseTotal - assessmentSlt
+      : weeklyPlanSlt;
   const assessmentWeight = documentAssessments.reduce(
     (sum, assessment) => sum + (Number(assessment.weight) || 0),
     0,
@@ -474,7 +482,7 @@ export function buildCourseDocument({
       continuousAssessmentSlt,
       finalAssessmentSlt,
       assessmentSlt,
-      grandSlt: courseContentSlt + assessmentSlt,
+      grandSlt: authoritativeCourseTotal ?? courseContentSlt + assessmentSlt,
       assessmentWeight,
     },
   };
