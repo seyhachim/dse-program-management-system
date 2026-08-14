@@ -79,11 +79,6 @@ function sectionTitle(number: string, title: string) {
   });
 }
 
-// Converts relative column weights (e.g. the same percentages the preview's
-// <colgroup> uses, which don't always sum to 100 — table-fixed layout just
-// treats them as proportions) into DXA widths that always sum exactly to
-// CONTENT_WIDTH_TWIPS, so every table's tblGrid spans the full page width
-// regardless of what the source weights added up to.
 function colWidths(weights: number[]): number[] {
   const total = weights.reduce((a, b) => a + b, 0);
   const widths = weights.map((w) =>
@@ -156,10 +151,7 @@ function programmeProfileCell(title: string, children: Paragraph[]) {
       left: 70,
       right: 70,
     },
-    children: [
-      compactParagraph(title, true, 20),
-      ...children,
-    ],
+    children: [compactParagraph(title, true, 20), ...children],
   });
 }
 
@@ -169,12 +161,6 @@ async function programmeProfileHeader(document: CourseDocumentModel) {
     throw new Error("Could not load the RUPP logo for Word export");
   const logo = new Uint8Array(await response.arrayBuffer());
 
-  // Fixed-layout tables need an explicit tblGrid to render reliably outside
-  // Word (Google Docs' importer has been seen collapsing unspecified grid
-  // columns to near-zero width, wrapping text one character per line) — so
-  // this table gets real DXA widths instead of the PERCENTAGE type the
-  // other tables use, with a matching `columnWidths` array on the Table
-  // itself.
   const sideWidth = Math.round(CONTENT_WIDTH_TWIPS * 0.16);
   const centerWidth = CONTENT_WIDTH_TWIPS - sideWidth * 2;
 
@@ -265,11 +251,6 @@ async function programmeProfileTable(document: CourseDocumentModel) {
       )
     : [compactParagraph("• —", false, 18)];
 
-  // Explicit 2-column DXA grid (34%/66%), same reasoning as the header
-  // table above: without a real `columnWidths` grid, docx.js infers the
-  // grid size from the columnSpan values used across all rows, which broke
-  // the PEOs row's `columnSpan: 2` (meant to span both columns) once other
-  // rows' cells stopped declaring a columnSpan at all.
   const leftWidth = Math.round(CONTENT_WIDTH_TWIPS * 0.34);
   const rightWidth = CONTENT_WIDTH_TWIPS - leftWidth;
 
@@ -313,8 +294,6 @@ function courseInformationTable(
   info: CourseDocumentModel["courseInformation"],
 ) {
   const row = (...cells: TableCell[]) => new TableRow({ children: cells });
-  // Matches the preview's <colgroup> for this table (28%/24%/16%/32%,
-  // document-preview.tsx's course-information Table).
   const w = colWidths([28, 24, 16, 32]);
   const labelValueRow = (label: string, value: string) =>
     row(
@@ -364,7 +343,7 @@ function courseInformationTable(
         info.semester,
         "Year",
         info.programmeYear,
-    ),
+      ),
       labelValueRow("13. Course Description / Synopsis", info.description),
     ],
     w,
@@ -372,31 +351,95 @@ function courseInformationTable(
 }
 
 function cloTable(document: CourseDocumentModel) {
-  // Matches the preview's <colgroup> for §14 CLOs (8%/62%/10%/20%).
-  const w = colWidths([8, 62, 10, 20]);
-  const rows = [
-    new TableRow({
-      children: [
-        headerCell("CLO", w[0]),
-        headerCell("Description", w[1]),
-        headerCell("C/A/P", w[2]),
-        headerCell("PLO", w[3]),
-      ],
-    }),
+  // Official §14 presentation: a merged-style green section label occupying
+  // 27% of the table, with the CLO code/outcome/level rows in the remaining
+  // 73%. A nested table gives Word the same geometry as the preview without
+  // duplicating or transforming CLO content.
+  const outer = colWidths([5, 22, 73]);
+  const rightWidth = outer[2]!;
+  const inner = [
+    Math.round(rightWidth * 0.11),
+    Math.round(rightWidth * 0.78),
+    0,
   ];
-  for (const clo of document.clos) {
-    const rowValues = [clo.code, clo.outcome, clo.level, values(clo.mappedPlos)];
-    rows.push(
+  inner[2] = rightWidth - inner[0]! - inner[1]!;
+
+  const cloRows = document.clos.length
+    ? document.clos.map(
+        (clo) =>
+          new TableRow({
+            cantSplit: true,
+            children: [
+              cell(clo.code, { width: inner[0] }),
+              cell(clo.outcome, { width: inner[1] }),
+              cell(clo.level, { width: inner[2] }),
+            ],
+          }),
+      )
+    : [
+        new TableRow({
+          children: [
+            cell("—", { width: inner[0] }),
+            cell("No Course Learning Outcomes have been added.", {
+              width: inner[1],
+            }),
+            cell("—", { width: inner[2] }),
+          ],
+        }),
+      ];
+
+  const innerTable = new Table({
+    width: { size: rightWidth, type: WidthType.DXA },
+    columnWidths: inner,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows: cloRows,
+  });
+
+  const labelCell = (
+    value: string,
+    width: number,
+    bold = false,
+    centeredText = false,
+  ) =>
+    new TableCell({
+      width: { size: width, type: WidthType.DXA },
+      shading: { fill: LABEL },
+      verticalAlign: VerticalAlign.TOP,
+      margins: { top: 70, bottom: 70, left: 70, right: 70 },
+      children: [
+        new Paragraph({
+          alignment: centeredText ? AlignmentType.CENTER : AlignmentType.LEFT,
+          spacing: { before: 0, after: 0, line: 220 },
+          children: [text(value, bold, SMALL)],
+        }),
+      ],
+    });
+
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: outer,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows: [
       new TableRow({
-        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+        cantSplit: true,
+        children: [
+          labelCell("14.", outer[0]!, false, true),
+          labelCell("Course Learning Outcomes", outer[1]!, true),
+          new TableCell({
+            width: { size: rightWidth, type: WidthType.DXA },
+            verticalAlign: VerticalAlign.TOP,
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            children: [innerTable],
+          }),
+        ],
       }),
-    );
-  }
-  return table(rows, w);
+    ],
+  });
 }
 
 function mappingTable(document: CourseDocumentModel) {
-  // Matches the preview's <colgroup> for §15's mapping table (8/15/9/34/34).
   const w = colWidths([8, 15, 9, 34, 34]);
   const rows = [
     new TableRow({
@@ -430,7 +473,6 @@ function cloPloMatrixTable(
   document: CourseDocumentModel,
   mode: "percent" | "hours",
 ) {
-  // Matches the preview's <colgroup> (6% CLO column, 9.4% per PLO column).
   const w = colWidths([6, ...PLOS.map(() => 9.4)]);
   const rows = [
     new TableRow({
@@ -466,7 +508,6 @@ function cloPloMatrixTable(
 }
 
 function sltTable(document: CourseDocumentModel) {
-  // Matches the preview's <colgroup> for §16 SLT (5/29/8/7/7/7/7/9/11).
   const w = colWidths([5, 29, 8, 7, 7, 7, 7, 9, 11]);
   const headers = [
     "Week",
@@ -560,8 +601,6 @@ function rubricCell(
 }
 
 function assessmentTable(document: CourseDocumentModel) {
-  // Matches the preview's <colgroup> for §17 assessment plan
-  // (7/8/10/23/7/7/24/14).
   const w = colWidths([7, 8, 10, 23, 7, 7, 24, 14]);
   const headers = [
     "CLOs",
@@ -624,8 +663,6 @@ function assessmentTable(document: CourseDocumentModel) {
 }
 
 function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
-  // Matches the preview's <colgroup> for §18 lesson plan
-  // (5/9/15/8/20/18/15/10).
   const w = colWidths([5, 9, 15, 8, 20, 18, 15, 10]);
   const headers = [
     "Week",
@@ -676,7 +713,6 @@ function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
 }
 
 function resourcesTable(resources: CourseDocumentModel["resources"]) {
-  // Matches the preview's <colgroup> for §19 resources (18/27/25/30).
   const w = colWidths([18, 27, 25, 30]);
   const headers = [
     "Resource Type",
@@ -731,7 +767,6 @@ function policyParagraphs(policy: CourseDocumentModel["policy"]) {
 }
 
 function ratingScaleTable() {
-  // Matches the preview's <colgroup> for §24 rating scale (25/25/25/25).
   const w = colWidths([25, 25, 25, 25]);
   const headers = ["Letter Grade", "Grade Point", "Score", "Explanation"];
   const rows = [
@@ -754,8 +789,6 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   const children: (Paragraph | Table)[] = [];
   const info = document.courseInformation;
 
-  // Page 1 is the fixed programme-profile cover layout. Content still comes
-  // exclusively from the existing DSE PMS document model.
   children.push(await programmeProfileHeader(document));
   children.push(
     centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 24),
@@ -763,19 +796,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(await programmeProfileTable(document));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(centered("Royal University of Phnom Penh", true));
-  children.push(centered("Faculty of Engineering", false, SMALL));
-  children.push(
-    centered("Department of Information Technology Engineering", false, SMALL),
-  );
-  children.push(centered(info.programmeTitle, true, SMALL));
-  children.push(centered("Course Specification", true, HEADING));
   children.push(paragraph(document.partTitle, true));
   children.push(paragraph("Course Information", true));
   children.push(courseInformationTable(info));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(sectionTitle("14", "Course Learning Outcomes"));
   children.push(cloTable(document));
   children.push(
     paragraph(
