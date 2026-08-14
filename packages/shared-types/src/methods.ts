@@ -81,16 +81,10 @@ export type UpdateActiveLearningStrategyInput = z.infer<typeof UpdateActiveLearn
 export const MethodsResponse = z.object({
   teaching: z.array(MethodSchema),
   assessment: z.array(MethodSchema),
-  // Optional for source compatibility with pre-feature mocks/responses. New API
-  // responses include this field; clients use an empty/fallback catalogue if absent.
-  activeLearningClusters: z.array(ActiveLearningClusterSchema).optional(),
+  activeLearningClusters: z.array(ActiveLearningClusterSchema),
 });
 export type MethodsResponse = z.infer<typeof MethodsResponse>;
 
 /** Admin/programme-management response including archived entries. */
-export const ManagedMethodsResponse = z.object({
-  teaching: z.array(MethodSchema),
-  assessment: z.array(MethodSchema),
-  activeLearningClusters: z.array(ActiveLearningClusterSchema),
-});
+export const ManagedMethodsResponse = MethodsResponse;
 export type ManagedMethodsResponse = z.infer<typeof ManagedMethodsResponse>;
