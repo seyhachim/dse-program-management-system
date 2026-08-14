@@ -53,6 +53,14 @@ const noBorders = {
   insideVertical: { style: BorderStyle.NONE, size: 0, color: BORDER },
 };
 
+const noTopBorder = {
+  top: { style: BorderStyle.NONE, size: 0, color: BORDER },
+};
+
+const noBottomBorder = {
+  bottom: { style: BorderStyle.NONE, size: 0, color: BORDER },
+};
+
 function text(text: string, bold = false, size = BODY) {
   return new TextRun({ text, bold, font: FONT, size });
 }
@@ -279,23 +287,6 @@ function levelParts(level: string) {
   };
 }
 
-function plainWordCell(
-  children: (Paragraph | Table)[],
-  width: number,
-  shade?: string,
-  alignment: AlignmentType = AlignmentType.LEFT,
-) {
-  return new TableCell({
-    width: { size: width, type: WidthType.DXA },
-    shading: shade ? { fill: shade } : undefined,
-    verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 35, bottom: 35, left: 50, right: 50 },
-    children: children.length
-      ? children
-      : [new Paragraph({ alignment, children: [text("", false, SMALL)] })],
-  });
-}
-
 function compactWordCell(
   value: string,
   width: number,
@@ -318,49 +309,8 @@ function compactWordCell(
 
 function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
   const bodyW = colWidths([7, 58, 8, 9, 9, 9]);
+  const descriptionWidth = bodyW[0]! + bodyW[1]!;
   const domainWidth = bodyW[3]! + bodyW[4]! + bodyW[5]!;
-  const domainCols = [bodyW[3]!, bodyW[4]!, bodyW[5]!];
-
-  const domainHeader = new Table({
-    width: { size: domainWidth, type: WidthType.DXA },
-    columnWidths: domainCols,
-    layout: TableLayoutType.FIXED,
-    borders,
-    rows: [
-      new TableRow({
-        cantSplit: true,
-        children: [new TableCell({
-          columnSpan: 3,
-          shading: { fill: LABEL },
-          verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 28, bottom: 28, left: 30, right: 30 },
-          children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              spacing: { before: 0, after: 0, line: 205 },
-              children: [text("Levels in Learning Domain:\nKnowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)],
-            }),
-          ],
-        })],
-      }),
-      new TableRow({
-        cantSplit: true,
-        children: ["C", "A", "P"].map((label, index) => new TableCell({
-          width: { size: domainCols[index]!, type: WidthType.DXA },
-          shading: { fill: LABEL },
-          verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 18, bottom: 18, left: 18, right: 18 },
-          children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              spacing: { before: 0, after: 0 },
-              children: [text(label, false, SMALL)],
-            }),
-          ],
-        })),
-      }),
-    ],
-  });
 
   const mainRows: TableRow[] = [
     new TableRow({
@@ -368,10 +318,11 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
       children: [
         new TableCell({
           columnSpan: 2,
-          width: { size: bodyW[0]! + bodyW[1]!, type: WidthType.DXA },
+          width: { size: descriptionWidth, type: WidthType.DXA },
           shading: { fill: LABEL },
+          borders: noBottomBorder,
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 30, bottom: 30, left: 45, right: 45 },
+          margins: { top: 30, bottom: 12, left: 45, right: 45 },
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -383,8 +334,9 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
         new TableCell({
           width: { size: bodyW[2]!, type: WidthType.DXA },
           shading: { fill: LABEL },
+          borders: noBottomBorder,
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 30, bottom: 30, left: 35, right: 35 },
+          margins: { top: 30, bottom: 12, left: 35, right: 35 },
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -396,10 +348,52 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
         new TableCell({
           columnSpan: 3,
           width: { size: domainWidth, type: WidthType.DXA },
+          shading: { fill: LABEL },
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 0, bottom: 0, left: 0, right: 0 },
-          children: [domainHeader],
+          margins: { top: 24, bottom: 24, left: 30, right: 30 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0, line: 205 },
+              children: [text("Levels in Learning Domain:\nKnowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)],
+            }),
+          ],
         }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        new TableCell({
+          columnSpan: 2,
+          width: { size: descriptionWidth, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          borders: noTopBorder,
+          margins: { top: 0, bottom: 18, left: 45, right: 45 },
+          children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
+        }),
+        new TableCell({
+          width: { size: bodyW[2]!, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          borders: noTopBorder,
+          margins: { top: 0, bottom: 18, left: 35, right: 35 },
+          children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
+        }),
+        ...(["C", "A", "P"] as const).map((label, index) =>
+          new TableCell({
+            width: { size: bodyW[index + 3]!, type: WidthType.DXA },
+            shading: { fill: LABEL },
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 18, bottom: 18, left: 18, right: 18 },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 0 },
+                children: [text(label, false, SMALL)],
+              }),
+            ],
+          }),
+        ),
       ],
     }),
   ];
