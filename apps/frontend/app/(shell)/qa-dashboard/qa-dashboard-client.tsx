@@ -180,7 +180,7 @@ export function QaDashboardClient() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" render={<a href={data.framework.sourceUrl} target="_blank" rel="noreferrer" />}>
+            <Button nativeButton={false} variant="outline" render={<a href={data.framework.sourceUrl} target="_blank" rel="noreferrer" />}>
               <BookOpen className="h-4 w-4" /> Official guide <ExternalLink className="h-3.5 w-3.5" />
             </Button>
             {canWrite ? (
