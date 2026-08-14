@@ -1,0 +1,21 @@
+name: Patch issue 191 Prisma schema
+on:
+  push:
+    branches: [agent/issue-191-human-qa-analysis-review]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-191-human-qa-analysis-review
+      - run: python .github/patch-issue-191-schema.py
+      - run: |
+          git config user.name "seyhachim"
+          git config user.email "32429415+seyhachim@users.noreply.github.com"
+          git add apps/backend/prisma/schema.prisma
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: patch issue 191 Prisma schema"
+          git push origin HEAD:agent/issue-191-human-qa-analysis-review
