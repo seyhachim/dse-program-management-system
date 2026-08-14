@@ -3,12 +3,18 @@ import { z } from "zod";
 import {
   CreateQaCycleSchema,
   CreateQaEvidenceSchema,
+  QaEvidenceAnalysisHistoryQuerySchema,
   QaEvidenceCandidatesQuerySchema,
   UpsertQaSelfAssessmentSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type AuthUser } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import {
+  QaAnalysisResourceNotFoundError,
+  QaAnalysisScopeMismatchError,
+  listQaEvidenceAnalyses,
+} from "./analysis/service.ts";
 import {
   QaEvidenceCandidateResourceNotFoundError,
   getQaEvidenceCandidates,
@@ -43,11 +49,17 @@ function ensureProgrammeScope(
 }
 
 function sendDomainError(res: Response, error: unknown): void {
-  if (error instanceof QaResourceNotFoundError) {
+  if (
+    error instanceof QaResourceNotFoundError ||
+    error instanceof QaAnalysisResourceNotFoundError
+  ) {
     res.status(404).json({ error: error.message });
     return;
   }
-  if (error instanceof QaScopeMismatchError) {
+  if (
+    error instanceof QaScopeMismatchError ||
+    error instanceof QaAnalysisScopeMismatchError
+  ) {
     res.status(409).json({ error: error.message });
     return;
   }
@@ -89,6 +101,31 @@ export function createQaRouter(): Router {
         res.status(404).json({ error: error.message });
         return;
       }
+      sendDomainError(res, error);
+    }
+  });
+
+  router.get("/cycles/:cycleId/analyses", requirePermission("qa:read"), async (req, res) => {
+    const cycleId = req.params.cycleId;
+    const parsed = QaEvidenceAnalysisHistoryQuerySchema.safeParse(req.query);
+    if (!cycleId || !parsed.success) {
+      res.status(400).json({
+        error: "Invalid QA analysis history query",
+        details: parsed.success ? undefined : parsed.error.flatten(),
+      });
+      return;
+    }
+    if (!ensureProgrammeScope(req, res, parsed.data.programmeId)) return;
+
+    try {
+      res.json(
+        await listQaEvidenceAnalyses(
+          parsed.data.programmeId,
+          cycleId,
+          parsed.data.requirementCode,
+        ),
+      );
+    } catch (error) {
       sendDomainError(res, error);
     }
   });
