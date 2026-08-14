@@ -1,6 +1,8 @@
 import {
   BarChart3,
   Book,
+  CalendarDays,
+  CheckSquare,
   ClipboardList,
   FileCheck,
   FileText,
@@ -9,6 +11,7 @@ import {
   History,
   Layers,
   LayoutDashboard,
+  LibraryBig,
   Presentation,
   RefreshCw,
   Settings,
@@ -49,6 +52,9 @@ export const iconMap: Record<string, LucideIcon> = {
   settings: Settings,
   history: History,
   "help-circle": HelpCircle,
+  "check-square": CheckSquare,
+  calendar: CalendarDays,
+  library: LibraryBig,
 };
 
 /** All nav routes, or — when roles are given — only those the caller's roles may see. */
