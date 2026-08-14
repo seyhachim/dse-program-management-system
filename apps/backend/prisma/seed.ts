@@ -1,5 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-import { PLOS, pluginManifests } from "@dse-pms/shared-types";
+import {
+  AUN_QA_V4_CATALOG,
+  AUN_QA_V4_ID,
+  AUN_QA_V4_SOURCE_URL,
+  PLOS,
+  pluginManifests,
+} from "@dse-pms/shared-types";
 import { syncNormalizedRubricTables } from "../src/plugins/rubrics/service.ts";
 import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
 import { defaultProgrammeIdForRole } from "../src/core/auth/token.ts";
@@ -336,6 +342,8 @@ const permissionTitles: Record<string, string> = {
   "programme:write": "Manage programme academic configuration",
   "student-portal:read": "View own student portal information",
   "student-portal:feedback": "Submit anonymous course feedback",
+  "qa:read": "View programme quality-assurance evidence and reviews",
+  "qa:write": "Manage programme quality-assurance evidence and self-assessments",
 };
 
 const permissionSlugs = [
@@ -378,6 +386,9 @@ const roleDefs: {
 
       "programme:read",
       "programme:write",
+
+      "qa:read",
+      "qa:write",
     ],
   },
 
@@ -413,6 +424,9 @@ const roleDefs: {
 
       "programme:read",
       "programme:write",
+
+      "qa:read",
+      "qa:write",
     ],
   },
 
@@ -481,9 +495,10 @@ const roleDefs: {
     slug: "qa_reviewer",
     title: "QA Reviewer",
 
-    // QA requires read-only access to programme-level academic evidence.
+    // QA reviewers maintain evidence assessments while underlying academic
+    // programme and course records remain read-only to them.
     description:
-      "Reviews programme evidence and findings for quality assurance. Read-only.",
+      "Reviews programme evidence and findings for quality assurance.",
 
     permissions: [
       "students:read",
@@ -494,6 +509,9 @@ const roleDefs: {
       "rubrics:read",
 
       "programme:read",
+
+      "qa:read",
+      "qa:write",
     ],
   },
 
@@ -932,6 +950,63 @@ async function main() {
     update: {},
     create: { id: "dse", ...programmePolicy },
   });
+
+  // ---------------------------------------------------------------------------
+  // AUN-QA Programme Assessment v4 catalogue
+  // ---------------------------------------------------------------------------
+
+  await prisma.qaFramework.upsert({
+    where: { id: AUN_QA_V4_ID },
+    update: {
+      code: "AUN-QA-PA",
+      name: "AUN-QA Assessment at Programme Level",
+      version: "4.0",
+      sourceUrl: AUN_QA_V4_SOURCE_URL,
+      active: true,
+    },
+    create: {
+      id: AUN_QA_V4_ID,
+      code: "AUN-QA-PA",
+      name: "AUN-QA Assessment at Programme Level",
+      version: "4.0",
+      sourceUrl: AUN_QA_V4_SOURCE_URL,
+      active: true,
+    },
+  });
+
+  for (const [criterionIndex, criterion] of AUN_QA_V4_CATALOG.entries()) {
+    const criterionId = `${AUN_QA_V4_ID}:${criterion.code}`;
+    await prisma.qaCriterion.upsert({
+      where: { id: criterionId },
+      update: {
+        title: criterion.title,
+        summary: criterion.summary,
+        order: criterionIndex + 1,
+      },
+      create: {
+        id: criterionId,
+        frameworkId: AUN_QA_V4_ID,
+        code: criterion.code,
+        title: criterion.title,
+        summary: criterion.summary,
+        order: criterionIndex + 1,
+      },
+    });
+
+    for (const [requirementIndex, [code, title]] of criterion.requirements.entries()) {
+      await prisma.qaRequirement.upsert({
+        where: { id: `${AUN_QA_V4_ID}:${code}` },
+        update: { title, order: requirementIndex + 1 },
+        create: {
+          id: `${AUN_QA_V4_ID}:${code}`,
+          criterionId,
+          code,
+          title,
+          order: requirementIndex + 1,
+        },
+      });
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Teaching / Assessment Methods

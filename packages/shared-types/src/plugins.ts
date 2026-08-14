@@ -247,6 +247,24 @@ export const programmeManifest: PluginManifest = {
   permissions: ["programme:read", "programme:write"],
 };
 
+export const qaManifest: PluginManifest = {
+  id: "qa",
+  name: "Quality Assurance",
+  version: "0.1.0",
+  description:
+    "Programme-scoped AUN-QA evidence, self-assessment, review, and readiness workflow.",
+  routes: [
+    {
+      label: "QA Dashboard",
+      path: "/qa-dashboard",
+      icon: "shield-check",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+  ],
+  permissions: ["qa:read", "qa:write"],
+};
+
 /**
  * Sidebar-only placeholder pages for sections not built yet (issue #49). Each
  * route renders a generic "coming soon" page — no backend plugin/router, since
@@ -284,13 +302,6 @@ export const placeholdersManifest: PluginManifest = {
       icon: "graduation-cap",
       roles: ["admin", "program_coordinator", "program_secretary"],
       group: "Academic",
-    },
-    {
-      label: "QA Dashboard",
-      path: "/qa-dashboard",
-      icon: "shield-check",
-      roles: ["admin", "program_coordinator", "qa_reviewer"],
-      group: "Quality Assurance",
     },
     {
       label: "Reports",
@@ -392,6 +403,7 @@ export const pluginManifests: PluginManifest[] = [
   offeringsManifest,
   lecturersManifest,
   programmeManifest,
+  qaManifest,
   placeholdersManifest,
   methodsManifest,
   rubricsManifest,
