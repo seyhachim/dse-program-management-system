@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import {
   CarryForwardQaImprovementActionSchema,
   CreateQaImprovementActionSchema,
@@ -19,7 +19,7 @@ import {
   updateQaImprovementAction,
 } from "./service.ts";
 
-function sendActionError(res: Parameters<Router["use"]>[0] extends never ? never : any, error: unknown) {
+function sendActionError(res: Response, error: unknown) {
   if (error instanceof QaImprovementActionResourceNotFoundError) {
     res.status(404).json({ error: error.message });
     return;
