@@ -115,6 +115,12 @@ enum QaEvidenceStatus {
   Reviewed
 }
 
+enum QaEvidenceAnalysisState {
+  EvidenceIdentified
+  PotentialEvidenceGap
+  ExpertReviewRequired
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -179,6 +185,7 @@ model Programme {
   qaCycles        QaAssessmentCycle[]
   qaEvidence      QaEvidence[]
   qaAssessments   QaRequirementAssessment[]
+  qaAnalyses      QaEvidenceAnalysis[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -225,6 +232,7 @@ model QaRequirement {
   evidence     QaEvidence[]
   assessments  QaRequirementAssessment[]
   expectations QaQualityExpectation[]
+  analyses     QaEvidenceAnalysis[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
@@ -245,6 +253,7 @@ model QaQualityExpectation {
   updatedAt     DateTime      @default(now())
 
   expectedEvidence QaExpectedEvidence[]
+  analyses         QaEvidenceAnalysis[]
 
   @@unique([requirementId, order])
   @@index([requirementId, active])
@@ -287,6 +296,7 @@ model QaAssessmentCycle {
 
   evidence    QaEvidence[]
   assessments QaRequirementAssessment[]
+  analyses    QaEvidenceAnalysis[]
 
   @@index([programmeId, status])
   @@index([frameworkId])
@@ -314,6 +324,8 @@ model QaEvidence {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
+  analysisSources QaEvidenceAnalysisSource[]
+
   @@index([programmeId, cycleId])
   @@index([requirementId])
   @@index([status])
@@ -338,6 +350,59 @@ model QaRequirementAssessment {
   @@id([cycleId, requirementId])
   @@index([programmeId, cycleId])
   @@index([reviewerId])
+}
+
+/// Append-only evidence-analysis run. Re-analysis creates a new row rather than
+/// overwriting history; official AUN-QA ratings remain in QaRequirementAssessment.
+model QaEvidenceAnalysis {
+  id              String                     @id @default(uuid())
+  programmeId     String
+  programme       Programme                  @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId         String
+  cycle           QaAssessmentCycle          @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId   String
+  requirement     QaRequirement              @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  expectationId   String
+  expectation     QaQualityExpectation       @relation(fields: [expectationId], references: [id], onDelete: Restrict)
+  state           QaEvidenceAnalysisState
+  explanation     String                     @default("")
+  confidence      Float?
+  uncertaintyNote String                     @default("")
+  engine          String
+  engineVersion   String
+  createdAt       DateTime                   @default(now())
+  sources         QaEvidenceAnalysisSource[]
+
+  @@index([programmeId, cycleId, createdAt])
+  @@index([requirementId, createdAt])
+  @@index([expectationId, createdAt])
+}
+
+/// Immutable snapshot of a source used by one analysis run. Structured entity
+/// identity is retained even if source content changes later; qaEvidenceId is an
+/// optional convenience FK for manually attached QA evidence.
+model QaEvidenceAnalysisSource {
+  id            String             @id @default(uuid())
+  analysisId    String
+  analysis      QaEvidenceAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  sourceKind    String
+  candidateKey  String
+  sourceDomain  String
+  entityType    String
+  entityId      String
+  qaEvidenceId  String?
+  qaEvidence    QaEvidence?        @relation(fields: [qaEvidenceId], references: [id], onDelete: SetNull)
+  title         String
+  summary       String             @default("")
+  excerpt       String             @default("")
+  route         String?
+  reportingDate DateTime?
+  relevance     Float?
+  createdAt     DateTime           @default(now())
+
+  @@unique([analysisId, candidateKey])
+  @@index([qaEvidenceId])
+  @@index([entityType, entityId])
 }
 
 model Permission {
