@@ -289,17 +289,36 @@ function plainWordCell(
     width: { size: width, type: WidthType.DXA },
     shading: shade ? { fill: shade } : undefined,
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 45, bottom: 45, left: 55, right: 55 },
+    margins: { top: 35, bottom: 35, left: 50, right: 50 },
     children: children.length
       ? children
       : [new Paragraph({ alignment, children: [text("", false, SMALL)] })],
   });
 }
 
+function compactWordCell(
+  value: string,
+  width: number,
+  alignment: AlignmentType = AlignmentType.LEFT,
+  bold = false,
+) {
+  return new TableCell({
+    width: { size: width, type: WidthType.DXA },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 28, bottom: 28, left: 48, right: 48 },
+    children: [
+      new Paragraph({
+        alignment,
+        spacing: { before: 0, after: 0, line: 205 },
+        children: [text(value, bold, SMALL)],
+      }),
+    ],
+  });
+}
+
 function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
   const bodyW = colWidths([7, 58, 8, 9, 9, 9]);
-  const headerW = [bodyW[0]! + bodyW[1]!, bodyW[2]!, bodyW[3]! + bodyW[4]! + bodyW[5]!];
-  const domainWidth = headerW[2]!;
+  const domainWidth = bodyW[3]! + bodyW[4]! + bodyW[5]!;
   const domainCols = [bodyW[3]!, bodyW[4]!, bodyW[5]!];
 
   const domainHeader = new Table({
@@ -309,66 +328,120 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
     borders,
     rows: [
       new TableRow({
+        cantSplit: true,
         children: [new TableCell({
           columnSpan: 3,
           shading: { fill: LABEL },
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 35, bottom: 35, left: 35, right: 35 },
-          children: [centered("Levels in Learning Domain:\nKnowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)],
+          margins: { top: 28, bottom: 28, left: 30, right: 30 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0, line: 205 },
+              children: [text("Levels in Learning Domain:\nKnowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)],
+            }),
+          ],
         })],
       }),
       new TableRow({
+        cantSplit: true,
         children: ["C", "A", "P"].map((label, index) => new TableCell({
           width: { size: domainCols[index]!, type: WidthType.DXA },
           shading: { fill: LABEL },
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 25, bottom: 25, left: 20, right: 20 },
-          children: [centered(label, false, SMALL)],
+          margins: { top: 18, bottom: 18, left: 18, right: 18 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0 },
+              children: [text(label, false, SMALL)],
+            }),
+          ],
         })),
       }),
     ],
   });
 
-  const headerTable = new Table({
-    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
-    columnWidths: headerW,
-    layout: TableLayoutType.FIXED,
-    borders,
-    rows: [new TableRow({ children: [
-      plainWordCell([centered("Description of the course learning outcomes – CLOs At the end of the course, students will be able to:", false, SMALL)], headerW[0]!, LABEL, AlignmentType.CENTER),
-      plainWordCell([centered("PLO", false, SMALL)], headerW[1]!, LABEL, AlignmentType.CENTER),
-      new TableCell({
-        width: { size: domainWidth, type: WidthType.DXA },
-        verticalAlign: VerticalAlign.CENTER,
-        margins: { top: 0, bottom: 0, left: 0, right: 0 },
-        children: [domainHeader],
-      }),
-    ] })],
-  });
+  const mainRows: TableRow[] = [
+    new TableRow({
+      cantSplit: true,
+      children: [
+        new TableCell({
+          columnSpan: 2,
+          width: { size: bodyW[0]! + bodyW[1]!, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 30, bottom: 30, left: 45, right: 45 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0, line: 205 },
+              children: [text("Description of the course learning outcomes – CLOs At the end of the course, students will be able to:", false, SMALL)],
+            }),
+          ],
+        }),
+        new TableCell({
+          width: { size: bodyW[2]!, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 30, bottom: 30, left: 35, right: 35 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0 },
+              children: [text("PLO", false, SMALL)],
+            }),
+          ],
+        }),
+        new TableCell({
+          columnSpan: 3,
+          width: { size: domainWidth, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+          children: [domainHeader],
+        }),
+      ],
+    }),
+  ];
 
-  const bodyRows = document.clos.length
-    ? document.clos.map((clo) => {
-        const domain = levelParts(clo.level);
-        return new TableRow({
+  if (document.clos.length) {
+    for (const clo of document.clos) {
+      const domain = levelParts(clo.level);
+      mainRows.push(
+        new TableRow({
           cantSplit: true,
           children: [
-            cell(clo.code, { width: bodyW[0] }),
-            cell(clo.outcome, { width: bodyW[1] }),
-            cell(values(clo.mappedPlos), { width: bodyW[2] }),
-            cell(domain.c, { width: bodyW[3] }),
-            cell(domain.a, { width: bodyW[4] }),
-            cell(domain.p, { width: bodyW[5] }),
+            compactWordCell(clo.code, bodyW[0]!, AlignmentType.CENTER),
+            compactWordCell(clo.outcome, bodyW[1]!),
+            compactWordCell(values(clo.mappedPlos), bodyW[2]!, AlignmentType.CENTER),
+            compactWordCell(domain.c, bodyW[3]!, AlignmentType.CENTER),
+            compactWordCell(domain.a, bodyW[4]!, AlignmentType.CENTER),
+            compactWordCell(domain.p, bodyW[5]!, AlignmentType.CENTER),
           ],
-        });
-      })
-    : [new TableRow({ children: [cell("No Course Learning Outcomes have been added.", { width: CONTENT_WIDTH_TWIPS, columnSpan: 6 })] })];
+        }),
+      );
+    }
+  } else {
+    mainRows.push(
+      new TableRow({
+        children: [
+          new TableCell({
+            columnSpan: 6,
+            width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+            margins: { top: 35, bottom: 35, left: 50, right: 50 },
+            children: [paragraph("No Course Learning Outcomes have been added.", false, SMALL)],
+          }),
+        ],
+      }),
+    );
+  }
 
-  const bodyTable = new Table({
+  const mainTable = new Table({
     width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
     columnWidths: bodyW,
     layout: TableLayoutType.FIXED,
     borders,
-    rows: bodyRows,
+    rows: mainRows,
   });
 
   const taxonomyData: [string, [string, string, string][]][] = [
@@ -385,17 +458,26 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
       columnWidths: innerW,
       layout: TableLayoutType.FIXED,
       borders,
-      rows: entries.map(([number, label, code]) => new TableRow({ children: [
-        cell(number, { width: innerW[0] }),
-        cell(label, { width: innerW[1] }),
-        cell(code, { width: innerW[2] }),
-      ] })),
+      rows: entries.map(([number, label, code]) => new TableRow({
+        cantSplit: true,
+        children: [
+          compactWordCell(number, innerW[0]!, AlignmentType.CENTER),
+          compactWordCell(label, innerW[1]!),
+          compactWordCell(code, innerW[2]!, AlignmentType.CENTER),
+        ],
+      })),
     });
     return new TableCell({
       width: { size: legendW[domainIndex]!, type: WidthType.DXA },
       verticalAlign: VerticalAlign.TOP,
-      margins: { top: 45, bottom: 45, left: 45, right: 45 },
-      children: [paragraph(title, true, SMALL), inner],
+      margins: { top: 30, bottom: 30, left: 35, right: 35 },
+      children: [
+        new Paragraph({
+          spacing: { before: 0, after: 20 },
+          children: [text(title, true, SMALL)],
+        }),
+        inner,
+      ],
     });
   });
   const legendTable = new Table({
@@ -403,17 +485,28 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
     columnWidths: legendW,
     layout: TableLayoutType.FIXED,
     borders,
-    rows: [new TableRow({ children: legendCells })],
+    rows: [new TableRow({ cantSplit: true, children: legendCells })],
   });
 
-  return [
-    sectionTitle("14", "Course Learning Outcomes"),
-    paragraph("Here are the CLOs of this course:", false, BODY),
-    headerTable,
-    bodyTable,
-    paragraph("* Levels in Learning Domain: Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL),
-    legendTable,
-  ];
+  const title = new Paragraph({
+    keepNext: true,
+    keepLines: true,
+    spacing: { before: 30, after: 18 },
+    children: [text("14. Course Learning Outcomes", true, 22)],
+  });
+  const subtitle = new Paragraph({
+    keepNext: true,
+    keepLines: true,
+    spacing: { before: 0, after: 35, line: 210 },
+    children: [text("Here are the CLOs of this course:", false, 20)],
+  });
+  const legendCaption = new Paragraph({
+    keepNext: true,
+    spacing: { before: 55, after: 20, line: 205 },
+    children: [text("* Levels in Learning Domain: Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)],
+  });
+
+  return [title, subtitle, mainTable, legendCaption, legendTable];
 }
 
 function mappingTable(document: CourseDocumentModel) {
@@ -547,7 +640,9 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(paragraph("Course Information", true));
   children.push(courseInformationTable(info));
 
-  children.push(new Paragraph({ children: [new PageBreak()] }));
+  // Let §14 naturally follow course information when space permits. This avoids
+  // the large blank area produced by a forced page break while the keep-next
+  // heading/subtitle and non-splitting CLO rows still protect readability.
   children.push(...cloSection(document));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
