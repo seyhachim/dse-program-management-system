@@ -42,6 +42,10 @@ export type AssessmentTemplatePayload = {
   }>;
 };
 
+export type AssessmentPlanSavePayload = AssessmentPlanSection & {
+  templateMetadata: AssessmentTemplatePayload;
+};
+
 export const EMPTY_ASSESSMENTS: AssessmentForm[] = [];
 
 const uuid = () => globalThis.crypto.randomUUID();
@@ -121,10 +125,31 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
   });
 }
 
-/** Convert the form model into the existing AssessmentPlanSection payload. */
+function toAssessmentTemplatePayload(
+  items: AssessmentForm[],
+): AssessmentTemplatePayload {
+  return {
+    items: items.map((a) => ({
+      assessmentId: a.id,
+      assessmentCategory: a.assessmentCategory,
+      topicNumbers: a.topicNumbers,
+      physicalSltHours:
+        a.physicalSltHours === "" ? null : Number(a.physicalSltHours),
+      onlineSltHours:
+        a.onlineSltHours === "" ? null : Number(a.onlineSltHours),
+      independentSltHours:
+        a.independentSltHours === "" ? null : Number(a.independentSltHours),
+    })),
+  };
+}
+
+/**
+ * Convert the form into the existing assessment payload plus metadata that the
+ * API client persists through the dedicated §16/§17 metadata endpoint.
+ */
 export function toAssessmentPayload(
   items: AssessmentForm[],
-): AssessmentPlanSection {
+): AssessmentPlanSavePayload {
   return {
     items: items.map((a) => ({
       id: a.id,
@@ -146,26 +171,8 @@ export function toAssessmentPayload(
       mappedPlos: a.mappedPlos,
       notes: a.notes.trim(),
     })),
-  } as AssessmentPlanSection;
-}
-
-/** Convert only the official-template metadata for the dedicated endpoint. */
-export function toAssessmentTemplatePayload(
-  items: AssessmentForm[],
-): AssessmentTemplatePayload {
-  return {
-    items: items.map((a) => ({
-      assessmentId: a.id,
-      assessmentCategory: a.assessmentCategory,
-      topicNumbers: a.topicNumbers,
-      physicalSltHours:
-        a.physicalSltHours === "" ? null : Number(a.physicalSltHours),
-      onlineSltHours:
-        a.onlineSltHours === "" ? null : Number(a.onlineSltHours),
-      independentSltHours:
-        a.independentSltHours === "" ? null : Number(a.independentSltHours),
-    })),
-  };
+    templateMetadata: toAssessmentTemplatePayload(items),
+  } as AssessmentPlanSavePayload;
 }
 
 export function assessmentSltHours(item: AssessmentForm): number {
