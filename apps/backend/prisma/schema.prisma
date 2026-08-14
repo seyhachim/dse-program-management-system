@@ -121,6 +121,12 @@ enum QaEvidenceAnalysisState {
   ExpertReviewRequired
 }
 
+enum QaAnalysisReviewDecision {
+  Confirmed
+  Rejected
+  NeedsMoreEvidence
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -147,6 +153,7 @@ model User {
   qaCyclesCreated         QaAssessmentCycle[]       @relation("QaCycleCreator")
   qaEvidenceCreated       QaEvidence[]              @relation("QaEvidenceCreator")
   qaAssessmentsReviewed   QaRequirementAssessment[] @relation("QaAssessmentReviewer")
+  qaAnalysisReviews       QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -187,6 +194,7 @@ model Programme {
   qaAssessments   QaRequirementAssessment[]
   qaAnalyses      QaEvidenceAnalysis[]
   qaDocuments     QaDocument[]
+  qaAnalysisReviews QaEvidenceAnalysisReview[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -374,6 +382,7 @@ model QaEvidenceAnalysis {
   promptVersion   String                     @default("")
   createdAt       DateTime                   @default(now())
   sources         QaEvidenceAnalysisSource[]
+  reviews         QaEvidenceAnalysisReview[]
 
   @@index([programmeId, cycleId, createdAt])
   @@index([requirementId, createdAt])
@@ -384,6 +393,24 @@ model QaEvidenceAnalysis {
 /// Immutable snapshot of a source used by one analysis run. Structured entity
 /// identity is retained even if source content changes later; qaEvidenceId is an
 /// optional convenience FK for manually attached QA evidence.
+/// Append-only human validation of one exact evidence-analysis version.
+model QaEvidenceAnalysisReview {
+  id          String                   @id @default(uuid())
+  programmeId String
+  programme   Programme                @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  analysisId  String
+  analysis    QaEvidenceAnalysis       @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  reviewerId  String
+  reviewer    User                     @relation("QaAnalysisReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  decision    QaAnalysisReviewDecision
+  comment     String                   @default("")
+  createdAt   DateTime                 @default(now())
+
+  @@index([programmeId, createdAt])
+  @@index([analysisId, createdAt])
+  @@index([reviewerId])
+}
+
 model QaEvidenceAnalysisSource {
   id            String             @id @default(uuid())
   analysisId    String
