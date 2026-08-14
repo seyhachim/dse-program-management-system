@@ -1092,11 +1092,10 @@ function assessmentPlanTable(document: CourseDocumentModel) {
     }),
   ];
 
-  const baseGroupKeys = document.assessments.map((assessment) => {
-    const cloKey = [...assessment.cloCodes].sort().join("|");
-    const ploKey = [...assessment.mappedPlos].sort().join("|");
-    return cloKey || ploKey ? `${cloKey}::${ploKey}` : assessment.id;
-  });
+  const baseGroupKeys = document.assessments.map(
+    (assessment) =>
+      [...assessment.cloCodes].sort().join("|") || assessment.id,
+  );
 
   let runIndex = -1;
   let previousBaseKey: string | null = null;
@@ -1225,52 +1224,143 @@ function assessmentPlanTable(document: CourseDocumentModel) {
   });
 }
 
-function lessonPlanTable(weeks: CourseDocumentModel["weeklyPlan"]) {
-  const w = colWidths([5, 9, 15, 8, 20, 18, 15, 10]);
-  const headers = [
-    "Week",
-    "Hour (L/T/P/O)",
-    "Topic",
-    "CLO",
-    "Lesson Learning Outcomes",
-    "Teaching Method / Activity",
-    "Assessment",
-    "Resources",
+function lloText(week: CourseDocumentModel["weeklyPlan"][number]) {
+  return week.lloItems.length
+    ? week.lloItems.map((value, index) => `LLO${index + 1}: ${value}`).join("\n")
+    : "";
+}
+
+function lessonLearningOutcomesTable(weeks: CourseDocumentModel["weeklyPlan"]) {
+  const w = colWidths([3.5, 25.5, 6, 65]);
+  const rows: TableRow[] = [
+    new TableRow({
+      cantSplit: true,
+      children: [
+        new TableCell({
+          columnSpan: 4,
+          width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+          shading: { fill: LABEL },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 20, bottom: 20, left: 25, right: 25 },
+          children: [centered("Lesson Learning Outcome (LLOs)", false, SMALL)],
+        }),
+      ],
+    }),
+    new TableRow({
+      cantSplit: true,
+      children: [
+        headerMergeCell("", w[0]!),
+        headerMergeCell("Topic", w[1]!),
+        headerMergeCell("CLOs", w[2]!),
+        headerMergeCell("Lesson Learning Outcomes (LLOs)", w[3]!),
+      ],
+    }),
   ];
-  const rows = [
-    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
-  ];
+
   for (const week of weeks) {
-    const rowValues = [
-      week.week,
-      [
-        week.lectureHours,
-        week.tutorialHours,
-        week.practiceHours,
-        week.otherHours,
-      ]
-        .map((h) => h || "0")
-        .join("/"),
-      week.topic,
-      values(week.cloCodes),
-      week.lloItems.length
-        ? week.lloItems.map((v, i) => `LLO${i + 1}: ${v}`).join("\n")
-        : "—",
-      values(
-        week.teachingMethods.length
-          ? week.teachingMethods
-          : week.learningActivities,
-      ),
-      values([week.assessment, ...week.assessmentMethods].filter(Boolean)),
-      values(week.resources),
-    ];
     rows.push(
       new TableRow({
-        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+        cantSplit: true,
+        children: [
+          compactWordCell(week.week, w[0]!, AlignmentType.CENTER),
+          topicSltCell(week.week, week.topic, w[1]!),
+          compactWordCell(week.cloCodes.join(", "), w[2]!, AlignmentType.CENTER),
+          compactWordCell(lloText(week), w[3]!),
+        ],
       }),
     );
   }
-  return table(rows, w);
+
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: w,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows,
+  });
+}
+
+function assessmentWeightForWeek(
+  document: CourseDocumentModel,
+  weekNumber: string,
+) {
+  return document.assessments
+    .filter((assessment) => assessment.dueWeek.trim() === weekNumber.trim())
+    .reduce((sum, assessment) => sum + (Number(assessment.weight) || 0), 0);
+}
+
+function lectureOutlineText(week: CourseDocumentModel["weeklyPlan"][number]) {
+  const lloCodes = week.lloItems.map((_, index) => `LLO${index + 1}`);
+  return lloCodes.length
+    ? `Topic ${week.week}: ${week.topic}\n- ${lloCodes.join(", ")}`
+    : `Topic ${week.week}: ${week.topic}`;
+}
+
+function detailCourseSyllabusTable(
+  document: CourseDocumentModel,
+  weeks: CourseDocumentModel["weeklyPlan"],
+) {
+  const w = colWidths([5, 8, 18, 7, 20, 20, 10, 12]);
+  const headers = [
+    "Week",
+    "Hour\n(L/T/P/O)",
+    "Lecture",
+    "CLOs",
+    "Teaching Method/Activity",
+    "Learning Method/Activity\n(ALS)",
+    "Assessment\n(Weight %)",
+    "T&L Resources",
+  ];
+  const rows: TableRow[] = [
+    new TableRow({
+      cantSplit: true,
+      children: headers.map((header, index) =>
+        headerMergeCell(header, w[index]!),
+      ),
+    }),
+  ];
+
+  for (const week of weeks) {
+    const hourText = [
+      week.lectureHours,
+      week.tutorialHours,
+      week.practiceHours,
+      week.otherHours,
+    ]
+      .map((hours) => hours || "0")
+      .join("/");
+    const teaching = week.teachingMethods.join(", ");
+    const learning = (
+      week.activeLearningStrategies.length
+        ? week.activeLearningStrategies
+        : week.learningActivities
+    ).join(", ");
+    const assessmentWeight = assessmentWeightForWeek(document, week.week);
+
+    rows.push(
+      new TableRow({
+        cantSplit: true,
+        children: [
+          compactWordCell(week.week, w[0]!, AlignmentType.CENTER),
+          compactWordCell(hourText, w[1]!, AlignmentType.CENTER),
+          compactWordCell(lectureOutlineText(week), w[2]!),
+          compactWordCell(week.cloCodes.join(", "), w[3]!, AlignmentType.CENTER),
+          compactWordCell(teaching, w[4]!, AlignmentType.CENTER),
+          compactWordCell(learning, w[5]!, AlignmentType.CENTER),
+          compactWordCell(String(assessmentWeight), w[6]!, AlignmentType.CENTER),
+          compactWordCell(week.resources.join(", "), w[7]!, AlignmentType.CENTER),
+        ],
+      }),
+    );
+  }
+
+  return new Table({
+    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+    columnWidths: w,
+    layout: TableLayoutType.FIXED,
+    borders,
+    rows,
+  });
 }
 
 function resourcesTable(resources: CourseDocumentModel["resources"]) {
@@ -1400,20 +1490,16 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     ]),
   );
 
-  const chunkSize = 7;
-  for (let i = 0; i < document.weeklyPlan.length; i += chunkSize) {
-    children.push(new Paragraph({ children: [new PageBreak()] }));
-    const chunk = document.weeklyPlan.slice(i, i + chunkSize);
-    children.push(
-      sectionBox([
-        sectionTitle(
-          "18",
-          `Course Outline / Detailed Lesson Plan — Weeks ${chunk[0]?.week ?? ""}–${chunk[chunk.length - 1]?.week ?? ""}`,
-        ),
-        lessonPlanTable(chunk),
-      ]),
-    );
-  }
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    sectionBox([
+      sectionTitle("18", "Course Outline/detailed lesson plan"),
+      lessonLearningOutcomesTable(document.weeklyPlan),
+      paragraph("* Active Learning Strategies (ALS)", false, SMALL),
+      centered("Detail Course Syllabus", false, SMALL),
+      detailCourseSyllabusTable(document, document.weeklyPlan),
+    ]),
+  );
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
