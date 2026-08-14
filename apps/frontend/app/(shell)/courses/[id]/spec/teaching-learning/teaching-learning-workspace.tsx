@@ -5,9 +5,12 @@ import { useParams } from "next/navigation";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleCheck,
   Lightbulb,
   Loader2,
+  Pencil,
   Save,
 } from "lucide-react";
 import {
@@ -46,6 +49,7 @@ export function TeachingLearningWorkspace({
 
   const [savingCloId, setSavingCloId] = useState<string | null>(null);
   const [savedCloId, setSavedCloId] = useState<string | null>(null);
+  const [editingCloId, setEditingCloId] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
@@ -98,13 +102,6 @@ export function TeachingLearningWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
-  const coveredClos = useMemo(
-    () =>
-      clos.filter(
-        (clo) => clo.status === "active" && clo.teachingMethodIds.length > 0,
-      ).length,
-    [clos],
-  );
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
     [clos],
@@ -115,6 +112,32 @@ export function TeachingLearningWorkspace({
         (strategy) => ({ id: strategy.id, name: strategy.label }),
       ),
     [],
+  );
+  const courseMethodIdSet = useMemo(
+    () => new Set(courseMethodIds),
+    [courseMethodIds],
+  );
+  const courseStrategyIdSet = useMemo(
+    () => new Set(strategyIds),
+    [strategyIds],
+  );
+  const courseMethodOptions = useMemo(
+    () => teachingMethods.filter((method) => courseMethodIdSet.has(method.id)),
+    [courseMethodIdSet, teachingMethods],
+  );
+  const courseStrategyOptions = useMemo(
+    () =>
+      strategyOptions.filter((strategy) =>
+        courseStrategyIdSet.has(strategy.id),
+      ),
+    [courseStrategyIdSet, strategyOptions],
+  );
+  const coveredClos = useMemo(
+    () =>
+      activeClos.filter((clo) =>
+        clo.teachingMethodIds.some((id) => courseMethodIdSet.has(id)),
+      ).length,
+    [activeClos, courseMethodIdSet],
   );
 
   const completion: [boolean, boolean, boolean, boolean, boolean] = [
@@ -282,7 +305,10 @@ export function TeachingLearningWorkspace({
         prompt="How will you normally teach this course?"
         complete={completion[1]}
       >
-        <div className="flex flex-wrap gap-2">
+        <div
+          id="teaching-learning-course-methods"
+          className="flex flex-wrap gap-2"
+        >
           {teachingMethods.map((method) => (
             <Chip
               key={method.id}
@@ -383,73 +409,158 @@ export function TeachingLearningWorkspace({
         prompt="Make sure every CLO has teaching support. Detailed alignment remains in Constructive Alignment."
         complete={completion[4]}
       >
+        <div className="mb-3 flex flex-col gap-2 rounded-xl bg-muted/40 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold">
+              {coveredClos} of {activeClos.length} active CLOs supported
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Each CLO can use only the methods and strategies selected above.
+            </p>
+          </div>
+          {coveredClos < activeClos.length ? (
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {activeClos.length - coveredClos} need attention
+            </span>
+          ) : (
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+              <CircleCheck className="h-3.5 w-3.5" />
+              All supported
+            </span>
+          )}
+        </div>
         <div className="space-y-2.5">
-          {clos.map((clo) => (
-            <div
-              key={clo.id}
-              className="rounded-xl border border-border bg-background p-4"
-            >
-              <div className="grid gap-4 xl:grid-cols-[minmax(220px,0.8fr)_minmax(300px,1fr)_minmax(300px,1fr)_140px] xl:items-start">
-                <div className="flex items-start gap-2.5">
-                  <span className="rounded-md bg-muted px-2 py-1 text-xs font-bold">
-                    {clo.code}
-                  </span>
-                  <p className="text-sm font-medium">{clo.description}</p>
+          {clos.map((clo) => {
+            const selectedMethodIds = clo.teachingMethodIds.filter((id) =>
+              courseMethodIdSet.has(id),
+            );
+            const selectedStrategyIds = clo.activeLearningStrategyIds.filter(
+              (id) => courseStrategyIdSet.has(id),
+            );
+            const supported = selectedMethodIds.length > 0;
+            const editing = editingCloId === clo.id;
+
+            return (
+              <div
+                key={clo.id}
+                className={`rounded-xl border bg-background transition-colors ${editing ? "border-primary/40" : "border-border"}`}
+              >
+                <div className="grid gap-3 p-3.5 lg:grid-cols-[minmax(240px,1.25fr)_minmax(180px,1fr)_minmax(180px,1fr)_140px] lg:items-center">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs font-bold">
+                      {clo.code}
+                    </span>
+                    <p className="line-clamp-2 text-sm font-medium leading-5">
+                      {clo.description}
+                    </p>
+                  </div>
+                  <SelectionSummary
+                    label="Teaching methods"
+                    options={courseMethodOptions}
+                    selectedIds={selectedMethodIds}
+                    emptyText="None selected"
+                  />
+                  <SelectionSummary
+                    label="Active learning"
+                    options={courseStrategyOptions}
+                    selectedIds={selectedStrategyIds}
+                    emptyText="Optional"
+                  />
+                  <div className="flex items-center justify-between gap-2 lg:justify-end">
+                    {savingCloId === clo.id ? (
+                      <Status
+                        icon={<Loader2 className="h-4 w-4 animate-spin" />}
+                        text="Saving…"
+                      />
+                    ) : savedCloId === clo.id ? (
+                      <Status
+                        good
+                        icon={<Check className="h-4 w-4" />}
+                        text="Saved"
+                      />
+                    ) : clo.status === "inactive" ? (
+                      <Status
+                        good
+                        icon={<CircleCheck className="h-4 w-4" />}
+                        text="Inactive"
+                      />
+                    ) : supported ? (
+                      <Status
+                        good
+                        icon={<CircleCheck className="h-4 w-4" />}
+                        text="Supported"
+                      />
+                    ) : (
+                      <Status
+                        icon={<AlertTriangle className="h-4 w-4" />}
+                        text="Needs attention"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      aria-expanded={editing}
+                      aria-controls={`clo-support-${clo.id}`}
+                      onClick={() => setEditingCloId(editing ? null : clo.id)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold transition hover:bg-muted/50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      {editing ? "Close" : "Edit"}
+                      {editing ? (
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <ChipMultiSelect
-                  label={`Teaching methods for ${clo.code}`}
-                  options={teachingMethods}
-                  selectedIds={clo.teachingMethodIds}
-                  onChange={(ids) =>
-                    void updateCloSupport(clo.id, { teachingMethodIds: ids })
-                  }
-                  emptyMessage="No teaching methods defined yet."
-                />
-                <ChipMultiSelect
-                  label={`Active learning for ${clo.code}`}
-                  options={strategyOptions}
-                  selectedIds={clo.activeLearningStrategyIds}
-                  onChange={(ids) =>
-                    void updateCloSupport(clo.id, {
-                      activeLearningStrategyIds: ids,
-                    })
-                  }
-                  emptyMessage="No active-learning strategies defined yet."
-                />
-                <div className="flex justify-end">
-                  {savingCloId === clo.id ? (
-                    <Status
-                      icon={<Loader2 className="h-4 w-4 animate-spin" />}
-                      text="Saving…"
-                    />
-                  ) : savedCloId === clo.id ? (
-                    <Status
-                      good
-                      icon={<Check className="h-4 w-4" />}
-                      text="Saved"
-                    />
-                  ) : clo.status === "inactive" ? (
-                    <Status
-                      good
-                      icon={<CircleCheck className="h-4 w-4" />}
-                      text="Inactive"
-                    />
-                  ) : clo.teachingMethodIds.length ? (
-                    <Status
-                      good
-                      icon={<CircleCheck className="h-4 w-4" />}
-                      text="Supported"
-                    />
-                  ) : (
-                    <Status
-                      icon={<AlertTriangle className="h-4 w-4" />}
-                      text="Needs attention"
-                    />
-                  )}
-                </div>
+
+                {editing ? (
+                  <div
+                    id={`clo-support-${clo.id}`}
+                    className="border-t border-border bg-muted/10 p-4"
+                  >
+                    <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        Choose a relevant subset of the course selections from
+                        sections 2 and 3.
+                      </p>
+                      <a
+                        href="#teaching-learning-course-methods"
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Manage course selections above
+                      </a>
+                    </div>
+                    <div className="grid gap-5 lg:grid-cols-2">
+                      <ChipMultiSelect
+                        label={`Teaching methods for ${clo.code}`}
+                        options={courseMethodOptions}
+                        selectedIds={selectedMethodIds}
+                        onChange={(ids) =>
+                          void updateCloSupport(clo.id, {
+                            teachingMethodIds: ids,
+                          })
+                        }
+                        emptyMessage="Select course teaching methods in section 2 first."
+                      />
+                      <ChipMultiSelect
+                        label={`Active learning for ${clo.code}`}
+                        options={courseStrategyOptions}
+                        selectedIds={selectedStrategyIds}
+                        onChange={(ids) =>
+                          void updateCloSupport(clo.id, {
+                            activeLearningStrategyIds: ids,
+                          })
+                        }
+                        emptyMessage="Select course active-learning strategies in section 3 first."
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Section>
 
@@ -586,6 +697,52 @@ function Group({
           </Chip>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SelectionSummary({
+  label,
+  options,
+  selectedIds,
+  emptyText,
+}: {
+  label: string;
+  options: Method[];
+  selectedIds: string[];
+  emptyText: string;
+}) {
+  const selected = selectedIds
+    .map((id) => options.find((option) => option.id === id))
+    .filter((option): option is Method => Boolean(option));
+  const visible = selected.slice(0, 2);
+  const remaining = selected.length - visible.length;
+
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      {selected.length > 0 ? (
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+          {visible.map((option) => (
+            <span
+              key={option.id}
+              className="max-w-36 truncate rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+              title={option.name}
+            >
+              {option.name}
+            </span>
+          ))}
+          {remaining > 0 ? (
+            <span className="text-xs font-medium text-muted-foreground">
+              +{remaining} more
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">{emptyText}</p>
+      )}
     </div>
   );
 }

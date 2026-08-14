@@ -74,6 +74,11 @@ test("Teaching & Learning readiness applies every required rule to active CLOs",
       { status: "active", teachingMethodIds: [] },
     ]),
   ).toBe(false);
+  expect(
+    teachingLearningIsReady(readyProfile, [
+      { status: "active", teachingMethodIds: ["not-selected-for-course"] },
+    ]),
+  ).toBe(false);
 });
 
 test("CloItem preserves provided SLT hours and method ids", () => {

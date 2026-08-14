@@ -548,6 +548,7 @@ export function teachingLearningIsReady(
   clos: TeachingLearningCloSupport[],
 ): boolean {
   const activeClos = clos.filter((clo) => clo.status === "active");
+  const courseTeachingMethodIds = new Set(profile.teachingMethodIds);
   const hasPhilosophy =
     profile.philosophyTags.length > 0 ||
     profile.philosophyStatement.trim().length > 0;
@@ -557,7 +558,9 @@ export function teachingLearningIsReady(
     profile.teachingMethodIds.length > 0 &&
     profile.activeLearningStrategyIds.length > 0 &&
     activeClos.length > 0 &&
-    activeClos.every((clo) => clo.teachingMethodIds.length > 0)
+    activeClos.every((clo) =>
+      clo.teachingMethodIds.some((id) => courseTeachingMethodIds.has(id)),
+    )
   );
 }
 
