@@ -92,7 +92,7 @@ export const INDEPENDENT_LEARNING_OPTIONS = [
 
 /** §20: instructional materials used to support teaching and student learning. */
 export const TEACHING_LEARNING_MATERIAL_OPTIONS = [
-  "Lecture Slides",
+  "Slides",
   "Readings",
   "Datasets",
   "Worksheets",
@@ -109,7 +109,7 @@ export const REQUIRED_DELIVERY_RESOURCE_OPTIONS = [
   "Computer Lab",
   "Reliable Internet",
   "Projector / Display",
-  "LMS Access",
+  "LMS",
   "Python Environment",
   "Jupyter",
   "Google Colab",
