@@ -1280,12 +1280,31 @@ function lessonLearningOutcomesTable(weeks: CourseDocumentModel["weeklyPlan"]) {
   });
 }
 
+function normalizeAssessmentText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\(\s*\d+(?:\.\d+)?\s*%\s*\)/g, " ")
+    .replace(/\b\d+(?:\.\d+)?\s*%\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function assessmentWeightForWeek(
   document: CourseDocumentModel,
-  weekNumber: string,
+  week: CourseDocumentModel["weeklyPlan"][number],
 ) {
+  const weeklyAssessment = normalizeAssessmentText(week.assessment);
+  if (!weeklyAssessment || weeklyAssessment === "0") return 0;
+
   return document.assessments
-    .filter((assessment) => assessment.dueWeek.trim() === weekNumber.trim())
+    .filter((assessment) => {
+      const assessmentName = normalizeAssessmentText(assessment.name);
+      if (!assessmentName) return false;
+      return (
+        weeklyAssessment.includes(assessmentName) ||
+        assessmentName.includes(weeklyAssessment)
+      );
+    })
     .reduce((sum, assessment) => sum + (Number(assessment.weight) || 0), 0);
 }
 
@@ -1335,7 +1354,7 @@ function detailCourseSyllabusTable(
         ? week.activeLearningStrategies
         : week.learningActivities
     ).join(", ");
-    const assessmentWeight = assessmentWeightForWeek(document, week.week);
+    const assessmentWeight = assessmentWeightForWeek(document, week);
 
     rows.push(
       new TableRow({
