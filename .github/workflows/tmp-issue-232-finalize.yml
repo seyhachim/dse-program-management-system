@@ -1,0 +1,88 @@
+name: Validate and finalize issue 232
+
+on:
+  push:
+    branches: [agent/issue-232-official-sar-assembler]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-232-official-sar-assembler
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_ci?schema=public
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run build
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_ci?schema=public
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-232-official-sar-assembler
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+
+  clean-and-merge:
+    needs: [quality, database]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-232-official-sar-assembler
+          fetch-depth: 0
+      - name: Remove all Phase 9 temporary validation files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/validation/issue-232-passed.txt
+          rm -f .github/workflows/tmp-issue-232-validation.yml
+          rm -f .github/workflows/tmp-issue-232-gated-validation.yml
+          rm -f .github/workflows/tmp-issue-232-cleanup.yml
+          rm -f .github/workflows/tmp-issue-232-finalize.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: remove Phase 9 validation files"
+            git push origin HEAD:agent/issue-232-official-sar-assembler
+          fi
+      - name: Merge validated Phase 9 PR
+        run: |
+          gh pr ready 250 --repo thymadona/dse-program-management-system || true
+          gh pr merge 250 --repo thymadona/dse-program-management-system --merge
