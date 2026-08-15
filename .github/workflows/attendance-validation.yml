@@ -43,6 +43,7 @@ jobs:
           --health-retries=5
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_ci?schema=public
+      PSQL_URL: postgresql://ci:ci@localhost:5432/dse_ci
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -54,7 +55,7 @@ jobs:
       - run: bun run seed
       - name: Verify attendance persistence
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          psql "$PSQL_URL" -v ON_ERROR_STOP=1 <<'SQL'
           SELECT table_schema, table_name
           FROM information_schema.tables
           WHERE table_schema = 'pms_attendance'
