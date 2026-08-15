@@ -1,6 +1,7 @@
 import type {
   CreateRubricInput,
   ListRubricsQuery,
+  PublicRubric,
   Rubric,
   RubricCriterion,
   RubricLevel,
@@ -24,7 +25,7 @@ const withNormalized = {
 } as const;
 type RubricRow = Prisma.RubricGetPayload<{ include: typeof withNormalized }>;
 
-/** Shape a Prisma row into the API `Rubric` (dates → ISO, normalized tables → arrays). */
+/** Shape a Prisma row into the authenticated API `Rubric`. */
 function toRubric(row: RubricRow): Rubric {
   const levels = row.levelRows.map((l) => ({ label: l.label, points: l.points }));
   const criteria = row.criterionRows.map((c) => {
@@ -46,6 +47,19 @@ function toRubric(row: RubricRow): Rubric {
     owner: row.owner ? { id: row.owner.id, name: row.owner.name } : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Strip management-only data from an Active rubric before public exposure. */
+function toPublicRubric(rubric: Rubric): PublicRubric {
+  return {
+    id: rubric.id,
+    name: rubric.name,
+    type: rubric.type,
+    description: rubric.description,
+    levels: rubric.levels,
+    criteria: rubric.criteria,
+    status: "Active",
   };
 }
 
@@ -102,7 +116,6 @@ export const rubricService = {
     const { search, status } = query;
     const rows = await prisma.rubric.findMany({
       where: {
-        // Default library view hides archived rubrics unless asked for explicitly.
         ...(status ? { status } : { status: { not: "Archived" } }),
         ...(search
           ? {
@@ -123,6 +136,15 @@ export const rubricService = {
   async getById(id: string): Promise<Rubric | null> {
     const row = await prisma.rubric.findUnique({ where: { id }, include: withNormalized });
     return row ? toRubric(row) : null;
+  },
+
+  /** Public lookup is Active-only at the database boundary. */
+  async getPublicById(id: string): Promise<PublicRubric | null> {
+    const row = await prisma.rubric.findFirst({
+      where: { id, status: "Active" },
+      include: withNormalized,
+    });
+    return row ? toPublicRubric(toRubric(row)) : null;
   },
 
   async create(input: CreateRubricInput, ownerId: string): Promise<Rubric> {
@@ -148,10 +170,6 @@ export const rubricService = {
 
   async update(id: string, input: UpdateRubricInput): Promise<Rubric> {
     return prisma.$transaction(async (tx) => {
-      // A partial update (only one of levels/criteria) still needs both to
-      // feed syncNormalizedRubricTables with the full final state. Read the
-      // missing side from the normalized tables, the sole storage since
-      // phase C dropped the jsonb columns.
       let finalLevels = input.levels;
       let finalCriteria = input.criteria;
       if (finalLevels === undefined || finalCriteria === undefined) {
