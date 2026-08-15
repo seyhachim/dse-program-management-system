@@ -309,6 +309,13 @@ export const qaManifest: PluginManifest = {
       group: "Quality Assurance",
     },
     {
+      label: "SAR Preview",
+      path: "/aun-qa/sar-preview",
+      icon: "file-text",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
       label: "QA Evidence Analysis",
       path: "/qa-dashboard",
       icon: "file-check",
