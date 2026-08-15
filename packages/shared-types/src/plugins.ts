@@ -295,6 +295,13 @@ export const qaManifest: PluginManifest = {
       group: "Quality Assurance",
     },
     {
+      label: "Evidence Library",
+      path: "/aun-qa/evidence",
+      icon: "library",
+      roles: ["admin", "program_coordinator", "qa_contributor", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
       label: "QA Evidence Analysis",
       path: "/qa-dashboard",
       icon: "file-check",
