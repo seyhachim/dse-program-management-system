@@ -1382,33 +1382,6 @@ function detailCourseSyllabusTable(
   });
 }
 
-function resourcesTable(resources: CourseDocumentModel["resources"]) {
-  const w = colWidths([18, 27, 25, 30]);
-  const headers = [
-    "Resource Type",
-    "Resource Name / Description",
-    "Link",
-    "Notes",
-  ];
-  const rows = [
-    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
-  ];
-  for (const resource of resources) {
-    const rowValues = [
-      resource.resourceType,
-      resource.title,
-      resource.url,
-      resource.notes,
-    ];
-    rows.push(
-      new TableRow({
-        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
-      }),
-    );
-  }
-  return table(rows, w);
-}
-
 function bulletedList(items: string[]) {
   return items.map(
     (item) =>
@@ -1524,15 +1497,30 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(
     sectionBox([
       sectionTitle("19", "Required Resources to Deliver the Course"),
-      ...(document.resources.length === 0
+      ...(document.requiredDeliveryResources.length === 0
         ? [
             paragraph(
-              "No required resources have been confirmed.",
+              "No required delivery resources have been selected.",
               false,
               SMALL,
             ),
           ]
-        : [resourcesTable(document.resources)]),
+        : bulletedList(document.requiredDeliveryResources)),
+    ]),
+  );
+  children.push(new Paragraph({ spacing: { before: 75, after: 0 }, children: [] }));
+  children.push(
+    sectionBox([
+      sectionTitle("20", "Other Teaching and Learning Materials"),
+      ...(document.teachingLearningMaterials.length === 0
+        ? [
+            paragraph(
+              "No other teaching and learning materials have been selected.",
+              false,
+              SMALL,
+            ),
+          ]
+        : bulletedList(document.teachingLearningMaterials)),
     ]),
   );
 
