@@ -151,8 +151,8 @@ export function AssessmentFormFields({
 
       <Section
         n={2}
-        title="Map to Course Learning Outcomes (CLOs)"
-        subtitle="Select the CLOs that this assessment directly measures."
+        title="CLO Evidence Mapping"
+        subtitle="Select only the CLOs this assessment directly measures. This mapping is independent from course-grade weighting."
       >
         {clos.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
@@ -198,7 +198,7 @@ export function AssessmentFormFields({
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>
             {draft.cloCodes.length === 0
-              ? "No CLO selected."
+              ? "No CLO evidence mapped. This is valid for grade-only or formative components."
               : `${draft.cloCodes.length} CLO${draft.cloCodes.length === 1 ? "" : "s"} selected: ${draft.cloCodes.join(", ")}`}
           </span>
           <span>
@@ -209,25 +209,49 @@ export function AssessmentFormFields({
 
       <Section
         n={3}
-        title="Weight, Topic Coverage & Student Learning Time"
-        subtitle="These values feed the official §16 and §17 tables directly."
+        title="Course Grading, Topic Coverage & Student Learning Time"
+        subtitle="Course-grade policy is separate from CLO evidence. These values feed the official §16 and §17 tables."
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Field label="Assessment Weight (%)" required>
+          <Field label="Counts toward final course grade">
+            <label className="flex h-9 items-center gap-3 rounded-lg border border-border px-3">
+              <Switch
+                checked={draft.countsTowardGrade}
+                onCheckedChange={(value) =>
+                  set({
+                    countsTowardGrade: value,
+                    weight: value ? draft.weight : "",
+                  })
+                }
+              />
+              <span className="text-sm text-foreground">
+                {draft.countsTowardGrade ? "Graded" : "Formative / non-graded"}
+              </span>
+            </label>
+          </Field>
+          <Field
+            label="Course Grade Weight (%)"
+            required={draft.countsTowardGrade}
+            optional={!draft.countsTowardGrade}
+          >
             <div className="flex">
               <input
                 type="number"
                 min={0}
                 max={100}
                 value={draft.weight}
+                disabled={!draft.countsTowardGrade}
                 onChange={(event) => set({ weight: event.target.value })}
-                placeholder="e.g. 25"
-                className={`${inputCls(false)} rounded-r-none`}
+                placeholder={draft.countsTowardGrade ? "e.g. 25" : "Not graded"}
+                className={`${inputCls(false)} rounded-r-none disabled:cursor-not-allowed disabled:opacity-50`}
               />
               <span className="inline-flex h-9 items-center rounded-r-lg border border-l-0 border-border bg-muted/40 px-3 text-sm text-muted-foreground">
                 %
               </span>
             </div>
+            <Hint>
+              Local course grading policy only. This percentage is never reused as a CLO or AUN-QA evidence weight.
+            </Hint>
           </Field>
           <Field label="Due Week" optional>
             <select
@@ -321,7 +345,7 @@ export function AssessmentFormFields({
         </div>
 
         <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-muted-foreground">
-          The total weight of all active assessments should equal 100%.
+          The course-grade weights of active graded assessments should equal 100%. Formative/non-graded assessments are excluded.
         </div>
       </Section>
 
@@ -378,6 +402,9 @@ export function AssessmentFormFields({
                   <span className="text-foreground">{criterion.name}</span>
                 </div>
               ))}
+            </div>
+            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+              Criterion-level CLO evidence is not inferred from the rubric. Until criterion-level student scores are stored, CLO evidence is mapped explicitly at assessment level above.
             </div>
           </div>
         ) : (
@@ -477,7 +504,12 @@ export function AssessmentFormFields({
 }
 
 export function assessmentFormErrors(draft: AssessmentForm) {
-  return { name: draft.name.trim().length === 0 };
+  return {
+    name: draft.name.trim().length === 0,
+    weight:
+      draft.countsTowardGrade &&
+      (draft.weight === "" || Number(draft.weight) <= 0 || Number(draft.weight) > 100),
+  };
 }
 
 const inputBase =

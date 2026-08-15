@@ -4,6 +4,11 @@ import type { AssessmentPlanSection } from "@dse-pms/shared-types";
  * An assessment (§17) held as a form model for input binding; converted on save by
  * the wizard. Numeric fields are kept as strings so empty inputs stay empty rather
  * than 0, matching the CLO / Weekly Plan form models.
+ *
+ * `countsTowardGrade` is an explicit UX concept while the persisted backward-
+ * compatible contract continues to use a nullable local `weight`: checked means a
+ * positive course-grade weight is expected; unchecked persists `weight: null`.
+ * CLO evidence remains independent in `cloCodes`.
  */
 export type AssessmentForm = {
   id: string;
@@ -13,6 +18,7 @@ export type AssessmentForm = {
   mode: "individual" | "group";
   status: "active" | "inactive";
   cloCodes: string[];
+  countsTowardGrade: boolean;
   weight: string;
   dueWeek: string;
   durationWeeks: string;
@@ -69,6 +75,7 @@ export function emptyAssessment(): AssessmentForm {
     mode: "individual",
     status: "active",
     cloCodes: [],
+    countsTowardGrade: true,
     weight: "",
     dueWeek: "",
     durationWeeks: "",
@@ -93,6 +100,7 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
   const items = (data as { items?: unknown[] } | undefined)?.items ?? [];
   return items.map((raw) => {
     const d = (raw ?? {}) as Record<string, unknown>;
+    const weight = d.weight == null ? "" : String(d.weight);
     return {
       id: str(d.id) || uuid(),
       name: str(d.name),
@@ -101,7 +109,8 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       mode: d.mode === "group" ? "group" : "individual",
       status: d.status === "inactive" ? "inactive" : "active",
       cloCodes: strArray(d.cloCodes),
-      weight: d.weight == null ? "" : String(d.weight),
+      countsTowardGrade: weight !== "" && Number(weight) > 0,
+      weight,
       dueWeek: d.dueWeek == null ? "" : String(d.dueWeek),
       durationWeeks: d.durationWeeks == null ? "" : String(d.durationWeeks),
       format: str(d.format),
@@ -159,7 +168,8 @@ export function toAssessmentPayload(
       mode: a.mode,
       status: a.status,
       cloCodes: a.cloCodes,
-      weight: a.weight === "" ? null : Number(a.weight),
+      weight:
+        !a.countsTowardGrade || a.weight === "" ? null : Number(a.weight),
       dueWeek: a.dueWeek === "" ? null : Number(a.dueWeek),
       durationWeeks: a.durationWeeks === "" ? null : Number(a.durationWeeks),
       format: a.format.trim(),
@@ -183,11 +193,18 @@ export function assessmentSltHours(item: AssessmentForm): number {
   );
 }
 
-/** Total weight (%) across active assessments — the plan should sum to 100. */
+/** Total local course-grade weight (%) across active graded assessments. */
 export function assessmentTotalWeight(items: AssessmentForm[]): number {
   return items
-    .filter((a) => a.status === "active")
+    .filter((a) => a.status === "active" && a.countsTowardGrade)
     .reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
+}
+
+export function assessmentEvidenceLabel(item: Pick<AssessmentForm, "cloCodes" | "countsTowardGrade">): string {
+  if (item.countsTowardGrade && item.cloCodes.length === 0) return "Grade only";
+  if (!item.countsTowardGrade && item.cloCodes.length > 0) return "CLO evidence only";
+  if (!item.countsTowardGrade && item.cloCodes.length === 0) return "Formative / neither";
+  return "Grade + CLO evidence";
 }
 
 /* ------------------------------------------------------------- type badge palette */
