@@ -27,6 +27,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
+import { assertCourseSpecEditable } from "./spec-lock.ts";
 
 /**
  * Courses business logic. The lecturer relationship is validated through the
@@ -443,23 +444,30 @@ export const courseService = {
     let course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
-    if (sectionId === "courseInfo") {
-      const info = values as CourseInfoInput;
-      course = await prisma.course.update({
-        where: { id: courseId },
-        data: {
-          prerequisites: info.prerequisites || null,
-          description: info.description || null,
-        },
-      });
-    }
-
     await prisma.$transaction(async (tx) => {
-      const spec = await tx.courseSpec.upsert({
+      const existingSpec = await tx.courseSpec.findUnique({
         where: { courseId },
-        create: { courseId },
-        update: {},
+        select: { id: true, reviewStatus: true },
       });
+      if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);
+
+      const spec =
+        existingSpec ??
+        (await tx.courseSpec.create({
+          data: { courseId },
+          select: { id: true, reviewStatus: true },
+        }));
+
+      if (sectionId === "courseInfo") {
+        const info = values as CourseInfoInput;
+        course = await tx.course.update({
+          where: { id: courseId },
+          data: {
+            prerequisites: info.prerequisites || null,
+            description: info.description || null,
+          },
+        });
+      }
 
       if (sectionId === "clos")
         await syncClos(tx, spec.id, (values as ClosSection).items);
