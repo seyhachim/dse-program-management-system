@@ -25,5 +25,7 @@ test("review authorization allows editable states and locks submitted work", () 
   expect(isEditableReviewStatus("draft")).toBe(true);
   expect(isEditableReviewStatus("changesRequested")).toBe(true);
   expect(isEditableReviewStatus("submitted")).toBe(false);
+  expect(isEditableReviewStatus("underReview")).toBe(false);
+  expect(isEditableReviewStatus("resubmitted")).toBe(false);
   expect(isEditableReviewStatus("approved")).toBe(false);
 });
