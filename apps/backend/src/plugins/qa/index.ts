@@ -6,10 +6,12 @@ import { createQaAssignmentsRouter } from "./assignments/router.ts";
 import { createQaReviewRouter } from "./reviews/router.ts";
 import { createQaRouter } from "./router.ts";
 import { qaService, type QaService } from "./service.ts";
+import { createQaWorkspaceRouter } from "./workspace/router.ts";
 
 const router = Router();
 router.use(createQaRouter());
 router.use(createQaAssignmentsRouter());
+router.use(createQaWorkspaceRouter());
 router.use(createQaLlmRouter());
 router.use(createQaReviewRouter());
 

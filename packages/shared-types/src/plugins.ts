@@ -283,19 +283,32 @@ export const programmeManifest: PluginManifest = {
 export const qaManifest: PluginManifest = {
   id: "qa",
   name: "Quality Assurance",
-  version: "0.1.0",
+  version: "0.2.0",
   description:
-    "Programme-scoped AUN-QA evidence, self-assessment, review, and readiness workflow.",
+    "Programme-scoped AUN-QA evidence, contributor work, self-assessment, review, and readiness workflow.",
   routes: [
     {
-      label: "QA Dashboard",
-      path: "/qa-dashboard",
+      label: "AUN-QA Workspace",
+      path: "/aun-qa",
       icon: "shield-check",
+      roles: ["admin", "program_coordinator", "qa_contributor"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "QA Evidence Analysis",
+      path: "/qa-dashboard",
+      icon: "file-check",
       roles: ["admin", "program_coordinator", "qa_reviewer"],
       group: "Quality Assurance",
     },
   ],
-  permissions: ["qa:read", "qa:write"],
+  permissions: [
+    "qa:read",
+    "qa:write",
+    "qa:contribute",
+    "qa:review",
+    "qa:manage",
+  ],
 };
 
 /**
