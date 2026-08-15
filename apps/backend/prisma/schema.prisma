@@ -1015,6 +1015,9 @@ model Offering {
   // Syllabus §12 Course Availability — optional, filled on the course spec form.
   semester       Semester?
   programmeYear  Int?
+  // Actual calendar delivery window for this specific offering/section.
+  startDate      DateTime?      @db.Date
+  endDate        DateTime?      @db.Date
   // Syllabus §10 Other Course Lecturer(s) — optional free text, varies per term.
   otherLecturers String?
   createdAt      DateTime       @default(now())

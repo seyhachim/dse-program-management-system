@@ -2,8 +2,10 @@ import { expect, test } from "bun:test";
 import {
   coLecturerViolation,
   CreateOfferingInput,
+  DateOnlySchema,
   OfferingMeetingInput,
   SectionCodeSchema,
+  teachingPeriodViolation,
   UpdateOfferingInput,
 } from "./offerings.ts";
 
@@ -103,5 +105,42 @@ test("meeting validation rejects invalid and reversed times", () => {
     startTime: "8am",
     endTime: "10:00",
     activityType: "Lecture",
+  }).success).toBe(false);
+});
+
+test("teaching-period dates use valid ISO calendar dates", () => {
+  expect(DateOnlySchema.safeParse("2026-08-10").success).toBe(true);
+  expect(DateOnlySchema.safeParse("2026/08/10").success).toBe(false);
+  expect(DateOnlySchema.safeParse("2026-02-31").success).toBe(false);
+});
+
+test("teaching-period invariant requires a complete ordered range", () => {
+  expect(teachingPeriodViolation({ startDate: null, endDate: null })).toBeNull();
+  expect(teachingPeriodViolation({ startDate: "2026-08-10", endDate: null })).toBe("missingEnd");
+  expect(teachingPeriodViolation({ startDate: null, endDate: "2026-11-28" })).toBe("missingStart");
+  expect(teachingPeriodViolation({ startDate: "2026-11-28", endDate: "2026-08-10" })).toBe("endBeforeStart");
+  expect(teachingPeriodViolation({ startDate: "2026-08-10", endDate: "2026-11-28" })).toBeNull();
+});
+
+test("CreateOfferingInput accepts either no dates or a complete teaching period", () => {
+  expect(CreateOfferingInput.safeParse({ courseId: COURSE, term: "2026-Fall" }).success).toBe(true);
+  expect(CreateOfferingInput.safeParse({
+    courseId: COURSE,
+    term: "2026-Fall",
+    startDate: "2026-08-10",
+    endDate: "2026-11-28",
+  }).success).toBe(true);
+  expect(CreateOfferingInput.safeParse({
+    courseId: COURSE,
+    term: "2026-Fall",
+    startDate: "2026-08-10",
+  }).success).toBe(false);
+});
+
+test("UpdateOfferingInput validates ordering when both teaching-period dates are supplied", () => {
+  expect(UpdateOfferingInput.safeParse({ startDate: "2026-08-10" }).success).toBe(true);
+  expect(UpdateOfferingInput.safeParse({
+    startDate: "2026-11-28",
+    endDate: "2026-08-10",
   }).success).toBe(false);
 });
