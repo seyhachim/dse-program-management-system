@@ -1,0 +1,23 @@
+name: Cleanup issue 231 validation files
+
+on:
+  push:
+    branches: [agent/issue-231-sar-review-approval]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-231-sar-review-approval
+      - name: Remove temporary validation workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/tmp-issue-231-validation.yml .github/workflows/tmp-cleanup-issue-231.yml
+          git commit -m "chore: remove temporary SAR review validation files"
+          git push origin HEAD:agent/issue-231-sar-review-approval
