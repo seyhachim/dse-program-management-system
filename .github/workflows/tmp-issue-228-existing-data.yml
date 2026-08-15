@@ -32,6 +32,8 @@ jobs:
         with:
           bun-version: 1.2.23
       - run: bun install --frozen-lockfile
+      - name: Generate Prisma Client
+        run: bun run db:generate
       - name: Apply migration history before reusable evidence refactor
         run: |
           set -euo pipefail
