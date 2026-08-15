@@ -2,10 +2,16 @@ import {
   rubricMaxLevelPoints,
   rubricScaleSummary,
   rubricTotalPoints,
-  type Rubric,
+  type RubricCriterion,
+  type RubricLevel,
 } from "@dse-pms/shared-types";
 
-export function RubricMatrix({ rubric }: { rubric: Rubric }) {
+type RubricMatrixValue = {
+  levels: RubricLevel[];
+  criteria: RubricCriterion[];
+};
+
+export function RubricMatrix({ rubric }: { rubric: RubricMatrixValue }) {
   const maxPoints = rubricMaxLevelPoints(rubric.levels);
   const total = rubricTotalPoints(rubric);
 
