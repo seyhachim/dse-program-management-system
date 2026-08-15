@@ -24,6 +24,21 @@ function formatHours(hours: number): string {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
 }
 
+function formatDate(value: string | null): string {
+  if (!value) return "Not set";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function teachingPeriodLabel(offering: OfferingView): string {
+  if (!offering.startDate || !offering.endDate) return "Dates not set";
+  return `${formatDate(offering.startDate)} – ${formatDate(offering.endDate)}`;
+}
+
 function scheduleLabel(offering: OfferingView): string {
   if (offering.meetings.length === 0) return "Schedule not set";
   return offering.meetings
@@ -99,7 +114,7 @@ export function LecturerOverviewClient() {
     <>
       <Topbar
         title="Overview"
-        subtitle="Your teaching assignments, classes, timetable, rooms, students, and current delivery status."
+        subtitle="Your teaching assignments, delivery dates, classes, timetable, rooms, students, and current status."
       />
 
       <main className="flex-1 overflow-y-auto p-6">
@@ -154,7 +169,7 @@ export function LecturerOverviewClient() {
                 <div className="border-b border-border px-4 py-4">
                   <h2 className="font-semibold text-foreground">Teaching assignments</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    One row per class section so timetable, room, enrolment, and delivery status remain clear.
+                    One row per class section so delivery dates, timetable, room, enrolment, and status remain clear.
                   </p>
                 </div>
 
@@ -164,13 +179,14 @@ export function LecturerOverviewClient() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[980px] text-sm">
+                    <table className="w-full min-w-[1120px] text-sm">
                       <thead className="bg-muted/30 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         <tr>
                           <th className="px-4 py-3">Course</th>
                           <th className="px-4 py-3">Class</th>
                           <th className="px-4 py-3">Role</th>
-                          <th className="px-4 py-3">Period</th>
+                          <th className="px-4 py-3">Academic Period</th>
+                          <th className="px-4 py-3">Teaching Dates</th>
                           <th className="px-4 py-3">Schedule</th>
                           <th className="px-4 py-3">Room</th>
                           <th className="px-4 py-3">Students</th>
@@ -203,8 +219,14 @@ export function LecturerOverviewClient() {
                                 </div>
                               </td>
                               <td className="px-4 py-4">
-                                <div className="flex max-w-[260px] gap-2 text-muted-foreground">
+                                <div className="flex max-w-[210px] gap-2 text-muted-foreground">
                                   <CalendarDays className="mt-0.5 h-4 w-4 shrink-0" />
+                                  <span>{teachingPeriodLabel(offering)}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex max-w-[260px] gap-2 text-muted-foreground">
+                                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
                                   <span>{scheduleLabel(offering)}</span>
                                 </div>
                               </td>
@@ -227,10 +249,6 @@ export function LecturerOverviewClient() {
                     </table>
                   </div>
                 )}
-              </section>
-
-              <section className="rounded-xl border border-dashed border-border bg-muted/10 px-4 py-3 text-sm text-muted-foreground">
-                Teaching start/end dates are not yet stored in the offering model. This dashboard intentionally shows only verified academic-period and timetable data until those dates are modeled.
               </section>
             </>
           )}
