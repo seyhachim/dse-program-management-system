@@ -53,7 +53,7 @@ async function roster(offeringId: string): Promise<EnrollmentRow[]> {
 async function sessionByDate(offeringId: string, date: string): Promise<SessionRow | null> {
   const rows = await prisma.$queryRaw<SessionRow[]>`
     SELECT "id", "offeringId", "sessionDate", "updatedAt"
-    FROM "AttendanceSession"
+    FROM "pms_attendance"."AttendanceSession"
     WHERE "offeringId" = ${offeringId}
       AND "sessionDate" = ${dateValue(date)}
     LIMIT 1
@@ -70,7 +70,7 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
   const recordRows = session
     ? await prisma.$queryRaw<RecordRow[]>`
         SELECT "studentId", "studentNumber", "studentName", "status", "note"
-        FROM "AttendanceRecord"
+        FROM "pms_attendance"."AttendanceRecord"
         WHERE "sessionId" = ${session.id}
       `
     : [];
@@ -124,7 +124,7 @@ export const attendanceService = {
   async list(offeringId: string): Promise<AttendanceSessionSummary[]> {
     const sessions = await prisma.$queryRaw<SessionRow[]>`
       SELECT "id", "offeringId", "sessionDate", "updatedAt"
-      FROM "AttendanceSession"
+      FROM "pms_attendance"."AttendanceSession"
       WHERE "offeringId" = ${offeringId}
       ORDER BY "sessionDate" DESC
     `;
@@ -138,7 +138,7 @@ export const attendanceService = {
     for (const session of sessions) {
       const rows = await prisma.$queryRaw<Array<{ status: AttendanceStatus; count: bigint }>>`
         SELECT "status", COUNT(*)::bigint AS "count"
-        FROM "AttendanceRecord"
+        FROM "pms_attendance"."AttendanceRecord"
         WHERE "sessionId" = ${session.id}
         GROUP BY "status"
       `;
@@ -175,7 +175,7 @@ export const attendanceService = {
     await prisma.$transaction(async (tx) => {
       const existing = await tx.$queryRaw<SessionRow[]>`
         SELECT "id", "offeringId", "sessionDate", "updatedAt"
-        FROM "AttendanceSession"
+        FROM "pms_attendance"."AttendanceSession"
         WHERE "offeringId" = ${offeringId}
           AND "sessionDate" = ${dateValue(date)}
         LIMIT 1
@@ -184,26 +184,26 @@ export const attendanceService = {
 
       if (existing.length === 0) {
         await tx.$executeRaw`
-          INSERT INTO "AttendanceSession" ("id", "offeringId", "sessionDate")
+          INSERT INTO "pms_attendance"."AttendanceSession" ("id", "offeringId", "sessionDate")
           VALUES (${sessionId}, ${offeringId}, ${dateValue(date)})
         `;
       } else {
         await tx.$executeRaw`
-          UPDATE "AttendanceSession"
+          UPDATE "pms_attendance"."AttendanceSession"
           SET "updatedAt" = CURRENT_TIMESTAMP
           WHERE "id" = ${sessionId}
         `;
       }
 
       await tx.$executeRaw`
-        DELETE FROM "AttendanceRecord"
+        DELETE FROM "pms_attendance"."AttendanceRecord"
         WHERE "sessionId" = ${sessionId}
       `;
 
       for (const record of input.records) {
         const student = studentById.get(record.studentId)!;
         await tx.$executeRaw`
-          INSERT INTO "AttendanceRecord"
+          INSERT INTO "pms_attendance"."AttendanceRecord"
             ("sessionId", "studentId", "studentNumber", "studentName", "status", "note")
           VALUES
             (${sessionId}, ${record.studentId}, ${student.studentId}, ${student.name}, ${record.status}, ${record.note})
