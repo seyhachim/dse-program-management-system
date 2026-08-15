@@ -9,6 +9,7 @@ import {
   type ProgrammeAcademicConfig,
   type Rubric,
   type StudentResponsibilitySection as StudentResponsibilityValue,
+  type TeachingLearningProfile,
 } from "@dse-pms/shared-types";
 
 import type { CourseInfoForm } from "./course-info-section";
@@ -82,6 +83,11 @@ export type CourseDocumentModel = {
     sltHours: string;
     assessment: string;
   }[];
+  /** §19: facilities, infrastructure, platforms, software, or equipment needed to deliver the course. */
+  requiredDeliveryResources: string[];
+  /** §20: course-level instructional materials used to support teaching and student learning. */
+  teachingLearningMaterials: string[];
+  /** Detailed files, links, textbooks, references, and resource records managed in the Resources tab. */
   resources: {
     id: string;
     resourceType: string;
@@ -227,6 +233,7 @@ type BuildCourseDocumentInput = {
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
   programme?: ProgrammeAcademicConfig | null;
+  teachingLearningProfile?: TeachingLearningProfile;
   resources?: ResourcesForm;
   responsibility?: StudentResponsibilityValue;
   policy?: PolicySectionValue;
@@ -239,6 +246,16 @@ const EMPTY_POLICY_VALUES: PolicySectionValue = {
   assignmentsLateSubmission: "",
   examinationRules: "",
   penaltiesConsequences: "",
+};
+
+const EMPTY_TEACHING_LEARNING_PROFILE: TeachingLearningProfile = {
+  philosophyTags: [],
+  philosophyStatement: "",
+  teachingMethodIds: [],
+  activeLearningStrategyIds: [],
+  independentLearningTypes: [],
+  resourceTypes: [],
+  technologyTypes: [],
 };
 
 type CourseType =
@@ -279,6 +296,7 @@ export function buildCourseDocument({
   teachingMethods = [],
   assessmentMethods = [],
   programme = null,
+  teachingLearningProfile = EMPTY_TEACHING_LEARNING_PROFILE,
   resources = [],
   responsibility,
   policy,
@@ -458,6 +476,8 @@ export function buildCourseDocument({
     clos: documentClos,
     mapping: documentMapping,
     weeklyPlan: documentWeeks,
+    requiredDeliveryResources: unique(teachingLearningProfile.technologyTypes),
+    teachingLearningMaterials: unique(teachingLearningProfile.resourceTypes),
     resources: resources.map((resource) => ({
       id: resource.id,
       resourceType: resource.resourceType,
