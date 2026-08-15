@@ -8,6 +8,11 @@ import {
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import {
+  hasAnyRoleInProgramme,
+  type AuthUser,
+  type Role,
+} from "../../core/auth/token.ts";
+import {
   addComment,
   createAction,
   createCommunity,
@@ -19,8 +24,13 @@ import {
   listDiscussions,
   updateActionStatus,
 } from "./service.ts";
+import {
+  actionProgrammeId,
+  communityProgrammeId,
+  discussionProgrammeId,
+} from "./scope.ts";
 
-const COMMUNITY_ROLES = new Set([
+const COMMUNITY_ROLES: Role[] = [
   "admin",
   "program_coordinator",
   "program_secretary",
@@ -28,47 +38,54 @@ const COMMUNITY_ROLES = new Set([
   "qa_contributor",
   "qa_reviewer",
   "student",
-]);
+];
 
-const FACILITATOR_ROLES = new Set([
+const FACILITATOR_ROLES: Role[] = [
   "admin",
   "program_coordinator",
   "lecturer",
   "qa_contributor",
-]);
+];
 
-const GOVERNANCE_ROLES = new Set(["admin", "program_coordinator", "lecturer"]);
+const GOVERNANCE_ROLES: Role[] = ["admin", "program_coordinator", "lecturer"];
 
-function hasAnyRole(user: { roles?: string[]; role?: string }, allowed: Set<string>) {
-  const roles = user.roles ?? (user.role ? [user.role] : []);
-  return roles.some((role) => allowed.has(role));
+function canAccessProgramme(user: AuthUser, programmeId: string): boolean {
+  return hasAnyRoleInProgramme(user, COMMUNITY_ROLES, programmeId);
+}
+
+function canFacilitate(user: AuthUser, programmeId: string): boolean {
+  return hasAnyRoleInProgramme(user, FACILITATOR_ROLES, programmeId);
+}
+
+function canGovern(user: AuthUser, programmeId: string): boolean {
+  return hasAnyRoleInProgramme(user, GOVERNANCE_ROLES, programmeId);
+}
+
+function denyProgramme(res: Parameters<Parameters<Router["use"]>[0]>[1]) {
+  res.status(403).json({ error: "You do not have Community of Practice access to this programme" });
 }
 
 export function createCommunityRouter(): Router {
   const router = Router();
   router.use(requireAuth);
 
-  router.use((req, res, next) => {
-    if (!req.user || !hasAnyRole(req.user, COMMUNITY_ROLES)) {
-      res.status(403).json({ error: "Community of Practice access is not available for this role" });
-      return;
-    }
-    next();
-  });
-
   router.get("/communities", async (req, res) => {
     const programmeId = typeof req.query.programmeId === "string" ? req.query.programmeId : "dse";
-    res.json(await listCommunities(programmeId, req.user!.id));
+    if (!req.user || !canAccessProgramme(req.user, programmeId)) {
+      denyProgramme(res);
+      return;
+    }
+    res.json(await listCommunities(programmeId, req.user.id));
   });
 
   router.post("/communities", async (req, res) => {
-    if (!req.user || !hasAnyRole(req.user, GOVERNANCE_ROLES)) {
-      res.status(403).json({ error: "Only programme leadership or lecturers can create a community" });
-      return;
-    }
     const parsed = CreateCommunitySchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid community", details: parsed.error.flatten() });
+      return;
+    }
+    if (!req.user || !canGovern(req.user, parsed.data.programmeId)) {
+      res.status(403).json({ error: "Only programme leadership or lecturers in this programme can create a community" });
       return;
     }
     try {
@@ -83,7 +100,16 @@ export function createCommunityRouter(): Router {
   });
 
   router.get("/communities/:communityId", async (req, res) => {
-    const community = await getCommunity(req.params.communityId!, req.user!.id);
+    const programmeId = await communityProgrammeId(req.params.communityId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Community not found" });
+      return;
+    }
+    if (!req.user || !canAccessProgramme(req.user, programmeId)) {
+      denyProgramme(res);
+      return;
+    }
+    const community = await getCommunity(req.params.communityId!, req.user.id);
     if (!community) {
       res.status(404).json({ error: "Community not found" });
       return;
@@ -92,11 +118,29 @@ export function createCommunityRouter(): Router {
   });
 
   router.post("/communities/:communityId/join", async (req, res) => {
-    await joinCommunity(req.params.communityId!, req.user!.id);
+    const programmeId = await communityProgrammeId(req.params.communityId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Community not found" });
+      return;
+    }
+    if (!req.user || !canAccessProgramme(req.user, programmeId)) {
+      denyProgramme(res);
+      return;
+    }
+    await joinCommunity(req.params.communityId!, req.user.id);
     res.status(204).end();
   });
 
   router.get("/communities/:communityId/discussions", async (req, res) => {
+    const programmeId = await communityProgrammeId(req.params.communityId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Community not found" });
+      return;
+    }
+    if (!req.user || !canAccessProgramme(req.user, programmeId)) {
+      denyProgramme(res);
+      return;
+    }
     res.json(await listDiscussions(req.params.communityId!));
   });
 
@@ -106,12 +150,30 @@ export function createCommunityRouter(): Router {
       res.status(400).json({ error: "Invalid discussion", details: parsed.error.flatten() });
       return;
     }
+    const programmeId = await communityProgrammeId(req.params.communityId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Community not found" });
+      return;
+    }
+    if (!req.user || !canAccessProgramme(req.user, programmeId)) {
+      denyProgramme(res);
+      return;
+    }
     res.status(201).json(
-      await createDiscussion(req.params.communityId!, parsed.data, req.user!.id),
+      await createDiscussion(req.params.communityId!, parsed.data, req.user.id),
     );
   });
 
   router.get("/discussions/:discussionId", async (req, res) => {
+    const programmeId = await discussionProgrammeId(req.params.discussionId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Discussion not found" });
+      return;
+    }
+    if (!req.user || !canAccessProgramme(req.user, programmeId)) {
+      denyProgramme(res);
+      return;
+    }
     const discussion = await getDiscussion(req.params.discussionId!);
     if (!discussion) {
       res.status(404).json({ error: "Discussion not found" });
@@ -126,19 +188,33 @@ export function createCommunityRouter(): Router {
       res.status(400).json({ error: "Invalid comment", details: parsed.error.flatten() });
       return;
     }
+    const programmeId = await discussionProgrammeId(req.params.discussionId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Discussion not found" });
+      return;
+    }
+    if (!req.user || !canAccessProgramme(req.user, programmeId)) {
+      denyProgramme(res);
+      return;
+    }
     res.status(201).json(
-      await addComment(req.params.discussionId!, parsed.data.body, req.user!.id),
+      await addComment(req.params.discussionId!, parsed.data.body, req.user.id),
     );
   });
 
   router.post("/discussions/:discussionId/actions", async (req, res) => {
-    if (!req.user || !hasAnyRole(req.user, FACILITATOR_ROLES)) {
-      res.status(403).json({ error: "Only community facilitators can convert a discussion to an action" });
-      return;
-    }
     const parsed = CreateCommunityActionSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid action", details: parsed.error.flatten() });
+      return;
+    }
+    const programmeId = await discussionProgrammeId(req.params.discussionId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Discussion not found" });
+      return;
+    }
+    if (!req.user || !canFacilitate(req.user, programmeId)) {
+      res.status(403).json({ error: "Only community facilitators in this programme can convert a discussion to an action" });
       return;
     }
     res.status(201).json(
@@ -147,13 +223,18 @@ export function createCommunityRouter(): Router {
   });
 
   router.patch("/actions/:actionId/status", async (req, res) => {
-    if (!req.user || !hasAnyRole(req.user, FACILITATOR_ROLES)) {
-      res.status(403).json({ error: "Only community facilitators can update action status" });
-      return;
-    }
     const parsed = UpdateCommunityActionStatusSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid action status", details: parsed.error.flatten() });
+      return;
+    }
+    const programmeId = await actionProgrammeId(req.params.actionId!);
+    if (!programmeId) {
+      res.status(404).json({ error: "Action not found" });
+      return;
+    }
+    if (!req.user || !canFacilitate(req.user, programmeId)) {
+      res.status(403).json({ error: "Only community facilitators in this programme can update action status" });
       return;
     }
     const action = await updateActionStatus(req.params.actionId!, parsed.data.status);
