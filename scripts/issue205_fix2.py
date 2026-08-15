@@ -11,6 +11,7 @@ def one(text: str, old: str, new: str, label: str) -> str:
 # gets an explicit courseSpecId in issue #211.
 p = Path("apps/backend/src/plugins/student-portal/service.ts")
 text = p.read_text()
+text = one(text, 'import { prisma } from "../../core/db/prisma.ts";', 'import { Prisma } from "@prisma/client";\nimport { prisma } from "../../core/db/prisma.ts";', "portal Prisma import")
 text = one(text, '''          spec: {
             include: {
               clos: { orderBy: { order: "asc" as const } },
@@ -19,19 +20,20 @@ text = one(text, '''          spec: {
               resources: { orderBy: { order: "asc" as const } },
             },
           },''', '''          specs: {
-            where: { reviewStatus: "Approved" as const },
+            where: { reviewStatus: "Approved" },
             orderBy: [
-              { versionMajor: "desc" as const },
-              { versionMinor: "desc" as const },
+              { versionMajor: "desc" },
+              { versionMinor: "desc" },
             ],
             take: 1,
             include: {
-              clos: { orderBy: { order: "asc" as const } },
-              weeks: { orderBy: { order: "asc" as const } },
-              assessmentItems: { orderBy: { order: "asc" as const } },
-              resources: { orderBy: { order: "asc" as const } },
+              clos: { orderBy: { order: "asc" } },
+              weeks: { orderBy: { order: "asc" } },
+              assessmentItems: { orderBy: { order: "asc" } },
+              resources: { orderBy: { order: "asc" } },
             },
           },''', "portal enrollment spec")
+text = one(text, '} as const;\n\ntype EnrollmentRow', '} satisfies Prisma.EnrollmentInclude;\n\ntype EnrollmentRow', "portal include typing")
 text = one(text, '  const spec = row.offering.course.spec;\n  return spec?.reviewStatus === "Approved" ? spec : null;', '  return row.offering.course.specs[0] ?? null;', "portal approved helper")
 text = one(text, 'include: { coLecturers: true, course: { select: { spec: { select: { id: true } } } } },', '''include: {
       coLecturers: true,
