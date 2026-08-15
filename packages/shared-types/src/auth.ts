@@ -7,10 +7,12 @@ import { z } from "zod";
  * path (issue #101 follow-up) — deliberately not the full `Role` enum:
  * - `admin` is excluded — minting a new admin login stays a manual/seed-only
  *   action, not something exposed through this form.
- * - `student` is excluded — students are provisioned via "Add Student" on the
- *   Students page, which creates a roster profile, not a login account.
+ * - `qa_contributor` is excluded — it is an additive programme role granted to
+ *   an existing staff account rather than a standalone account type.
+ * - `student` requires a roster profile with the same email; account
+ *   provisioning links that profile to the invited User.
  */
-export const INVITABLE_ROLES = ["lecturer", "program_coordinator", "program_secretary", "qa_reviewer"] as const;
+export const INVITABLE_ROLES = ["lecturer", "program_coordinator", "program_secretary", "qa_reviewer", "student"] as const;
 export const CreateAccountInput = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("A valid email is required"),
@@ -19,20 +21,44 @@ export const CreateAccountInput = z.object({
 export type CreateAccountInput = z.infer<typeof CreateAccountInput>;
 
 /**
- * The application roles (issue #101). Shared so nav/permission gating can key
- * off it. `program_coordinator`/`program_secretary`/`qa_reviewer` are
- * programme-wide today (there is exactly one programme, so nothing to scope
- * to yet) — see `PROGRAMME_WIDE_ROLES` in the backend's `token.ts`.
+ * Application roles. `qa_contributor` is intentionally additive: a lecturer or
+ * other staff member can hold it alongside their existing role to work on an
+ * assigned AUN-QA/SAR scope without receiving programme-management authority.
  */
 export const Role = z.enum([
   "admin",
   "program_coordinator",
   "program_secretary",
   "lecturer",
+  "qa_contributor",
   "qa_reviewer",
   "student",
 ]);
 export type Role = z.infer<typeof Role>;
+
+/**
+ * Roles that can be granted through programme role management. Start narrowly:
+ * programme leadership may add/remove the QA Contributor capability without
+ * turning the role-management endpoint into a general privilege-escalation API.
+ */
+export const PROGRAMME_ASSIGNABLE_ROLES = ["qa_contributor"] as const;
+export const ProgrammeAssignableRole = z.enum(PROGRAMME_ASSIGNABLE_ROLES);
+export type ProgrammeAssignableRole = z.infer<typeof ProgrammeAssignableRole>;
+
+export const ManageProgrammeRoleInput = z.object({
+  userId: z.string().uuid(),
+  programmeId: z.string().trim().min(1),
+  role: ProgrammeAssignableRole,
+});
+export type ManageProgrammeRoleInput = z.infer<typeof ManageProgrammeRoleInput>;
+
+export interface ProgrammeRoleAssignmentView {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  programmeId: string;
+  role: ProgrammeAssignableRole;
+}
 
 /**
  * Shape returned by GET /api/auth/me — the resolved caller. `role` is the

@@ -3,9 +3,14 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Lightbulb, Loader2, Plus } from "lucide-react";
-import type { Method, StudentLearningActivity } from "@dse-pms/shared-types";
+import type {
+  ActiveLearningCluster,
+  Method,
+  StudentLearningActivity,
+} from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { courseSpecApi } from "@/lib/course-spec";
+import { methodsApi } from "@/lib/methods";
 import {
   EMPTY_TEACHING_LEARNING_PROFILE,
   teachingLearningApi,
@@ -35,6 +40,9 @@ export function WeekSuggestionsPanel({
 }) {
   const [profile, setProfile] = useState<TeachingLearningProfile | null>(null);
   const [assessments, setAssessments] = useState<AssessmentForm[]>([]);
+  const [activeLearningClusters, setActiveLearningClusters] = useState<
+    ActiveLearningCluster[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,11 +56,13 @@ export function WeekSuggestionsPanel({
         .get(courseId)
         .catch(() => EMPTY_TEACHING_LEARNING_PROFILE),
       courseSpecApi.get(courseId),
+      methodsApi.list(),
     ])
-      .then(([teachingLearning, spec]) => {
+      .then(([teachingLearning, spec, vocabulary]) => {
         if (cancelled) return;
         setProfile(teachingLearning);
         setAssessments(toAssessmentForm(spec.data.assessmentPlan));
+        setActiveLearningClusters(vocabulary.activeLearningClusters);
       })
       .catch(() => {
         if (!cancelled) setError("Course suggestions could not be loaded.");
@@ -73,10 +83,19 @@ export function WeekSuggestionsPanel({
         cloCodes: draft.cloCodes,
         clos,
         teachingMethods,
+        activeLearningClusters,
         profile,
         assessments,
       }),
-    [draft.week, draft.cloCodes, clos, teachingMethods, profile, assessments],
+    [
+      draft.week,
+      draft.cloCodes,
+      clos,
+      teachingMethods,
+      activeLearningClusters,
+      profile,
+      assessments,
+    ],
   );
 
   const suggestionCount = countSuggestions(suggestions);

@@ -19,7 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@dse-pms/ui";
-import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
+import {
+  LETTER_GRADES,
+  PLOS,
+  referenceKindLabel,
+} from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
@@ -45,6 +49,19 @@ function displayValue(value: string | number | null | undefined): string {
 
 function joinValues(values: string[]): string {
   return values.length ? values.join(", ") : "—";
+}
+
+function referenceCitation(
+  reference: CourseDocumentModel["references"][number],
+): string {
+  const parts = [
+    reference.authors,
+    reference.year ? `(${reference.year})` : "",
+    reference.title,
+    reference.publisher,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(". ") : "—";
 }
 
 function Page({
@@ -589,12 +606,21 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     weeklyPages.push(document.weeklyPlan.slice(i, i + 7));
   if (!weeklyPages.length) weeklyPages.push([]);
 
-  const weeklyStartPage = 8;
+  const weeklyStartPage = 9;
   const resourcesPage = weeklyStartPage + weeklyPages.length;
-  const materialsPage = resourcesPage + 1;
-  const responsibilityPage = materialsPage + 1;
-  const policyPage = responsibilityPage + 1;
+  const referencesPage = resourcesPage + 1;
+  const responsibilityPage = referencesPage + 1;
+
+  // One rubric per page — a criteria × levels grid's height is unpredictable
+  // (unlike the Weekly Plan's uniform rows), so unlike weeklyPages this isn't
+  // batched, to avoid silently clipping content against the page's fixed height.
+  const rubricPages: CourseDocumentModel["rubrics"][] = document.rubrics.length
+    ? document.rubrics.map((rubric) => [rubric])
+    : [[]];
+  const rubricStartPage = responsibilityPage + 1;
+  const policyPage = rubricStartPage + rubricPages.length;
   const ratingScalePage = policyPage + 1;
+  const datePage = ratingScalePage + 1;
 
   return (
     <div className="space-y-4">
@@ -661,7 +687,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <div>
                 <dt className="text-xs text-muted-foreground">Sections</dt>
                 <dd className="mt-0.5 font-medium">
-                  Part 1 + Sections 1–21, 23, 24
+                  Part 1 + Sections 1–25
                 </dd>
               </div>
               <div>
@@ -675,6 +701,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             <nav className="mt-3 space-y-1 text-sm">
               <a href="#programme-overview" className="block rounded-md px-2 py-2 hover:bg-muted">
                 Part 1. Programme Overview
+              </a>
+              <a href="#plo-taxonomy" className="block rounded-md px-2 py-2 hover:bg-muted">
+                Part 1. PLO Taxonomy
               </a>
               <a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">
                 1–13. Course Information
@@ -697,17 +726,23 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <a href="#resources" className="block rounded-md px-2 py-2 hover:bg-muted">
                 19. Required Resources
               </a>
-              <a href="#materials" className="block rounded-md px-2 py-2 hover:bg-muted">
-                20. Teaching &amp; Learning Materials
+              <a href="#references" className="block rounded-md px-2 py-2 hover:bg-muted">
+                20. References / Textbooks
               </a>
               <a href="#responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">
                 21. Student Responsibility
+              </a>
+              <a href="#rubric" className="block rounded-md px-2 py-2 hover:bg-muted">
+                22. Rubric
               </a>
               <a href="#policy" className="block rounded-md px-2 py-2 hover:bg-muted">
                 23. Course Policy
               </a>
               <a href="#rating-scale" className="block rounded-md px-2 py-2 hover:bg-muted">
                 24. Rating Scale
+              </a>
+              <a href="#spec-date" className="block rounded-md px-2 py-2 hover:bg-muted">
+                25. Date
               </a>
             </nav>
           </div>
@@ -765,6 +800,56 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             </Page>
 
             <Page zoom={zoom} pageNumber={2}>
+              <div id="plo-taxonomy" className="h-full px-[54px] py-[42px]">
+                <h2 className="mb-3 text-[13px] font-bold uppercase">
+                  Part 1 (continued): Programme Learning Outcomes — Taxonomy
+                </h2>
+                {document.plos.length === 0 ? (
+                  <p className="text-[11px]">
+                    No programme learning outcomes have been configured.
+                  </p>
+                ) : (
+                  <Table>
+                    <colgroup>
+                      <col className="w-[6%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[38%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[8%]" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <TH>No.</TH>
+                        <TH>PLO</TH>
+                        <TH>Description</TH>
+                        <TH>Major</TH>
+                        <TH>Learning Domain</TH>
+                        <TH>Specific / Generic</TH>
+                        <TH>C/A/P</TH>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {document.plos.map((plo, index) => (
+                        <tr key={plo.id}>
+                          <TD className="text-center">{index + 1}</TD>
+                          <TD className="font-medium">{plo.code}</TD>
+                          <TD>{plo.description}</TD>
+                          <TD>{displayValue(plo.major)}</TD>
+                          <TD>{displayValue(plo.learningDomain)}</TD>
+                          <TD>{displayValue(plo.specificOrGeneric)}</TD>
+                          <TD>{displayValue(plo.cap)}</TD>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                )}
+                <PageFooter courseCode={info.courseCode} page={2} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={3}>
               <div id="course-information" className="h-full px-[54px] py-[38px]">
                 <PageHeader document={document} />
                 <p className="mb-3 text-[12px] font-bold">{document.partTitle}</p>
@@ -788,11 +873,11 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                     <tr><LabelCell number="13">Course Description / Synopsis</LabelCell><ValueCell colSpan={3} className="leading-[1.45]">{displayValue(info.description)}</ValueCell></tr>
                   </tbody>
                 </Table>
-                <PageFooter courseCode={info.courseCode} page={2} />
+                <PageFooter courseCode={info.courseCode} page={3} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={3}>
+            <Page zoom={zoom} pageNumber={4}>
               <div id="clos" className="h-full px-[54px] py-[42px]" style={{ display: "block" }}>
                 <div className="mb-1 flex items-baseline gap-2 text-[13px]">
                   <span>14.</span>
@@ -847,22 +932,22 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   </Table>
                 </div>
                 <TaxonomyLegend />
-                <PageFooter courseCode={info.courseCode} page={3} />
+                <PageFooter courseCode={info.courseCode} page={4} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={4}>
+            <Page zoom={zoom} pageNumber={5}>
               <div id="mapping" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="15">Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods</SectionTitle>
                 <CloPloMatrix mapping={document.mapping} mode="percent" />
                 <p className="mt-3 text-[9px] leading-[1.5]"><strong>Fully (F)</strong> indicates a focus of more than 50% of the total SLT on this PLO, <strong>Moderate (M)</strong> indicates a focus of 31%–50% of the total SLT, and <strong>Partial (P)</strong> indicates a focus of less than 30% of the total SLT on the PLO.</p>
                 <div className="mt-4"><CloPloMatrix mapping={document.mapping} mode="hours" /></div>
                 <p className="mt-3 text-[9px]">1 Credit = 40 Student Learning Time (SLT)</p>
-                <PageFooter courseCode={info.courseCode} page={4} />
+                <PageFooter courseCode={info.courseCode} page={5} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={5}>
+            <Page zoom={zoom} pageNumber={6}>
               <div className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="15">Mapping of the Course Learning Outcomes (continued)</SectionTitle>
                 <Table>
@@ -871,11 +956,11 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   <tbody>{document.mapping.map((row) => (<tr key={row.cloCode}><TD className="font-medium">{row.cloCode}</TD><TD>{joinValues(row.ploCodes)}</TD><TD>{displayValue(row.level)}</TD><TD>{joinValues(row.teachingMethods)}</TD><TD>{joinValues(row.assessmentMethods)}</TD></tr>))}</tbody>
                 </Table>
                 <p className="mt-4 text-[9px]">The mapping shown here is generated from the current CLO, PLO, teaching-method and assessment-method records stored in the PMS. No additional alignment values are inferred for the document.</p>
-                <PageFooter courseCode={info.courseCode} page={5} />
+                <PageFooter courseCode={info.courseCode} page={6} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={6}>
+            <Page zoom={zoom} pageNumber={7}>
               <div id="slt" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="16">Distribution of Student Learning Time (SLT)</SectionTitle>
                 <Table>
@@ -885,11 +970,11 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   <tfoot><tr><TD colSpan={3} className="font-semibold">Total SLT for Course Content</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.lectureHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.tutorialHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.practiceHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.otherHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.selfStudyHours) || 0), 0)}</TD><TD className="font-semibold">{document.totals.courseContentSlt} h</TD></tr></tfoot>
                 </Table>
                 <div className="mt-5 rounded border border-black p-3 text-[10px]"><p className="font-bold">Assessment SLT</p><p className="mt-1">Assessment-specific SLT is not currently stored in the course assessment records, so no assessment SLT value is invented in this preview.</p><p className="mt-2">Grand Total SLT: <strong>Not available from current structured data</strong></p></div>
-                <PageFooter courseCode={info.courseCode} page={6} />
+                <PageFooter courseCode={info.courseCode} page={7} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={7}>
+            <Page zoom={zoom} pageNumber={8}>
               <div id="assessment-plan" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="17">Course Assessment Plan</SectionTitle>
                 <Table>
@@ -899,7 +984,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   <tfoot><tr><TD colSpan={5} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD colSpan={2}></TD></tr></tfoot>
                 </Table>
                 <p className="mt-4 text-[9px]">Assessment SLT is omitted here because the current CourseSpecAssessmentItem data model does not contain an assessment-duration/SLT field.</p>
-                <PageFooter courseCode={info.courseCode} page={7} />
+                <PageFooter courseCode={info.courseCode} page={8} />
               </div>
             </Page>
 
@@ -921,32 +1006,55 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             <Page zoom={zoom} pageNumber={resourcesPage}>
               <div id="resources" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="19">Required Resources to Deliver the Course</SectionTitle>
-                {document.requiredDeliveryResources.length === 0 ? (
-                  <p className="text-[11px]">No required delivery resources have been selected.</p>
-                ) : (
-                  <ul className="list-disc space-y-1.5 pl-5 text-[11px] leading-[1.4]">
-                    {document.requiredDeliveryResources.map((item, index) => (
-                      <li key={`${item}-${index}`}>{item}</li>
-                    ))}
-                  </ul>
-                )}
+                {document.resources.length === 0 ? <p className="text-[11px]">No required resources have been confirmed.</p> : <Table><colgroup><col className="w-[18%]" /><col className="w-[27%]" /><col className="w-[25%]" /><col className="w-[30%]" /></colgroup><thead><tr><TH>Resource Type</TH><TH>Resource Name / Description</TH><TH>Link</TH><TH>Notes</TH></tr></thead><tbody>{document.resources.map((resource) => (<tr key={resource.id}><TD>{displayValue(resource.resourceType)}</TD><TD>{displayValue(resource.title)}</TD><TD>{displayValue(resource.url)}</TD><TD>{displayValue(resource.notes)}</TD></tr>))}</tbody></Table>}
                 <PageFooter courseCode={info.courseCode} page={resourcesPage} />
               </div>
             </Page>
 
-            <Page zoom={zoom} pageNumber={materialsPage}>
-              <div id="materials" className="h-full px-[54px] py-[42px]">
-                <SectionTitle number="20">Other Teaching and Learning Materials</SectionTitle>
-                {document.teachingLearningMaterials.length === 0 ? (
-                  <p className="text-[11px]">No other teaching and learning materials have been selected.</p>
+            <Page zoom={zoom} pageNumber={referencesPage}>
+              <div id="references" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="20">References / Textbooks</SectionTitle>
+
+                {document.references.length === 0 ? (
+                  <p className="text-[11px]">
+                    No references have been recorded.
+                  </p>
                 ) : (
-                  <ul className="list-disc space-y-1.5 pl-5 text-[11px] leading-[1.4]">
-                    {document.teachingLearningMaterials.map((item, index) => (
-                      <li key={`${item}-${index}`}>{item}</li>
-                    ))}
-                  </ul>
+                  <Table>
+                    <colgroup>
+                      <col className="w-[13%]" />
+                      <col className="w-[45%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <TH>Kind</TH>
+                        <TH>Citation</TH>
+                        <TH>ISBN</TH>
+                        <TH>Link</TH>
+                        <TH>Notes</TH>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {document.references.map((reference) => (
+                        <tr key={reference.id}>
+                          <TD>{referenceKindLabel(reference.kind)}</TD>
+                          <TD>{referenceCitation(reference)}</TD>
+                          <TD>{displayValue(reference.isbn)}</TD>
+                          <TD>{displayValue(reference.url)}</TD>
+                          <TD>{displayValue(reference.notes)}</TD>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
                 )}
-                <PageFooter courseCode={info.courseCode} page={materialsPage} />
+
+                <PageFooter
+                  courseCode={info.courseCode}
+                  page={referencesPage}
+                />
               </div>
             </Page>
 
@@ -957,6 +1065,84 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 <PageFooter courseCode={info.courseCode} page={responsibilityPage} />
               </div>
             </Page>
+
+            {rubricPages.map((rubrics, index) => (
+              <Page
+                zoom={zoom}
+                pageNumber={rubricStartPage + index}
+                key={`rubric-${index}`}
+              >
+                <div id="rubric" className="h-full px-[54px] py-[42px]">
+                  <SectionTitle number="22">
+                    Rubric
+                    {rubricPages.length > 1
+                      ? ` (${index + 1} of ${rubricPages.length})`
+                      : ""}
+                  </SectionTitle>
+                  {rubrics.length === 0 ? (
+                    <p className="text-[11px]">
+                      No assessment has a rubric linked from the Rubric
+                      Library.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {rubrics.map((rubric, ri) => (
+                        <div key={ri}>
+                          <p className="text-[11px] font-bold">
+                            {rubric.assessmentName} — {rubric.name} (
+                            {rubric.type})
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-slate-600">
+                            Rating Scale: {rubric.scaleSummary}
+                          </p>
+                          <Table className="mt-1.5">
+                            <colgroup>
+                              <col className="w-[22%]" />
+                              {rubric.levels.map((_level, i) => (
+                                <col
+                                  key={i}
+                                  style={{
+                                    width: `${78 / rubric.levels.length}%`,
+                                  }}
+                                />
+                              ))}
+                            </colgroup>
+                            <thead>
+                              <tr>
+                                <TH>Criteria</TH>
+                                {rubric.levels.map((level, i) => (
+                                  <TH key={i} className="text-center">
+                                    {level.points} – {level.label}
+                                  </TH>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rubric.criteria.map((criterion, ci) => (
+                                <tr key={ci}>
+                                  <TD className="font-semibold">
+                                    {criterion.name}
+                                  </TD>
+                                  {rubric.levels.map((_level, li) => (
+                                    <TD key={li}>
+                                      {criterion.descriptors[li] ?? "—"}
+                                    </TD>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <PageFooter
+                    courseCode={info.courseCode}
+                    page={rubricStartPage + index}
+                  />
+                </div>
+              </Page>
+            ))}
 
             <Page zoom={zoom} pageNumber={policyPage}>
               <div id="policy" className="h-full px-[54px] py-[42px]">
@@ -971,6 +1157,18 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 <SectionTitle number="24">Rating Scale</SectionTitle>
                 <Table><colgroup><col className="w-[25%]" /><col className="w-[25%]" /><col className="w-[25%]" /><col className="w-[25%]" /></colgroup><thead><tr><TH>Letter Grade</TH><TH>Grade Point</TH><TH>Score</TH><TH>Explanation</TH></tr></thead><tbody>{LETTER_GRADES.map((grade) => (<tr key={grade.grade}><TD className="text-center">{grade.grade}</TD><TD className="text-center">{grade.point}</TD><TD className="text-center">{grade.score}</TD><TD>{grade.label}</TD></tr>))}</tbody></Table>
                 <PageFooter courseCode={info.courseCode} page={ratingScalePage} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={datePage}>
+              <div id="spec-date" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="25">Date</SectionTitle>
+                <Table>
+                  <colgroup><col className="w-[50%]" /><col className="w-[50%]" /></colgroup>
+                  <thead><tr><TH>Item</TH><TH>Date</TH></tr></thead>
+                  <tbody><tr><TD>Course Specification Last Revised / Approved</TD><TD>{displayValue(document.specDate)}</TD></tr></tbody>
+                </Table>
+                <PageFooter courseCode={info.courseCode} page={datePage} />
               </div>
             </Page>
           </div>

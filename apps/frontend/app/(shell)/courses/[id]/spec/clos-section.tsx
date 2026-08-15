@@ -11,7 +11,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@dse-pms/ui";
-import { bloomStyle, withCodes, type CloForm } from "./clo-model";
+import {
+  bloomStyle,
+  capDomainStyle,
+  withCodes,
+  type CloForm,
+} from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
 import { CloWizardModal } from "./clos/clo-wizard-modal";
 import type { ProgrammeAcademicConfig } from "@dse-pms/shared-types";
@@ -23,7 +28,16 @@ export {
   type CloForm,
 } from "./clo-model";
 
-type FilterKey = "all" | "active" | "inactive" | "mapped" | "unmapped";
+type FilterKey =
+  | "all"
+  | "active"
+  | "inactive"
+  | "mapped"
+  | "unmapped"
+  | "cognitive"
+  | "affective"
+  | "psychomotor"
+  | "unclassified";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All CLOs" },
@@ -31,6 +45,10 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "inactive", label: "Inactive" },
   { key: "mapped", label: "Mapped to PLOs" },
   { key: "unmapped", label: "Not mapped" },
+  { key: "cognitive", label: "Cognitive (C)" },
+  { key: "affective", label: "Affective (A)" },
+  { key: "psychomotor", label: "Psychomotor (P)" },
+  { key: "unclassified", label: "Unclassified" },
 ];
 
 export function ClosSection({
@@ -58,14 +76,22 @@ export function ClosSection({
   );
 
   const visible = clos.filter((c) => {
+    const domain = capDomainStyle(c.level);
     if (filter === "active" && c.status !== "active") return false;
     if (filter === "inactive" && c.status !== "inactive") return false;
     if (filter === "mapped" && c.mappedPlos.length === 0) return false;
     if (filter === "unmapped" && c.mappedPlos.length > 0) return false;
+    if (filter === "cognitive" && domain?.code !== "C") return false;
+    if (filter === "affective" && domain?.code !== "A") return false;
+    if (filter === "psychomotor" && domain?.code !== "P") return false;
+    if (filter === "unclassified" && domain) return false;
     if (query.trim()) {
       const q = query.toLowerCase();
-      const hay =
-        `${c.code} ${c.description} ${c.mappedPlos.join(" ")}`.toLowerCase();
+      const hay = `${c.code} ${c.description} ${c.level} ${
+        bloomStyle(c.level).name
+      } ${domain?.name ?? "unclassified"} ${c.mappedPlos.join(
+        " ",
+      )}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -206,13 +232,14 @@ export function ClosSection({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
                   <th className="w-8 py-2 pr-2">#</th>
                   <th className="py-2 pr-3">CLO Code</th>
                   <th className="py-2 pr-3">Course Learning Outcome</th>
-                  <th className="py-2 pr-3">Bloom's Level</th>
+                  <th className="py-2 pr-3">C/A/P Level</th>
+                  <th className="py-2 pr-3">Level Description</th>
                   <th className="py-2 pr-3">Mapped PLOs</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 text-right">Actions</th>
@@ -222,7 +249,7 @@ export function ClosSection({
                 {visible.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="py-8 text-center text-sm text-muted-foreground"
                     >
                       No CLOs match your search.
@@ -232,6 +259,7 @@ export function ClosSection({
                   visible.map((clo) => {
                     const index = clos.indexOf(clo);
                     const bloom = clo.level ? bloomStyle(clo.level) : null;
+                    const domain = capDomainStyle(clo.level);
                     return (
                       <tr
                         key={clo.code}
@@ -249,14 +277,24 @@ export function ClosSection({
                           )}
                         </td>
                         <td className="py-3 pr-3">
-                          {bloom ? (
+                          {domain ? (
                             <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${bloom.chip}`}
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${domain.chip}`}
+                              title={`${domain.name}: ${bloom?.name ?? clo.level}`}
                             >
-                              {bloom.name}
+                              {clo.level}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3 text-foreground">
+                          {bloom && domain ? (
+                            bloom.name
+                          ) : (
+                            <span className="text-muted-foreground">
+                              Unclassified
+                            </span>
                           )}
                         </td>
                         <td className="py-3 pr-3 text-foreground">

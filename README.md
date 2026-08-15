@@ -18,6 +18,9 @@ The backend currently registers domain plugins for:
 - Teaching methods
 - Assessments and rubrics
 - Course-spec review and approval workflows
+- Enrollment-scoped student portal with courses, schedules, approved learning
+  information, assessments, published results, CLO achievement, announcements,
+  anonymous feedback, and downloadable approved course documents
 
 Course-spec data includes normalized structures for CLOs, assessments, CLO alignment, weekly planning, review status, and related teaching/learning information.
 
@@ -150,6 +153,12 @@ Generate a development token:
 
 ```bash
 bun run gen-token --role admin
+```
+
+To preview the seeded student portal instead, generate a student token:
+
+```bash
+bun run gen-token --role student
 ```
 
 Then add it to `apps/frontend/.env.local`:

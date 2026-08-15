@@ -1,15 +1,54 @@
 /// <reference types="bun" />
 
 import { expect, test } from "bun:test";
-import type { Method, TeachingLearningProfile } from "@dse-pms/shared-types";
+import type {
+  ActiveLearningCluster,
+  Method,
+  TeachingLearningProfile,
+} from "@dse-pms/shared-types";
 import type { AssessmentForm } from "../assessment-model";
 import type { CloForm } from "../clo-model";
 import { buildWeekSuggestions } from "./week-suggestions";
 
 const teachingMethods = [
-  { id: "lecture", name: "Lecture" },
-  { id: "lab", name: "Lab" },
+  { id: "lecture", name: "Lecture", active: true },
+  { id: "lab", name: "Lab", active: true },
 ] as Method[];
+
+const activeLearningClusters: ActiveLearningCluster[] = [
+  {
+    id: "practice",
+    name: "Practice",
+    description: "Learn by doing",
+    sortOrder: 10,
+    active: true,
+    strategies: [
+      {
+        id: "coding-exercise",
+        name: "Coding Exercise",
+        clusterId: "practice",
+        sortOrder: 10,
+        active: true,
+      },
+    ],
+  },
+  {
+    id: "reflect",
+    name: "Reflect",
+    description: "Improve through feedback",
+    sortOrder: 20,
+    active: true,
+    strategies: [
+      {
+        id: "peer-review",
+        name: "Peer Review",
+        clusterId: "reflect",
+        sortOrder: 10,
+        active: true,
+      },
+    ],
+  },
+];
 
 const profile: TeachingLearningProfile = {
   philosophyTags: ["applied"],
@@ -64,7 +103,7 @@ const assessment = {
   format: "",
   submissionMethod: "",
   instructions: "",
-  rubric: "",
+  rubricId: "",
   feedbackMethod: "",
   feedbackTimeline: "",
   mappedPlos: [],
@@ -82,6 +121,7 @@ test("weekly suggestions use only support mapped to the selected CLO", () => {
     cloCodes: ["CLO1"],
     clos,
     teachingMethods,
+    activeLearningClusters,
     profile,
     assessments: [assessment],
   });
@@ -103,6 +143,7 @@ test("weekly suggestions fall back to course strategies for legacy CLOs", () => 
     cloCodes: ["CLO1"],
     clos: legacyClos,
     teachingMethods,
+    activeLearningClusters,
     profile,
     assessments: [assessment],
   });
@@ -112,4 +153,29 @@ test("weekly suggestions fall back to course strategies for legacy CLOs", () => 
     "coding-exercise",
   ]);
   expect(result.assessments).toEqual([]);
+});
+
+test("weekly suggestions use programme-renamed strategy labels", () => {
+  const renamed = activeLearningClusters.map((cluster) => ({
+    ...cluster,
+    strategies: cluster.strategies.map((strategy) =>
+      strategy.id === "coding-exercise"
+        ? { ...strategy, name: "Guided Coding Practice" }
+        : strategy,
+    ),
+  }));
+
+  const result = buildWeekSuggestions({
+    week: "3",
+    cloCodes: ["CLO1"],
+    clos,
+    teachingMethods,
+    activeLearningClusters: renamed,
+    profile,
+    assessments: [],
+  });
+
+  expect(result.activeLearningStrategies).toEqual([
+    { id: "coding-exercise", label: "Guided Coding Practice" },
+  ]);
 });

@@ -15,7 +15,11 @@ import {
   WidthType,
 } from "docx";
 
-import { LETTER_GRADES, PLOS } from "@dse-pms/shared-types";
+import {
+  LETTER_GRADES,
+  PLOS,
+  referenceKindLabel,
+} from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
@@ -1280,31 +1284,12 @@ function lessonLearningOutcomesTable(weeks: CourseDocumentModel["weeklyPlan"]) {
   });
 }
 
-function normalizeAssessmentText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/\(\s*\d+(?:\.\d+)?\s*%\s*\)/g, " ")
-    .replace(/\b\d+(?:\.\d+)?\s*%\b/g, " ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
 function assessmentWeightForWeek(
   document: CourseDocumentModel,
-  week: CourseDocumentModel["weeklyPlan"][number],
+  weekNumber: string,
 ) {
-  const weeklyAssessment = normalizeAssessmentText(week.assessment);
-  if (!weeklyAssessment || weeklyAssessment === "0") return 0;
-
   return document.assessments
-    .filter((assessment) => {
-      const assessmentName = normalizeAssessmentText(assessment.name);
-      if (!assessmentName) return false;
-      return (
-        weeklyAssessment.includes(assessmentName) ||
-        assessmentName.includes(weeklyAssessment)
-      );
-    })
+    .filter((assessment) => assessment.dueWeek.trim() === weekNumber.trim())
     .reduce((sum, assessment) => sum + (Number(assessment.weight) || 0), 0);
 }
 
@@ -1354,7 +1339,7 @@ function detailCourseSyllabusTable(
         ? week.activeLearningStrategies
         : week.learningActivities
     ).join(", ");
-    const assessmentWeight = assessmentWeightForWeek(document, week);
+    const assessmentWeight = assessmentWeightForWeek(document, week.week);
 
     rows.push(
       new TableRow({
@@ -1382,6 +1367,79 @@ function detailCourseSyllabusTable(
   });
 }
 
+function resourcesTable(resources: CourseDocumentModel["resources"]) {
+  const w = colWidths([18, 27, 25, 30]);
+  const headers = [
+    "Resource Type",
+    "Resource Name / Description",
+    "Link",
+    "Notes",
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
+  for (const resource of resources) {
+    const rowValues = [
+      resource.resourceType,
+      resource.title,
+      resource.url,
+      resource.notes,
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) => cell(v, { width: w[i] })),
+      }),
+    );
+  }
+  return table(rows, w);
+}
+
+function referenceCitation(
+  reference: CourseDocumentModel["references"][number],
+): string {
+  const parts = [
+    reference.authors,
+    reference.year ? `(${reference.year})` : "",
+    reference.title,
+    reference.publisher,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(". ") : "—";
+}
+
+function referencesTable(references: CourseDocumentModel["references"]) {
+  const w = colWidths([13, 45, 12, 15, 15]);
+  const headers = ["Kind", "Citation", "ISBN", "Link", "Notes"];
+
+  const rows = [
+    new TableRow({
+      children: headers.map((header, index) =>
+        headerCell(header, w[index]),
+      ),
+    }),
+  ];
+
+  for (const reference of references) {
+    const rowValues = [
+      referenceKindLabel(reference.kind),
+      referenceCitation(reference),
+      reference.isbn,
+      reference.url,
+      reference.notes,
+    ];
+
+    rows.push(
+      new TableRow({
+        children: rowValues.map((value, index) =>
+          cell(value, { width: w[index] }),
+        ),
+      }),
+    );
+  }
+
+  return table(rows, w);
+}
+
 function bulletedList(items: string[]) {
   return items.map(
     (item) =>
@@ -1405,6 +1463,94 @@ function policyParagraphs(policy: CourseDocumentModel["policy"]) {
     paragraph(label, true, SMALL),
     paragraph(value || "—", false, SMALL),
   ]);
+}
+
+function rubricGridTable(rubric: CourseDocumentModel["rubrics"][number]) {
+  const w = colWidths([22, ...rubric.levels.map(() => 78 / rubric.levels.length)]);
+  const headers = [
+    "Criteria",
+    ...rubric.levels.map((level) => `${level.points} – ${level.label}`),
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
+  for (const criterion of rubric.criteria) {
+    const rowValues = [
+      criterion.name,
+      ...rubric.levels.map((_level, li) => criterion.descriptors[li] ?? "—"),
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) =>
+          cell(v, { width: w[i], bold: i === 0 }),
+        ),
+      }),
+    );
+  }
+  return table(rows, w);
+}
+
+function rubricSection(document: CourseDocumentModel) {
+  if (document.rubrics.length === 0) {
+    return [paragraph("No assessment has a rubric linked from the Rubric Library.", false, SMALL)];
+  }
+  return document.rubrics.flatMap((rubric) => [
+    paragraph(`${rubric.assessmentName} — ${rubric.name} (${rubric.type})`, true, SMALL),
+    paragraph(`Rating Scale: ${rubric.scaleSummary}`, false, SMALL),
+    rubricGridTable(rubric),
+    new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }),
+  ]);
+}
+
+function ploTaxonomyTable(plos: CourseDocumentModel["plos"]) {
+  const w = colWidths([6, 8, 38, 16, 16, 8, 8]);
+  const headers = [
+    "No.",
+    "PLO",
+    "Description",
+    "Major",
+    "Learning Domain",
+    "Specific / Generic",
+    "C/A/P",
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
+  plos.forEach((plo, index) => {
+    const rowValues = [
+      String(index + 1),
+      plo.code,
+      plo.description,
+      plo.major ?? "",
+      plo.learningDomain ?? "",
+      plo.specificOrGeneric ?? "",
+      plo.cap ?? "",
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) =>
+          cell(v, { width: w[i], bold: i === 1 }),
+        ),
+      }),
+    );
+  });
+  return table(rows, w);
+}
+
+function dateTable(specDate: CourseDocumentModel["specDate"]) {
+  const w = colWidths([50, 50]);
+  const rows = [
+    new TableRow({
+      children: ["Item", "Date"].map((h, i) => headerCell(h, w[i])),
+    }),
+    new TableRow({
+      children: [
+        cell("Course Specification Last Revised / Approved", { width: w[0] }),
+        cell(specDate ?? "", { width: w[1] }),
+      ],
+    }),
+  ];
+  return table(rows, w);
 }
 
 function ratingScaleTable() {
@@ -1433,6 +1579,20 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 24),
   );
   children.push(await programmeProfileTable(document));
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    paragraph("Part 1 (continued): Programme Learning Outcomes — Taxonomy", true),
+  );
+  children.push(
+    document.plos.length === 0
+      ? paragraph(
+          "No programme learning outcomes have been configured.",
+          false,
+          SMALL,
+        )
+      : ploTaxonomyTable(document.plos),
+  );
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(paragraph(document.partTitle, true));
@@ -1497,30 +1657,31 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(
     sectionBox([
       sectionTitle("19", "Required Resources to Deliver the Course"),
-      ...(document.requiredDeliveryResources.length === 0
+      ...(document.resources.length === 0
         ? [
             paragraph(
-              "No required delivery resources have been selected.",
+              "No required resources have been confirmed.",
               false,
               SMALL,
             ),
           ]
-        : bulletedList(document.requiredDeliveryResources)),
+        : [resourcesTable(document.resources)]),
     ]),
   );
-  children.push(new Paragraph({ spacing: { before: 75, after: 0 }, children: [] }));
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
     sectionBox([
-      sectionTitle("20", "Other Teaching and Learning Materials"),
-      ...(document.teachingLearningMaterials.length === 0
+      sectionTitle("20", "References / Textbooks"),
+      ...(document.references.length === 0
         ? [
             paragraph(
-              "No other teaching and learning materials have been selected.",
+              "No references have been recorded.",
               false,
               SMALL,
             ),
           ]
-        : bulletedList(document.teachingLearningMaterials)),
+        : [referencesTable(document.references)]),
     ]),
   );
 
@@ -1542,6 +1703,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
+    sectionBox([sectionTitle("22", "Rubric"), ...rubricSection(document)]),
+  );
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
     sectionBox([
       sectionTitle("23", "Course Policy"),
       ...policyParagraphs(document.policy),
@@ -1551,6 +1717,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
     sectionBox([sectionTitle("24", "Rating Scale"), ratingScaleTable()]),
+  );
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    sectionBox([sectionTitle("25", "Date"), dateTable(document.specDate)]),
   );
 
   const doc = new Document({

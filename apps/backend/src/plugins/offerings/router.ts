@@ -1,14 +1,17 @@
 import { Router } from "express";
 import {
+  AttendanceDateSchema,
   CreateOfferingInput,
   EnrollInput,
   ListLecturerWorkloadQuery,
   ListOfferingsQuery,
+  SaveAttendanceInput,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import { attendanceService } from "./attendance-service.ts";
 import { CapacityError, offeringService, ReferenceError } from "./service.ts";
 
 export function createOfferingRouter(): Router {
@@ -35,6 +38,39 @@ export function createOfferingRouter(): Router {
       return;
     }
     res.json(await offeringService.workloadForLecturer(req.user!.id, parsed.data));
+  });
+
+  router.get("/:id/attendance", requirePermission("offerings:read"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res, "view attendance for"))) return;
+    res.json(await attendanceService.list(req.params.id!));
+  });
+
+  router.get("/:id/attendance/:date", requirePermission("offerings:read"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res, "view attendance for"))) return;
+    const parsedDate = AttendanceDateSchema.safeParse(req.params.date);
+    if (!parsedDate.success) {
+      res.status(400).json({ error: "Invalid attendance date" });
+      return;
+    }
+    res.json(await attendanceService.get(req.params.id!, parsedDate.data));
+  });
+
+  router.put("/:id/attendance/:date", requirePermission("offerings:write"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res, "record attendance for"))) return;
+    const parsedDate = AttendanceDateSchema.safeParse(req.params.date);
+    const parsedBody = SaveAttendanceInput.safeParse(req.body);
+    if (!parsedDate.success || !parsedBody.success) {
+      res.status(400).json({
+        error: "Invalid attendance data",
+        details: parsedBody.success ? undefined : parsedBody.error.flatten(),
+      });
+      return;
+    }
+    try {
+      res.json(await attendanceService.save(req.params.id!, parsedDate.data, parsedBody.data));
+    } catch (err) {
+      handleError(err, res, "Could not save attendance");
+    }
   });
 
   router.get("/:id", requirePermission("offerings:read"), async (req, res) => {
@@ -140,11 +176,9 @@ const OFFERING_ROSTER_WIDE_ROLES: Role[] = ["admin", "program_coordinator", "pro
 
 /**
  * True (and untouched response) if the caller may manage this offering —
- * scheduling (PATCH/DELETE) or its roster (enroll/unenroll): a programme-wide
- * role scoped to the offering's own course's programme (issue #147), the
- * primary lecturer, or an assigned co-lecturer (#79). `courses:manage`'s
- * `program_coordinator`/`program_secretary`/`admin` set matches
- * `OFFERING_ROSTER_WIDE_ROLES` exactly, so this is the right guard for both.
+ * scheduling (PATCH/DELETE), its roster, or section delivery records: a
+ * programme-wide role scoped to the offering's programme, the primary lecturer,
+ * or an assigned co-lecturer.
  */
 async function assertOwnOfferingOrAdmin(
   req: import("express").Request,
@@ -152,11 +186,15 @@ async function assertOwnOfferingOrAdmin(
   action = "manage enrollment for",
 ): Promise<boolean> {
   const offering = await offeringService.getById(req.params.id!);
-  if (hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, offering?.course?.programmeId ?? null)) {
+  if (!offering) {
+    res.status(404).json({ error: "Offering not found" });
+    return false;
+  }
+  if (hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, offering.course?.programmeId ?? null)) {
     return true;
   }
   const isAssigned =
-    offering?.lecturer?.id === req.user!.id || offering?.coLecturers.some((c) => c.id === req.user!.id);
+    offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
   if (!isAssigned) {
     res.status(403).json({ error: `You can only ${action} your own offerings` });
     return false;

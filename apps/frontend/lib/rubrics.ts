@@ -1,5 +1,6 @@
 import type {
   CreateRubricInput,
+  PublicRubric,
   Rubric,
   RubricStatus,
   RubricType,
@@ -8,7 +9,7 @@ import type {
 import type { StatusTone } from "@dse-pms/ui";
 import { api } from "./api";
 
-/** Frontend-side Rubric Library API — mirrors the backend router. */
+/** Frontend-side Rubric Library API — mirrors the authenticated backend router. */
 export const rubricsApi = {
   list(params: { search?: string; status?: RubricStatus } = {}): Promise<Rubric[]> {
     const qs = new URLSearchParams();
@@ -28,6 +29,13 @@ export const rubricsApi = {
   },
   remove(id: string): Promise<void> {
     return api.delete<void>(`/api/rubrics/${id}`);
+  },
+};
+
+/** Active rubric content that is safe to load without a login. */
+export const publicRubricsApi = {
+  get(id: string): Promise<PublicRubric> {
+    return api.get<PublicRubric>(`/api/rubrics/public/${id}`);
   },
 };
 

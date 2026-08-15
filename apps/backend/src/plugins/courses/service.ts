@@ -8,11 +8,13 @@ import {
   type CourseSpecProgress,
   type CoursesServiceContract,
   type CreateCourseInput,
+  type DateSection,
   type LecturerRef,
   type LecturersServiceContract,
   type ListCoursesQuery,
   type MappingSection,
   type PolicySection,
+  type ReferencesSection,
   type ResourcesSection,
   type StudentResponsibilitySection,
   type OfferingsServiceContract,
@@ -26,6 +28,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
+import { assertCourseSpecEditable } from "./spec-lock.ts";
 
 /**
  * Courses business logic. The lecturer relationship is validated through the
@@ -442,23 +445,30 @@ export const courseService = {
     let course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
-    if (sectionId === "courseInfo") {
-      const info = values as CourseInfoInput;
-      course = await prisma.course.update({
-        where: { id: courseId },
-        data: {
-          prerequisites: info.prerequisites || null,
-          description: info.description || null,
-        },
-      });
-    }
-
     await prisma.$transaction(async (tx) => {
-      const spec = await tx.courseSpec.upsert({
+      const existingSpec = await tx.courseSpec.findUnique({
         where: { courseId },
-        create: { courseId },
-        update: {},
+        select: { id: true, reviewStatus: true },
       });
+      if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);
+
+      const spec =
+        existingSpec ??
+        (await tx.courseSpec.create({
+          data: { courseId },
+          select: { id: true, reviewStatus: true },
+        }));
+
+      if (sectionId === "courseInfo") {
+        const info = values as CourseInfoInput;
+        course = await tx.course.update({
+          where: { id: courseId },
+          data: {
+            prerequisites: info.prerequisites || null,
+            description: info.description || null,
+          },
+        });
+      }
 
       if (sectionId === "clos")
         await syncClos(tx, spec.id, (values as ClosSection).items);
@@ -474,6 +484,8 @@ export const courseService = {
         await syncMappingCells(tx, spec.id, (values as MappingSection).cells);
       if (sectionId === "resources")
         await syncResources(tx, spec.id, (values as ResourcesSection).items);
+      if (sectionId === "references")
+        await syncReferences(tx, spec.id, (values as ReferencesSection).items);
       if (sectionId === "responsibility")
         await syncStudentResponsibilities(
           tx,
@@ -482,6 +494,13 @@ export const courseService = {
         );
       if (sectionId === "policy")
         await syncPolicy(tx, spec.id, values as PolicySection);
+      if (sectionId === "date") {
+        const { date } = values as DateSection;
+        await tx.courseSpec.update({
+          where: { id: spec.id },
+          data: { specDate: date ? new Date(`${date}T00:00:00.000Z`) : null },
+        });
+      }
 
       // Every saveable section must have a normalized table to write into — enforced,
       // not just documented, so a future section added to SPEC_SECTION_SCHEMAS without
@@ -567,8 +586,10 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "assessmentPlan",
   "mapping",
   "resources",
+  "references",
   "responsibility",
   "policy",
+  "date",
 ]);
 
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
@@ -677,7 +698,7 @@ function reassembleSpec(spec: SpecRow | null): {
         format: item.format,
         submissionMethod: item.submissionMethod,
         instructions: item.instructions,
-        rubric: item.rubric,
+        rubricId: item.rubricId,
         feedbackMethod: item.feedbackMethod,
         feedbackTimeline: item.feedbackTimeline,
         mappedPlos: item.mappedPlos,
@@ -697,19 +718,39 @@ function reassembleSpec(spec: SpecRow | null): {
   }
   if (hasSection("resources")) {
     data.resources = {
-      items: spec.resources.map((resource) => ({
-        id: resource.id,
-        resourceType: resource.resourceType,
-        title: resource.title,
-        url: resource.url,
-        notes: resource.notes,
-        evidenceWeekIds:
-          resource.evidenceWeekIds.length > 0
-            ? resource.evidenceWeekIds
-            : resource.weekId
-              ? [resource.weekId]
-              : [],
-      })),
+      items: spec.resources
+        .filter((resource) => resource.section === "Resource")
+        .map((resource) => ({
+          id: resource.id,
+          resourceType: resource.resourceType,
+          title: resource.title,
+          url: resource.url,
+          notes: resource.notes,
+          evidenceWeekIds:
+            resource.evidenceWeekIds.length > 0
+              ? resource.evidenceWeekIds
+              : resource.weekId
+                ? [resource.weekId]
+                : [],
+        })),
+    };
+  }
+  if (hasSection("references")) {
+    data.references = {
+      items: spec.resources
+        .filter((resource) => resource.section === "Reference")
+        .map((resource) => ({
+          id: resource.id,
+          kind: resource.kind,
+          title: resource.title,
+          authors: resource.authors,
+          publisher: resource.publisher,
+          year: resource.year,
+          isbn: resource.isbn,
+          url: resource.url,
+          basedOn: resource.basedOn,
+          notes: resource.notes,
+        })),
     };
   }
   if (hasSection("responsibility")) {
@@ -727,6 +768,11 @@ function reassembleSpec(spec: SpecRow | null): {
       assignmentsLateSubmission: spec.policy.assignmentsLateSubmission,
       examinationRules: spec.policy.examinationRules,
       penaltiesConsequences: spec.policy.penaltiesConsequences,
+    };
+  }
+  if (hasSection("date")) {
+    data.date = {
+      date: spec.specDate ? spec.specDate.toISOString().slice(0, 10) : null,
     };
   }
   return { data, status };
@@ -845,7 +891,13 @@ async function syncWeeklyPlan(
   });
 }
 
-/** Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17) section save. */
+/**
+ * Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17)
+ * section save. `rubricId` is reconciled against real Rubric rows before writing
+ * (rather than letting the FK reject the whole save) since the wizard already
+ * tolerates a stale/deleted rubric selection as a valid state (issue #123) — unlike
+ * CLO teaching/assessment method ids, which deliberately fail hard on a bad id.
+ */
 async function syncAssessmentPlan(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
@@ -853,6 +905,19 @@ async function syncAssessmentPlan(
 ) {
   await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
   if (items.length === 0) return;
+
+  const rubricIds = [...new Set(items.flatMap((item) => item.rubricId ? [item.rubricId] : []))];
+  const validRubricIds = rubricIds.length
+    ? new Set(
+        (
+          await tx.rubric.findMany({
+            where: { id: { in: rubricIds } },
+            select: { id: true },
+          })
+        ).map((r) => r.id),
+      )
+    : new Set<string>();
+
   await tx.courseSpecAssessmentItem.createMany({
     data: items.map((item, order) => ({
       id: item.id,
@@ -874,7 +939,10 @@ async function syncAssessmentPlan(
       format: item.format,
       submissionMethod: item.submissionMethod,
       instructions: item.instructions,
-      rubric: item.rubric,
+      rubricId:
+        item.rubricId && validRubricIds.has(item.rubricId)
+          ? item.rubricId
+          : null,
       feedbackMethod: item.feedbackMethod,
       feedbackTimeline: item.feedbackTimeline,
       mappedPlos: item.mappedPlos,
@@ -883,7 +951,12 @@ async function syncAssessmentPlan(
   });
 }
 
-/** Delete-and-rebuild CourseSpecMappingCell rows for a `mapping` (CLO Alignment) section save. */
+/**
+ * Delete-and-rebuild CourseSpecResource rows for a `resources` (§19) section
+ * save. Scoped to `section: "Resource"` — CourseSpecResource also backs §20
+ * References (`section: "Reference"`), and an unscoped delete here would wipe
+ * out that section's rows on every §19 save.
+ */
 async function syncResources(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
@@ -908,7 +981,9 @@ async function syncResources(
     }
   }
 
-  await tx.courseSpecResource.deleteMany({ where: { courseSpecId } });
+  await tx.courseSpecResource.deleteMany({
+    where: { courseSpecId, section: "Resource" },
+  });
   if (resources.length === 0) return;
 
   await tx.courseSpecResource.createMany({
@@ -916,12 +991,48 @@ async function syncResources(
       id: resource.id,
       courseSpecId,
       order,
+      section: "Resource",
       weekId: resource.evidenceWeekIds[0] ?? null,
       resourceType: resource.resourceType,
       title: resource.title,
       url: resource.url,
       notes: resource.notes,
       evidenceWeekIds: resource.evidenceWeekIds,
+    })),
+  });
+}
+
+/**
+ * Delete-and-rebuild CourseSpecResource rows for a `references` (§20) section
+ * save, scoped to `section: "Reference"` — see {@link syncResources}. §20 has
+ * no Weekly Plan evidence linkage, unlike §19.
+ */
+async function syncReferences(
+  tx: Prisma.TransactionClient,
+  courseSpecId: string,
+  references: ReferencesSection["items"],
+) {
+  await tx.courseSpecResource.deleteMany({
+    where: { courseSpecId, section: "Reference" },
+  });
+  if (references.length === 0) return;
+
+  await tx.courseSpecResource.createMany({
+    data: references.map((reference, order) => ({
+      id: reference.id,
+      courseSpecId,
+      order,
+      section: "Reference",
+      resourceType: "",
+      kind: reference.kind,
+      title: reference.title,
+      authors: reference.authors,
+      publisher: reference.publisher,
+      year: reference.year,
+      isbn: reference.isbn,
+      url: reference.url,
+      basedOn: reference.basedOn,
+      notes: reference.notes,
     })),
   });
 }

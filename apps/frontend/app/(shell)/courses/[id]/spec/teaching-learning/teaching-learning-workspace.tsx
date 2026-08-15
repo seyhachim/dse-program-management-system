@@ -12,11 +12,13 @@ import {
 } from "lucide-react";
 import {
   teachingLearningIsReady,
+  type ActiveLearningCluster,
   type Method,
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ChipMultiSelect } from "../clos/chip-multiselect";
 import { withCodes, type CloForm } from "../clo-model";
+import { methodsApi } from "@/lib/methods";
 import {
   teachingLearningApi,
   type TeachingLearningProfile,
@@ -28,6 +30,22 @@ import {
   TEACHING_LEARNING_MATERIAL_OPTIONS,
   TEACHING_PHILOSOPHY_OPTIONS,
 } from "./strategy-catalog";
+
+const FALLBACK_ACTIVE_LEARNING_CLUSTERS: ActiveLearningCluster[] =
+  ACTIVE_LEARNING_CLUSTERS.map((cluster, clusterIndex) => ({
+    id: cluster.id,
+    name: cluster.label,
+    description: cluster.description,
+    sortOrder: (clusterIndex + 1) * 10,
+    active: true,
+    strategies: cluster.strategies.map((strategy, strategyIndex) => ({
+      id: strategy.id,
+      name: strategy.label,
+      clusterId: cluster.id,
+      sortOrder: (strategyIndex + 1) * 10,
+      active: true,
+    })),
+  }));
 
 export function TeachingLearningWorkspace({
   value,
@@ -55,6 +73,9 @@ export function TeachingLearningWorkspace({
   const [philosophyStatement, setPhilosophyStatement] = useState("");
   const [courseMethodIds, setCourseMethodIds] = useState<string[]>([]);
   const [strategyIds, setStrategyIds] = useState<string[]>([]);
+  const [activeLearningClusters, setActiveLearningClusters] = useState<
+    ActiveLearningCluster[]
+  >(FALLBACK_ACTIVE_LEARNING_CLUSTERS);
   const [independentLearning, setIndependentLearning] = useState<string[]>([]);
   const [teachingLearningMaterials, setTeachingLearningMaterials] = useState<string[]>([]);
   const [requiredDeliveryResources, setRequiredDeliveryResources] = useState<string[]>([]);
@@ -66,7 +87,10 @@ export function TeachingLearningWorkspace({
       setProfileLoading(true);
       setProfileError(null);
       try {
-        const profile = await teachingLearningApi.get(courseId);
+        const [profile, vocabulary] = await Promise.all([
+          teachingLearningApi.get(courseId),
+          methodsApi.list(),
+        ]);
         if (cancelled) return;
         setPhilosophyTags(profile.philosophyTags);
         setPhilosophyStatement(profile.philosophyStatement);
@@ -76,15 +100,14 @@ export function TeachingLearningWorkspace({
             : [...new Set(clos.flatMap((clo) => clo.teachingMethodIds))],
         );
         setStrategyIds(profile.activeLearningStrategyIds);
+        setActiveLearningClusters(vocabulary.activeLearningClusters);
         setIndependentLearning(profile.independentLearningTypes);
-        // Keep the existing API/storage fields for backward compatibility while
-        // presenting the correct course-spec concepts to lecturers.
         setTeachingLearningMaterials(profile.resourceTypes);
         setRequiredDeliveryResources(profile.technologyTypes);
       } catch {
         if (!cancelled) {
           setProfileError(
-            "Could not load the saved Teaching & Learning profile.",
+            "Could not load all saved Teaching & Learning settings. The default active-learning catalogue is shown as a fallback.",
           );
         }
       } finally {
@@ -113,10 +136,10 @@ export function TeachingLearningWorkspace({
   );
   const strategyOptions = useMemo(
     () =>
-      ACTIVE_LEARNING_CLUSTERS.flatMap((cluster) => cluster.strategies).map(
-        (strategy) => ({ id: strategy.id, name: strategy.label }),
+      activeLearningClusters.flatMap((cluster) => cluster.strategies).map(
+        (strategy) => ({ id: strategy.id, name: strategy.name }),
       ),
-    [],
+    [activeLearningClusters],
   );
 
   const completion: [boolean, boolean, boolean, boolean, boolean] = [
@@ -288,7 +311,7 @@ export function TeachingLearningWorkspace({
         complete={completion[1]}
       >
         <div className="flex flex-wrap gap-2">
-          {teachingMethods.map((method) => (
+          {teachingMethods.filter((method) => method.active).map((method) => (
             <Chip
               key={method.id}
               selected={courseMethodIds.includes(method.id)}
@@ -310,21 +333,20 @@ export function TeachingLearningWorkspace({
       >
         <div className="mb-3 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <Lightbulb className="h-4 w-4" />
-          Clustered for quick selection so lecturers do not need to scan one
-          long list.
+          Programme-managed clusters keep selection quick and consistent across courses.
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {ACTIVE_LEARNING_CLUSTERS.map((cluster) => (
+          {activeLearningClusters.map((cluster) => (
             <div
               key={cluster.id}
               className="rounded-xl border border-border bg-muted/10 p-3.5"
             >
-              <h4 className="text-sm font-semibold">{cluster.label}</h4>
+              <h4 className="text-sm font-semibold">{cluster.name}</h4>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {cluster.description}
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {cluster.strategies.slice(0, 3).map((strategy) => (
+                {cluster.strategies.map((strategy) => (
                   <Chip
                     compact
                     key={strategy.id}
@@ -333,18 +355,10 @@ export function TeachingLearningWorkspace({
                       toggle(strategy.id, strategyIds, setStrategyIds)
                     }
                   >
-                    {strategy.label}
+                    {strategy.name}
                   </Chip>
                 ))}
               </div>
-              {cluster.strategies.length > 3 ? (
-                <button
-                  type="button"
-                  className="mt-3 text-xs font-medium text-primary"
-                >
-                  View more strategies
-                </button>
-              ) : null}
             </div>
           ))}
         </div>
@@ -423,7 +437,7 @@ export function TeachingLearningWorkspace({
                 </div>
                 <ChipMultiSelect
                   label={`Teaching methods for ${clo.code}`}
-                  options={teachingMethods}
+                  options={teachingMethods.filter((method) => method.active)}
                   selectedIds={clo.teachingMethodIds}
                   onChange={(ids) =>
                     void updateCloSupport(clo.id, { teachingMethodIds: ids })
