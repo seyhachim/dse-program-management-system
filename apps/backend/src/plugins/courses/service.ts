@@ -8,6 +8,7 @@ import {
   type CourseSpecProgress,
   type CoursesServiceContract,
   type CreateCourseInput,
+  type DateSection,
   type LecturerRef,
   type LecturersServiceContract,
   type ListCoursesQuery,
@@ -27,6 +28,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
+import { assertCourseSpecEditable } from "./spec-lock.ts";
 
 /**
  * Courses business logic. The lecturer relationship is validated through the
@@ -443,23 +445,30 @@ export const courseService = {
     let course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
-    if (sectionId === "courseInfo") {
-      const info = values as CourseInfoInput;
-      course = await prisma.course.update({
-        where: { id: courseId },
-        data: {
-          prerequisites: info.prerequisites || null,
-          description: info.description || null,
-        },
-      });
-    }
-
     await prisma.$transaction(async (tx) => {
-      const spec = await tx.courseSpec.upsert({
+      const existingSpec = await tx.courseSpec.findUnique({
         where: { courseId },
-        create: { courseId },
-        update: {},
+        select: { id: true, reviewStatus: true },
       });
+      if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);
+
+      const spec =
+        existingSpec ??
+        (await tx.courseSpec.create({
+          data: { courseId },
+          select: { id: true, reviewStatus: true },
+        }));
+
+      if (sectionId === "courseInfo") {
+        const info = values as CourseInfoInput;
+        course = await tx.course.update({
+          where: { id: courseId },
+          data: {
+            prerequisites: info.prerequisites || null,
+            description: info.description || null,
+          },
+        });
+      }
 
       if (sectionId === "clos")
         await syncClos(tx, spec.id, (values as ClosSection).items);
@@ -485,6 +494,13 @@ export const courseService = {
         );
       if (sectionId === "policy")
         await syncPolicy(tx, spec.id, values as PolicySection);
+      if (sectionId === "date") {
+        const { date } = values as DateSection;
+        await tx.courseSpec.update({
+          where: { id: spec.id },
+          data: { specDate: date ? new Date(`${date}T00:00:00.000Z`) : null },
+        });
+      }
 
       // Every saveable section must have a normalized table to write into — enforced,
       // not just documented, so a future section added to SPEC_SECTION_SCHEMAS without
@@ -573,6 +589,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "references",
   "responsibility",
   "policy",
+  "date",
 ]);
 
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
@@ -681,7 +698,7 @@ function reassembleSpec(spec: SpecRow | null): {
         format: item.format,
         submissionMethod: item.submissionMethod,
         instructions: item.instructions,
-        rubric: item.rubric,
+        rubricId: item.rubricId,
         feedbackMethod: item.feedbackMethod,
         feedbackTimeline: item.feedbackTimeline,
         mappedPlos: item.mappedPlos,
@@ -751,6 +768,11 @@ function reassembleSpec(spec: SpecRow | null): {
       assignmentsLateSubmission: spec.policy.assignmentsLateSubmission,
       examinationRules: spec.policy.examinationRules,
       penaltiesConsequences: spec.policy.penaltiesConsequences,
+    };
+  }
+  if (hasSection("date")) {
+    data.date = {
+      date: spec.specDate ? spec.specDate.toISOString().slice(0, 10) : null,
     };
   }
   return { data, status };
@@ -869,7 +891,13 @@ async function syncWeeklyPlan(
   });
 }
 
-/** Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17) section save. */
+/**
+ * Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17)
+ * section save. `rubricId` is reconciled against real Rubric rows before writing
+ * (rather than letting the FK reject the whole save) since the wizard already
+ * tolerates a stale/deleted rubric selection as a valid state (issue #123) — unlike
+ * CLO teaching/assessment method ids, which deliberately fail hard on a bad id.
+ */
 async function syncAssessmentPlan(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
@@ -877,6 +905,19 @@ async function syncAssessmentPlan(
 ) {
   await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
   if (items.length === 0) return;
+
+  const rubricIds = [...new Set(items.flatMap((item) => item.rubricId ? [item.rubricId] : []))];
+  const validRubricIds = rubricIds.length
+    ? new Set(
+        (
+          await tx.rubric.findMany({
+            where: { id: { in: rubricIds } },
+            select: { id: true },
+          })
+        ).map((r) => r.id),
+      )
+    : new Set<string>();
+
   await tx.courseSpecAssessmentItem.createMany({
     data: items.map((item, order) => ({
       id: item.id,
@@ -898,7 +939,10 @@ async function syncAssessmentPlan(
       format: item.format,
       submissionMethod: item.submissionMethod,
       instructions: item.instructions,
-      rubric: item.rubric,
+      rubricId:
+        item.rubricId && validRubricIds.has(item.rubricId)
+          ? item.rubricId
+          : null,
       feedbackMethod: item.feedbackMethod,
       feedbackTimeline: item.feedbackTimeline,
       mappedPlos: item.mappedPlos,

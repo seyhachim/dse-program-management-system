@@ -127,13 +127,6 @@ enum QaAnalysisReviewDecision {
   NeedsMoreEvidence
 }
 
-enum QaImprovementActionStatus {
-  Open
-  InProgress
-  Completed
-  Cancelled
-}
-
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -161,7 +154,8 @@ model User {
   qaEvidenceCreated       QaEvidence[]              @relation("QaEvidenceCreator")
   qaAssessmentsReviewed   QaRequirementAssessment[] @relation("QaAssessmentReviewer")
   qaAnalysisReviews       QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
-  qaImprovementActionsOwned QaImprovementAction[]    @relation("QaActionOwner")
+  qaRequirementAssignments QaRequirementAssignment[] @relation("QaRequirementAssignee")
+  qaAssignmentsCreated     QaRequirementAssignment[] @relation("QaRequirementAssignedBy")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -203,7 +197,7 @@ model Programme {
   qaAnalyses      QaEvidenceAnalysis[]
   qaDocuments     QaDocument[]
   qaAnalysisReviews QaEvidenceAnalysisReview[]
-  qaImprovementActions QaImprovementAction[]
+  qaRequirementAssignments QaRequirementAssignment[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -251,7 +245,7 @@ model QaRequirement {
   assessments  QaRequirementAssessment[]
   expectations QaQualityExpectation[]
   analyses     QaEvidenceAnalysis[]
-  improvementActions QaImprovementAction[]
+  assignments  QaRequirementAssignment[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
@@ -316,10 +310,34 @@ model QaAssessmentCycle {
   evidence    QaEvidence[]
   assessments QaRequirementAssessment[]
   analyses    QaEvidenceAnalysis[]
-  improvementActions QaImprovementAction[]
+  assignments QaRequirementAssignment[]
 
   @@index([programmeId, status])
   @@index([frameworkId])
+}
+
+/// One primary QA/SAR work owner for a requirement in one assessment cycle.
+/// This is workflow ownership only; it does not change evidence, analysis, or
+/// the separate human self-assessment/rating record.
+model QaRequirementAssignment {
+  id            String            @id @default(uuid())
+  programmeId   String
+  programme     Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId       String
+  cycle         QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId String
+  requirement   QaRequirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  assigneeId    String
+  assignee      User              @relation("QaRequirementAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  assignedById  String
+  assignedBy    User              @relation("QaRequirementAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([cycleId, requirementId])
+  @@index([programmeId, cycleId])
+  @@index([cycleId, assigneeId])
+  @@index([assignedById])
 }
 
 /// Verifiable evidence for one requirement. Direct programme ownership makes
@@ -394,7 +412,6 @@ model QaEvidenceAnalysis {
   createdAt       DateTime                   @default(now())
   sources         QaEvidenceAnalysisSource[]
   reviews         QaEvidenceAnalysisReview[]
-  improvementActions QaImprovementAction[]
 
   @@index([programmeId, cycleId, createdAt])
   @@index([requirementId, createdAt])
@@ -402,6 +419,9 @@ model QaEvidenceAnalysis {
   @@index([engine, promptVersion])
 }
 
+/// Immutable snapshot of a source used by one analysis run. Structured entity
+/// identity is retained even if source content changes later; qaEvidenceId is an
+/// optional convenience FK for manually attached QA evidence.
 /// Append-only human validation of one exact evidence-analysis version.
 model QaEvidenceAnalysisReview {
   id          String                   @id @default(uuid())
@@ -414,52 +434,10 @@ model QaEvidenceAnalysisReview {
   decision    QaAnalysisReviewDecision
   comment     String                   @default("")
   createdAt   DateTime                 @default(now())
-  improvementActions QaImprovementAction[]
 
   @@index([programmeId, createdAt])
   @@index([analysisId, createdAt])
   @@index([reviewerId])
-}
-
-/// Immutable snapshot of a source used by one analysis run. Structured entity
-/// identity is retained even if source content changes later; qaEvidenceId is an
-/// optional convenience FK for manually attached QA evidence.
-/// Operational PDCA/CQI action created from a human-validated evidence finding.
-/// The originating analysis/review remain immutable; the action lifecycle is mutable.
-model QaImprovementAction {
-  id                  String                    @id @default(uuid())
-  programmeId         String
-  programme           Programme                 @relation(fields: [programmeId], references: [id], onDelete: Restrict)
-  cycleId             String
-  cycle               QaAssessmentCycle         @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  requirementId       String
-  requirement         QaRequirement             @relation(fields: [requirementId], references: [id], onDelete: Restrict)
-  analysisId          String
-  analysis            QaEvidenceAnalysis        @relation(fields: [analysisId], references: [id], onDelete: Cascade)
-  reviewId            String
-  review              QaEvidenceAnalysisReview  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  ownerId             String?
-  owner               User?                     @relation("QaActionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  plannedAction       String
-  indicator           String
-  dueDate             DateTime?
-  status              QaImprovementActionStatus @default(Open)
-  result              String                    @default("")
-  effectivenessReview String                    @default("")
-  completedAt         DateTime?
-  carriedFromActionId String?
-  carriedFrom         QaImprovementAction?       @relation("QaActionCarryForward", fields: [carriedFromActionId], references: [id], onDelete: SetNull)
-  carriedTo           QaImprovementAction[]      @relation("QaActionCarryForward")
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-
-  @@index([programmeId, status, dueDate])
-  @@index([cycleId, status])
-  @@index([requirementId])
-  @@index([analysisId])
-  @@index([reviewId])
-  @@index([ownerId])
-  @@index([carriedFromActionId])
 }
 
 model QaEvidenceAnalysisSource {
@@ -619,6 +597,14 @@ model ProgramLearningOutcome {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  /// Cover page taxonomy classification (issue #124) — free text, RUPP
+  /// template vocabulary not yet finalized. All nullable since existing PLOs
+  /// predate this classification and the table renders "—" for an unset cell.
+  major             String?
+  learningDomain    String?
+  specificOrGeneric String?
+  cap               String?
+
   competencyLinks ProgramCompetencyPlo[]
 }
 
@@ -745,6 +731,10 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+  /// §25 Date — spec last revised/approved date (issue #124). A single value,
+  /// so it lives directly on CourseSpec rather than a normalized child table,
+  /// same reasoning as courseInfo mirroring onto Course instead of a section row.
+  specDate                DateTime?                         @db.Date
 
   @@index([reviewStatus])
   @@index([submittedById])
@@ -939,7 +929,15 @@ model CourseSpecWeek {
 /// `assessmentPlan` section's JSON `items` array). Same composite-key rationale as
 /// CourseSpecWeek. Assessment learning levels are derived from the mapped CLOs rather
 /// than duplicated on the assessment item. `cloCodes`/`mappedPlos` are loose
-/// references, same as CourseSpecWeek.
+/// references, same as CourseSpecWeek. `rubricId` (issue #123) is a real FK into the
+/// standalone Rubric Library — previously an unvalidated string the wizard already
+/// populated with a `Rubric.id` but the DB never checked. `onDelete: SetNull` lets a
+/// rubric be deleted from the library without blocking on assessments that reference
+/// it; `syncAssessmentPlan` additionally nulls out any id that doesn't resolve at
+/// save time (a stale client-held id from a since-deleted rubric) rather than letting
+/// the FK reject the whole §17 save — the wizard already tolerates a missing rubric
+/// selection as a valid state, unlike CLO teaching/assessment method ids, which fail
+/// hard on a bad id by design.
 model CourseSpecAssessmentItem {
   id                  String               @default(uuid())
   courseSpecId        String
@@ -964,11 +962,13 @@ model CourseSpecAssessmentItem {
   format              String               @default("")
   submissionMethod    String               @default("")
   instructions        String               @default("")
-  rubric              String               @default("")
+  rubricId            String?
+  rubric              Rubric?              @relation(fields: [rubricId], references: [id], onDelete: SetNull)
   mappedPlos          String[]             @default([])
   notes               String               @default("")
 
   @@id([courseSpecId, id])
+  @@index([rubricId])
 }
 
 /// Issue #103: normalized CLO Alignment Mapping cells (previously the `mapping`
@@ -1066,6 +1066,9 @@ model Offering {
   // Syllabus §12 Course Availability — optional, filled on the course spec form.
   semester       Semester?
   programmeYear  Int?
+  // Actual calendar delivery window for this specific offering/section.
+  startDate      DateTime?      @db.Date
+  endDate        DateTime?      @db.Date
   // Syllabus §10 Other Course Lecturer(s) — optional free text, varies per term.
   otherLecturers String?
   createdAt      DateTime       @default(now())
@@ -1274,6 +1277,7 @@ model Rubric {
   owner         User?             @relation("RubricOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   levelRows     RubricLevel[]
   criterionRows RubricCriterion[]
+  assessmentItems CourseSpecAssessmentItem[]
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 

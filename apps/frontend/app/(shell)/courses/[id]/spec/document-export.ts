@@ -1465,6 +1465,94 @@ function policyParagraphs(policy: CourseDocumentModel["policy"]) {
   ]);
 }
 
+function rubricGridTable(rubric: CourseDocumentModel["rubrics"][number]) {
+  const w = colWidths([22, ...rubric.levels.map(() => 78 / rubric.levels.length)]);
+  const headers = [
+    "Criteria",
+    ...rubric.levels.map((level) => `${level.points} – ${level.label}`),
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
+  for (const criterion of rubric.criteria) {
+    const rowValues = [
+      criterion.name,
+      ...rubric.levels.map((_level, li) => criterion.descriptors[li] ?? "—"),
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) =>
+          cell(v, { width: w[i], bold: i === 0 }),
+        ),
+      }),
+    );
+  }
+  return table(rows, w);
+}
+
+function rubricSection(document: CourseDocumentModel) {
+  if (document.rubrics.length === 0) {
+    return [paragraph("No assessment has a rubric linked from the Rubric Library.", false, SMALL)];
+  }
+  return document.rubrics.flatMap((rubric) => [
+    paragraph(`${rubric.assessmentName} — ${rubric.name} (${rubric.type})`, true, SMALL),
+    paragraph(`Rating Scale: ${rubric.scaleSummary}`, false, SMALL),
+    rubricGridTable(rubric),
+    new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }),
+  ]);
+}
+
+function ploTaxonomyTable(plos: CourseDocumentModel["plos"]) {
+  const w = colWidths([6, 8, 38, 16, 16, 8, 8]);
+  const headers = [
+    "No.",
+    "PLO",
+    "Description",
+    "Major",
+    "Learning Domain",
+    "Specific / Generic",
+    "C/A/P",
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
+  plos.forEach((plo, index) => {
+    const rowValues = [
+      String(index + 1),
+      plo.code,
+      plo.description,
+      plo.major ?? "",
+      plo.learningDomain ?? "",
+      plo.specificOrGeneric ?? "",
+      plo.cap ?? "",
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) =>
+          cell(v, { width: w[i], bold: i === 1 }),
+        ),
+      }),
+    );
+  });
+  return table(rows, w);
+}
+
+function dateTable(specDate: CourseDocumentModel["specDate"]) {
+  const w = colWidths([50, 50]);
+  const rows = [
+    new TableRow({
+      children: ["Item", "Date"].map((h, i) => headerCell(h, w[i])),
+    }),
+    new TableRow({
+      children: [
+        cell("Course Specification Last Revised / Approved", { width: w[0] }),
+        cell(specDate ?? "", { width: w[1] }),
+      ],
+    }),
+  ];
+  return table(rows, w);
+}
+
 function ratingScaleTable() {
   const w = colWidths([25, 25, 25, 25]);
   const headers = ["Letter Grade", "Grade Point", "Score", "Explanation"];
@@ -1491,6 +1579,20 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     centered("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 24),
   );
   children.push(await programmeProfileTable(document));
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    paragraph("Part 1 (continued): Programme Learning Outcomes — Taxonomy", true),
+  );
+  children.push(
+    document.plos.length === 0
+      ? paragraph(
+          "No programme learning outcomes have been configured.",
+          false,
+          SMALL,
+        )
+      : ploTaxonomyTable(document.plos),
+  );
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(paragraph(document.partTitle, true));
@@ -1601,6 +1703,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
+    sectionBox([sectionTitle("22", "Rubric"), ...rubricSection(document)]),
+  );
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
     sectionBox([
       sectionTitle("23", "Course Policy"),
       ...policyParagraphs(document.policy),
@@ -1610,6 +1717,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
     sectionBox([sectionTitle("24", "Rating Scale"), ratingScaleTable()]),
+  );
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    sectionBox([sectionTitle("25", "Date"), dateTable(document.specDate)]),
   );
 
   const doc = new Document({

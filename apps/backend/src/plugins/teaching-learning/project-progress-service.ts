@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { assertCourseSpecEditable } from "../courses/spec-lock.ts";
 
 export type WeekProjectProgress = {
   weekId: string;
@@ -54,12 +55,18 @@ export const weekProjectProgressService = {
     courseId: string,
     value: WeekProjectProgress,
   ): Promise<WeekProjectProgress> {
-    const spec = await prisma.courseSpec.upsert({
+    const existingSpec = await prisma.courseSpec.findUnique({
       where: { courseId },
-      create: { courseId },
-      update: {},
-      select: { id: true },
+      select: { id: true, reviewStatus: true },
     });
+    if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);
+
+    const spec =
+      existingSpec ??
+      (await prisma.courseSpec.create({
+        data: { courseId },
+        select: { id: true, reviewStatus: true },
+      }));
 
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO "CourseSpecWeekProjectProgress" (

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  UpdatePloTaxonomySchema,
   UpdateProgramCompetencyPlosSchema,
   UpdateProgramPolicySchema,
   UpdateProgrammeProfileSchema,
@@ -120,6 +121,45 @@ export function createProgrammeRouter(): Router {
         res.status(500).json({
           error: "Could not update competency PLO mappings",
         });
+      }
+    },
+  );
+
+  router.put(
+    "/plos/:code",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const code = req.params.code;
+
+      if (!code) {
+        res.status(400).json({ error: "PLO code is required" });
+        return;
+      }
+
+      const parsed = UpdatePloTaxonomySchema.safeParse(req.body);
+
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid PLO taxonomy",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      try {
+        const plo = await programmeService.updatePloTaxonomy(
+          code,
+          parsed.data,
+        );
+
+        if (!plo) {
+          res.status(404).json({ error: "PLO not found" });
+          return;
+        }
+
+        res.json(plo);
+      } catch {
+        res.status(500).json({ error: "Could not update PLO taxonomy" });
       }
     },
   );

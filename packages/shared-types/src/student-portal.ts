@@ -90,7 +90,7 @@ export interface PortalCourseDetail extends PortalCourseSummary {
     format: string;
     submissionMethod: string;
     instructions: string;
-    rubric: string;
+    rubricName: string;
     result: PortalAssessmentResult | null;
   }>;
   resources: Array<{
@@ -170,3 +170,66 @@ export const SetAssessmentDeadlineInput = z.object({
   dueAt: z.string().datetime(),
 });
 export type SetAssessmentDeadlineInput = z.infer<typeof SetAssessmentDeadlineInput>;
+
+export interface CourseDeliveryResultRow {
+  enrollmentId: string;
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  score: number | null;
+  maxScore: number | null;
+  feedback: string;
+  publishedAt: string | null;
+}
+
+export interface CourseDeliveryAssessment {
+  id: string;
+  name: string;
+  type: string;
+  weight: number | null;
+  dueWeek: number | null;
+  dueAt: string | null;
+  results: CourseDeliveryResultRow[];
+}
+
+export interface CourseDeliveryAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  pinned: boolean;
+  authorName: string;
+  publishedAt: string | null;
+}
+
+export interface CourseFeedbackSummary {
+  responseCount: number;
+  minimumResponses: number;
+  available: boolean;
+  averages: {
+    overall: number;
+    teachingClarity: number;
+    assessmentClarity: number;
+  } | null;
+  workload: {
+    light: number;
+    appropriate: number;
+    heavy: number;
+  };
+  positiveComments: string[];
+  improvementComments: string[];
+}
+
+export interface CourseDeliveryOffering {
+  offeringId: string;
+  courseId: string;
+  code: string;
+  title: string;
+  term: string;
+  sectionCode: string;
+  status: string;
+  specificationStatus: string | null;
+  studentCount: number;
+  assessments: CourseDeliveryAssessment[];
+  announcements: CourseDeliveryAnnouncement[];
+  feedback: CourseFeedbackSummary;
+}

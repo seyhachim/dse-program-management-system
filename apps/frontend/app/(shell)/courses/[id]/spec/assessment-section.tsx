@@ -391,7 +391,7 @@ export function AssessmentSection({
                         )}
                       </td>
                       <td className="py-3 pr-3">
-                        {assessment.rubric ? (
+                        {assessment.rubricId ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                             <Check className="h-3.5 w-3.5" /> Attached
                           </span>
