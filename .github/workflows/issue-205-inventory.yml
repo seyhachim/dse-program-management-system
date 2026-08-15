@@ -1,0 +1,21 @@
+name: Issue 205 inventory
+
+on:
+  push:
+    branches:
+      - agent/issue-205-academic-version-schema
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CourseSpec API assumptions
+        shell: bash
+        run: |
+          echo '=== courseSpec calls ==='
+          grep -RInE 'courseSpec\.(findUnique|upsert|update|delete)|course\.spec\b|spec:' apps packages --include='*.ts' --include='*.tsx' || true
+          echo '=== Prisma Course/CourseSpec models ==='
+          grep -nE '^model (Course|CourseSpec) ' apps/backend/prisma/schema.prisma || true
+          echo '=== migrations ==='
+          ls apps/backend/prisma/migrations | tail -20
