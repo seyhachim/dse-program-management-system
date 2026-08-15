@@ -3,6 +3,7 @@ import {
   CreateQaEvidenceItemSchema,
   MapQaEvidenceSchema,
   QaEvidenceLibraryQuerySchema,
+  UpdateQaEvidenceItemSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme } from "../../../core/auth/token.ts";
@@ -16,6 +17,7 @@ import {
   mapQaEvidence,
   unmapQaEvidence,
 } from "./library.ts";
+import { updateQaEvidenceMetadata } from "./metadata.ts";
 
 const QA_LIBRARY_ROLES = [
   "admin",
@@ -95,6 +97,32 @@ export function createQaEvidenceLibraryRouter(): Router {
       sendLibraryError(res, error);
     }
   });
+
+  router.put(
+    "/evidence-library/:evidenceId",
+    requirePermission("qa:manage"),
+    async (req, res) => {
+      const evidenceId = req.params.evidenceId;
+      const parsed = UpdateQaEvidenceItemSchema.safeParse(req.body);
+      if (!evidenceId || !parsed.success) {
+        res.status(400).json({
+          error: "Invalid evidence metadata",
+          details: parsed.success ? undefined : parsed.error.flatten(),
+        });
+        return;
+      }
+      if (!hasAnyRoleInProgramme(req.user!, ["admin", "program_coordinator"], parsed.data.programmeId)) {
+        res.status(403).json({ error: "Only programme leadership can edit canonical evidence metadata" });
+        return;
+      }
+
+      try {
+        res.json(await updateQaEvidenceMetadata(evidenceId, parsed.data));
+      } catch (error) {
+        sendLibraryError(res, error);
+      }
+    },
+  );
 
   router.put(
     "/cycles/:cycleId/evidence/:evidenceId/mapping",
