@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, FileWarning, LockKeyhole, RefreshCw } from "lucide-react";
+import { CheckCircle2, Download, FileWarning, LockKeyhole, RefreshCw } from "lucide-react";
 import type {
   QaDashboardView,
+  QaSarBlock,
   QaSarDocumentModelView,
   QaSarDocumentMode,
   QaSarReleaseView,
 } from "@dse-pms/shared-types";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
+import { exportSarDocx, exportSarPdf } from "./sar-export";
 
 const PROGRAMME_ID = "dse";
 
@@ -104,6 +106,8 @@ export function SarPreviewClient() {
           <div className="flex flex-wrap gap-2">
             <Link href="/aun-qa" className="rounded-md border px-3 py-2 text-sm">Workspace</Link>
             <button onClick={() => void load(mode)} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"><RefreshCw className="h-4 w-4" />Refresh</button>
+            <button onClick={() => void exportSarDocx(model)} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"><Download className="h-4 w-4" />DOCX</button>
+            <button onClick={() => exportSarPdf(model)} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"><Download className="h-4 w-4" />PDF</button>
             {canFinalize && model.mode === "official" ? (
               <button
                 disabled={!officialReady || finalizing}
@@ -202,7 +206,11 @@ export function SarPreviewClient() {
           {releases.map((release) => (
             <div key={release.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
               <div><span className="font-medium">Release v{release.version}</span> · {release.title}<div className="text-xs text-muted-foreground">Finalized by {release.finalizedBy.name} · {new Date(release.finalizedAt).toLocaleString()}</div></div>
-              <span className="text-xs text-muted-foreground">{release.submissionIds.length} pinned sections</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{release.submissionIds.length} pinned sections</span>
+                <button onClick={() => void exportSarDocx(release.snapshot, `${release.title}-v${release.version}`)} className="rounded-md border px-2 py-1 text-xs">DOCX</button>
+                <button onClick={() => exportSarPdf(release.snapshot, `${release.title}-v${release.version}`)} className="rounded-md border px-2 py-1 text-xs">PDF</button>
+              </div>
             </div>
           ))}
           {releases.length === 0 ? <div className="text-sm text-muted-foreground">No final release has been created yet.</div> : null}
@@ -216,7 +224,7 @@ function Metric({ label, value, warning = false }: { label: string; value: numbe
   return <div className="rounded-xl border bg-white p-4 shadow-sm"><div className="text-sm text-muted-foreground">{label}</div><div className={`mt-2 text-2xl font-semibold ${warning ? "text-amber-700" : ""}`}>{value}</div></div>;
 }
 
-function RenderedBlock({ block }: { block: QaSarDocumentModelView["criteria"][number]["sections"][number]["content"] extends infer C ? C extends { blocks: Array<infer B> } ? B : never : never }) {
+function RenderedBlock({ block }: { block: QaSarBlock }) {
   if (block.type === "heading") return <h4 className={block.level === 2 ? "text-lg font-semibold" : "font-semibold"}>{block.text}</h4>;
   if (block.type === "bullet") return <div className="flex gap-2"><span>•</span><p>{block.text}</p></div>;
   if (block.type === "evidenceReference") return <span className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800">Evidence: {block.label}</span>;
