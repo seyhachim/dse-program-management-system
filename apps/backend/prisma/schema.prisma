@@ -68,6 +68,25 @@ enum CourseSpecReviewActionType {
   Approved
 }
 
+enum CourseSpecRevisionType {
+  Initial
+  Minor
+  Major
+}
+
+enum CourseSpecRevisionTrigger {
+  ScheduledReview
+  StudentFeedback
+  AlumniFeedback
+  EmployerFeedback
+  LecturerReflection
+  ProgrammeCoordinator
+  ExternalExaminer
+  QaFinding
+  RegulatoryChange
+  Other
+}
+
 /// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
 /// normalized CLO row.
 enum CloRowStatus {
@@ -765,7 +784,7 @@ model Course {
   createdAt     DateTime    @default(now())
 
   offerings Offering[]
-  spec      CourseSpec?
+  specs     CourseSpec[]
 
   @@index([lecturerId])
   @@index([programmeId])
@@ -779,9 +798,19 @@ model Course {
 /// rows) — kept in place unused for one deploy cycle before being dropped in a
 /// follow-up migration (issue #81 phase C), same expand/contract pattern as #80.
 model CourseSpec {
-  id                      String                            @id @default(uuid())
-  courseId                String                            @unique
-  course                  Course                            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  versionMajor            Int                               @default(1)
+  versionMinor            Int                               @default(0)
+  revisionType            CourseSpecRevisionType            @default(Initial)
+  revisionTriggers        CourseSpecRevisionTrigger[]
+  revisionReason          String                            @default("")
+  changeSummary           String                            @default("")
+  basedOnVersionId        String?
+  basedOnVersion          CourseSpec?                       @relation("CourseSpecVersionHistory", fields: [basedOnVersionId], references: [id], onDelete: SetNull)
+  derivedVersions         CourseSpec[]                      @relation("CourseSpecVersionHistory")
   sections                CourseSpecSection[]
   clos                    CourseSpecClo[]
   weeks                   CourseSpecWeek[]
@@ -801,13 +830,22 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+
+  approvedAt      DateTime?
+  effectiveFrom   DateTime?
+  nextReviewDueAt DateTime?
+  contentHash     String?
   /// §25 Date — spec last revised/approved date (issue #124). A single value,
   /// so it lives directly on CourseSpec rather than a normalized child table,
   /// same reasoning as courseInfo mirroring onto Course instead of a section row.
-  specDate                DateTime?                         @db.Date
+  specDate        DateTime? @db.Date
 
+  @@unique([courseId, versionMajor, versionMinor])
+  @@index([courseId, reviewStatus])
   @@index([reviewStatus])
   @@index([submittedById])
+  @@index([nextReviewDueAt])
+  @@index([basedOnVersionId])
 }
 
 /// Immutable workflow events for Course Specification submission/review actions.
