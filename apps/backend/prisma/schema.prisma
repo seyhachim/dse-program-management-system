@@ -175,6 +175,7 @@ model User {
   qaSarSectionsUpdated      QaSarSection[]             @relation("QaSarSectionUpdatedBy")
   qaSarSubmissions          QaSarSubmission[]          @relation("QaSarSubmittedBy")
   qaSarReviews              QaSarReview[]              @relation("QaSarReviewer")
+  qaSarReleasesFinalized    QaSarRelease[]             @relation("QaSarReleaseFinalizedBy")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -220,6 +221,7 @@ model Programme {
   qaRequirementAssignments QaRequirementAssignment[]
   qaSarSections             QaSarSection[]
   qaSarSubmissions          QaSarSubmission[]
+  qaSarReleases             QaSarRelease[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -338,6 +340,7 @@ model QaAssessmentCycle {
   assignments      QaRequirementAssignment[]
   sarSections      QaSarSection[]
   sarSubmissions   QaSarSubmission[]
+  sarReleases      QaSarRelease[]
 
   @@index([programmeId, status])
   @@index([frameworkId])
@@ -441,6 +444,28 @@ model QaSarReview {
 
   @@index([submissionId, createdAt])
   @@index([reviewerId])
+}
+
+/// Immutable official SAR release. The JSON snapshot is rendered from exact
+/// approved submissions and the submission id list pins the source versions.
+model QaSarRelease {
+  id              String            @id @default(uuid())
+  programmeId     String
+  programme       Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId         String
+  cycle           QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  version         Int
+  title           String
+  templateVersion String            @default("aun-qa-sar-v1")
+  snapshot        Json
+  submissionIds   String[]
+  finalizedById   String
+  finalizedBy     User              @relation("QaSarReleaseFinalizedBy", fields: [finalizedById], references: [id], onDelete: Restrict)
+  finalizedAt     DateTime          @default(now())
+
+  @@unique([cycleId, version])
+  @@index([programmeId, cycleId])
+  @@index([finalizedById])
 }
 
 /// Canonical programme evidence item. Applicability to an assessment cycle,
