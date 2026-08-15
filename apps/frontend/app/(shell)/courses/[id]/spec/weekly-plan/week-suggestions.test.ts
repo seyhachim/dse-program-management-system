@@ -97,6 +97,7 @@ const assessment = {
   mode: "individual",
   status: "active",
   cloCodes: ["CLO1"],
+  countsTowardGrade: true,
   weight: "10",
   dueWeek: "3",
   durationWeeks: "",
