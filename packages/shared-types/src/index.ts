@@ -11,6 +11,7 @@ export * from "./course-spec.ts";
 export * from "./methods.ts";
 export * from "./rubrics.ts";
 export * from "./student-portal.ts";
+export * from "./telegram.ts";
 export * from "./qa.ts";
 export * from "./qa-knowledge.ts";
 export * from "./qa-evidence-candidates.ts";
