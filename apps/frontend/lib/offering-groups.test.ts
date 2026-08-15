@@ -18,6 +18,8 @@ function offering(
     createdAt: "2026-08-14T00:00:00.000Z",
     semester: "Second",
     programmeYear: 2,
+    startDate: null,
+    endDate: null,
     otherLecturers: null,
     meetings: [],
     course: {
