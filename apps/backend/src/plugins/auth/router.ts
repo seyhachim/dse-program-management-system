@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { CreateAccountInput, ManageProgrammeRoleInput } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
-import { hasAnyRoleInProgramme } from "../../core/auth/token.ts";
+import { hasAnyRoleInProgramme, type AuthUser } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import {
   authService,
@@ -14,10 +14,7 @@ const ProgrammeRoleListQuery = z.object({
   programmeId: z.string().trim().min(1),
 });
 
-function canManageProgrammeRoles(
-  user: NonNullable<Express.Request["user"]>,
-  programmeId: string,
-): boolean {
+function canManageProgrammeRoles(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, ["admin", "program_coordinator"], programmeId);
 }
 
@@ -34,7 +31,6 @@ export function createAuthRouter(): Router {
   router.use(requireAuth);
 
   router.get("/me", async (req, res) => {
-    // requireAuth guarantees req.user is set.
     res.json(await authService.me(req.user!.id));
   });
 
