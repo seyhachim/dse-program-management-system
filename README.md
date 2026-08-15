@@ -32,7 +32,7 @@ Course-spec data includes normalized structures for CLOs, assessments, CLO align
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
 | Backend | Express, TypeScript, Bun |
 | Database | PostgreSQL + Prisma |
-| Authentication | Dev JWT or Supabase Auth |
+| Authentication | Local/test Dev JWT; Supabase Auth for production |
 | Validation/contracts | Zod + `@dse-pms/shared-types` |
 | Shared UI | `@dse-pms/ui` |
 | Production frontend | Vercel |
@@ -88,7 +88,7 @@ Install:
 - PostgreSQL access — local PostgreSQL or a hosted PostgreSQL database such as Supabase
 - Git
 
-Docker is **not required for normal local development**. Configure `DATABASE_URL` to point at the PostgreSQL database you want to use.
+DSE-PMS runs directly with Bun; Docker is not part of the current development workflow. Configure `DATABASE_URL` to point at the PostgreSQL database you want to use.
 
 ## Local setup
 
@@ -104,12 +104,13 @@ Create `apps/backend/.env` and provide at least:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public"
+AUTH_MODE=dev
 JWT_SECRET="replace-with-a-development-secret"
 PORT=4000
 CORS_ORIGIN="http://localhost:3000"
 ```
 
-For simple local development, the backend can run in the dev-token authentication mode.
+`AUTH_MODE` is required. `dev` authentication is only for local development and tests; a production backend refuses to start unless `AUTH_MODE=supabase` is configured.
 
 ### 3. Apply database migrations
 
@@ -145,9 +146,10 @@ Create `apps/frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL="http://localhost:4000"
+NEXT_PUBLIC_AUTH_MODE=dev
 ```
 
-#### Dev-token auth
+#### Local dev-token auth
 
 Generate a development token:
 
@@ -167,9 +169,11 @@ Then add it to `apps/frontend/.env.local`:
 NEXT_PUBLIC_DEV_TOKEN="<generated-token>"
 ```
 
+`NEXT_PUBLIC_DEV_TOKEN` is local/test-only. Never configure it in a production or preview frontend environment.
+
 #### Supabase Auth
 
-The application also supports Supabase Auth. When using it, configure the backend and frontend Supabase environment variables described in [`DEPLOY.md`](./DEPLOY.md).
+Deployed environments use Supabase Auth. Configure the backend and frontend Supabase environment variables described in [`DEPLOY.md`](./DEPLOY.md).
 
 ### 6. Start development
 
@@ -229,10 +233,12 @@ Example options used by the importer include course filtering, replacement of ex
 
 ## Authentication and authorization
 
-DSE-PMS supports two authentication modes:
+DSE-PMS has two authentication modes with different allowed environments:
 
-1. **Development JWT** — useful for local development and controlled demos.
-2. **Supabase Auth** — per-user login for deployed environments.
+1. **Development JWT** — local development and automated tests only.
+2. **Supabase Auth** — required for production/deployed environments.
+
+Both backend and frontend require an explicit auth mode. Production fails closed instead of defaulting to development authentication.
 
 Application authorization is owned by DSE-PMS. Roles and permissions are stored in PostgreSQL and enforced by the backend rather than relying only on authentication-provider metadata.
 
@@ -264,6 +270,8 @@ bun test
 bun run build
 ```
 
+A production frontend build requires the Supabase public environment variables described in `DEPLOY.md`; CI supplies non-secret placeholder values so the fail-closed production configuration is exercised without using real credentials.
+
 If a change modifies Prisma models, also verify migrations against both the intended existing database path and a fresh database where appropriate.
 
 ## Adding or changing a backend plugin
@@ -286,10 +294,10 @@ Cross-domain behavior should use explicit services/contracts rather than tightly
 The current deployment architecture uses:
 
 ```text
-Supabase PostgreSQL → backend API → Vercel frontend
+Supabase PostgreSQL/Auth → Bun backend API → Vercel frontend
 ```
 
-See [`DEPLOY.md`](./DEPLOY.md) for environment variables, database migration steps, Supabase Auth configuration, invite redirects, and deployment verification.
+See [`DEPLOY.md`](./DEPLOY.md) for environment variables, database migration steps, Supabase Auth configuration, invite redirects, credential retirement, and deployment verification.
 
 Production database migrations should use:
 
@@ -304,11 +312,12 @@ Do not run `prisma migrate dev` against the production database.
 - Never commit `.env`, `.env.local`, database passwords, JWT secrets, Supabase service-role keys, or access tokens.
 - `SUPABASE_SERVICE_ROLE_KEY` belongs on the backend only.
 - `NEXT_PUBLIC_*` variables are exposed to the browser and must not contain private secrets.
-- Development JWTs should not be treated as production authentication credentials.
+- `NEXT_PUBLIC_DEV_TOKEN` is forbidden in production frontend builds.
+- Development JWT authentication is forbidden when the backend runs with `NODE_ENV=production`.
 
 ## Documentation
 
-- [`DEPLOY.md`](./DEPLOY.md) — deployment and Supabase Auth setup
+- [`DEPLOY.md`](./DEPLOY.md) — production deployment and Supabase Auth setup
 - [`CLAUDE.md`](./CLAUDE.md) — repository-specific development guidance and architecture notes
 
 ## Project status

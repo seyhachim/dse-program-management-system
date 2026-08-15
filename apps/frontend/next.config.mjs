@@ -1,4 +1,7 @@
 import { fileURLToPath } from "node:url";
+import { validateProductionAuthConfig } from "./auth-config.mjs";
+
+validateProductionAuthConfig();
 
 /** @type {import('next').NextConfig} */
 const config = {
