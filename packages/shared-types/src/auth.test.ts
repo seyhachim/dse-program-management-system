@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CreateAccountInput, Role } from "./auth.ts";
+import { CreateAccountInput, ManageProgrammeRoleInput, Role } from "./auth.ts";
 
 test("Role supports the additive QA contributor role", () => {
   expect(Role.options).toEqual([
@@ -44,6 +44,16 @@ test("CreateAccountInput rejects qa_contributor because it is granted additively
     role: "qa_contributor",
   });
   expect(result.success).toBe(false);
+});
+
+test("ManageProgrammeRoleInput only allows the additive QA contributor role", () => {
+  const base = {
+    userId: "11111111-1111-4111-8111-111111111111",
+    programmeId: "dse",
+  };
+  expect(ManageProgrammeRoleInput.safeParse({ ...base, role: "qa_contributor" }).success).toBe(true);
+  expect(ManageProgrammeRoleInput.safeParse({ ...base, role: "admin" }).success).toBe(false);
+  expect(ManageProgrammeRoleInput.safeParse({ ...base, role: "qa_reviewer" }).success).toBe(false);
 });
 
 test("CreateAccountInput accepts student portal invites", () => {
