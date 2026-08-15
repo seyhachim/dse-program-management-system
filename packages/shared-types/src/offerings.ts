@@ -15,6 +15,15 @@ export const SEMESTERS = ["First", "Second"] as const;
 export const SemesterSchema = z.enum(SEMESTERS);
 export type Semester = z.infer<typeof SemesterSchema>;
 
+/** ISO date-only value used for offering teaching periods. */
+export const DateOnlySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Use a valid calendar date");
+
 /** Short, stable class label within a course and term (for example A or B2). */
 export const SectionCodeSchema = z
   .string()
@@ -113,6 +122,23 @@ export function coLecturerViolation({
   return null;
 }
 
+export interface TeachingPeriodAssignment {
+  startDate?: string | null;
+  endDate?: string | null;
+}
+export type TeachingPeriodViolation = "missingStart" | "missingEnd" | "endBeforeStart";
+
+/** Final-state teaching-period invariant used by validation and the PATCH service. */
+export function teachingPeriodViolation({
+  startDate,
+  endDate,
+}: TeachingPeriodAssignment): TeachingPeriodViolation | null {
+  if (startDate && !endDate) return "missingEnd";
+  if (!startDate && endDate) return "missingStart";
+  if (startDate && endDate && endDate < startDate) return "endBeforeStart";
+  return null;
+}
+
 function refineCoLecturers(data: CoLecturerAssignment, ctx: z.RefinementCtx): void {
   const violation = coLecturerViolation(data);
   if (violation === "duplicate") {
@@ -123,6 +149,25 @@ function refineCoLecturers(data: CoLecturerAssignment, ctx: z.RefinementCtx): vo
       message: "The primary lecturer cannot also be a co-lecturer",
       path: ["coLecturerIds"],
     });
+  }
+}
+
+function refineTeachingPeriod(
+  data: TeachingPeriodAssignment,
+  ctx: z.RefinementCtx,
+  requirePair: boolean,
+): void {
+  const hasStart = data.startDate !== undefined;
+  const hasEnd = data.endDate !== undefined;
+  if (!requirePair && hasStart !== hasEnd) return;
+
+  const violation = teachingPeriodViolation(data);
+  if (violation === "missingStart") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Set a teaching start date", path: ["startDate"] });
+  } else if (violation === "missingEnd") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Set a teaching end date", path: ["endDate"] });
+  } else if (violation === "endBeforeStart") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "End date must be on or after start date", path: ["endDate"] });
   }
 }
 
@@ -142,16 +187,27 @@ const OfferingInputShape = z.object({
   // §12 Course Availability — optional. Year is the programme/study year (1–6).
   semester: SemesterSchema.nullable().optional(),
   programmeYear: z.coerce.number().int().min(1).max(6).nullable().optional(),
+  // Calendar dates for this delivered offering. Both are null when not scheduled.
+  startDate: DateOnlySchema.nullable().optional(),
+  endDate: DateOnlySchema.nullable().optional(),
   // §10 Other Course Lecturer(s) — optional free text, co-teachers this term.
   otherLecturers: z.string().optional(),
 });
 
-export const CreateOfferingInput = OfferingInputShape.superRefine(refineCoLecturers);
+export const CreateOfferingInput = OfferingInputShape.superRefine((data, ctx) => {
+  refineCoLecturers(data, ctx);
+  refineTeachingPeriod(data, ctx, true);
+});
 export type CreateOfferingInput = z.infer<typeof CreateOfferingInput>;
 
 export const UpdateOfferingInput = OfferingInputShape.omit({ courseId: true })
   .partial()
-  .superRefine(refineCoLecturers);
+  .superRefine((data, ctx) => {
+    refineCoLecturers(data, ctx);
+    // A PATCH may send one side while the other already exists; the service
+    // validates the merged final state. When both are supplied, catch ordering here.
+    refineTeachingPeriod(data, ctx, false);
+  });
 export type UpdateOfferingInput = z.infer<typeof UpdateOfferingInput>;
 
 export const ListOfferingsQuery = z.object({
@@ -182,6 +238,8 @@ export interface OfferingView {
   createdAt: string;
   semester: Semester | null;
   programmeYear: number | null;
+  startDate: string | null;
+  endDate: string | null;
   otherLecturers: string | null;
   meetings: OfferingMeetingView[];
   // programmeId backs the router's programme-scope access check (issue #147) —
