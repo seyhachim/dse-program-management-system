@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Copy, ExternalLink, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { type Rubric } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
@@ -30,6 +30,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const base = `/courses/${courseId}/spec/assessment/rubrics`;
   const assessmentHref = `/courses/${courseId}/spec?tab=assessmentPlan`;
@@ -66,6 +67,12 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
     }
   };
 
+  const copyPublicLink = async (rubricId: string) => {
+    await navigator.clipboard.writeText(`${window.location.origin}/rubrics/${rubricId}`);
+    setCopiedId(rubricId);
+    window.setTimeout(() => setCopiedId((current) => (current === rubricId ? null : current)), 1800);
+  };
+
   const openRubric = (rubricId: string) => router.push(`${base}/${rubricId}`);
   const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
 
@@ -73,7 +80,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
     <>
       <Topbar
         title="Rubric Bank"
-        subtitle="Browse reusable assessment rubrics. Open any rubric for a clear read-only view."
+        subtitle="Browse reusable assessment rubrics. Active rubrics can also be shared publicly."
       />
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-[1500px] space-y-4">
@@ -201,6 +208,27 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
+                          {rubric.status === "Active" ? (
+                            <>
+                              <Link
+                                href={`/rubrics/${rubric.id}`}
+                                aria-label={`View public page for ${rubric.name}`}
+                                title="View public page"
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => copyPublicLink(rubric.id)}
+                                aria-label={`Copy public link for ${rubric.name}`}
+                                title={copiedId === rubric.id ? "Public link copied" : "Copy public link"}
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                {copiedId === rubric.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                              </button>
+                            </>
+                          ) : null}
                           {canWrite ? (
                             <>
                               <Link
@@ -232,7 +260,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Rubric detail pages are read-only. Editing controls are only shown to users with rubric write permission.
+            Active rubrics are public: use the public-page or copy-link actions to share them with students, QA reviewers, or external stakeholders. Draft and Archived rubrics remain private.
           </p>
         </div>
       </main>
