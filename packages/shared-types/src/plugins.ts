@@ -302,6 +302,13 @@ export const qaManifest: PluginManifest = {
       group: "Quality Assurance",
     },
     {
+      label: "SAR Review",
+      path: "/aun-qa/review",
+      icon: "clipboard-check",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
       label: "QA Evidence Analysis",
       path: "/qa-dashboard",
       icon: "file-check",

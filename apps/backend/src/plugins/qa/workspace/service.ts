@@ -2,6 +2,8 @@ import type {
   QaContributorWorkspaceView,
   QaCycleView,
   QaEvidenceReadiness,
+  QaSarReviewStatus,
+  QaWritingReadiness,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import { listMyQaRequirementAssignments } from "../assignments/service.ts";
@@ -12,6 +14,15 @@ const cycleStatus = {
   UnderReview: "underReview",
   Closed: "closed",
 } as const;
+
+const sarLifecycle = {
+  NotStarted: { writingStatus: "notStarted", reviewStatus: "notSubmitted" },
+  Drafting: { writingStatus: "drafting", reviewStatus: "notSubmitted" },
+  ReadyForReview: { writingStatus: "submitted", reviewStatus: "notSubmitted" },
+  UnderReview: { writingStatus: "submitted", reviewStatus: "underReview" },
+  ChangesRequested: { writingStatus: "drafting", reviewStatus: "changesRequested" },
+  Approved: { writingStatus: "approved", reviewStatus: "approved" },
+} as const satisfies Record<string, { writingStatus: QaWritingReadiness; reviewStatus: QaSarReviewStatus }>;
 
 function toCycleView(cycle: {
   id: string;
@@ -72,17 +83,30 @@ export async function getQaContributorWorkspace(
   }
 
   const requirementCodes = assignments.map((item) => item.requirementCode);
-  const evidenceMappings = await prisma.qaEvidenceMapping.findMany({
-    where: {
-      programmeId,
-      cycleId: selectedCycle.id,
-      requirement: { code: { in: requirementCodes } },
-    },
-    select: {
-      requirement: { select: { code: true } },
-      evidence: { select: { status: true } },
-    },
-  });
+  const [evidenceMappings, sarSections] = await Promise.all([
+    prisma.qaEvidenceMapping.findMany({
+      where: {
+        programmeId,
+        cycleId: selectedCycle.id,
+        requirement: { code: { in: requirementCodes } },
+      },
+      select: {
+        requirement: { select: { code: true } },
+        evidence: { select: { status: true } },
+      },
+    }),
+    prisma.qaSarSection.findMany({
+      where: {
+        programmeId,
+        cycleId: selectedCycle.id,
+        requirement: { code: { in: requirementCodes } },
+      },
+      select: {
+        status: true,
+        requirement: { select: { code: true } },
+      },
+    }),
+  ]);
 
   const counts = new Map<string, { count: number; reviewedCount: number }>();
   for (const row of evidenceMappings) {
@@ -91,12 +115,16 @@ export async function getQaContributorWorkspace(
     if (row.evidence.status === "Reviewed") current.reviewedCount += 1;
     counts.set(row.requirement.code, current);
   }
+  const lifecycleByRequirement = new Map(
+    sarSections.map((section) => [section.requirement.code, sarLifecycle[section.status]]),
+  );
 
   return {
     programmeId,
     selectedCycle: toCycleView(selectedCycle),
     work: assignments.map((assignment) => {
       const count = counts.get(assignment.requirementCode) ?? { count: 0, reviewedCount: 0 };
+      const lifecycle = lifecycleByRequirement.get(assignment.requirementCode) ?? sarLifecycle.NotStarted;
       return {
         assignment,
         evidence: {
@@ -104,10 +132,8 @@ export async function getQaContributorWorkspace(
           reviewedCount: count.reviewedCount,
           readiness: evidenceReadiness(count.count, count.reviewedCount),
         },
-        // SAR content/review models arrive in phases 7 and 8. Keep these
-        // dimensions explicit now rather than inventing a combined percentage.
-        writingStatus: "notStarted" as const,
-        reviewStatus: "notSubmitted" as const,
+        writingStatus: lifecycle.writingStatus,
+        reviewStatus: lifecycle.reviewStatus,
       };
     }),
   };
