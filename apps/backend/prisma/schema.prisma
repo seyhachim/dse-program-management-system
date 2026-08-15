@@ -1,7 +1,5 @@
 generator client {
   provider      = "prisma-client-js"
-  // Debian 12 (oven/bun image) ships OpenSSL 3.0; pin the engine so Prisma
-  // doesn't misdetect and fall back to the incompatible 1.1.x binary.
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -22,13 +20,11 @@ enum OfferingStatus {
   Completed
 }
 
-/// Syllabus §12 "Course Availability" — which semester the course is delivered in.
 enum Semester {
   First
   Second
 }
 
-/// Syllabus §11 "Course Type".
 enum CourseType {
   Basic
   Core
@@ -37,16 +33,12 @@ enum CourseType {
   MoeysHeip
 }
 
-/// Rubric Library publication state. Active = usable, Draft = work-in-progress,
-/// Archived = hidden from the default library view.
 enum RubricStatus {
   Active
   Draft
   Archived
 }
 
-/// Per-section save state for CourseSpecSection — mirrors the shared-types
-/// `SpecSectionStatus` zod enum ("draft"|"complete").
 enum CourseSpecSectionStatus {
   Draft
   Complete
@@ -68,29 +60,21 @@ enum CourseSpecReviewActionType {
   Approved
 }
 
-/// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
-/// normalized CLO row.
 enum CloRowStatus {
   Active
   Inactive
 }
 
-/// Mirrors the shared-types `AssessmentMode` zod enum ("individual"|"group") for a
-/// normalized §17 assessment row.
 enum AssessmentItemMode {
   Individual
   Group
 }
 
-/// Mirrors the shared-types `AssessmentStatus` zod enum ("active"|"inactive") for a
-/// normalized §17 assessment row.
 enum AssessmentItemStatus {
   Active
   Inactive
 }
 
-/// Mirrors the shared-types `MappingComponentKind` zod enum ("week"|"assessment")
-/// for a normalized CLO Alignment Mapping cell.
 enum MappingComponentKind {
   Week
   Assessment
@@ -127,10 +111,6 @@ enum QaAnalysisReviewDecision {
   NeedsMoreEvidence
 }
 
-/// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
-/// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
-/// via the Lecturers plugin. title/qualification/phone feed the syllabus
-/// "Course Details" instructor block.
 model User {
   id            String   @id @default(uuid())
   authId        String?  @unique
@@ -156,11 +136,6 @@ model User {
   qaAnalysisReviews       QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
 }
 
-/// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
-/// additively; phase 2 (#67) wires `User.roleId` to `Role` and switches
-/// `requirePermission` to read `RolePermission` instead of the hardcoded
-/// ROLE_PERMISSIONS map. `slug` values match UserRole's values / the permission
-/// strings requirePermission() already checks (e.g. "courses:write").
 model Role {
   id          String   @id @default(uuid())
   slug        String   @unique
@@ -174,11 +149,6 @@ model Role {
   userAssignments UserRoleAssignment[]
 }
 
-/// Issue #143 phase A: additive-only. A programme a role assignment or course
-/// can be scoped to. Seeded with a single `"dse"` row today (matching the id
-/// convention ProgrammeProfile/ProgramPolicy already use) — nothing yet reads
-/// or enforces this scope; that's phase B. Deliberately not FK'd to
-/// ProgrammeProfile/ProgramPolicy/PLOs in this phase — see issue #143.
 model Programme {
   id        String   @id
   code      String   @unique
@@ -187,18 +157,16 @@ model Programme {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  roleAssignments UserRoleAssignment[]
-  courses         Course[]
-  qaCycles        QaAssessmentCycle[]
-  qaEvidence      QaEvidence[]
-  qaAssessments   QaRequirementAssessment[]
-  qaAnalyses      QaEvidenceAnalysis[]
-  qaDocuments     QaDocument[]
+  roleAssignments  UserRoleAssignment[]
+  courses          Course[]
+  qaCycles         QaAssessmentCycle[]
+  qaEvidence       QaEvidence[]
+  qaAssessments    QaRequirementAssessment[]
+  qaAnalyses       QaEvidenceAnalysis[]
+  qaDocuments      QaDocument[]
   qaAnalysisReviews QaEvidenceAnalysisReview[]
 }
 
-/// Versioned quality-assurance catalogue. Framework content is seeded from the
-/// shared AUN-QA v4 catalogue; programme work belongs to assessment cycles below.
 model QaFramework {
   id        String   @id
   code      String
@@ -248,8 +216,6 @@ model QaRequirement {
   @@index([code])
 }
 
-/// Framework-level operational interpretation of a QA requirement. Expectations
-/// are reusable across programmes; programme/cycle evidence remains in QaEvidence.
 model QaQualityExpectation {
   id            String        @id
   requirementId String
@@ -268,9 +234,6 @@ model QaQualityExpectation {
   @@index([requirementId, active])
 }
 
-/// Evidence forms that may support one quality expectation. Role and sourceDomain
-/// stay as constrained strings in SQL so the catalogue can evolve independently
-/// of Prisma enum migrations while shared Zod contracts provide API validation.
 model QaExpectedEvidence {
   id            String               @id
   expectationId String
@@ -287,7 +250,6 @@ model QaExpectedEvidence {
   @@index([sourceDomain])
 }
 
-/// One programme's self-assessment/reporting window against a framework version.
 model QaAssessmentCycle {
   id             String        @id @default(uuid())
   programmeId    String
@@ -311,8 +273,6 @@ model QaAssessmentCycle {
   @@index([frameworkId])
 }
 
-/// Verifiable evidence for one requirement. Direct programme ownership makes
-/// scope explicit and supports efficient fail-closed authorisation checks.
 model QaEvidence {
   id              String            @id @default(uuid())
   programmeId     String
@@ -340,8 +300,6 @@ model QaEvidence {
   @@index([status])
 }
 
-/// Human-entered, justified self-rating. It is deliberately not derived from
-/// evidence coverage and must never be presented as an official AUN-QA result.
 model QaRequirementAssessment {
   programmeId   String
   programme     Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
@@ -361,8 +319,6 @@ model QaRequirementAssessment {
   @@index([reviewerId])
 }
 
-/// Append-only evidence-analysis run. Re-analysis creates a new row rather than
-/// overwriting history; official AUN-QA ratings remain in QaRequirementAssessment.
 model QaEvidenceAnalysis {
   id              String                     @id @default(uuid())
   programmeId     String
@@ -390,10 +346,6 @@ model QaEvidenceAnalysis {
   @@index([engine, promptVersion])
 }
 
-/// Immutable snapshot of a source used by one analysis run. Structured entity
-/// identity is retained even if source content changes later; qaEvidenceId is an
-/// optional convenience FK for manually attached QA evidence.
-/// Append-only human validation of one exact evidence-analysis version.
 model QaEvidenceAnalysisReview {
   id          String                   @id @default(uuid())
   programmeId String
@@ -435,8 +387,6 @@ model QaEvidenceAnalysisSource {
   @@index([entityType, entityId])
 }
 
-/// Programme-scoped QA document metadata. Text content is normalized into
-/// chunks below so retrieval can preserve page/section provenance independently.
 model QaDocument {
   id             String            @id @default(uuid())
   programmeId    String
@@ -457,9 +407,6 @@ model QaDocument {
   @@index([programmeId, reportingEnd])
 }
 
-/// Stable chunk provenance for QA document retrieval. Embeddings are stored as
-/// PostgreSQL float arrays so the pilot does not require pgvector; ranking is
-/// performed application-side at the current programme-scale volume.
 model QaDocumentChunk {
   id             String     @id
   documentId     String
@@ -491,8 +438,6 @@ model Permission {
   rolePermissions RolePermission[]
 }
 
-/// Join table: which permissions a role grants. Composite PK prevents duplicate
-/// grants; both FKs cascade so deleting a role or permission cleans up its grants.
 model RolePermission {
   roleId       String
   permissionId String
@@ -506,30 +451,15 @@ model RolePermission {
   @@index([permissionId])
 }
 
-/// Many-to-many bridge for User<->Role (issue #77). Phase A's migration
-/// backfilled one row per existing `User.roleId` (the legacy 1:1 FK column,
-/// dropped in phase C along with `User.role` and the `UserRole` enum); every
-/// path that creates or reassigns a User's role (`auth.createAccount`,
-/// `lecturers.create`, `prisma/seed.ts`) keeps a matching row here. This is the
-/// sole authorization/role source of truth (`core/auth/middleware.ts`,
-/// `core/permissions/index.ts`, `lecturers/service.ts`).
 model UserRoleAssignment {
   userId      String
   roleId      String
-  // Permanently nullable — null means a global grant (today, only `admin`;
-  // see `core/auth/token.ts`'s `hasAnyRoleInProgramme`), not un-backfilled
-  // data (issue #147 phase B). PK stays (userId, roleId): allowing the same
-  // role in multiple programmes would need a composite-PK change, closed as
-  // not-needed in #150 phase C since no second programme exists to require it.
   programmeId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   role      Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  // Restrict, not SetNull: a Programme is never expected to be deleted while
-  // rows reference it — silently orphaning assignments to NULL would hide a
-  // real data problem rather than surface it.
   programme Programme? @relation(fields: [programmeId], references: [id], onDelete: Restrict)
 
   @@id([userId, roleId])
@@ -537,7 +467,6 @@ model UserRoleAssignment {
   @@index([programmeId])
 }
 
-/// Students plugin domain model.
 model Student {
   id        String        @id @default(uuid())
   name      String
@@ -553,12 +482,6 @@ model Student {
   @@index([status])
 }
 
-/// Programme-level learning outcomes for the single DSE programme.
-///
-/// `code` is the stable academic identifier (for example "PLO1") and must
-/// remain compatible with existing CourseSpecClo.mappedPlos String[] values.
-/// Existing CLO mappings continue storing PLO codes; no CLO migration is
-/// required when this table is introduced.
 model ProgramLearningOutcome {
   id          String   @id @default(uuid())
   code        String   @unique
@@ -571,10 +494,6 @@ model ProgramLearningOutcome {
   competencyLinks ProgramCompetencyPlo[]
 }
 
-/// Programme-level graduate competencies for the single DSE programme.
-///
-/// Competencies are managed at programme level. Course lecturers do not map
-/// CLOs directly to competencies; competency context is derived through PLOs.
 model ProgramCompetency {
   id          String   @id @default(uuid())
   code        String   @unique
@@ -588,10 +507,6 @@ model ProgramCompetency {
   ploLinks ProgramCompetencyPlo[]
 }
 
-/// Many-to-many bridge between programme competencies and PLOs.
-///
-/// A competency may be supported by multiple PLOs, and a PLO may contribute
-/// to multiple competencies.
 model ProgramCompetencyPlo {
   competencyId String
   ploId        String
@@ -604,14 +519,6 @@ model ProgramCompetencyPlo {
   @@index([ploId])
 }
 
-/// Programme-level course policy baseline for the single DSE programme.
-///
-/// The singleton id is intentionally stable because this deployment serves one
-/// programme. CourseSpecPolicy remains the course-specific override/addition
-/// layer and is not replaced by this model.
-/// Programme-level profile used by the required Course Specification Part 1 cover page.
-/// The singleton keeps programme vision, mission, goals, educational philosophy,
-/// and PEOs separate from course-level policy data.
 model ProgrammeProfile {
   id                    String   @id @default("dse")
   vision                String   @default("")
@@ -634,8 +541,6 @@ model ProgramPolicy {
   createdAt                 DateTime @default(now())
 }
 
-/// Courses plugin domain model. lecturerId references a User with role = lecturer
-/// (validated at the service layer through registry.get('lecturers')).
 model Course {
   id            String      @id @default(uuid())
   code          String      @unique
@@ -643,16 +548,10 @@ model Course {
   description   String?
   lecturerId    String?
   lecturer      User?       @relation("CourseLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
-  // Syllabus Course Information — §4 credits, §5 prerequisites (free text), §11 type.
   credits       Int?
   prerequisites String?
   courseType    CourseType?
-  // Admin-entered total Student Learning Time for the course (hours). Independent of
-  // §16 — always a direct input, never derived. Used as the §15 Focus % denominator.
   totalSltHours Int?
-  // Issue #150 phase C: every Course belongs to exactly one programme — unlike
-  // UserRoleAssignment.programmeId, null here never had a meaning to preserve.
-  // Restrict, not SetNull — see UserRoleAssignment.programme for why.
   programmeId   String
   programme     Programme   @relation(fields: [programmeId], references: [id], onDelete: Restrict)
   createdAt     DateTime    @default(now())
@@ -664,13 +563,6 @@ model Course {
   @@index([programmeId])
 }
 
-/// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a
-/// single document per course. Overlapping §1–13 scalars are mirrored onto Course.
-/// `data`/`status` are the pre-issue-#81 storage: one JSON blob for every section,
-/// so saving any one section required rewriting the whole row. Superseded by
-/// `sections` (one `CourseSpecSection` row per section) and `clos` (normalized CLO
-/// rows) — kept in place unused for one deploy cycle before being dropped in a
-/// follow-up migration (issue #81 phase C), same expand/contract pattern as #80.
 model CourseSpec {
   id                      String                            @id @default(uuid())
   courseId                String                            @unique
@@ -699,9 +591,6 @@ model CourseSpec {
   @@index([submittedById])
 }
 
-/// Immutable workflow events for Course Specification submission/review actions.
-/// Notes are retained so requested changes and approval decisions remain traceable
-/// across submission versions without overwriting earlier review history.
 model CourseSpecReviewAction {
   id                String                     @id @default(uuid())
   courseSpecId      String
@@ -717,19 +606,6 @@ model CourseSpecReviewAction {
   @@index([actorId])
 }
 
-/// Issue #81: one row per wizard section, replacing the CourseSpec.data/status
-/// blob so saving one section doesn't touch another's `updatedAt`/content.
-/// Every saveable section's actual payload lives in its own normalized table
-/// (CourseSpecClo for "clos", CourseSpecWeek for "slt", CourseSpecAssessmentItem
-/// for "assessmentPlan", CourseSpecMappingCell for "mapping"; "courseInfo" is
-/// mirrored onto Course.prerequisites/description and always live-recomputed) —
-/// this row exists purely to track per-section save status for the spec-progress
-/// dashboard. Issue #103 phase C dropped the last `Json` column (`content`) once
-/// its backfill was verified against production — there is no jsonb column left
-/// anywhere in this schema; any future section must land its own normalized
-/// table(s) rather than reintroducing one.
-/// §23 Course Policy. One normalized row per course specification so the five
-/// policy areas can be edited independently from other specification sections.
 model CourseSpecPolicy {
   courseSpecId              String     @id
   courseSpec                CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
@@ -742,15 +618,6 @@ model CourseSpecPolicy {
   createdAt                 DateTime   @default(now())
 }
 
-/// Course-level Teaching & Learning strategy (issue #137). Written
-/// exclusively via raw SQL (`teaching-learning/service.ts`'s `$queryRaw`/
-/// `$executeRaw`), never through the Prisma client — declared here anyway so
-/// `prisma migrate dev`'s schema diff doesn't see a real, populated table as
-/// drift to delete (issue #150 caught this the hard way: the auto-generated
-/// migration for an unrelated column change proposed dropping this table).
-/// `updatedAt` matches the migration's actual `DEFAULT CURRENT_TIMESTAMP`
-/// column default — not `@updatedAt`, which Prisma only manages client-side
-/// and would never apply here since nothing writes through the client.
 model CourseSpecTeachingLearning {
   courseSpecId              String     @id
   courseSpec                CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
@@ -765,11 +632,6 @@ model CourseSpecTeachingLearning {
   updatedAt                 DateTime   @default(now())
 }
 
-/// Optional Project-Based Learning progress attached to a Weekly Plan row.
-/// Same raw-SQL-only situation as `CourseSpecTeachingLearning` above — see
-/// its comment. References `CourseSpec` only, not `CourseSpecWeek`, because
-/// Weekly Plan saves rebuild `CourseSpecWeek` rows; `weekId` is the stable
-/// client-generated id.
 model CourseSpecWeekProjectProgress {
   courseSpecId     String
   weekId           String
@@ -795,17 +657,6 @@ model CourseSpecSection {
   @@unique([courseSpecId, sectionKey])
 }
 
-/// Issue #81: normalized §14 CLO rows (previously the `clos` section's JSON
-/// array). `id` is client-generated (crypto.randomUUID(), mirroring
-/// RubricCriterion) and is the stable identity the method join tables key on —
-/// but, also like RubricCriterion, only unique *within* a course spec (a client
-/// could send the same id for two different courses), hence the composite
-/// `(courseSpecId, id)` key rather than a bare `@id`. `order` preserves array
-/// position; `code` (e.g. "CLO1") isn't stored at all — it's a position-derived
-/// display label the frontend recomputes on every add/remove
-/// (`withCodes()`/clo-model.ts) and the backend re-derives the same way from
-/// `order` on reassembly, so there's exactly one source of truth for position
-/// instead of a stored value that could drift from it.
 model CourseSpecClo {
   id                        String                          @default(uuid())
   courseSpecId              String
@@ -824,10 +675,6 @@ model CourseSpecClo {
   @@id([courseSpecId, id])
 }
 
-/// Issue #81: enforces §14 teaching-method picks against the TeachingMethod
-/// vocab via a real FK (previously an unenforced id string inside CLO JSON).
-/// FK to CourseSpecClo is itself composite, mirroring RubricCell's FK to
-/// RubricCriterion, to satisfy CourseSpecClo's composite key.
 model CourseSpecCloTeachingMethod {
   courseSpecId     String
   cloId            String
@@ -839,7 +686,6 @@ model CourseSpecCloTeachingMethod {
   @@index([teachingMethodId])
 }
 
-/// Issue #81: same as CourseSpecCloTeachingMethod, for §14 assessment-method picks.
 model CourseSpecCloAssessmentMethod {
   courseSpecId       String
   cloId              String
@@ -851,15 +697,6 @@ model CourseSpecCloAssessmentMethod {
   @@index([assessmentMethodId])
 }
 
-/// Issue #103: normalized §18 Weekly Plan rows (previously the `slt` section's JSON
-/// `weeks` array). `id` is client-generated, only unique *within* a course spec —
-/// same composite-key rationale as CourseSpecClo. `week` is the user-entered week
-/// number (not necessarily sequential); `order` separately preserves array
-/// position, same split CourseSpecClo makes between its stored `order` and its
-/// derived `code`. `cloCodes` reference §14 CLOs by code, not id — a loose
-/// reference, same as CourseSpecClo's own `mappedPlos`, left unenforced by a DB FK
-/// since `code` isn't a stored/unique column to FK against (it's derived from
-/// `order`) and the frontend already reconciles orphaned references on save.
 model CourseSpecWeek {
   id                        String     @default(uuid())
   courseSpecId              String
@@ -885,10 +722,6 @@ model CourseSpecWeek {
   @@id([courseSpecId, id])
 }
 
-/// `assessmentPlan` section's JSON `items` array). Same composite-key rationale as
-/// CourseSpecWeek. Assessment learning levels are derived from the mapped CLOs rather
-/// than duplicated on the assessment item. `cloCodes`/`mappedPlos` are loose
-/// references, same as CourseSpecWeek.
 model CourseSpecAssessmentItem {
   id                  String               @default(uuid())
   courseSpecId        String
@@ -920,15 +753,6 @@ model CourseSpecAssessmentItem {
   @@id([courseSpecId, id])
 }
 
-/// Issue #103: normalized CLO Alignment Mapping cells (previously the `mapping`
-/// section's sparse JSON `cells` array). No synthetic id needed — the
-/// `(cloCode, kind, ref)` triple is already the cell's natural, unique identity
-/// (a lecturer can only rate one strength per CLO × week/assessment pair), so
-/// it's the composite PK directly. `ref` (a CourseSpecWeek or CourseSpecAssessmentItem
-/// id, depending on `kind`) has no DB FK — it's polymorphic across two possible
-/// parent tables, and, like `cloCode`, was already an unenforced loose reference
-/// before this migration (mapping-model.ts's `reconcileCells` is the only place
-/// orphaned refs get cleaned up today; this doesn't regress that).
 model CourseSpecMappingCell {
   courseSpecId String
   courseSpec   CourseSpec           @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
@@ -940,54 +764,35 @@ model CourseSpecMappingCell {
   @@id([courseSpecId, cloCode, kind, ref])
 }
 
-/// §19 Required Resources. Each row supplies the actual material/link for a
-/// resource type planned in one §18 Weekly Plan week. `weekId` is intentionally
-/// a loose reference, matching CourseSpecMappingCell.ref: CourseSpecWeek uses a
-/// composite key and weekly-plan sync rebuilds rows, so a hard FK would cascade
-/// resource evidence during an otherwise harmless weekly-plan save.
-/// Table backs two distinct sections, discriminated by `section`: §19 Required
-/// Resources (`Resource`, the historical default — `resourceType`/`evidenceWeekIds`
-/// are meaningful only here) and §20 References/Textbooks (`Reference` — the
-/// `kind`/`authors`/`publisher`/`year`/`isbn`/`basedOn` bibliographic columns,
-/// dormant since the `unify_course_spec_resources` migrations, are meaningful only
-/// here). Every sync/read must filter by `section` — see `syncResources`/
-/// `syncReferences` in courses/service.ts.
+enum CourseSpecResourceSection {
+  Resource
+  Reference
+}
+
 model CourseSpecResource {
   id              String                    @default(uuid())
   courseSpecId    String
   courseSpec      CourseSpec                @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
   order           Int
   section         CourseSpecResourceSection @default(Resource)
-  // Legacy single-week provenance is retained for safe migration/backward compatibility.
   weekId          String?
   resourceType    String
-  title           String     @default("")
-  url             String     @default("")
-  notes           String     @default("")
-  evidenceWeekIds String[]   @default([])
-
-  // Existing unified Resources metadata. Keep these fields to preserve
-  // already-stored textbook/reference data in the development database.
-  kind      String @default("OTHER")
-  authors   String @default("")
-  publisher String @default("")
-  year      String @default("")
-  isbn      String @default("")
-  basedOn   String @default("")
+  title           String                    @default("")
+  url             String                    @default("")
+  notes           String                    @default("")
+  evidenceWeekIds String[]                  @default([])
+  kind            String                    @default("OTHER")
+  authors         String                    @default("")
+  publisher       String                    @default("")
+  year            String                    @default("")
+  isbn            String                    @default("")
+  basedOn         String                    @default("")
 
   @@id([courseSpecId, id])
   @@index([courseSpecId, weekId])
   @@index([courseSpecId, section])
 }
 
-/// Discriminates which wizard section a `CourseSpecResource` row belongs to —
-/// added when §20 was wired up to reuse the same table as §19 (issue #122).
-enum CourseSpecResourceSection {
-  Resource
-  Reference
-}
-
-/// §21 Student Responsibility. One ordered statement per course specification.
 model CourseSpecStudentResponsibility {
   id           String     @default(uuid())
   courseSpecId String
@@ -999,9 +804,6 @@ model CourseSpecStudentResponsibility {
   @@index([courseSpecId, order])
 }
 
-/// Course Offerings plugin — a course delivered in a given term, with an assigned
-/// lecturer, a seat capacity, and enrolled students. The architectural proof point:
-/// it links Students <-> Courses <-> Lecturers through the registry.
 model Offering {
   id             String         @id @default(uuid())
   courseId       String
@@ -1012,10 +814,10 @@ model Offering {
   sectionCode    String         @default("A")
   capacity       Int            @default(30)
   status         OfferingStatus @default(Planned)
-  // Syllabus §12 Course Availability — optional, filled on the course spec form.
   semester       Semester?
   programmeYear  Int?
-  // Syllabus §10 Other Course Lecturer(s) — optional free text, varies per term.
+  startDate      DateTime?      @db.Date
+  endDate        DateTime?      @db.Date
   otherLecturers String?
   createdAt      DateTime       @default(now())
 
@@ -1031,8 +833,6 @@ model Offering {
   @@index([lecturerId])
 }
 
-/// A recurring weekly class session. Duration is derived from startTime/endTime
-/// by the API so stored schedule data has one source of truth.
 model OfferingMeeting {
   id           String   @id @default(uuid())
   offeringId   String
@@ -1046,12 +846,6 @@ model OfferingMeeting {
   @@index([offeringId, dayOfWeek, startTime])
 }
 
-/// Join table (issue #79, supersedes #73's Course-level table): co-lecturers are
-/// existing lecturer Users assigned to an Offering (a course delivered in a given
-/// term) alongside its primary `Offering.lecturerId`, distinct from
-/// `Offering.otherLecturers` (per-term free text, untouched by this table).
-/// Cascades on either side since a row here is a pure link with no data of its
-/// own to preserve.
 model OfferingCoLecturer {
   offeringId String
   offering   Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
@@ -1063,7 +857,6 @@ model OfferingCoLecturer {
   @@index([lecturerId])
 }
 
-/// Join model linking a Student to an Offering (enrollment).
 model Enrollment {
   id         String             @id @default(uuid())
   offeringId String
@@ -1077,8 +870,6 @@ model Enrollment {
   @@index([studentId])
 }
 
-/// An exact, section-specific deadline that overrides the course specification's
-/// week-level due date. Assessment ids remain stable inside one CourseSpec.
 model OfferingAssessmentDeadline {
   id               String   @id @default(uuid())
   offeringId       String
@@ -1093,8 +884,6 @@ model OfferingAssessmentDeadline {
   @@index([offeringId, dueAt])
 }
 
-/// A result is visible to a student only after `publishedAt` is set. The
-/// enrollment relation is the authorization boundary for all portal reads.
 model AssessmentResult {
   id               String     @id @default(uuid())
   enrollmentId     String
@@ -1112,8 +901,6 @@ model AssessmentResult {
   @@index([enrollmentId, publishedAt])
 }
 
-/// Section-level notices. Draft notices have a null `publishedAt` and never
-/// appear in student portal reads.
 model CourseAnnouncement {
   id          String    @id @default(uuid())
   offeringId  String
@@ -1130,9 +917,6 @@ model CourseAnnouncement {
   @@index([offeringId, publishedAt])
 }
 
-/// Anonymous-to-staff course feedback. `responseKeyHash` is a one-way HMAC
-/// generated from the authenticated student and offering; it prevents duplicate
-/// submissions without storing a student/user foreign key on the response.
 model CourseFeedback {
   id                      String   @id @default(uuid())
   offeringId              String
@@ -1150,8 +934,6 @@ model CourseFeedback {
   @@index([offeringId, createdAt])
 }
 
-/// §15 teaching-method vocabulary. Global and shared across all courses.
-/// Programme managers can archive entries without invalidating historical CLO links.
 model TeachingMethod {
   id        String                        @id @default(uuid())
   name      String                        @unique
@@ -1161,7 +943,6 @@ model TeachingMethod {
   cloLinks  CourseSpecCloTeachingMethod[]
 }
 
-/// §15 assessment-method vocabulary. Same lifecycle as TeachingMethod.
 model AssessmentMethod {
   id        String                          @id @default(uuid())
   name      String                          @unique
@@ -1171,8 +952,6 @@ model AssessmentMethod {
   cloLinks  CourseSpecCloAssessmentMethod[]
 }
 
-/// Programme-managed grouping for active-learning strategies. IDs intentionally use
-/// the existing frontend slugs (for example "practice") so migration is lossless.
 model ActiveLearningCluster {
   id          String                   @id
   name        String
@@ -1186,8 +965,6 @@ model ActiveLearningCluster {
   @@index([active, sortOrder])
 }
 
-/// Programme-managed active-learning vocabulary. `id` is the stable slug already
-/// stored by CourseSpecTeachingLearning and CourseSpecClo, so existing specs need no rewrite.
 model ActiveLearningStrategy {
   id        String                @id
   name      String
@@ -1201,18 +978,6 @@ model ActiveLearningStrategy {
   @@index([clusterId, active, sortOrder])
 }
 
-/// Rubric Library — a reusable assessment grid shared across courses. `levelRows`
-/// holds the ordered rating scale (columns) and `criterionRows` the rows, each
-/// with one `RubricCell` descriptor per level; the API's `levels`/`criteria`
-/// arrays (opaque JSON validated by the shared Zod schema at the API boundary)
-/// are reassembled from these on read. `ownerId` is the User who created it
-/// (nulled if that user is removed, matching Course/Offering lecturer relations).
-///
-/// `levelRows`/`criterionRows` are the normalized replacement for what was
-/// originally a `levels`/`criteria` jsonb pair on this model (issue #77-style
-/// expand/contract, this time issue #80): phase A added these tables and
-/// dual-wrote them alongside the jsonb columns, phase B cut reads over, and
-/// phase C dropped the jsonb columns outright — this is now the sole storage.
 model Rubric {
   id            String            @id @default(uuid())
   name          String
@@ -1230,10 +995,6 @@ model Rubric {
   @@index([ownerId])
 }
 
-/// One rating-scale column of a Rubric (normalized form of the API's `levels`
-/// array, issue #80). `id` is synthesized (the API's `levels` entries have no
-/// id — the frontend indexes levels by array position, not identity) so
-/// `RubricCell` has something to reference.
 model RubricLevel {
   id       String       @id @default(uuid())
   rubricId String
@@ -1246,12 +1007,6 @@ model RubricLevel {
   @@index([rubricId])
 }
 
-/// One criterion row of a Rubric (normalized form of the API's `criteria`
-/// array, issue #80). `id` is preserved from the criterion's own `id` field
-/// (client-generated via `crypto.randomUUID()`, keyed on by the edit form)
-/// rather than synthesized — but that id is only unique *within* a rubric
-/// (seeded rubrics reuse short ids like "c1" across different rubrics), so
-/// the primary key is the (rubricId, id) pair, not id alone.
 model RubricCriterion {
   id       String
   rubricId String
@@ -1264,13 +1019,6 @@ model RubricCriterion {
   @@index([name])
 }
 
-/// One grid cell: a criterion's descriptor at a given level (normalized form
-/// of a `criteria[].descriptors[levelIndex]` entry, issue #80). Still written
-/// via a full delete-and-rebuild per rubric (`syncNormalizedRubricTables`),
-/// same as `RubricLevel`/`RubricCriterion` — a real single-cell targeted
-/// write is a later improvement this table only makes possible, not one
-/// delivered yet. `rubricId` is carried alongside `criterionId` to satisfy
-/// RubricCriterion's composite (rubricId, id) key.
 model RubricCell {
   rubricId    String
   criterionId String
