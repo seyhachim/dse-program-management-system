@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import {
   CreateCommunityActionSchema,
   CreateCommunityCommentSchema,
@@ -61,7 +61,7 @@ function canGovern(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, GOVERNANCE_ROLES, programmeId);
 }
 
-function denyProgramme(res: Parameters<Parameters<Router["use"]>[0]>[1]) {
+function denyProgramme(res: Response) {
   res.status(403).json({ error: "You do not have Community of Practice access to this programme" });
 }
 
