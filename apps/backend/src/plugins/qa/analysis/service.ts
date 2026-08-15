@@ -143,20 +143,20 @@ export async function createQaEvidenceAnalysis(
     ),
   ];
   if (qaEvidenceIds.length > 0) {
-    const evidenceRows = await prisma.qaEvidence.findMany({
+    const evidenceMappings = await prisma.qaEvidenceMapping.findMany({
       where: {
-        id: { in: qaEvidenceIds },
         programmeId: input.programmeId,
         cycleId: input.cycleId,
         requirementId: requirement.id,
+        evidenceId: { in: qaEvidenceIds },
       },
-      select: { id: true },
+      select: { evidenceId: true },
     });
-    const allowed = new Set(evidenceRows.map((row) => row.id));
+    const allowed = new Set(evidenceMappings.map((row) => row.evidenceId));
     const invalidId = qaEvidenceIds.find((id) => !allowed.has(id));
     if (invalidId) {
       throw new QaAnalysisScopeMismatchError(
-        "Analysis source references QA evidence outside this programme, cycle, or requirement",
+        "Analysis source references QA evidence that is not mapped to this programme, cycle, or requirement",
       );
     }
   }
