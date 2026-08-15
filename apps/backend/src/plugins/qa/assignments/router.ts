@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { z } from "zod";
 import {
   QaRequirementAssignmentScopeSchema,
@@ -19,7 +19,7 @@ import {
 
 const RequirementCodeSchema = z.string().regex(/^\d\.\d$/);
 
-function sendAssignmentError(res: Parameters<Parameters<Router["get"]>[1]>[1], error: unknown) {
+function sendAssignmentError(res: Response, error: unknown): void {
   if (error instanceof QaAssignmentResourceNotFoundError) {
     res.status(404).json({ error: error.message });
     return;
