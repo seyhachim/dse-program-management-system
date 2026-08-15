@@ -18,11 +18,13 @@ import {
   type QaAnalysisReviewView,
   type QaDashboardView,
   type QaEvidenceAnalysisView,
+  type QaImprovementActionView,
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { QaAnalysisReviewPanel } from "./qa-analysis-review-panel";
+import { QaImprovementActionsPanel } from "./qa-improvement-actions-panel";
 
 const PROGRAMME_ID = "dse";
 const pilotRequirementCodes = new Set<string>(QA_PILOT_REQUIREMENT_CODES);
@@ -49,6 +51,7 @@ export function QaDashboardClient() {
   const [data, setData] = useState<QaDashboardView | null>(null);
   const [analyses, setAnalyses] = useState<QaEvidenceAnalysisView[]>([]);
   const [reviews, setReviews] = useState<QaAnalysisReviewView[]>([]);
+  const [actions, setActions] = useState<QaImprovementActionView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCycleForm, setShowCycleForm] = useState(false);
@@ -72,19 +75,24 @@ export function QaDashboardClient() {
 
       if (dashboard.selectedCycle) {
         const historyQuery = new URLSearchParams({ programmeId: PROGRAMME_ID });
-        const [analysisHistory, reviewHistory] = await Promise.all([
+        const [analysisHistory, reviewHistory, actionHistory] = await Promise.all([
           api.get<QaEvidenceAnalysisView[]>(
             `/api/qa/cycles/${dashboard.selectedCycle.id}/analyses?${historyQuery}`,
           ),
           api.get<QaAnalysisReviewView[]>(
             `/api/qa/cycles/${dashboard.selectedCycle.id}/reviews?${historyQuery}`,
           ),
+          api.get<QaImprovementActionView[]>(
+            `/api/qa/actions?${new URLSearchParams({ programmeId: PROGRAMME_ID, cycleId: dashboard.selectedCycle.id })}`,
+          ),
         ]);
         setAnalyses(analysisHistory);
         setReviews(reviewHistory);
+        setActions(actionHistory);
       } else {
         setAnalyses([]);
         setReviews([]);
+        setActions([]);
       }
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load QA readiness");
@@ -282,6 +290,14 @@ export function QaDashboardClient() {
       </section>
 
       {error ? <ErrorNotice message={error} /> : null}
+
+      {data.selectedCycle ? (
+        <QaImprovementActionsPanel
+          actions={actions}
+          canWrite={canWrite}
+          onChanged={() => load(data.selectedCycle!.id)}
+        />
+      ) : null}
 
       {!data.selectedCycle ? (
         <section className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">

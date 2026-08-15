@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { qaManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import { createQaActionRouter } from "./actions/router.ts";
 import { createQaLlmRouter } from "./analysis/llm-router.ts";
 import { createQaAssignmentsRouter } from "./assignments/router.ts";
 import { createQaReviewRouter } from "./reviews/router.ts";
@@ -14,6 +15,7 @@ router.use(createQaAssignmentsRouter());
 router.use(createQaWorkspaceRouter());
 router.use(createQaLlmRouter());
 router.use(createQaReviewRouter());
+router.use(createQaActionRouter());
 
 export const qaPlugin: BackendPlugin<QaService> = {
   manifest: qaManifest,
