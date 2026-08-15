@@ -152,6 +152,7 @@ model User {
   announcementsAuthored   CourseAnnouncement[]      @relation("AnnouncementAuthor")
   qaCyclesCreated         QaAssessmentCycle[]       @relation("QaCycleCreator")
   qaEvidenceCreated       QaEvidence[]              @relation("QaEvidenceCreator")
+  qaEvidenceMappings      QaEvidenceMapping[]       @relation("QaEvidenceMapper")
   qaAssessmentsReviewed   QaRequirementAssessment[] @relation("QaAssessmentReviewer")
   qaAnalysisReviews       QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
   qaRequirementAssignments QaRequirementAssignment[] @relation("QaRequirementAssignee")
@@ -193,6 +194,7 @@ model Programme {
   courses         Course[]
   qaCycles        QaAssessmentCycle[]
   qaEvidence      QaEvidence[]
+  qaEvidenceMappings QaEvidenceMapping[]
   qaAssessments   QaRequirementAssessment[]
   qaAnalyses      QaEvidenceAnalysis[]
   qaDocuments     QaDocument[]
@@ -241,8 +243,8 @@ model QaRequirement {
   title       String
   order       Int
 
-  evidence     QaEvidence[]
-  assessments  QaRequirementAssessment[]
+  evidenceMappings QaEvidenceMapping[]
+  assessments      QaRequirementAssessment[]
   expectations QaQualityExpectation[]
   analyses     QaEvidenceAnalysis[]
   assignments  QaRequirementAssignment[]
@@ -267,6 +269,7 @@ model QaQualityExpectation {
 
   expectedEvidence QaExpectedEvidence[]
   analyses         QaEvidenceAnalysis[]
+  evidenceMappings QaEvidenceMapping[]
 
   @@unique([requirementId, order])
   @@index([requirementId, active])
@@ -307,10 +310,10 @@ model QaAssessmentCycle {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  evidence    QaEvidence[]
-  assessments QaRequirementAssessment[]
-  analyses    QaEvidenceAnalysis[]
-  assignments QaRequirementAssignment[]
+  evidenceMappings QaEvidenceMapping[]
+  assessments      QaRequirementAssessment[]
+  analyses         QaEvidenceAnalysis[]
+  assignments      QaRequirementAssignment[]
 
   @@index([programmeId, status])
   @@index([frameworkId])
@@ -340,33 +343,59 @@ model QaRequirementAssignment {
   @@index([assignedById])
 }
 
-/// Verifiable evidence for one requirement. Direct programme ownership makes
-/// scope explicit and supports efficient fail-closed authorisation checks.
+/// Canonical programme evidence item. Applicability to an assessment cycle,
+/// requirement, and optional quality expectation is expressed through mappings
+/// so the same survey, minutes, policy, or report is stored once and reused.
 model QaEvidence {
-  id              String            @id @default(uuid())
+  id              String           @id @default(uuid())
   programmeId     String
-  programme       Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
-  cycleId         String
-  cycle           QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  requirementId   String
-  requirement     QaRequirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  programme       Programme        @relation(fields: [programmeId], references: [id], onDelete: Restrict)
   title           String
-  description     String            @default("")
+  description     String           @default("")
   kind            QaEvidenceKind
   sourceUrl       String?
-  sourceRef       String            @default("")
-  reportingPeriod String            @default("")
-  status          QaEvidenceStatus  @default(Draft)
+  sourceRef       String           @default("")
+  reportingPeriod String           @default("")
+  status          QaEvidenceStatus @default(Draft)
   createdById     String?
-  createdBy       User?             @relation("QaEvidenceCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdBy       User?            @relation("QaEvidenceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
+  mappings        QaEvidenceMapping[]
   analysisSources QaEvidenceAnalysisSource[]
 
+  @@index([programmeId])
+  @@index([status])
+}
+
+/// Cycle-specific use of one canonical evidence item. A single evidence item can
+/// support multiple requirements while each cycle/requirement link remains
+/// explicit, auditable, and optionally tied to one quality expectation.
+model QaEvidenceMapping {
+  id              String               @id @default(uuid())
+  programmeId     String
+  programme       Programme            @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId         String
+  cycle           QaAssessmentCycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  evidenceId      String
+  evidence        QaEvidence           @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  requirementId   String
+  requirement     QaRequirement        @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  expectationId   String?
+  expectation     QaQualityExpectation? @relation(fields: [expectationId], references: [id], onDelete: SetNull)
+  relevanceNote   String               @default("")
+  mappedById      String?
+  mappedBy        User?                @relation("QaEvidenceMapper", fields: [mappedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([cycleId, evidenceId, requirementId])
   @@index([programmeId, cycleId])
   @@index([requirementId])
-  @@index([status])
+  @@index([evidenceId])
+  @@index([expectationId])
+  @@index([mappedById])
 }
 
 /// Human-entered, justified self-rating. It is deliberately not derived from

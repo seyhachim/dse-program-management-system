@@ -109,7 +109,7 @@ async function manualEvidenceCandidates(
   cycleId: string,
   requirementCode: string,
 ): Promise<CandidateWithKind[]> {
-  const rows = await prisma.qaEvidence.findMany({
+  const rows = await prisma.qaEvidenceMapping.findMany({
     where: {
       programmeId,
       cycleId,
@@ -118,32 +118,41 @@ async function manualEvidenceCandidates(
         criterion: { frameworkId: AUN_QA_V4_ID },
       },
     },
-    include: { requirement: { select: { code: true } } },
-    orderBy: { createdAt: "desc" },
+    include: {
+      requirement: { select: { code: true } },
+      evidence: true,
+    },
+    orderBy: { evidence: { createdAt: "desc" } },
   });
 
-  return rows.map((row) => ({
-    sourceKind: "qaEvidence" as const,
-    qaEvidenceId: row.id,
-    candidate: {
-      key: `qa-evidence:${row.id}`,
-      evidenceType: "manual-qa-evidence",
-      sourceDomain: manualEvidenceDomain(row.kind),
-      title: row.title,
-      summary: row.description || `Manually attached QA evidence for requirement ${row.requirement.code}.`,
-      entityType: "QaEvidence",
-      entityId: row.id,
-      route: null,
-      reportingDate: row.updatedAt.toISOString(),
-      attributes: {
-        kind: row.kind,
-        status: row.status,
-        sourceUrl: row.sourceUrl,
-        sourceRef: row.sourceRef,
-        reportingPeriod: row.reportingPeriod,
+  return rows.map((row) => {
+    const evidence = row.evidence;
+    return {
+      sourceKind: "qaEvidence" as const,
+      qaEvidenceId: evidence.id,
+      candidate: {
+        key: `qa-evidence:${evidence.id}`,
+        evidenceType: "manual-qa-evidence",
+        sourceDomain: manualEvidenceDomain(evidence.kind),
+        title: evidence.title,
+        summary:
+          evidence.description ||
+          `Mapped QA evidence for requirement ${row.requirement.code}.`,
+        entityType: "QaEvidence",
+        entityId: evidence.id,
+        route: null,
+        reportingDate: evidence.updatedAt.toISOString(),
+        attributes: {
+          kind: evidence.kind,
+          status: evidence.status,
+          sourceUrl: evidence.sourceUrl,
+          sourceRef: evidence.sourceRef,
+          reportingPeriod: evidence.reportingPeriod,
+          evidenceMappingId: row.id,
+        },
       },
-    },
-  }));
+    };
+  });
 }
 
 export async function runLlmAssistedQaAnalysis(
