@@ -271,7 +271,7 @@ async function cloneNormalizedContent(
         format: row.format,
         submissionMethod: row.submissionMethod,
         instructions: row.instructions,
-        rubric: row.rubric,
+        rubricId: row.rubricId,
         mappedPlos: row.mappedPlos,
         notes: row.notes,
       })),
