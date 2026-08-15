@@ -488,11 +488,23 @@ function dueWeekForAssessment(
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   if (!needle) return null;
+
   for (const week of doc.lessonPlan?.weeks ?? []) {
-    const hay = week.assessmentRaw.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+    const raw = cleanText(week.assessmentRaw);
+    if (!raw || raw === "0" || raw === "-" || raw === "—") continue;
+
+    const hay = raw
+      .toLowerCase()
+      .replace(/\(\s*\d+(?:\.\d+)?\s*%\s*\)/g, " ")
+      .replace(/\b\d+(?:\.\d+)?\s*%\b/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    if (!hay) continue;
+
+    const candidate = hay.replace(/^\d+\s*/, "").trim();
     if (
       hay.includes(needle) ||
-      needle.includes(hay.replace(/^\d+\s*/, "").trim())
+      (candidate.length > 0 && needle.includes(candidate))
     )
       return week.week;
   }
