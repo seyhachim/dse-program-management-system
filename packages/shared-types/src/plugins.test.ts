@@ -79,20 +79,41 @@ test("Lecturer gets the focused workspace routes in the intended sidebar cluster
   }
 });
 
-test("QA Reviewer lands on its own QA Dashboard, not the general Dashboard, and has no admin-only routes", () => {
+test("QA Reviewer lands on evidence analysis, not contributor work or the general Dashboard", () => {
   const routes = navForRole(pluginManifests, ["qa_reviewer"]);
   expect(routes.some((r) => r.path === "/students")).toBe(false);
   expect(routes.some((r) => r.path === "/dashboard")).toBe(false);
   expect(routes.some((r) => r.path === "/users")).toBe(false);
   expect(routes.some((r) => r.path === "/settings")).toBe(false);
   expect(routes.some((r) => r.path === "/qa-dashboard")).toBe(true);
+  expect(routes.some((r) => r.path === "/aun-qa")).toBe(false);
 });
 
-test("QA Dashboard is provided by the real QA plugin with explicit permissions", () => {
+test("QA Contributor sees the AUN-QA workspace without receiving reviewer navigation", () => {
+  const contributorRoutes = navForRole(pluginManifests, ["qa_contributor"]).map((r) => r.path);
+  expect(contributorRoutes).toContain("/aun-qa");
+  expect(contributorRoutes).not.toContain("/qa-dashboard");
+
+  const lecturerOnlyRoutes = navForRole(pluginManifests, ["lecturer"]).map((r) => r.path);
+  expect(lecturerOnlyRoutes).not.toContain("/aun-qa");
+
+  const combined = navForRole(pluginManifests, ["lecturer", "qa_contributor"]).map((r) => r.path);
+  expect(combined).toContain("/courses");
+  expect(combined).toContain("/aun-qa");
+});
+
+test("Quality Assurance plugin exposes workspace, evidence analysis, and granular permissions", () => {
   const qa = pluginManifests.find((manifest) => manifest.id === "qa");
   expect(qa).toBeDefined();
+  expect(qa?.routes?.some((route) => route.path === "/aun-qa")).toBe(true);
   expect(qa?.routes?.some((route) => route.path === "/qa-dashboard")).toBe(true);
-  expect(qa?.permissions).toEqual(["qa:read", "qa:write"]);
+  expect(qa?.permissions).toEqual([
+    "qa:read",
+    "qa:write",
+    "qa:contribute",
+    "qa:review",
+    "qa:manage",
+  ]);
 });
 
 test("QA Reviewer can reach Course Specification content for review, and its own QA sections", () => {
