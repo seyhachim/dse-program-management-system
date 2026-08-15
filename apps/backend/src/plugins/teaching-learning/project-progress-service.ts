@@ -55,8 +55,9 @@ export const weekProjectProgressService = {
     courseId: string,
     value: WeekProjectProgress,
   ): Promise<WeekProjectProgress> {
-    const existingSpec = await prisma.courseSpec.findUnique({
+    const existingSpec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
       select: { id: true, reviewStatus: true },
     });
     if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);

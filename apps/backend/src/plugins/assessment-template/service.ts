@@ -33,7 +33,13 @@ async function readItems(
       ai."independentSltHours"
     FROM "CourseSpecAssessmentItem" ai
     INNER JOIN "CourseSpec" cs ON cs."id" = ai."courseSpecId"
-    WHERE cs."courseId" = ${courseId}
+    WHERE cs."id" = (
+      SELECT current_spec."id"
+      FROM "CourseSpec" current_spec
+      WHERE current_spec."courseId" = ${courseId}
+      ORDER BY current_spec."versionMajor" DESC, current_spec."versionMinor" DESC
+      LIMIT 1
+    )
     ORDER BY ai."order" ASC
   `);
 
@@ -55,8 +61,9 @@ export const assessmentTemplateService = {
 
   async save(courseId: string, items: AssessmentTemplateItem[]) {
     return prisma.$transaction(async (tx) => {
-      const spec = await tx.courseSpec.findUnique({
+      const spec = await tx.courseSpec.findFirst({
         where: { courseId },
+        orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
         select: { id: true },
       });
       if (!spec) throw new Error("Course specification not found");

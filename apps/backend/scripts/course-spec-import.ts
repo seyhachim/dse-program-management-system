@@ -549,9 +549,15 @@ async function importOne(
 
   const existingCourse = await prisma.course.findUnique({
     where: { code: courseCode },
-    include: { spec: { select: { id: true } } },
+    include: {
+      specs: {
+        orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
+        take: 1,
+        select: { id: true },
+      },
+    },
   });
-  if (existingCourse?.spec && !options.replaceExisting)
+  if (existingCourse?.specs[0] && !options.replaceExisting)
     return {
       file,
       courseCode,
@@ -588,12 +594,13 @@ async function importOne(
       },
     });
 
-    const oldSpec = await tx.courseSpec.findUnique({
+    const oldSpec = await tx.courseSpec.findFirst({
       where: { courseId: course.id },
+      orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
       select: { id: true },
     });
     if (oldSpec && options.replaceExisting)
-      await tx.courseSpec.delete({ where: { courseId: course.id } });
+      await tx.courseSpec.delete({ where: { id: oldSpec.id } });
     const spec = await tx.courseSpec.create({ data: { courseId: course.id } });
 
     const teachingMethodNames = new Set<string>();
@@ -840,7 +847,7 @@ async function importOne(
   return {
     file,
     courseCode,
-    action: existingCourse?.spec ? "replaced" : "created",
+    action: existingCourse?.specs[0] ? "replaced" : "created",
     warnings,
   };
 }

@@ -209,7 +209,9 @@ async function processFile(file: string, options: Options) {
   const stored = await prisma.course.findUnique({
     where: { code },
     include: {
-      spec: {
+      specs: {
+        orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
+        take: 1,
         include: {
           clos: { orderBy: { order: "asc" } },
           weeks: { orderBy: { order: "asc" } },
@@ -218,7 +220,7 @@ async function processFile(file: string, options: Options) {
       },
     },
   });
-  if (!stored?.spec) {
+  if (!stored?.specs[0]) {
     return { courseCode: code, action: "skipped", reason: "CourseSpec not found" };
   }
 
@@ -227,7 +229,7 @@ async function processFile(file: string, options: Options) {
   const sltByAssessment = recoverAssessmentSlt(doc);
   const sourceAssessments = assessmentItems(doc);
 
-  const updates = stored.spec.assessmentItems.map((item, index) => {
+  const updates = stored.specs[0].assessmentItems.map((item, index) => {
     const source = sourceAssessments[index] ?? {};
     const sourceName = clean(source.name) || item.name;
     const recovered = sltByAssessment.get(sourceName.toLowerCase());
@@ -250,12 +252,12 @@ async function processFile(file: string, options: Options) {
     };
   });
 
-  const cloUpdates = stored.spec.clos.map((clo, index) => ({
+  const cloUpdates = stored.specs[0].clos.map((clo, index) => ({
     id: clo.id,
     hours: cloSlt.get(`CLO${index + 1}`) ?? null,
   }));
 
-  const weekUpdates = stored.spec.weeks
+  const weekUpdates = stored.specs[0].weeks
     .map((week) => {
       const topicNumber = topicNumberFromTitle(week.topic);
       if (topicNumber == null) return null;
@@ -274,7 +276,7 @@ async function processFile(file: string, options: Options) {
         await tx.courseSpecAssessmentItem.update({
           where: {
             courseSpecId_id: {
-              courseSpecId: stored.spec!.id,
+              courseSpecId: stored.specs[0]!.id,
               id: update.id,
             },
           },
@@ -292,7 +294,7 @@ async function processFile(file: string, options: Options) {
         await tx.courseSpecClo.update({
           where: {
             courseSpecId_id: {
-              courseSpecId: stored.spec!.id,
+              courseSpecId: stored.specs[0]!.id,
               id: update.id,
             },
           },
@@ -303,7 +305,7 @@ async function processFile(file: string, options: Options) {
         await tx.courseSpecWeek.update({
           where: {
             courseSpecId_id: {
-              courseSpecId: stored.spec!.id,
+              courseSpecId: stored.specs[0]!.id,
               id: update.id,
             },
           },

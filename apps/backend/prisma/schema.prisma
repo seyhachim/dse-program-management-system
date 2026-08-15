@@ -68,6 +68,25 @@ enum CourseSpecReviewActionType {
   Approved
 }
 
+enum CourseSpecRevisionType {
+  Initial
+  Minor
+  Major
+}
+
+enum CourseSpecRevisionTrigger {
+  ScheduledReview
+  StudentFeedback
+  AlumniFeedback
+  EmployerFeedback
+  LecturerReflection
+  ProgrammeCoordinator
+  ExternalExaminer
+  QaFinding
+  RegulatoryChange
+  Other
+}
+
 /// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
 /// normalized CLO row.
 enum CloRowStatus {
@@ -156,25 +175,25 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed              Course[]                  @relation("CourseLecturer")
-  offeringsLed            Offering[]                @relation("OfferingLecturer")
-  rubricsOwned            Rubric[]                  @relation("RubricOwner")
-  coLecturerOf            OfferingCoLecturer[]      @relation("OfferingCoLecturer")
-  roleAssignments         UserRoleAssignment[]
-  courseSpecSubmissions   CourseSpec[]              @relation("CourseSpecSubmittedBy")
-  courseSpecReviewActions CourseSpecReviewAction[]  @relation("CourseSpecReviewActor")
-  studentProfile          Student?
-  announcementsAuthored   CourseAnnouncement[]      @relation("AnnouncementAuthor")
-  qaCyclesCreated         QaAssessmentCycle[]       @relation("QaCycleCreator")
-  qaEvidenceCreated       QaEvidence[]              @relation("QaEvidenceCreator")
-  qaEvidenceMappings      QaEvidenceMapping[]       @relation("QaEvidenceMapper")
-  qaAssessmentsReviewed   QaRequirementAssessment[] @relation("QaAssessmentReviewer")
-  qaAnalysisReviews       QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
-  qaRequirementAssignments QaRequirementAssignment[] @relation("QaRequirementAssignee")
-  qaAssignmentsCreated     QaRequirementAssignment[] @relation("QaRequirementAssignedBy")
-  qaSarSectionsUpdated      QaSarSection[]             @relation("QaSarSectionUpdatedBy")
-  qaSarSubmissions          QaSarSubmission[]          @relation("QaSarSubmittedBy")
-  qaSarReviews              QaSarReview[]              @relation("QaSarReviewer")
+  coursesLed               Course[]                   @relation("CourseLecturer")
+  offeringsLed             Offering[]                 @relation("OfferingLecturer")
+  rubricsOwned             Rubric[]                   @relation("RubricOwner")
+  coLecturerOf             OfferingCoLecturer[]       @relation("OfferingCoLecturer")
+  roleAssignments          UserRoleAssignment[]
+  courseSpecSubmissions    CourseSpec[]               @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions  CourseSpecReviewAction[]   @relation("CourseSpecReviewActor")
+  studentProfile           Student?
+  announcementsAuthored    CourseAnnouncement[]       @relation("AnnouncementAuthor")
+  qaCyclesCreated          QaAssessmentCycle[]        @relation("QaCycleCreator")
+  qaEvidenceCreated        QaEvidence[]               @relation("QaEvidenceCreator")
+  qaEvidenceMappings       QaEvidenceMapping[]        @relation("QaEvidenceMapper")
+  qaAssessmentsReviewed    QaRequirementAssessment[]  @relation("QaAssessmentReviewer")
+  qaAnalysisReviews        QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
+  qaRequirementAssignments QaRequirementAssignment[]  @relation("QaRequirementAssignee")
+  qaAssignmentsCreated     QaRequirementAssignment[]  @relation("QaRequirementAssignedBy")
+  qaSarSectionsUpdated     QaSarSection[]             @relation("QaSarSectionUpdatedBy")
+  qaSarSubmissions         QaSarSubmission[]          @relation("QaSarSubmittedBy")
+  qaSarReviews             QaSarReview[]              @relation("QaSarReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -208,18 +227,18 @@ model Programme {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  roleAssignments UserRoleAssignment[]
-  courses         Course[]
-  qaCycles        QaAssessmentCycle[]
-  qaEvidence      QaEvidence[]
-  qaEvidenceMappings QaEvidenceMapping[]
-  qaAssessments   QaRequirementAssessment[]
-  qaAnalyses      QaEvidenceAnalysis[]
-  qaDocuments     QaDocument[]
-  qaAnalysisReviews QaEvidenceAnalysisReview[]
+  roleAssignments          UserRoleAssignment[]
+  courses                  Course[]
+  qaCycles                 QaAssessmentCycle[]
+  qaEvidence               QaEvidence[]
+  qaEvidenceMappings       QaEvidenceMapping[]
+  qaAssessments            QaRequirementAssessment[]
+  qaAnalyses               QaEvidenceAnalysis[]
+  qaDocuments              QaDocument[]
+  qaAnalysisReviews        QaEvidenceAnalysisReview[]
   qaRequirementAssignments QaRequirementAssignment[]
-  qaSarSections             QaSarSection[]
-  qaSarSubmissions          QaSarSubmission[]
+  qaSarSections            QaSarSection[]
+  qaSarSubmissions         QaSarSubmission[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -265,11 +284,11 @@ model QaRequirement {
 
   evidenceMappings QaEvidenceMapping[]
   assessments      QaRequirementAssessment[]
-  expectations QaQualityExpectation[]
-  analyses     QaEvidenceAnalysis[]
-  assignments  QaRequirementAssignment[]
-  sarSections    QaSarSection[]
-  sarSubmissions QaSarSubmission[]
+  expectations     QaQualityExpectation[]
+  analyses         QaEvidenceAnalysis[]
+  assignments      QaRequirementAssignment[]
+  sarSections      QaSarSection[]
+  sarSubmissions   QaSarSubmission[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
@@ -371,25 +390,25 @@ model QaRequirementAssignment {
 /// Approved/submitted history is introduced separately; this model is the
 /// contributor's current structured draft, not the official SAR snapshot.
 model QaSarSection {
-  id                    String             @id @default(uuid())
-  programmeId           String
-  programme             Programme          @relation(fields: [programmeId], references: [id], onDelete: Restrict)
-  cycleId               String
-  cycle                 QaAssessmentCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  requirementId         String
-  requirement           QaRequirement      @relation(fields: [requirementId], references: [id], onDelete: Restrict)
-  content               Json
-  plainText             String             @default("")
-  status                QaSarSectionStatus @default(NotStarted)
-  practiceDescribed     Boolean            @default(false)
-  resultsAnalysed       Boolean            @default(false)
-  improvementExplained  Boolean            @default(false)
-  updatedById           String?
-  updatedBy             User?              @relation("QaSarSectionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  id                   String             @id @default(uuid())
+  programmeId          String
+  programme            Programme          @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId              String
+  cycle                QaAssessmentCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId        String
+  requirement          QaRequirement      @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  content              Json
+  plainText            String             @default("")
+  status               QaSarSectionStatus @default(NotStarted)
+  practiceDescribed    Boolean            @default(false)
+  resultsAnalysed      Boolean            @default(false)
+  improvementExplained Boolean            @default(false)
+  updatedById          String?
+  updatedBy            User?              @relation("QaSarSectionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
-  submissions           QaSarSubmission[]
+  submissions QaSarSubmission[]
 
   @@unique([cycleId, requirementId])
   @@index([programmeId, cycleId])
@@ -400,27 +419,27 @@ model QaSarSection {
 /// Immutable snapshot of one SAR draft at the moment it is submitted for
 /// review. New submissions append versions rather than overwriting history.
 model QaSarSubmission {
-  id                    String            @id @default(uuid())
-  programmeId           String
-  programme             Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
-  cycleId               String
-  cycle                 QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  requirementId         String
-  requirement           QaRequirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
-  sectionId             String
-  section               QaSarSection      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  version               Int
-  content               Json
-  plainText             String
-  practiceDescribed     Boolean
-  resultsAnalysed       Boolean
-  improvementExplained  Boolean
-  evidenceIds           String[]
-  submittedById         String
-  submittedBy           User              @relation("QaSarSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
-  submittedAt           DateTime          @default(now())
+  id                   String            @id @default(uuid())
+  programmeId          String
+  programme            Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId              String
+  cycle                QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId        String
+  requirement          QaRequirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  sectionId            String
+  section              QaSarSection      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  version              Int
+  content              Json
+  plainText            String
+  practiceDescribed    Boolean
+  resultsAnalysed      Boolean
+  improvementExplained Boolean
+  evidenceIds          String[]
+  submittedById        String
+  submittedBy          User              @relation("QaSarSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedAt          DateTime          @default(now())
 
-  reviews               QaSarReview[]
+  reviews QaSarReview[]
 
   @@unique([sectionId, version])
   @@index([programmeId, cycleId])
@@ -430,14 +449,14 @@ model QaSarSubmission {
 
 /// Append-only human decision tied to one exact immutable SAR submission.
 model QaSarReview {
-  id            String              @id @default(uuid())
-  submissionId  String
-  submission    QaSarSubmission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  reviewerId    String
-  reviewer      User                @relation("QaSarReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
-  decision      QaSarReviewDecision
-  comment       String              @default("")
-  createdAt     DateTime            @default(now())
+  id           String              @id @default(uuid())
+  submissionId String
+  submission   QaSarSubmission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewerId   String
+  reviewer     User                @relation("QaSarReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  decision     QaSarReviewDecision
+  comment      String              @default("")
+  createdAt    DateTime            @default(now())
 
   @@index([submissionId, createdAt])
   @@index([reviewerId])
@@ -473,22 +492,22 @@ model QaEvidence {
 /// support multiple requirements while each cycle/requirement link remains
 /// explicit, auditable, and optionally tied to one quality expectation.
 model QaEvidenceMapping {
-  id              String               @id @default(uuid())
-  programmeId     String
-  programme       Programme            @relation(fields: [programmeId], references: [id], onDelete: Restrict)
-  cycleId         String
-  cycle           QaAssessmentCycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  evidenceId      String
-  evidence        QaEvidence           @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-  requirementId   String
-  requirement     QaRequirement        @relation(fields: [requirementId], references: [id], onDelete: Restrict)
-  expectationId   String?
-  expectation     QaQualityExpectation? @relation(fields: [expectationId], references: [id], onDelete: SetNull)
-  relevanceNote   String               @default("")
-  mappedById      String?
-  mappedBy        User?                @relation("QaEvidenceMapper", fields: [mappedById], references: [id], onDelete: SetNull)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  id            String                @id @default(uuid())
+  programmeId   String
+  programme     Programme             @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId       String
+  cycle         QaAssessmentCycle     @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  evidenceId    String
+  evidence      QaEvidence            @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  requirementId String
+  requirement   QaRequirement         @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  expectationId String?
+  expectation   QaQualityExpectation? @relation(fields: [expectationId], references: [id], onDelete: SetNull)
+  relevanceNote String                @default("")
+  mappedById    String?
+  mappedBy      User?                 @relation("QaEvidenceMapper", fields: [mappedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
   @@unique([cycleId, evidenceId, requirementId])
   @@index([programmeId, cycleId])
@@ -824,7 +843,7 @@ model Course {
   createdAt     DateTime    @default(now())
 
   offerings Offering[]
-  spec      CourseSpec?
+  specs     CourseSpec[]
 
   @@index([lecturerId])
   @@index([programmeId])
@@ -838,9 +857,19 @@ model Course {
 /// rows) — kept in place unused for one deploy cycle before being dropped in a
 /// follow-up migration (issue #81 phase C), same expand/contract pattern as #80.
 model CourseSpec {
-  id                      String                            @id @default(uuid())
-  courseId                String                            @unique
-  course                  Course                            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  versionMajor            Int                               @default(1)
+  versionMinor            Int                               @default(0)
+  revisionType            CourseSpecRevisionType            @default(Initial)
+  revisionTriggers        CourseSpecRevisionTrigger[]
+  revisionReason          String                            @default("")
+  changeSummary           String                            @default("")
+  basedOnVersionId        String?
+  basedOnVersion          CourseSpec?                       @relation("CourseSpecVersionHistory", fields: [basedOnVersionId], references: [id], onDelete: SetNull)
+  derivedVersions         CourseSpec[]                      @relation("CourseSpecVersionHistory")
   sections                CourseSpecSection[]
   clos                    CourseSpecClo[]
   weeks                   CourseSpecWeek[]
@@ -860,13 +889,22 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+
+  approvedAt      DateTime?
+  effectiveFrom   DateTime?
+  nextReviewDueAt DateTime?
+  contentHash     String?
   /// §25 Date — spec last revised/approved date (issue #124). A single value,
   /// so it lives directly on CourseSpec rather than a normalized child table,
   /// same reasoning as courseInfo mirroring onto Course instead of a section row.
-  specDate                DateTime?                         @db.Date
+  specDate        DateTime? @db.Date
 
+  @@unique([courseId, versionMajor, versionMinor])
+  @@index([courseId, reviewStatus])
   @@index([reviewStatus])
   @@index([submittedById])
+  @@index([nextReviewDueAt])
+  @@index([basedOnVersionId])
 }
 
 /// Immutable workflow events for Course Specification submission/review actions.
@@ -1141,10 +1179,10 @@ model CourseSpecResource {
   // Legacy single-week provenance is retained for safe migration/backward compatibility.
   weekId          String?
   resourceType    String
-  title           String     @default("")
-  url             String     @default("")
-  notes           String     @default("")
-  evidenceWeekIds String[]   @default([])
+  title           String                    @default("")
+  url             String                    @default("")
+  notes           String                    @default("")
+  evidenceWeekIds String[]                  @default([])
 
   // Existing unified Resources metadata. Keep these fields to preserve
   // already-stored textbook/reference data in the development database.
@@ -1397,18 +1435,18 @@ model ActiveLearningStrategy {
 /// dual-wrote them alongside the jsonb columns, phase B cut reads over, and
 /// phase C dropped the jsonb columns outright — this is now the sole storage.
 model Rubric {
-  id            String            @id @default(uuid())
-  name          String
-  type          String
-  description   String            @default("")
-  status        RubricStatus      @default(Draft)
-  ownerId       String?
-  owner         User?             @relation("RubricOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  levelRows     RubricLevel[]
-  criterionRows RubricCriterion[]
+  id              String                     @id @default(uuid())
+  name            String
+  type            String
+  description     String                     @default("")
+  status          RubricStatus               @default(Draft)
+  ownerId         String?
+  owner           User?                      @relation("RubricOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  levelRows       RubricLevel[]
+  criterionRows   RubricCriterion[]
   assessmentItems CourseSpecAssessmentItem[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
 
   @@index([status])
   @@index([ownerId])
