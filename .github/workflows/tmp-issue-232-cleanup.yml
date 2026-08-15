@@ -1,0 +1,28 @@
+name: Cleanup issue 232 validation gate
+
+on:
+  push:
+    branches: [agent/issue-232-official-sar-assembler]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-232-official-sar-assembler
+      - name: Require successful validation marker and clean temporary files
+        run: |
+          test -f .github/validation/issue-232-passed.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f \
+            .github/validation/issue-232-passed.txt \
+            .github/workflows/tmp-issue-232-validation.yml \
+            .github/workflows/tmp-issue-232-gated-validation.yml \
+            .github/workflows/tmp-issue-232-cleanup.yml
+          git commit -m "chore: remove Phase 9 validation gate"
+          git push origin HEAD:agent/issue-232-official-sar-assembler
