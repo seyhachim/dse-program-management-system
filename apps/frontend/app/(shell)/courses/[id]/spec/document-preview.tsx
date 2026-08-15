@@ -591,7 +591,8 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
 
   const weeklyStartPage = 8;
   const resourcesPage = weeklyStartPage + weeklyPages.length;
-  const responsibilityPage = resourcesPage + 1;
+  const materialsPage = resourcesPage + 1;
+  const responsibilityPage = materialsPage + 1;
   const policyPage = responsibilityPage + 1;
   const ratingScalePage = policyPage + 1;
 
@@ -660,7 +661,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <div>
                 <dt className="text-xs text-muted-foreground">Sections</dt>
                 <dd className="mt-0.5 font-medium">
-                  Part 1 + Sections 1–19, 21, 24
+                  Part 1 + Sections 1–21, 23, 24
                 </dd>
               </div>
               <div>
@@ -695,6 +696,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               </a>
               <a href="#resources" className="block rounded-md px-2 py-2 hover:bg-muted">
                 19. Required Resources
+              </a>
+              <a href="#materials" className="block rounded-md px-2 py-2 hover:bg-muted">
+                20. Teaching &amp; Learning Materials
               </a>
               <a href="#responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">
                 21. Student Responsibility
@@ -917,8 +921,32 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             <Page zoom={zoom} pageNumber={resourcesPage}>
               <div id="resources" className="h-full px-[54px] py-[42px]">
                 <SectionTitle number="19">Required Resources to Deliver the Course</SectionTitle>
-                {document.resources.length === 0 ? <p className="text-[11px]">No required resources have been confirmed.</p> : <Table><colgroup><col className="w-[18%]" /><col className="w-[27%]" /><col className="w-[25%]" /><col className="w-[30%]" /></colgroup><thead><tr><TH>Resource Type</TH><TH>Resource Name / Description</TH><TH>Link</TH><TH>Notes</TH></tr></thead><tbody>{document.resources.map((resource) => (<tr key={resource.id}><TD>{displayValue(resource.resourceType)}</TD><TD>{displayValue(resource.title)}</TD><TD>{displayValue(resource.url)}</TD><TD>{displayValue(resource.notes)}</TD></tr>))}</tbody></Table>}
+                {document.requiredDeliveryResources.length === 0 ? (
+                  <p className="text-[11px]">No required delivery resources have been selected.</p>
+                ) : (
+                  <ul className="list-disc space-y-1.5 pl-5 text-[11px] leading-[1.4]">
+                    {document.requiredDeliveryResources.map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                )}
                 <PageFooter courseCode={info.courseCode} page={resourcesPage} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={materialsPage}>
+              <div id="materials" className="h-full px-[54px] py-[42px]">
+                <SectionTitle number="20">Other Teaching and Learning Materials</SectionTitle>
+                {document.teachingLearningMaterials.length === 0 ? (
+                  <p className="text-[11px]">No other teaching and learning materials have been selected.</p>
+                ) : (
+                  <ul className="list-disc space-y-1.5 pl-5 text-[11px] leading-[1.4]">
+                    {document.teachingLearningMaterials.map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+                <PageFooter courseCode={info.courseCode} page={materialsPage} />
               </div>
             </Page>
 
