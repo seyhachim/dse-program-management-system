@@ -29,16 +29,14 @@ export function CoursesPageClient() {
         />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm">
-            <span className="font-medium text-foreground">Your teaching role:</span>
+            <span className="font-medium text-foreground">Your specification role:</span>
             <TeachingRoleBadge role="Primary" />
             <TeachingRoleBadge role="Co-Lecturer" />
             <span className="text-muted-foreground">
-              The Role column shows how you are assigned to each course offering.
+              Class sections that share a course are grouped under one course specification.
             </span>
           </div>
-          <div className="[&>div>section]:hidden">
-            <MyCoursesClient />
-          </div>
+          <MyCoursesClient />
         </main>
       </>
     );
