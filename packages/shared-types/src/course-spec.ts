@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CourseTypeSchema } from "./courses.ts";
-import { SemesterSchema } from "./offerings.ts";
+import { DateOnlySchema, SemesterSchema } from "./offerings.ts";
 
 /**
  * Course Specification wizard contract. The full RUPP syllabus (Part 2 §1–25) is
@@ -115,7 +115,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
     part: "Part 2",
     state: "soon",
   },
-  { id: "date", title: "Date", ref: "§25", part: "Part 2", state: "soon" },
+  { id: "date", title: "Date", ref: "§25", part: "Part 2", state: "ready" },
 ] as const;
 
 export type SpecSectionId = (typeof SPEC_SECTIONS)[number]["id"];
@@ -482,6 +482,12 @@ export const PolicySection = z.object({
 });
 
 export type PolicySection = z.infer<typeof PolicySection>;
+
+/** §25 Date — spec last revised/approved date. A single value, stored directly on CourseSpec. */
+export const DateSection = z.object({
+  date: DateOnlySchema.nullable(),
+});
+export type DateSection = z.infer<typeof DateSection>;
 /**
  * What `PUT /:id/spec/courseInfo` actually accepts. Every other Course
  * Information field is admin/assignment-derived (see `CourseInfoSection`) and
@@ -817,7 +823,8 @@ export const AssessmentItem = z.object({
   format: z.string().default(""),
   submissionMethod: z.string().default(""),
   instructions: z.string().default(""),
-  rubric: z.string().default(""),
+  // A Rubric Library `Rubric.id`, or null when no rubric is linked (issue #123).
+  rubricId: z.string().nullable().default(null),
   feedbackMethod: z.string().default(""),
   feedbackTimeline: z.string().default(""),
   // PLO mapping & notes.
@@ -959,6 +966,7 @@ export const SPEC_SECTION_SCHEMAS: Partial<
   references: ReferencesSection,
   responsibility: StudentResponsibilitySection,
   policy: PolicySection,
+  date: DateSection,
 };
 
 /**

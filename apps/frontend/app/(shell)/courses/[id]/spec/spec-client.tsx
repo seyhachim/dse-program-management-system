@@ -82,7 +82,9 @@ import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
 import { EMPTY_POLICY, PolicySection } from "./policy-section";
+import { DateSection, EMPTY_DATE } from "./date-section";
 import type {
+  DateSection as DateSectionValue,
   PolicySection as PolicySectionValue,
   StudentResponsibilitySection as StudentResponsibilityValue,
 } from "@dse-pms/shared-types";
@@ -123,6 +125,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "references", label: "References" },
   { id: "responsibility", label: "Responsibility" },
   { id: "policy", label: "Policies" },
+  { id: "date", label: "Date" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
@@ -137,6 +140,7 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "references",
   "responsibility",
   "policy",
+  "date",
 ]);
 
 const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
@@ -166,6 +170,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
     useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
+  const [specDate, setSpecDate] = useState<DateSectionValue>(EMPTY_DATE);
   const [resources, setResources] = useState<ResourcesForm>(EMPTY_RESOURCES);
   const [references, setReferences] =
     useState<ReferencesForm>(EMPTY_REFERENCES);
@@ -267,6 +272,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setMapping(toMappingForm(spec.data.mapping));
       setPolicy(
         (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
+      );
+      setSpecDate(
+        (spec.data.date as DateSectionValue | undefined) ?? EMPTY_DATE,
       );
       setResources(toResourcesForm(spec.data.resources));
       setReferences(toReferencesForm(spec.data.references));
@@ -416,6 +424,35 @@ export function SpecClient({ courseId }: { courseId: string }) {
           err instanceof ApiError
             ? err.message
             : "Failed to save course policies",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, editingLocked],
+  );
+
+  const persistDate = useCallback(
+    async (value: DateSectionValue) => {
+      if (editingLocked) {
+        setError(
+          "This course specification is locked while it is in the review workflow.",
+        );
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(courseId, "date", value);
+        setSpecDate(value);
+        setStatus((s) => ({ ...s, date: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError ? err.message : "Failed to save the date",
         );
         return false;
       } finally {
@@ -683,6 +720,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         references,
         responsibility,
         policy,
+        specDate,
         courseTotalSlt,
       }),
     [
@@ -700,6 +738,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       references,
       responsibility,
       policy,
+      specDate,
       courseTotalSlt,
     ],
   );
@@ -903,6 +942,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 value={policy}
                 programPolicy={programme?.policy ?? null}
                 onPersist={persistPolicy}
+                disabled={editingLocked}
+              />
+            </TabsContent>
+
+            <TabsContent value="date" className="mt-4">
+              <DateSection
+                value={specDate}
+                onPersist={persistDate}
                 disabled={editingLocked}
               />
             </TabsContent>

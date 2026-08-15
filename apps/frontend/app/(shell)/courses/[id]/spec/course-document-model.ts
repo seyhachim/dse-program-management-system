@@ -4,6 +4,8 @@ import {
   semesterLabel,
   cloFocusCode,
   cloFocusPercent,
+  rubricScaleSummary,
+  type DateSection as DateSectionValue,
   type Method,
   type PolicySection as PolicySectionValue,
   type ProgrammeAcademicConfig,
@@ -27,6 +29,10 @@ export type CourseDocumentModel = {
   title: string;
   partTitle: string;
   programmeProfile: ProgrammeAcademicConfig["profile"];
+  /** §25 Date — spec last revised/approved date, YYYY-MM-DD or null if unset. */
+  specDate: string | null;
+  /** Part 1 cover page PLO taxonomy table. */
+  plos: ProgrammeAcademicConfig["plos"];
   courseInformation: {
     programmeTitle: string;
     courseTitle: string;
@@ -136,6 +142,15 @@ export type CourseDocumentModel = {
     independentSltHours: string;
     totalSltHours: number;
   }[];
+  /** §22 — one entry per active assessment with a linked Rubric Library rubric. */
+  rubrics: {
+    assessmentName: string;
+    name: string;
+    type: string;
+    scaleSummary: string;
+    levels: { label: string; points: number }[];
+    criteria: { name: string; descriptors: string[] }[];
+  }[];
   totals: {
     courseContentSlt: number;
     continuousAssessmentSlt: number;
@@ -244,6 +259,7 @@ type BuildCourseDocumentInput = {
   references?: ReferencesForm;
   responsibility?: StudentResponsibilityValue;
   policy?: PolicySectionValue;
+  specDate?: DateSectionValue;
   courseTotalSlt?: number | null;
 };
 
@@ -297,6 +313,7 @@ export function buildCourseDocument({
   references = [],
   responsibility,
   policy,
+  specDate,
   courseTotalSlt = null,
 }: BuildCourseDocumentInput): CourseDocumentModel {
   const ploByCode = new Map(
@@ -390,10 +407,10 @@ export function buildCourseDocument({
       feedbackMethod: assessment.feedbackMethod,
       feedbackTimeline: assessment.feedbackTimeline,
       evaluationDefinition:
-        rubricById.get(assessment.rubric)?.description ?? "",
-      rubricName: rubricById.get(assessment.rubric)?.name ?? "",
-      rubricUrl: assessment.rubric
-        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
+        rubricById.get(assessment.rubricId)?.description ?? "",
+      rubricName: rubricById.get(assessment.rubricId)?.name ?? "",
+      rubricUrl: assessment.rubricId
+        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubricId)}/edit`
         : "",
       assessmentCategory: assessment.assessmentCategory,
       topicNumbers: assessment.topicNumbers,
@@ -402,6 +419,29 @@ export function buildCourseDocument({
       independentSltHours: assessment.independentSltHours,
       totalSltHours: assessmentSltHours(assessment),
     }));
+
+  const documentRubrics = assessments
+    .filter((assessment) => assessment.status === "active")
+    .flatMap((assessment) => {
+      const rubric = rubricById.get(assessment.rubricId);
+      if (!rubric) return [];
+      return [
+        {
+          assessmentName: assessment.name,
+          name: rubric.name,
+          type: rubric.type,
+          scaleSummary: rubricScaleSummary(rubric.levels),
+          levels: rubric.levels.map((level) => ({
+            label: level.label,
+            points: level.points,
+          })),
+          criteria: rubric.criteria.map((criterion) => ({
+            name: criterion.name,
+            descriptors: criterion.descriptors,
+          })),
+        },
+      ];
+    });
 
   const documentMapping = activeClos.map((clo) => {
     const focusPercent = cloFocusPercent(
@@ -450,6 +490,8 @@ export function buildCourseDocument({
       educationalPhilosophy: [],
       peos: [],
     },
+    specDate: specDate?.date ?? null,
+    plos: programme?.plos ?? [],
     courseInformation: {
       programmeTitle: programme?.title ?? PROGRAMME_TITLE,
       courseTitle: courseInfo.courseTitle,
@@ -497,6 +539,7 @@ export function buildCourseDocument({
       .filter(Boolean),
     policy: policy ?? EMPTY_POLICY_VALUES,
     assessments: documentAssessments,
+    rubrics: documentRubrics,
     totals: {
       courseContentSlt,
       continuousAssessmentSlt,

@@ -3,9 +3,11 @@ import {
   ProgrammeProfileSchema,
   type ProgrammeAcademicConfig,
   type ProgramCompetencyWithPlos,
+  type ProgramLearningOutcome,
   type ProgramPolicy,
   type ProgrammeProfile,
   type UpdateProgramCompetencyPlosInput,
+  type UpdatePloTaxonomyInput,
   type UpdateProgramPolicyInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
@@ -70,6 +72,10 @@ export const programmeService = {
           description: true,
           order: true,
           active: true,
+          major: true,
+          learningDomain: true,
+          specificOrGeneric: true,
+          cap: true,
         },
       }),
 
@@ -253,6 +259,37 @@ export const programmeService = {
         .map((link) => link.plo)
         .sort((a, b) => a.order - b.order),
     };
+  },
+
+  /** Update one PLO's cover page taxonomy classification (issue #124). */
+  async updatePloTaxonomy(
+    code: string,
+    input: UpdatePloTaxonomyInput,
+  ): Promise<ProgramLearningOutcome | null> {
+    const plo = await prisma.programLearningOutcome.findUnique({
+      where: { code },
+      select: { id: true },
+    });
+
+    if (!plo) {
+      return null;
+    }
+
+    return prisma.programLearningOutcome.update({
+      where: { code },
+      data: input,
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        order: true,
+        active: true,
+        major: true,
+        learningDomain: true,
+        specificOrGeneric: true,
+        cap: true,
+      },
+    });
   },
 };
 
