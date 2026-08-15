@@ -7,6 +7,7 @@ import { createQaAssignmentsRouter } from "./assignments/router.ts";
 import { createQaEvidenceLibraryRouter } from "./evidence/router.ts";
 import { createQaReviewRouter } from "./reviews/router.ts";
 import { createQaRouter } from "./router.ts";
+import { createQaSarRouter } from "./sar/router.ts";
 import { qaService, type QaService } from "./service.ts";
 import { createQaWorkspaceRouter } from "./workspace/router.ts";
 
@@ -15,6 +16,7 @@ router.use(createQaRouter());
 router.use(createQaAssignmentsRouter());
 router.use(createQaEvidenceLibraryRouter());
 router.use(createQaWorkspaceRouter());
+router.use(createQaSarRouter());
 router.use(createQaLlmRouter());
 router.use(createQaReviewRouter());
 router.use(createQaActionRouter());

@@ -127,6 +127,15 @@ enum QaAnalysisReviewDecision {
   NeedsMoreEvidence
 }
 
+enum QaSarSectionStatus {
+  NotStarted
+  Drafting
+  ReadyForReview
+  UnderReview
+  ChangesRequested
+  Approved
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -157,6 +166,7 @@ model User {
   qaAnalysisReviews       QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
   qaRequirementAssignments QaRequirementAssignment[] @relation("QaRequirementAssignee")
   qaAssignmentsCreated     QaRequirementAssignment[] @relation("QaRequirementAssignedBy")
+  qaSarSectionsUpdated      QaSarSection[]             @relation("QaSarSectionUpdatedBy")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -200,6 +210,7 @@ model Programme {
   qaDocuments     QaDocument[]
   qaAnalysisReviews QaEvidenceAnalysisReview[]
   qaRequirementAssignments QaRequirementAssignment[]
+  qaSarSections             QaSarSection[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -248,6 +259,7 @@ model QaRequirement {
   expectations QaQualityExpectation[]
   analyses     QaEvidenceAnalysis[]
   assignments  QaRequirementAssignment[]
+  sarSections  QaSarSection[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
@@ -314,6 +326,7 @@ model QaAssessmentCycle {
   assessments      QaRequirementAssessment[]
   analyses         QaEvidenceAnalysis[]
   assignments      QaRequirementAssignment[]
+  sarSections      QaSarSection[]
 
   @@index([programmeId, status])
   @@index([frameworkId])
@@ -341,6 +354,34 @@ model QaRequirementAssignment {
   @@index([programmeId, cycleId])
   @@index([cycleId, assigneeId])
   @@index([assignedById])
+}
+
+/// Mutable working SAR section for one AUN-QA requirement in one cycle.
+/// Approved/submitted history is introduced separately; this model is the
+/// contributor's current structured draft, not the official SAR snapshot.
+model QaSarSection {
+  id                    String             @id @default(uuid())
+  programmeId           String
+  programme             Programme          @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId               String
+  cycle                 QaAssessmentCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId         String
+  requirement           QaRequirement      @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  content               Json
+  plainText             String             @default("")
+  status                QaSarSectionStatus @default(NotStarted)
+  practiceDescribed     Boolean            @default(false)
+  resultsAnalysed       Boolean            @default(false)
+  improvementExplained  Boolean            @default(false)
+  updatedById           String?
+  updatedBy             User?              @relation("QaSarSectionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([cycleId, requirementId])
+  @@index([programmeId, cycleId])
+  @@index([status])
+  @@index([updatedById])
 }
 
 /// Canonical programme evidence item. Applicability to an assessment cycle,
