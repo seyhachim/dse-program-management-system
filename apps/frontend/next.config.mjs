@@ -1,24 +1,7 @@
 import { fileURLToPath } from "node:url";
+import { validateProductionAuthConfig } from "./auth-config.mjs";
 
-function requireProductionAuthConfig() {
-  if (process.env.NODE_ENV !== "production") return;
-
-  if (process.env.NEXT_PUBLIC_AUTH_MODE !== "supabase") {
-    throw new Error("Production frontend builds require NEXT_PUBLIC_AUTH_MODE=supabase");
-  }
-
-  if (process.env.NEXT_PUBLIC_DEV_TOKEN) {
-    throw new Error("NEXT_PUBLIC_DEV_TOKEN must not be configured in a production frontend build");
-  }
-
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    throw new Error(
-      "Production frontend builds require NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    );
-  }
-}
-
-requireProductionAuthConfig();
+validateProductionAuthConfig();
 
 /** @type {import('next').NextConfig} */
 const config = {
