@@ -39,6 +39,52 @@ import { assertCourseSpecEditable } from "./spec-lock.ts";
 /** Thrown when an input references something that doesn't exist. */
 export class ReferenceError extends Error {}
 
+export function validateAssessmentCloEvidence(
+  items: Array<{ name: string; cloCodes: string[] }>,
+  validCloCodes: ReadonlySet<string>,
+) {
+  for (const item of items) {
+    if (new Set(item.cloCodes).size !== item.cloCodes.length) {
+      throw new ReferenceError(`Assessment "${item.name}" contains a duplicate CLO mapping`);
+    }
+    const invalidCode = item.cloCodes.find((code) => !validCloCodes.has(code));
+    if (invalidCode) {
+      throw new ReferenceError(
+        `Assessment "${item.name}" references ${invalidCode}, which does not belong to this course specification`,
+      );
+    }
+  }
+}
+
+export function validateCourseSpecMappingEvidence(
+  cells: Array<{ cloCode: string; kind: "assessment" | "week"; ref: string }>,
+  validCloCodes: ReadonlySet<string>,
+  weekIds: ReadonlySet<string>,
+  assessmentIds: ReadonlySet<string>,
+) {
+  const keys = new Set<string>();
+  for (const cell of cells) {
+    if (!validCloCodes.has(cell.cloCode)) {
+      throw new ReferenceError(
+        `CLO mapping references ${cell.cloCode}, which does not belong to this course specification`,
+      );
+    }
+    const validRef = cell.kind === "assessment"
+      ? assessmentIds.has(cell.ref)
+      : weekIds.has(cell.ref);
+    if (!validRef) {
+      throw new ReferenceError(
+        `CLO mapping references an ${cell.kind} that does not belong to this course specification`,
+      );
+    }
+    const key = `${cell.cloCode}:${cell.kind}:${cell.ref}`;
+    if (keys.has(key)) {
+      throw new ReferenceError("Duplicate CLO alignment mapping is not allowed");
+    }
+    keys.add(key);
+  }
+}
+
 function lecturers(): LecturersServiceContract {
   return registry.get<LecturersServiceContract>("lecturers").service;
 }
@@ -903,18 +949,28 @@ async function syncWeeklyPlan(
 
 /**
  * Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17)
- * section save. `rubricId` is reconciled against real Rubric rows before writing
- * (rather than letting the FK reject the whole save) since the wizard already
- * tolerates a stale/deleted rubric selection as a valid state (issue #123) — unlike
- * CLO teaching/assessment method ids, which deliberately fail hard on a bad id.
+ * section save. CLO evidence references are validated against the current
+ * CourseSpec before the existing rows are rebuilt. `rubricId` is reconciled
+ * against real Rubric rows before writing (rather than letting the FK reject the
+ * whole save) since the wizard already tolerates a stale/deleted rubric selection
+ * as a valid state (issue #123).
  */
 async function syncAssessmentPlan(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
   items: AssessmentPlanSection["items"],
 ) {
-  await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
-  if (items.length === 0) return;
+  if (items.length === 0) {
+    await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
+    return;
+  }
+
+  const clos = await tx.courseSpecClo.findMany({
+    where: { courseSpecId },
+    select: { order: true },
+  });
+  const validCloCodes = new Set(clos.map((clo) => `CLO${clo.order + 1}`));
+  validateAssessmentCloEvidence(items, validCloCodes);
 
   const rubricIds = [...new Set(items.flatMap((item) => item.rubricId ? [item.rubricId] : []))];
   const validRubricIds = rubricIds.length
@@ -928,6 +984,7 @@ async function syncAssessmentPlan(
       )
     : new Set<string>();
 
+  await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
   await tx.courseSpecAssessmentItem.createMany({
     data: items.map((item, order) => ({
       id: item.id,
@@ -1083,8 +1140,24 @@ async function syncMappingCells(
   courseSpecId: string,
   cells: MappingSection["cells"],
 ) {
+  if (cells.length === 0) {
+    await tx.courseSpecMappingCell.deleteMany({ where: { courseSpecId } });
+    return;
+  }
+
+  const [clos, weeks, assessmentItems] = await Promise.all([
+    tx.courseSpecClo.findMany({ where: { courseSpecId }, select: { order: true } }),
+    tx.courseSpecWeek.findMany({ where: { courseSpecId }, select: { id: true } }),
+    tx.courseSpecAssessmentItem.findMany({ where: { courseSpecId }, select: { id: true } }),
+  ]);
+  validateCourseSpecMappingEvidence(
+    cells,
+    new Set(clos.map((clo) => `CLO${clo.order + 1}`)),
+    new Set(weeks.map((week) => week.id)),
+    new Set(assessmentItems.map((assessment) => assessment.id)),
+  );
+
   await tx.courseSpecMappingCell.deleteMany({ where: { courseSpecId } });
-  if (cells.length === 0) return;
   await tx.courseSpecMappingCell.createMany({
     data: cells.map((cell) => ({
       courseSpecId,
@@ -1096,13 +1169,6 @@ async function syncMappingCells(
       ref: cell.ref,
       strength: cell.strength,
     })),
-    // Unlike CourseSpecWeek/CourseSpecAssessmentItem (client-generated uuid ids —
-    // collision-free by construction), this table's PK is a composite of
-    // user-selected values (cloCode, kind, ref); a payload with a repeated triple
-    // is plausible client state, not just historical data, so this needs the same
-    // dedupe posture the migration's own backfill already takes (`ON CONFLICT DO
-    // NOTHING`) rather than throwing a unique-violation on save.
-    skipDuplicates: true,
   });
 }
 

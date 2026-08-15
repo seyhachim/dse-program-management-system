@@ -109,12 +109,14 @@ export function calculateCloAchievements(
         .flatMap((assessment) => {
           const result = resultByAssessment.get(assessment.id);
           return result && result.maxScore > 0
-            ? [{ percentage: (result.score / result.maxScore) * 100, weight: assessment.weight ?? 1 }]
+            ? [(result.score / result.maxScore) * 100]
             : [];
         });
-      const denominator = evidence.reduce((sum, item) => sum + item.weight, 0);
-      const percentage = denominator
-        ? Math.round(evidence.reduce((sum, item) => sum + item.percentage * item.weight, 0) / denominator)
+      // Course grading weight is intentionally not reused here. A CLO is measured
+      // only by explicitly mapped evidence; until a dedicated CLO aggregation rule
+      // exists, mapped evidence items contribute equally to the CLO achievement.
+      const percentage = evidence.length
+        ? Math.round(evidence.reduce((sum, item) => sum + item, 0) / evidence.length)
         : null;
       return {
         code,
