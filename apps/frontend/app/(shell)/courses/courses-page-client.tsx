@@ -33,7 +33,9 @@ export function CoursesPageClient() {
               The Role column shows how you are assigned to each course offering.
             </span>
           </div>
-          <MyCoursesClient />
+          <div className="[&>div>section]:hidden">
+            <MyCoursesClient />
+          </div>
         </main>
       </>
     );
