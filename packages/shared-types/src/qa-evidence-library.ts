@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { QaEvidenceKindSchema, QaEvidenceStatusSchema } from "./qa.ts";
 
-export const CreateQaEvidenceItemSchema = z
+const QaEvidenceMetadataSchema = z
   .object({
     programmeId: z.string().trim().min(1),
     title: z.string().trim().min(3).max(200),
@@ -29,6 +29,9 @@ export const CreateQaEvidenceItemSchema = z
     }
   });
 
+export const CreateQaEvidenceItemSchema = QaEvidenceMetadataSchema;
+export const UpdateQaEvidenceItemSchema = QaEvidenceMetadataSchema;
+
 export const MapQaEvidenceSchema = z.object({
   programmeId: z.string().trim().min(1),
   requirementCode: z.string().regex(/^\d\.\d$/),
@@ -41,6 +44,7 @@ export const QaEvidenceLibraryQuerySchema = z.object({
 });
 
 export type CreateQaEvidenceItemInput = z.infer<typeof CreateQaEvidenceItemSchema>;
+export type UpdateQaEvidenceItemInput = z.infer<typeof UpdateQaEvidenceItemSchema>;
 export type MapQaEvidenceInput = z.infer<typeof MapQaEvidenceSchema>;
 
 export interface QaEvidenceMappingView {
