@@ -14,6 +14,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
 
 export class PortalNotFoundError extends Error {}
 export class PortalConflictError extends Error {}
@@ -35,11 +36,8 @@ const enrollmentInclude = {
       course: {
         include: {
           specs: {
-
             where: { reviewStatus: "Approved" },
-
             orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-
             take: 1,
             include: {
               clos: { orderBy: { order: "asc" as const } },
@@ -96,34 +94,26 @@ function achievementStatus(percentage: number | null): PortalCloAchievement["sta
 
 export function calculateCloAchievements(
   clos: Array<{ order: number; description: string; status: string }>,
-  assessments: Array<{ id: string; cloCodes: string[]; weight: number | null; status: string }>,
+  assessments: Array<{ id: string; name: string; cloCodes: string[]; weight: number | null; status: string }>,
   results: Array<{ assessmentItemId: string; score: number; maxScore: number }>,
 ): PortalCloAchievement[] {
-  const resultByAssessment = new Map(results.map((result) => [result.assessmentItemId, result]));
+  const assessmentById = new Map(assessments.map((assessment) => [assessment.id, assessment]));
   return clos
     .filter((clo) => clo.status === "Active")
     .map((clo) => {
       const code = `CLO${clo.order + 1}`;
-      const evidence = assessments
-        .filter((assessment) => assessment.status === "Active" && assessment.cloCodes.includes(code))
-        .flatMap((assessment) => {
-          const result = resultByAssessment.get(assessment.id);
-          return result && result.maxScore > 0
-            ? [(result.score / result.maxScore) * 100]
-            : [];
-        });
-      // Course grading weight is intentionally not reused here. A CLO is measured
-      // only by explicitly mapped evidence; until a dedicated CLO aggregation rule
-      // exists, mapped evidence items contribute equally to the CLO achievement.
-      const percentage = evidence.length
-        ? Math.round(evidence.reduce((sum, item) => sum + item, 0) / evidence.length)
-        : null;
+      const calculation = calculateCloEvidence(code, assessments, results);
       return {
         code,
         description: clo.description,
-        percentage,
-        status: achievementStatus(percentage),
-        evidenceCount: evidence.length,
+        percentage: calculation.percentage,
+        status: achievementStatus(calculation.percentage),
+        evidenceCount: calculation.evidence.length,
+        evidence: calculation.evidence.map((item) => ({
+          assessmentItemId: item.assessmentItemId,
+          assessmentName: assessmentById.get(item.assessmentItemId)?.name ?? "Assessment",
+          rawPercentage: item.rawPercentage,
+        })),
       };
     });
 }
@@ -249,6 +239,12 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
   const achievements = spec
     ? calculateCloAchievements(spec.clos, spec.assessmentItems, row.results)
     : [];
+  const grade = spec
+    ? calculateCourseGrade(spec.assessmentItems, row.results)
+    : { totalGrade: null, complete: false, completedWeight: 0, configuredWeight: 0, contributions: [] };
+  const contributionByAssessment = new Map(
+    grade.contributions.map((item) => [item.assessmentItemId, item.weightedContribution]),
+  );
   const measured = achievements.flatMap((item) => item.percentage === null ? [] : [item.percentage]);
   const responseKeyHash = feedbackKey(userId, row.offeringId);
   return {
@@ -275,6 +271,7 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
       .filter((item) => item.status === "Active")
       .map((item) => {
         const result = resultByAssessment.get(item.id);
+        const countsTowardGrade = item.weight !== null && item.weight > 0;
         return {
           id: item.id,
           name: item.name,
@@ -283,6 +280,8 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           mode: item.mode === "Group" ? "group" as const : "individual" as const,
           cloCodes: item.cloCodes,
           weight: item.weight,
+          countsTowardGrade,
+          courseGradeWeight: item.weight,
           dueAt: deadlines.get(item.id)?.toISOString() ?? null,
           dueWeek: item.dueWeek,
           format: item.format,
@@ -295,6 +294,9 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
                 score: result.score,
                 maxScore: result.maxScore,
                 percentage: Math.round((result.score / result.maxScore) * 100),
+                weightedCourseContribution: countsTowardGrade
+                  ? contributionByAssessment.get(item.id) ?? null
+                  : null,
                 feedback: result.feedback,
                 publishedAt: result.publishedAt.toISOString(),
               }
@@ -308,6 +310,10 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
       url: resource.url,
       notes: resource.notes,
     })),
+    totalCourseGrade: grade.totalGrade,
+    courseGradeComplete: grade.complete,
+    completedGradeWeight: grade.completedWeight,
+    configuredGradeWeight: grade.configuredWeight,
     achievements,
     overallAchievement: measured.length
       ? Math.round(measured.reduce((sum, item) => sum + item, 0) / measured.length)
@@ -368,11 +374,8 @@ export const studentPortalService = {
         course: {
           include: {
             specs: {
-
               where: { reviewStatus: "Approved" },
-
               orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-
               take: 1,
               include: { assessmentItems: { orderBy: { order: "asc" } } },
             },
@@ -417,6 +420,9 @@ export const studentPortalService = {
             name: assessment.name,
             type: assessment.type,
             weight: assessment.weight,
+            countsTowardGrade: assessment.weight !== null && assessment.weight > 0,
+            courseGradeWeight: assessment.weight,
+            cloCodes: assessment.cloCodes,
             dueWeek: assessment.dueWeek,
             dueAt: deadlines.get(assessment.id)?.toISOString() ?? null,
             results: offering.enrollments.map((enrollment) => {
