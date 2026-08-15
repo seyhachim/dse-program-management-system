@@ -72,23 +72,23 @@ export async function getQaContributorWorkspace(
   }
 
   const requirementCodes = assignments.map((item) => item.requirementCode);
-  const evidence = await prisma.qaEvidence.findMany({
+  const evidenceMappings = await prisma.qaEvidenceMapping.findMany({
     where: {
       programmeId,
       cycleId: selectedCycle.id,
       requirement: { code: { in: requirementCodes } },
     },
     select: {
-      status: true,
       requirement: { select: { code: true } },
+      evidence: { select: { status: true } },
     },
   });
 
   const counts = new Map<string, { count: number; reviewedCount: number }>();
-  for (const row of evidence) {
+  for (const row of evidenceMappings) {
     const current = counts.get(row.requirement.code) ?? { count: 0, reviewedCount: 0 };
     current.count += 1;
-    if (row.status === "Reviewed") current.reviewedCount += 1;
+    if (row.evidence.status === "Reviewed") current.reviewedCount += 1;
     counts.set(row.requirement.code, current);
   }
 
