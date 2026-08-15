@@ -7,6 +7,8 @@ import { z } from "zod";
  * path (issue #101 follow-up) — deliberately not the full `Role` enum:
  * - `admin` is excluded — minting a new admin login stays a manual/seed-only
  *   action, not something exposed through this form.
+ * - `qa_contributor` is excluded — it is an additive programme role granted to
+ *   an existing staff account rather than a standalone account type.
  * - `student` requires a roster profile with the same email; account
  *   provisioning links that profile to the invited User.
  */
@@ -19,16 +21,16 @@ export const CreateAccountInput = z.object({
 export type CreateAccountInput = z.infer<typeof CreateAccountInput>;
 
 /**
- * The application roles (issue #101). Shared so nav/permission gating can key
- * off it. `program_coordinator`/`program_secretary`/`qa_reviewer` are
- * programme-wide today (there is exactly one programme, so nothing to scope
- * to yet) — see `PROGRAMME_WIDE_ROLES` in the backend's `token.ts`.
+ * Application roles. `qa_contributor` is intentionally additive: a lecturer or
+ * other staff member can hold it alongside their existing role to work on an
+ * assigned AUN-QA/SAR scope without receiving programme-management authority.
  */
 export const Role = z.enum([
   "admin",
   "program_coordinator",
   "program_secretary",
   "lecturer",
+  "qa_contributor",
   "qa_reviewer",
   "student",
 ]);
