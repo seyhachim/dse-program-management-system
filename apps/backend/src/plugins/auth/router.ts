@@ -62,7 +62,7 @@ export function createAuthRouter(): Router {
     }
   });
 
-  router.get("/programme-roles", requirePermission("qa:write"), async (req, res) => {
+  router.get("/programme-roles", requirePermission("qa:manage"), async (req, res) => {
     const parsed = ProgrammeRoleListQuery.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid programme role query", details: parsed.error.flatten() });
@@ -75,7 +75,7 @@ export function createAuthRouter(): Router {
     res.json(await authService.listProgrammeRoleAssignments(parsed.data.programmeId));
   });
 
-  router.post("/programme-roles", requirePermission("qa:write"), async (req, res) => {
+  router.post("/programme-roles", requirePermission("qa:manage"), async (req, res) => {
     const parsed = ManageProgrammeRoleInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid programme role assignment", details: parsed.error.flatten() });
@@ -96,7 +96,7 @@ export function createAuthRouter(): Router {
     }
   });
 
-  router.delete("/programme-roles/:userId", requirePermission("qa:write"), async (req, res) => {
+  router.delete("/programme-roles/:userId", requirePermission("qa:manage"), async (req, res) => {
     const parsed = ProgrammeRoleDeleteRequest.safeParse({
       userId: req.params.userId,
       programmeId: req.query.programmeId,
