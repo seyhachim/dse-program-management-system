@@ -4,7 +4,7 @@ import { PublicRubricSchema } from "./rubrics.ts";
 const activeRubric = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Final Project Rubric",
-  type: "Project",
+  type: "Project" as const,
   description: "Published project assessment rubric",
   levels: [
     { label: "Excellent", points: 4 },
