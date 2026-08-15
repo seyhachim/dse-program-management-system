@@ -16,6 +16,7 @@ import type {
   QaContributorWorkspaceView,
   QaDashboardView,
   QaRequirementAssignmentView,
+  QaSarProgressItemView,
 } from "@dse-pms/shared-types";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
@@ -42,6 +43,7 @@ export function AunQaWorkspaceClient() {
   const [dashboard, setDashboard] = useState<QaDashboardView | null>(null);
   const [assignments, setAssignments] = useState<QaRequirementAssignmentView[]>([]);
   const [contributors, setContributors] = useState<ProgrammeRoleAssignmentView[]>([]);
+  const [sarProgress, setSarProgress] = useState<QaSarProgressItemView[]>([]);
   const [myWorkspace, setMyWorkspace] = useState<QaContributorWorkspaceView | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingCode, setSavingCode] = useState<string | null>(null);
@@ -58,16 +60,22 @@ export function AunQaWorkspaceClient() {
         setDashboard(dashboardView);
         setMyWorkspace(null);
 
-        const [assignmentRows, contributorRows] = await Promise.all([
+        const [assignmentRows, contributorRows, progressRows] = await Promise.all([
           dashboardView.selectedCycle
             ? api.get<QaRequirementAssignmentView[]>(
                 `/api/qa/cycles/${dashboardView.selectedCycle.id}/assignments?${query}`,
               )
             : Promise.resolve([]),
           api.get<ProgrammeRoleAssignmentView[]>(`/api/auth/programme-roles?${query}`),
+          dashboardView.selectedCycle
+            ? api.get<QaSarProgressItemView[]>(
+                `/api/qa/cycles/${dashboardView.selectedCycle.id}/sar-progress?${query}`,
+              )
+            : Promise.resolve([]),
         ]);
         setAssignments(assignmentRows);
         setContributors(contributorRows.filter((item) => item.role === "qa_contributor"));
+        setSarProgress(progressRows);
       } else {
         const query = new URLSearchParams({ programmeId: PROGRAMME_ID });
         const workspace = await api.get<QaContributorWorkspaceView>(
@@ -77,6 +85,7 @@ export function AunQaWorkspaceClient() {
         setDashboard(null);
         setAssignments([]);
         setContributors([]);
+        setSarProgress([]);
       }
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load the AUN-QA workspace");
@@ -92,6 +101,10 @@ export function AunQaWorkspaceClient() {
   const assignmentByRequirement = useMemo(
     () => new Map(assignments.map((item) => [item.requirementCode, item])),
     [assignments],
+  );
+  const progressByRequirement = useMemo(
+    () => new Map(sarProgress.map((item) => [item.requirementCode, item])),
+    [sarProgress],
   );
   const evidenceByRequirement = useMemo(() => {
     const counts = new Map<string, { count: number; reviewed: number }>();
@@ -150,6 +163,7 @@ export function AunQaWorkspaceClient() {
           contributors={contributors}
           assignmentByRequirement={assignmentByRequirement}
           evidenceByRequirement={evidenceByRequirement}
+          progressByRequirement={progressByRequirement}
           savingCode={savingCode}
           onChangeAssignment={changeAssignment}
         />
@@ -166,6 +180,7 @@ function LeadershipWorkspace({
   contributors,
   assignmentByRequirement,
   evidenceByRequirement,
+  progressByRequirement,
   savingCode,
   onChangeAssignment,
 }: {
@@ -174,6 +189,7 @@ function LeadershipWorkspace({
   contributors: ProgrammeRoleAssignmentView[];
   assignmentByRequirement: Map<string, QaRequirementAssignmentView>;
   evidenceByRequirement: Map<string, { count: number; reviewed: number }>;
+  progressByRequirement: Map<string, QaSarProgressItemView>;
   savingCode: string | null;
   onChangeAssignment: (requirementCode: string, assigneeId: string) => Promise<void>;
 }) {
@@ -253,6 +269,7 @@ function LeadershipWorkspace({
                     {criterion.requirements.map((requirement) => {
                       const owner = assignmentByRequirement.get(requirement.code);
                       const evidence = evidenceByRequirement.get(requirement.code) ?? { count: 0, reviewed: 0 };
+                      const progress = progressByRequirement.get(requirement.code);
                       return (
                         <tr key={requirement.code}>
                           <td className="py-3 pr-4">
@@ -285,10 +302,14 @@ function LeadershipWorkspace({
                           </td>
                           <td className="py-3 pr-4">
                             <Link href={`/aun-qa/sar/${requirement.code}`} className="text-xs font-medium text-primary hover:underline">
-                              Open editor
+                              {progress?.status === "approved" ? "Approved" : progress?.status === "underReview" ? "Submitted" : progress?.status === "changesRequested" ? "Revise" : progress ? "Drafting" : "Open editor"}
                             </Link>
                           </td>
-                          <td className="py-3"><StatusPill>Not submitted</StatusPill></td>
+                          <td className="py-3">
+                            <StatusPill tone={progress?.status === "approved" ? "good" : progress?.status === "underReview" || progress?.status === "changesRequested" ? "warn" : "neutral"}>
+                              {progress?.status === "approved" ? "Approved" : progress?.status === "underReview" ? "Under review" : progress?.status === "changesRequested" ? "Changes requested" : "Not submitted"}
+                            </StatusPill>
+                          </td>
                         </tr>
                       );
                     })}
@@ -343,8 +364,16 @@ function ContributorWorkspace({ workspace }: { workspace: QaContributorWorkspace
               </div>
               <div className="mt-5 grid grid-cols-3 gap-2 text-xs">
                 <ReadinessBox label="Evidence" value={item.evidence.count === 0 ? "None yet" : `${item.evidence.count} collected`} tone={item.evidence.readiness === "reviewed" ? "good" : item.evidence.readiness === "collected" ? "warn" : "neutral"} />
-                <ReadinessBox label="SAR writing" value="Not started" tone="neutral" />
-                <ReadinessBox label="Review" value="Not submitted" tone="neutral" />
+                <ReadinessBox
+                  label="SAR writing"
+                  value={item.writingStatus === "approved" ? "Approved" : item.writingStatus === "submitted" ? "Submitted" : item.writingStatus === "drafting" ? "Drafting" : "Not started"}
+                  tone={item.writingStatus === "approved" ? "good" : item.writingStatus === "submitted" ? "warn" : "neutral"}
+                />
+                <ReadinessBox
+                  label="Review"
+                  value={item.reviewStatus === "approved" ? "Approved" : item.reviewStatus === "underReview" ? "Under review" : item.reviewStatus === "changesRequested" ? "Changes requested" : "Not submitted"}
+                  tone={item.reviewStatus === "approved" ? "good" : item.reviewStatus === "underReview" || item.reviewStatus === "changesRequested" ? "warn" : "neutral"}
+                />
               </div>
               <div className="mt-4 flex items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">Write the narrative around mapped evidence and PMS data.</p>
