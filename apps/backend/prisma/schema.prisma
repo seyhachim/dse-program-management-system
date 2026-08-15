@@ -68,6 +68,25 @@ enum CourseSpecReviewActionType {
   Approved
 }
 
+enum CourseSpecRevisionType {
+  Initial
+  Minor
+  Major
+}
+
+enum CourseSpecRevisionTrigger {
+  ScheduledReview
+  StudentFeedback
+  AlumniFeedback
+  EmployerFeedback
+  LecturerReflection
+  ProgrammeCoordinator
+  ExternalExaminer
+  QaFinding
+  RegulatoryChange
+  Other
+}
+
 /// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
 /// normalized CLO row.
 enum CloRowStatus {
@@ -141,18 +160,18 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed              Course[]                  @relation("CourseLecturer")
-  offeringsLed            Offering[]                @relation("OfferingLecturer")
-  rubricsOwned            Rubric[]                  @relation("RubricOwner")
-  coLecturerOf            OfferingCoLecturer[]      @relation("OfferingCoLecturer")
+  coursesLed              Course[]                   @relation("CourseLecturer")
+  offeringsLed            Offering[]                 @relation("OfferingLecturer")
+  rubricsOwned            Rubric[]                   @relation("RubricOwner")
+  coLecturerOf            OfferingCoLecturer[]       @relation("OfferingCoLecturer")
   roleAssignments         UserRoleAssignment[]
-  courseSpecSubmissions   CourseSpec[]              @relation("CourseSpecSubmittedBy")
-  courseSpecReviewActions CourseSpecReviewAction[]  @relation("CourseSpecReviewActor")
+  courseSpecSubmissions   CourseSpec[]               @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions CourseSpecReviewAction[]   @relation("CourseSpecReviewActor")
   studentProfile          Student?
-  announcementsAuthored   CourseAnnouncement[]      @relation("AnnouncementAuthor")
-  qaCyclesCreated         QaAssessmentCycle[]       @relation("QaCycleCreator")
-  qaEvidenceCreated       QaEvidence[]              @relation("QaEvidenceCreator")
-  qaAssessmentsReviewed   QaRequirementAssessment[] @relation("QaAssessmentReviewer")
+  announcementsAuthored   CourseAnnouncement[]       @relation("AnnouncementAuthor")
+  qaCyclesCreated         QaAssessmentCycle[]        @relation("QaCycleCreator")
+  qaEvidenceCreated       QaEvidence[]               @relation("QaEvidenceCreator")
+  qaAssessmentsReviewed   QaRequirementAssessment[]  @relation("QaAssessmentReviewer")
   qaAnalysisReviews       QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
 }
 
@@ -187,13 +206,13 @@ model Programme {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  roleAssignments UserRoleAssignment[]
-  courses         Course[]
-  qaCycles        QaAssessmentCycle[]
-  qaEvidence      QaEvidence[]
-  qaAssessments   QaRequirementAssessment[]
-  qaAnalyses      QaEvidenceAnalysis[]
-  qaDocuments     QaDocument[]
+  roleAssignments   UserRoleAssignment[]
+  courses           Course[]
+  qaCycles          QaAssessmentCycle[]
+  qaEvidence        QaEvidence[]
+  qaAssessments     QaRequirementAssessment[]
+  qaAnalyses        QaEvidenceAnalysis[]
+  qaDocuments       QaDocument[]
   qaAnalysisReviews QaEvidenceAnalysisReview[]
 }
 
@@ -658,7 +677,7 @@ model Course {
   createdAt     DateTime    @default(now())
 
   offerings Offering[]
-  spec      CourseSpec?
+  specs     CourseSpec[]
 
   @@index([lecturerId])
   @@index([programmeId])
@@ -673,8 +692,17 @@ model Course {
 /// follow-up migration (issue #81 phase C), same expand/contract pattern as #80.
 model CourseSpec {
   id                      String                            @id @default(uuid())
-  courseId                String                            @unique
+  courseId                String
   course                  Course                            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  versionMajor            Int                               @default(1)
+  versionMinor            Int                               @default(0)
+  revisionType            CourseSpecRevisionType            @default(Initial)
+  revisionTriggers        CourseSpecRevisionTrigger[]
+  revisionReason          String                            @default("")
+  changeSummary           String                            @default("")
+  basedOnVersionId        String?
+  basedOnVersion          CourseSpec?                       @relation("CourseSpecVersionHistory", fields: [basedOnVersionId], references: [id], onDelete: SetNull)
+  derivedVersions         CourseSpec[]                      @relation("CourseSpecVersionHistory")
   sections                CourseSpecSection[]
   clos                    CourseSpecClo[]
   weeks                   CourseSpecWeek[]
@@ -685,8 +713,6 @@ model CourseSpec {
   policy                  CourseSpecPolicy?
   teachingLearning        CourseSpecTeachingLearning?
   weekProjectProgress     CourseSpecWeekProjectProgress[]
-  updatedAt               DateTime                          @updatedAt
-  createdAt               DateTime                          @default(now())
   reviewStatus            CourseSpecReviewStatus            @default(Draft)
   submissionVersion       Int                               @default(0)
   submittedAt             DateTime?
@@ -694,9 +720,19 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+  approvedAt              DateTime?
+  effectiveFrom           DateTime?
+  nextReviewDueAt         DateTime?
+  contentHash             String?
+  updatedAt               DateTime                          @updatedAt
+  createdAt               DateTime                          @default(now())
 
+  @@unique([courseId, versionMajor, versionMinor])
+  @@index([courseId, reviewStatus])
   @@index([reviewStatus])
   @@index([submittedById])
+  @@index([nextReviewDueAt])
+  @@index([basedOnVersionId])
 }
 
 /// Immutable workflow events for Course Specification submission/review actions.
@@ -961,10 +997,10 @@ model CourseSpecResource {
   // Legacy single-week provenance is retained for safe migration/backward compatibility.
   weekId          String?
   resourceType    String
-  title           String     @default("")
-  url             String     @default("")
-  notes           String     @default("")
-  evidenceWeekIds String[]   @default([])
+  title           String                    @default("")
+  url             String                    @default("")
+  notes           String                    @default("")
+  evidenceWeekIds String[]                  @default([])
 
   // Existing unified Resources metadata. Keep these fields to preserve
   // already-stored textbook/reference data in the development database.

@@ -35,6 +35,7 @@ export const teachingLearningService = {
       FROM "CourseSpecTeachingLearning" tl
       INNER JOIN "CourseSpec" cs ON cs."id" = tl."courseSpecId"
       WHERE cs."courseId" = ${courseId}
+      ORDER BY cs."versionMajor" DESC, cs."versionMinor" DESC
       LIMIT 1
     `);
 
@@ -56,8 +57,9 @@ export const teachingLearningService = {
     courseId: string,
     value: TeachingLearningProfile,
   ): Promise<TeachingLearningProfile> {
-    const existingSpec = await prisma.courseSpec.findUnique({
+    const existingSpec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
       select: { id: true, reviewStatus: true },
     });
     if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);

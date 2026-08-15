@@ -1188,9 +1188,21 @@ async function main() {
     // Small approved specification + portal evidence so a fresh development
     // database demonstrates every student MVP state without manual setup.
     const spec = await prisma.courseSpec.upsert({
-      where: { courseId: cs101.id },
+      where: {
+        courseId_versionMajor_versionMinor: {
+          courseId: cs101.id,
+          versionMajor: 1,
+          versionMinor: 0,
+        },
+      },
       update: {},
-      create: { courseId: cs101.id, reviewStatus: "Approved", submissionVersion: 1 },
+      create: {
+        courseId: cs101.id,
+        versionMajor: 1,
+        versionMinor: 0,
+        reviewStatus: "Approved",
+        submissionVersion: 1,
+      },
     });
     for (const sectionKey of ["clos", "slt", "assessmentPlan", "resources"] as const) {
       await prisma.courseSpecSection.upsert({

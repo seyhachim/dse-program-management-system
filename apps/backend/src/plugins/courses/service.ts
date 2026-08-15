@@ -86,6 +86,10 @@ async function ownerScopeFilter(lecturerScope: string) {
 }
 
 const COMPLETABLE_SECTION_IDS = COMPLETABLE_SPEC_SECTIONS.map((s) => s.id);
+const CURRENT_SPEC_ORDER = [
+  { versionMajor: "desc" as const },
+  { versionMinor: "desc" as const },
+];
 
 export const courseService = {
   /**
@@ -133,13 +137,15 @@ export const courseService = {
         id: true,
         code: true,
         title: true,
-        spec: {
+        specs: {
+          orderBy: CURRENT_SPEC_ORDER,
+          take: 1,
           select: { sections: { select: { sectionKey: true, status: true } } },
         },
       },
     });
     return courses.map((course) => {
-      const sections = course.spec?.sections ?? [];
+      const sections = course.specs[0]?.sections ?? [];
 
       const completedSectionIds = new Set(
         sections
@@ -191,8 +197,9 @@ export const courseService = {
   // Part of CoursesServiceContract — workload consumers need only scheduled
   // contact hours, never CourseSpec's storage details or self-study time.
   async weeklyContactHours(courseId: string) {
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       select: {
         weeks: {
           orderBy: { order: "asc" },
@@ -258,8 +265,9 @@ export const courseService = {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) return null;
 
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       include: SPEC_INCLUDE,
     });
     const { data, status } = reassembleSpec(spec);
@@ -271,8 +279,9 @@ export const courseService = {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       include: SPEC_INCLUDE,
     });
     if (!spec)
@@ -325,7 +334,7 @@ export const courseService = {
     const nextStatus =
       spec.reviewStatus === "ChangesRequested" ? "Resubmitted" : "Submitted";
     const updated = await prisma.courseSpec.update({
-      where: { courseId },
+      where: { id: spec.id },
       data: {
         reviewStatus: nextStatus,
         submissionVersion: nextVersion,
@@ -355,7 +364,7 @@ export const courseService = {
         "A review comment is required when requesting changes",
       );
 
-    const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
+    const spec = await prisma.courseSpec.findFirst({ where: { courseId }, orderBy: CURRENT_SPEC_ORDER });
     if (!spec)
       throw new ReferenceError("Course specification has not been started");
     if (
@@ -367,7 +376,7 @@ export const courseService = {
     }
 
     const updated = await prisma.courseSpec.update({
-      where: { courseId },
+      where: { id: spec.id },
       data: {
         reviewStatus: "ChangesRequested",
         reviewActions: {
@@ -390,7 +399,7 @@ export const courseService = {
   },
 
   async approveSpec(courseId: string, reviewerId: string, note: string) {
-    const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
+    const spec = await prisma.courseSpec.findFirst({ where: { courseId }, orderBy: CURRENT_SPEC_ORDER });
     if (!spec)
       throw new ReferenceError("Course specification has not been started");
     if (
@@ -402,7 +411,7 @@ export const courseService = {
     }
 
     const updated = await prisma.courseSpec.update({
-      where: { courseId },
+      where: { id: spec.id },
       data: {
         reviewStatus: "Approved",
         reviewActions: {
@@ -445,7 +454,7 @@ export const courseService = {
     if (!course) throw new ReferenceError("Course not found");
 
     await prisma.$transaction(async (tx) => {
-      const existingSpec = await tx.courseSpec.findUnique({
+      const existingSpec = await tx.courseSpec.findFirst({
         where: { courseId },
         select: { id: true, reviewStatus: true },
       });
@@ -521,8 +530,9 @@ export const courseService = {
       });
     });
 
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       include: SPEC_INCLUDE,
     });
     const { data, status } = reassembleSpec(spec);

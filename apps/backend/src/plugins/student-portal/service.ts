@@ -10,6 +10,7 @@ import type {
   SetAssessmentDeadlineInput,
   StudentPortalHome,
 } from "@dse-pms/shared-types";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 
 export class PortalNotFoundError extends Error {}
@@ -31,19 +32,25 @@ const enrollmentInclude = {
       },
       course: {
         include: {
-          spec: {
+          specs: {
+            where: { reviewStatus: "Approved" },
+            orderBy: [
+              { versionMajor: "desc" },
+              { versionMinor: "desc" },
+            ],
+            take: 1,
             include: {
-              clos: { orderBy: { order: "asc" as const } },
-              weeks: { orderBy: { order: "asc" as const } },
-              assessmentItems: { orderBy: { order: "asc" as const } },
-              resources: { orderBy: { order: "asc" as const } },
+              clos: { orderBy: { order: "asc" } },
+              weeks: { orderBy: { order: "asc" } },
+              assessmentItems: { orderBy: { order: "asc" } },
+              resources: { orderBy: { order: "asc" } },
             },
           },
         },
       },
     },
   },
-} as const;
+} satisfies Prisma.EnrollmentInclude;
 
 type EnrollmentRow = Awaited<ReturnType<typeof enrolledRows>>[number];
 
@@ -115,8 +122,7 @@ export function calculateCloAchievements(
 }
 
 function approvedSpec(row: EnrollmentRow) {
-  const spec = row.offering.course.spec;
-  return spec?.reviewStatus === "Approved" ? spec : null;
+  return row.offering.course.specs[0] ?? null;
 }
 
 function toSummary(row: EnrollmentRow): PortalCourseSummary {
@@ -261,7 +267,19 @@ function announcementsFrom(rows: EnrollmentRow[]): PortalAnnouncement[] {
 async function assertOfferingEditor(offeringId: string, userId: string, programmeWide: boolean) {
   const offering = await prisma.offering.findUnique({
     where: { id: offeringId },
-    include: { coLecturers: true, course: { select: { spec: { select: { id: true } } } } },
+    include: {
+      coLecturers: true,
+      course: {
+        select: {
+          specs: {
+            where: { reviewStatus: "Approved" },
+            orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
+            take: 1,
+            select: { id: true },
+          },
+        },
+      },
+    },
   });
   if (!offering) throw new PortalNotFoundError("Offering not found");
   const assigned = offering.lecturerId === userId || offering.coLecturers.some((item) => item.lecturerId === userId);
@@ -346,11 +364,26 @@ export const studentPortalService = {
   async publishResult(authorId: string, programmeWide: boolean, input: PublishAssessmentResultInput) {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: input.enrollmentId },
-      include: { offering: { include: { course: { include: { spec: { include: { assessmentItems: true } } } } } } },
+      include: {
+        offering: {
+          include: {
+            course: {
+              include: {
+                specs: {
+                  where: { reviewStatus: "Approved" },
+                  orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
+                  take: 1,
+                  include: { assessmentItems: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     if (!enrollment) throw new PortalNotFoundError("Enrollment not found");
     await assertOfferingEditor(enrollment.offeringId, authorId, programmeWide);
-    const spec = enrollment.offering.course.spec;
+    const spec = enrollment.offering.course.specs[0];
     if (!spec || !spec.assessmentItems.some((item) => item.id === input.assessmentItemId)) {
       throw new PortalNotFoundError("Assessment not found");
     }
@@ -377,19 +410,19 @@ export const studentPortalService = {
 
   async setDeadline(authorId: string, programmeWide: boolean, input: SetAssessmentDeadlineInput) {
     const offering = await assertOfferingEditor(input.offeringId, authorId, programmeWide);
-    if (!offering.course.spec?.id) throw new PortalNotFoundError("Course specification not found");
+    if (!offering.course.specs[0]?.id) throw new PortalNotFoundError("Course specification not found");
     return prisma.offeringAssessmentDeadline.upsert({
       where: {
         offeringId_courseSpecId_assessmentItemId: {
           offeringId: input.offeringId,
-          courseSpecId: offering.course.spec.id,
+          courseSpecId: offering.course.specs[0]!.id,
           assessmentItemId: input.assessmentItemId,
         },
       },
       update: { dueAt: new Date(input.dueAt) },
       create: {
         offeringId: input.offeringId,
-        courseSpecId: offering.course.spec.id,
+        courseSpecId: offering.course.specs[0]!.id,
         assessmentItemId: input.assessmentItemId,
         dueAt: new Date(input.dueAt),
       },
