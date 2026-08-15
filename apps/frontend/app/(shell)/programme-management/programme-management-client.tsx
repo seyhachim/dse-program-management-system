@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import type {
   ProgramCompetencyWithPlos,
+  ProgramLearningOutcome,
   ProgramPolicy,
   ProgrammeAcademicConfig,
   ProgrammeProfile,
+  UpdatePloTaxonomyInput,
 } from "@dse-pms/shared-types";
 import {
   Button,
@@ -15,6 +18,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  Input,
+  Label,
   Tabs,
   TabsContent,
   TabsList,
@@ -42,6 +47,18 @@ export function ProgrammeManagementClient() {
 
   const [savingMapping, setSavingMapping] = useState(false);
   const [mappingError, setMappingError] = useState<string | null>(null);
+
+  const [editingPlo, setEditingPlo] = useState<ProgramLearningOutcome | null>(
+    null,
+  );
+  const [taxonomyDraft, setTaxonomyDraft] = useState<UpdatePloTaxonomyInput>({
+    major: null,
+    learningDomain: null,
+    specificOrGeneric: null,
+    cap: null,
+  });
+  const [savingTaxonomy, setSavingTaxonomy] = useState(false);
+  const [taxonomyError, setTaxonomyError] = useState<string | null>(null);
 
   const [policyDraft, setPolicyDraft] = useState<ProgramPolicy | null>(null);
   const [profileDraft, setProfileDraft] = useState<ProgrammeProfile | null>(null);
@@ -247,6 +264,57 @@ export function ProgrammeManagementClient() {
     }
   };
 
+  const openTaxonomyDialog = (plo: ProgramLearningOutcome) => {
+    setEditingPlo(plo);
+    setTaxonomyDraft({
+      major: plo.major,
+      learningDomain: plo.learningDomain,
+      specificOrGeneric: plo.specificOrGeneric,
+      cap: plo.cap,
+    });
+    setTaxonomyError(null);
+  };
+
+  const closeTaxonomyDialog = () => {
+    if (savingTaxonomy) return;
+
+    setEditingPlo(null);
+    setTaxonomyError(null);
+  };
+
+  const saveTaxonomy = async () => {
+    if (!editingPlo) return;
+
+    setSavingTaxonomy(true);
+    setTaxonomyError(null);
+
+    try {
+      const updated = await api.put<ProgramLearningOutcome>(
+        `/api/programme/plos/${editingPlo.code}`,
+        taxonomyDraft,
+      );
+
+      setData((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          plos: current.plos.map((plo) =>
+            plo.id === updated.id ? updated : plo,
+          ),
+        };
+      });
+
+      setEditingPlo(null);
+    } catch (err) {
+      setTaxonomyError(
+        err instanceof ApiError ? err.message : "Failed to save classification",
+      );
+    } finally {
+      setSavingTaxonomy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="rounded-xl border border-border bg-card p-6">
@@ -431,7 +499,7 @@ export function ProgrammeManagementClient() {
                 {data.plos.map((plo) => (
                   <div
                     key={plo.id}
-                    className="grid gap-2 px-5 py-4 md:grid-cols-[90px_1fr]"
+                    className="grid gap-2 px-5 py-4 md:grid-cols-[90px_1fr_auto]"
                   >
                     <div>
                       <span className="inline-flex rounded-md bg-muted px-2 py-1 text-xs font-semibold">
@@ -439,9 +507,41 @@ export function ProgrammeManagementClient() {
                       </span>
                     </div>
 
-                    <p className="text-sm leading-6 text-foreground">
-                      {plo.description}
-                    </p>
+                    <div>
+                      <p className="text-sm leading-6 text-foreground">
+                        {plo.description}
+                      </p>
+
+                      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <div className="flex gap-1">
+                          <dt className="font-medium">Major:</dt>
+                          <dd>{plo.major ?? "—"}</dd>
+                        </div>
+                        <div className="flex gap-1">
+                          <dt className="font-medium">Learning Domain:</dt>
+                          <dd>{plo.learningDomain ?? "—"}</dd>
+                        </div>
+                        <div className="flex gap-1">
+                          <dt className="font-medium">Specific/Generic:</dt>
+                          <dd>{plo.specificOrGeneric ?? "—"}</dd>
+                        </div>
+                        <div className="flex gap-1">
+                          <dt className="font-medium">C/A/P:</dt>
+                          <dd>{plo.cap ?? "—"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+
+                    {canWrite ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openTaxonomyDialog(plo)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit Classification
+                      </Button>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -696,6 +796,73 @@ export function ProgrammeManagementClient() {
                 {savingMapping ? "Saving…" : "Save Mapping"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editingPlo !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeTaxonomyDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Classification</DialogTitle>
+
+            <DialogDescription>
+              {editingPlo
+                ? `${editingPlo.code} — cover page taxonomy classification`
+                : "Set the cover page taxonomy classification for this PLO."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {taxonomyError ? (
+            <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-3 py-2 text-sm text-status-upcoming">
+              {taxonomyError}
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            {(
+              [
+                ["major", "Major"],
+                ["learningDomain", "Learning Domain"],
+                ["specificOrGeneric", "Specific/Generic"],
+                ["cap", "C/A/P"],
+              ] as const
+            ).map(([key, label]) => (
+              <div key={key}>
+                <Label htmlFor={`plo-taxonomy-${key}`}>{label}</Label>
+                <Input
+                  id={`plo-taxonomy-${key}`}
+                  value={taxonomyDraft[key] ?? ""}
+                  onChange={(event) =>
+                    setTaxonomyDraft((current) => ({
+                      ...current,
+                      [key]: event.target.value || null,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={closeTaxonomyDialog}
+              disabled={savingTaxonomy}
+            >
+              Cancel
+            </Button>
+
+            <Button onClick={saveTaxonomy} disabled={savingTaxonomy}>
+              {savingTaxonomy ? "Saving…" : "Save Classification"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

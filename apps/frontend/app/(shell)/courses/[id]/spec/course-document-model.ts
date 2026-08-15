@@ -5,6 +5,7 @@ import {
   cloFocusCode,
   cloFocusPercent,
   rubricScaleSummary,
+  type DateSection as DateSectionValue,
   type Method,
   type PolicySection as PolicySectionValue,
   type ProgrammeAcademicConfig,
@@ -28,6 +29,10 @@ export type CourseDocumentModel = {
   title: string;
   partTitle: string;
   programmeProfile: ProgrammeAcademicConfig["profile"];
+  /** §25 Date — spec last revised/approved date, YYYY-MM-DD or null if unset. */
+  specDate: string | null;
+  /** Part 1 cover page PLO taxonomy table. */
+  plos: ProgrammeAcademicConfig["plos"];
   courseInformation: {
     programmeTitle: string;
     courseTitle: string;
@@ -254,6 +259,7 @@ type BuildCourseDocumentInput = {
   references?: ReferencesForm;
   responsibility?: StudentResponsibilityValue;
   policy?: PolicySectionValue;
+  specDate?: DateSectionValue;
   courseTotalSlt?: number | null;
 };
 
@@ -307,6 +313,7 @@ export function buildCourseDocument({
   references = [],
   responsibility,
   policy,
+  specDate,
   courseTotalSlt = null,
 }: BuildCourseDocumentInput): CourseDocumentModel {
   const ploByCode = new Map(
@@ -483,6 +490,8 @@ export function buildCourseDocument({
       educationalPhilosophy: [],
       peos: [],
     },
+    specDate: specDate?.date ?? null,
+    plos: programme?.plos ?? [],
     courseInformation: {
       programmeTitle: programme?.title ?? PROGRAMME_TITLE,
       courseTitle: courseInfo.courseTitle,
