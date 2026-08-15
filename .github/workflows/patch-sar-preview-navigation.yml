@@ -1,0 +1,55 @@
+name: Patch SAR preview navigation
+
+on:
+  push:
+    branches: [agent/sar-preview-navigation]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/sar-preview-navigation
+      - name: Add SAR Preview navigation and contract test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          plugins = Path('packages/shared-types/src/plugins.ts')
+          text = plugins.read_text()
+          if 'path: "/aun-qa/sar-preview"' not in text:
+              anchor = '''    {
+                label: "SAR Review",
+                path: "/aun-qa/review",
+                icon: "clipboard-check",
+                roles: ["admin", "program_coordinator", "qa_reviewer"],
+                group: "Quality Assurance",
+              },
+          '''
+              addition = anchor + '''    {
+                label: "SAR Preview",
+                path: "/aun-qa/sar-preview",
+                icon: "file-text",
+                roles: ["admin", "program_coordinator", "qa_reviewer"],
+                group: "Quality Assurance",
+              },
+          '''
+              if text.count(anchor) != 1:
+                  raise SystemExit(f'expected one SAR Review nav anchor, found {text.count(anchor)}')
+              plugins.write_text(text.replace(anchor, addition, 1))
+
+          test = Path('packages/shared-types/src/qa-sar-preview-nav.test.ts')
+          test.write_text('''import { expect, test } from "bun:test";\nimport { navForRole, qaManifest } from "./plugins";\n\ntest("SAR Preview is visible to programme leadership and QA reviewers", () => {\n  for (const role of ["admin", "program_coordinator", "qa_reviewer"] as const) {\n    const paths = navForRole([qaManifest], [role]).map((route) => route.path);\n    expect(paths).toContain("/aun-qa/sar-preview");\n  }\n});\n\ntest("SAR Preview is not exposed to contributors or ordinary lecturers", () => {\n  for (const role of ["qa_contributor", "lecturer"] as const) {\n    const paths = navForRole([qaManifest], [role]).map((route) => route.path);\n    expect(paths).not.toContain("/aun-qa/sar-preview");\n  }\n});\n''')
+          PY
+      - name: Commit product patch and remove helper workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/shared-types/src/plugins.ts packages/shared-types/src/qa-sar-preview-nav.test.ts
+          git rm .github/workflows/patch-sar-preview-navigation.yml
+          git commit -m "qa: expose whole SAR preview to programme leadership"
+          git push origin HEAD:agent/sar-preview-navigation
