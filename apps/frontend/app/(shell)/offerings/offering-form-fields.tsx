@@ -70,6 +70,10 @@ interface OfferingFormFieldsProps {
   onSemesterChange: (v: string) => void;
   programmeYear: string;
   onProgrammeYearChange: (v: string) => void;
+  startDate: string;
+  onStartDateChange: (v: string) => void;
+  endDate: string;
+  onEndDateChange: (v: string) => void;
 }
 
 export function OfferingFormFields({
@@ -84,6 +88,10 @@ export function OfferingFormFields({
   onSemesterChange,
   programmeYear,
   onProgrammeYearChange,
+  startDate,
+  onStartDateChange,
+  endDate,
+  onEndDateChange,
 }: OfferingFormFieldsProps) {
   const courseItems: Record<string, string> = Object.fromEntries(
     courses.map((c) => [c.id, `${c.code} — ${c.title}`]),
@@ -254,6 +262,32 @@ export function OfferingFormFields({
           </Select>
         </Field>
       </div>
+      <fieldset className="space-y-3 rounded-lg border border-border p-4">
+        <div>
+          <legend className="text-sm font-semibold text-foreground">Teaching Period</legend>
+          <p className="text-xs text-muted-foreground">
+            Optional calendar range for the actual delivery period. Set both dates or leave both empty.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Start date">
+            <Input
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(event) => onStartDateChange(event.target.value)}
+            />
+          </Field>
+          <Field label="End date">
+            <Input
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(event) => onEndDateChange(event.target.value)}
+            />
+          </Field>
+        </div>
+      </fieldset>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Capacity" error={errors.capacity?.message}>
           <Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} />
