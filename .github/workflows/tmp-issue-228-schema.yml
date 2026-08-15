@@ -1,4 +1,4 @@
-name: Patch issue 228 Prisma schema
+name: Patch issue 228 evidence refactor
 
 on:
   push:
@@ -15,11 +15,12 @@ jobs:
         with:
           ref: agent/issue-228-reusable-qa-evidence
       - run: python .github/patch-issue-228-schema.py
-      - name: Commit schema patch if changed
+      - run: python .github/patch-issue-228-service.py
+      - name: Commit generated patches if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/backend/prisma/schema.prisma
+          git add apps/backend/prisma/schema.prisma apps/backend/src/plugins/qa/service.ts
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "qa: model reusable evidence mappings"
+          git commit -m "qa: refactor evidence ownership into reusable mappings"
           git push origin HEAD:agent/issue-228-reusable-qa-evidence
