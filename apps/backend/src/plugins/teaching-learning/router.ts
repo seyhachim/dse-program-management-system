@@ -8,6 +8,7 @@ import {
 } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { registry } from "../../core/plugins/registry.ts";
+import { CourseSpecLockedError } from "../courses/spec-lock.ts";
 import { teachingLearningService } from "./service.ts";
 import { weekProjectProgressService } from "./project-progress-service.ts";
 
@@ -66,10 +67,6 @@ async function ensureEditable(
   res: Response,
   id: string,
 ): Promise<boolean> {
-  if (hasProgrammeWideRole(req.user!.roles)) {
-    return true;
-  }
-
   const courses = registry.get<CoursesAccessService>("courses").service;
   const spec = await courses.getSpec(id);
   const reviewStatus = spec?.review?.status;
@@ -139,7 +136,15 @@ export function createTeachingLearningRouter(): Router {
         return;
       }
 
-      res.json(await weekProjectProgressService.save(id, parsed.data));
+      try {
+        res.json(await weekProjectProgressService.save(id, parsed.data));
+      } catch (error) {
+        if (error instanceof CourseSpecLockedError) {
+          res.status(409).json({ error: error.message });
+          return;
+        }
+        throw error;
+      }
     },
   );
 
@@ -173,7 +178,15 @@ export function createTeachingLearningRouter(): Router {
         return;
       }
 
-      res.json(await teachingLearningService.save(id, parsed.data));
+      try {
+        res.json(await teachingLearningService.save(id, parsed.data));
+      } catch (error) {
+        if (error instanceof CourseSpecLockedError) {
+          res.status(409).json({ error: error.message });
+          return;
+        }
+        throw error;
+      }
     },
   );
 
