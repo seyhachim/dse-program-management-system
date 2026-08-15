@@ -1071,6 +1071,7 @@ async function main() {
     },
   });
 
+  const rubricIdByName = new Map<string, string>();
   for (const r of rubrics) {
     const { levels, criteria, ...rubricData } = r;
 
@@ -1099,6 +1100,7 @@ async function main() {
           })
         ).id;
 
+    rubricIdByName.set(r.name, rubricId);
     await syncNormalizedRubricTables(prisma, rubricId, levels, criteria);
   }
 
@@ -1240,7 +1242,7 @@ async function main() {
         dueWeek: 4,
         format: "Source Code and Written Report",
         submissionMethod: "LMS (Upload)",
-        rubric: "Correctness 40%; problem solving 30%; code quality 20%; explanation 10%.",
+        rubricId: rubricIdByName.get("Assignment Rubric – Written Report") ?? null,
       },
     });
     await prisma.courseSpecResource.upsert({

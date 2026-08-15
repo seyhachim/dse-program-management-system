@@ -747,7 +747,7 @@ async function importOne(
       format: "",
       submissionMethod: "",
       instructions: "",
-      rubric: "",
+      rubricId: null,
       mappedPlos: item.plos,
       notes: "",
     }));

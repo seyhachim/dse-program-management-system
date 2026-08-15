@@ -817,7 +817,8 @@ export const AssessmentItem = z.object({
   format: z.string().default(""),
   submissionMethod: z.string().default(""),
   instructions: z.string().default(""),
-  rubric: z.string().default(""),
+  // A Rubric Library `Rubric.id`, or null when no rubric is linked (issue #123).
+  rubricId: z.string().nullable().default(null),
   feedbackMethod: z.string().default(""),
   feedbackTimeline: z.string().default(""),
   // PLO mapping & notes.

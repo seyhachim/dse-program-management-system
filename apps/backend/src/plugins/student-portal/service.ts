@@ -37,7 +37,10 @@ const enrollmentInclude = {
             include: {
               clos: { orderBy: { order: "asc" as const } },
               weeks: { orderBy: { order: "asc" as const } },
-              assessmentItems: { orderBy: { order: "asc" as const } },
+              assessmentItems: {
+                orderBy: { order: "asc" as const },
+                include: { rubric: { select: { name: true } } },
+              },
               resources: { orderBy: { order: "asc" as const } },
             },
           },
@@ -277,7 +280,7 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           format: item.format,
           submissionMethod: item.submissionMethod,
           instructions: item.instructions,
-          rubric: item.rubric,
+          rubricName: item.rubric?.name ?? "",
           result: result && result.publishedAt
             ? {
                 assessmentItemId: item.id,

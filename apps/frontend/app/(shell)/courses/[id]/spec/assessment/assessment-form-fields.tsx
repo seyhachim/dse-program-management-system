@@ -48,8 +48,8 @@ export function AssessmentFormFields({
   touched: boolean;
 }) {
   const nameError = touched && draft.name.trim().length === 0;
-  const selectedRubric = rubrics.find((rubric) => rubric.id === draft.rubric);
-  const missingRubric = draft.rubric !== "" && !selectedRubric;
+  const selectedRubric = rubrics.find((rubric) => rubric.id === draft.rubricId);
+  const missingRubric = draft.rubricId !== "" && !selectedRubric;
   const totalAssessmentSlt = assessmentSltHours(draft);
 
   const toggleTopic = (topic: number) => {
@@ -329,8 +329,8 @@ export function AssessmentFormFields({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
           <Field label="Rubric">
             <select
-              value={draft.rubric}
-              onChange={(event) => set({ rubric: event.target.value })}
+              value={draft.rubricId}
+              onChange={(event) => set({ rubricId: event.target.value })}
               className={selectCls}
             >
               <option value="">— No rubric —</option>
@@ -340,7 +340,7 @@ export function AssessmentFormFields({
                 </option>
               ))}
               {missingRubric ? (
-                <option value={draft.rubric}>
+                <option value={draft.rubricId}>
                   Selected rubric (no longer in library)
                 </option>
               ) : null}

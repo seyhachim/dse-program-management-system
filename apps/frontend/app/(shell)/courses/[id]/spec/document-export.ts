@@ -1465,6 +1465,43 @@ function policyParagraphs(policy: CourseDocumentModel["policy"]) {
   ]);
 }
 
+function rubricGridTable(rubric: CourseDocumentModel["rubrics"][number]) {
+  const w = colWidths([22, ...rubric.levels.map(() => 78 / rubric.levels.length)]);
+  const headers = [
+    "Criteria",
+    ...rubric.levels.map((level) => `${level.points} – ${level.label}`),
+  ];
+  const rows = [
+    new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
+  ];
+  for (const criterion of rubric.criteria) {
+    const rowValues = [
+      criterion.name,
+      ...rubric.levels.map((_level, li) => criterion.descriptors[li] ?? "—"),
+    ];
+    rows.push(
+      new TableRow({
+        children: rowValues.map((v, i) =>
+          cell(v, { width: w[i], bold: i === 0 }),
+        ),
+      }),
+    );
+  }
+  return table(rows, w);
+}
+
+function rubricSection(document: CourseDocumentModel) {
+  if (document.rubrics.length === 0) {
+    return [paragraph("No assessment has a rubric linked from the Rubric Library.", false, SMALL)];
+  }
+  return document.rubrics.flatMap((rubric) => [
+    paragraph(`${rubric.assessmentName} — ${rubric.name} (${rubric.type})`, true, SMALL),
+    paragraph(`Rating Scale: ${rubric.scaleSummary}`, false, SMALL),
+    rubricGridTable(rubric),
+    new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }),
+  ]);
+}
+
 function ratingScaleTable() {
   const w = colWidths([25, 25, 25, 25]);
   const headers = ["Letter Grade", "Grade Point", "Score", "Explanation"];
@@ -1597,6 +1634,11 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
           ]
         : bulletedList(document.responsibilities)),
     ]),
+  );
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(
+    sectionBox([sectionTitle("22", "Rubric"), ...rubricSection(document)]),
   );
 
   children.push(new Paragraph({ children: [new PageBreak()] }));

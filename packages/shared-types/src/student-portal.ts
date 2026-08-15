@@ -90,7 +90,7 @@ export interface PortalCourseDetail extends PortalCourseSummary {
     format: string;
     submissionMethod: string;
     instructions: string;
-    rubric: string;
+    rubricName: string;
     result: PortalAssessmentResult | null;
   }>;
   resources: Array<{

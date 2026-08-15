@@ -4,6 +4,7 @@ import {
   semesterLabel,
   cloFocusCode,
   cloFocusPercent,
+  rubricScaleSummary,
   type Method,
   type PolicySection as PolicySectionValue,
   type ProgrammeAcademicConfig,
@@ -135,6 +136,15 @@ export type CourseDocumentModel = {
     onlineSltHours: string;
     independentSltHours: string;
     totalSltHours: number;
+  }[];
+  /** §22 — one entry per active assessment with a linked Rubric Library rubric. */
+  rubrics: {
+    assessmentName: string;
+    name: string;
+    type: string;
+    scaleSummary: string;
+    levels: { label: string; points: number }[];
+    criteria: { name: string; descriptors: string[] }[];
   }[];
   totals: {
     courseContentSlt: number;
@@ -390,10 +400,10 @@ export function buildCourseDocument({
       feedbackMethod: assessment.feedbackMethod,
       feedbackTimeline: assessment.feedbackTimeline,
       evaluationDefinition:
-        rubricById.get(assessment.rubric)?.description ?? "",
-      rubricName: rubricById.get(assessment.rubric)?.name ?? "",
-      rubricUrl: assessment.rubric
-        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
+        rubricById.get(assessment.rubricId)?.description ?? "",
+      rubricName: rubricById.get(assessment.rubricId)?.name ?? "",
+      rubricUrl: assessment.rubricId
+        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubricId)}/edit`
         : "",
       assessmentCategory: assessment.assessmentCategory,
       topicNumbers: assessment.topicNumbers,
@@ -402,6 +412,29 @@ export function buildCourseDocument({
       independentSltHours: assessment.independentSltHours,
       totalSltHours: assessmentSltHours(assessment),
     }));
+
+  const documentRubrics = assessments
+    .filter((assessment) => assessment.status === "active")
+    .flatMap((assessment) => {
+      const rubric = rubricById.get(assessment.rubricId);
+      if (!rubric) return [];
+      return [
+        {
+          assessmentName: assessment.name,
+          name: rubric.name,
+          type: rubric.type,
+          scaleSummary: rubricScaleSummary(rubric.levels),
+          levels: rubric.levels.map((level) => ({
+            label: level.label,
+            points: level.points,
+          })),
+          criteria: rubric.criteria.map((criterion) => ({
+            name: criterion.name,
+            descriptors: criterion.descriptors,
+          })),
+        },
+      ];
+    });
 
   const documentMapping = activeClos.map((clo) => {
     const focusPercent = cloFocusPercent(
@@ -497,6 +530,7 @@ export function buildCourseDocument({
       .filter(Boolean),
     policy: policy ?? EMPTY_POLICY_VALUES,
     assessments: documentAssessments,
+    rubrics: documentRubrics,
     totals: {
       courseContentSlt,
       continuousAssessmentSlt,

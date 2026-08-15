@@ -689,7 +689,7 @@ function reassembleSpec(spec: SpecRow | null): {
         format: item.format,
         submissionMethod: item.submissionMethod,
         instructions: item.instructions,
-        rubric: item.rubric,
+        rubricId: item.rubricId,
         feedbackMethod: item.feedbackMethod,
         feedbackTimeline: item.feedbackTimeline,
         mappedPlos: item.mappedPlos,
@@ -877,7 +877,13 @@ async function syncWeeklyPlan(
   });
 }
 
-/** Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17) section save. */
+/**
+ * Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17)
+ * section save. `rubricId` is reconciled against real Rubric rows before writing
+ * (rather than letting the FK reject the whole save) since the wizard already
+ * tolerates a stale/deleted rubric selection as a valid state (issue #123) — unlike
+ * CLO teaching/assessment method ids, which deliberately fail hard on a bad id.
+ */
 async function syncAssessmentPlan(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
@@ -885,6 +891,19 @@ async function syncAssessmentPlan(
 ) {
   await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
   if (items.length === 0) return;
+
+  const rubricIds = [...new Set(items.flatMap((item) => item.rubricId ? [item.rubricId] : []))];
+  const validRubricIds = rubricIds.length
+    ? new Set(
+        (
+          await tx.rubric.findMany({
+            where: { id: { in: rubricIds } },
+            select: { id: true },
+          })
+        ).map((r) => r.id),
+      )
+    : new Set<string>();
+
   await tx.courseSpecAssessmentItem.createMany({
     data: items.map((item, order) => ({
       id: item.id,
@@ -906,7 +925,10 @@ async function syncAssessmentPlan(
       format: item.format,
       submissionMethod: item.submissionMethod,
       instructions: item.instructions,
-      rubric: item.rubric,
+      rubricId:
+        item.rubricId && validRubricIds.has(item.rubricId)
+          ? item.rubricId
+          : null,
       feedbackMethod: item.feedbackMethod,
       feedbackTimeline: item.feedbackTimeline,
       mappedPlos: item.mappedPlos,
