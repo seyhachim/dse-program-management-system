@@ -65,7 +65,7 @@ function AssessmentSltTable({
           <tr>
             <Th>No.</Th>
             <Th>{title}</Th>
-            <Th>%</Th>
+            <Th>Course Grade Weight (%)</Th>
             <Th>Physical / F2F</Th>
             <Th>Online / Technology-mediated (Synchronous)</Th>
             <Th>Independent Learning (Asynchronous)</Th>
@@ -79,7 +79,7 @@ function AssessmentSltTable({
                 <Td className="text-center">{index + 1}</Td>
                 <Td>{value(assessment.name)}</Td>
                 <Td className="text-center">
-                  {assessment.weight ? `${assessment.weight}%` : "—"}
+                  {assessment.weight ? `${assessment.weight}%` : "Not graded"}
                 </Td>
                 <Td className="text-center">{value(assessment.physicalSltHours)}</Td>
                 <Td className="text-center">{value(assessment.onlineSltHours)}</Td>
@@ -144,48 +144,55 @@ export function AssessmentSltSection({ document }: { document: CourseDocumentMod
 
 export function AssessmentPlanMatrix({ document }: { document: CourseDocumentModel }) {
   return (
-    <Table>
-      <thead>
-        <tr>
-          <Th>CLO</Th>
-          <Th>PLO</Th>
-          <Th>Assessment</Th>
-          <Th>G/I</Th>
-          <Th>Weight %</Th>
-          <Th>C/A/P Level</Th>
-          {Array.from({ length: 15 }, (_, index) => index + 1).map((topic) => (
-            <Th key={topic} className="px-0 text-[7px]">{topic}</Th>
-          ))}
-          <Th>Total Weight (%)</Th>
-          <Th>Total SLT</Th>
-        </tr>
-      </thead>
-      <tbody>
-        {document.assessments.map((assessment) => (
-          <tr key={assessment.id}>
-            <Td className="text-[8px]">{join(assessment.cloCodes)}</Td>
-            <Td className="text-[8px]">{join(assessment.mappedPlos)}</Td>
-            <Td className="text-[8px]">{value(assessment.name)}</Td>
-            <Td className="text-center">{assessment.mode === "group" ? "G" : "I"}</Td>
-            <Td className="text-center">{value(assessment.weight)}</Td>
-            <Td className="text-center text-[8px]">{join(assessment.capLevels)}</Td>
+    <div>
+      <p className="mb-2 text-[8px] leading-[1.3]">
+        <strong>Course Grade Weight</strong> is the programme/course grading policy.
+        <strong> CLO Evidence</strong> is shown separately through the explicit CLO mapping.
+        No AUN-QA evidence weight is inferred from a grading percentage.
+      </p>
+      <Table>
+        <thead>
+          <tr>
+            <Th>CLO Evidence</Th>
+            <Th>Derived PLO</Th>
+            <Th>Assessment</Th>
+            <Th>G/I</Th>
+            <Th>Course Grade Weight %</Th>
+            <Th>C/A/P Level</Th>
             {Array.from({ length: 15 }, (_, index) => index + 1).map((topic) => (
-              <Td key={topic} className="px-0 text-center text-[8px]">
-                {assessment.topicNumbers.includes(topic) ? "✓" : ""}
-              </Td>
+              <Th key={topic} className="px-0 text-[7px]">{topic}</Th>
             ))}
-            <Td className="text-center">{value(assessment.weight)}</Td>
-            <Td className="text-center">{assessment.totalSltHours}</Td>
+            <Th>Course Grade Weight %</Th>
+            <Th>Total SLT</Th>
           </tr>
-        ))}
-      </tbody>
-      <tfoot>
-        <tr>
-          <Td colSpan={21} className="font-semibold">Total Weightage (%)</Td>
-          <Td className="text-center font-semibold">{document.totals.assessmentWeight}</Td>
-          <Td className="text-center font-semibold">{document.totals.assessmentSlt}</Td>
-        </tr>
-      </tfoot>
-    </Table>
+        </thead>
+        <tbody>
+          {document.assessments.map((assessment) => (
+            <tr key={assessment.id}>
+              <Td className="text-[8px]">{join(assessment.cloCodes)}</Td>
+              <Td className="text-[8px]">{join(assessment.mappedPlos)}</Td>
+              <Td className="text-[8px]">{value(assessment.name)}</Td>
+              <Td className="text-center">{assessment.mode === "group" ? "G" : "I"}</Td>
+              <Td className="text-center">{assessment.weight ? value(assessment.weight) : "Not graded"}</Td>
+              <Td className="text-center text-[8px]">{join(assessment.capLevels)}</Td>
+              {Array.from({ length: 15 }, (_, index) => index + 1).map((topic) => (
+                <Td key={topic} className="px-0 text-center text-[8px]">
+                  {assessment.topicNumbers.includes(topic) ? "✓" : ""}
+                </Td>
+              ))}
+              <Td className="text-center">{assessment.weight ? value(assessment.weight) : "—"}</Td>
+              <Td className="text-center">{assessment.totalSltHours}</Td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <Td colSpan={21} className="font-semibold">Total Local Course Grade Weight (%)</Td>
+            <Td className="text-center font-semibold">{document.totals.assessmentWeight}</Td>
+            <Td className="text-center font-semibold">{document.totals.assessmentSlt}</Td>
+          </tr>
+        </tfoot>
+      </Table>
+    </div>
   );
 }

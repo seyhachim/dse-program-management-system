@@ -22,6 +22,7 @@ export interface PortalAssessmentResult {
   score: number;
   maxScore: number;
   percentage: number;
+  weightedCourseContribution: number | null;
   feedback: string;
   publishedAt: string;
 }
@@ -38,6 +39,11 @@ export interface PortalCloAchievement {
   percentage: number | null;
   status: CloAchievementStatus;
   evidenceCount: number;
+  evidence: Array<{
+    assessmentItemId: string;
+    assessmentName: string;
+    rawPercentage: number;
+  }>;
 }
 
 export interface PortalCourseSummary {
@@ -85,6 +91,8 @@ export interface PortalCourseDetail extends PortalCourseSummary {
     mode: "individual" | "group";
     cloCodes: string[];
     weight: number | null;
+    countsTowardGrade: boolean;
+    courseGradeWeight: number | null;
     dueAt: string | null;
     dueWeek: number | null;
     format: string;
@@ -100,6 +108,10 @@ export interface PortalCourseDetail extends PortalCourseSummary {
     url: string;
     notes: string;
   }>;
+  totalCourseGrade: number | null;
+  courseGradeComplete: boolean;
+  completedGradeWeight: number;
+  configuredGradeWeight: number;
   achievements: PortalCloAchievement[];
   overallAchievement: number | null;
   feedbackSubmitted: boolean;
@@ -187,6 +199,9 @@ export interface CourseDeliveryAssessment {
   name: string;
   type: string;
   weight: number | null;
+  countsTowardGrade: boolean;
+  courseGradeWeight: number | null;
+  cloCodes: string[];
   dueWeek: number | null;
   dueAt: string | null;
   results: CourseDeliveryResultRow[];
