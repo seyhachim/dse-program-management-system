@@ -90,19 +90,39 @@ export const INDEPENDENT_LEARNING_OPTIONS = [
   "Reflection",
 ] as const;
 
-export const RESOURCE_TYPE_OPTIONS = [
-  "Slides",
+/** §20: instructional materials used to support teaching and student learning. */
+export const TEACHING_LEARNING_MATERIAL_OPTIONS = [
+  "Lecture Slides",
   "Readings",
   "Datasets",
   "Worksheets",
   "Videos",
   "Case Studies",
+  "Lab Manuals",
+  "Jupyter Notebooks",
+  "Sample Code",
+  "Exercises / Handouts",
 ] as const;
 
-export const TECHNOLOGY_OPTIONS = [
-  "LMS",
+/** §19: facilities, infrastructure, software, platforms, and equipment needed to run the course. */
+export const REQUIRED_DELIVERY_RESOURCE_OPTIONS = [
+  "Computer Lab",
+  "Reliable Internet",
+  "Projector / Display",
+  "LMS Access",
+  "Python Environment",
   "Jupyter",
-  "GitHub",
   "Google Colab",
-  "Discussion Forum",
+  "GitHub",
+  "GPU Workstation",
+  "Licensed Software",
+  "Specialized Lab",
+  "Sensors / IoT Devices",
+  "Weather Station",
+  "Drone / UAV",
+  "GPS Equipment",
 ] as const;
+
+// Backward-compatible aliases for code that still uses the old internal names.
+export const RESOURCE_TYPE_OPTIONS = TEACHING_LEARNING_MATERIAL_OPTIONS;
+export const TECHNOLOGY_OPTIONS = REQUIRED_DELIVERY_RESOURCE_OPTIONS;
