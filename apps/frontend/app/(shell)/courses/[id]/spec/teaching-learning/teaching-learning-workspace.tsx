@@ -24,9 +24,9 @@ import {
 import {
   ACTIVE_LEARNING_CLUSTERS,
   INDEPENDENT_LEARNING_OPTIONS,
-  RESOURCE_TYPE_OPTIONS,
+  REQUIRED_DELIVERY_RESOURCE_OPTIONS,
+  TEACHING_LEARNING_MATERIAL_OPTIONS,
   TEACHING_PHILOSOPHY_OPTIONS,
-  TECHNOLOGY_OPTIONS,
 } from "./strategy-catalog";
 
 export function TeachingLearningWorkspace({
@@ -56,8 +56,8 @@ export function TeachingLearningWorkspace({
   const [courseMethodIds, setCourseMethodIds] = useState<string[]>([]);
   const [strategyIds, setStrategyIds] = useState<string[]>([]);
   const [independentLearning, setIndependentLearning] = useState<string[]>([]);
-  const [resourceTypes, setResourceTypes] = useState<string[]>([]);
-  const [technologyTypes, setTechnologyTypes] = useState<string[]>([]);
+  const [teachingLearningMaterials, setTeachingLearningMaterials] = useState<string[]>([]);
+  const [requiredDeliveryResources, setRequiredDeliveryResources] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,8 +77,10 @@ export function TeachingLearningWorkspace({
         );
         setStrategyIds(profile.activeLearningStrategyIds);
         setIndependentLearning(profile.independentLearningTypes);
-        setResourceTypes(profile.resourceTypes);
-        setTechnologyTypes(profile.technologyTypes);
+        // Keep the existing API/storage fields for backward compatibility while
+        // presenting the correct course-spec concepts to lecturers.
+        setTeachingLearningMaterials(profile.resourceTypes);
+        setRequiredDeliveryResources(profile.technologyTypes);
       } catch {
         if (!cancelled) {
           setProfileError(
@@ -121,7 +123,9 @@ export function TeachingLearningWorkspace({
     philosophyTags.length > 0 || philosophyStatement.trim().length > 0,
     courseMethodIds.length > 0,
     strategyIds.length > 0,
-    independentLearning.length + resourceTypes.length + technologyTypes.length >
+    independentLearning.length +
+        teachingLearningMaterials.length +
+        requiredDeliveryResources.length >
       0,
     activeClos.length > 0 && coveredClos === activeClos.length,
   ];
@@ -170,8 +174,8 @@ export function TeachingLearningWorkspace({
       teachingMethodIds: courseMethodIds,
       activeLearningStrategyIds: strategyIds,
       independentLearningTypes: independentLearning,
-      resourceTypes,
-      technologyTypes,
+      resourceTypes: teachingLearningMaterials,
+      technologyTypes: requiredDeliveryResources,
     };
 
     setProfileSaving(true);
@@ -184,8 +188,8 @@ export function TeachingLearningWorkspace({
       setCourseMethodIds(saved.teachingMethodIds);
       setStrategyIds(saved.activeLearningStrategyIds);
       setIndependentLearning(saved.independentLearningTypes);
-      setResourceTypes(saved.resourceTypes);
-      setTechnologyTypes(saved.technologyTypes);
+      setTeachingLearningMaterials(saved.resourceTypes);
+      setRequiredDeliveryResources(saved.technologyTypes);
       onProfileSaved?.(saved);
       setProfileSaved(true);
       window.setTimeout(() => setProfileSaved(false), 2500);
@@ -216,8 +220,9 @@ export function TeachingLearningWorkspace({
           <div>
             <h2 className="text-lg font-bold">Teaching &amp; Learning</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Define the course-level philosophy and reusable teaching strategy.
-              Weekly Plan remains the week-by-week execution workspace.
+              Define the course-level philosophy, teaching strategy, delivery
+              requirements, and learning materials. Weekly Plan remains the
+              week-by-week execution workspace.
             </p>
           </div>
           <div className="sm:w-56">
@@ -347,13 +352,14 @@ export function TeachingLearningWorkspace({
 
       <Section
         number={4}
-        title="Independent Learning, Resources & Technology"
-        prompt="Set course-level preferences. Actual files and links remain in Resources."
+        title="Course-Level Learning Support"
+        prompt="Define what the institution must provide and what materials support learning across the course."
         complete={completion[3]}
       >
         <div className="grid gap-5 lg:grid-cols-3">
           <Group
-            title="Independent learning"
+            title="Independent Learning"
+            description="How students continue learning outside scheduled contact time."
             options={[...INDEPENDENT_LEARNING_OPTIONS]}
             selected={independentLearning}
             onToggle={(value) =>
@@ -361,19 +367,38 @@ export function TeachingLearningWorkspace({
             }
           />
           <Group
-            title="Resource types"
-            options={[...RESOURCE_TYPE_OPTIONS]}
-            selected={resourceTypes}
-            onToggle={(value) => toggle(value, resourceTypes, setResourceTypes)}
-          />
-          <Group
-            title="Tools & technology"
-            options={[...TECHNOLOGY_OPTIONS]}
-            selected={technologyTypes}
+            title="Required Delivery Resources (§19)"
+            description="Facilities, infrastructure, software, platforms, or equipment required to run the course."
+            options={[...REQUIRED_DELIVERY_RESOURCE_OPTIONS]}
+            selected={requiredDeliveryResources}
             onToggle={(value) =>
-              toggle(value, technologyTypes, setTechnologyTypes)
+              toggle(
+                value,
+                requiredDeliveryResources,
+                setRequiredDeliveryResources,
+              )
             }
           />
+          <Group
+            title="Teaching & Learning Materials (§20)"
+            description="Instructional materials used by the lecturer or students to support learning."
+            options={[...TEACHING_LEARNING_MATERIAL_OPTIONS]}
+            selected={teachingLearningMaterials}
+            onToggle={(value) =>
+              toggle(
+                value,
+                teachingLearningMaterials,
+                setTeachingLearningMaterials,
+              )
+            }
+          />
+        </div>
+        <div className="mt-4 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
+          <strong className="text-foreground">§19</strong> is what the
+          university/department must provide to deliver the course.{" "}
+          <strong className="text-foreground">§20</strong> is what the lecturer
+          prepares or selects for teaching and student learning. Files, URLs, and
+          references can still be managed in the Resources tab.
         </div>
       </Section>
 
@@ -471,8 +496,8 @@ export function TeachingLearningWorkspace({
             teachingMethodIds: courseMethodIds,
             activeLearningStrategyIds: strategyIds,
             independentLearningTypes: independentLearning,
-            resourceTypes,
-            technologyTypes,
+            resourceTypes: teachingLearningMaterials,
+            technologyTypes: requiredDeliveryResources,
           },
           clos,
         ) ? (
@@ -560,11 +585,13 @@ function Chip({
 
 function Group({
   title,
+  description,
   options,
   selected,
   onToggle,
 }: {
   title: string;
+  description?: string;
   options: string[];
   selected: string[];
   onToggle: (value: string) => void;
@@ -574,6 +601,11 @@ function Group({
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </p>
+      {description ? (
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-1.5">
         {options.map((option) => (
           <Chip
