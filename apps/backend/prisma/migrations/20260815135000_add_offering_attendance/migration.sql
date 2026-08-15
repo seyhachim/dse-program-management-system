@@ -16,22 +16,23 @@ CREATE UNIQUE INDEX "AttendanceSession_offeringId_sessionDate_key"
 CREATE INDEX "AttendanceSession_offeringId_sessionDate_idx"
   ON "AttendanceSession"("offeringId", "sessionDate");
 
--- Attendance is attached to Enrollment, not directly to Student, so a record is
--- always tied to the exact class section in which the student was enrolled.
+-- Keep a small student identity snapshot so historical attendance survives later
+-- roster changes. The service only accepts students currently enrolled in the
+-- offering at save time; records intentionally do not cascade with Enrollment.
 CREATE TABLE "AttendanceRecord" (
   "sessionId" TEXT NOT NULL,
-  "enrollmentId" TEXT NOT NULL,
+  "studentId" TEXT NOT NULL,
+  "studentNumber" TEXT NOT NULL,
+  "studentName" TEXT NOT NULL,
   "status" TEXT NOT NULL,
   "note" TEXT NOT NULL DEFAULT '',
 
-  CONSTRAINT "AttendanceRecord_pkey" PRIMARY KEY ("sessionId", "enrollmentId"),
+  CONSTRAINT "AttendanceRecord_pkey" PRIMARY KEY ("sessionId", "studentId"),
   CONSTRAINT "AttendanceRecord_sessionId_fkey"
     FOREIGN KEY ("sessionId") REFERENCES "AttendanceSession"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "AttendanceRecord_enrollmentId_fkey"
-    FOREIGN KEY ("enrollmentId") REFERENCES "Enrollment"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "AttendanceRecord_status_check"
     CHECK ("status" IN ('Present', 'Absent', 'Late', 'Excused'))
 );
 
-CREATE INDEX "AttendanceRecord_enrollmentId_idx"
-  ON "AttendanceRecord"("enrollmentId");
+CREATE INDEX "AttendanceRecord_studentId_idx"
+  ON "AttendanceRecord"("studentId");
