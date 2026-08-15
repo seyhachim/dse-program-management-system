@@ -44,3 +44,17 @@ test("SAR semantic blocks reject unsupported arbitrary document nodes", () => {
 
   expect(result.success).toBe(false);
 });
+
+test("SAR evidence references require a stable evidence id and display label", () => {
+  const missingEvidenceId = QaSarDocumentSchema.safeParse({
+    version: 1,
+    blocks: [{ id: "e1", type: "evidenceReference", evidenceId: "", label: "Employer Survey 2025" }],
+  });
+  const missingLabel = QaSarDocumentSchema.safeParse({
+    version: 1,
+    blocks: [{ id: "e1", type: "evidenceReference", evidenceId: "evidence-1", label: "" }],
+  });
+
+  expect(missingEvidenceId.success).toBe(false);
+  expect(missingLabel.success).toBe(false);
+});
