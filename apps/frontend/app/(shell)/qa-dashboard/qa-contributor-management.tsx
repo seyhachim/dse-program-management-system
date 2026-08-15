@@ -62,11 +62,7 @@ export function QaContributorManagement() {
     setSaving(true);
     try {
       setError(null);
-      await api.delete("/api/auth/programme-roles", {
-        userId,
-        programmeId: PROGRAMME_ID,
-        role: "qa_contributor",
-      });
+      await api.delete(`/api/auth/programme-roles/${userId}?programmeId=${PROGRAMME_ID}&role=qa_contributor`);
       await load();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not remove QA contributor");
