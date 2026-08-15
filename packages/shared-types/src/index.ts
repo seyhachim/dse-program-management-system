@@ -19,3 +19,5 @@ export * from "./qa-documents.ts";
 export * from "./qa-llm.ts";
 export * from "./qa-review.ts";
 export * from "./qa-assignments.ts";
+export * from "./qa-workspace.ts";
+export * from "./qa-actions.ts";
