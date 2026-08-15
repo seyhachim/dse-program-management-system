@@ -1,12 +1,13 @@
 import { expect, test } from "bun:test";
 import { CreateAccountInput, Role } from "./auth.ts";
 
-test("Role supports all six roles from issue #101", () => {
+test("Role supports the additive QA contributor role", () => {
   expect(Role.options).toEqual([
     "admin",
     "program_coordinator",
     "program_secretary",
     "lecturer",
+    "qa_contributor",
     "qa_reviewer",
     "student",
   ]);
@@ -36,6 +37,15 @@ test("CreateAccountInput rejects admin (manual/seed-only, not self-service invit
   expect(result.success).toBe(false);
 });
 
+test("CreateAccountInput rejects qa_contributor because it is granted additively", () => {
+  const result = CreateAccountInput.safeParse({
+    name: "Ada",
+    email: "ada@dse.dev",
+    role: "qa_contributor",
+  });
+  expect(result.success).toBe(false);
+});
+
 test("CreateAccountInput accepts student portal invites", () => {
   const result = CreateAccountInput.safeParse({
     name: "Ada",
@@ -45,7 +55,7 @@ test("CreateAccountInput accepts student portal invites", () => {
   expect(result.success).toBe(true);
 });
 
-test("CreateAccountInput accepts the programme/QA roles added for issue #101", () => {
+test("CreateAccountInput accepts the programme/QA account roles", () => {
   for (const role of ["program_coordinator", "program_secretary", "qa_reviewer"] as const) {
     const result = CreateAccountInput.safeParse({ name: "Ada", email: "ada@dse.dev", role });
     expect(result.success).toBe(true);
