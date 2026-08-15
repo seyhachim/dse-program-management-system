@@ -1,0 +1,24 @@
+name: Sync issue 230 with main
+
+on:
+  push:
+    branches: [agent/issue-230-structured-sar-editor]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-230-structured-sar-editor
+          fetch-depth: 0
+      - name: Merge current main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge origin/main --no-edit
+          git push origin HEAD:agent/issue-230-structured-sar-editor
