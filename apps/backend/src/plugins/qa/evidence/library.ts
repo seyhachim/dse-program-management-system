@@ -1,9 +1,11 @@
 import {
   AUN_QA_V4_ID,
+  type CreateQaEvidenceInput,
   type CreateQaEvidenceItemInput,
   type MapQaEvidenceInput,
   type QaEvidenceItemView,
   type QaEvidenceMappingView,
+  type QaEvidenceView,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 
@@ -83,6 +85,34 @@ function evidenceToView(evidence: {
     createdAt: evidence.createdAt.toISOString(),
     updatedAt: evidence.updatedAt.toISOString(),
     mappings: evidence.mappings.map(mappingToView),
+  };
+}
+
+function mappedEvidenceToLegacyView(mapping: {
+  requirement: { code: string };
+  evidence: {
+    id: string;
+    title: string;
+    description: string;
+    kind: keyof typeof evidenceKind;
+    sourceUrl: string | null;
+    sourceRef: string;
+    reportingPeriod: string;
+    status: keyof typeof evidenceStatus;
+    createdAt: Date;
+  };
+}): QaEvidenceView {
+  return {
+    id: mapping.evidence.id,
+    requirementCode: mapping.requirement.code,
+    title: mapping.evidence.title,
+    description: mapping.evidence.description,
+    kind: evidenceKind[mapping.evidence.kind],
+    sourceUrl: mapping.evidence.sourceUrl,
+    sourceRef: mapping.evidence.sourceRef,
+    reportingPeriod: mapping.evidence.reportingPeriod,
+    status: evidenceStatus[mapping.evidence.status],
+    createdAt: mapping.evidence.createdAt.toISOString(),
   };
 }
 
@@ -169,6 +199,22 @@ export async function listQaEvidenceLibrary(
   return rows.map(evidenceToView);
 }
 
+export async function listMappedQaEvidenceForCycle(
+  programmeId: string,
+  cycleId: string,
+): Promise<QaEvidenceView[]> {
+  await resolveCycle(programmeId, cycleId);
+  const rows = await prisma.qaEvidenceMapping.findMany({
+    where: { programmeId, cycleId },
+    orderBy: { evidence: { createdAt: "desc" } },
+    include: {
+      requirement: { select: { code: true } },
+      evidence: true,
+    },
+  });
+  return rows.map(mappedEvidenceToLegacyView);
+}
+
 export async function createQaEvidenceItem(
   input: CreateQaEvidenceItemInput,
   userId: string,
@@ -194,6 +240,48 @@ export async function createQaEvidenceItem(
     include: libraryInclude,
   });
   return evidenceToView(created);
+}
+
+/** Backwards-compatible create-and-link operation used by the current QA dashboard. */
+export async function createAndMapQaEvidence(
+  cycleId: string,
+  input: CreateQaEvidenceInput,
+  userId: string,
+): Promise<QaEvidenceView> {
+  await resolveCycle(input.programmeId, cycleId);
+  const requirement = await resolveRequirementAndExpectation(input.requirementCode, null);
+
+  const created = await prisma.$transaction(async (tx) => {
+    const evidence = await tx.qaEvidence.create({
+      data: {
+        programmeId: input.programmeId,
+        title: input.title,
+        description: input.description,
+        kind: toDbEvidenceKind[input.kind],
+        sourceUrl: input.sourceUrl || null,
+        sourceRef: input.sourceRef,
+        reportingPeriod: input.reportingPeriod,
+        status: toDbEvidenceStatus[input.status],
+        createdById: userId,
+      },
+    });
+    const mapping = await tx.qaEvidenceMapping.create({
+      data: {
+        programmeId: input.programmeId,
+        cycleId,
+        evidenceId: evidence.id,
+        requirementId: requirement.id,
+        mappedById: userId,
+      },
+      include: {
+        requirement: { select: { code: true } },
+        evidence: true,
+      },
+    });
+    return mapping;
+  });
+
+  return mappedEvidenceToLegacyView(created);
 }
 
 export async function mapQaEvidence(
