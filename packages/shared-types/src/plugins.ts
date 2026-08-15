@@ -125,6 +125,13 @@ export const lecturerWorkspaceManifest: PluginManifest = {
       group: "Teaching",
     },
     {
+      label: "Course Delivery",
+      path: "/course-delivery",
+      icon: "megaphone",
+      roles: ["lecturer"],
+      group: "Academic",
+    },
+    {
       label: "Teaching Schedule",
       path: "/teaching-schedule",
       icon: "calendar",
