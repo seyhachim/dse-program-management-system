@@ -7,6 +7,7 @@ import {
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme } from "../../../core/auth/token.ts";
 import { requirePermission } from "../../../core/permissions/index.ts";
+import { listMyQaRequirementAssignments } from "../assignments/service.ts";
 import {
   QaEvidenceLibraryResourceNotFoundError,
   QaEvidenceLibraryScopeMismatchError,
@@ -22,12 +23,25 @@ const QA_LIBRARY_ROLES = [
   "qa_reviewer",
   "qa_contributor",
 ] as const;
+const QA_LIBRARY_MANAGER_ROLES = ["admin", "program_coordinator", "qa_reviewer"] as const;
 
 function canAccessEvidenceLibrary(
   user: Parameters<typeof hasAnyRoleInProgramme>[0],
   programmeId: string,
 ): boolean {
   return hasAnyRoleInProgramme(user, [...QA_LIBRARY_ROLES], programmeId);
+}
+
+async function canMapRequirement(
+  user: Parameters<typeof hasAnyRoleInProgramme>[0],
+  programmeId: string,
+  cycleId: string,
+  requirementCode: string,
+): Promise<boolean> {
+  if (hasAnyRoleInProgramme(user, [...QA_LIBRARY_MANAGER_ROLES], programmeId)) return true;
+  if (!hasAnyRoleInProgramme(user, ["qa_contributor"], programmeId)) return false;
+  const assignments = await listMyQaRequirementAssignments(programmeId, cycleId, user.id);
+  return assignments.some((assignment) => assignment.requirementCode === requirementCode);
 }
 
 function sendLibraryError(res: Response, error: unknown): void {
@@ -100,6 +114,10 @@ export function createQaEvidenceLibraryRouter(): Router {
         res.status(403).json({ error: "You cannot map evidence in this programme" });
         return;
       }
+      if (!(await canMapRequirement(req.user!, parsed.data.programmeId, cycleId, parsed.data.requirementCode))) {
+        res.status(403).json({ error: "QA Contributors can only map evidence to requirements assigned to them" });
+        return;
+      }
 
       try {
         res.json(await mapQaEvidence(cycleId, evidenceId, parsed.data, req.user!.id));
@@ -126,6 +144,10 @@ export function createQaEvidenceLibraryRouter(): Router {
       }
       if (!canAccessEvidenceLibrary(req.user!, parsed.data.programmeId)) {
         res.status(403).json({ error: "You cannot unmap evidence in this programme" });
+        return;
+      }
+      if (!(await canMapRequirement(req.user!, parsed.data.programmeId, cycleId, requirementCode))) {
+        res.status(403).json({ error: "QA Contributors can only unmap evidence from requirements assigned to them" });
         return;
       }
 
