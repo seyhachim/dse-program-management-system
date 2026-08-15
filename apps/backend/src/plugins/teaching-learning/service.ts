@@ -4,6 +4,7 @@ import {
   type TeachingLearningProfile,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { assertCourseSpecEditable } from "../courses/spec-lock.ts";
 
 export const EMPTY_TEACHING_LEARNING_PROFILE: TeachingLearningProfile = {
   philosophyTags: [],
@@ -55,12 +56,18 @@ export const teachingLearningService = {
     courseId: string,
     value: TeachingLearningProfile,
   ): Promise<TeachingLearningProfile> {
-    const spec = await prisma.courseSpec.upsert({
+    const existingSpec = await prisma.courseSpec.findUnique({
       where: { courseId },
-      create: { courseId },
-      update: {},
-      select: { id: true },
+      select: { id: true, reviewStatus: true },
     });
+    if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);
+
+    const spec =
+      existingSpec ??
+      (await prisma.courseSpec.create({
+        data: { courseId },
+        select: { id: true, reviewStatus: true },
+      }));
 
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO "CourseSpecTeachingLearning" (
