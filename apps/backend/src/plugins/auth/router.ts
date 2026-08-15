@@ -14,17 +14,23 @@ const ProgrammeRoleListQuery = z.object({
   programmeId: z.string().trim().min(1),
 });
 
+const ProgrammeRoleDeleteRequest = z.object({
+  userId: z.string().uuid(),
+  programmeId: z.string().trim().min(1),
+  role: z.literal("qa_contributor"),
+});
+
 function canManageProgrammeRoles(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, ["admin", "program_coordinator"], programmeId);
 }
 
 /**
  * Auth router:
- * - GET    /me               — the resolved caller (any authenticated user).
- * - POST   /accounts         — admin-only account provisioning.
- * - GET    /programme-roles  — programme leadership lists additive QA grants.
- * - POST   /programme-roles  — add an allowed programme role without replacing existing roles.
- * - DELETE /programme-roles  — remove only the requested additive programme role.
+ * - GET    /me                         — the resolved caller.
+ * - POST   /accounts                   — admin-only account provisioning.
+ * - GET    /programme-roles            — programme leadership lists additive QA grants.
+ * - POST   /programme-roles            — add an allowed programme role without replacing existing roles.
+ * - DELETE /programme-roles/:userId    — remove only the requested additive programme role.
  */
 export function createAuthRouter(): Router {
   const router = Router();
@@ -90,8 +96,12 @@ export function createAuthRouter(): Router {
     }
   });
 
-  router.delete("/programme-roles", requirePermission("qa:write"), async (req, res) => {
-    const parsed = ManageProgrammeRoleInput.safeParse(req.body);
+  router.delete("/programme-roles/:userId", requirePermission("qa:write"), async (req, res) => {
+    const parsed = ProgrammeRoleDeleteRequest.safeParse({
+      userId: req.params.userId,
+      programmeId: req.query.programmeId,
+      role: req.query.role,
+    });
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid programme role removal", details: parsed.error.flatten() });
       return;
