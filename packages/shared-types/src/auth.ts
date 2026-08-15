@@ -37,6 +37,30 @@ export const Role = z.enum([
 export type Role = z.infer<typeof Role>;
 
 /**
+ * Roles that can be granted through programme role management. Start narrowly:
+ * programme leadership may add/remove the QA Contributor capability without
+ * turning the role-management endpoint into a general privilege-escalation API.
+ */
+export const PROGRAMME_ASSIGNABLE_ROLES = ["qa_contributor"] as const;
+export const ProgrammeAssignableRole = z.enum(PROGRAMME_ASSIGNABLE_ROLES);
+export type ProgrammeAssignableRole = z.infer<typeof ProgrammeAssignableRole>;
+
+export const ManageProgrammeRoleInput = z.object({
+  userId: z.string().uuid(),
+  programmeId: z.string().trim().min(1),
+  role: ProgrammeAssignableRole,
+});
+export type ManageProgrammeRoleInput = z.infer<typeof ManageProgrammeRoleInput>;
+
+export interface ProgrammeRoleAssignmentView {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  programmeId: string;
+  role: ProgrammeAssignableRole;
+}
+
+/**
  * Shape returned by GET /api/auth/me — the resolved caller. `role` is the
  * caller's primary role, kept alongside `roles` (issue #77 phase B, all of the
  * caller's assigned roles) so a frontend bundle deployed before this field
