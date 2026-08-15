@@ -13,6 +13,7 @@ import { teachingLearningPlugin } from "../plugins/teaching-learning/index.ts";
 import { assessmentTemplatePlugin } from "../plugins/assessment-template/index.ts";
 import { studentPortalPlugin } from "../plugins/student-portal/index.ts";
 import { qaPlugin } from "../plugins/qa/index.ts";
+import { telegramPlugin } from "../plugins/telegram/index.ts";
 
 /**
  * Builds the Express app: registers plugins, mounts each plugin router at
@@ -35,6 +36,7 @@ export function createApp(): Express {
   registry.register(assessmentTemplatePlugin);
   registry.register(studentPortalPlugin);
   registry.register(qaPlugin);
+  registry.register(telegramPlugin);
 
   const app = express();
 
