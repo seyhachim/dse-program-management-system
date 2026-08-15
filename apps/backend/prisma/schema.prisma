@@ -568,6 +568,14 @@ model ProgramLearningOutcome {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  /// Cover page taxonomy classification (issue #124) — free text, RUPP
+  /// template vocabulary not yet finalized. All nullable since existing PLOs
+  /// predate this classification and the table renders "—" for an unset cell.
+  major             String?
+  learningDomain    String?
+  specificOrGeneric String?
+  cap               String?
+
   competencyLinks ProgramCompetencyPlo[]
 }
 
@@ -694,6 +702,10 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+  /// §25 Date — spec last revised/approved date (issue #124). A single value,
+  /// so it lives directly on CourseSpec rather than a normalized child table,
+  /// same reasoning as courseInfo mirroring onto Course instead of a section row.
+  specDate                DateTime?                         @db.Date
 
   @@index([reviewStatus])
   @@index([submittedById])

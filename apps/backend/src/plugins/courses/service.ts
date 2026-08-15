@@ -8,6 +8,7 @@ import {
   type CourseSpecProgress,
   type CoursesServiceContract,
   type CreateCourseInput,
+  type DateSection,
   type LecturerRef,
   type LecturersServiceContract,
   type ListCoursesQuery,
@@ -493,6 +494,13 @@ export const courseService = {
         );
       if (sectionId === "policy")
         await syncPolicy(tx, spec.id, values as PolicySection);
+      if (sectionId === "date") {
+        const { date } = values as DateSection;
+        await tx.courseSpec.update({
+          where: { id: spec.id },
+          data: { specDate: date ? new Date(`${date}T00:00:00.000Z`) : null },
+        });
+      }
 
       // Every saveable section must have a normalized table to write into — enforced,
       // not just documented, so a future section added to SPEC_SECTION_SCHEMAS without
@@ -581,6 +589,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "references",
   "responsibility",
   "policy",
+  "date",
 ]);
 
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
@@ -759,6 +768,11 @@ function reassembleSpec(spec: SpecRow | null): {
       assignmentsLateSubmission: spec.policy.assignmentsLateSubmission,
       examinationRules: spec.policy.examinationRules,
       penaltiesConsequences: spec.policy.penaltiesConsequences,
+    };
+  }
+  if (hasSection("date")) {
+    data.date = {
+      date: spec.specDate ? spec.specDate.toISOString().slice(0, 10) : null,
     };
   }
   return { data, status };
