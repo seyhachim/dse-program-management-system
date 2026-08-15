@@ -103,7 +103,7 @@ const assessment = {
   format: "",
   submissionMethod: "",
   instructions: "",
-  rubric: "",
+  rubricId: "",
   feedbackMethod: "",
   feedbackTimeline: "",
   mappedPlos: [],

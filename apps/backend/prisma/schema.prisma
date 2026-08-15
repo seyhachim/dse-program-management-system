@@ -888,7 +888,15 @@ model CourseSpecWeek {
 /// `assessmentPlan` section's JSON `items` array). Same composite-key rationale as
 /// CourseSpecWeek. Assessment learning levels are derived from the mapped CLOs rather
 /// than duplicated on the assessment item. `cloCodes`/`mappedPlos` are loose
-/// references, same as CourseSpecWeek.
+/// references, same as CourseSpecWeek. `rubricId` (issue #123) is a real FK into the
+/// standalone Rubric Library — previously an unvalidated string the wizard already
+/// populated with a `Rubric.id` but the DB never checked. `onDelete: SetNull` lets a
+/// rubric be deleted from the library without blocking on assessments that reference
+/// it; `syncAssessmentPlan` additionally nulls out any id that doesn't resolve at
+/// save time (a stale client-held id from a since-deleted rubric) rather than letting
+/// the FK reject the whole §17 save — the wizard already tolerates a missing rubric
+/// selection as a valid state, unlike CLO teaching/assessment method ids, which fail
+/// hard on a bad id by design.
 model CourseSpecAssessmentItem {
   id                  String               @default(uuid())
   courseSpecId        String
@@ -913,11 +921,13 @@ model CourseSpecAssessmentItem {
   format              String               @default("")
   submissionMethod    String               @default("")
   instructions        String               @default("")
-  rubric              String               @default("")
+  rubricId            String?
+  rubric              Rubric?              @relation(fields: [rubricId], references: [id], onDelete: SetNull)
   mappedPlos          String[]             @default([])
   notes               String               @default("")
 
   @@id([courseSpecId, id])
+  @@index([rubricId])
 }
 
 /// Issue #103: normalized CLO Alignment Mapping cells (previously the `mapping`
@@ -1226,6 +1236,7 @@ model Rubric {
   owner         User?             @relation("RubricOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   levelRows     RubricLevel[]
   criterionRows RubricCriterion[]
+  assessmentItems CourseSpecAssessmentItem[]
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 

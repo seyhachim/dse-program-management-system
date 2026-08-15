@@ -610,7 +610,15 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
   const resourcesPage = weeklyStartPage + weeklyPages.length;
   const referencesPage = resourcesPage + 1;
   const responsibilityPage = referencesPage + 1;
-  const policyPage = responsibilityPage + 1;
+
+  // One rubric per page — a criteria × levels grid's height is unpredictable
+  // (unlike the Weekly Plan's uniform rows), so unlike weeklyPages this isn't
+  // batched, to avoid silently clipping content against the page's fixed height.
+  const rubricPages: CourseDocumentModel["rubrics"][] = document.rubrics.length
+    ? document.rubrics.map((rubric) => [rubric])
+    : [[]];
+  const rubricStartPage = responsibilityPage + 1;
+  const policyPage = rubricStartPage + rubricPages.length;
   const ratingScalePage = policyPage + 1;
 
   return (
@@ -678,7 +686,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <div>
                 <dt className="text-xs text-muted-foreground">Sections</dt>
                 <dd className="mt-0.5 font-medium">
-                  Part 1 + Sections 1–21, 24
+                  Part 1 + Sections 1–24
                 </dd>
               </div>
               <div>
@@ -719,6 +727,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               </a>
               <a href="#responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">
                 21. Student Responsibility
+              </a>
+              <a href="#rubric" className="block rounded-md px-2 py-2 hover:bg-muted">
+                22. Rubric
               </a>
               <a href="#policy" className="block rounded-md px-2 py-2 hover:bg-muted">
                 23. Course Policy
@@ -997,6 +1008,84 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                 <PageFooter courseCode={info.courseCode} page={responsibilityPage} />
               </div>
             </Page>
+
+            {rubricPages.map((rubrics, index) => (
+              <Page
+                zoom={zoom}
+                pageNumber={rubricStartPage + index}
+                key={`rubric-${index}`}
+              >
+                <div id="rubric" className="h-full px-[54px] py-[42px]">
+                  <SectionTitle number="22">
+                    Rubric
+                    {rubricPages.length > 1
+                      ? ` (${index + 1} of ${rubricPages.length})`
+                      : ""}
+                  </SectionTitle>
+                  {rubrics.length === 0 ? (
+                    <p className="text-[11px]">
+                      No assessment has a rubric linked from the Rubric
+                      Library.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {rubrics.map((rubric, ri) => (
+                        <div key={ri}>
+                          <p className="text-[11px] font-bold">
+                            {rubric.assessmentName} — {rubric.name} (
+                            {rubric.type})
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-slate-600">
+                            Rating Scale: {rubric.scaleSummary}
+                          </p>
+                          <Table className="mt-1.5">
+                            <colgroup>
+                              <col className="w-[22%]" />
+                              {rubric.levels.map((_level, i) => (
+                                <col
+                                  key={i}
+                                  style={{
+                                    width: `${78 / rubric.levels.length}%`,
+                                  }}
+                                />
+                              ))}
+                            </colgroup>
+                            <thead>
+                              <tr>
+                                <TH>Criteria</TH>
+                                {rubric.levels.map((level, i) => (
+                                  <TH key={i} className="text-center">
+                                    {level.points} – {level.label}
+                                  </TH>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rubric.criteria.map((criterion, ci) => (
+                                <tr key={ci}>
+                                  <TD className="font-semibold">
+                                    {criterion.name}
+                                  </TD>
+                                  {rubric.levels.map((_level, li) => (
+                                    <TD key={li}>
+                                      {criterion.descriptors[li] ?? "—"}
+                                    </TD>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <PageFooter
+                    courseCode={info.courseCode}
+                    page={rubricStartPage + index}
+                  />
+                </div>
+              </Page>
+            ))}
 
             <Page zoom={zoom} pageNumber={policyPage}>
               <div id="policy" className="h-full px-[54px] py-[42px]">
