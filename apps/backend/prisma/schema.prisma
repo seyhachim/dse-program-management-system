@@ -155,6 +155,12 @@ enum QaSarSectionStatus {
   Approved
 }
 
+enum QaSarReviewDecision {
+  Approved
+  ChangesRequested
+  MoreEvidenceRequested
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -186,6 +192,8 @@ model User {
   qaRequirementAssignments QaRequirementAssignment[]  @relation("QaRequirementAssignee")
   qaAssignmentsCreated     QaRequirementAssignment[]  @relation("QaRequirementAssignedBy")
   qaSarSectionsUpdated     QaSarSection[]             @relation("QaSarSectionUpdatedBy")
+  qaSarSubmissions         QaSarSubmission[]          @relation("QaSarSubmittedBy")
+  qaSarReviews             QaSarReview[]              @relation("QaSarReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -230,6 +238,7 @@ model Programme {
   qaAnalysisReviews        QaEvidenceAnalysisReview[]
   qaRequirementAssignments QaRequirementAssignment[]
   qaSarSections            QaSarSection[]
+  qaSarSubmissions         QaSarSubmission[]
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -279,6 +288,7 @@ model QaRequirement {
   analyses         QaEvidenceAnalysis[]
   assignments      QaRequirementAssignment[]
   sarSections      QaSarSection[]
+  sarSubmissions   QaSarSubmission[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
@@ -346,6 +356,7 @@ model QaAssessmentCycle {
   analyses         QaEvidenceAnalysis[]
   assignments      QaRequirementAssignment[]
   sarSections      QaSarSection[]
+  sarSubmissions   QaSarSubmission[]
 
   @@index([programmeId, status])
   @@index([frameworkId])
@@ -397,10 +408,58 @@ model QaSarSection {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
+  submissions QaSarSubmission[]
+
   @@unique([cycleId, requirementId])
   @@index([programmeId, cycleId])
   @@index([status])
   @@index([updatedById])
+}
+
+/// Immutable snapshot of one SAR draft at the moment it is submitted for
+/// review. New submissions append versions rather than overwriting history.
+model QaSarSubmission {
+  id                   String            @id @default(uuid())
+  programmeId          String
+  programme            Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cycleId              String
+  cycle                QaAssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  requirementId        String
+  requirement          QaRequirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  sectionId            String
+  section              QaSarSection      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  version              Int
+  content              Json
+  plainText            String
+  practiceDescribed    Boolean
+  resultsAnalysed      Boolean
+  improvementExplained Boolean
+  evidenceIds          String[]
+  submittedById        String
+  submittedBy          User              @relation("QaSarSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedAt          DateTime          @default(now())
+
+  reviews QaSarReview[]
+
+  @@unique([sectionId, version])
+  @@index([programmeId, cycleId])
+  @@index([requirementId])
+  @@index([submittedById])
+}
+
+/// Append-only human decision tied to one exact immutable SAR submission.
+model QaSarReview {
+  id           String              @id @default(uuid())
+  submissionId String
+  submission   QaSarSubmission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewerId   String
+  reviewer     User                @relation("QaSarReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  decision     QaSarReviewDecision
+  comment      String              @default("")
+  createdAt    DateTime            @default(now())
+
+  @@index([submissionId, createdAt])
+  @@index([reviewerId])
 }
 
 /// Canonical programme evidence item. Applicability to an assessment cycle,
