@@ -13,6 +13,7 @@ import { teachingLearningPlugin } from "../plugins/teaching-learning/index.ts";
 import { assessmentTemplatePlugin } from "../plugins/assessment-template/index.ts";
 import { studentPortalPlugin } from "../plugins/student-portal/index.ts";
 import { qaPlugin } from "../plugins/qa/index.ts";
+import { telegramPlugin } from "../plugins/telegram/index.ts";
 import { communityPlugin } from "../plugins/community/index.ts";
 
 /**
@@ -21,6 +22,9 @@ import { communityPlugin } from "../plugins/community/index.ts";
  * nothing about any plugin's domain — it just iterates the registry.
  */
 export function createApp(): Express {
+  // Register plugins (one line per plugin — this is the only place they're listed).
+  // Cross-plugin dependencies are resolved lazily at request time via the registry,
+  // so registration order is not significant, but we list providers first for clarity.
   registry.register(studentsPlugin);
   registry.register(lecturersPlugin);
   registry.register(coursesPlugin);
@@ -33,6 +37,7 @@ export function createApp(): Express {
   registry.register(assessmentTemplatePlugin);
   registry.register(studentPortalPlugin);
   registry.register(qaPlugin);
+  registry.register(telegramPlugin);
   registry.register(communityPlugin);
 
   const app = express();
@@ -45,8 +50,10 @@ export function createApp(): Express {
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
+  // Runtime introspection: the frontend can read the live manifest list.
   app.get("/api/registry", (_req, res) => res.json(registry.manifests()));
 
+  // Mount every registered plugin's router at /api/{id}.
   for (const plugin of registry.all()) {
     app.use(`/api/${plugin.manifest.id}`, plugin.router);
   }
