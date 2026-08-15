@@ -9,16 +9,25 @@ import { requirePermission, roleHasPermission } from "../../core/permissions/ind
 import { rubricService } from "./service.ts";
 
 /**
- * Rubric Library REST router. Reads need `rubrics:read`, writes `rubrics:write`.
- * Read-only users can only discover and open Active rubrics. Users with write
- * permission can also work with Draft and Archived rubrics.
+ * Rubric Library REST router.
  *
- * On create the owner is taken from `req.user`, never the request body. Bodies
- * and queries are validated with the shared Zod schemas so the wire contract is
- * enforced at runtime.
+ * Public access is intentionally narrow: GET /api/rubrics/public/:id is mounted
+ * before auth and only returns Active rubrics through a stripped public DTO.
+ * Every management/list/detail route below remains authenticated.
  */
 export function createRubricRouter(): Router {
   const router = Router();
+
+  // GET /api/rubrics/public/:id — no login required, Active only.
+  router.get("/public/:id", async (req, res) => {
+    const rubric = await rubricService.getPublicById(req.params.id!);
+    if (!rubric) {
+      res.status(404).json({ error: "Rubric not found" });
+      return;
+    }
+    res.json(rubric);
+  });
+
   router.use(requireAuth);
 
   // GET /api/rubrics?search=&status=
