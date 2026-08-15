@@ -19,7 +19,7 @@ export type AssessmentForm = {
   format: string;
   submissionMethod: string;
   instructions: string;
-  rubric: string;
+  rubricId: string;
   feedbackMethod: string;
   feedbackTimeline: string;
   mappedPlos: string[];
@@ -75,7 +75,7 @@ export function emptyAssessment(): AssessmentForm {
     format: "",
     submissionMethod: "",
     instructions: "",
-    rubric: "",
+    rubricId: "",
     feedbackMethod: "",
     feedbackTimeline: "",
     mappedPlos: [],
@@ -107,7 +107,7 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       format: str(d.format),
       submissionMethod: str(d.submissionMethod),
       instructions: str(d.instructions),
-      rubric: str(d.rubric),
+      rubricId: str(d.rubricId),
       feedbackMethod: str(d.feedbackMethod),
       feedbackTimeline: str(d.feedbackTimeline),
       mappedPlos: strArray(d.mappedPlos),
@@ -165,7 +165,7 @@ export function toAssessmentPayload(
       format: a.format.trim(),
       submissionMethod: a.submissionMethod.trim(),
       instructions: a.instructions.trim(),
-      rubric: a.rubric.trim(),
+      rubricId: a.rubricId === "" ? null : a.rubricId,
       feedbackMethod: a.feedbackMethod.trim(),
       feedbackTimeline: a.feedbackTimeline.trim(),
       mappedPlos: a.mappedPlos,

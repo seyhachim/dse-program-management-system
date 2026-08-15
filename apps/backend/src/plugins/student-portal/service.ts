@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import type {
+  CourseDeliveryOffering,
   CourseFeedbackInput,
+  CourseFeedbackSummary,
   PortalAnnouncement,
   PortalCloAchievement,
   PortalCourseDetail,
@@ -10,7 +12,6 @@ import type {
   SetAssessmentDeadlineInput,
   StudentPortalHome,
 } from "@dse-pms/shared-types";
-import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 
 export class PortalNotFoundError extends Error {}
@@ -32,25 +33,22 @@ const enrollmentInclude = {
       },
       course: {
         include: {
-          specs: {
-            where: { reviewStatus: "Approved" },
-            orderBy: [
-              { versionMajor: "desc" },
-              { versionMinor: "desc" },
-            ],
-            take: 1,
+          spec: {
             include: {
-              clos: { orderBy: { order: "asc" } },
-              weeks: { orderBy: { order: "asc" } },
-              assessmentItems: { orderBy: { order: "asc" } },
-              resources: { orderBy: { order: "asc" } },
+              clos: { orderBy: { order: "asc" as const } },
+              weeks: { orderBy: { order: "asc" as const } },
+              assessmentItems: {
+                orderBy: { order: "asc" as const },
+                include: { rubric: { select: { name: true } } },
+              },
+              resources: { orderBy: { order: "asc" as const } },
             },
           },
         },
       },
     },
   },
-} satisfies Prisma.EnrollmentInclude;
+} as const;
 
 type EnrollmentRow = Awaited<ReturnType<typeof enrolledRows>>[number];
 
@@ -121,8 +119,72 @@ export function calculateCloAchievements(
     });
 }
 
+const FEEDBACK_MINIMUM_RESPONSES = 3;
+
+type FeedbackSummaryRow = {
+  overallRating: number;
+  teachingClarityRating: number;
+  assessmentClarityRating: number;
+  workload: string;
+  positiveComment: string;
+  improvementComment: string;
+};
+
+export function summarizeAnonymousFeedback(
+  rows: FeedbackSummaryRow[],
+  minimumResponses = FEEDBACK_MINIMUM_RESPONSES,
+): CourseFeedbackSummary {
+  const workload = { light: 0, appropriate: 0, heavy: 0 };
+  for (const row of rows) {
+    if (row.workload === "light" || row.workload === "appropriate" || row.workload === "heavy") {
+      workload[row.workload] += 1;
+    }
+  }
+
+  const available = rows.length >= minimumResponses;
+  if (!available) {
+    return {
+      responseCount: rows.length,
+      minimumResponses,
+      available: false,
+      averages: null,
+      workload: { light: 0, appropriate: 0, heavy: 0 },
+      positiveComments: [],
+      improvementComments: [],
+    };
+  }
+
+  const average = (values: number[]) =>
+    Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+  return {
+    responseCount: rows.length,
+    minimumResponses,
+    available: true,
+    averages: {
+      overall: average(rows.map((row) => row.overallRating)),
+      teachingClarity: average(rows.map((row) => row.teachingClarityRating)),
+      assessmentClarity: average(rows.map((row) => row.assessmentClarityRating)),
+    },
+    workload,
+    positiveComments: rows.map((row) => row.positiveComment.trim()).filter(Boolean),
+    improvementComments: rows.map((row) => row.improvementComment.trim()).filter(Boolean),
+  };
+}
+
+export function deliveryOfferingScope(userId: string, programmeWide: boolean) {
+  return programmeWide
+    ? {}
+    : {
+        OR: [
+          { lecturerId: userId },
+          { coLecturers: { some: { lecturerId: userId } } },
+        ],
+      };
+}
+
 function approvedSpec(row: EnrollmentRow) {
-  return row.offering.course.specs[0] ?? null;
+  const spec = row.offering.course.spec;
+  return spec?.reviewStatus === "Approved" ? spec : null;
 }
 
 function toSummary(row: EnrollmentRow): PortalCourseSummary {
@@ -218,7 +280,7 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           format: item.format,
           submissionMethod: item.submissionMethod,
           instructions: item.instructions,
-          rubric: item.rubric,
+          rubricName: item.rubric?.name ?? "",
           result: result && result.publishedAt
             ? {
                 assessmentItemId: item.id,
@@ -271,12 +333,7 @@ async function assertOfferingEditor(offeringId: string, userId: string, programm
       coLecturers: true,
       course: {
         select: {
-          specs: {
-            where: { reviewStatus: "Approved" },
-            orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-            take: 1,
-            select: { id: true },
-          },
+          spec: { select: { id: true, assessmentItems: { select: { id: true } } } },
         },
       },
     },
@@ -288,6 +345,87 @@ async function assertOfferingEditor(offeringId: string, userId: string, programm
 }
 
 export const studentPortalService = {
+  async deliveryOfferings(userId: string, programmeWide: boolean): Promise<CourseDeliveryOffering[]> {
+    const offerings = await prisma.offering.findMany({
+      where: deliveryOfferingScope(userId, programmeWide),
+      include: {
+        course: {
+          include: {
+            spec: {
+              include: { assessmentItems: { orderBy: { order: "asc" } } },
+            },
+          },
+        },
+        enrollments: {
+          include: {
+            student: { select: { id: true, studentId: true, name: true } },
+            results: true,
+          },
+          orderBy: { student: { name: "asc" } },
+        },
+        assessmentDeadlines: true,
+        announcements: {
+          include: { author: { select: { name: true } } },
+          orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
+        },
+        feedbackResponses: { orderBy: { createdAt: "asc" } },
+      },
+      orderBy: [{ term: "desc" }, { course: { code: "asc" } }, { sectionCode: "asc" }],
+    });
+
+    return offerings.map((offering) => {
+      const spec = offering.course.spec;
+      const deadlines = new Map(
+        offering.assessmentDeadlines.map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+      );
+      return {
+        offeringId: offering.id,
+        courseId: offering.courseId,
+        code: offering.course.code,
+        title: offering.course.title,
+        term: offering.term,
+        sectionCode: offering.sectionCode,
+        status: offering.status,
+        specificationStatus: spec?.reviewStatus ?? null,
+        studentCount: offering.enrollments.length,
+        assessments: (spec?.assessmentItems ?? [])
+          .filter((assessment) => assessment.status === "Active")
+          .map((assessment) => ({
+            id: assessment.id,
+            name: assessment.name,
+            type: assessment.type,
+            weight: assessment.weight,
+            dueWeek: assessment.dueWeek,
+            dueAt: deadlines.get(assessment.id)?.toISOString() ?? null,
+            results: offering.enrollments.map((enrollment) => {
+              const result = enrollment.results.find(
+                (item) => item.courseSpecId === spec?.id && item.assessmentItemId === assessment.id,
+              );
+              return {
+                enrollmentId: enrollment.id,
+                studentId: enrollment.student.id,
+                studentCode: enrollment.student.studentId,
+                studentName: enrollment.student.name,
+                score: result?.score ?? null,
+                maxScore: result?.maxScore ?? null,
+                feedback: result?.feedback ?? "",
+                publishedAt: result?.publishedAt?.toISOString() ?? null,
+              };
+            }),
+          })),
+        announcements: offering.announcements.map((announcement) => ({
+          id: announcement.id,
+          title: announcement.title,
+          body: announcement.body,
+          pinned: announcement.pinned,
+          authorName: announcement.author.name,
+          publishedAt: announcement.publishedAt?.toISOString() ?? null,
+        })),
+        feedback: summarizeAnonymousFeedback(offering.feedbackResponses),
+      };
+    });
+  },
+
   async courses(userId: string): Promise<PortalCourseSummary[]> {
     return (await enrolledRows(userId)).map(toSummary);
   },
@@ -364,26 +502,11 @@ export const studentPortalService = {
   async publishResult(authorId: string, programmeWide: boolean, input: PublishAssessmentResultInput) {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: input.enrollmentId },
-      include: {
-        offering: {
-          include: {
-            course: {
-              include: {
-                specs: {
-                  where: { reviewStatus: "Approved" },
-                  orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-                  take: 1,
-                  include: { assessmentItems: true },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: { offering: { include: { course: { include: { spec: { include: { assessmentItems: true } } } } } } },
     });
     if (!enrollment) throw new PortalNotFoundError("Enrollment not found");
     await assertOfferingEditor(enrollment.offeringId, authorId, programmeWide);
-    const spec = enrollment.offering.course.specs[0];
+    const spec = enrollment.offering.course.spec;
     if (!spec || !spec.assessmentItems.some((item) => item.id === input.assessmentItemId)) {
       throw new PortalNotFoundError("Assessment not found");
     }
@@ -410,19 +533,23 @@ export const studentPortalService = {
 
   async setDeadline(authorId: string, programmeWide: boolean, input: SetAssessmentDeadlineInput) {
     const offering = await assertOfferingEditor(input.offeringId, authorId, programmeWide);
-    if (!offering.course.specs[0]?.id) throw new PortalNotFoundError("Course specification not found");
+    const spec = offering.course.spec;
+    if (!spec?.id) throw new PortalNotFoundError("Course specification not found");
+    if (!spec.assessmentItems.some((assessment) => assessment.id === input.assessmentItemId)) {
+      throw new PortalNotFoundError("Assessment not found");
+    }
     return prisma.offeringAssessmentDeadline.upsert({
       where: {
         offeringId_courseSpecId_assessmentItemId: {
           offeringId: input.offeringId,
-          courseSpecId: offering.course.specs[0]!.id,
+          courseSpecId: spec.id,
           assessmentItemId: input.assessmentItemId,
         },
       },
       update: { dueAt: new Date(input.dueAt) },
       create: {
         offeringId: input.offeringId,
-        courseSpecId: offering.course.specs[0]!.id,
+        courseSpecId: spec.id,
         assessmentItemId: input.assessmentItemId,
         dueAt: new Date(input.dueAt),
       },

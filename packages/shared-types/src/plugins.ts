@@ -85,19 +85,10 @@ export const coursesManifest: PluginManifest = {
   name: "Courses",
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
-  // Two route entries at the same path, split by role (issue #104): a lecturer
-  // gets a teaching-focused "My Courses" label/page, everyone else keeps the
-  // curriculum-management label. Safe to split like this because the role sets
-  // are disjoint in practice — a caller holding both would see both sidebar
-  // entries, an accepted edge case (no seeded user holds both today).
+  // Programme-wide roles keep the curriculum-management course entry. The
+  // lecturer-facing /courses entry lives in lecturerWorkspaceManifest so its
+  // label and grouping can follow the lecturer-specific information architecture.
   routes: [
-    {
-      label: "My Courses",
-      path: "/courses",
-      icon: "book",
-      roles: ["lecturer"],
-      group: "Academic",
-    },
     {
       label: "Course Management",
       path: "/courses",
@@ -118,18 +109,25 @@ export const coursesManifest: PluginManifest = {
   permissions: ["courses:read", "courses:write", "courses:manage", "courses:review"],
 };
 
-/** Lecturer-focused cross-course workspace navigation (issue #158). */
+/** Lecturer-focused cross-course workspace navigation. */
 export const lecturerWorkspaceManifest: PluginManifest = {
   id: "lecturer-workspace",
   name: "Lecturer Workspace",
-  version: "0.1.0",
+  version: "0.2.0",
   description:
-    "Cross-course lecturer workspace for tasks, teaching schedule, and reusable guidance.",
+    "Lecturer navigation organized around teaching, curriculum, delivery, and personal work.",
   routes: [
     {
-      label: "My Tasks",
-      path: "/my-tasks",
-      icon: "check-square",
+      label: "Overview",
+      path: "/lecturer-overview",
+      icon: "dashboard",
+      roles: ["lecturer"],
+      group: "Teaching",
+    },
+    {
+      label: "Course Delivery",
+      path: "/course-delivery",
+      icon: "megaphone",
       roles: ["lecturer"],
       group: "Academic",
     },
@@ -138,14 +136,49 @@ export const lecturerWorkspaceManifest: PluginManifest = {
       path: "/teaching-schedule",
       icon: "calendar",
       roles: ["lecturer"],
-      group: "Academic",
+      group: "Teaching",
     },
     {
-      label: "Templates & Guides",
-      path: "/templates-guides",
-      icon: "library",
+      label: "Course Specifications",
+      path: "/courses",
+      icon: "book",
       roles: ["lecturer"],
-      group: "Resources",
+      group: "Curriculum",
+    },
+    {
+      label: "Attendance",
+      path: "/attendance",
+      icon: "check-square",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Assessments / Results",
+      path: "/assessments-results",
+      icon: "file-check",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Announcements",
+      path: "/announcements",
+      icon: "bell",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Feedback",
+      path: "/feedback",
+      icon: "chart",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Account Settings",
+      path: "/account-settings",
+      icon: "settings",
+      roles: ["lecturer"],
+      group: "Personal",
     },
   ],
 };
@@ -250,19 +283,39 @@ export const programmeManifest: PluginManifest = {
 export const qaManifest: PluginManifest = {
   id: "qa",
   name: "Quality Assurance",
-  version: "0.1.0",
+  version: "0.2.0",
   description:
-    "Programme-scoped AUN-QA evidence, self-assessment, review, and readiness workflow.",
+    "Programme-scoped AUN-QA evidence, contributor work, self-assessment, review, and readiness workflow.",
   routes: [
     {
-      label: "QA Dashboard",
-      path: "/qa-dashboard",
+      label: "AUN-QA Workspace",
+      path: "/aun-qa",
       icon: "shield-check",
+      roles: ["admin", "program_coordinator", "qa_contributor"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Evidence Library",
+      path: "/aun-qa/evidence",
+      icon: "library",
+      roles: ["admin", "program_coordinator", "qa_contributor", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "QA Evidence Analysis",
+      path: "/qa-dashboard",
+      icon: "file-check",
       roles: ["admin", "program_coordinator", "qa_reviewer"],
       group: "Quality Assurance",
     },
   ],
-  permissions: ["qa:read", "qa:write"],
+  permissions: [
+    "qa:read",
+    "qa:write",
+    "qa:contribute",
+    "qa:review",
+    "qa:manage",
+  ],
 };
 
 /**

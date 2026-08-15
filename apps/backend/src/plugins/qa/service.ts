@@ -14,6 +14,7 @@ import {
   type UpsertQaSelfAssessmentInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { createAndMapQaEvidence, listMappedQaEvidenceForCycle } from "./evidence/library.ts";
 
 const cycleStatus = {
   Draft: "draft",
@@ -222,11 +223,7 @@ export const qaService = {
 
     const [evidenceRows, assessmentRows] = selected
       ? await Promise.all([
-          prisma.qaEvidence.findMany({
-            where: { programmeId, cycleId: selected.id },
-            orderBy: { createdAt: "desc" },
-            include: { requirement: { select: { code: true } } },
-          }),
+          listMappedQaEvidenceForCycle(programmeId, selected.id),
           prisma.qaRequirementAssessment.findMany({
             where: { programmeId, cycleId: selected.id },
             orderBy: { requirement: { code: "asc" } },
@@ -238,11 +235,11 @@ export const qaService = {
         ])
       : [[], []];
 
-    const evidenceCodes = new Set(evidenceRows.map((row) => row.requirement.code));
+    const evidenceCodes = new Set(evidenceRows.map((row) => row.requirementCode));
     const reviewedCodes = new Set(
       evidenceRows
-        .filter((row) => row.status === "Reviewed")
-        .map((row) => row.requirement.code),
+        .filter((row) => row.status === "reviewed")
+        .map((row) => row.requirementCode),
     );
     const ratedCodes = new Set(
       assessmentRows
@@ -293,7 +290,7 @@ export const qaService = {
         rated: ratedCodes.size,
         reviewedEvidence: reviewedCodes.size,
       },
-      evidence: evidenceRows.map(toEvidenceView),
+      evidence: evidenceRows,
       selfAssessments,
     };
   },
@@ -326,43 +323,7 @@ export const qaService = {
     input: CreateQaEvidenceInput,
     userId: string,
   ): Promise<QaEvidenceView> {
-    const [cycle, requirement] = await Promise.all([
-      prisma.qaAssessmentCycle.findUnique({
-        where: { id: cycleId },
-        select: { programmeId: true, frameworkId: true },
-      }),
-      prisma.qaRequirement.findFirst({
-        where: {
-          code: input.requirementCode,
-          criterion: { frameworkId: AUN_QA_V4_ID },
-        },
-        select: { id: true },
-      }),
-    ]);
-    if (!cycle || !requirement) {
-      throw new QaResourceNotFoundError("QA cycle or requirement not found");
-    }
-    if (cycle.programmeId !== input.programmeId || cycle.frameworkId !== AUN_QA_V4_ID) {
-      throw new QaScopeMismatchError("Evidence does not belong to this programme cycle");
-    }
-
-    const created = await prisma.qaEvidence.create({
-      data: {
-        programmeId: input.programmeId,
-        cycleId,
-        requirementId: requirement.id,
-        title: input.title,
-        description: input.description,
-        kind: toDbEvidenceKind[input.kind],
-        sourceUrl: input.sourceUrl || null,
-        sourceRef: input.sourceRef,
-        reportingPeriod: input.reportingPeriod,
-        status: toDbEvidenceStatus[input.status],
-        createdById: userId,
-      },
-      include: { requirement: { select: { code: true } } },
-    });
-    return toEvidenceView(created);
+    return createAndMapQaEvidence(cycleId, input, userId);
   },
 
   async upsertSelfAssessment(

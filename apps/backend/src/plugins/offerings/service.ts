@@ -1,5 +1,6 @@
 import {
   coLecturerViolation,
+  teachingPeriodViolation,
   type CoursesServiceContract,
   type CourseWeeklyContactHoursRef,
   type CreateOfferingInput,
@@ -56,6 +57,14 @@ function meetingDurationHours(startTime: string, endTime: string): number {
   return ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60;
 }
 
+function dateOnly(value: Date | null): string | null {
+  return value ? value.toISOString().slice(0, 10) : null;
+}
+
+function toDate(value: string | null | undefined): Date | null {
+  return value ? new Date(`${value}T00:00:00.000Z`) : null;
+}
+
 /**
  * Assemble an enriched OfferingView by joining across plugins via the registry.
  * `lecturerById` is looked up once by the caller (not per offering row) so that
@@ -72,6 +81,8 @@ async function toView(
     status: OfferingView["status"];
     semester: OfferingView["semester"];
     programmeYear: number | null;
+    startDate: Date | null;
+    endDate: Date | null;
     otherLecturers: string | null;
     createdAt: Date;
     enrollments: { studentId: string }[];
@@ -104,6 +115,8 @@ async function toView(
     capacity: offering.capacity,
     semester: offering.semester,
     programmeYear: offering.programmeYear,
+    startDate: dateOnly(offering.startDate),
+    endDate: dateOnly(offering.endDate),
     otherLecturers: offering.otherLecturers,
     meetings: offering.meetings.map((meeting) => ({
       ...meeting,
@@ -180,6 +193,8 @@ export const offeringService = {
         status: offeringInput.status,
         semester: offeringInput.semester ?? null,
         programmeYear: offeringInput.programmeYear ?? null,
+        startDate: toDate(offeringInput.startDate),
+        endDate: toDate(offeringInput.endDate),
         otherLecturers: offeringInput.otherLecturers ?? null,
         coLecturers: coLecturerIds?.length
           ? { create: coLecturerIds.map((lecturerId) => ({ lecturerId })) }
@@ -204,9 +219,8 @@ export const offeringService = {
       throw new ReferenceError("Assigned lecturer does not exist");
     }
 
-    // Zod's superRefine only sees the fields in *this* request, so a PATCH that
-    // changes only lecturerId (or only coLecturerIds) needs the invariant
-    // re-checked against the merged final state.
+    // Zod's superRefine only sees the fields in *this* request, so PATCHes need
+    // co-lecturer and teaching-period invariants re-checked against final state.
     const existing = await prisma.offering.findUnique({
       where: { id },
       include: { coLecturers: { select: { lecturerId: true } } },
@@ -218,6 +232,22 @@ export const offeringService = {
     if (coLecturerViolation({ lecturerId: nextLecturerId, coLecturerIds: nextCoLecturerIds })) {
       throw new ReferenceError("The primary lecturer cannot also be a co-lecturer");
     }
+
+    const nextStartDate =
+      offeringInput.startDate !== undefined ? offeringInput.startDate : dateOnly(existing.startDate);
+    const nextEndDate =
+      offeringInput.endDate !== undefined ? offeringInput.endDate : dateOnly(existing.endDate);
+    const periodViolation = teachingPeriodViolation({
+      startDate: nextStartDate,
+      endDate: nextEndDate,
+    });
+    if (periodViolation === "missingStart" || periodViolation === "missingEnd") {
+      throw new ReferenceError("Teaching start and end dates must be set together");
+    }
+    if (periodViolation === "endBeforeStart") {
+      throw new ReferenceError("Teaching end date must be on or after start date");
+    }
+
     if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
 
     const offering = await prisma.$transaction(async (tx) => {
@@ -255,6 +285,8 @@ export const offeringService = {
           ...(offeringInput.programmeYear !== undefined
             ? { programmeYear: offeringInput.programmeYear }
             : {}),
+          ...(offeringInput.startDate !== undefined ? { startDate: toDate(offeringInput.startDate) } : {}),
+          ...(offeringInput.endDate !== undefined ? { endDate: toDate(offeringInput.endDate) } : {}),
           ...(offeringInput.otherLecturers !== undefined
             ? { otherLecturers: offeringInput.otherLecturers }
             : {}),

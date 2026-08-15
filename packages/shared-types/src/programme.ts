@@ -21,11 +21,26 @@ export const ProgramLearningOutcomeSchema = z.object({
   description: z.string(),
   order: z.number().int(),
   active: z.boolean(),
+  // Cover page taxonomy classification (issue #124) — free text, nullable
+  // since existing PLOs predate this classification.
+  major: z.string().nullable(),
+  learningDomain: z.string().nullable(),
+  specificOrGeneric: z.string().nullable(),
+  cap: z.string().nullable(),
 });
 
 export type ProgramLearningOutcome = z.infer<
   typeof ProgramLearningOutcomeSchema
 >;
+
+/** Payload for `PUT /api/programme/plos/:code` — taxonomy fields only. */
+export const UpdatePloTaxonomySchema = z.object({
+  major: z.string().nullable(),
+  learningDomain: z.string().nullable(),
+  specificOrGeneric: z.string().nullable(),
+  cap: z.string().nullable(),
+});
+export type UpdatePloTaxonomyInput = z.infer<typeof UpdatePloTaxonomySchema>;
 
 /**
  * A programme-level graduate competency.

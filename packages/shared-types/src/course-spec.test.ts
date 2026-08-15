@@ -477,6 +477,7 @@ test("COMPLETABLE_SPEC_SECTIONS is the save-able sections, in SPEC_SECTIONS orde
     "references",
     "responsibility",
     "policy",
+    "date",
   ]);
 });
 
