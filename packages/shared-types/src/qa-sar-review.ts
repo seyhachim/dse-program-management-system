@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { QaSarDocument } from "./qa-sar.ts";
+import type { QaSarDocument, QaSarSectionStatus } from "./qa-sar.ts";
 
 export const QaSarReviewDecisionSchema = z.enum([
   "approved",
@@ -65,4 +65,11 @@ export interface QaSarReviewQueueView {
   programmeId: string;
   cycleId: string | null;
   submissions: QaSarSubmissionView[];
+}
+
+export interface QaSarProgressItemView {
+  requirementCode: string;
+  status: QaSarSectionStatus;
+  latestSubmissionVersion: number | null;
+  latestReviewDecision: QaSarReviewDecision | null;
 }
