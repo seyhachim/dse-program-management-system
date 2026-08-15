@@ -36,6 +36,7 @@ test("Lecturer gets the focused workspace routes in the intended sidebar cluster
   const paths = lecturerRoutes.map((r) => r.path);
 
   expect(paths).toContain("/lecturer-overview");
+  expect(paths).toContain("/course-delivery");
   expect(paths).toContain("/teaching-schedule");
   expect(paths).toContain("/courses");
   expect(paths).toContain("/attendance");
@@ -45,6 +46,7 @@ test("Lecturer gets the focused workspace routes in the intended sidebar cluster
   expect(paths).toContain("/account-settings");
 
   expect(lecturerRoutes.find((r) => r.path === "/lecturer-overview")?.group).toBe("Teaching");
+  expect(lecturerRoutes.find((r) => r.path === "/course-delivery")?.group).toBe("Academic");
   expect(lecturerRoutes.find((r) => r.path === "/teaching-schedule")?.group).toBe("Teaching");
   expect(lecturerRoutes.find((r) => r.path === "/courses")?.group).toBe("Curriculum");
   expect(lecturerRoutes.find((r) => r.path === "/attendance")?.group).toBe("Delivery");
@@ -56,7 +58,7 @@ test("Lecturer gets the focused workspace routes in the intended sidebar cluster
   const groups = navGroupsForRole(pluginManifests, ["lecturer"])
     .filter((group) => group.label !== "footer")
     .map((group) => group.label);
-  expect(groups).toEqual(["Teaching", "Curriculum", "Delivery", "Personal"]);
+  expect(groups).toEqual(["Teaching", "Academic", "Curriculum", "Delivery", "Personal"]);
 
   const coursesRoute = lecturerRoutes.find((r) => r.path === "/courses");
   expect(coursesRoute?.label).toBe("Course Specifications");
@@ -67,6 +69,7 @@ test("Lecturer gets the focused workspace routes in the intended sidebar cluster
   for (const role of ["admin", "program_coordinator", "program_secretary", "qa_reviewer", "student"] as const) {
     const rolePaths = navForRole(pluginManifests, [role]).map((r) => r.path);
     expect(rolePaths).not.toContain("/lecturer-overview");
+    expect(rolePaths).not.toContain("/course-delivery");
     expect(rolePaths).not.toContain("/teaching-schedule");
     expect(rolePaths).not.toContain("/attendance");
     expect(rolePaths).not.toContain("/assessments-results");
