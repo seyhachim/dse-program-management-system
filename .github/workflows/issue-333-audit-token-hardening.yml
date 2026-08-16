@@ -1,0 +1,129 @@
+name: Issue 333 audit token hardening
+
+on:
+  push:
+    branches:
+      - agent/issue-333-finalized-result-corrections
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-333-finalized-result-corrections
+      - name: Require exact audit row for finalized value mutations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          service = Path('apps/backend/src/plugins/student-portal/results-lifecycle.ts')
+          text = service.read_text()
+          old = '''      const updated = await tx.assessmentResult.update({
+          where: { id: result.id },
+          data: { score: input.score, maxScore: input.maxScore, feedback: input.feedback },
+        });
+          '''
+          new = '''      await tx.$executeRaw`SELECT set_config('dse.result_correction_id', ${correction.id}, true)`;
+          const updated = await tx.assessmentResult.update({
+          where: { id: result.id },
+          data: { score: input.score, maxScore: input.maxScore, feedback: input.feedback },
+        });
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one correction update marker')
+          service.write_text(text.replace(old, new, 1))
+
+          migration = Path('apps/backend/prisma/migrations/20260817003500_add_finalized_result_corrections/migration.sql')
+          text = migration.read_text()
+          old = '''  IF OLD."finalizedAt" IS NOT NULL THEN
+            IF NEW."enrollmentId" IS DISTINCT FROM OLD."enrollmentId"
+              OR NEW."courseSpecId" IS DISTINCT FROM OLD."courseSpecId"
+              OR NEW."assessmentItemId" IS DISTINCT FROM OLD."assessmentItemId"
+              OR NEW."publishedAt" IS DISTINCT FROM OLD."publishedAt"
+              OR NEW."publishedById" IS DISTINCT FROM OLD."publishedById"
+              OR NEW."finalizedAt" IS DISTINCT FROM OLD."finalizedAt"
+              OR NEW."finalizedById" IS DISTINCT FROM OLD."finalizedById"
+            THEN
+              RAISE EXCEPTION 'Finalized result identity and publication/finalization provenance are immutable';
+            END IF;
+          END IF;
+          '''
+          new = '''  IF OLD."finalizedAt" IS NOT NULL THEN
+            IF NEW."enrollmentId" IS DISTINCT FROM OLD."enrollmentId"
+              OR NEW."courseSpecId" IS DISTINCT FROM OLD."courseSpecId"
+              OR NEW."assessmentItemId" IS DISTINCT FROM OLD."assessmentItemId"
+              OR NEW."publishedAt" IS DISTINCT FROM OLD."publishedAt"
+              OR NEW."publishedById" IS DISTINCT FROM OLD."publishedById"
+              OR NEW."finalizedAt" IS DISTINCT FROM OLD."finalizedAt"
+              OR NEW."finalizedById" IS DISTINCT FROM OLD."finalizedById"
+            THEN
+              RAISE EXCEPTION 'Finalized result identity and publication/finalization provenance are immutable';
+            END IF;
+
+            IF NEW."score" IS DISTINCT FROM OLD."score"
+              OR NEW."maxScore" IS DISTINCT FROM OLD."maxScore"
+              OR NEW."feedback" IS DISTINCT FROM OLD."feedback"
+            THEN
+              IF NOT EXISTS (
+                SELECT 1
+                FROM "AssessmentResultCorrection" c
+                WHERE c."id" = NULLIF(current_setting('dse.result_correction_id', true), '')
+                  AND c."assessmentResultId" = OLD."id"
+                  AND c."beforeScore" IS NOT DISTINCT FROM OLD."score"
+                  AND c."beforeMaxScore" IS NOT DISTINCT FROM OLD."maxScore"
+                  AND c."beforeFeedback" IS NOT DISTINCT FROM OLD."feedback"
+                  AND c."afterScore" IS NOT DISTINCT FROM NEW."score"
+                  AND c."afterMaxScore" IS NOT DISTINCT FROM NEW."maxScore"
+                  AND c."afterFeedback" IS NOT DISTINCT FROM NEW."feedback"
+              ) THEN
+                RAISE EXCEPTION 'Finalized result values require a matching append-only correction record';
+              END IF;
+            END IF;
+          END IF;
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one finalized result trigger marker')
+          migration.write_text(text.replace(old, new, 1))
+
+          test = Path('apps/backend/src/plugins/student-portal/results-lifecycle-db.test.ts')
+          text = test.read_text()
+          old = '''    await expectDatabaseRejection(() =>
+            prisma.assessmentResult.update({
+              where: { id: finalized.id },
+              data: { score: 101 },
+            }),
+          );
+          '''
+          new = '''    await expectDatabaseRejection(() =>
+            prisma.assessmentResult.update({
+              where: { id: finalized.id },
+              data: { score: 81 },
+            }),
+          );
+          await expectDatabaseRejection(() =>
+            prisma.assessmentResult.update({
+              where: { id: finalized.id },
+              data: { score: 101 },
+            }),
+          );
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one direct finalized update test marker')
+          test.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit hardening and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/issue-333-audit-token-hardening.yml
+          git add apps/backend/prisma/migrations/20260817003500_add_finalized_result_corrections/migration.sql \
+                  apps/backend/src/plugins/student-portal/results-lifecycle.ts \
+                  apps/backend/src/plugins/student-portal/results-lifecycle-db.test.ts
+          git diff --cached --check
+          git commit -m "fix(results): enforce audited finalized value changes"
+          git push origin HEAD:agent/issue-333-finalized-result-corrections
