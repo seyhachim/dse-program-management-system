@@ -61,8 +61,6 @@ const EXPECTED_PUBLIC_TABLES = [
   "QaRequirementAssignment",
   "QaEvidence",
   "QaEvidenceMapping",
-  "QaEvidenceSnapshot",
-  "QaEvidenceExternalReference",
   "QaRequirementAssessment",
   "QaEvidenceAnalysis",
   "QaEvidenceAnalysisSource",
@@ -97,6 +95,11 @@ const EXPECTED_TELEGRAM_SECURITY_TABLES = [
   "TelegramAuditEvent",
   "TelegramNotificationPreference",
   "TelegramNotificationDelivery",
+] as const;
+
+const EXPECTED_QA_SECURITY_TABLES = [
+  "QaEvidenceSnapshot",
+  "QaEvidenceExternalReference",
 ] as const;
 
 const FORBIDDEN_GRANTEES = new Set([
@@ -172,10 +175,11 @@ async function tablesForSchema(schemaName: string): Promise<TableRow[]> {
 async function main(): Promise<void> {
   const errors: string[] = [];
 
-  const [publicTables, attendanceTables, telegramSecurityTables] = await Promise.all([
+  const [publicTables, attendanceTables, telegramSecurityTables, qaSecurityTables] = await Promise.all([
     tablesForSchema("public"),
     tablesForSchema("pms_attendance"),
     tablesForSchema("telegram_security"),
+    tablesForSchema("qa_security"),
   ]);
 
   errors.push(
@@ -199,11 +203,19 @@ async function main(): Promise<void> {
       telegramSecurityTables.map((table) => table.table_name),
     ),
   );
+  errors.push(
+    ...compareInventory(
+      "qa_security schema",
+      EXPECTED_QA_SECURITY_TABLES,
+      qaSecurityTables.map((table) => table.table_name),
+    ),
+  );
 
   for (const table of [
     ...publicTables,
     ...attendanceTables,
     ...telegramSecurityTables,
+    ...qaSecurityTables,
   ]) {
     if (!table.rls_enabled) {
       errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
@@ -222,7 +234,7 @@ async function main(): Promise<void> {
       COALESCE(c.relacl, acldefault('r', c.relowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security')
       AND c.relkind IN ('r', 'p')
       AND c.relname <> '_prisma_migrations'
       AND (
@@ -251,7 +263,7 @@ async function main(): Promise<void> {
       COALESCE(n.nspacl, acldefault('n', n.nspowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('pms_attendance', 'telegram_security')
+    WHERE n.nspname IN ('pms_attendance', 'telegram_security', 'qa_security')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
@@ -282,7 +294,7 @@ async function main(): Promise<void> {
     JOIN pg_namespace n ON n.oid = d.defaclnamespace
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
@@ -308,7 +320,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, and ${telegramSecurityTables.length} Telegram security tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, and ${qaSecurityTables.length} QA security tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 
