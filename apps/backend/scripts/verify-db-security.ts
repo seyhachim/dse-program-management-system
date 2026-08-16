@@ -61,6 +61,8 @@ const EXPECTED_PUBLIC_TABLES = [
   "QaRequirementAssignment",
   "QaEvidence",
   "QaEvidenceMapping",
+  "QaEvidenceSnapshot",
+  "QaEvidenceExternalReference",
   "QaRequirementAssessment",
   "QaEvidenceAnalysis",
   "QaEvidenceAnalysisSource",
