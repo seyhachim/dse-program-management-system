@@ -244,7 +244,7 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
   const draftCount = assessment?.results.filter((row) => row.score !== null && !row.publishedAt).length ?? 0;
   const missingCount = assessment?.results.filter((row) => row.score === null).length ?? 0;
   const allPublished = Boolean(assessment?.results.length) && publishedCount === assessment?.results.length;
-  const readyToPublish = Boolean(assessment?.results.length) && missingCount === 0 && publishedCount === 0;
+  const readyToPublish = Boolean(assessment?.results.length) && missingCount === 0 && !allPublished;
 
   const publishAssessment = async () => {
     if (!assessment || !readyToPublish) return;
@@ -289,6 +289,7 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
           </div>
         ) : null}
         {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
+        {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
       {assessment ? (
