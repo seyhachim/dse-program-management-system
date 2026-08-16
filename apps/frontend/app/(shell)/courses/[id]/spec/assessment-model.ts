@@ -26,6 +26,7 @@ export type AssessmentForm = {
   submissionMethod: string;
   instructions: string;
   rubricId: string;
+  criterionCloMappings: Array<{ criterionId: string; cloCodes: string[] }>;
   feedbackMethod: string;
   feedbackTimeline: string;
   mappedPlos: string[];
@@ -83,6 +84,7 @@ export function emptyAssessment(): AssessmentForm {
     submissionMethod: "",
     instructions: "",
     rubricId: "",
+    criterionCloMappings: [],
     feedbackMethod: "",
     feedbackTimeline: "",
     mappedPlos: [],
@@ -117,6 +119,12 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       submissionMethod: str(d.submissionMethod),
       instructions: str(d.instructions),
       rubricId: str(d.rubricId),
+      criterionCloMappings: Array.isArray(d.criterionCloMappings)
+        ? (d.criterionCloMappings as Array<Record<string, unknown>>).map((mapping) => ({
+            criterionId: str(mapping.criterionId),
+            cloCodes: strArray(mapping.cloCodes),
+          })).filter((mapping) => mapping.criterionId !== "")
+        : [],
       feedbackMethod: str(d.feedbackMethod),
       feedbackTimeline: str(d.feedbackTimeline),
       mappedPlos: strArray(d.mappedPlos),
@@ -176,6 +184,7 @@ export function toAssessmentPayload(
       submissionMethod: a.submissionMethod.trim(),
       instructions: a.instructions.trim(),
       rubricId: a.rubricId === "" ? null : a.rubricId,
+      criterionCloMappings: a.criterionCloMappings,
       feedbackMethod: a.feedbackMethod.trim(),
       feedbackTimeline: a.feedbackTimeline.trim(),
       mappedPlos: a.mappedPlos,

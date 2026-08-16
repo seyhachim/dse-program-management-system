@@ -17,6 +17,19 @@ export interface PortalMeeting {
   activityType: MeetingActivityType;
 }
 
+export interface PortalCriterionEvidence {
+  assessmentItemId: string;
+  rubricId: string;
+  criterionId: string;
+  criterionName: string;
+  score: number;
+  maxScore: number;
+  rawPercentage: number;
+  rubricLevelLabel: string | null;
+  rubricContentHash: string;
+  cloCodes: string[];
+}
+
 export interface PortalAssessmentResult {
   assessmentItemId: string;
   score: number;
@@ -25,6 +38,7 @@ export interface PortalAssessmentResult {
   weightedCourseContribution: number | null;
   feedback: string;
   publishedAt: string;
+  criterionEvidence: PortalCriterionEvidence[];
 }
 
 export type CloAchievementStatus =
@@ -43,6 +57,13 @@ export interface PortalCloAchievement {
     assessmentItemId: string;
     assessmentName: string;
     rawPercentage: number;
+    source: "assessment" | "criterion";
+    rubricId?: string;
+    criterionId?: string;
+    criterionName?: string;
+    score?: number;
+    maxScore?: number;
+    rubricContentHash?: string;
   }>;
 }
 
@@ -177,6 +198,18 @@ export const SaveAssessmentResultInput = z.object({
 });
 export type SaveAssessmentResultInput = z.infer<typeof SaveAssessmentResultInput>;
 
+/** Replace the private criterion-score set for one draft whole-assessment result. */
+export const SaveAssessmentCriterionScoresInput = z.object({
+  enrollmentId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+  scores: z.array(z.object({
+    criterionId: z.string().min(1),
+    score: z.coerce.number().min(0),
+    rubricLevelId: z.string().nullable().optional(),
+  })),
+});
+export type SaveAssessmentCriterionScoresInput = z.infer<typeof SaveAssessmentCriterionScoresInput>;
+
 /** Explicitly publish every complete draft row for one assessment in one offering. */
 export const PublishAssessmentResultsInput = z.object({
   offeringId: z.string().uuid(),
@@ -219,6 +252,21 @@ export const SetAssessmentDeadlineInput = z.object({
 });
 export type SetAssessmentDeadlineInput = z.infer<typeof SetAssessmentDeadlineInput>;
 
+export interface CourseDeliveryRubricCriterion {
+  id: string;
+  name: string;
+  cloCodes: string[];
+  levels: Array<{ id: string; label: string; points: number }>;
+}
+
+export interface CourseDeliveryCriterionScore {
+  criterionId: string;
+  score: number;
+  maxScore: number;
+  rubricLevelId: string | null;
+  rubricLevelLabel: string | null;
+}
+
 export interface CourseDeliveryResultRow {
   enrollmentId: string;
   studentId: string;
@@ -228,6 +276,8 @@ export interface CourseDeliveryResultRow {
   maxScore: number | null;
   feedback: string;
   publishedAt: string | null;
+  finalizedAt: string | null;
+  criterionScores: CourseDeliveryCriterionScore[];
 }
 
 export interface CourseDeliveryAssessment {
@@ -240,6 +290,10 @@ export interface CourseDeliveryAssessment {
   cloCodes: string[];
   dueWeek: number | null;
   dueAt: string | null;
+  rubricId: string | null;
+  rubricName: string;
+  rubricContentHash: string | null;
+  rubricCriteria: CourseDeliveryRubricCriterion[];
   results: CourseDeliveryResultRow[];
 }
 
