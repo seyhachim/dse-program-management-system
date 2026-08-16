@@ -59,6 +59,10 @@ These tables were added after the original #133 security-baseline migration. A l
 
 The custom `pms_attendance` schema and its `AttendanceSession` and `AttendanceRecord` tables are **backend-only**. In addition to table RLS/grant protection, schema access is revoked from `PUBLIC` and Supabase Data API roles when those roles exist.
 
+### Telegram security schema
+
+The custom `telegram_security` schema and `TelegramInitVerification` table are **backend-only**. The table stores replay-protection metadata for verified Telegram Mini App launches; raw Telegram `initData` and bot secrets are not persisted there. The schema is not part of the browser/PostgREST data-access contract, so RLS is enabled and schema/table/sequence/function privileges are revoked from `PUBLIC`, `anon`, `authenticated`, and `service_role` where those roles exist.
+
 `_prisma_migrations` is Prisma infrastructure rather than an application table and is intentionally excluded from the application-table inventory.
 
 ## Migration-owned controls
@@ -69,9 +73,9 @@ The #133 migration series provides these controls:
 2. Revoke direct table privileges from `PUBLIC`.
 3. Revoke direct table privileges from `anon`, `authenticated`, and `service_role` when those Supabase roles exist.
 4. Revoke future default table, sequence, and function privileges in protected schemas so new exposure is opt-in for objects created by the migration role.
-5. Revoke direct access to the `pms_attendance` schema and its objects.
-6. Apply later follow-up protection when new backend-only table families are introduced after the original baseline, without rewriting applied migration history.
-7. Fail migration/security verification when expected protected objects are missing or new public application tables have not been classified.
+5. Revoke direct access to the custom `pms_attendance` and `telegram_security` schemas and their objects.
+6. Apply later follow-up protection when new backend-only table families or custom schemas are introduced after the original baseline, without rewriting applied migration history.
+7. Fail migration/security verification when expected protected objects are missing or new application tables have not been classified.
 
 Supabase-only role references are guarded through `pg_roles`, so the migrations also run in ordinary PostgreSQL CI where those roles do not exist.
 
@@ -86,15 +90,15 @@ bun run --cwd apps/backend db:security:verify
 CI runs the verifier after a fresh migration and seed. It fails when:
 
 - a classified table is missing;
-- an unexpected/unclassified public table appears;
+- an unexpected/unclassified table appears in an inventoried application schema;
 - RLS is disabled on a classified table;
 - `PUBLIC`, `anon`, `authenticated`, or `service_role` has a forbidden direct table grant;
-- the attendance schema is exposed to a forbidden grantee; or
-- unsafe future default privileges are present.
+- `pms_attendance` or `telegram_security` schema access is exposed to a forbidden grantee; or
+- unsafe future default privileges are present in a protected schema.
 
 CI also proves fail-closed behavior by temporarily creating an unclassified public table and a forbidden `authenticated` table grant; both probes must make the verifier fail before cleanup, followed by a final clean pass.
 
-When adding a new application table, the same PR must establish its intended access path, add migration-owned controls, and update the verifier inventory. A green verifier is therefore a required database-security gate, not a one-time audit.
+When adding a new application table or custom application schema, the same PR must establish its intended access path, add migration-owned controls, and update the verifier inventory. A green verifier is therefore a required database-security gate, not a one-time audit.
 
 ## Upgrade and rollback implications
 
