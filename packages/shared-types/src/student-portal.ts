@@ -184,6 +184,30 @@ export const PublishAssessmentResultsInput = z.object({
 });
 export type PublishAssessmentResultsInput = z.infer<typeof PublishAssessmentResultsInput>;
 
+/** Finalize one fully-published assessment result set as the official locked state. */
+export const FinalizeAssessmentResultsInput = z.object({
+  offeringId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+});
+export type FinalizeAssessmentResultsInput = z.infer<typeof FinalizeAssessmentResultsInput>;
+
+export interface PublishAssessmentResultsResponse {
+  offeringId: string;
+  assessmentItemId: string;
+  publishedCount: number;
+  previouslyPublishedCount: number;
+  publishedAt: string;
+  publishedById: string;
+}
+
+export interface FinalizeAssessmentResultsResponse {
+  offeringId: string;
+  assessmentItemId: string;
+  finalizedCount: number;
+  finalizedAt: string;
+  finalizedById: string;
+}
+
 /** @deprecated Use SaveAssessmentResultInput. Kept temporarily for source compatibility. */
 export const PublishAssessmentResultInput = SaveAssessmentResultInput;
 export type PublishAssessmentResultInput = SaveAssessmentResultInput;

@@ -4,6 +4,7 @@ import {
   assertDraftWritable,
   buildStudentResultReview,
   canManageOfferingResults,
+  finalizationReadiness,
   publicationReadiness,
 } from "./results-lifecycle.ts";
 
@@ -55,6 +56,60 @@ describe("results lifecycle", () => {
     expect(canManageOfferingResults("co", false, "primary", ["co"])).toBe(true);
     expect(canManageOfferingResults("admin", true, "primary", ["co"])).toBe(true);
     expect(canManageOfferingResults("other", false, "primary", ["co"])).toBe(false);
+    expect(canManageOfferingResults("student", false, "primary", ["co"])).toBe(false);
+  });
+
+  test("allows finalization only when every enrolled row is published and not finalized", () => {
+    const readiness = finalizationReadiness(
+      ["e1", "e2"],
+      [
+        { enrollmentId: "e1", publishedAt: "2026-08-16T01:00:00Z", finalizedAt: null },
+        { enrollmentId: "e2", publishedAt: "2026-08-16T01:00:00Z", finalizedAt: null },
+      ],
+    );
+    expect(readiness).toEqual({
+      ready: true,
+      missingEnrollmentIds: [],
+      unpublishedEnrollmentIds: [],
+      finalizedEnrollmentIds: [],
+    });
+  });
+
+  test("blocks finalization when an enrolled result is missing", () => {
+    const readiness = finalizationReadiness(
+      ["e1", "e2"],
+      [{ enrollmentId: "e1", publishedAt: "2026-08-16T01:00:00Z", finalizedAt: null }],
+    );
+    expect(readiness.ready).toBe(false);
+    expect(readiness.missingEnrollmentIds).toEqual(["e2"]);
+  });
+
+  test("blocks finalization until every result has been published", () => {
+    const readiness = finalizationReadiness(
+      ["e1", "e2"],
+      [
+        { enrollmentId: "e1", publishedAt: "2026-08-16T01:00:00Z", finalizedAt: null },
+        { enrollmentId: "e2", publishedAt: null, finalizedAt: null },
+      ],
+    );
+    expect(readiness.ready).toBe(false);
+    expect(readiness.unpublishedEnrollmentIds).toEqual(["e2"]);
+  });
+
+  test("blocks repeated or partially repeated finalization", () => {
+    const readiness = finalizationReadiness(
+      ["e1", "e2"],
+      [
+        {
+          enrollmentId: "e1",
+          publishedAt: "2026-08-16T01:00:00Z",
+          finalizedAt: "2026-08-16T02:00:00Z",
+        },
+        { enrollmentId: "e2", publishedAt: "2026-08-16T01:00:00Z", finalizedAt: null },
+      ],
+    );
+    expect(readiness.ready).toBe(false);
+    expect(readiness.finalizedEnrollmentIds).toEqual(["e1"]);
   });
 
   test("builds complete weighted total and CLO evidence from draft or published marks", () => {

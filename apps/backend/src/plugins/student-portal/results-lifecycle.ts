@@ -1,8 +1,11 @@
 import type {
   CourseDeliveryResultReview,
   CourseDeliveryStudentResultReview,
+  FinalizeAssessmentResultsInput,
+  FinalizeAssessmentResultsResponse,
   PortalCloAchievement,
   PublishAssessmentResultsInput,
+  PublishAssessmentResultsResponse,
   SaveAssessmentResultInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
@@ -188,6 +191,81 @@ export function publicationReadiness(
   };
 }
 
+export function finalizationReadiness(
+  enrollmentIds: string[],
+  results: Array<{
+    enrollmentId: string;
+    publishedAt?: Date | string | null;
+    finalizedAt?: Date | string | null;
+  }>,
+) {
+  const byEnrollment = new Map(results.map((result) => [result.enrollmentId, result]));
+  const missingEnrollmentIds = enrollmentIds.filter((id) => !byEnrollment.has(id));
+  const unpublishedEnrollmentIds = enrollmentIds.filter((id) => {
+    const result = byEnrollment.get(id);
+    return Boolean(result && !result.publishedAt);
+  });
+  const finalizedEnrollmentIds = enrollmentIds.filter(
+    (id) => Boolean(byEnrollment.get(id)?.finalizedAt),
+  );
+  return {
+    ready:
+      missingEnrollmentIds.length === 0 &&
+      unpublishedEnrollmentIds.length === 0 &&
+      finalizedEnrollmentIds.length === 0,
+    missingEnrollmentIds,
+    unpublishedEnrollmentIds,
+    finalizedEnrollmentIds,
+  };
+}
+
+async function offeringLifecycleContext(
+  offeringId: string,
+  authorId: string,
+  programmeWide: boolean,
+  assessmentItemId: string,
+) {
+  const offering = await prisma.offering.findUnique({
+    where: { id: offeringId },
+    include: {
+      coLecturers: true,
+      enrollments: { select: { id: true } },
+      course: {
+        include: {
+          specs: {
+            where: { reviewStatus: "Approved" },
+            orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
+            take: 1,
+            include: { assessmentItems: true },
+          },
+        },
+      },
+    },
+  });
+  if (!offering) throw new PortalNotFoundError("Offering not found");
+
+  if (!canManageOfferingResults(
+    authorId,
+    programmeWide,
+    offering.lecturerId,
+    offering.coLecturers.map((item) => item.lecturerId),
+  )) {
+    throw new PortalAccessError("You are not assigned to this offering");
+  }
+
+  const spec = offering.course.specs[0] ?? null;
+  if (!spec) throw new PortalNotFoundError("Approved course specification not found");
+  const assessment = spec.assessmentItems.find(
+    (item) => item.id === assessmentItemId && item.status === "Active",
+  );
+  if (!assessment) throw new PortalNotFoundError("Active assessment not found");
+  if (!offering.enrollments.length) {
+    throw new PortalConflictError("This offering has no enrolled students");
+  }
+
+  return { offering, spec, assessment };
+}
+
 export const resultsLifecycleService = {
   async review(
     authorId: string,
@@ -287,6 +365,9 @@ export const resultsLifecycleService = {
         maxScore: input.maxScore,
         feedback: input.feedback,
         publishedAt: null,
+        publishedById: null,
+        finalizedAt: null,
+        finalizedById: null,
       },
       create: {
         ...key,
@@ -294,6 +375,9 @@ export const resultsLifecycleService = {
         maxScore: input.maxScore,
         feedback: input.feedback,
         publishedAt: null,
+        publishedById: null,
+        finalizedAt: null,
+        finalizedById: null,
       },
     });
   },
@@ -302,47 +386,16 @@ export const resultsLifecycleService = {
     authorId: string,
     programmeWide: boolean,
     input: PublishAssessmentResultsInput,
-  ) {
-    const offering = await prisma.offering.findUnique({
-      where: { id: input.offeringId },
-      include: {
-        coLecturers: true,
-        enrollments: { select: { id: true } },
-        course: {
-          include: {
-            specs: {
-              where: { reviewStatus: "Approved" },
-              orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-              take: 1,
-              include: { assessmentItems: true },
-            },
-          },
-        },
-      },
-    });
-    if (!offering) throw new PortalNotFoundError("Offering not found");
-
-    if (!canManageOfferingResults(
+  ): Promise<PublishAssessmentResultsResponse> {
+    const { offering, spec, assessment } = await offeringLifecycleContext(
+      input.offeringId,
       authorId,
       programmeWide,
-      offering.lecturerId,
-      offering.coLecturers.map((item) => item.lecturerId),
-    )) {
-      throw new PortalAccessError("You are not assigned to this offering");
-    }
-
-    const spec = offering.course.specs[0] ?? null;
-    if (!spec) throw new PortalNotFoundError("Approved course specification not found");
-    const assessment = spec.assessmentItems.find(
-      (item) => item.id === input.assessmentItemId && item.status === "Active",
+      input.assessmentItemId,
     );
-    if (!assessment) throw new PortalNotFoundError("Active assessment not found");
-    if (!offering.enrollments.length) {
-      throw new PortalConflictError("This offering has no enrolled students");
-    }
-
     const enrollmentIds = offering.enrollments.map((item) => item.id);
     const now = new Date();
+
     return prisma.$transaction(async (tx) => {
       const results = await tx.assessmentResult.findMany({
         where: {
@@ -382,7 +435,7 @@ export const resultsLifecycleService = {
           id: { in: unpublishedIds },
           publishedAt: null,
         },
-        data: { publishedAt: now },
+        data: { publishedAt: now, publishedById: authorId },
       });
       if (updated.count !== unpublishedIds.length) {
         throw new PortalConflictError(
@@ -395,6 +448,77 @@ export const resultsLifecycleService = {
         publishedCount: updated.count,
         previouslyPublishedCount: readiness.publishedEnrollmentIds.length,
         publishedAt: now.toISOString(),
+        publishedById: authorId,
+      };
+    });
+  },
+
+  async finalizeAssessment(
+    authorId: string,
+    programmeWide: boolean,
+    input: FinalizeAssessmentResultsInput,
+  ): Promise<FinalizeAssessmentResultsResponse> {
+    const { offering, spec, assessment } = await offeringLifecycleContext(
+      input.offeringId,
+      authorId,
+      programmeWide,
+      input.assessmentItemId,
+    );
+    const enrollmentIds = offering.enrollments.map((item) => item.id);
+    const now = new Date();
+
+    return prisma.$transaction(async (tx) => {
+      const results = await tx.assessmentResult.findMany({
+        where: {
+          enrollmentId: { in: enrollmentIds },
+          courseSpecId: spec.id,
+          assessmentItemId: input.assessmentItemId,
+        },
+        select: {
+          id: true,
+          enrollmentId: true,
+          publishedAt: true,
+          finalizedAt: true,
+        },
+      });
+      const readiness = finalizationReadiness(enrollmentIds, results);
+      if (readiness.missingEnrollmentIds.length) {
+        throw new PortalConflictError(
+          `${readiness.missingEnrollmentIds.length} student result(s) are missing and cannot be finalized.`,
+        );
+      }
+      if (readiness.unpublishedEnrollmentIds.length) {
+        throw new PortalConflictError(
+          `${readiness.unpublishedEnrollmentIds.length} student result(s) must be published before finalization.`,
+        );
+      }
+      if (readiness.finalizedEnrollmentIds.length) {
+        throw new PortalConflictError(
+          "This assessment contains already-finalized results. Reload the result set before continuing.",
+        );
+      }
+
+      const resultIds = results.map((result) => result.id);
+      const updated = await tx.assessmentResult.updateMany({
+        where: {
+          id: { in: resultIds },
+          publishedAt: { not: null },
+          finalizedAt: null,
+        },
+        data: { finalizedAt: now, finalizedById: authorId },
+      });
+      if (updated.count !== resultIds.length) {
+        throw new PortalConflictError(
+          "Result finalization changed concurrently. Reload the result set and review it before trying again.",
+        );
+      }
+
+      return {
+        offeringId: offering.id,
+        assessmentItemId: assessment.id,
+        finalizedCount: updated.count,
+        finalizedAt: now.toISOString(),
+        finalizedById: authorId,
       };
     });
   },
