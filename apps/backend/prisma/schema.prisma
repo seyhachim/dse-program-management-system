@@ -175,26 +175,28 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed               Course[]                   @relation("CourseLecturer")
-  offeringsLed             Offering[]                 @relation("OfferingLecturer")
-  rubricsOwned             Rubric[]                   @relation("RubricOwner")
-  coLecturerOf             OfferingCoLecturer[]       @relation("OfferingCoLecturer")
-  roleAssignments          UserRoleAssignment[]
-  courseSpecSubmissions    CourseSpec[]               @relation("CourseSpecSubmittedBy")
-  courseSpecReviewActions  CourseSpecReviewAction[]   @relation("CourseSpecReviewActor")
-  studentProfile           Student?
-  announcementsAuthored    CourseAnnouncement[]       @relation("AnnouncementAuthor")
-  qaCyclesCreated          QaAssessmentCycle[]        @relation("QaCycleCreator")
-  qaEvidenceCreated        QaEvidence[]               @relation("QaEvidenceCreator")
-  qaEvidenceMappings       QaEvidenceMapping[]        @relation("QaEvidenceMapper")
-  qaAssessmentsReviewed    QaRequirementAssessment[]  @relation("QaAssessmentReviewer")
-  qaAnalysisReviews        QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
-  qaRequirementAssignments QaRequirementAssignment[]  @relation("QaRequirementAssignee")
-  qaAssignmentsCreated     QaRequirementAssignment[]  @relation("QaRequirementAssignedBy")
-  qaSarSectionsUpdated     QaSarSection[]             @relation("QaSarSectionUpdatedBy")
-  qaSarSubmissions         QaSarSubmission[]          @relation("QaSarSubmittedBy")
-  qaSarReviews             QaSarReview[]              @relation("QaSarReviewer")
-  qaSarReleasesFinalized   QaSarRelease[]             @relation("QaSarReleaseFinalizedBy")
+  coursesLed                 Course[]                   @relation("CourseLecturer")
+  offeringsLed               Offering[]                 @relation("OfferingLecturer")
+  rubricsOwned               Rubric[]                   @relation("RubricOwner")
+  coLecturerOf               OfferingCoLecturer[]       @relation("OfferingCoLecturer")
+  roleAssignments            UserRoleAssignment[]
+  courseSpecSubmissions      CourseSpec[]               @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions    CourseSpecReviewAction[]   @relation("CourseSpecReviewActor")
+  studentProfile             Student?
+  announcementsAuthored      CourseAnnouncement[]       @relation("AnnouncementAuthor")
+  assessmentResultsPublished AssessmentResult[]         @relation("AssessmentResultPublishedBy")
+  assessmentResultsFinalized AssessmentResult[]         @relation("AssessmentResultFinalizedBy")
+  qaCyclesCreated            QaAssessmentCycle[]        @relation("QaCycleCreator")
+  qaEvidenceCreated          QaEvidence[]               @relation("QaEvidenceCreator")
+  qaEvidenceMappings         QaEvidenceMapping[]        @relation("QaEvidenceMapper")
+  qaAssessmentsReviewed      QaRequirementAssessment[]  @relation("QaAssessmentReviewer")
+  qaAnalysisReviews          QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
+  qaRequirementAssignments   QaRequirementAssignment[]  @relation("QaRequirementAssignee")
+  qaAssignmentsCreated       QaRequirementAssignment[]  @relation("QaRequirementAssignedBy")
+  qaSarSectionsUpdated       QaSarSection[]             @relation("QaSarSectionUpdatedBy")
+  qaSarSubmissions           QaSarSubmission[]          @relation("QaSarSubmittedBy")
+  qaSarReviews               QaSarReview[]              @relation("QaSarReviewer")
+  qaSarReleasesFinalized     QaSarRelease[]             @relation("QaSarReleaseFinalizedBy")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -1352,11 +1354,19 @@ model AssessmentResult {
   maxScore         Float
   feedback         String     @default("")
   publishedAt      DateTime?
+  publishedById    String?
+  publishedBy      User?      @relation("AssessmentResultPublishedBy", fields: [publishedById], references: [id], onDelete: Restrict)
+  finalizedAt      DateTime?
+  finalizedById    String?
+  finalizedBy      User?      @relation("AssessmentResultFinalizedBy", fields: [finalizedById], references: [id], onDelete: Restrict)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
   @@unique([enrollmentId, courseSpecId, assessmentItemId])
   @@index([enrollmentId, publishedAt])
+  @@index([publishedById])
+  @@index([finalizedAt])
+  @@index([finalizedById])
 }
 
 /// Section-level notices. Draft notices have a null `publishedAt` and never
