@@ -1,4 +1,4 @@
--- Add nullable provenance so legacy published rows remain valid without inventing an actor.
+-- Issue #284: add nullable provenance so legacy published rows remain valid without inventing an actor.
 ALTER TABLE "AssessmentResult"
   ADD COLUMN "publishedById" TEXT,
   ADD COLUMN "finalizedAt" TIMESTAMP(3),
