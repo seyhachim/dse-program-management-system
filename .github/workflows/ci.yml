@@ -148,6 +148,11 @@ jobs:
         env:
           CURRICULUM_DB_TESTS: "1"
 
+      - name: Verify curriculum draft mutations
+        run: bun test apps/backend/src/plugins/programme/curriculum-draft-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
