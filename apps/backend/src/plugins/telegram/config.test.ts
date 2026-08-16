@@ -9,6 +9,8 @@ describe("Telegram configuration", () => {
       botUsername: undefined,
       miniAppUrl: undefined,
       miniAppShortName: undefined,
+      initDataMaxAgeSeconds: 300,
+      initDataMaxFutureSkewSeconds: 30,
     });
   });
 
@@ -20,6 +22,8 @@ describe("Telegram configuration", () => {
         TELEGRAM_BOT_USERNAME: "DSEPMSBot",
         TELEGRAM_MINI_APP_URL: "https://example.com/telegram",
         TELEGRAM_MINI_APP_SHORT_NAME: "pms",
+        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: "600",
+        TELEGRAM_INIT_DATA_MAX_FUTURE_SKEW_SECONDS: "45",
       } as NodeJS.ProcessEnv),
     ).toEqual({
       enabled: true,
@@ -27,6 +31,8 @@ describe("Telegram configuration", () => {
       botUsername: "DSEPMSBot",
       miniAppUrl: "https://example.com/telegram",
       miniAppShortName: "pms",
+      initDataMaxAgeSeconds: 600,
+      initDataMaxFutureSkewSeconds: 45,
     });
   });
 
@@ -58,4 +64,18 @@ describe("Telegram configuration", () => {
       } as NodeJS.ProcessEnv),
     ).toThrow("TELEGRAM_MINI_APP_URL");
   });
+
+  for (const [name, value] of [
+    ["TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "0"],
+    ["TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "-1"],
+    ["TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "abc"],
+    ["TELEGRAM_INIT_DATA_MAX_FUTURE_SKEW_SECONDS", "0"],
+    ["TELEGRAM_INIT_DATA_MAX_FUTURE_SKEW_SECONDS", "1.5"],
+  ] as const) {
+    test(`rejects invalid ${name}`, () => {
+      expect(() =>
+        getTelegramConfig({ [name]: value } as NodeJS.ProcessEnv),
+      ).toThrow(name);
+    });
+  }
 });
