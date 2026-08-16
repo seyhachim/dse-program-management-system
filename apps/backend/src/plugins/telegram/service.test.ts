@@ -55,7 +55,7 @@ describe("Telegram service", () => {
   });
 
   test("returns only a verified pre-link Telegram context", async () => {
-    let replayInput: Record<string, unknown> | undefined;
+    let replayInput: unknown;
     const service = createTelegramService({
       getConfig: () => ({
         enabled: true,
