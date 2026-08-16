@@ -153,8 +153,8 @@ CREATE INDEX "ProgrammeCurriculumVersion_basedOnVersionId_idx"
 CREATE INDEX "ProgrammeCurriculumVersion_createdById_idx"
   ON "ProgrammeCurriculumVersion"("createdById");
 
--- A curriculum may retain multiple Approved historical versions, but only one
--- version can be the currently Active version at a time.
+-- Historical Approved versions may coexist, but exactly one version may be the
+-- currently Active curriculum for a canonical curriculum at a time.
 CREATE UNIQUE INDEX "ProgrammeCurriculumVersion_one_active_per_curriculum"
   ON "ProgrammeCurriculumVersion"("curriculumId")
   WHERE "status" = 'Active';
@@ -201,9 +201,8 @@ ON "ProgrammeCurriculumVersion"
 FOR EACH ROW
 EXECUTE FUNCTION "check_programme_curriculum_predecessor"();
 
--- Once a version is Approved, Active, or Superseded, its academic content and
--- revision provenance are immutable. Lifecycle status may still advance through
--- Approved -> Active -> Superseded in later workflow work.
+-- Approved/Active/Superseded academic content is immutable. Only forward
+-- lifecycle transitions are allowed after approval: Approved -> Active -> Superseded.
 CREATE OR REPLACE FUNCTION "protect_immutable_programme_curriculum_version"()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -220,10 +219,23 @@ BEGIN
       OR NEW."intakeYear" IS DISTINCT FROM OLD."intakeYear"
       OR NEW."academicYear" IS DISTINCT FROM OLD."academicYear"
       OR NEW."effectiveFrom" IS DISTINCT FROM OLD."effectiveFrom"
+      OR NEW."approvedAt" IS DISTINCT FROM OLD."approvedAt"
       OR NEW."createdById" IS DISTINCT FROM OLD."createdById"
       OR NEW."createdAt" IS DISTINCT FROM OLD."createdAt"
     THEN
       RAISE EXCEPTION 'Approved, Active, and Superseded curriculum versions are immutable';
+    END IF;
+
+    IF OLD."status" = 'Approved' AND NEW."status" NOT IN ('Approved', 'Active') THEN
+      RAISE EXCEPTION 'Approved curriculum versions can only remain Approved or become Active';
+    END IF;
+
+    IF OLD."status" = 'Active' AND NEW."status" NOT IN ('Active', 'Superseded') THEN
+      RAISE EXCEPTION 'Active curriculum versions can only remain Active or become Superseded';
+    END IF;
+
+    IF OLD."status" = 'Superseded' AND NEW."status" <> 'Superseded' THEN
+      RAISE EXCEPTION 'Superseded curriculum versions cannot change lifecycle state';
     END IF;
   END IF;
 
@@ -237,37 +249,41 @@ FOR EACH ROW
 EXECUTE FUNCTION "protect_immutable_programme_curriculum_version"();
 
 -- Placements are mutable only while their owning version is Draft. This protects
--- the historical credit/type snapshots from direct SQL/Prisma writes as well as
--- from normal service-layer mutation paths.
+-- historical credit/type snapshots from direct SQL/Prisma writes as well as
+-- normal service-layer mutation paths.
 CREATE OR REPLACE FUNCTION "protect_immutable_programme_curriculum_course"()
 RETURNS TRIGGER AS $$
 DECLARE
-  parent_version_id TEXT;
-  parent_status "ProgrammeCurriculumStatus";
+  old_parent_status "ProgrammeCurriculumStatus";
+  new_parent_status "ProgrammeCurriculumStatus";
 BEGIN
-  parent_version_id := COALESCE(OLD."curriculumVersionId", NEW."curriculumVersionId");
-
-  SELECT "status"
-    INTO parent_status
-    FROM "ProgrammeCurriculumVersion"
-    WHERE "id" = parent_version_id;
-
-  IF parent_status IN ('Approved', 'Active', 'Superseded') THEN
-    RAISE EXCEPTION 'Cannot mutate course placements of an immutable curriculum version';
-  END IF;
-
-  IF TG_OP = 'UPDATE' AND NEW."curriculumVersionId" <> OLD."curriculumVersionId" THEN
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
     SELECT "status"
-      INTO parent_status
+      INTO old_parent_status
       FROM "ProgrammeCurriculumVersion"
-      WHERE "id" = NEW."curriculumVersionId";
+      WHERE "id" = OLD."curriculumVersionId";
 
-    IF parent_status IN ('Approved', 'Active', 'Superseded') THEN
-      RAISE EXCEPTION 'Cannot move a placement into an immutable curriculum version';
+    IF old_parent_status IN ('Approved', 'Active', 'Superseded') THEN
+      RAISE EXCEPTION 'Cannot mutate course placements of an immutable curriculum version';
     END IF;
   END IF;
 
-  RETURN COALESCE(NEW, OLD);
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    SELECT "status"
+      INTO new_parent_status
+      FROM "ProgrammeCurriculumVersion"
+      WHERE "id" = NEW."curriculumVersionId";
+
+    IF new_parent_status IN ('Approved', 'Active', 'Superseded') THEN
+      RAISE EXCEPTION 'Cannot add or move a placement into an immutable curriculum version';
+    END IF;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
