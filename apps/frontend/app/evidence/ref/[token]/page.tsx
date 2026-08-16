@@ -27,7 +27,7 @@ export default async function ExternalEvidencePage({ params }: PageProps) {
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">External QA evidence</div>
           <h1 className="mt-3 text-2xl font-semibold text-slate-900">Reference unavailable</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            This evidence reference is invalid, expired, or has been revoked. Contact the programme QA team for a current reference.
+            This evidence reference is invalid, expired, revoked, or no longer meets the current external-sharing privacy policy. Contact the programme QA team for a current reference.
           </p>
         </div>
       </main>
@@ -95,7 +95,7 @@ export default async function ExternalEvidencePage({ params }: PageProps) {
 
         <section className="rounded-2xl border bg-white p-5 text-xs text-slate-500 shadow-sm">
           <div><span className="font-medium text-slate-700">Integrity hash:</span> <span className="break-all font-mono">{evidence.contentHash}</span></div>
-          <div className="mt-2">Student-identifying fields and individual grades are excluded from the external snapshot by the PMS redaction policy.</div>
+          <div className="mt-2">External snapshots use the current PMS redaction policy. Narrative source text is omitted by default; structured review-safe evidence and page/section provenance remain available.</div>
         </section>
       </div>
     </main>

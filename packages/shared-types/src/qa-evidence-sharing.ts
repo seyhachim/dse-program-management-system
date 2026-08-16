@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const QA_EVIDENCE_REDACTION_POLICY_VERSION = "qa-external-v1" as const;
+export const QA_EVIDENCE_REDACTION_POLICY_VERSION = "qa-external-v2" as const;
 export const QA_EVIDENCE_SNAPSHOT_SCHEMA_VERSION = 1 as const;
 
 export const QaEvidenceSnapshotSourceKindSchema = z.enum([
@@ -48,7 +48,7 @@ export const QaEvidenceSnapshotProvenanceSchema = z.object({
   approvedAt: z.string().nullable().default(null),
   verifiedAt: z.string().nullable().default(null),
   sourceContentHash: z.string().nullable().default(null),
-  redactionPolicyVersion: z.literal(QA_EVIDENCE_REDACTION_POLICY_VERSION),
+  redactionPolicyVersion: z.string().trim().min(1),
 });
 
 export const CreateQaEvidenceSnapshotSchema = z.object({
@@ -96,7 +96,7 @@ export interface QaEvidenceSnapshotView {
   reportingPeriod: QaEvidenceReportingPeriod;
   provenance: QaEvidenceSnapshotProvenance;
   contentHash: string;
-  redactionPolicyVersion: typeof QA_EVIDENCE_REDACTION_POLICY_VERSION;
+  redactionPolicyVersion: string;
   capturedBy: { id: string; name: string };
   capturedAt: string;
 }
