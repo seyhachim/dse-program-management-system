@@ -5,6 +5,7 @@ export * from "./programme.ts";
 export * from "./curriculum.ts";
 export * from "./curriculum-workflow.ts";
 export * from "./curriculum-history.ts";
+export * from "./curriculum-course-spec-binding.ts";
 export * from "./curriculum-plugin.ts";
 export * from "./students.ts";
 export * from "./lecturers.ts";
