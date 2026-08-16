@@ -14,6 +14,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
 
 export class PortalNotFoundError extends Error {}
@@ -22,7 +23,10 @@ export class PortalAccessError extends Error {}
 
 const lecturerSelect = { id: true, name: true, email: true, title: true } as const;
 const enrollmentInclude = {
-  results: { where: { publishedAt: { not: null } } },
+  results: {
+    where: { publishedAt: { not: null } },
+    include: { criterionScores: true },
+  },
   offering: {
     include: {
       lecturer: { select: lecturerSelect },
@@ -44,7 +48,12 @@ const enrollmentInclude = {
               weeks: { orderBy: { order: "asc" as const } },
               assessmentItems: {
                 orderBy: { order: "asc" as const },
-                include: { rubric: { select: { name: true } } },
+                include: {
+                  criterionCloMappings: true,
+                  rubric: {
+                    include: { levelRows: { orderBy: { order: "asc" } }, criterionRows: { orderBy: { order: "asc" } } },
+                  },
+                },
               },
               resources: { orderBy: { order: "asc" as const } },
             },
@@ -95,14 +104,40 @@ function achievementStatus(percentage: number | null): PortalCloAchievement["sta
 export function calculateCloAchievements(
   clos: Array<{ order: number; description: string; status: string }>,
   assessments: Array<{ id: string; name: string; cloCodes: string[]; weight: number | null; status: string }>,
-  results: Array<{ assessmentItemId: string; score: number; maxScore: number }>,
+  results: Array<{
+    assessmentItemId: string;
+    score: number;
+    maxScore: number;
+    criterionScores?: Array<{
+      rubricId: string; criterionId: string; criterionName: string; rubricContentHash: string; score: number; maxScore: number;
+    }>;
+  }>,
+  criterionMappings: Array<{ assessmentItemId: string; rubricId: string; criterionId: string; cloCode: string }> = [],
 ): PortalCloAchievement[] {
   const assessmentById = new Map(assessments.map((assessment) => [assessment.id, assessment]));
   return clos
     .filter((clo) => clo.status === "Active")
     .map((clo) => {
       const code = `CLO${clo.order + 1}`;
-      const calculation = calculateCloEvidence(code, assessments, results);
+      const criterionEvidence = results.flatMap((result) =>
+        (result.criterionScores ?? []).map((score) => ({
+          assessmentItemId: result.assessmentItemId,
+          rubricId: score.rubricId,
+          criterionId: score.criterionId,
+          criterionName: score.criterionName,
+          rubricContentHash: score.rubricContentHash,
+          score: score.score,
+          maxScore: score.maxScore,
+          cloCodes: criterionMappings
+            .filter((mapping) =>
+              mapping.assessmentItemId === result.assessmentItemId &&
+              mapping.rubricId === score.rubricId &&
+              mapping.criterionId === score.criterionId,
+            )
+            .map((mapping) => mapping.cloCode),
+        })),
+      );
+      const calculation = calculateCloEvidence(code, assessments, results, criterionEvidence);
       return {
         code,
         description: clo.description,
@@ -113,6 +148,17 @@ export function calculateCloAchievements(
           assessmentItemId: item.assessmentItemId,
           assessmentName: assessmentById.get(item.assessmentItemId)?.name ?? "Assessment",
           rawPercentage: item.rawPercentage,
+          source: item.source,
+          ...(item.source === "criterion"
+            ? {
+                rubricId: item.rubricId,
+                criterionId: item.criterionId,
+                criterionName: item.criterionName,
+                score: item.score,
+                maxScore: item.maxScore,
+                rubricContentHash: item.rubricContentHash,
+              }
+            : {}),
         })),
       };
     });
@@ -236,8 +282,16 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
   const resultByAssessment = new Map(
     row.results.map((result) => [result.assessmentItemId, result]),
   );
+  const criterionMappings = (spec?.assessmentItems ?? []).flatMap((assessment) =>
+    assessment.criterionCloMappings.map((mapping) => ({
+      assessmentItemId: assessment.id,
+      rubricId: mapping.rubricId,
+      criterionId: mapping.criterionId,
+      cloCode: mapping.cloCode,
+    })),
+  );
   const achievements = spec
-    ? calculateCloAchievements(spec.clos, spec.assessmentItems, row.results)
+    ? calculateCloAchievements(spec.clos, spec.assessmentItems, row.results, criterionMappings)
     : [];
   const grade = spec
     ? calculateCourseGrade(spec.assessmentItems, row.results)
@@ -299,6 +353,20 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
                   : null,
                 feedback: result.feedback,
                 publishedAt: result.publishedAt.toISOString(),
+                criterionEvidence: result.criterionScores.map((score) => ({
+                  assessmentItemId: item.id,
+                  rubricId: score.rubricId,
+                  criterionId: score.criterionId,
+                  criterionName: score.criterionName,
+                  score: score.score,
+                  maxScore: score.maxScore,
+                  rawPercentage: Math.round((score.score / score.maxScore) * 10000) / 100,
+                  rubricLevelLabel: score.rubricLevelLabel,
+                  rubricContentHash: score.rubricContentHash,
+                  cloCodes: item.criterionCloMappings
+                    .filter((mapping) => mapping.rubricId === score.rubricId && mapping.criterionId === score.criterionId)
+                    .map((mapping) => mapping.cloCode),
+                })),
               }
             : null,
         };
@@ -377,14 +445,22 @@ export const studentPortalService = {
               where: { reviewStatus: "Approved" },
               orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
               take: 1,
-              include: { assessmentItems: { orderBy: { order: "asc" } } },
+              include: {
+                assessmentItems: {
+                  orderBy: { order: "asc" },
+                  include: {
+                    criterionCloMappings: true,
+                    rubric: { include: { levelRows: { orderBy: { order: "asc" } }, criterionRows: { orderBy: { order: "asc" } } } },
+                  },
+                },
+              },
             },
           },
         },
         enrollments: {
           include: {
             student: { select: { id: true, studentId: true, name: true } },
-            results: true,
+            results: { include: { criterionScores: true } },
           },
           orderBy: { student: { name: "asc" } },
         },
@@ -425,6 +501,19 @@ export const studentPortalService = {
             cloCodes: assessment.cloCodes,
             dueWeek: assessment.dueWeek,
             dueAt: deadlines.get(assessment.id)?.toISOString() ?? null,
+            rubricId: assessment.rubricId,
+            rubricName: assessment.rubric?.name ?? "",
+            rubricContentHash: assessment.rubric ? rubricContentHash(assessment.rubric) : null,
+            rubricCriteria: (assessment.rubric?.criterionRows ?? []).map((criterion) => ({
+              id: criterion.id,
+              name: criterion.name,
+              cloCodes: assessment.criterionCloMappings
+                .filter((mapping) => mapping.rubricId === assessment.rubricId && mapping.criterionId === criterion.id)
+                .map((mapping) => mapping.cloCode),
+              levels: (assessment.rubric?.levelRows ?? []).map((level) => ({
+                id: level.id, label: level.label, points: level.points,
+              })),
+            })),
             results: offering.enrollments.map((enrollment) => {
               const result = enrollment.results.find(
                 (item) => item.courseSpecId === spec?.id && item.assessmentItemId === assessment.id,
@@ -438,6 +527,14 @@ export const studentPortalService = {
                 maxScore: result?.maxScore ?? null,
                 feedback: result?.feedback ?? "",
                 publishedAt: result?.publishedAt?.toISOString() ?? null,
+                finalizedAt: result?.finalizedAt?.toISOString() ?? null,
+                criterionScores: result?.criterionScores.map((score) => ({
+                  criterionId: score.criterionId,
+                  score: score.score,
+                  maxScore: score.maxScore,
+                  rubricLevelId: score.rubricLevelId,
+                  rubricLevelLabel: score.rubricLevelLabel,
+                })) ?? [],
               };
             }),
           })),

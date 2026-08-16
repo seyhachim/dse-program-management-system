@@ -825,6 +825,11 @@ export const AssessmentItem = z.object({
   instructions: z.string().default(""),
   // A Rubric Library `Rubric.id`, or null when no rubric is linked (issue #123).
   rubricId: z.string().nullable().default(null),
+  // Issue #282: explicit criterion -> CLO evidence, independent from local grade weight.
+  criterionCloMappings: z.array(z.object({
+    criterionId: z.string().min(1),
+    cloCodes: z.array(z.string().min(1)).default([]),
+  })).default([]),
   feedbackMethod: z.string().default(""),
   feedbackTimeline: z.string().default(""),
   // PLO mapping & notes.

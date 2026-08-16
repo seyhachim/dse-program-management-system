@@ -105,6 +105,7 @@ const assessment = {
   submissionMethod: "",
   instructions: "",
   rubricId: "",
+  criterionCloMappings: [],
   feedbackMethod: "",
   feedbackTimeline: "",
   mappedPlos: [],
