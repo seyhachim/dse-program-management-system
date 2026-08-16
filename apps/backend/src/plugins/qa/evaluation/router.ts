@@ -1,7 +1,6 @@
 import { Router, type Response } from "express";
 import {
   CreateQaEvaluationHumanRatingSchema,
-  CreateQaEvaluationRunSchema,
   CreateQaEvaluationScenarioSchema,
   QaEvaluationRunQuerySchema,
   SetQaEvaluationGoldSchema,
@@ -13,7 +12,6 @@ import {
   QaEvaluationResourceNotFoundError,
   QaEvaluationScopeMismatchError,
   createQaEvaluationHumanRating,
-  createQaEvaluationRun,
   createQaEvaluationScenario,
   exportQaEvaluationData,
   getQaEvaluationMetrics,
@@ -92,19 +90,6 @@ export function createQaEvaluationRouter(): Router {
     }
     try {
       res.json(await listQaEvaluationRuns(parsed.data));
-    } catch (error) {
-      sendEvaluationError(res, error);
-    }
-  });
-
-  router.post("/evaluation/runs", requirePermission("qa:write"), async (req, res) => {
-    const parsed = CreateQaEvaluationRunSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid QA evaluation run", details: parsed.error.flatten() });
-      return;
-    }
-    try {
-      res.status(201).json(await createQaEvaluationRun(parsed.data));
     } catch (error) {
       sendEvaluationError(res, error);
     }
