@@ -62,6 +62,14 @@ export function getUnmarkedStudentIds(records: AttendanceRecordView[]): string[]
   return records.filter((record) => record.status === null).map((record) => record.studentId);
 }
 
+export function getSkipFeedback(record: AttendanceRecordView): string {
+  if (record.status === null) {
+    return `${record.studentName} skipped and left Unmarked.`;
+  }
+  const label = record.status === "Excused" ? "Excused Absence" : record.status;
+  return `${record.studentName} skipped; existing ${label} status kept.`;
+}
+
 export function updateAttendanceRecord(
   records: AttendanceRecordView[],
   studentId: string,
