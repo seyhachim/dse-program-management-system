@@ -9,6 +9,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { QaSarDocumentSchema } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
+import { prepareQaSarExternalEvidence } from "../evidence-sharing/sar-integration.ts";
 import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
 
 const sectionStatus = {
@@ -323,7 +324,7 @@ export async function finalizeQaSarDocument(
   userId: string,
   title?: string,
 ): Promise<QaSarReleaseView> {
-  const model = await buildQaSarDocument(programmeId, cycleId, "official");
+  let model = await buildQaSarDocument(programmeId, cycleId, "official");
   if (model.totals.requiredSections === 0 || model.totals.missingSections > 0) {
     throw new QaSarFinalizeError(
       `Official SAR cannot be finalized: ${model.totals.missingSections} required section(s) do not have an approved submission`,
@@ -336,6 +337,11 @@ export async function finalizeQaSarDocument(
   if (submissionIds.length !== model.totals.requiredSections) {
     throw new QaSarFinalizeError("Official SAR submission manifest is incomplete");
   }
+
+  // Freeze the exact evidence content used in this release and embed fresh,
+  // unlisted assessor URLs into the immutable release snapshot. No live source
+  // route is used as the release-time evidence source of truth.
+  model = await prepareQaSarExternalEvidence(model, userId);
 
   const latest = await prisma.qaSarRelease.findFirst({
     where: { cycleId },

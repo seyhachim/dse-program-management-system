@@ -1,10 +1,20 @@
 import { offeringsManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import { attendanceService } from "./attendance-service.ts";
+import { classResponsibilityService } from "./class-responsibility-service.ts";
 import { createOfferingRouter } from "./router.ts";
-import { offeringService, type OfferingService } from "./service.ts";
+import { offeringService } from "./service.ts";
 
-export const offeringsPlugin: BackendPlugin<OfferingService> = {
+export const offeringsService = {
+  ...offeringService,
+  attendance: attendanceService,
+  classResponsibilities: classResponsibilityService,
+};
+
+export type OfferingsService = typeof offeringsService;
+
+export const offeringsPlugin: BackendPlugin<OfferingsService> = {
   manifest: offeringsManifest,
   router: createOfferingRouter(),
-  service: offeringService,
+  service: offeringsService,
 };

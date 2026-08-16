@@ -7,7 +7,7 @@ export default function TelegramMiniAppPage() {
         <p className="text-sm font-medium text-slate-500">DSE PMS</p>
         <h1 className="text-2xl font-semibold tracking-tight">Telegram Mini App</h1>
         <p className="text-sm text-slate-600">
-          Lightweight mobile access to the Program Management System.
+          Secure mobile access to high-frequency student and lecturer workflows.
         </p>
       </header>
 
@@ -16,7 +16,7 @@ export default function TelegramMiniAppPage() {
       </div>
 
       <p className="text-xs leading-5 text-slate-500">
-        This foundation does not authenticate Telegram users or expose student or lecturer data.
+        Telegram launches are verified server-side. PMS identity, enrolment, roles, result publication, survey, and attendance permissions are re-checked by the PMS backend on every protected request.
       </p>
     </section>
   );

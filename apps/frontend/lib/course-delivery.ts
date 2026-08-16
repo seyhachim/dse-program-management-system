@@ -4,6 +4,7 @@ import type {
   PublishAnnouncementInput,
   PublishAssessmentResultsInput,
   SaveAssessmentResultInput,
+  SaveAssessmentCriterionScoresInput,
   SetAssessmentDeadlineInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
@@ -19,6 +20,8 @@ export const courseDeliveryApi = {
     api.put("/api/student-portal/manage/deadlines", input),
   saveResult: (input: SaveAssessmentResultInput) =>
     api.put("/api/student-portal/manage/results", input),
+  saveCriterionScores: (input: SaveAssessmentCriterionScoresInput) =>
+    api.put("/api/student-portal/manage/results/criteria", input),
   publishAssessmentResults: (input: PublishAssessmentResultsInput) =>
     api.post("/api/student-portal/manage/results/publish", input),
 };

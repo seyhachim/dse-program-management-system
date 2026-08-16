@@ -295,7 +295,7 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
       {assessment ? (
         <Panel title={assessment.name} description={allPublished ? "Published results are locked against ordinary edits." : `${draftCount} of ${assessment.results.length} student marks saved as drafts.`}>
           <div className="space-y-3">
-            {assessment.results.map((row) => <ResultRow key={row.enrollmentId} assessmentId={assessment.id} row={row} onChanged={onChanged} />)}
+            {assessment.results.map((row) => <ResultRow key={row.enrollmentId} assessment={assessment} row={row} onChanged={onChanged} />)}
             {!assessment.results.length ? <Muted>No students are enrolled in this section.</Muted> : null}
           </div>
         </Panel>
@@ -304,7 +304,7 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
   );
 }
 
-function ResultRow({ assessmentId, row, onChanged }: { assessmentId: string; row: CourseDeliveryResultRow; onChanged: (message: string) => Promise<void> }) {
+function ResultRow({ assessment, row, onChanged }: { assessment: CourseDeliveryAssessment; row: CourseDeliveryResultRow; onChanged: (message: string) => Promise<void> }) {
   const [score, setScore] = useState(row.score === null ? "" : String(row.score));
   const [maxScore, setMaxScore] = useState(row.maxScore === null ? "100" : String(row.maxScore));
   const [feedback, setFeedback] = useState(row.feedback);
@@ -318,7 +318,7 @@ function ResultRow({ assessmentId, row, onChanged }: { assessmentId: string; row
     }
     setSaving(true); setError(null);
     try {
-      await courseDeliveryApi.saveResult({ enrollmentId: row.enrollmentId, assessmentItemId: assessmentId, score: numericScore, maxScore: numericMax, feedback });
+      await courseDeliveryApi.saveResult({ enrollmentId: row.enrollmentId, assessmentItemId: assessment.id, score: numericScore, maxScore: numericMax, feedback });
       await onChanged(`${row.studentName}'s draft mark saved.`);
     } catch (reason) { setError(messageFrom(reason, "Could not save draft result")); }
     finally { setSaving(false); }
@@ -348,6 +348,64 @@ function ResultRow({ assessmentId, row, onChanged }: { assessmentId: string; row
           <Button type="button" onClick={save} disabled={saving || score === ""}><CheckCircle2 />{saving ? "Saving…" : "Save draft"}</Button>
         )}
       </div>
+      {assessment.rubricCriteria.length > 0 ? (
+        <CriterionScoreEditor assessment={assessment} row={row} locked={locked} onChanged={onChanged} />
+      ) : null}
+      {error ? <InlineError>{error}</InlineError> : null}
+    </div>
+  );
+}
+
+function CriterionScoreEditor({ assessment, row, locked, onChanged }: { assessment: CourseDeliveryAssessment; row: CourseDeliveryResultRow; locked: boolean; onChanged: (message: string) => Promise<void> }) {
+  const [levels, setLevels] = useState<Record<string, string>>(
+    Object.fromEntries(row.criterionScores.map((score) => [score.criterionId, score.rubricLevelId ?? ""])),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    const scores = assessment.rubricCriteria.flatMap((criterion) => {
+      const levelId = levels[criterion.id];
+      const level = criterion.levels.find((candidate) => candidate.id === levelId);
+      return level ? [{ criterionId: criterion.id, score: level.points, rubricLevelId: level.id }] : [];
+    });
+    setSaving(true); setError(null);
+    try {
+      await courseDeliveryApi.saveCriterionScores({
+        enrollmentId: row.enrollmentId,
+        assessmentItemId: assessment.id,
+        scores,
+      });
+      await onChanged(`${row.studentName}'s rubric criterion scores saved.`);
+    } catch (reason) {
+      setError(messageFrom(reason, "Could not save rubric criterion scores"));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <p className="text-sm font-semibold">Rubric criterion evidence</p>
+      <p className="mt-1 text-xs text-muted-foreground">Criterion ratings contribute only to explicitly mapped CLO evidence. The assessment's local course-grade weight is unchanged.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {assessment.rubricCriteria.map((criterion) => (
+          <label key={criterion.id} className="text-sm font-medium">
+            <span>{criterion.name}</span>
+            <span className="ml-2 text-xs font-normal text-muted-foreground">{criterion.cloCodes.length ? `→ ${criterion.cloCodes.join(", ")}` : "No CLO evidence mapping"}</span>
+            <select
+              value={levels[criterion.id] ?? ""}
+              onChange={(event) => setLevels((current) => ({ ...current, [criterion.id]: event.target.value }))}
+              disabled={locked}
+              className="mt-1 block h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Not scored</option>
+              {criterion.levels.map((level) => (
+                <option key={level.id} value={level.id}>{level.label} · {level.points} pts</option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+      {!locked ? <Button type="button" variant="outline" className="mt-3" onClick={save} disabled={saving}>{saving ? "Saving rubric…" : "Save rubric scores"}</Button> : null}
       {error ? <InlineError>{error}</InlineError> : null}
     </div>
   );
