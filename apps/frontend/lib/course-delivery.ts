@@ -18,10 +18,6 @@ export const courseDeliveryApi = {
     api.put("/api/student-portal/manage/results", input),
   publishAssessmentResults: (input: PublishAssessmentResultsInput) =>
     api.post("/api/student-portal/manage/results/publish", input),
-  // Temporary source-compatibility alias. The backend endpoint is draft-only now,
-  // so legacy callers cannot accidentally publish marks while the UI is migrated.
-  publishResult: (input: SaveAssessmentResultInput) =>
-    api.put("/api/student-portal/manage/results", input),
 };
 
 export function toDateTimeLocal(value: string | null): string {
