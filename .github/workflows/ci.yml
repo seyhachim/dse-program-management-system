@@ -100,3 +100,8 @@ jobs:
 
       - name: Seed clean database
         run: bun run seed
+
+      - name: Verify curriculum database invariants
+        run: bun test apps/backend/src/plugins/programme/curriculum-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
