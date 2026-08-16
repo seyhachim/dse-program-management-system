@@ -1,160 +1,106 @@
-# Telegram Mini App Foundation
+# Telegram Mini App Companion
 
 Parent epic: #265  
-Foundation: #266  
-Signed init-data verification: #267
+Foundation/authentication: #266–#267  
+MVP continuation: #268–#275
 
-## Purpose
+## Purpose and boundary
 
-The Telegram Mini App is a lightweight mobile companion to the DSE PMS. The existing PMS backend and PostgreSQL database remain the single source of truth.
+The Telegram Mini App is a lightweight mobile companion to DSE PMS. The existing PMS backend and PostgreSQL database remain the single source of truth for identity, roles, enrolment, schedules, announcements, results/CLO achievement, anonymous feedback, and attendance.
 
-The integration now verifies signed Telegram Mini App launch data on the backend. It still does **not** link Telegram accounts to PMS users, infer PMS roles from Telegram profile data, or expose protected student/lecturer data before account linking. Those capabilities belong to later issues, beginning with #268.
+Telegram profile data never grants PMS authority. Complex course-specification authoring, programme administration, QA/SAR workflows, bulk grading, and database administration remain in the normal web PMS.
 
-## Architecture
+## Production environment
 
-```text
-Telegram
-   |
-   | Telegram.WebApp.initData
-   v
-Next.js /telegram
-   |
-   v
-PMS Backend /api/telegram/*
-   |
-   +-- signed init-data verification
-   +-- replay-resistant verification context
-   +-- existing PMS plugins and data (only after later account linking)
-```
-
-The backend registers Telegram through the existing plugin registry. Public endpoints are:
-
-- `GET /api/telegram/config`
-- `GET /api/telegram/health`
-- `POST /api/telegram/auth/verify`
-
-`/api/telegram/config` returns public integration metadata only. It must never return the bot token or other server credentials.
-
-## Environment variables
-
-Configure these in `apps/backend/.env`:
+Configure these backend-only variables:
 
 ```env
 TELEGRAM_ENABLED=false
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
-TELEGRAM_MINI_APP_URL=http://localhost:3000/telegram
+TELEGRAM_MINI_APP_URL=https://your-pms.example/telegram
 TELEGRAM_MINI_APP_SHORT_NAME=pms
 TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=300
 TELEGRAM_INIT_DATA_MAX_FUTURE_SKEW_SECONDS=30
+JWT_SECRET=use-a-strong-production-secret
 ```
 
-`TELEGRAM_BOT_TOKEN` is server-only. Never create a `NEXT_PUBLIC_TELEGRAM_BOT_TOKEN` variable.
+`TELEGRAM_BOT_TOKEN` and `JWT_SECRET` are server secrets. Never expose them through `NEXT_PUBLIC_*`, browser configuration, logs, screenshots, Telegram messages, or deep links.
 
-When `TELEGRAM_ENABLED=false`, the normal PMS starts without Telegram credentials. When Telegram is enabled, all required Telegram values must be present and the Mini App URL must be valid.
+Keep `TELEGRAM_ENABLED=false` until the bot, HTTPS Mini App URL, migrations, and production secrets are configured. Enabled Telegram configuration with missing or malformed required values fails closed.
 
-The default init-data policy accepts launch data up to five minutes old and tolerates at most 30 seconds of future clock skew. Both values are server-side configuration and invalid non-positive values fail configuration validation.
+## Authentication and account linking
 
-## BotFather setup
+1. The browser sends the raw `Telegram.WebApp.initData` to `POST /api/telegram/auth/verify`.
+2. The backend verifies Telegram's HMAC signature, freshness, bounded clock skew, and replay protection.
+3. Verification yields a short-lived, single-use verification id plus the cryptographically verified numeric Telegram user id. Username/display name remain informational only.
+4. An unlinked user must authenticate to PMS and call the protected account-link endpoint with that verification id.
+5. Linking is transactional and enforces one PMS user ↔ one Telegram user. Conflicting identities fail safely.
+6. Returning linked users receive a short-lived Mini App bearer session. The token contains identity references, not trusted role claims.
+7. Every protected Mini App request re-checks that the identity is still active and reloads the PMS user's current programme-role assignments from PostgreSQL.
+8. Revoking a link therefore invalidates an already-issued Mini App session on its next request.
 
-1. Create or select the DSE PMS bot in BotFather.
-2. Configure a Mini App for the bot.
-3. Set the Mini App URL to the deployed `/telegram` route.
-4. Set the Mini App short name to match `TELEGRAM_MINI_APP_SHORT_NAME`.
-5. Store the bot token only in the backend deployment environment.
+Mini App session tokens are kept in browser `sessionStorage`, expire after 30 minutes, and are cleared after a `401`. Signed deep links expire after one hour and select only a destination; they never grant resource access.
 
-Use HTTPS for deployed Mini App URLs.
+## Authorization and academic-data reuse
 
-## Local development
+All `/api/telegram/mini/*` endpoints require a valid Telegram Mini App session.
 
-No Docker-specific setup is required.
+- Students obtain courses, announcements, published results/CLO data, and surveys through the existing Student Portal services, preserving enrolment, publication, anonymity, and current result-access rules.
+- Lecturer class/attendance access is checked against the actual offering, assigned lecturer/co-lecturers, and current programme-scoped PMS roles before delegating to the existing offering attendance service.
+- Deep-link resolution is session-protected, and the destination API still performs normal object-level authorization.
+- Announcement recipients are derived from PMS enrolments joined to active Telegram identities; revoked/unlinked users are excluded and notification preferences are respected.
+- Notification delivery has a unique identity/event claim so retries do not create duplicate sends for the same event.
+- Sensitive Telegram lifecycle and mutation actions write audit-compatible events without storing Telegram init data, bearer tokens, bot secrets, or survey response content.
 
-```bash
-bun install
-bun run dev
-```
+Class-monitor/sub-class-monitor Telegram actions are intentionally not invented here because the current PMS repository has no canonical class-monitor assignment/permission domain to reuse. Add those actions only after that core PMS authorization model exists.
 
-Frontend: `http://localhost:3000/telegram`  
-Backend: `http://localhost:4000`
+## Database security
 
-For local foundation testing, keep `TELEGRAM_ENABLED=false` unless you are explicitly testing enabled configuration.
+Telegram security state is isolated in the `telegram_security` PostgreSQL schema. Migrations enable RLS and revoke schema/table/function/sequence access from `PUBLIC` and Supabase Data API roles (`anon`, `authenticated`, `service_role`). The CI database-security verifier is fail-closed and includes negative probes for unclassified Telegram tables and forbidden grants.
 
-## Signed init-data verification
+Academic records remain in their existing PMS tables; Telegram does not maintain a competing grade, attendance, survey, course, or role store.
 
-The browser must send the raw value from `Telegram.WebApp.initData` to:
+## Deployment verification
 
-```http
-POST /api/telegram/auth/verify
-Content-Type: application/json
-```
+Before a controlled production pilot:
 
-```json
-{
-  "initData": "query_id=...&user=...&auth_date=...&hash=..."
-}
-```
+1. Apply all migrations to the target PostgreSQL/Supabase database and run the database-security verifier successfully.
+2. Run root `typecheck`, `lint`, `test`, backend test discovery, and production `build` successfully.
+3. Confirm the Mini App URL is HTTPS and BotFather points the official DSE bot/Mini App to that URL and configured short name.
+4. Open `/telegram` directly in a normal browser and confirm it does not authenticate a user without verified Telegram init data.
+5. Launch from the official Telegram bot and confirm signed init data verifies while tampered, stale, future-skewed, and replayed launches fail closed.
+6. Link one pilot PMS account while authenticated. Confirm a second PMS account cannot claim the same Telegram user and the PMS account cannot silently switch to another Telegram identity.
+7. Reopen the Mini App and confirm the server resolves current PMS roles/programme scope, not Telegram profile fields or cached client roles.
+8. As a student, verify only enrolled classes and currently publishable result/CLO/feedback/survey data are visible.
+9. As a lecturer, verify class detail and attendance are limited to assigned offerings or current programme-wide PMS authority; an arbitrary offering id must fail.
+10. Verify a signed deep link opens its intended route but changing route/object ids cannot bypass the destination API's authorization.
+11. Publish one pilot announcement. Confirm only active linked enrolled recipients with announcements enabled are targeted and a repeated delivery for the same event is deduplicated.
+12. Revoke the Telegram link from PMS account settings and confirm the already-issued Mini App session receives `401` on its next protected request.
+13. Review Telegram audit/delivery records for useful actor/resource/timestamp context and verify no bot token, bearer token, raw init data, or anonymous survey response is recorded.
 
-The backend:
+## Revocation and incident response
 
-1. parses the signed query string and rejects duplicate/malformed required fields;
-2. builds Telegram's alphabetically sorted data-check string, excluding `hash`;
-3. derives the HMAC-SHA-256 secret from the server-only bot token using `WebAppData`;
-4. compares the received and expected hashes with a timing-safe comparison;
-5. validates `auth_date` freshness and bounded future clock skew;
-6. normalizes the verified Telegram user id to a string; and
-7. atomically records a SHA-256 digest of the verified raw init data so the same launch payload cannot be reused.
+### Revoke one user's access
 
-Replay records are stored in the dedicated PostgreSQL `telegram_security` schema. The raw init data, bot token, derived HMAC key, and expected hash are never persisted.
+1. Use the authenticated PMS account settings Telegram card to revoke the link.
+2. Confirm `/api/telegram/account` reports `linked: false`.
+3. Confirm the previous Mini App session receives `401` from a protected `/api/telegram/mini/*` endpoint.
+4. Review `telegram_security.TelegramAuditEvent` for the user/identity.
+5. Re-link only from a fresh cryptographically verified Telegram launch and the intended authenticated PMS account.
 
-A successful response is a **pre-link Telegram identity context** only:
+### Bot token exposure
 
-```json
-{
-  "verified": true,
-  "verificationId": "uuid",
-  "telegramUser": {
-    "id": "123456789",
-    "username": "optional"
-  },
-  "authDate": "2026-08-16T05:00:00.000Z",
-  "expiresAt": "2026-08-16T05:05:00.000Z"
-}
-```
+Rotate/revoke `TELEGRAM_BOT_TOKEN` in BotFather, replace the production backend secret, and verify pilot notification delivery before enabling notifications again.
 
-This response must not contain a PMS user id, PMS role, permission, JWT, session token, enrolment, grade, attendance record, or other academic data. Issue #268 is responsible for proving a PMS identity and consuming this verified Telegram context during explicit account linking.
+### JWT secret exposure
 
-Do not use `Telegram.WebApp.initDataUnsafe.user` as trusted identity. It is display/convenience data only; authorization must be based on server-validated `initData` and then normal PMS authorization after linking.
+Rotate `JWT_SECRET` in the production backend. Existing tokens signed with the previous secret, including Telegram Mini App sessions and deep links, become invalid and must be reissued.
 
-## Verification errors
+### Disable the integration
 
-The verification endpoint fails closed with stable categories:
+Set `TELEGRAM_ENABLED=false`. Do not delete or alter academic results, attendance, survey responses, or course records as part of Telegram incident response.
 
-- `400 INVALID_INIT_DATA` — malformed request body
-- `401 INVALID_INIT_DATA` — signed launch data could not be authenticated
-- `401 INIT_DATA_EXPIRED` — validly structured launch data is stale or outside allowed clock skew
-- `409 INIT_DATA_REPLAYED` — the same valid launch payload was already accepted
-- `503 TELEGRAM_DISABLED` — Telegram integration is disabled
+## Rollout
 
-Cryptographic details, raw init data, and bot secrets must not be returned in error bodies or logs.
-
-## Deep-link convention
-
-Start payloads are versioned. The foundation currently supports:
-
-```text
-v1_home
-```
-
-Future resource links may extend the convention using opaque identifiers, for example `v1_class_<opaque-id>`.
-
-Rules:
-
-- A deep link selects a destination; it never establishes identity or grants authorization.
-- Never include JWTs, session tokens, roles, grades, student email addresses, or other sensitive academic data in a start payload.
-- Unsupported, malformed, and oversized payloads must fail safely.
-
-## Security boundary after #267
-
-Signed Telegram launch data can now prove which Telegram user opened the Mini App recently, subject to the configured freshness and replay rules.
-
-That proof is **not** a PMS login. Telegram username, display name, client-supplied roles, or a verified Telegram id alone must never grant access to protected PMS data. PMS account linking and revocation are implemented separately in #268.
+Start with a small DSE student/lecturer pilot. Validate real-device linking, revocation, class access, result publication boundaries, survey anonymity, attendance permissions, and notification delivery before programme-wide enablement.
