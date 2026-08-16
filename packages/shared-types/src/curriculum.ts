@@ -70,6 +70,43 @@ export type CreateCurriculumRevisionInput = z.infer<
   typeof CreateCurriculumRevisionSchema
 >;
 
+export const CurriculumDraftPlacementInputSchema = z.object({
+  courseId: z.string().uuid(),
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  credits: z.number().int().min(0).max(30),
+  courseType: CourseTypeSchema,
+  sortOrder: z.number().int().min(0),
+});
+export type CurriculumDraftPlacementInput = z.infer<
+  typeof CurriculumDraftPlacementInputSchema
+>;
+
+export const SaveCurriculumDraftSchema = z
+  .object({
+    expectedUpdatedAt: z.string().datetime(),
+    cohortLabel: z.string().trim().max(120),
+    intakeYear: z.number().int().min(1900).max(2200).nullable(),
+    academicYear: z.string().trim().max(40),
+    effectiveFrom: z.string().date().nullable(),
+    placements: z.array(CurriculumDraftPlacementInputSchema).max(240),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    const seen = new Set<string>();
+    input.placements.forEach((placement, index) => {
+      if (seen.has(placement.courseId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["placements", index, "courseId"],
+          message: "A course can appear only once in a curriculum version",
+        });
+      }
+      seen.add(placement.courseId);
+    });
+  });
+export type SaveCurriculumDraftInput = z.infer<typeof SaveCurriculumDraftSchema>;
+
 export const CurriculumCourseSchema = z.object({
   placementId: z.string().uuid(),
   courseId: z.string().uuid(),
