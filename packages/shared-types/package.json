@@ -11,7 +11,7 @@
     "./students": "./src/students.ts"
   },
   "scripts": {
-    "typecheck": "bash -o pipefail -c 'tsc --noEmit --pretty false 2>&1 | while IFS= read -r line; do echo \"::error::$line\"; done'"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^3.23.8"
