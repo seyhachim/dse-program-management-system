@@ -1,5 +1,6 @@
 import type {
   CourseDeliveryOffering,
+  CourseDeliveryResultReview,
   PublishAnnouncementInput,
   PublishAssessmentResultsInput,
   SaveAssessmentResultInput,
@@ -10,6 +11,8 @@ import { api } from "./api";
 export const courseDeliveryApi = {
   offerings: () =>
     api.get<CourseDeliveryOffering[]>("/api/student-portal/manage/offerings"),
+  resultReview: (offeringId: string) =>
+    api.get<CourseDeliveryResultReview>(`/api/student-portal/manage/results/review/${offeringId}`),
   publishAnnouncement: (input: PublishAnnouncementInput) =>
     api.post("/api/student-portal/manage/announcements", input),
   setDeadline: (input: SetAssessmentDeadlineInput) =>
