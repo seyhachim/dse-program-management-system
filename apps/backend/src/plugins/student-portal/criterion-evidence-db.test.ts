@@ -13,6 +13,16 @@ const OPEN_REVIEW_STATUSES = [
   "Resubmitted",
 ] as const;
 
+async function expectDatabaseRejection(operation: () => Promise<unknown>): Promise<void> {
+  let rejected = false;
+  try {
+    await operation();
+  } catch {
+    rejected = true;
+  }
+  expect(rejected).toBe(true);
+}
+
 dbDescribe("criterion scoring database integrity", () => {
   let assessmentResultId = "";
   let createdAssessmentResult = false;
@@ -86,23 +96,23 @@ dbDescribe("criterion scoring database integrity", () => {
       rubricContentHash: "issue-282-db-content-hash",
     };
 
-    await expect(
-      prisma.assessmentCriterionScore.create({
+    await expectDatabaseRejection(async () => {
+      await prisma.assessmentCriterionScore.create({
         data: { ...base, criterionId: "negative", score: -0.1, maxScore: 4 },
-      }),
-    ).rejects.toThrow();
+      });
+    });
 
-    await expect(
-      prisma.assessmentCriterionScore.create({
+    await expectDatabaseRejection(async () => {
+      await prisma.assessmentCriterionScore.create({
         data: { ...base, criterionId: "zero-max", score: 0, maxScore: 0 },
-      }),
-    ).rejects.toThrow();
+      });
+    });
 
-    await expect(
-      prisma.assessmentCriterionScore.create({
+    await expectDatabaseRejection(async () => {
+      await prisma.assessmentCriterionScore.create({
         data: { ...base, criterionId: "above-max", score: 4.1, maxScore: 4 },
-      }),
-    ).rejects.toThrow();
+      });
+    });
 
     const valid = await prisma.assessmentCriterionScore.create({
       data: { ...base, criterionId: "valid", score: 3, maxScore: 4 },
