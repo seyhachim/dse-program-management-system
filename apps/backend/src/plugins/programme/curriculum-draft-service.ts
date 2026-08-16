@@ -7,10 +7,18 @@ import type {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { curriculumService } from "./curriculum-service.ts";
+import { getCurriculumWorkflowState } from "./curriculum-workflow-service.ts";
 
 export class CurriculumDraftNotFoundError extends Error {}
 export class CurriculumDraftConflictError extends Error {}
 export class CurriculumDraftMutationError extends Error {}
+
+async function assertEditableWorkflow(versionId: string) {
+  const workflow = await getCurriculumWorkflowState(versionId);
+  if (workflow.status !== "Draft") {
+    throw new CurriculumDraftMutationError("Only Draft curriculum versions can be edited");
+  }
+}
 
 async function getDraftVersion(versionId: string) {
   const version = await prisma.programmeCurriculumVersion.findUnique({
@@ -26,6 +34,7 @@ async function getDraftVersion(versionId: string) {
   if (version.status !== "Draft") {
     throw new CurriculumDraftMutationError("Only Draft curriculum versions can be edited");
   }
+  await assertEditableWorkflow(versionId);
   return version;
 }
 
@@ -142,6 +151,7 @@ export const curriculumDraftService = {
     if (placement.curriculumVersion.status !== "Draft") {
       throw new CurriculumDraftMutationError("Only Draft curriculum versions can be edited");
     }
+    await assertEditableWorkflow(placement.curriculumVersion.id);
 
     await prisma.$transaction(async (tx) => {
       await tx.programmeCurriculumCourse.update({
@@ -213,6 +223,7 @@ export const curriculumDraftService = {
     if (placement.curriculumVersion.status !== "Draft") {
       throw new CurriculumDraftMutationError("Only Draft curriculum versions can be edited");
     }
+    await assertEditableWorkflow(placement.curriculumVersion.id);
 
     await prisma.$transaction(async (tx) => {
       await tx.programmeCurriculumAuditAction.create({
