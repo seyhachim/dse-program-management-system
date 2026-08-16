@@ -11,6 +11,7 @@ import {
   revisionTriggerLabel,
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
+import { CurriculumEditor } from "./curriculum-editor";
 
 const STATUS_CLASS: Record<ProgrammeCurriculumRead["selectedVersion"]["status"], string> = {
   Draft: "border-amber-200 bg-amber-50 text-amber-800",
@@ -120,6 +121,18 @@ export function CurriculumPageClient() {
     if (selectedCurriculumId) await loadVersion(selectedCurriculumId, versionId);
   };
 
+  const handleSaved = (result: ProgrammeCurriculumRead) => {
+    setData(result);
+    setSelectedVersionId(result.selectedVersion.id);
+    setCurricula((current) =>
+      current.map((curriculum) =>
+        curriculum.id === result.curriculum.id
+          ? { ...curriculum, versions: result.versions }
+          : curriculum,
+      ),
+    );
+  };
+
   if (meLoading || loading) return <CurriculumSkeleton />;
 
   if (permissionDenied) {
@@ -219,6 +232,8 @@ export function CurriculumPageClient() {
         </div>
       </section>
 
+      <CurriculumEditor data={data} canWrite={canWrite} onSaved={handleSaved} />
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Curriculum credit summary">
         <Stat label="Total credits" value={data.totals.programmeCredits} />
         <Stat label="Core" value={data.totals.coreCredits} />
@@ -305,7 +320,7 @@ export function CurriculumPageClient() {
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-semibold text-foreground">Version timeline</h3>
               {canWrite && version.status === "Draft" ? (
-                <span className="text-xs font-medium text-muted-foreground">Draft editing lands in #317</span>
+                <span className="text-xs font-medium text-amber-700">Editable draft</span>
               ) : null}
             </div>
             <ol className="mt-4 space-y-4">
