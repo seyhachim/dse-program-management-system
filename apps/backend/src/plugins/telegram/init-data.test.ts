@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   TELEGRAM_INIT_DATA_MAX_LENGTH,
   TelegramInitDataError,
+  type TelegramInitDataErrorCode,
   verifyTelegramInitData,
 } from "./init-data.ts";
 
@@ -43,7 +44,7 @@ function verify(raw: string) {
   });
 }
 
-function expectCode(fn: () => unknown, code: string) {
+function expectCode(fn: () => unknown, code: TelegramInitDataErrorCode) {
   try {
     fn();
     throw new Error("Expected verification to fail");
