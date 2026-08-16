@@ -87,7 +87,13 @@ const EXPECTED_ATTENDANCE_TABLES = [
   "AttendanceRecord",
 ] as const;
 
-const EXPECTED_TELEGRAM_SECURITY_TABLES = ["TelegramInitVerification"] as const;
+const EXPECTED_TELEGRAM_SECURITY_TABLES = [
+  "TelegramInitVerification",
+  "TelegramIdentity",
+  "TelegramAuditEvent",
+  "TelegramNotificationPreference",
+  "TelegramNotificationDelivery",
+] as const;
 
 const FORBIDDEN_GRANTEES = new Set([
   "PUBLIC",
