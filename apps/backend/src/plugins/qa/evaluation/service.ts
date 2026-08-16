@@ -35,6 +35,15 @@ export class QaEvaluationResourceNotFoundError extends Error {}
 export class QaEvaluationScopeMismatchError extends Error {}
 export class QaEvaluationIntegrityError extends Error {}
 
+function controlledAttributes(value: unknown): Record<string, string | number | boolean | null> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) =>
+      item === null || ["string", "number", "boolean"].includes(typeof item),
+    ),
+  ) as Record<string, string | number | boolean | null>;
+}
+
 function scenarioToView(row: any): QaEvaluationScenarioView {
   return {
     id: row.id,
@@ -53,12 +62,14 @@ function scenarioToView(row: any): QaEvaluationScenarioView {
       id: item.id,
       scenarioId: item.scenarioId,
       order: item.order,
+      evidenceType: item.evidenceType,
       sourceDomain: QaEvidenceSourceDomainSchema.parse(item.sourceDomain),
       entityType: item.entityType,
       label: item.label,
       text: item.text,
       referenceKey: item.referenceKey,
       reportingDate: item.reportingDate?.toISOString() ?? null,
+      attributes: controlledAttributes(item.attributes),
       goldRelevant: item.goldRelevant,
     })),
     createdAt: row.createdAt.toISOString(),
@@ -111,7 +122,12 @@ export async function createQaEvaluationScenario(
     }),
     prisma.qaQualityExpectation.findUnique({
       where: { id: input.expectationId },
-      select: { id: true, requirementId: true, active: true },
+      select: {
+        id: true,
+        requirementId: true,
+        active: true,
+        expectedEvidence: { select: { evidenceType: true } },
+      },
     }),
   ]);
   if (!requirement || !expectation) {
@@ -120,6 +136,16 @@ export async function createQaEvaluationScenario(
   if (!expectation.active || expectation.requirementId !== requirement.id) {
     throw new QaEvaluationScopeMismatchError(
       "Evaluation expectation does not belong to the selected AUN-QA requirement",
+    );
+  }
+
+  const allowedEvidenceTypes = new Set(expectation.expectedEvidence.map((item) => item.evidenceType));
+  const invalidEvidenceType = input.evidence.find(
+    (item) => item.evidenceType !== "" && !allowedEvidenceTypes.has(item.evidenceType),
+  );
+  if (invalidEvidenceType) {
+    throw new QaEvaluationScopeMismatchError(
+      `Controlled evidence type ${invalidEvidenceType.evidenceType} is not registered for the selected quality expectation`,
     );
   }
 
@@ -132,12 +158,14 @@ export async function createQaEvaluationScenario(
       evidence: {
         create: input.evidence.map((item, order) => ({
           order,
+          evidenceType: item.evidenceType,
           sourceDomain: item.sourceDomain,
           entityType: item.entityType,
           label: item.label,
           text: item.text,
           referenceKey: item.referenceKey,
           reportingDate: item.reportingDate,
+          attributes: item.attributes,
         })),
       },
     },
@@ -223,7 +251,7 @@ export async function setQaEvaluationGold(
 }
 
 /** Internal persistence for an actual prototype run. This is intentionally not
- * exposed as a client-write route; #194 will call it from the controlled runner. */
+ * exposed as a client-write route; #194 calls it from the controlled runner. */
 export async function createQaEvaluationRun(
   input: CreateRunInput,
 ): Promise<QaEvaluationRunView> {

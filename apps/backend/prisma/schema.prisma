@@ -716,17 +716,20 @@ model QaEvaluationScenarioEvidence {
   scenarioId    String
   scenario      QaEvaluationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
   order         Int
+  evidenceType  String               @default("")
   sourceDomain  String
   entityType    String
   label         String
   text          String
   referenceKey  String               @default("")
   reportingDate DateTime?
+  attributes    Json                 @default("{}")
   goldRelevant  Boolean?
   runLinks       QaEvaluationRunEvidence[]
 
   @@unique([scenarioId, order])
   @@index([scenarioId, goldRelevant])
+  @@index([scenarioId, evidenceType])
 }
 
 /// Immutable prototype output for one controlled scenario. Gold labels are read

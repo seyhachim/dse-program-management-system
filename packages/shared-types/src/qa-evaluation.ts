@@ -2,13 +2,22 @@ import { z } from "zod";
 import { QaEvidenceAnalysisStateSchema } from "./qa-analysis.ts";
 import { QaEvidenceSourceDomainSchema } from "./qa-knowledge.ts";
 
+export const QaEvaluationEvidenceAttributeValueSchema = z.union([
+  z.string().max(5000),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
 export const QaEvaluationScenarioEvidenceInputSchema = z.object({
+  evidenceType: z.string().trim().max(120).default(""),
   sourceDomain: QaEvidenceSourceDomainSchema,
   entityType: z.string().trim().min(1).max(120).default("ControlledEvidence"),
   label: z.string().trim().min(1).max(300),
   text: z.string().trim().min(1).max(50_000),
   referenceKey: z.string().trim().max(500).default(""),
   reportingDate: z.coerce.date().nullable().optional().default(null),
+  attributes: z.record(z.string(), QaEvaluationEvidenceAttributeValueSchema).default({}),
 });
 
 export const CreateQaEvaluationScenarioSchema = z.object({
@@ -89,12 +98,14 @@ export interface QaEvaluationEvidenceView {
   id: string;
   scenarioId: string;
   order: number;
+  evidenceType: string;
   sourceDomain: z.infer<typeof QaEvidenceSourceDomainSchema>;
   entityType: string;
   label: string;
   text: string;
   referenceKey: string;
   reportingDate: string | null;
+  attributes: Record<string, z.infer<typeof QaEvaluationEvidenceAttributeValueSchema>>;
   goldRelevant: boolean | null;
 }
 
