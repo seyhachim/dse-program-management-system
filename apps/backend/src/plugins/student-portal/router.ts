@@ -9,7 +9,7 @@ import {
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
-import { telegramNotificationService } from "../telegram/notification-service.ts";
+import { registry } from "../../core/plugins/registry.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
 import {
   PortalAccessError,
@@ -17,6 +17,17 @@ import {
   PortalNotFoundError,
   studentPortalService,
 } from "./service.ts";
+
+interface TelegramNotificationsContract {
+  notifications: {
+    deliverAnnouncement(input: {
+      announcementId: string;
+      offeringId: string;
+      title: string;
+      body: string;
+    }): Promise<void>;
+  };
+}
 
 function programmeWide(roles: Role[]): boolean {
   return roles.some((role) => PROGRAMME_WIDE_ROLES.includes(role));
@@ -68,14 +79,15 @@ export function createStudentPortalRouter(): Router {
         parsed.data,
       );
       res.status(201).json(announcement);
-      // Delivery is deliberately detached from the PMS write. Telegram outages
-      // are recorded by the notification service and never make publication fail.
-      void telegramNotificationService.deliverAnnouncement({
-        announcementId: announcement.id,
-        offeringId: parsed.data.offeringId,
-        title: parsed.data.title,
-        body: parsed.data.body,
-      }).catch((error) => console.error("Telegram announcement delivery failed", error));
+      if (registry.has("telegram")) {
+        const telegram = registry.get<TelegramNotificationsContract>("telegram").service;
+        void telegram.notifications.deliverAnnouncement({
+          announcementId: announcement.id,
+          offeringId: parsed.data.offeringId,
+          title: parsed.data.title,
+          body: parsed.data.body,
+        }).catch((error) => console.error("Telegram announcement delivery failed", error));
+      }
     } catch (error) { handleError(error, res); }
   });
   router.put("/manage/results", requirePermission("courses:write"), async (req, res) => {
