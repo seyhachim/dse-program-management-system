@@ -4,6 +4,8 @@ import { prisma } from "../../core/db/prisma.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
 import { PortalAccessError, PortalConflictError, studentPortalService } from "./service.ts";
 
+process.env.JWT_SECRET ??= "issue-333-result-correction-test-secret-at-least-32-characters";
+
 const runDbTests = process.env.RESULT_CORRECTION_DB_TESTS === "1";
 const dbDescribe = runDbTests ? describe : describe.skip;
 
