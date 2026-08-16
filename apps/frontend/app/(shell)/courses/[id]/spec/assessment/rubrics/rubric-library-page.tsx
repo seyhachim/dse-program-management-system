@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Copy, ExternalLink, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Archive, Check, Copy, ExternalLink, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { type Rubric } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
@@ -20,7 +20,15 @@ import { Topbar } from "../../../../../topbar";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { coursesApi, type CourseView } from "@/lib/courses";
-import { rubricsApi, rubricStatusTone, typeChipClass } from "@/lib/rubrics";
+import {
+  canArchiveRubric,
+  canDeleteRubric,
+  canEditRubric,
+  rubricLockLabel,
+  rubricsApi,
+  rubricStatusTone,
+  typeChipClass,
+} from "@/lib/rubrics";
 
 export function RubricLibraryPage({ courseId }: { courseId: string }) {
   const router = useRouter();
@@ -34,7 +42,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
 
   const base = `/courses/${courseId}/spec/assessment/rubrics`;
   const assessmentHref = `/courses/${courseId}/spec?tab=assessmentPlan`;
-  const canWrite = me?.permissions.includes("rubrics:write") ?? false;
+  const canCreate = me?.permissions.includes("rubrics:write") ?? false;
 
   useEffect(() => {
     coursesApi.get(courseId).then(setCourse).catch(() => setCourse(null));
@@ -58,12 +66,22 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
   }, [load]);
 
   const handleDelete = async (rubric: Rubric) => {
-    if (!confirm(`Delete "${rubric.name}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete "${rubric.name}"? This is allowed only for an unused Draft rubric.`)) return;
     try {
       await rubricsApi.remove(rubric.id);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to delete rubric");
+    }
+  };
+
+  const handleArchive = async (rubric: Rubric) => {
+    if (!confirm(`Archive "${rubric.name}"? Existing assessment links remain preserved, but the rubric will no longer be published for new use.`)) return;
+    try {
+      await rubricsApi.archive(rubric.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to archive rubric");
     }
   };
 
@@ -118,7 +136,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                 className="pl-9"
               />
             </div>
-            {canWrite ? (
+            {canCreate ? (
               <Button render={<Link href={`${base}/new`}><Plus className="h-4 w-4" />Create Rubric</Link>} />
             ) : null}
           </div>
@@ -151,86 +169,94 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                 ) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                      {canWrite ? "No rubrics yet. Create the first rubric." : "No rubrics are available."}
+                      {canCreate ? "No rubrics yet. Create the first rubric." : "No rubrics are available."}
                     </td>
                   </tr>
                 ) : (
-                  rows.map((rubric) => (
-                    <tr
-                      key={rubric.id}
-                      role="link"
-                      tabIndex={0}
-                      onClick={() => openRubric(rubric.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openRubric(rubric.id);
-                        }
-                      }}
-                      className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`${base}/${rubric.id}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="font-medium text-foreground hover:underline"
-                        >
-                          {rubric.name}
-                        </Link>
-                        {rubric.description ? (
-                          <div className="mt-1 line-clamp-1 max-w-xl text-xs text-muted-foreground">
-                            {rubric.description}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${typeChipClass(rubric.type)}`}>
-                          {rubric.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center font-medium text-foreground">
-                        {rubric.criteria.length}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDate(rubric.updatedAt)}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge tone={rubricStatusTone(rubric.status)} label={rubric.status} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div
-                          className="flex items-center justify-end gap-1"
-                          onClick={(event) => event.stopPropagation()}
-                        >
+                  rows.map((rubric) => {
+                    const editable = canEditRubric(me, rubric);
+                    const deletable = canDeleteRubric(me, rubric);
+                    const archivable = canArchiveRubric(me, rubric);
+                    const lockLabel = rubricLockLabel(rubric);
+
+                    return (
+                      <tr
+                        key={rubric.id}
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => openRubric(rubric.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openRubric(rubric.id);
+                          }
+                        }}
+                        className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      >
+                        <td className="px-4 py-3">
                           <Link
                             href={`${base}/${rubric.id}`}
-                            aria-label={`View ${rubric.name}`}
-                            title="View rubric"
-                            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            onClick={(event) => event.stopPropagation()}
+                            className="font-medium text-foreground hover:underline"
                           >
-                            <Eye className="h-4 w-4" />
+                            {rubric.name}
                           </Link>
-                          {rubric.status === "Active" ? (
-                            <>
-                              <Link
-                                href={`/rubrics/${rubric.id}`}
-                                aria-label={`View public page for ${rubric.name}`}
-                                title="View public page"
-                                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => copyPublicLink(rubric.id)}
-                                aria-label={`Copy public link for ${rubric.name}`}
-                                title={copiedId === rubric.id ? "Public link copied" : "Copy public link"}
-                                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                              >
-                                {copiedId === rubric.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                              </button>
-                            </>
+                          {rubric.description ? (
+                            <div className="mt-1 line-clamp-1 max-w-xl text-xs text-muted-foreground">
+                              {rubric.description}
+                            </div>
                           ) : null}
-                          {canWrite ? (
-                            <>
+                          {lockLabel ? (
+                            <div className="mt-1 text-xs text-muted-foreground">{lockLabel}</div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${typeChipClass(rubric.type)}`}>
+                            {rubric.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center font-medium text-foreground">
+                          {rubric.criteria.length}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{formatDate(rubric.updatedAt)}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge tone={rubricStatusTone(rubric.status)} label={rubric.status} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div
+                            className="flex items-center justify-end gap-1"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <Link
+                              href={`${base}/${rubric.id}`}
+                              aria-label={`View ${rubric.name}`}
+                              title="View rubric"
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            {rubric.status === "Active" ? (
+                              <>
+                                <Link
+                                  href={`/rubrics/${rubric.id}`}
+                                  aria-label={`View public page for ${rubric.name}`}
+                                  title="View public page"
+                                  className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => copyPublicLink(rubric.id)}
+                                  aria-label={`Copy public link for ${rubric.name}`}
+                                  title={copiedId === rubric.id ? "Public link copied" : "Copy public link"}
+                                  className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                  {copiedId === rubric.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                </button>
+                              </>
+                            ) : null}
+                            {editable ? (
                               <Link
                                 href={`${base}/${rubric.id}/edit`}
                                 aria-label={`Edit ${rubric.name}`}
@@ -239,6 +265,19 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                               >
                                 <Pencil className="h-4 w-4" />
                               </Link>
+                            ) : null}
+                            {archivable ? (
+                              <button
+                                type="button"
+                                onClick={() => handleArchive(rubric)}
+                                aria-label={`Archive ${rubric.name}`}
+                                title="Archive rubric"
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                <Archive className="h-4 w-4" />
+                              </button>
+                            ) : null}
+                            {deletable ? (
                               <button
                                 type="button"
                                 onClick={() => handleDelete(rubric)}
@@ -248,19 +287,19 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
-                            </>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Active rubrics are public: use the public-page or copy-link actions to share them with students, QA reviewers, or external stakeholders. Draft and Archived rubrics remain private.
+            Draft rubrics can be edited only by their owner or programme leadership. Once a rubric is published or linked to an assessment, its scoring content is locked to preserve academic evidence. Active rubrics can be archived, while only unused Draft rubrics can be deleted.
           </p>
         </div>
       </main>

@@ -8,6 +8,7 @@ import type {
   UpdateRubricInput,
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
+import type { AuthUser } from "../../core/auth/token.ts";
 import { prisma } from "../../core/db/prisma.ts";
 
 /**
@@ -22,8 +23,113 @@ const withNormalized = {
     orderBy: { order: "asc" },
     include: { cells: true },
   },
+  _count: { select: { assessmentItems: true } },
 } as const;
 type RubricRow = Prisma.RubricGetPayload<{ include: typeof withNormalized }>;
+
+export type RubricActor = Pick<AuthUser, "id" | "roles">;
+export type RubricLifecycleSnapshot = {
+  ownerId: string | null;
+  status: Rubric["status"];
+  assessmentUsageCount: number;
+};
+
+export class RubricNotFoundError extends Error {}
+export class RubricConflictError extends Error {}
+
+/** Admin and Program Coordinator may manage any rubric; other writers are owner-scoped. */
+export function canManageAllRubrics(actor: RubricActor): boolean {
+  return actor.roles.some((role) => role === "admin" || role === "program_coordinator");
+}
+
+/** Lecturers/writers may manage only their own rubric unless they have an elevated role. */
+export function canManageRubric(actor: RubricActor, ownerId: string | null): boolean {
+  return canManageAllRubrics(actor) || (ownerId !== null && ownerId === actor.id);
+}
+
+/**
+ * Active rubrics are intentionally readable to authenticated rubric readers.
+ * Draft/Archived rubrics are private to their owner and programme leadership.
+ */
+export function canReadRubric(actor: RubricActor, snapshot: Pick<RubricLifecycleSnapshot, "ownerId" | "status">): boolean {
+  return snapshot.status === "Active" || canManageRubric(actor, snapshot.ownerId);
+}
+
+const CONTENT_FIELDS: Array<keyof UpdateRubricInput> = [
+  "name",
+  "type",
+  "description",
+  "levels",
+  "criteria",
+];
+
+function hasContentMutation(input: UpdateRubricInput): boolean {
+  return CONTENT_FIELDS.some((field) => input[field] !== undefined);
+}
+
+function providedFields(input: UpdateRubricInput): Array<keyof UpdateRubricInput> {
+  return (Object.keys(input) as Array<keyof UpdateRubricInput>).filter(
+    (field) => input[field] !== undefined,
+  );
+}
+
+/**
+ * Return a safe conflict reason, or null when this PATCH is allowed.
+ *
+ * Lifecycle policy:
+ * - Draft + unlinked: owner/elevated role may edit or publish/archive.
+ * - Draft + linked: content is locked, but status-only publish/archive is allowed.
+ * - Active: academic content is immutable; only Active -> Archived is allowed.
+ * - Archived: immutable.
+ */
+export function rubricUpdateConflict(
+  snapshot: RubricLifecycleSnapshot,
+  input: UpdateRubricInput,
+): string | null {
+  const fields = providedFields(input);
+  if (fields.length === 0) return null;
+
+  if (snapshot.status === "Archived") {
+    const noOp = fields.length === 1 && fields[0] === "status" && input.status === "Archived";
+    return noOp
+      ? null
+      : "Archived rubrics are immutable. Create a new rubric to make changes.";
+  }
+
+  if (snapshot.status === "Active") {
+    const noOp = fields.length === 1 && fields[0] === "status" && input.status === "Active";
+    if (noOp) return null;
+    const archiveOnly = fields.length === 1 && fields[0] === "status" && input.status === "Archived";
+    return archiveOnly
+      ? null
+      : "Published rubrics are immutable. Archive the rubric or create a new rubric for revised content.";
+  }
+
+  if (snapshot.assessmentUsageCount > 0 && hasContentMutation(input)) {
+    return "Rubrics linked to assessments cannot have their scoring content changed. Unlink the rubric or create a new rubric.";
+  }
+
+  return null;
+}
+
+/** Only an unlinked Draft may be physically deleted. */
+export function rubricDeleteConflict(snapshot: RubricLifecycleSnapshot): string | null {
+  if (snapshot.status !== "Draft") {
+    return "Only Draft rubrics can be deleted. Published rubrics must be archived to preserve academic history.";
+  }
+  if (snapshot.assessmentUsageCount > 0) {
+    return "Rubrics linked to assessments cannot be deleted. Unlink the rubric first or keep it for historical evidence.";
+  }
+  return null;
+}
+
+function lifecycleSnapshot(row: RubricRow): RubricLifecycleSnapshot {
+  return {
+    ownerId: row.ownerId,
+    status: row.status,
+    assessmentUsageCount: row._count.assessmentItems,
+  };
+}
 
 /** Shape a Prisma row into the authenticated API `Rubric`. */
 function toRubric(row: RubricRow): Rubric {
@@ -45,6 +151,7 @@ function toRubric(row: RubricRow): Rubric {
     criteria,
     status: row.status,
     owner: row.owner ? { id: row.owner.id, name: row.owner.name } : null,
+    assessmentUsageCount: row._count.assessmentItems,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -112,17 +219,29 @@ export async function syncNormalizedRubricTables(
  * one and is stamped from the authenticated caller, never from the request body.
  */
 export const rubricService = {
-  async list(query: ListRubricsQuery): Promise<Rubric[]> {
+  async list(query: ListRubricsQuery, actor: RubricActor): Promise<Rubric[]> {
     const { search, status } = query;
     const rows = await prisma.rubric.findMany({
       where: {
-        ...(status ? { status } : { status: { not: "Archived" } }),
+        ...(canManageAllRubrics(actor)
+          ? {}
+          : {
+              OR: [
+                { status: "Active" as const },
+                { ownerId: actor.id },
+              ],
+            }),
+        ...(status ? { status } : { status: { not: "Archived" as const } }),
         ...(search
           ? {
-              OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { description: { contains: search, mode: "insensitive" } },
-                { type: { contains: search, mode: "insensitive" } },
+              AND: [
+                {
+                  OR: [
+                    { name: { contains: search, mode: "insensitive" as const } },
+                    { description: { contains: search, mode: "insensitive" as const } },
+                    { type: { contains: search, mode: "insensitive" as const } },
+                  ],
+                },
               ],
             }
           : {}),
@@ -133,9 +252,10 @@ export const rubricService = {
     return rows.map(toRubric);
   },
 
-  async getById(id: string): Promise<Rubric | null> {
+  async getById(id: string, actor: RubricActor): Promise<Rubric | null> {
     const row = await prisma.rubric.findUnique({ where: { id }, include: withNormalized });
-    return row ? toRubric(row) : null;
+    if (!row || !canReadRubric(actor, lifecycleSnapshot(row))) return null;
+    return toRubric(row);
   },
 
   /** Public lookup is Active-only at the database boundary. */
@@ -147,7 +267,7 @@ export const rubricService = {
     return row ? toPublicRubric(toRubric(row)) : null;
   },
 
-  async create(input: CreateRubricInput, ownerId: string): Promise<Rubric> {
+  async create(input: CreateRubricInput, actor: RubricActor): Promise<Rubric> {
     return prisma.$transaction(async (tx) => {
       const created = await tx.rubric.create({
         data: {
@@ -155,7 +275,7 @@ export const rubricService = {
           type: input.type,
           description: input.description,
           status: input.status,
-          ownerId,
+          ownerId: actor.id,
         },
         select: { id: true },
       });
@@ -168,17 +288,24 @@ export const rubricService = {
     });
   },
 
-  async update(id: string, input: UpdateRubricInput): Promise<Rubric> {
+  async update(id: string, input: UpdateRubricInput, actor: RubricActor): Promise<Rubric> {
     return prisma.$transaction(async (tx) => {
+      const existing = await tx.rubric.findUnique({ where: { id }, include: withNormalized });
+      if (!existing || !canManageRubric(actor, existing.ownerId)) {
+        throw new RubricNotFoundError("Rubric not found");
+      }
+
+      const conflict = rubricUpdateConflict(lifecycleSnapshot(existing), input);
+      if (conflict) throw new RubricConflictError(conflict);
+
       let finalLevels = input.levels;
       let finalCriteria = input.criteria;
       if (finalLevels === undefined || finalCriteria === undefined) {
-        const current = toRubric(
-          await tx.rubric.findUniqueOrThrow({ where: { id }, include: withNormalized }),
-        );
+        const current = toRubric(existing);
         finalLevels ??= current.levels;
         finalCriteria ??= current.criteria;
       }
+
       await tx.rubric.update({
         where: { id },
         data: {
@@ -189,15 +316,28 @@ export const rubricService = {
         },
       });
       if (input.levels !== undefined || input.criteria !== undefined) {
-        await syncNormalizedRubricTables(tx, id, finalLevels as RubricLevel[], finalCriteria as RubricCriterion[]);
+        await syncNormalizedRubricTables(
+          tx,
+          id,
+          finalLevels as RubricLevel[],
+          finalCriteria as RubricCriterion[],
+        );
       }
       const row = await tx.rubric.findUniqueOrThrow({ where: { id }, include: withNormalized });
       return toRubric(row);
     });
   },
 
-  async remove(id: string): Promise<void> {
-    await prisma.rubric.delete({ where: { id } });
+  async remove(id: string, actor: RubricActor): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.rubric.findUnique({ where: { id }, include: withNormalized });
+      if (!existing || !canManageRubric(actor, existing.ownerId)) {
+        throw new RubricNotFoundError("Rubric not found");
+      }
+      const conflict = rubricDeleteConflict(lifecycleSnapshot(existing));
+      if (conflict) throw new RubricConflictError(conflict);
+      await tx.rubric.delete({ where: { id } });
+    });
   },
 };
 
