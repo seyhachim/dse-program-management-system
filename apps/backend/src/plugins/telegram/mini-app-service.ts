@@ -1,25 +1,88 @@
-import type { CourseFeedbackInput } from "@dse-pms/shared-types";
-import { prisma } from "../../core/db/prisma.ts";
+import type { CourseFeedbackInput, SaveAttendanceInput } from "@dse-pms/shared-types";
 import { hasAnyRoleInProgramme, type AuthUser, type Role } from "../../core/auth/token.ts";
-import { attendanceService } from "../offerings/attendance-service.ts";
-import { offeringService } from "../offerings/service.ts";
-import {
-  PortalAccessError,
-  PortalNotFoundError,
-  studentPortalService,
-} from "../student-portal/service.ts";
-import type { TelegramSessionUser } from "./session.ts";
+import { registry } from "../../core/plugins/registry.ts";
 import { telegramIdentityStore } from "./identity-store.ts";
+import type { TelegramSessionUser } from "./session.ts";
 
 const WIDE_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"];
 
-function authUser(user: TelegramSessionUser): AuthUser {
-  return {
-    id: user.id,
-    email: user.email,
-    roles: user.roles,
-    programmeRoles: user.programmeRoles,
+class TelegramMiniNotFoundError extends Error {}
+class TelegramMiniAccessError extends Error {}
+
+interface PortalCourse {
+  offeringId: string;
+  code: string;
+  title: string;
+  term: string;
+  sectionCode: string;
+  meetings: Array<{
+    dayOfWeek: string;
+    startTime: string;
+    endTime: string;
+    room: string | null;
+    activityType: string;
+  }>;
+  assessments?: Array<{ result: unknown | null }>;
+  feedbackSubmitted?: boolean;
+}
+
+interface DeliveryOffering {
+  offeringId: string;
+  code: string;
+  title: string;
+  term: string;
+  sectionCode: string;
+  announcements: Array<{
+    id: string;
+    title: string;
+    body: string;
+    pinned: boolean;
+    publishedAt: string | null;
+  }>;
+}
+
+interface StudentPortalContract {
+  courses(userId: string): Promise<PortalCourse[]>;
+  course(userId: string, offeringId: string): Promise<PortalCourse & Record<string, unknown>>;
+  announcements(userId: string): Promise<Array<Record<string, unknown>>>;
+  deliveryOfferings(userId: string, programmeWide: boolean): Promise<DeliveryOffering[]>;
+  submitFeedback(userId: string, offeringId: string, input: CourseFeedbackInput): Promise<{ submitted: boolean }>;
+}
+
+interface OfferingView {
+  id: string;
+  term: string;
+  sectionCode: string;
+  course?: { programmeId?: string | null; code?: string; title?: string } | null;
+  lecturer?: { id: string } | null;
+  coLecturers: Array<{ id: string }>;
+  meetings?: Array<{
+    dayOfWeek: string;
+    startTime: string;
+    endTime: string;
+    room: string | null;
+    activityType: string;
+  }>;
+}
+
+interface OfferingsContract {
+  getById(id: string): Promise<OfferingView | null>;
+  attendance: {
+    get(offeringId: string, date: string): Promise<unknown>;
+    save(offeringId: string, date: string, input: SaveAttendanceInput): Promise<unknown>;
   };
+}
+
+function portal() {
+  return registry.get<StudentPortalContract>("student-portal").service;
+}
+
+function offerings() {
+  return registry.get<OfferingsContract>("offerings").service;
+}
+
+function authUser(user: TelegramSessionUser): AuthUser {
+  return { id: user.id, email: user.email, roles: user.roles, programmeRoles: user.programmeRoles };
 }
 
 function isStudent(user: TelegramSessionUser) {
@@ -27,74 +90,32 @@ function isStudent(user: TelegramSessionUser) {
 }
 
 async function assertOfferingAccess(user: TelegramSessionUser, offeringId: string, write = false) {
-  const offering = await offeringService.getById(offeringId);
-  if (!offering) throw new PortalNotFoundError("Offering not found");
+  const offering = await offerings().getById(offeringId);
+  if (!offering) throw new TelegramMiniNotFoundError("Offering not found");
   const programmeId = offering.course?.programmeId ?? null;
-  const assigned =
-    offering.lecturer?.id === user.id || offering.coLecturers.some((item) => item.id === user.id);
+  const assigned = offering.lecturer?.id === user.id || offering.coLecturers.some((item) => item.id === user.id);
   const programmeWide = hasAnyRoleInProgramme(authUser(user), WIDE_ROLES, programmeId);
   if (!assigned && !programmeWide) {
-    throw new PortalAccessError(
+    throw new TelegramMiniAccessError(
       write ? "You can only change attendance for your own offerings" : "You cannot access this offering",
     );
   }
   return offering;
 }
 
-function nextMeeting(meetings: Array<{
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-  room: string | null;
-  activityType: string;
-}>) {
+function nextMeeting(meetings: PortalCourse["meetings"] = []) {
   const meeting = meetings[0];
-  if (!meeting) return null;
-  return {
+  return meeting ? {
     dayOfWeek: meeting.dayOfWeek,
     startTime: meeting.startTime,
     endTime: meeting.endTime,
     room: meeting.room,
     activityType: meeting.activityType,
-  };
-}
-
-async function lecturerCourses(user: TelegramSessionUser) {
-  const programmeIds = user.programmeRoles
-    .filter((assignment) => WIDE_ROLES.includes(assignment.role) && assignment.programmeId)
-    .map((assignment) => assignment.programmeId as string);
-  const globallyWide = user.programmeRoles.some(
-    (assignment) => WIDE_ROLES.includes(assignment.role) && assignment.programmeId === null,
-  );
-
-  const offerings = await prisma.offering.findMany({
-    where: globallyWide
-      ? {}
-      : {
-          OR: [
-            { lecturerId: user.id },
-            { coLecturers: { some: { lecturerId: user.id } } },
-            ...(programmeIds.length ? [{ course: { programmeId: { in: programmeIds } } }] : []),
-          ],
-        },
-    include: { course: true, meetings: { orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }] } },
-    orderBy: [{ term: "desc" }, { course: { code: "asc" } }, { sectionCode: "asc" }],
-  });
-
-  return offerings.map((offering) => ({
-    offeringId: offering.id,
-    courseCode: offering.course.code,
-    courseTitle: offering.course.title,
-    sectionCode: offering.sectionCode,
-    term: offering.term,
-    role: "lecturer" as const,
-    nextMeeting: nextMeeting(offering.meetings),
-  }));
+  } : null;
 }
 
 async function studentCourses(userId: string) {
-  const courses = await studentPortalService.courses(userId);
-  return courses.map((course) => ({
+  return (await portal().courses(userId)).map((course) => ({
     offeringId: course.offeringId,
     courseCode: course.code,
     courseTitle: course.title,
@@ -105,10 +126,40 @@ async function studentCourses(userId: string) {
   }));
 }
 
+async function lecturerDelivery(user: TelegramSessionUser) {
+  const flatWide = user.roles.some((role) => WIDE_ROLES.includes(role));
+  const candidates = await portal().deliveryOfferings(user.id, flatWide);
+  const accepted: Array<{ delivery: DeliveryOffering; offering: OfferingView }> = [];
+  for (const delivery of candidates) {
+    const offering = await offerings().getById(delivery.offeringId);
+    if (!offering) continue;
+    const programmeWide = hasAnyRoleInProgramme(
+      authUser(user),
+      WIDE_ROLES,
+      offering.course?.programmeId ?? null,
+    );
+    const assigned = offering.lecturer?.id === user.id || offering.coLecturers.some((item) => item.id === user.id);
+    if (programmeWide || assigned) accepted.push({ delivery, offering });
+  }
+  return accepted;
+}
+
+async function lecturerCourses(user: TelegramSessionUser) {
+  const items = await lecturerDelivery(user);
+  return items.map(({ delivery, offering }) => ({
+    offeringId: delivery.offeringId,
+    courseCode: delivery.code,
+    courseTitle: delivery.title,
+    sectionCode: delivery.sectionCode,
+    term: delivery.term,
+    role: "lecturer" as const,
+    nextMeeting: nextMeeting(offering.meetings ?? []),
+  }));
+}
+
 export const telegramMiniAppService = {
   async courses(user: TelegramSessionUser) {
-    if (isStudent(user)) return studentCourses(user.id);
-    return lecturerCourses(user);
+    return isStudent(user) ? studentCourses(user.id) : lecturerCourses(user);
   },
 
   async home(user: TelegramSessionUser) {
@@ -118,12 +169,12 @@ export const telegramMiniAppService = {
     let surveyActions = 0;
     if (isStudent(user)) {
       const [announcements, details] = await Promise.all([
-        studentPortalService.announcements(user.id),
-        Promise.all(courses.map((course) => studentPortalService.course(user.id, course.offeringId))),
+        portal().announcements(user.id),
+        Promise.all(courses.map((course) => portal().course(user.id, course.offeringId))),
       ]);
       unreadAnnouncements = announcements.length;
       publishedResultCount = details.reduce(
-        (sum, course) => sum + course.assessments.filter((assessment) => assessment.result).length,
+        (sum, course) => sum + (course.assessments ?? []).filter((assessment) => assessment.result).length,
         0,
       );
       surveyActions = details.filter((course) => !course.feedbackSubmitted).length;
@@ -138,56 +189,45 @@ export const telegramMiniAppService = {
   },
 
   async course(user: TelegramSessionUser, offeringId: string) {
-    if (isStudent(user)) return studentPortalService.course(user.id, offeringId);
-    await assertOfferingAccess(user, offeringId);
-    const row = await prisma.offering.findUnique({
-      where: { id: offeringId },
-      include: {
-        course: true,
-        meetings: true,
-        enrollments: { include: { student: { select: { id: true, studentId: true, name: true } } } },
-        announcements: { where: { publishedAt: { not: null } }, orderBy: { publishedAt: "desc" } },
-      },
-    });
-    if (!row) throw new PortalNotFoundError("Offering not found");
-    return row;
+    if (isStudent(user)) return portal().course(user.id, offeringId);
+    return assertOfferingAccess(user, offeringId);
   },
 
   async announcements(user: TelegramSessionUser) {
-    if (isStudent(user)) return studentPortalService.announcements(user.id);
-    const courseIds = (await lecturerCourses(user)).map((course) => course.offeringId);
-    if (!courseIds.length) return [];
-    return prisma.courseAnnouncement.findMany({
-      where: { offeringId: { in: courseIds }, publishedAt: { not: null } },
-      include: { offering: { include: { course: true } } },
-      orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
-    });
+    if (isStudent(user)) return portal().announcements(user.id);
+    const items = await lecturerDelivery(user);
+    return items.flatMap(({ delivery }) => delivery.announcements.map((announcement) => ({
+      ...announcement,
+      offeringId: delivery.offeringId,
+      courseCode: delivery.code,
+      courseTitle: delivery.title,
+    })));
   },
 
   async results(user: TelegramSessionUser, offeringId?: string) {
-    if (!isStudent(user)) throw new PortalAccessError("Student results are only available to the student account");
-    const courses = await studentPortalService.courses(user.id);
+    if (!isStudent(user)) throw new TelegramMiniAccessError("Student results are only available to the student account");
+    const courses = await portal().courses(user.id);
     const selected = offeringId ? courses.filter((course) => course.offeringId === offeringId) : courses;
-    if (offeringId && selected.length === 0) throw new PortalNotFoundError("Enrolled course not found");
-    return Promise.all(selected.map((course) => studentPortalService.course(user.id, course.offeringId)));
+    if (offeringId && selected.length === 0) throw new TelegramMiniNotFoundError("Enrolled course not found");
+    return Promise.all(selected.map((course) => portal().course(user.id, course.offeringId)));
   },
 
   async surveys(user: TelegramSessionUser) {
     if (!isStudent(user)) return [];
-    const courses = await studentPortalService.courses(user.id);
-    const details = await Promise.all(courses.map((course) => studentPortalService.course(user.id, course.offeringId)));
+    const courses = await portal().courses(user.id);
+    const details = await Promise.all(courses.map((course) => portal().course(user.id, course.offeringId)));
     return details.map((course) => ({
       offeringId: course.offeringId,
       courseCode: course.code,
       courseTitle: course.title,
-      submitted: course.feedbackSubmitted,
+      submitted: Boolean(course.feedbackSubmitted),
       deepLink: `/telegram/surveys/${encodeURIComponent(course.offeringId)}`,
     }));
   },
 
   async submitSurvey(user: TelegramSessionUser, offeringId: string, input: CourseFeedbackInput) {
-    if (!isStudent(user)) throw new PortalAccessError("Only students can submit course feedback");
-    const result = await studentPortalService.submitFeedback(user.id, offeringId, input);
+    if (!isStudent(user)) throw new TelegramMiniAccessError("Only students can submit course feedback");
+    const result = await portal().submitFeedback(user.id, offeringId, input);
     await telegramIdentityStore.audit({
       identityId: user.identity.id,
       userId: user.id,
@@ -201,12 +241,12 @@ export const telegramMiniAppService = {
 
   async attendance(user: TelegramSessionUser, offeringId: string, date: string) {
     await assertOfferingAccess(user, offeringId);
-    return attendanceService.get(offeringId, date);
+    return offerings().attendance.get(offeringId, date);
   },
 
-  async saveAttendance(user: TelegramSessionUser, offeringId: string, date: string, input: Parameters<typeof attendanceService.save>[2]) {
+  async saveAttendance(user: TelegramSessionUser, offeringId: string, date: string, input: SaveAttendanceInput) {
     await assertOfferingAccess(user, offeringId, true);
-    const result = await attendanceService.save(offeringId, date, input);
+    const result = await offerings().attendance.save(offeringId, date, input);
     await telegramIdentityStore.audit({
       identityId: user.identity.id,
       userId: user.id,
@@ -219,3 +259,9 @@ export const telegramMiniAppService = {
     return result;
   },
 };
+
+export function telegramMiniErrorStatus(error: unknown): number | null {
+  if (error instanceof TelegramMiniNotFoundError) return 404;
+  if (error instanceof TelegramMiniAccessError) return 403;
+  return null;
+}
