@@ -95,10 +95,9 @@ jobs:
       - name: Generate Prisma Client
         run: bun run db:generate
 
-      # Reproduce the Supabase-side risk on ordinary PostgreSQL: tables created
-      # before the #133 baseline inherit broad Data API-role grants. The baseline
-      # must remove both those grants and the future defaults, while remaining
-      # portable when the same roles do not exist outside Supabase.
+      # Reproduce the Supabase-side risk on ordinary PostgreSQL. The migration
+      # series must remove broad Data API-role grants/defaults in both public and
+      # custom backend-only application schemas.
       - name: Simulate Supabase Data API roles and defaults
         run: |
           cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
@@ -122,6 +121,15 @@ jobs:
             GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
           ALTER DEFAULT PRIVILEGES IN SCHEMA public
             GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+
+          CREATE SCHEMA IF NOT EXISTS telegram_security;
+          GRANT USAGE, CREATE ON SCHEMA telegram_security TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
           SQL
 
       - name: Apply migrations
@@ -143,17 +151,30 @@ jobs:
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
-      - name: Prove verifier rejects an unclassified table
+      - name: Prove verifier rejects an unclassified public table
         run: |
           echo 'CREATE TABLE public."SecurityVerifierProbe" ("id" text PRIMARY KEY);' \
             | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
 
           if bun run --cwd apps/backend db:security:verify; then
-            echo "Verifier unexpectedly accepted an unclassified table."
+            echo "Verifier unexpectedly accepted an unclassified public table."
             exit 1
           fi
 
           echo 'DROP TABLE public."SecurityVerifierProbe";' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects an unclassified Telegram security table
+        run: |
+          echo 'CREATE TABLE telegram_security."SecurityVerifierProbe" ("id" text PRIMARY KEY);' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted an unclassified Telegram security table."
+            exit 1
+          fi
+
+          echo 'DROP TABLE telegram_security."SecurityVerifierProbe";' \
             | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
 
       - name: Prove verifier rejects a forbidden Data API grant
@@ -167,6 +188,19 @@ jobs:
           fi
 
           echo 'REVOKE SELECT ON TABLE public."User" FROM authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects a forbidden protected-schema grant
+        run: |
+          echo 'GRANT USAGE ON SCHEMA telegram_security TO authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted a forbidden Telegram schema grant."
+            exit 1
+          fi
+
+          echo 'REVOKE USAGE ON SCHEMA telegram_security FROM authenticated;' \
             | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
 
       - name: Verify database security after fail-closed probes
