@@ -7,7 +7,7 @@
     "dev": "bun --watch src/server.ts",
     "start": "bun src/server.ts",
     "build": "bun build src/server.ts --target=bun --outdir dist",
-    "typecheck": "bash -o pipefail -c 'tsc --noEmit --pretty false 2>&1 | while IFS= read -r line; do echo \"::error::$line\"; done'",
+    "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
