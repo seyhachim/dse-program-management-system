@@ -13,8 +13,12 @@ import {
 const READ_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary", "qa_reviewer"];
 const WRITE_ROLES: Role[] = ["admin", "program_coordinator"];
 
-function hasScope(user: AuthUser, roles: Role[], programmeId: string) {
-  return hasAnyRoleInProgramme(user, roles, programmeId);
+export function canReadCurriculumCourseSpecs(user: AuthUser, programmeId: string) {
+  return hasAnyRoleInProgramme(user, READ_ROLES, programmeId);
+}
+
+export function canWriteCurriculumCourseSpecs(user: AuthUser, programmeId: string) {
+  return hasAnyRoleInProgramme(user, WRITE_ROLES, programmeId);
 }
 
 function sendError(res: Parameters<Parameters<Router["get"]>[1]>[1], error: unknown) {
@@ -48,7 +52,7 @@ export function createCurriculumCourseSpecRouter(): Router {
       }
       try {
         const programmeId = await curriculumCourseSpecService.programmeId(versionId);
-        if (!hasScope(req.user, READ_ROLES, programmeId)) {
+        if (!canReadCurriculumCourseSpecs(req.user, programmeId)) {
           res.status(403).json({ error: "No curriculum CourseSpec read access for this programme" });
           return;
         }
@@ -76,7 +80,7 @@ export function createCurriculumCourseSpecRouter(): Router {
       }
       try {
         const programmeId = await curriculumCourseSpecService.programmeId(versionId);
-        if (!hasScope(req.user, WRITE_ROLES, programmeId)) {
+        if (!canWriteCurriculumCourseSpecs(req.user, programmeId)) {
           res.status(403).json({ error: "No curriculum CourseSpec write access for this programme" });
           return;
         }
