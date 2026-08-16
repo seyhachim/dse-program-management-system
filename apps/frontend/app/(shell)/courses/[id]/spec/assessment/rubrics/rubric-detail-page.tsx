@@ -18,7 +18,13 @@ import { Topbar } from "../../../../../topbar";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { coursesApi, type CourseView } from "@/lib/courses";
-import { rubricsApi, rubricStatusTone, typeChipClass } from "@/lib/rubrics";
+import {
+  canEditRubric,
+  rubricLockLabel,
+  rubricsApi,
+  rubricStatusTone,
+  typeChipClass,
+} from "@/lib/rubrics";
 import { RubricMatrix } from "./rubric-matrix";
 
 export function RubricDetailPage({
@@ -36,7 +42,8 @@ export function RubricDetailPage({
 
   const libraryHref = `/courses/${courseId}/spec/assessment/rubrics`;
   const assessmentHref = `/courses/${courseId}/spec?tab=assessmentPlan`;
-  const canWrite = me?.permissions.includes("rubrics:write") ?? false;
+  const editable = rubric ? canEditRubric(me, rubric) : false;
+  const lockLabel = rubric ? rubricLockLabel(rubric) : null;
 
   useEffect(() => {
     coursesApi.get(courseId).then(setCourse).catch(() => setCourse(null));
@@ -101,7 +108,7 @@ export function RubricDetailPage({
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Button variant="outline" render={<Link href={libraryHref}><ArrowLeft className="h-4 w-4" />Back to Rubric Bank</Link>} />
-            {canWrite && rubric ? (
+            {editable && rubric ? (
               <Button render={<Link href={`${libraryHref}/${rubric.id}/edit`}><Pencil className="h-4 w-4" />Edit Rubric</Link>} />
             ) : null}
           </div>
@@ -126,6 +133,11 @@ export function RubricDetailPage({
                     {rubric.description ? (
                       <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
                         {rubric.description}
+                      </p>
+                    ) : null}
+                    {lockLabel ? (
+                      <p className="mt-2 text-xs font-medium text-muted-foreground">
+                        {lockLabel}. Create a new rubric for revised scoring content.
                       </p>
                     ) : null}
                   </div>
