@@ -1,7 +1,12 @@
 -- Issue #347: immutable QA evidence snapshots and secure external assessor references.
--- Additive only: existing QaEvidence, mappings, analyses, SAR submissions, and SAR releases are unchanged.
+-- These records intentionally live outside Prisma's managed public schema, like
+-- the existing attendance/Telegram security domains. Backend services use
+-- parameterized SQL and the repository verifier enforces fail-closed RLS/grants.
 
-CREATE TABLE "QaEvidenceSnapshot" (
+CREATE SCHEMA IF NOT EXISTS qa_security;
+REVOKE ALL ON SCHEMA qa_security FROM PUBLIC;
+
+CREATE TABLE qa_security."QaEvidenceSnapshot" (
   "id" TEXT NOT NULL,
   "programmeId" TEXT NOT NULL,
   "cycleId" TEXT NOT NULL,
@@ -28,37 +33,37 @@ CREATE TABLE "QaEvidenceSnapshot" (
 );
 
 CREATE UNIQUE INDEX "QaEvidenceSnapshot_referenceCode_key"
-  ON "QaEvidenceSnapshot"("referenceCode");
+  ON qa_security."QaEvidenceSnapshot"("referenceCode");
 CREATE INDEX "QaEvidenceSnapshot_programmeId_cycleId_idx"
-  ON "QaEvidenceSnapshot"("programmeId", "cycleId");
+  ON qa_security."QaEvidenceSnapshot"("programmeId", "cycleId");
 CREATE INDEX "QaEvidenceSnapshot_evidenceId_idx"
-  ON "QaEvidenceSnapshot"("evidenceId");
+  ON qa_security."QaEvidenceSnapshot"("evidenceId");
 CREATE INDEX "QaEvidenceSnapshot_sourceEntityType_sourceEntityId_idx"
-  ON "QaEvidenceSnapshot"("sourceEntityType", "sourceEntityId");
+  ON qa_security."QaEvidenceSnapshot"("sourceEntityType", "sourceEntityId");
 CREATE INDEX "QaEvidenceSnapshot_contentHash_idx"
-  ON "QaEvidenceSnapshot"("contentHash");
+  ON qa_security."QaEvidenceSnapshot"("contentHash");
 CREATE UNIQUE INDEX "QaEvidenceSnapshot_cycle_evidence_hash_key"
-  ON "QaEvidenceSnapshot"("cycleId", "evidenceId", "contentHash")
+  ON qa_security."QaEvidenceSnapshot"("cycleId", "evidenceId", "contentHash")
   WHERE "evidenceId" IS NOT NULL;
 
-ALTER TABLE "QaEvidenceSnapshot"
+ALTER TABLE qa_security."QaEvidenceSnapshot"
   ADD CONSTRAINT "QaEvidenceSnapshot_programmeId_fkey"
-  FOREIGN KEY ("programmeId") REFERENCES "Programme"("id")
+  FOREIGN KEY ("programmeId") REFERENCES public."Programme"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "QaEvidenceSnapshot"
+ALTER TABLE qa_security."QaEvidenceSnapshot"
   ADD CONSTRAINT "QaEvidenceSnapshot_cycleId_fkey"
-  FOREIGN KEY ("cycleId") REFERENCES "QaAssessmentCycle"("id")
+  FOREIGN KEY ("cycleId") REFERENCES public."QaAssessmentCycle"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "QaEvidenceSnapshot"
+ALTER TABLE qa_security."QaEvidenceSnapshot"
   ADD CONSTRAINT "QaEvidenceSnapshot_evidenceId_fkey"
-  FOREIGN KEY ("evidenceId") REFERENCES "QaEvidence"("id")
+  FOREIGN KEY ("evidenceId") REFERENCES public."QaEvidence"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "QaEvidenceSnapshot"
+ALTER TABLE qa_security."QaEvidenceSnapshot"
   ADD CONSTRAINT "QaEvidenceSnapshot_capturedById_fkey"
-  FOREIGN KEY ("capturedById") REFERENCES "User"("id")
+  FOREIGN KEY ("capturedById") REFERENCES public."User"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
-CREATE TABLE "QaEvidenceExternalReference" (
+CREATE TABLE qa_security."QaEvidenceExternalReference" (
   "id" TEXT NOT NULL,
   "snapshotId" TEXT NOT NULL,
   "tokenHash" TEXT NOT NULL,
@@ -73,24 +78,22 @@ CREATE TABLE "QaEvidenceExternalReference" (
 );
 
 CREATE UNIQUE INDEX "QaEvidenceExternalReference_tokenHash_key"
-  ON "QaEvidenceExternalReference"("tokenHash");
+  ON qa_security."QaEvidenceExternalReference"("tokenHash");
 CREATE INDEX "QaEvidenceExternalReference_snapshotId_idx"
-  ON "QaEvidenceExternalReference"("snapshotId");
+  ON qa_security."QaEvidenceExternalReference"("snapshotId");
 CREATE INDEX "QaEvidenceExternalReference_active_expiresAt_idx"
-  ON "QaEvidenceExternalReference"("active", "expiresAt");
+  ON qa_security."QaEvidenceExternalReference"("active", "expiresAt");
 
-ALTER TABLE "QaEvidenceExternalReference"
+ALTER TABLE qa_security."QaEvidenceExternalReference"
   ADD CONSTRAINT "QaEvidenceExternalReference_snapshotId_fkey"
-  FOREIGN KEY ("snapshotId") REFERENCES "QaEvidenceSnapshot"("id")
+  FOREIGN KEY ("snapshotId") REFERENCES qa_security."QaEvidenceSnapshot"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "QaEvidenceExternalReference"
+ALTER TABLE qa_security."QaEvidenceExternalReference"
   ADD CONSTRAINT "QaEvidenceExternalReference_createdById_fkey"
-  FOREIGN KEY ("createdById") REFERENCES "User"("id")
+  FOREIGN KEY ("createdById") REFERENCES public."User"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- Evidence snapshots are academic/audit records. Corrections are represented by
--- a new snapshot, never by rewriting or deleting a captured snapshot.
-CREATE OR REPLACE FUNCTION "reject_qa_evidence_snapshot_mutation"()
+CREATE OR REPLACE FUNCTION qa_security.reject_qa_evidence_snapshot_mutation()
 RETURNS trigger AS $$
 BEGIN
   RAISE EXCEPTION 'QA evidence snapshots are immutable; capture a new snapshot instead';
@@ -98,14 +101,25 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "QaEvidenceSnapshot_reject_update"
-BEFORE UPDATE ON "QaEvidenceSnapshot"
-FOR EACH ROW EXECUTE FUNCTION "reject_qa_evidence_snapshot_mutation"();
+BEFORE UPDATE ON qa_security."QaEvidenceSnapshot"
+FOR EACH ROW EXECUTE FUNCTION qa_security.reject_qa_evidence_snapshot_mutation();
 
 CREATE TRIGGER "QaEvidenceSnapshot_reject_delete"
-BEFORE DELETE ON "QaEvidenceSnapshot"
-FOR EACH ROW EXECUTE FUNCTION "reject_qa_evidence_snapshot_mutation"();
+BEFORE DELETE ON qa_security."QaEvidenceSnapshot"
+FOR EACH ROW EXECUTE FUNCTION qa_security.reject_qa_evidence_snapshot_mutation();
 
--- Backend-only evidence-sharing tables. No permissive Supabase Data API policies
--- are created; the repository verifier classifies them and requires RLS.
-ALTER TABLE "QaEvidenceSnapshot" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "QaEvidenceExternalReference" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qa_security."QaEvidenceSnapshot" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qa_security."QaEvidenceExternalReference" ENABLE ROW LEVEL SECURITY;
+
+-- Explicitly revoke Data API roles if the roles exist in the target environment.
+DO $$
+DECLARE role_name TEXT;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL ON SCHEMA qa_security FROM %I', role_name);
+      EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA qa_security FROM %I', role_name);
+      EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA qa_security FROM %I', role_name);
+    END IF;
+  END LOOP;
+END $$;
