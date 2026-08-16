@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { CourseType, PrismaClient } from "@prisma/client";
+import { curriculumCourseSpecService } from "./curriculum-course-spec-service.ts";
 import { curriculumDraftService, CurriculumDraftMutationError } from "./curriculum-draft-service.ts";
 import { curriculumService } from "./curriculum-service.ts";
 import {
@@ -25,7 +26,18 @@ async function fixture(complete = true) {
   });
   const course = await prisma.course.create({ data: { programmeId: programme.id, code: `C-${token}`, title: `Course ${token}`, credits: 3, courseType: CourseType.Core } });
   if (complete) {
-    await curriculumDraftService.addCourse(initial.selectedVersion.id, user.id, { courseId: course.id, yearLevel: 1, semester: "First", sortOrder: 0 });
+    const spec = await prisma.courseSpec.create({
+      data: {
+        courseId: course.id,
+        reviewStatus: "Approved",
+        approvedAt: new Date(),
+      },
+    });
+    const read = await curriculumDraftService.addCourse(initial.selectedVersion.id, user.id, { courseId: course.id, yearLevel: 1, semester: "First", sortOrder: 0 });
+    const placementId = read.years[0]!.semesters[0]!.courses[0]!.placementId;
+    await curriculumCourseSpecService.bind(initial.selectedVersion.id, placementId, user.id, {
+      courseSpecVersionId: spec.id,
+    });
   }
   return { user, programme, course, curriculumId: initial.curriculum.id, versionId: initial.selectedVersion.id };
 }

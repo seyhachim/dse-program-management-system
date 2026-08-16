@@ -41,6 +41,11 @@ export interface QaSarEvidenceRegisterItemView {
   sourceRef: string;
   sourceUrl: string | null;
   requirementCodes: string[];
+  /** Immutable evidence snapshot pinned for audit/external verification when available. */
+  snapshotId?: string | null;
+  referenceCode?: string | null;
+  externalUrl?: string | null;
+  capturedAt?: string | null;
 }
 
 export interface QaSarDocumentModelView {

@@ -22,6 +22,17 @@ enum OfferingStatus {
   Completed
 }
 
+enum ClassResponsibilityRole {
+  ClassMonitor
+  SubClassMonitor
+}
+
+enum ClassResponsibilityAuditAction {
+  Assigned
+  Revoked
+  Reassigned
+}
+
 /// Syllabus §12 "Course Availability" — which semester the course is delivered in.
 enum Semester {
   First
@@ -212,32 +223,35 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed               Course[]                         @relation("CourseLecturer")
-  offeringsLed             Offering[]                       @relation("OfferingLecturer")
-  rubricsOwned             Rubric[]                         @relation("RubricOwner")
-  coLecturerOf             OfferingCoLecturer[]             @relation("OfferingCoLecturer")
-  roleAssignments          UserRoleAssignment[]
-  courseSpecSubmissions    CourseSpec[]                     @relation("CourseSpecSubmittedBy")
-  courseSpecReviewActions  CourseSpecReviewAction[]         @relation("CourseSpecReviewActor")
-  curriculumVersionsCreated ProgrammeCurriculumVersion[]    @relation("ProgrammeCurriculumVersionCreatedBy")
-  curriculumAuditActions   ProgrammeCurriculumAuditAction[] @relation("ProgrammeCurriculumAuditActor")
-  studentProfile           Student?
-  announcementsAuthored    CourseAnnouncement[]             @relation("AnnouncementAuthor")
-  assessmentResultsPublished AssessmentResult[]                   @relation("AssessmentResultPublishedBy")
-  assessmentResultsFinalized AssessmentResult[]                   @relation("AssessmentResultFinalizedBy")
-  qaCyclesCreated          QaAssessmentCycle[]              @relation("QaCycleCreator")
-  qaEvidenceCreated        QaEvidence[]                     @relation("QaEvidenceCreator")
-  qaEvidenceMappings       QaEvidenceMapping[]              @relation("QaEvidenceMapper")
-  qaAssessmentsReviewed    QaRequirementAssessment[]        @relation("QaAssessmentReviewer")
-  qaAnalysisReviews        QaEvidenceAnalysisReview[]       @relation("QaAnalysisReviewer")
-  qaRequirementAssignments QaRequirementAssignment[]        @relation("QaRequirementAssignee")
-  qaAssignmentsCreated     QaRequirementAssignment[]        @relation("QaRequirementAssignedBy")
-  qaSarSectionsUpdated     QaSarSection[]                   @relation("QaSarSectionUpdatedBy")
-  qaSarSubmissions         QaSarSubmission[]                @relation("QaSarSubmittedBy")
-  qaSarReviews             QaSarReview[]                    @relation("QaSarReviewer")
-  qaSarReleasesFinalized   QaSarRelease[]                   @relation("QaSarReleaseFinalizedBy")
-  qaEvaluationGoldReviews  QaEvaluationScenario[]           @relation("QaEvaluationGoldReviewer")
-  qaEvaluationRatings      QaEvaluationHumanRating[]        @relation("QaEvaluationHumanReviewer")
+  coursesLed                       Course[]                         @relation("CourseLecturer")
+  offeringsLed                     Offering[]                       @relation("OfferingLecturer")
+  rubricsOwned                     Rubric[]                         @relation("RubricOwner")
+  coLecturerOf                     OfferingCoLecturer[]             @relation("OfferingCoLecturer")
+  roleAssignments                  UserRoleAssignment[]
+  courseSpecSubmissions            CourseSpec[]                     @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions          CourseSpecReviewAction[]         @relation("CourseSpecReviewActor")
+  curriculumVersionsCreated        ProgrammeCurriculumVersion[]     @relation("ProgrammeCurriculumVersionCreatedBy")
+  curriculumAuditActions           ProgrammeCurriculumAuditAction[] @relation("ProgrammeCurriculumAuditActor")
+  studentProfile                   Student?
+  announcementsAuthored            CourseAnnouncement[]             @relation("AnnouncementAuthor")
+  assessmentResultsPublished       AssessmentResult[]               @relation("AssessmentResultPublishedBy")
+  assessmentResultsFinalized       AssessmentResult[]               @relation("AssessmentResultFinalizedBy")
+  classResponsibilitiesAssigned    ClassResponsibilityAssignment[]  @relation("ClassResponsibilityAssignedBy")
+  classResponsibilitiesRevoked     ClassResponsibilityAssignment[]  @relation("ClassResponsibilityRevokedBy")
+  classResponsibilityAuditEvents   ClassResponsibilityAuditEvent[]  @relation("ClassResponsibilityAuditActor")
+  qaCyclesCreated                  QaAssessmentCycle[]               @relation("QaCycleCreator")
+  qaEvidenceCreated                QaEvidence[]                      @relation("QaEvidenceCreator")
+  qaEvidenceMappings               QaEvidenceMapping[]               @relation("QaEvidenceMapper")
+  qaAssessmentsReviewed            QaRequirementAssessment[]         @relation("QaAssessmentReviewer")
+  qaAnalysisReviews                QaEvidenceAnalysisReview[]        @relation("QaAnalysisReviewer")
+  qaRequirementAssignments         QaRequirementAssignment[]         @relation("QaRequirementAssignee")
+  qaAssignmentsCreated             QaRequirementAssignment[]         @relation("QaRequirementAssignedBy")
+  qaSarSectionsUpdated             QaSarSection[]                    @relation("QaSarSectionUpdatedBy")
+  qaSarSubmissions                 QaSarSubmission[]                 @relation("QaSarSubmittedBy")
+  qaSarReviews                     QaSarReview[]                     @relation("QaSarReviewer")
+  qaSarReleasesFinalized           QaSarRelease[]                    @relation("QaSarReleaseFinalizedBy")
+  qaEvaluationGoldReviews          QaEvaluationScenario[]            @relation("QaEvaluationGoldReviewer")
+  qaEvaluationRatings              QaEvaluationHumanRating[]         @relation("QaEvaluationHumanReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -349,6 +363,8 @@ model ProgrammeCurriculumCourse {
   curriculumVersion   ProgrammeCurriculumVersion @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
   courseId            String
   course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  courseSpecVersionId String?
+  courseSpecVersion   CourseSpec?                 @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)
   yearLevel           Int
   semester            Semester
   creditsSnapshot     Int
@@ -359,6 +375,7 @@ model ProgrammeCurriculumCourse {
 
   @@unique([curriculumVersionId, courseId])
   @@index([courseId])
+  @@index([courseSpecVersionId])
   @@index([curriculumVersionId, yearLevel, semester, sortOrder])
 }
 
@@ -985,7 +1002,9 @@ model Student {
   userId    String?       @unique
   user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  enrollments Enrollment[]
+  enrollments                    Enrollment[]
+  classResponsibilityAssignments ClassResponsibilityAssignment[]
+  classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
 
   @@index([status])
 }
@@ -1150,6 +1169,7 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+  curriculumPlacements    ProgrammeCurriculumCourse[]       @relation("ProgrammeCurriculumCourseSpecVersion")
 
   approvedAt      DateTime?
   effectiveFrom   DateTime?
@@ -1522,12 +1542,14 @@ model Offering {
   otherLecturers String?
   createdAt      DateTime       @default(now())
 
-  enrollments         Enrollment[]
-  coLecturers         OfferingCoLecturer[]
-  meetings            OfferingMeeting[]
-  assessmentDeadlines OfferingAssessmentDeadline[]
-  announcements       CourseAnnouncement[]
-  feedbackResponses   CourseFeedback[]
+  enrollments                    Enrollment[]
+  coLecturers                    OfferingCoLecturer[]
+  meetings                       OfferingMeeting[]
+  assessmentDeadlines            OfferingAssessmentDeadline[]
+  announcements                  CourseAnnouncement[]
+  feedbackResponses              CourseFeedback[]
+  classResponsibilityAssignments ClassResponsibilityAssignment[]
+  classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
 
   @@unique([courseId, term, sectionCode])
   @@index([status])
@@ -1578,6 +1600,61 @@ model Enrollment {
 
   @@unique([offeringId, studentId])
   @@index([studentId])
+}
+
+/// Offering-scoped Class Monitor/Sub-class Monitor responsibility. Runtime
+/// authorization is revalidated from Student + Enrollment + this active row.
+model ClassResponsibilityAssignment {
+  id           String                  @id @default(uuid())
+  offeringId   String
+  studentId    String
+  role         ClassResponsibilityRole
+  assignedById String
+  assignedAt   DateTime                @default(now())
+  revokedById  String?
+  revokedAt    DateTime?
+  revokeReason String                  @default("")
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @default(now()) @updatedAt
+
+  offering    Offering                       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student     Student                        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  assignedBy  User                           @relation("ClassResponsibilityAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+  revokedBy   User?                          @relation("ClassResponsibilityRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  auditEvents ClassResponsibilityAuditEvent[]
+
+  @@index([offeringId])
+  @@index([studentId, offeringId])
+  @@index([offeringId, role])
+  @@index([offeringId, revokedAt])
+  @@index([assignedById])
+  @@index([revokedById])
+}
+
+/// Append-only lifecycle evidence for class-responsibility assignment,
+/// reassignment and revocation.
+model ClassResponsibilityAuditEvent {
+  id           String                          @id @default(uuid())
+  assignmentId String?
+  offeringId   String
+  studentId    String
+  actorId      String
+  action       ClassResponsibilityAuditAction
+  previousRole ClassResponsibilityRole?
+  newRole      ClassResponsibilityRole?
+  reason       String                          @default("")
+  details      Json?
+  createdAt    DateTime                        @default(now())
+
+  assignment ClassResponsibilityAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  offering   Offering                       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student    Student                        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  actor      User                           @relation("ClassResponsibilityAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([offeringId, createdAt])
+  @@index([studentId])
+  @@index([actorId])
+  @@index([assignmentId])
 }
 
 /// An exact, section-specific deadline that overrides the course specification's
