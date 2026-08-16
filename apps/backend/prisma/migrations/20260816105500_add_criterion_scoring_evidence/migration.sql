@@ -35,8 +35,9 @@ CREATE INDEX "AssessmentCriterionScore_assessmentResultId_idx" ON "AssessmentCri
 CREATE INDEX "AssessmentCriterionScore_rubricId_criterionId_idx" ON "AssessmentCriterionScore"("rubricId", "criterionId");
 ALTER TABLE "AssessmentCriterionScore" ADD CONSTRAINT "AssessmentCriterionScore_assessmentResultId_fkey" FOREIGN KEY ("assessmentResultId") REFERENCES "AssessmentResult"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- These tables contain academic evidence and are backend-only. Keep them out of
--- Supabase Data API access and make the repository security verifier fail closed
--- if RLS protection is ever removed. No permissive policies are created.
+-- These tables contain academic evidence and are intentionally backend-only.
+-- Keep them out of Supabase Data API access and make the repository security
+-- verifier fail closed if RLS protection is ever removed. No permissive policies
+-- are created here.
 ALTER TABLE "CourseSpecCriterionCloMapping" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AssessmentCriterionScore" ENABLE ROW LEVEL SECURITY;
