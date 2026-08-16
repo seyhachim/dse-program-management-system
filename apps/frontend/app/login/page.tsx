@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button, Input } from "@dse-pms/ui";
@@ -11,11 +11,7 @@ function safeReturnPath(value: string | null): string {
   return value;
 }
 
-/**
- * Email + password login. Only meaningful in AUTH_MODE=supabase; in dev mode the
- * app runs on the static dev token, so we just bounce to the requested safe route.
- */
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnPath = useMemo(() => safeReturnPath(searchParams.get("next")), [searchParams]);
@@ -74,5 +70,17 @@ export default function LoginPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+/**
+ * Email + password login. Only meaningful in AUTH_MODE=supabase; in dev mode the
+ * app runs on the static dev token, so we just bounce to the requested safe route.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background" aria-busy="true" />}>
+      <LoginForm />
+    </Suspense>
   );
 }
