@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { CorrectFinalizedAssessmentResultInput } from "@dse-pms/shared-types";
 import { PortalConflictError } from "./service.ts";
 import {
   assertDraftWritable,
@@ -15,6 +16,26 @@ describe("results lifecycle", () => {
 
   test("blocks ordinary edits after publication", () => {
     expect(() => assertDraftWritable(new Date("2026-08-16T00:00:00Z"))).toThrow(PortalConflictError);
+  });
+
+  test("requires a non-empty reason and valid mark for finalized corrections", () => {
+    const base = {
+      assessmentResultId: "8da4e4dd-e41c-42ab-bbad-d36d001ab077",
+      score: 80,
+      maxScore: 100,
+      feedback: "Corrected feedback",
+      expectedUpdatedAt: "2026-08-16T02:00:00.000Z",
+    };
+
+    expect(CorrectFinalizedAssessmentResultInput.safeParse({ ...base, reason: "   " }).success).toBe(false);
+    expect(CorrectFinalizedAssessmentResultInput.safeParse({ ...base, score: 101, reason: "Transcription error" }).success).toBe(false);
+    expect(CorrectFinalizedAssessmentResultInput.safeParse({ ...base, maxScore: 0, reason: "Transcription error" }).success).toBe(false);
+
+    const valid = CorrectFinalizedAssessmentResultInput.parse({
+      ...base,
+      reason: "  Moderation transcription error  ",
+    });
+    expect(valid.reason).toBe("Moderation transcription error");
   });
 
   test("requires every enrolled student to have a valid draft before publication", () => {

@@ -224,6 +224,20 @@ export const FinalizeAssessmentResultsInput = z.object({
 });
 export type FinalizeAssessmentResultsInput = z.infer<typeof FinalizeAssessmentResultsInput>;
 
+/** Apply one controlled correction to an already-finalized result. */
+export const CorrectFinalizedAssessmentResultInput = z.object({
+  assessmentResultId: z.string().uuid(),
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+  reason: z.string().trim().min(1, "A correction reason is required").max(2000),
+  expectedUpdatedAt: z.string().datetime(),
+}).refine((value) => value.score <= value.maxScore, {
+  message: "Score cannot exceed maximum score",
+  path: ["score"],
+});
+export type CorrectFinalizedAssessmentResultInput = z.infer<typeof CorrectFinalizedAssessmentResultInput>;
+
 export interface PublishAssessmentResultsResponse {
   offeringId: string;
   assessmentItemId: string;
@@ -239,6 +253,17 @@ export interface FinalizeAssessmentResultsResponse {
   finalizedCount: number;
   finalizedAt: string;
   finalizedById: string;
+}
+
+export interface CorrectFinalizedAssessmentResultResponse {
+  assessmentResultId: string;
+  correctionId: string;
+  score: number;
+  maxScore: number;
+  feedback: string;
+  correctedAt: string;
+  correctedById: string;
+  updatedAt: string;
 }
 
 /** @deprecated Use SaveAssessmentResultInput. Kept temporarily for source compatibility. */

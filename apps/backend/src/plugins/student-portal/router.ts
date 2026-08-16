@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  CorrectFinalizedAssessmentResultInput,
   CourseFeedbackInput,
   FinalizeAssessmentResultsInput,
   PublishAnnouncementInput,
@@ -116,6 +117,19 @@ export function createStudentPortalRouter(): Router {
     const parsed = FinalizeAssessmentResultsInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid finalization request", details: parsed.error.flatten() });
     try { res.json(await resultsLifecycleService.finalizeAssessment(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.post("/manage/results/correct", requirePermission("courses:write"), async (req, res) => {
+    const parsed = CorrectFinalizedAssessmentResultInput.safeParse(req.body);
+    if (!parsed.success) {
+      return void res.status(400).json({ error: "Invalid correction request", details: parsed.error.flatten() });
+    }
+    try {
+      res.json(await resultsLifecycleService.correctFinalized(
+        req.user!.id,
+        programmeWide(req.user!.roles),
+        parsed.data,
+      ));
+    } catch (error) { handleError(error, res); }
   });
   router.put("/manage/deadlines", requirePermission("courses:write"), async (req, res) => {
     const parsed = SetAssessmentDeadlineInput.safeParse(req.body);

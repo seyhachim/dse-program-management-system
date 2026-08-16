@@ -1,4 +1,6 @@
 import type {
+  CorrectFinalizedAssessmentResultInput,
+  CorrectFinalizedAssessmentResultResponse,
   CourseDeliveryResultReview,
   CourseDeliveryStudentResultReview,
   FinalizeAssessmentResultsInput,
@@ -400,33 +402,33 @@ export const resultsLifecycleService = {
       courseSpecId: context.spec.id,
       assessmentItemId: input.assessmentItemId,
     };
-    const existing = await prisma.assessmentResult.findUnique({
-      where: { enrollmentId_courseSpecId_assessmentItemId: key },
-      select: { publishedAt: true, finalizedAt: true },
-    });
-    assertDraftWritable(existing?.publishedAt ?? existing?.finalizedAt);
 
-    return prisma.assessmentResult.upsert({
-      where: { enrollmentId_courseSpecId_assessmentItemId: key },
-      update: {
-        score: input.score,
-        maxScore: input.maxScore,
-        feedback: input.feedback,
-        publishedAt: null,
-        publishedById: null,
-        finalizedAt: null,
-        finalizedById: null,
-      },
-      create: {
-        ...key,
-        score: input.score,
-        maxScore: input.maxScore,
-        feedback: input.feedback,
-        publishedAt: null,
-        publishedById: null,
-        finalizedAt: null,
-        finalizedById: null,
-      },
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.assessmentResult.findUnique({
+        where: { enrollmentId_courseSpecId_assessmentItemId: key },
+        select: { id: true, publishedAt: true, finalizedAt: true },
+      });
+      if (!existing) {
+        return tx.assessmentResult.create({
+          data: {
+            ...key,
+            score: input.score,
+            maxScore: input.maxScore,
+            feedback: input.feedback,
+          },
+        });
+      }
+      assertDraftWritable(existing.publishedAt ?? existing.finalizedAt);
+      const updated = await tx.assessmentResult.updateMany({
+        where: { id: existing.id, publishedAt: null, finalizedAt: null },
+        data: { score: input.score, maxScore: input.maxScore, feedback: input.feedback },
+      });
+      if (updated.count !== 1) {
+        throw new PortalConflictError(
+          "Result state changed concurrently. Reload the markbook before saving again.",
+        );
+      }
+      return tx.assessmentResult.findUniqueOrThrow({ where: { id: existing.id } });
     });
   },
 
@@ -445,14 +447,6 @@ export const resultsLifecycleService = {
       courseSpecId: context.spec.id,
       assessmentItemId: input.assessmentItemId,
     };
-    const result = await prisma.assessmentResult.findUnique({
-      where: { enrollmentId_courseSpecId_assessmentItemId: key },
-      select: { id: true, publishedAt: true, finalizedAt: true },
-    });
-    if (!result) {
-      throw new PortalConflictError("Save the whole-assessment draft before entering rubric criterion scores");
-    }
-    assertDraftWritable(result.publishedAt ?? result.finalizedAt);
 
     const currentHash = rubricContentHash(assessment.rubric);
     const mappedHashes = new Set(assessment.criterionCloMappings.map((mapping) => mapping.rubricContentHash));
@@ -467,7 +461,7 @@ export const resultsLifecycleService = {
     const maxScore = Math.max(0, ...assessment.rubric.levelRows.map((level) => level.points));
     if (maxScore <= 0) throw new PortalConflictError("The linked rubric has no positive scoring scale");
     const seen = new Set<string>();
-    const rows = input.scores.map((inputScore) => {
+    const preparedRows = input.scores.map((inputScore) => {
       if (seen.has(inputScore.criterionId)) throw new PortalConflictError("Duplicate rubric criterion score");
       seen.add(inputScore.criterionId);
       const criterion = criterionById.get(inputScore.criterionId);
@@ -479,7 +473,6 @@ export const resultsLifecycleService = {
         throw new PortalConflictError("Selected rubric level points do not match the criterion score");
       }
       return {
-        assessmentResultId: result.id,
         rubricId: assessment.rubricId!,
         criterionId: criterion.id,
         criterionName: criterion.name,
@@ -492,9 +485,31 @@ export const resultsLifecycleService = {
     });
 
     return prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{
+        id: string;
+        publishedAt: Date | null;
+        finalizedAt: Date | null;
+      }>>`
+        SELECT "id", "publishedAt", "finalizedAt"
+        FROM "AssessmentResult"
+        WHERE "enrollmentId" = ${key.enrollmentId}
+          AND "courseSpecId" = ${key.courseSpecId}
+          AND "assessmentItemId" = ${key.assessmentItemId}
+        FOR UPDATE
+      `;
+      const result = locked[0];
+      if (!result) {
+        throw new PortalConflictError("Save the whole-assessment draft before entering rubric criterion scores");
+      }
+      assertDraftWritable(result.publishedAt ?? result.finalizedAt);
+
       await tx.assessmentCriterionScore.deleteMany({ where: { assessmentResultId: result.id } });
-      if (rows.length > 0) await tx.assessmentCriterionScore.createMany({ data: rows });
-      return { savedCount: rows.length, rubricContentHash: currentHash };
+      if (preparedRows.length > 0) {
+        await tx.assessmentCriterionScore.createMany({
+          data: preparedRows.map((row) => ({ ...row, assessmentResultId: result.id })),
+        });
+      }
+      return { savedCount: preparedRows.length, rubricContentHash: currentHash };
     });
   },
 
@@ -509,10 +524,19 @@ export const resultsLifecycleService = {
       programmeWide,
       input.assessmentItemId,
     );
-    const enrollmentIds = offering.enrollments.map((item) => item.id);
     const now = new Date();
 
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Offering" WHERE "id" = ${offering.id} FOR UPDATE`;
+      const currentEnrollments = await tx.enrollment.findMany({
+        where: { offeringId: offering.id },
+        select: { id: true },
+      });
+      const enrollmentIds = currentEnrollments.map((item) => item.id);
+      if (!enrollmentIds.length) {
+        throw new PortalConflictError("This offering has no enrolled students");
+      }
+
       const results = await tx.assessmentResult.findMany({
         where: {
           enrollmentId: { in: enrollmentIds },
@@ -550,6 +574,7 @@ export const resultsLifecycleService = {
         where: {
           id: { in: unpublishedIds },
           publishedAt: null,
+          finalizedAt: null,
         },
         data: { publishedAt: now, publishedById: authorId },
       });
@@ -580,10 +605,19 @@ export const resultsLifecycleService = {
       programmeWide,
       input.assessmentItemId,
     );
-    const enrollmentIds = offering.enrollments.map((item) => item.id);
     const now = new Date();
 
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Offering" WHERE "id" = ${offering.id} FOR UPDATE`;
+      const currentEnrollments = await tx.enrollment.findMany({
+        where: { offeringId: offering.id },
+        select: { id: true },
+      });
+      const enrollmentIds = currentEnrollments.map((item) => item.id);
+      if (!enrollmentIds.length) {
+        throw new PortalConflictError("This offering has no enrolled students");
+      }
+
       const results = await tx.assessmentResult.findMany({
         where: {
           enrollmentId: { in: enrollmentIds },
@@ -635,6 +669,107 @@ export const resultsLifecycleService = {
         finalizedCount: updated.count,
         finalizedAt: now.toISOString(),
         finalizedById: authorId,
+      };
+    });
+  },
+
+  async correctFinalized(
+    authorId: string,
+    programmeWide: boolean,
+    input: CorrectFinalizedAssessmentResultInput,
+  ): Promise<CorrectFinalizedAssessmentResultResponse> {
+    return prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "AssessmentResult"
+        WHERE "id" = ${input.assessmentResultId}
+        FOR UPDATE
+      `;
+      if (!locked.length) throw new PortalNotFoundError("Assessment result not found");
+
+      const result = await tx.assessmentResult.findUnique({
+        where: { id: input.assessmentResultId },
+        include: {
+          enrollment: {
+            include: {
+              offering: { include: { coLecturers: true } },
+            },
+          },
+        },
+      });
+      if (!result) throw new PortalNotFoundError("Assessment result not found");
+
+      if (!canManageOfferingResults(
+        authorId,
+        programmeWide,
+        result.enrollment.offering.lecturerId,
+        result.enrollment.offering.coLecturers.map((item) => item.lecturerId),
+      )) {
+        throw new PortalAccessError("You are not assigned to this offering");
+      }
+      if (!result.finalizedAt || !result.finalizedById || !result.publishedAt) {
+        throw new PortalConflictError("Only finalized results can use the controlled correction workflow");
+      }
+
+      const expectedUpdatedAt = new Date(input.expectedUpdatedAt).toISOString();
+      if (result.updatedAt.toISOString() !== expectedUpdatedAt) {
+        throw new PortalConflictError(
+          "This finalized result changed after you loaded it. Reload the result before applying a correction.",
+        );
+      }
+      if (
+        result.score === input.score &&
+        result.maxScore === input.maxScore &&
+        result.feedback === input.feedback
+      ) {
+        throw new PortalConflictError("The correction must change the score, maximum score, or feedback");
+      }
+
+      const originalProvenance = {
+        publishedAt: result.publishedAt,
+        publishedById: result.publishedById,
+        finalizedAt: result.finalizedAt,
+        finalizedById: result.finalizedById,
+      };
+      const correctedAt = new Date();
+      const correction = await tx.assessmentResultCorrection.create({
+        data: {
+          assessmentResultId: result.id,
+          beforeScore: result.score,
+          beforeMaxScore: result.maxScore,
+          beforeFeedback: result.feedback,
+          afterScore: input.score,
+          afterMaxScore: input.maxScore,
+          afterFeedback: input.feedback,
+          reason: input.reason,
+          correctedById: authorId,
+          createdAt: correctedAt,
+        },
+      });
+      await tx.$queryRaw`SELECT set_config('dse.result_correction_id', ${correction.id}, true)`;
+      const updated = await tx.assessmentResult.update({
+        where: { id: result.id },
+        data: { score: input.score, maxScore: input.maxScore, feedback: input.feedback },
+      });
+
+      if (
+        updated.publishedAt?.getTime() !== originalProvenance.publishedAt.getTime() ||
+        updated.publishedById !== originalProvenance.publishedById ||
+        updated.finalizedAt?.getTime() !== originalProvenance.finalizedAt.getTime() ||
+        updated.finalizedById !== originalProvenance.finalizedById
+      ) {
+        throw new PortalConflictError("Result provenance changed unexpectedly; the correction was rolled back");
+      }
+
+      return {
+        assessmentResultId: updated.id,
+        correctionId: correction.id,
+        score: updated.score,
+        maxScore: updated.maxScore,
+        feedback: updated.feedback,
+        correctedAt: correction.createdAt.toISOString(),
+        correctedById: correction.correctedById,
+        updatedAt: updated.updatedAt.toISOString(),
       };
     });
   },

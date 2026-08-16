@@ -43,6 +43,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "ClassResponsibilityAuditEvent",
   "OfferingAssessmentDeadline",
   "AssessmentResult",
+  "AssessmentResultCorrection",
   "AssessmentCriterionScore",
   "CourseAnnouncement",
   "CourseFeedback",
