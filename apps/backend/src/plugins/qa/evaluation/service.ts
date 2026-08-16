@@ -174,6 +174,12 @@ export async function setQaEvaluationGold(
     include: { evidence: { select: { id: true } } },
   });
   if (!scenario) throw new QaEvaluationResourceNotFoundError("Evaluation scenario not found");
+  if (scenario.goldState !== null) {
+    throw new QaEvaluationIntegrityError(
+      "Gold reference classification is already established; create a new controlled scenario instead of overwriting the human reference label",
+    );
+  }
+
   const evidenceIds = new Set(scenario.evidence.map((item) => item.id));
   const invalid = input.evidenceJudgments.find((item) => !evidenceIds.has(item.evidenceId));
   if (invalid) {
@@ -216,6 +222,8 @@ export async function setQaEvaluationGold(
   return scenarioToView(updated);
 }
 
+/** Internal persistence for an actual prototype run. This is intentionally not
+ * exposed as a client-write route; #194 will call it from the controlled runner. */
 export async function createQaEvaluationRun(
   input: CreateRunInput,
 ): Promise<QaEvaluationRunView> {
