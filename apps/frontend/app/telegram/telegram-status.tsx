@@ -3,24 +3,13 @@
 import { useEffect, useState } from "react";
 import type { TelegramHomeResponse, TelegramInitDataVerifyResponse } from "@dse-pms/shared-types";
 import { API_URL } from "../../lib/api";
-
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: {
-        initData?: string;
-        ready(): void;
-        expand(): void;
-      };
-    };
-  }
-}
+import { saveTelegramSession } from "./telegram-client";
 
 type State =
   | { status: "loading" }
   | { status: "outside" }
   | { status: "unlinked"; verificationId: string }
-  | { status: "ready"; home: TelegramHomeResponse; token: string }
+  | { status: "ready"; home: TelegramHomeResponse }
   | { status: "error"; message: string };
 
 async function telegramFetch<T>(path: string, token: string): Promise<T> {
@@ -58,8 +47,9 @@ export function TelegramStatus() {
           if (!cancelled) setState({ status: "unlinked", verificationId: verified.verificationId });
           return;
         }
+        saveTelegramSession(verified.sessionToken, verified.sessionExpiresAt);
         const home = await telegramFetch<TelegramHomeResponse>("/api/telegram/mini/home", verified.sessionToken);
-        if (!cancelled) setState({ status: "ready", home, token: verified.sessionToken });
+        if (!cancelled) setState({ status: "ready", home });
       } catch (error) {
         if (!cancelled) setState({ status: "error", message: error instanceof Error ? error.message : "Telegram Mini App failed" });
       }
@@ -89,24 +79,32 @@ export function TelegramStatus() {
   }
 
   const { home } = state;
+  const student = home.user.roles.includes("student");
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-6">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in as</p>
         <p className="text-lg font-semibold">{home.user.name}</p>
         <p className="text-xs text-slate-500">{home.user.roles.join(" · ")}</p>
       </div>
 
+      <nav className="grid grid-cols-2 gap-2 text-sm">
+        <a href="/telegram/announcements" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Announcements</a>
+        {student ? <a href="/telegram/results" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Results & CLO</a> : null}
+        {student ? <a href="/telegram/surveys" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Course surveys</a> : null}
+        <a href="/telegram/settings" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Notifications</a>
+      </nav>
+
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl bg-slate-100 p-3"><p className="text-lg font-semibold">{home.courses.length}</p><p className="text-xs text-slate-500">Classes</p></div>
         <div className="rounded-xl bg-slate-100 p-3"><p className="text-lg font-semibold">{home.unreadAnnouncements}</p><p className="text-xs text-slate-500">News</p></div>
-        <div className="rounded-xl bg-slate-100 p-3"><p className="text-lg font-semibold">{home.surveyActions}</p><p className="text-xs text-slate-500">Surveys</p></div>
+        <div className="rounded-xl bg-slate-100 p-3"><p className="text-lg font-semibold">{student ? home.surveyActions : home.publishedResultCount}</p><p className="text-xs text-slate-500">{student ? "Surveys" : "Results"}</p></div>
       </div>
 
       <div className="space-y-2">
         <h2 className="text-sm font-semibold">Your classes</h2>
         {home.courses.map((course) => (
-          <a key={course.offeringId} href={`/telegram/classes/${course.offeringId}`} className="block rounded-xl border border-slate-200 p-3">
+          <a key={course.offeringId} href={`/telegram/classes/${course.offeringId}`} className="block rounded-xl border border-slate-200 bg-white p-3">
             <div className="flex items-start justify-between gap-3">
               <div><p className="font-medium">{course.courseCode}</p><p className="text-sm text-slate-600">{course.courseTitle}</p></div>
               <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{course.sectionCode}</span>
