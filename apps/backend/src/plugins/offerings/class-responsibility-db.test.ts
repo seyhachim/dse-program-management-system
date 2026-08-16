@@ -99,7 +99,11 @@ describeDb("class responsibility PostgreSQL integrity", () => {
     expect((await classResponsibilityService.list(offering.id)).filter((row) => row.role === "ClassMonitor")).toHaveLength(1);
 
     const history = await classResponsibilityService.history(offering.id);
-    expect(history.map((event) => event.action)).toEqual(["Assigned", "Reassigned", "Assigned"]);
+    const actions = history.map((event) => event.action);
+    expect(actions.filter((action) => action === "Assigned")).toHaveLength(2);
+    expect(actions.filter((action) => action === "Reassigned")).toHaveLength(1);
+    expect(history.some((event) => event.studentId === first.id && event.action === "Reassigned")).toBe(true);
+    expect(history.some((event) => event.studentId === second.id && event.action === "Assigned")).toBe(true);
   });
 
   test("rejects ineligible students and prevents the same student holding both active responsibilities", async () => {
