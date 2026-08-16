@@ -1,7 +1,8 @@
 import type {
   CourseDeliveryOffering,
   PublishAnnouncementInput,
-  PublishAssessmentResultInput,
+  PublishAssessmentResultsInput,
+  SaveAssessmentResultInput,
   SetAssessmentDeadlineInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
@@ -13,8 +14,10 @@ export const courseDeliveryApi = {
     api.post("/api/student-portal/manage/announcements", input),
   setDeadline: (input: SetAssessmentDeadlineInput) =>
     api.put("/api/student-portal/manage/deadlines", input),
-  publishResult: (input: PublishAssessmentResultInput) =>
+  saveResult: (input: SaveAssessmentResultInput) =>
     api.put("/api/student-portal/manage/results", input),
+  publishAssessmentResults: (input: PublishAssessmentResultsInput) =>
+    api.post("/api/student-portal/manage/results/publish", input),
 };
 
 export function toDateTimeLocal(value: string | null): string {
