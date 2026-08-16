@@ -7,9 +7,20 @@ import type {
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
+export type OfferingResultAccessPolicy = {
+  offeringId: string;
+  requireSurveyBeforeResults: boolean;
+};
+
 export const courseDeliveryApi = {
   offerings: () =>
     api.get<CourseDeliveryOffering[]>("/api/student-portal/manage/offerings"),
+  resultAccessPolicy: (offeringId: string) =>
+    api.get<OfferingResultAccessPolicy>(`/api/student-portal/manage/offerings/${offeringId}/result-access`),
+  setResultAccessPolicy: (offeringId: string, requireSurveyBeforeResults: boolean) =>
+    api.put<OfferingResultAccessPolicy>(`/api/student-portal/manage/offerings/${offeringId}/result-access`, {
+      requireSurveyBeforeResults,
+    }),
   publishAnnouncement: (input: PublishAnnouncementInput) =>
     api.post("/api/student-portal/manage/announcements", input),
   setDeadline: (input: SetAssessmentDeadlineInput) =>
