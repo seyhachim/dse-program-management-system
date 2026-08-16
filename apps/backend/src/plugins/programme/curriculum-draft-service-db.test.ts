@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { CourseType, PrismaClient } from "@prisma/client";
+import type { SaveCurriculumDraftInput } from "@dse-pms/shared-types";
 import { curriculumDraftService } from "./curriculum-draft-service.ts";
 import {
   CurriculumConflictError,
@@ -111,14 +112,14 @@ describeDb("curriculum draft editing", () => {
 
   test("rejects stale saves instead of overwriting newer draft work", async () => {
     const { user, initial } = await createFixture();
-    const input = {
+    const input: SaveCurriculumDraftInput = {
       expectedUpdatedAt: initial.selectedVersion.updatedAt,
       cohortLabel: "First save",
       intakeYear: 2026,
       academicYear: "2026-2027",
       effectiveFrom: null,
       placements: [],
-    } as const;
+    };
 
     await curriculumDraftService.save(
       initial.curriculum.id,
