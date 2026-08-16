@@ -71,6 +71,8 @@ export const RubricSchema = z.object({
   criteria: z.array(RubricCriterion),
   status: RubricStatusSchema,
   owner: RubricOwner.nullable(),
+  /** Number of course-spec assessment rows currently referencing this rubric. */
+  assessmentUsageCount: z.number().int().nonnegative().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -78,8 +80,8 @@ export type Rubric = z.infer<typeof RubricSchema>;
 
 /**
  * Deliberately small public contract. Only published (`Active`) rubric content
- * is exposed; ownership and internal lifecycle timestamps never leave the public
- * endpoint.
+ * is exposed; ownership, usage counts, and internal lifecycle timestamps never
+ * leave the public endpoint.
  */
 export const PublicRubricSchema = z.object({
   id: z.string().uuid(),
