@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Typecheck, test, build
+    name: Typecheck, lint, test, build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -28,10 +28,10 @@ jobs:
         with:
           bun-version: 1.2.23
 
-      - name: Install dependencies
+      - name: Install dependencies and generate Prisma Client
         run: bun install --frozen-lockfile
 
-      - name: Generate Prisma Client
+      - name: Generate Prisma Client explicitly
         run: bun run db:generate
 
       - name: Validate Prisma schema
@@ -42,8 +42,14 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Test
-        run: bun test
+      - name: Lint
+        run: bun run lint
+
+      - name: Test all suites
+        run: bun run test
+
+      - name: Verify backend test discovery
+        run: bun run test:backend
 
       - name: Build
         run: bun run build
@@ -51,11 +57,6 @@ jobs:
           NEXT_PUBLIC_AUTH_MODE: supabase
           NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
-
-      - name: Lint status
-        run: |
-          echo "Lint is intentionally not a required CI gate yet."
-          echo "Issue #127 tracks replacing the broken Next.js 'next lint' command with a reliable ESLint command."
 
   database:
     name: Fresh database migration, seed, and security
@@ -89,10 +90,10 @@ jobs:
         with:
           bun-version: 1.2.23
 
-      - name: Install dependencies
+      - name: Install dependencies and generate Prisma Client
         run: bun install --frozen-lockfile
 
-      - name: Generate Prisma Client
+      - name: Generate Prisma Client explicitly
         run: bun run db:generate
 
       # Reproduce the Supabase-side risk on ordinary PostgreSQL. The migration
@@ -147,6 +148,22 @@ jobs:
         run: bun test apps/backend/src/plugins/programme/curriculum-service-db.test.ts
         env:
           CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify curriculum draft mutations
+        run: bun test apps/backend/src/plugins/programme/curriculum-draft-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify curriculum lifecycle workflow
+        run: bun test apps/backend/src/plugins/programme/curriculum-workflow-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify Telegram identity and revocation security
+        run: bun test apps/backend/src/plugins/telegram/telegram-security-db.test.ts
+        env:
+          TELEGRAM_DB_TESTS: "1"
+          JWT_SECRET: telegram-ci-security-secret-at-least-32-characters
 
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
@@ -205,3 +222,53 @@ jobs:
 
       - name: Verify database security after fail-closed probes
         run: bun run --cwd apps/backend db:security:verify
+
+  backend-integration:
+    name: Backend integration authorization
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_integration
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_integration"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_integration?schema=public
+      AUTH_MODE: dev
+      JWT_SECRET: issue-130-ci-integration-secret-at-least-32-characters
+      BACKEND_INTEGRATION_TESTS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client explicitly
+        run: bun run db:generate
+
+      - name: Apply migrations to isolated integration database
+        run: bun run db:migrate:deploy
+
+      - name: Seed isolated integration database
+        run: bun run seed
+
+      - name: Run backend route/database authorization integration suite
+        run: bun run test:backend:integration
