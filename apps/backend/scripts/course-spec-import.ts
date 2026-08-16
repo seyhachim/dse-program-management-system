@@ -488,11 +488,23 @@ function dueWeekForAssessment(
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   if (!needle) return null;
+
   for (const week of doc.lessonPlan?.weeks ?? []) {
-    const hay = week.assessmentRaw.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+    const raw = cleanText(week.assessmentRaw);
+    if (!raw || raw === "0" || raw === "-" || raw === "—") continue;
+
+    const hay = raw
+      .toLowerCase()
+      .replace(/\(\s*\d+(?:\.\d+)?\s*%\s*\)/g, " ")
+      .replace(/\b\d+(?:\.\d+)?\s*%\b/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    if (!hay) continue;
+
+    const candidate = hay.replace(/^\d+\s*/, "").trim();
     if (
       hay.includes(needle) ||
-      needle.includes(hay.replace(/^\d+\s*/, "").trim())
+      (candidate.length > 0 && needle.includes(candidate))
     )
       return week.week;
   }
@@ -537,9 +549,15 @@ async function importOne(
 
   const existingCourse = await prisma.course.findUnique({
     where: { code: courseCode },
-    include: { spec: { select: { id: true } } },
+    include: {
+      specs: {
+        orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
+        take: 1,
+        select: { id: true },
+      },
+    },
   });
-  if (existingCourse?.spec && !options.replaceExisting)
+  if (existingCourse?.specs[0] && !options.replaceExisting)
     return {
       file,
       courseCode,
@@ -563,8 +581,6 @@ async function importOne(
         courseType: prismaCourseType(doc.course.courseType),
         totalSltHours: grandTotalSlt(doc),
         lecturerId: lecturer.id,
-        // Only programme that exists yet — matches every other Course
-        // creation path (courses/service.ts, prisma/seed.ts).
         programmeId: DEFAULT_PROGRAMME_ID,
       },
       update: {
@@ -578,57 +594,39 @@ async function importOne(
       },
     });
 
-    const oldSpec = await tx.courseSpec.findUnique({
+    const oldSpec = await tx.courseSpec.findFirst({
       where: { courseId: course.id },
+      orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
       select: { id: true },
     });
     if (oldSpec && options.replaceExisting)
-      await tx.courseSpec.delete({ where: { courseId: course.id } });
+      await tx.courseSpec.delete({ where: { id: oldSpec.id } });
     const spec = await tx.courseSpec.create({ data: { courseId: course.id } });
 
     const teachingMethodNames = new Set<string>();
     const assessmentMethodNames = new Set<string>();
     for (const clo of doc.clos) {
-      aliasesFromRaw(
-        clo.teachingMethodsRaw ?? "",
-        TEACHING_METHOD_ALIASES,
-      ).forEach((x) => teachingMethodNames.add(x));
-      aliasesFromRaw(
-        clo.assessmentMethodsRaw ?? "",
-        ASSESSMENT_METHOD_ALIASES,
-      ).forEach((x) => assessmentMethodNames.add(x));
+      aliasesFromRaw(clo.teachingMethodsRaw ?? "", TEACHING_METHOD_ALIASES).forEach((x) => teachingMethodNames.add(x));
+      aliasesFromRaw(clo.assessmentMethodsRaw ?? "", ASSESSMENT_METHOD_ALIASES).forEach((x) => assessmentMethodNames.add(x));
     }
     for (const week of doc.lessonPlan?.weeks ?? [])
-      aliasesFromRaw(week.teachingMethodsRaw, TEACHING_METHOD_ALIASES).forEach(
-        (x) => teachingMethodNames.add(x),
-      );
+      aliasesFromRaw(week.teachingMethodsRaw, TEACHING_METHOD_ALIASES).forEach((x) => teachingMethodNames.add(x));
     for (const item of doc.assessments)
-      ASSESSMENT_METHOD_ALIASES.filter(([rx]) => rx.test(item.name)).forEach(
-        ([, x]) => assessmentMethodNames.add(x),
-      );
+      ASSESSMENT_METHOD_ALIASES.filter(([rx]) => rx.test(item.name)).forEach(([, x]) => assessmentMethodNames.add(x));
 
     const teachingMethodIds = new Map<string, string>();
     for (const name of teachingMethodNames)
       teachingMethodIds.set(name, (await ensureTeachingMethod(tx, name)).id);
     const assessmentMethodIds = new Map<string, string>();
     for (const name of assessmentMethodNames)
-      assessmentMethodIds.set(
-        name,
-        (await ensureAssessmentMethod(tx, name)).id,
-      );
+      assessmentMethodIds.set(name, (await ensureAssessmentMethod(tx, name)).id);
 
     const activeStrategyIds = [
-      ...new Set(
-        (doc.lessonPlan?.weeks ?? []).flatMap((w) =>
-          activeLearningFromRaw(w.activeLearningRaw),
-        ),
-      ),
+      ...new Set((doc.lessonPlan?.weeks ?? []).flatMap((w) => activeLearningFromRaw(w.activeLearningRaw))),
     ];
     const selfStudy = selfStudyByWeek(doc);
     const topicByNumber = new Map(
-      (doc.lessonPlan?.topics ?? [])
-        .filter((t) => t.number != null)
-        .map((t) => [t.number!, t]),
+      (doc.lessonPlan?.topics ?? []).filter((t) => t.number != null).map((t) => [t.number!, t]),
     );
 
     const cloRows = doc.clos.map((clo, order) => ({
@@ -639,60 +637,36 @@ async function importOne(
       level: clo.level ?? null,
       mappedPlos: clo.mappedPlos,
       sltHours: null,
-      status:
-        clo.status === "inactive" ? ("Inactive" as const) : ("Active" as const),
+      status: clo.status === "inactive" ? ("Inactive" as const) : ("Active" as const),
       notes: "",
       activeLearningStrategyIds: activeStrategyIds,
     }));
     if (cloRows.length) await tx.courseSpecClo.createMany({ data: cloRows });
-    const cloIdByCode = new Map(
-      doc.clos.map((c, i) => [c.code, cloRows[i]!.id]),
-    );
+    const cloIdByCode = new Map(doc.clos.map((c, i) => [c.code, cloRows[i]!.id]));
     const cloTeachingLinks = doc.clos.flatMap((clo) =>
-      aliasesFromRaw(
-        clo.teachingMethodsRaw ?? "",
-        TEACHING_METHOD_ALIASES,
-      ).flatMap((name) => {
+      aliasesFromRaw(clo.teachingMethodsRaw ?? "", TEACHING_METHOD_ALIASES).flatMap((name) => {
         const id = teachingMethodIds.get(name);
         const cloId = cloIdByCode.get(clo.code);
-        return id && cloId
-          ? [{ courseSpecId: spec.id, cloId, teachingMethodId: id }]
-          : [];
+        return id && cloId ? [{ courseSpecId: spec.id, cloId, teachingMethodId: id }] : [];
       }),
     );
     if (cloTeachingLinks.length)
-      await tx.courseSpecCloTeachingMethod.createMany({
-        data: cloTeachingLinks,
-        skipDuplicates: true,
-      });
+      await tx.courseSpecCloTeachingMethod.createMany({ data: cloTeachingLinks, skipDuplicates: true });
     const cloAssessmentLinks = doc.clos.flatMap((clo) =>
-      aliasesFromRaw(
-        clo.assessmentMethodsRaw ?? "",
-        ASSESSMENT_METHOD_ALIASES,
-      ).flatMap((name) => {
+      aliasesFromRaw(clo.assessmentMethodsRaw ?? "", ASSESSMENT_METHOD_ALIASES).flatMap((name) => {
         const id = assessmentMethodIds.get(name);
         const cloId = cloIdByCode.get(clo.code);
-        return id && cloId
-          ? [{ courseSpecId: spec.id, cloId, assessmentMethodId: id }]
-          : [];
+        return id && cloId ? [{ courseSpecId: spec.id, cloId, assessmentMethodId: id }] : [];
       }),
     );
     if (cloAssessmentLinks.length)
-      await tx.courseSpecCloAssessmentMethod.createMany({
-        data: cloAssessmentLinks,
-        skipDuplicates: true,
-      });
+      await tx.courseSpecCloAssessmentMethod.createMany({ data: cloAssessmentLinks, skipDuplicates: true });
 
     const weekRows = (doc.lessonPlan?.weeks ?? []).map((week, order) => {
-      const [lectureHours, tutorialHours, practiceHours, otherHours] =
-        parseContactHours(week.hoursRaw);
+      const [lectureHours, tutorialHours, practiceHours, otherHours] = parseContactHours(week.hoursRaw);
       const topicMatch = /Topic\s*(\d+)/i.exec(week.lectureTopic);
-      const topic = topicMatch
-        ? topicByNumber.get(Number(topicMatch[1]))
-        : undefined;
-      const llos = topic
-        ? llosFromRaw(topic.llosRaw, courseCode, topic.number ?? order)
-        : [];
+      const topic = topicMatch ? topicByNumber.get(Number(topicMatch[1])) : undefined;
+      const llos = topic ? llosFromRaw(topic.llosRaw, courseCode, topic.number ?? order) : [];
       return {
         id: stableId(courseCode, "week", week.week),
         courseSpecId: spec.id,
@@ -702,26 +676,18 @@ async function importOne(
         cloCodes: week.clos,
         lloItems: llos.map((x) => x.description),
         lessonLearningOutcomes: llos as Prisma.InputJsonValue,
-        activities: cleanText(week.activeLearningRaw)
-          ? [cleanText(week.activeLearningRaw)]
-          : [],
+        activities: cleanText(week.activeLearningRaw) ? [cleanText(week.activeLearningRaw)] : [],
         studentLearningActivities: [] as unknown as Prisma.InputJsonValue,
         lectureHours,
         tutorialHours,
         practiceHours,
         otherHours,
         selfStudyHours: selfStudy.get(week.week) ?? null,
-        teachingMethodIds: aliasesFromRaw(
-          week.teachingMethodsRaw,
-          TEACHING_METHOD_ALIASES,
-        ).flatMap((name) => teachingMethodIds.get(name) ?? []),
+        teachingMethodIds: aliasesFromRaw(week.teachingMethodsRaw, TEACHING_METHOD_ALIASES).flatMap((name) => teachingMethodIds.get(name) ?? []),
         teachingResourceTypes: cleanText(week.resourcesRaw)
           ? week.resourcesRaw.split(/[,;]+/).map(cleanText).filter(Boolean)
           : [],
-        assessmentMethodIds: aliasesFromRaw(
-          week.assessmentRaw,
-          ASSESSMENT_METHOD_ALIASES,
-        ).flatMap((name) => assessmentMethodIds.get(name) ?? []),
+        assessmentMethodIds: aliasesFromRaw(week.assessmentRaw, ASSESSMENT_METHOD_ALIASES).flatMap((name) => assessmentMethodIds.get(name) ?? []),
         assessment: cleanText(week.assessmentRaw),
       };
     });
@@ -734,9 +700,7 @@ async function importOne(
       name: item.name,
       type: assessmentType(item.name),
       description: "",
-      mode: item.mode.toLowerCase().includes("group")
-        ? ("Group" as const)
-        : ("Individual" as const),
+      mode: item.mode.toLowerCase().includes("group") ? ("Group" as const) : ("Individual" as const),
       status: "Active" as const,
       cloCodes: item.clo ? [item.clo] : [],
       feedbackMethod: "",
@@ -747,7 +711,7 @@ async function importOne(
       format: "",
       submissionMethod: "",
       instructions: "",
-      rubric: "",
+      rubricId: null,
       mappedPlos: item.plos,
       notes: "",
     }));
@@ -757,10 +721,7 @@ async function importOne(
     const resourceRows: Prisma.CourseSpecResourceCreateManyInput[] = [];
     const seenResources = new Map<string, number>();
     for (const week of doc.lessonPlan?.weeks ?? []) {
-      for (const title of week.resourcesRaw
-        .split(/[,;]+/)
-        .map(cleanText)
-        .filter(Boolean)) {
+      for (const title of week.resourcesRaw.split(/[,;]+/).map(cleanText).filter(Boolean)) {
         const key = title.toLowerCase();
         const existing = seenResources.get(key);
         if (existing != null) {
@@ -768,12 +729,8 @@ async function importOne(
           const existingWeekIds = Array.isArray(row.evidenceWeekIds)
             ? row.evidenceWeekIds
             : (row.evidenceWeekIds?.set ?? []);
-
           row.evidenceWeekIds = [
-            ...new Set([
-              ...existingWeekIds,
-              stableId(courseCode, "week", week.week),
-            ]),
+            ...new Set([...existingWeekIds, stableId(courseCode, "week", week.week)]),
           ];
         } else {
           seenResources.set(key, resourceRows.length);
@@ -797,10 +754,7 @@ async function importOne(
       }
     }
     const refs = doc.resources?.references;
-    for (const [kind, list] of [
-      ["REQUIRED", refs?.required ?? []],
-      ["RECOMMENDED", refs?.recommended ?? []],
-    ] as const) {
+    for (const [kind, list] of [["REQUIRED", refs?.required ?? []], ["RECOMMENDED", refs?.recommended ?? []]] as const) {
       for (const ref of list) {
         const title = cleanText(String(ref.title ?? ""));
         if (!title) continue;
@@ -825,9 +779,7 @@ async function importOne(
     if (resourceRows.length)
       await tx.courseSpecResource.createMany({ data: resourceRows });
 
-    const responsibilities = splitResponsibilities(
-      doc.studentResponsibilitiesRaw,
-    );
+    const responsibilities = splitResponsibilities(doc.studentResponsibilitiesRaw);
     if (responsibilities.length)
       await tx.courseSpecStudentResponsibility.createMany({
         data: responsibilities.map((text, order) => ({
@@ -840,37 +792,30 @@ async function importOne(
 
     const policy = parsePolicy(doc.coursePolicyRaw);
     if (Object.values(policy).some(Boolean))
-      await tx.courseSpecPolicy.create({
-        data: { courseSpecId: spec.id, ...policy },
-      });
+      await tx.courseSpecPolicy.create({ data: { courseSpecId: spec.id, ...policy } });
 
     const resourceTypes = [
-      ...new Set(
-        (doc.lessonPlan?.weeks ?? []).flatMap((w) => {
-          const raw = w.resourcesRaw.toLowerCase();
-          const values: string[] = [];
-          if (raw.includes("slide")) values.push("Slides");
-          if (raw.includes("dataset") || raw.includes("data set"))
-            values.push("Datasets");
-          if (raw.includes("worksheet")) values.push("Worksheets");
-          if (raw.includes("video")) values.push("Videos");
-          if (raw.includes("case")) values.push("Case Studies");
-          return values;
-        }),
-      ),
+      ...new Set((doc.lessonPlan?.weeks ?? []).flatMap((w) => {
+        const raw = w.resourcesRaw.toLowerCase();
+        const values: string[] = [];
+        if (raw.includes("slide")) values.push("Slides");
+        if (raw.includes("dataset") || raw.includes("data set")) values.push("Datasets");
+        if (raw.includes("worksheet")) values.push("Worksheets");
+        if (raw.includes("video")) values.push("Videos");
+        if (raw.includes("case")) values.push("Case Studies");
+        return values;
+      })),
     ];
     const technologyTypes = [
-      ...new Set(
-        (doc.lessonPlan?.weeks ?? []).flatMap((w) => {
-          const raw = w.resourcesRaw.toLowerCase();
-          const values: string[] = [];
-          if (raw.includes("jupyter")) values.push("Jupyter");
-          if (raw.includes("github")) values.push("GitHub");
-          if (raw.includes("colab")) values.push("Google Colab");
-          if (raw.includes("lms")) values.push("LMS");
-          return values;
-        }),
-      ),
+      ...new Set((doc.lessonPlan?.weeks ?? []).flatMap((w) => {
+        const raw = w.resourcesRaw.toLowerCase();
+        const values: string[] = [];
+        if (raw.includes("jupyter")) values.push("Jupyter");
+        if (raw.includes("github")) values.push("GitHub");
+        if (raw.includes("colab")) values.push("Google Colab");
+        if (raw.includes("lms")) values.push("LMS");
+        return values;
+      })),
     ];
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO "CourseSpecTeachingLearning" ("courseSpecId", "philosophyTags", "philosophyStatement", "teachingMethodIds", "activeLearningStrategyIds", "independentLearningTypes", "resourceTypes", "technologyTypes", "updatedAt")
@@ -902,7 +847,7 @@ async function importOne(
   return {
     file,
     courseCode,
-    action: existingCourse?.spec ? "replaced" : "created",
+    action: existingCourse?.specs[0] ? "replaced" : "created",
     warnings,
   };
 }
@@ -915,13 +860,8 @@ async function main() {
     if (file.endsWith("schema.json") || file.endsWith("import-report.json"))
       continue;
     try {
-      const parsed = CanonicalCourseSchema.parse(
-        JSON.parse(await readFile(file, "utf8")),
-      );
-      if (
-        options.courseCode &&
-        parsed.course.code.toUpperCase() !== options.courseCode
-      )
+      const parsed = CanonicalCourseSchema.parse(JSON.parse(await readFile(file, "utf8")));
+      if (options.courseCode && parsed.course.code.toUpperCase() !== options.courseCode)
         continue;
       results.push(await importOne(parsed, file, options));
     } catch (error) {
@@ -946,10 +886,7 @@ async function main() {
   };
   console.log(JSON.stringify({ summary, results }, null, 2));
   if (options.reportPath)
-    await writeFile(
-      options.reportPath,
-      JSON.stringify({ summary, results }, null, 2),
-    );
+    await writeFile(options.reportPath, JSON.stringify({ summary, results }, null, 2));
   if (summary.failed > 0 || summary.blocked > 0) process.exitCode = 1;
 }
 

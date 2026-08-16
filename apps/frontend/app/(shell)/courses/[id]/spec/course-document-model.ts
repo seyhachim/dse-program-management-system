@@ -4,11 +4,14 @@ import {
   semesterLabel,
   cloFocusCode,
   cloFocusPercent,
+  rubricScaleSummary,
+  type DateSection as DateSectionValue,
   type Method,
   type PolicySection as PolicySectionValue,
   type ProgrammeAcademicConfig,
   type Rubric,
   type StudentResponsibilitySection as StudentResponsibilityValue,
+  type TeachingLearningProfile,
 } from "@dse-pms/shared-types";
 
 import type { CourseInfoForm } from "./course-info-section";
@@ -27,6 +30,10 @@ export type CourseDocumentModel = {
   title: string;
   partTitle: string;
   programmeProfile: ProgrammeAcademicConfig["profile"];
+  /** §25 Date — spec last revised/approved date, YYYY-MM-DD or null if unset. */
+  specDate: string | null;
+  /** Part 1 cover page PLO taxonomy table. */
+  plos: ProgrammeAcademicConfig["plos"];
   courseInformation: {
     programmeTitle: string;
     courseTitle: string;
@@ -83,6 +90,11 @@ export type CourseDocumentModel = {
     sltHours: string;
     assessment: string;
   }[];
+  /** §19: facilities, infrastructure, platforms, software, or equipment needed to deliver the course. */
+  requiredDeliveryResources: string[];
+  /** §20: course-level instructional materials used to support teaching and student learning. */
+  teachingLearningMaterials: string[];
+  /** Detailed files, links, textbooks, references, and resource records managed in the Resources tab. */
   resources: {
     id: string;
     resourceType: string;
@@ -135,6 +147,15 @@ export type CourseDocumentModel = {
     onlineSltHours: string;
     independentSltHours: string;
     totalSltHours: number;
+  }[];
+  /** §22 — one entry per active assessment with a linked Rubric Library rubric. */
+  rubrics: {
+    assessmentName: string;
+    name: string;
+    type: string;
+    scaleSummary: string;
+    levels: { label: string; points: number }[];
+    criteria: { name: string; descriptors: string[] }[];
   }[];
   totals: {
     courseContentSlt: number;
@@ -240,10 +261,12 @@ type BuildCourseDocumentInput = {
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
   programme?: ProgrammeAcademicConfig | null;
+  teachingLearningProfile?: TeachingLearningProfile;
   resources?: ResourcesForm;
   references?: ReferencesForm;
   responsibility?: StudentResponsibilityValue;
   policy?: PolicySectionValue;
+  specDate?: DateSectionValue;
   courseTotalSlt?: number | null;
 };
 
@@ -253,6 +276,16 @@ const EMPTY_POLICY_VALUES: PolicySectionValue = {
   assignmentsLateSubmission: "",
   examinationRules: "",
   penaltiesConsequences: "",
+};
+
+const EMPTY_TEACHING_LEARNING_PROFILE: TeachingLearningProfile = {
+  philosophyTags: [],
+  philosophyStatement: "",
+  teachingMethodIds: [],
+  activeLearningStrategyIds: [],
+  independentLearningTypes: [],
+  resourceTypes: [],
+  technologyTypes: [],
 };
 
 type CourseType =
@@ -293,10 +326,12 @@ export function buildCourseDocument({
   teachingMethods = [],
   assessmentMethods = [],
   programme = null,
+  teachingLearningProfile = EMPTY_TEACHING_LEARNING_PROFILE,
   resources = [],
   references = [],
   responsibility,
   policy,
+  specDate,
   courseTotalSlt = null,
 }: BuildCourseDocumentInput): CourseDocumentModel {
   const ploByCode = new Map(
@@ -390,10 +425,10 @@ export function buildCourseDocument({
       feedbackMethod: assessment.feedbackMethod,
       feedbackTimeline: assessment.feedbackTimeline,
       evaluationDefinition:
-        rubricById.get(assessment.rubric)?.description ?? "",
-      rubricName: rubricById.get(assessment.rubric)?.name ?? "",
-      rubricUrl: assessment.rubric
-        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubric)}/edit`
+        rubricById.get(assessment.rubricId)?.description ?? "",
+      rubricName: rubricById.get(assessment.rubricId)?.name ?? "",
+      rubricUrl: assessment.rubricId
+        ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubricId)}/edit`
         : "",
       assessmentCategory: assessment.assessmentCategory,
       topicNumbers: assessment.topicNumbers,
@@ -402,6 +437,29 @@ export function buildCourseDocument({
       independentSltHours: assessment.independentSltHours,
       totalSltHours: assessmentSltHours(assessment),
     }));
+
+  const documentRubrics = assessments
+    .filter((assessment) => assessment.status === "active")
+    .flatMap((assessment) => {
+      const rubric = rubricById.get(assessment.rubricId);
+      if (!rubric) return [];
+      return [
+        {
+          assessmentName: assessment.name,
+          name: rubric.name,
+          type: rubric.type,
+          scaleSummary: rubricScaleSummary(rubric.levels),
+          levels: rubric.levels.map((level) => ({
+            label: level.label,
+            points: level.points,
+          })),
+          criteria: rubric.criteria.map((criterion) => ({
+            name: criterion.name,
+            descriptors: criterion.descriptors,
+          })),
+        },
+      ];
+    });
 
   const documentMapping = activeClos.map((clo) => {
     const focusPercent = cloFocusPercent(
@@ -450,6 +508,8 @@ export function buildCourseDocument({
       educationalPhilosophy: [],
       peos: [],
     },
+    specDate: specDate?.date ?? null,
+    plos: programme?.plos ?? [],
     courseInformation: {
       programmeTitle: programme?.title ?? PROGRAMME_TITLE,
       courseTitle: courseInfo.courseTitle,
@@ -473,6 +533,8 @@ export function buildCourseDocument({
     clos: documentClos,
     mapping: documentMapping,
     weeklyPlan: documentWeeks,
+    requiredDeliveryResources: unique(teachingLearningProfile.technologyTypes),
+    teachingLearningMaterials: unique(teachingLearningProfile.resourceTypes),
     resources: resources.map((resource) => ({
       id: resource.id,
       resourceType: resource.resourceType,
@@ -497,6 +559,7 @@ export function buildCourseDocument({
       .filter(Boolean),
     policy: policy ?? EMPTY_POLICY_VALUES,
     assessments: documentAssessments,
+    rubrics: documentRubrics,
     totals: {
       courseContentSlt,
       continuousAssessmentSlt,

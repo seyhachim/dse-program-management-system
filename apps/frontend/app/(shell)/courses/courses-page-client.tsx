@@ -10,9 +10,9 @@ import { TeachingRoleBadge } from "./teaching-role-badge";
  * Programme-wide roles that keep the curriculum-management "Course Management"
  * view — mirrors the backend's PROGRAMME_WIDE_ROLES (apps/backend/src/core/auth/token.ts),
  * duplicated here since the frontend has no import path to that backend module.
- * Anyone else holding "lecturer" gets the teaching-focused "My Courses" view
- * (issue #104); a caller with neither (e.g. a not-yet-resolved session) falls
- * back to the admin view while `me` loads.
+ * Anyone else holding "lecturer" gets the focused "Course Specifications" view;
+ * a caller with neither (e.g. a not-yet-resolved session) falls back to the
+ * programme-wide view while `me` loads.
  */
 const PROGRAMME_WIDE_ROLES = ["admin", "program_coordinator", "program_secretary", "qa_reviewer"];
 
@@ -23,14 +23,17 @@ export function CoursesPageClient() {
   if (isLecturerOnly) {
     return (
       <>
-        <Topbar title="My Courses" subtitle="Courses you teach and their current academic status." />
+        <Topbar
+          title="Course Specifications"
+          subtitle="Specification status, completeness, and follow-up for the courses you teach."
+        />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm">
-            <span className="font-medium text-foreground">Your teaching role:</span>
+            <span className="font-medium text-foreground">Your specification role:</span>
             <TeachingRoleBadge role="Primary" />
             <TeachingRoleBadge role="Co-Lecturer" />
             <span className="text-muted-foreground">
-              The Role column shows how you are assigned to each course offering.
+              Class sections that share a course are grouped under one course specification.
             </span>
           </div>
           <MyCoursesClient />

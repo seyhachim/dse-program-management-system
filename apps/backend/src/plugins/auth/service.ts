@@ -1,5 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { CreateAccountInput } from "@dse-pms/shared-types";
+import type {
+  CreateAccountInput,
+  ManageProgrammeRoleInput,
+  ProgrammeRoleAssignmentView,
+} from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { permissionsForRoles } from "../../core/permissions/index.ts";
 import { defaultProgrammeIdForRole, type Role } from "../../core/auth/token.ts";
@@ -21,6 +25,7 @@ const accountSelect = {
 } as const;
 
 export class ProvisioningError extends Error {}
+export class ProgrammeRoleAssignmentError extends Error {}
 
 let adminClient: SupabaseClient | undefined;
 
@@ -37,6 +42,25 @@ function getAdminClient(): SupabaseClient {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   return adminClient;
+}
+
+async function programmeRoleView(
+  userId: string,
+  programmeId: string,
+  role: "qa_contributor",
+): Promise<ProgrammeRoleAssignmentView> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, email: true },
+  });
+  if (!user) throw new ProgrammeRoleAssignmentError("User not found");
+  return {
+    userId: user.id,
+    userName: user.name,
+    userEmail: user.email,
+    programmeId,
+    role,
+  };
 }
 
 export const authService = {
@@ -108,9 +132,9 @@ export const authService = {
       select: accountSelect,
     });
 
-    // UserRoleAssignment is the role source of truth — keep it populated here,
-    // not just by seed.ts. Reassigning an existing email to a different role
-    // also drops its old assignment.
+    // UserRoleAssignment is the role source of truth. Account provisioning keeps
+    // its historical single-primary-role behavior, but additive QA Contributor
+    // grants are preserved so re-inviting a lecturer cannot silently remove SAR work access.
     const role = await prisma.role.findUniqueOrThrow({ where: { slug: input.role } });
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
@@ -118,7 +142,11 @@ export const authService = {
       create: { userId: user.id, roleId: role.id, programmeId: defaultProgrammeIdForRole(input.role) },
     });
     await prisma.userRoleAssignment.deleteMany({
-      where: { userId: user.id, roleId: { not: role.id } },
+      where: {
+        userId: user.id,
+        roleId: { not: role.id },
+        role: { slug: { not: "qa_contributor" } },
+      },
     });
 
     if (studentProfile) {
@@ -128,7 +156,89 @@ export const authService = {
       });
     }
 
-    return { ...user, role: role.slug, roles: [role.slug] };
+    const roles = await prisma.userRoleAssignment.findMany({
+      where: { userId: user.id },
+      select: { role: { select: { slug: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    return { ...user, role: role.slug, roles: roles.map((assignment) => assignment.role.slug) };
+  },
+
+  /** Add a narrowly-allowed programme role without replacing any existing role. */
+  async assignProgrammeRole(input: ManageProgrammeRoleInput): Promise<ProgrammeRoleAssignmentView> {
+    const [user, programme, role] = await Promise.all([
+      prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } }),
+      prisma.programme.findUnique({ where: { id: input.programmeId }, select: { id: true } }),
+      prisma.role.findUnique({ where: { slug: input.role }, select: { id: true } }),
+    ]);
+    if (!user) throw new ProgrammeRoleAssignmentError("User not found");
+    if (!programme) throw new ProgrammeRoleAssignmentError("Programme not found");
+    if (!role) throw new ProgrammeRoleAssignmentError("Programme role is not installed");
+
+    const existing = await prisma.userRoleAssignment.findUnique({
+      where: { userId_roleId: { userId: input.userId, roleId: role.id } },
+      select: { programmeId: true },
+    });
+    if (existing && existing.programmeId !== input.programmeId) {
+      throw new ProgrammeRoleAssignmentError(
+        "This role is already assigned to the user in a different programme",
+      );
+    }
+
+    await prisma.userRoleAssignment.upsert({
+      where: { userId_roleId: { userId: input.userId, roleId: role.id } },
+      update: { programmeId: input.programmeId },
+      create: {
+        userId: input.userId,
+        roleId: role.id,
+        programmeId: input.programmeId,
+      },
+    });
+
+    return programmeRoleView(input.userId, input.programmeId, input.role);
+  },
+
+  /** Remove only the requested additive programme role; all other roles remain intact. */
+  async removeProgrammeRole(input: ManageProgrammeRoleInput): Promise<void> {
+    const role = await prisma.role.findUnique({
+      where: { slug: input.role },
+      select: { id: true },
+    });
+    if (!role) throw new ProgrammeRoleAssignmentError("Programme role is not installed");
+
+    await prisma.userRoleAssignment.deleteMany({
+      where: {
+        userId: input.userId,
+        roleId: role.id,
+        programmeId: input.programmeId,
+      },
+    });
+  },
+
+  async listProgrammeRoleAssignments(
+    programmeId: string,
+  ): Promise<ProgrammeRoleAssignmentView[]> {
+    const rows = await prisma.userRoleAssignment.findMany({
+      where: {
+        programmeId,
+        role: { slug: "qa_contributor" },
+      },
+      orderBy: { user: { name: "asc" } },
+      select: {
+        userId: true,
+        programmeId: true,
+        user: { select: { name: true, email: true } },
+      },
+    });
+    return rows.flatMap((row) => row.programmeId
+      ? [{
+          userId: row.userId,
+          userName: row.user.name,
+          userEmail: row.user.email,
+          programmeId: row.programmeId,
+          role: "qa_contributor" as const,
+        }]
+      : []);
   },
 
   /**

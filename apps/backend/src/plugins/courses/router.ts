@@ -11,6 +11,7 @@ import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES } from "../../core/auth/tok
 import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
 import { overlayCourseSpecTeachingAssignment } from "./teaching-assignment.ts";
+import { CourseSpecLockedError } from "./spec-lock.ts";
 
 /**
  * Get a required route parameter.
@@ -109,27 +110,15 @@ async function ensureCourseAccess(
 }
 
 /**
- * Lecturers may edit a course specification only while it is in
- * Draft or Changes Requested.
- *
- * Programme-wide roles retain edit access for administration
- * and review workflows.
+ * Course-specification content is editable only while the workflow is Draft
+ * or Changes Requested. Programme-wide roles retain broad course access, but
+ * they do not bypass content immutability once a specification enters review.
  */
-
 async function ensureSpecEditable(
   req: Request,
   res: Response,
   courseId: string,
 ): Promise<boolean> {
-  // Caller already passed ensureCourseAccess for this same course (its sole
-  // caller), so the course is known to exist — re-fetch just its programmeId
-  // rather than threading the earlier lookup through, matching this file's
-  // existing per-check independent-fetch style.
-  const course = await courseService.getById(courseId);
-  if (course && hasAnyRoleInProgramme(req.user!, PROGRAMME_WIDE_ROLES, course.programmeId)) {
-    return true;
-  }
-
   const spec = await courseService.getSpec(courseId);
 
   if (!spec) {
@@ -509,6 +498,10 @@ export function createCourseRouter(): Router {
  * Map service/Prisma errors to HTTP status.
  */
 function errStatus(err: unknown): number {
+  if (err instanceof CourseSpecLockedError) {
+    return 409;
+  }
+
   if (err instanceof ReferenceError) {
     return 400;
   }
@@ -527,6 +520,10 @@ function errStatus(err: unknown): number {
 }
 
 function errMessage(err: unknown, uniqueField: string): string | null {
+  if (err instanceof CourseSpecLockedError) {
+    return err.message;
+  }
+
   if (err instanceof ReferenceError) {
     return err.message;
   }

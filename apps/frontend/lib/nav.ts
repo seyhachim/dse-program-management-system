@@ -15,6 +15,7 @@ import {
   Home,
   ChartNoAxesCombined,
   LibraryBig,
+  Megaphone,
   Presentation,
   RefreshCw,
   Settings,
@@ -24,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  communityManifest,
   navForRole,
   navFromManifests,
   navGroupsForRole,
@@ -34,10 +36,11 @@ import {
 } from "@dse-pms/shared-types";
 
 /**
- * Sidebar nav is generated automatically from the shared plugin manifest — the
- * same source of truth the backend registers routers against. Adding a plugin
- * to `pluginManifests` makes it appear here with no other change.
+ * Sidebar nav is generated from the shared plugin manifests. Community of Practice
+ * is kept in its own additive manifest while the legacy registry is gradually split.
  */
+const frontendManifests = [...pluginManifests, communityManifest];
+
 export const iconMap: Record<string, LucideIcon> = {
   users: Users,
   book: Book,
@@ -61,14 +64,15 @@ export const iconMap: Record<string, LucideIcon> = {
   home: Home,
   chart: ChartNoAxesCombined,
   bell: Bell,
+  megaphone: Megaphone,
 };
 
 /** All nav routes, or — when roles are given — only those the caller's roles may see. */
 export function getNavRoutes(roles?: Role[]): PluginRoute[] {
-  return roles ? navForRole(pluginManifests, roles) : navFromManifests(pluginManifests);
+  return roles ? navForRole(frontendManifests, roles) : navFromManifests(frontendManifests);
 }
 
-/** Nav routes for `roles` (union across all of them), grouped into sidebar sections (see `NavGroup`). */
+/** Nav routes for `roles` (union across all of them), grouped into sidebar sections. */
 export function getNavGroups(roles: Role[]): NavGroup[] {
-  return navGroupsForRole(pluginManifests, roles);
+  return navGroupsForRole(frontendManifests, roles);
 }

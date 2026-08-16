@@ -8,6 +8,7 @@ import {
   type CourseSpecProgress,
   type CoursesServiceContract,
   type CreateCourseInput,
+  type DateSection,
   type LecturerRef,
   type LecturersServiceContract,
   type ListCoursesQuery,
@@ -27,6 +28,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
+import { assertCourseSpecEditable } from "./spec-lock.ts";
 
 /**
  * Courses business logic. The lecturer relationship is validated through the
@@ -36,6 +38,52 @@ import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 
 /** Thrown when an input references something that doesn't exist. */
 export class ReferenceError extends Error {}
+
+export function validateAssessmentCloEvidence(
+  items: Array<{ name: string; cloCodes: string[] }>,
+  validCloCodes: ReadonlySet<string>,
+) {
+  for (const item of items) {
+    if (new Set(item.cloCodes).size !== item.cloCodes.length) {
+      throw new ReferenceError(`Assessment "${item.name}" contains a duplicate CLO mapping`);
+    }
+    const invalidCode = item.cloCodes.find((code) => !validCloCodes.has(code));
+    if (invalidCode) {
+      throw new ReferenceError(
+        `Assessment "${item.name}" references ${invalidCode}, which does not belong to this course specification`,
+      );
+    }
+  }
+}
+
+export function validateCourseSpecMappingEvidence(
+  cells: Array<{ cloCode: string; kind: "assessment" | "week"; ref: string }>,
+  validCloCodes: ReadonlySet<string>,
+  weekIds: ReadonlySet<string>,
+  assessmentIds: ReadonlySet<string>,
+) {
+  const keys = new Set<string>();
+  for (const cell of cells) {
+    if (!validCloCodes.has(cell.cloCode)) {
+      throw new ReferenceError(
+        `CLO mapping references ${cell.cloCode}, which does not belong to this course specification`,
+      );
+    }
+    const validRef = cell.kind === "assessment"
+      ? assessmentIds.has(cell.ref)
+      : weekIds.has(cell.ref);
+    if (!validRef) {
+      throw new ReferenceError(
+        `CLO mapping references an ${cell.kind} that does not belong to this course specification`,
+      );
+    }
+    const key = `${cell.cloCode}:${cell.kind}:${cell.ref}`;
+    if (keys.has(key)) {
+      throw new ReferenceError("Duplicate CLO alignment mapping is not allowed");
+    }
+    keys.add(key);
+  }
+}
 
 function lecturers(): LecturersServiceContract {
   return registry.get<LecturersServiceContract>("lecturers").service;
@@ -85,6 +133,10 @@ async function ownerScopeFilter(lecturerScope: string) {
 }
 
 const COMPLETABLE_SECTION_IDS = COMPLETABLE_SPEC_SECTIONS.map((s) => s.id);
+const CURRENT_SPEC_ORDER = [
+  { versionMajor: "desc" as const },
+  { versionMinor: "desc" as const },
+];
 
 export const courseService = {
   /**
@@ -132,13 +184,15 @@ export const courseService = {
         id: true,
         code: true,
         title: true,
-        spec: {
+        specs: {
+          orderBy: CURRENT_SPEC_ORDER,
+          take: 1,
           select: { sections: { select: { sectionKey: true, status: true } } },
         },
       },
     });
     return courses.map((course) => {
-      const sections = course.spec?.sections ?? [];
+      const sections = course.specs[0]?.sections ?? [];
 
       const completedSectionIds = new Set(
         sections
@@ -190,8 +244,9 @@ export const courseService = {
   // Part of CoursesServiceContract — workload consumers need only scheduled
   // contact hours, never CourseSpec's storage details or self-study time.
   async weeklyContactHours(courseId: string) {
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       select: {
         weeks: {
           orderBy: { order: "asc" },
@@ -257,8 +312,9 @@ export const courseService = {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) return null;
 
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       include: SPEC_INCLUDE,
     });
     const { data, status } = reassembleSpec(spec);
@@ -270,8 +326,9 @@ export const courseService = {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       include: SPEC_INCLUDE,
     });
     if (!spec)
@@ -324,7 +381,7 @@ export const courseService = {
     const nextStatus =
       spec.reviewStatus === "ChangesRequested" ? "Resubmitted" : "Submitted";
     const updated = await prisma.courseSpec.update({
-      where: { courseId },
+      where: { id: spec.id },
       data: {
         reviewStatus: nextStatus,
         submissionVersion: nextVersion,
@@ -354,7 +411,7 @@ export const courseService = {
         "A review comment is required when requesting changes",
       );
 
-    const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
+    const spec = await prisma.courseSpec.findFirst({ where: { courseId }, orderBy: CURRENT_SPEC_ORDER });
     if (!spec)
       throw new ReferenceError("Course specification has not been started");
     if (
@@ -366,7 +423,7 @@ export const courseService = {
     }
 
     const updated = await prisma.courseSpec.update({
-      where: { courseId },
+      where: { id: spec.id },
       data: {
         reviewStatus: "ChangesRequested",
         reviewActions: {
@@ -389,7 +446,7 @@ export const courseService = {
   },
 
   async approveSpec(courseId: string, reviewerId: string, note: string) {
-    const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
+    const spec = await prisma.courseSpec.findFirst({ where: { courseId }, orderBy: CURRENT_SPEC_ORDER });
     if (!spec)
       throw new ReferenceError("Course specification has not been started");
     if (
@@ -401,7 +458,7 @@ export const courseService = {
     }
 
     const updated = await prisma.courseSpec.update({
-      where: { courseId },
+      where: { id: spec.id },
       data: {
         reviewStatus: "Approved",
         reviewActions: {
@@ -443,23 +500,30 @@ export const courseService = {
     let course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
 
-    if (sectionId === "courseInfo") {
-      const info = values as CourseInfoInput;
-      course = await prisma.course.update({
-        where: { id: courseId },
-        data: {
-          prerequisites: info.prerequisites || null,
-          description: info.description || null,
-        },
-      });
-    }
-
     await prisma.$transaction(async (tx) => {
-      const spec = await tx.courseSpec.upsert({
+      const existingSpec = await tx.courseSpec.findFirst({
         where: { courseId },
-        create: { courseId },
-        update: {},
+        select: { id: true, reviewStatus: true },
       });
+      if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);
+
+      const spec =
+        existingSpec ??
+        (await tx.courseSpec.create({
+          data: { courseId },
+          select: { id: true, reviewStatus: true },
+        }));
+
+      if (sectionId === "courseInfo") {
+        const info = values as CourseInfoInput;
+        course = await tx.course.update({
+          where: { id: courseId },
+          data: {
+            prerequisites: info.prerequisites || null,
+            description: info.description || null,
+          },
+        });
+      }
 
       if (sectionId === "clos")
         await syncClos(tx, spec.id, (values as ClosSection).items);
@@ -485,6 +549,13 @@ export const courseService = {
         );
       if (sectionId === "policy")
         await syncPolicy(tx, spec.id, values as PolicySection);
+      if (sectionId === "date") {
+        const { date } = values as DateSection;
+        await tx.courseSpec.update({
+          where: { id: spec.id },
+          data: { specDate: date ? new Date(`${date}T00:00:00.000Z`) : null },
+        });
+      }
 
       // Every saveable section must have a normalized table to write into — enforced,
       // not just documented, so a future section added to SPEC_SECTION_SCHEMAS without
@@ -513,8 +584,9 @@ export const courseService = {
       });
     });
 
-    const spec = await prisma.courseSpec.findUnique({
+    const spec = await prisma.courseSpec.findFirst({
       where: { courseId },
+      orderBy: CURRENT_SPEC_ORDER,
       include: SPEC_INCLUDE,
     });
     const { data, status } = reassembleSpec(spec);
@@ -573,6 +645,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
   "references",
   "responsibility",
   "policy",
+  "date",
 ]);
 
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
@@ -681,7 +754,7 @@ function reassembleSpec(spec: SpecRow | null): {
         format: item.format,
         submissionMethod: item.submissionMethod,
         instructions: item.instructions,
-        rubric: item.rubric,
+        rubricId: item.rubricId,
         feedbackMethod: item.feedbackMethod,
         feedbackTimeline: item.feedbackTimeline,
         mappedPlos: item.mappedPlos,
@@ -751,6 +824,11 @@ function reassembleSpec(spec: SpecRow | null): {
       assignmentsLateSubmission: spec.policy.assignmentsLateSubmission,
       examinationRules: spec.policy.examinationRules,
       penaltiesConsequences: spec.policy.penaltiesConsequences,
+    };
+  }
+  if (hasSection("date")) {
+    data.date = {
+      date: spec.specDate ? spec.specDate.toISOString().slice(0, 10) : null,
     };
   }
   return { data, status };
@@ -869,14 +947,44 @@ async function syncWeeklyPlan(
   });
 }
 
-/** Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17) section save. */
+/**
+ * Delete-and-rebuild CourseSpecAssessmentItem rows for an `assessmentPlan` (§17)
+ * section save. CLO evidence references are validated against the current
+ * CourseSpec before the existing rows are rebuilt. `rubricId` is reconciled
+ * against real Rubric rows before writing (rather than letting the FK reject the
+ * whole save) since the wizard already tolerates a stale/deleted rubric selection
+ * as a valid state (issue #123).
+ */
 async function syncAssessmentPlan(
   tx: Prisma.TransactionClient,
   courseSpecId: string,
   items: AssessmentPlanSection["items"],
 ) {
+  if (items.length === 0) {
+    await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
+    return;
+  }
+
+  const clos = await tx.courseSpecClo.findMany({
+    where: { courseSpecId },
+    select: { order: true },
+  });
+  const validCloCodes = new Set(clos.map((clo) => `CLO${clo.order + 1}`));
+  validateAssessmentCloEvidence(items, validCloCodes);
+
+  const rubricIds = [...new Set(items.flatMap((item) => item.rubricId ? [item.rubricId] : []))];
+  const validRubricIds = rubricIds.length
+    ? new Set(
+        (
+          await tx.rubric.findMany({
+            where: { id: { in: rubricIds } },
+            select: { id: true },
+          })
+        ).map((r) => r.id),
+      )
+    : new Set<string>();
+
   await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
-  if (items.length === 0) return;
   await tx.courseSpecAssessmentItem.createMany({
     data: items.map((item, order) => ({
       id: item.id,
@@ -898,7 +1006,10 @@ async function syncAssessmentPlan(
       format: item.format,
       submissionMethod: item.submissionMethod,
       instructions: item.instructions,
-      rubric: item.rubric,
+      rubricId:
+        item.rubricId && validRubricIds.has(item.rubricId)
+          ? item.rubricId
+          : null,
       feedbackMethod: item.feedbackMethod,
       feedbackTimeline: item.feedbackTimeline,
       mappedPlos: item.mappedPlos,
@@ -1029,8 +1140,24 @@ async function syncMappingCells(
   courseSpecId: string,
   cells: MappingSection["cells"],
 ) {
+  if (cells.length === 0) {
+    await tx.courseSpecMappingCell.deleteMany({ where: { courseSpecId } });
+    return;
+  }
+
+  const [clos, weeks, assessmentItems] = await Promise.all([
+    tx.courseSpecClo.findMany({ where: { courseSpecId }, select: { order: true } }),
+    tx.courseSpecWeek.findMany({ where: { courseSpecId }, select: { id: true } }),
+    tx.courseSpecAssessmentItem.findMany({ where: { courseSpecId }, select: { id: true } }),
+  ]);
+  validateCourseSpecMappingEvidence(
+    cells,
+    new Set(clos.map((clo) => `CLO${clo.order + 1}`)),
+    new Set(weeks.map((week) => week.id)),
+    new Set(assessmentItems.map((assessment) => assessment.id)),
+  );
+
   await tx.courseSpecMappingCell.deleteMany({ where: { courseSpecId } });
-  if (cells.length === 0) return;
   await tx.courseSpecMappingCell.createMany({
     data: cells.map((cell) => ({
       courseSpecId,
@@ -1042,13 +1169,6 @@ async function syncMappingCells(
       ref: cell.ref,
       strength: cell.strength,
     })),
-    // Unlike CourseSpecWeek/CourseSpecAssessmentItem (client-generated uuid ids —
-    // collision-free by construction), this table's PK is a composite of
-    // user-selected values (cloCode, kind, ref); a payload with a repeated triple
-    // is plausible client state, not just historical data, so this needs the same
-    // dedupe posture the migration's own backfill already takes (`ON CONFLICT DO
-    // NOTHING`) rather than throwing a unique-violation on save.
-    skipDuplicates: true,
   });
 }
 

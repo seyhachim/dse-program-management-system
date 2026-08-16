@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@dse-pms/ui";
 import {
+  assessmentEvidenceLabel,
   assessmentSltHours,
   assessmentTotalWeight,
   assessmentTypeChip,
@@ -67,7 +68,8 @@ export function AssessmentSection({
   const coveragePercent =
     clos.length > 0 ? Math.round((assessedCloCount / clos.length) * 100) : 0;
   const coverageComplete = clos.length > 0 && unassessedClos.length === 0;
-  const totalOk = value.length === 0 || Math.round(total) === 100;
+  const gradedAssessments = activeAssessments.filter((assessment) => assessment.countsTowardGrade);
+  const totalOk = gradedAssessments.length === 0 || Math.round(total) === 100;
 
   const openAdd = () => router.push(`/courses/${courseId}/spec/assessment/add`);
   const openEdit = (id: string) =>
@@ -114,8 +116,8 @@ export function AssessmentSection({
         <div>
           <h2 className="text-lg font-bold text-foreground">Assessment</h2>
           <p className="text-sm text-muted-foreground">
-            Define assessments, link them to CLOs, set weightings, and plan the
-            assessment schedule.
+            Define local course grading and CLO evidence independently. Course grade
+            weights calculate the class result; CLO mappings identify outcome evidence.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -148,10 +150,10 @@ export function AssessmentSection({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-foreground">
-                CLO Assessment Coverage
+                CLO Evidence Coverage
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Based on CLOs linked to active assessments.
+                Based only on explicit CLO mappings on active assessments.
               </p>
             </div>
             {coverageComplete ? (
@@ -173,7 +175,7 @@ export function AssessmentSection({
                     {assessedCloCount}
                   </span>
                   <span className="ml-1 text-sm text-muted-foreground">
-                    of {clos.length} CLO{clos.length === 1 ? "" : "s"} assessed
+                    of {clos.length} CLO{clos.length === 1 ? "" : "s"} with evidence
                   </span>
                 </div>
                 <span className="text-sm font-semibold text-foreground">
@@ -192,7 +194,7 @@ export function AssessmentSection({
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
                     <div>
                       <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
-                        CLOs without an active assessment
+                        CLOs without explicit assessment evidence
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {unassessedClos.map((clo) => (
@@ -220,13 +222,13 @@ export function AssessmentSection({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-foreground">
-                Assessment Weight
+                Course Grade Weight
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Active assessment weight should total 100%.
+                Active graded assessments should total 100%. Formative items are excluded.
               </p>
             </div>
-            {value.length > 0 && totalOk ? (
+            {gradedAssessments.length > 0 && totalOk ? (
               <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                 <Check className="h-3.5 w-3.5" /> Complete
               </span>
@@ -249,19 +251,23 @@ export function AssessmentSection({
           {value.length === 0 ? (
             <div className="mt-4 rounded-lg border border-dashed border-border p-4">
               <p className="text-sm text-muted-foreground">
-                Add assessments to define the course assessment weighting.
+                Add assessments to define course grading and CLO evidence.
               </p>
             </div>
+          ) : gradedAssessments.length === 0 ? (
+            <p className="mt-4 text-xs text-muted-foreground">
+              No active assessment currently contributes to the final course grade.
+            </p>
           ) : totalOk ? (
             <p className="mt-4 text-xs text-muted-foreground">
-              Active assessment weight equals 100%.
+              Local course-grade weights equal 100%.
             </p>
           ) : (
             <div className="mt-4 flex items-start gap-2 rounded-lg border border-status-live/40 bg-status-live/10 p-3">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-live" />
               <p className="text-xs text-status-live">
-                Active assessment weight is {Math.round(total * 100) / 100}%. It
-                must total 100%.
+                Local course-grade weight is {Math.round(total * 100) / 100}%. It
+                must total 100% across active graded assessments.
               </p>
             </div>
           )}
@@ -287,15 +293,16 @@ export function AssessmentSection({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-sm">
+            <table className="w-full min-w-[1240px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
                   <th className="w-8 py-2 pr-2">#</th>
                   <th className="py-2 pr-3">Assessment Name</th>
                   <th className="py-2 pr-3">Type</th>
                   <th className="py-2 pr-3">Category</th>
-                  <th className="py-2 pr-3">Assesses</th>
-                  <th className="py-2 pr-3 text-center">Weight</th>
+                  <th className="py-2 pr-3">CLO Evidence</th>
+                  <th className="py-2 pr-3">Role</th>
+                  <th className="py-2 pr-3 text-center">Course Grade Weight</th>
                   <th className="py-2 pr-3 text-center">Total SLT</th>
                   <th className="py-2 pr-3">Schedule</th>
                   <th className="py-2 pr-3">Rubric</th>
@@ -356,13 +363,16 @@ export function AssessmentSection({
                               </span>
                             ))
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">None</span>
                           )}
                         </div>
                       </td>
+                      <td className="py-3 pr-3 text-xs text-muted-foreground">
+                        {assessmentEvidenceLabel(assessment)}
+                      </td>
                       <td className="py-3 pr-3 text-center text-foreground">
-                        {assessment.weight === "" ? (
-                          <span className="text-muted-foreground">—</span>
+                        {!assessment.countsTowardGrade || assessment.weight === "" ? (
+                          <span className="text-muted-foreground">Not graded</span>
                         ) : (
                           `${assessment.weight}%`
                         )}
@@ -391,7 +401,7 @@ export function AssessmentSection({
                         )}
                       </td>
                       <td className="py-3 pr-3">
-                        {assessment.rubric ? (
+                        {assessment.rubricId ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                             <Check className="h-3.5 w-3.5" /> Attached
                           </span>
@@ -440,7 +450,7 @@ export function AssessmentSection({
 
               <tfoot>
                 <tr className="border-t border-border text-sm font-semibold text-foreground">
-                  <td colSpan={5} className="py-2.5 pr-3">Total</td>
+                  <td colSpan={6} className="py-2.5 pr-3">Local course-grade total</td>
                   <td
                     className={`py-2.5 pr-3 text-center ${totalOk ? "text-foreground" : "text-status-live"}`}
                   >
@@ -473,9 +483,11 @@ export function AssessmentSection({
               }`}
             >
               <Info className="h-3.5 w-3.5 shrink-0" />
-              {totalOk
-                ? "Total weight equals 100%."
-                : `Total weight is ${Math.round(total * 100) / 100}% — active assessments must sum to 100%.`}
+              {gradedAssessments.length === 0
+                ? "No active graded assessments."
+                : totalOk
+                  ? "Local course-grade weights equal 100%. CLO evidence remains independent."
+                  : `Local course-grade weight is ${Math.round(total * 100) / 100}% — active graded assessments must sum to 100%.`}
             </div>
           </div>
         ) : null}

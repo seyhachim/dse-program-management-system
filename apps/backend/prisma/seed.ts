@@ -1071,6 +1071,7 @@ async function main() {
     },
   });
 
+  const rubricIdByName = new Map<string, string>();
   for (const r of rubrics) {
     const { levels, criteria, ...rubricData } = r;
 
@@ -1099,6 +1100,7 @@ async function main() {
           })
         ).id;
 
+    rubricIdByName.set(r.name, rubricId);
     await syncNormalizedRubricTables(prisma, rubricId, levels, criteria);
   }
 
@@ -1188,9 +1190,21 @@ async function main() {
     // Small approved specification + portal evidence so a fresh development
     // database demonstrates every student MVP state without manual setup.
     const spec = await prisma.courseSpec.upsert({
-      where: { courseId: cs101.id },
+      where: {
+        courseId_versionMajor_versionMinor: {
+          courseId: cs101.id,
+          versionMajor: 1,
+          versionMinor: 0,
+        },
+      },
       update: {},
-      create: { courseId: cs101.id, reviewStatus: "Approved", submissionVersion: 1 },
+      create: {
+        courseId: cs101.id,
+        versionMajor: 1,
+        versionMinor: 0,
+        reviewStatus: "Approved",
+        submissionVersion: 1,
+      },
     });
     for (const sectionKey of ["clos", "slt", "assessmentPlan", "resources"] as const) {
       await prisma.courseSpecSection.upsert({
@@ -1240,7 +1254,7 @@ async function main() {
         dueWeek: 4,
         format: "Source Code and Written Report",
         submissionMethod: "LMS (Upload)",
-        rubric: "Correctness 40%; problem solving 30%; code quality 20%; explanation 10%.",
+        rubricId: rubricIdByName.get("Assignment Rubric – Written Report") ?? null,
       },
     });
     await prisma.courseSpecResource.upsert({

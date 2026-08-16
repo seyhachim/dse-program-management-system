@@ -82,7 +82,9 @@ import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
 import { EMPTY_POLICY, PolicySection } from "./policy-section";
+import { DateSection, EMPTY_DATE } from "./date-section";
 import type {
+  DateSection as DateSectionValue,
   PolicySection as PolicySectionValue,
   StudentResponsibilitySection as StudentResponsibilityValue,
 } from "@dse-pms/shared-types";
@@ -123,6 +125,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "references", label: "References" },
   { id: "responsibility", label: "Responsibility" },
   { id: "policy", label: "Policies" },
+  { id: "date", label: "Date" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
@@ -137,6 +140,7 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "references",
   "responsibility",
   "policy",
+  "date",
 ]);
 
 const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
@@ -166,6 +170,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
     useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
+  const [specDate, setSpecDate] = useState<DateSectionValue>(EMPTY_DATE);
   const [resources, setResources] = useState<ResourcesForm>(EMPTY_RESOURCES);
   const [references, setReferences] =
     useState<ReferencesForm>(EMPTY_REFERENCES);
@@ -187,9 +192,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [savedFlash, setSavedFlash] = useState(false);
   const [courseInfoDialogOpen, setCourseInfoDialogOpen] = useState(false);
 
-  // Review & Submit readiness:
-  // CLOs are complete only when there is at least one active CLO and
-  // every active CLO has at least one PLO mapping.
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
     [clos],
@@ -216,9 +218,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setActiveTabState(nextId);
       router.replace(
         nextId === "overview" ? pathname : `${pathname}?tab=${nextId}`,
-        {
-          scroll: false,
-        },
+        { scroll: false },
       );
     },
     [pathname, review, router],
@@ -244,17 +244,16 @@ export function SpecClient({ courseId }: { courseId: string }) {
         programmeConfig,
         rubricList,
         teachingLearningProfile,
-      ] =
-        await Promise.all([
-          courseSpecApi.get(courseId),
-          methodsApi.list(),
-          coursesApi.get(courseId),
-          api.get<ProgrammeAcademicConfig>("/api/programme"),
-          rubricsApi.list().catch(() => [] as Rubric[]),
-          teachingLearningApi
-            .get(courseId)
-            .catch(() => EMPTY_TEACHING_LEARNING_PROFILE),
-        ]);
+      ] = await Promise.all([
+        courseSpecApi.get(courseId),
+        methodsApi.list(),
+        coursesApi.get(courseId),
+        api.get<ProgrammeAcademicConfig>("/api/programme"),
+        rubricsApi.list().catch(() => [] as Rubric[]),
+        teachingLearningApi
+          .get(courseId)
+          .catch(() => EMPTY_TEACHING_LEARNING_PROFILE),
+      ]);
       setTeachingLearningProfile(teachingLearningProfile);
       setCourseInfo(
         toCourseInfoForm(
@@ -267,6 +266,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setMapping(toMappingForm(spec.data.mapping));
       setPolicy(
         (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
+      );
+      setSpecDate(
+        (spec.data.date as DateSectionValue | undefined) ?? EMPTY_DATE,
       );
       setResources(toResourcesForm(spec.data.resources));
       setReferences(toReferencesForm(spec.data.references));
@@ -298,14 +300,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
     load();
   }, [load]);
 
-  // §14 saves per action (add / edit / duplicate / delete), so it persists an
-  // explicit list rather than reading possibly-stale `clos` state from a closure.
   const persistClos = useCallback(
     async (items: CloForm[]) => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setClos(items);
@@ -317,9 +315,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setClosSavedAt(new Date());
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to save this section",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save this section");
         return false;
       } finally {
         setSaving(false);
@@ -328,31 +324,21 @@ export function SpecClient({ courseId }: { courseId: string }) {
     [courseId, editingLocked],
   );
 
-  // §17 saves per action (add / edit / duplicate / delete), like §14, so it persists
-  // an explicit list rather than reading possibly-stale `assessments` state.
   const persistAssessments = useCallback(
     async (items: AssessmentForm[]) => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setAssessments(items);
       setSaving(true);
       setError(null);
       try {
-        await courseSpecApi.saveSection(
-          courseId,
-          "assessmentPlan",
-          toAssessmentPayload(items),
-        );
+        await courseSpecApi.saveSection(courseId, "assessmentPlan", toAssessmentPayload(items));
         setStatus((s) => ({ ...s, assessmentPlan: "complete" }));
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to save this section",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save this section");
         return false;
       } finally {
         setSaving(false);
@@ -364,28 +350,20 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const persistWeeklyPlan = useCallback(
     async (items: WeeklyPlanForm) => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setSaving(true);
       setError(null);
       try {
-        await courseSpecApi.saveSection(
-          courseId,
-          "slt",
-          toWeeklyPlanPayload(items),
-        );
+        await courseSpecApi.saveSection(courseId, "slt", toWeeklyPlanPayload(items));
         setWeeklyPlan(items);
         setStatus((s) => ({ ...s, slt: "complete" }));
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to save weekly plan",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save weekly plan");
         return false;
       } finally {
         setSaving(false);
@@ -397,9 +375,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const persistPolicy = useCallback(
     async (value: PolicySectionValue) => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setSaving(true);
@@ -412,11 +388,32 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Failed to save course policies",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save course policies");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, editingLocked],
+  );
+
+  const persistDate = useCallback(
+    async (value: DateSectionValue) => {
+      if (editingLocked) {
+        setError("This course specification is locked while it is in the review workflow.");
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(courseId, "date", value);
+        setSpecDate(value);
+        setStatus((s) => ({ ...s, date: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to save the date");
         return false;
       } finally {
         setSaving(false);
@@ -428,9 +425,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const persistResources = useCallback(
     async (items: ResourcesForm) => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setSaving(true);
@@ -447,9 +442,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to save resources",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save resources");
         return false;
       } finally {
         setSaving(false);
@@ -461,9 +454,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const persistReferences = useCallback(
     async (items: ReferencesForm) => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setSaving(true);
@@ -480,9 +471,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to save references",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save references");
         return false;
       } finally {
         setSaving(false);
@@ -494,9 +483,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const persistResponsibility = useCallback(
     async (value: StudentResponsibilityValue) => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setSaving(true);
@@ -509,11 +496,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Failed to save student responsibility",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save student responsibility");
         return false;
       } finally {
         setSaving(false);
@@ -534,11 +517,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Failed to submit course specification",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to submit course specification");
         return false;
       } finally {
         setSaving(false);
@@ -550,20 +529,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const saveSection = useCallback(
     async (sectionId: "courseInfo" | "mapping") => {
       if (editingLocked) {
-        setError(
-          "This course specification is locked while it is in the review workflow.",
-        );
+        setError("This course specification is locked while it is in the review workflow.");
         return false;
       }
       setSaving(true);
       setError(null);
       try {
         if (sectionId === "courseInfo") {
-          await courseSpecApi.saveSection(
-            courseId,
-            "courseInfo",
-            toCourseInfoPayload(courseInfo),
-          );
+          await courseSpecApi.saveSection(courseId, "courseInfo", toCourseInfoPayload(courseInfo));
         } else if (sectionId === "mapping") {
           const refs = validRefs(clos, weeklyPlan, assessments);
           const payload = toMappingPayload(mapping, refs);
@@ -575,23 +548,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to save this section",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to save this section");
         return false;
       } finally {
         setSaving(false);
       }
     },
-    [
-      courseId,
-      courseInfo,
-      clos,
-      weeklyPlan,
-      assessments,
-      mapping,
-      editingLocked,
-    ],
+    [courseId, courseInfo, clos, weeklyPlan, assessments, mapping, editingLocked],
   );
 
   const canReview = me?.permissions.includes("courses:review") ?? false;
@@ -608,9 +571,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to request changes",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to request changes");
         return false;
       } finally {
         setSaving(false);
@@ -631,11 +592,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Failed to approve course specification",
-        );
+        setError(err instanceof ApiError ? err.message : "Failed to approve course specification");
         return false;
       } finally {
         setSaving(false);
@@ -646,9 +603,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
   const canSaveActive = activeTab === "mapping";
 
-  // Course Information (courseInfo) has no tab of its own — it's edited via the
-  // dialog opened from the Overview tab — so "Continue Editing" needs a special
-  // case to land there and open it, rather than just switching tabs like the rest.
   const goToSection = useCallback(
     (sectionId: SpecSectionId) => {
       if (sectionId === "courseInfo") {
@@ -679,10 +633,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
         teachingMethods,
         assessmentMethods,
         programme,
+        teachingLearningProfile,
         resources,
         references,
         responsibility,
         policy,
+        specDate,
         courseTotalSlt,
       }),
     [
@@ -696,10 +652,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
       teachingMethods,
       assessmentMethods,
       programme,
+      teachingLearningProfile,
       resources,
       references,
       responsibility,
       policy,
+      specDate,
       courseTotalSlt,
     ],
   );
@@ -709,9 +667,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink
-              render={<Link href="/courses">Course Management</Link>}
-            />
+            <BreadcrumbLink render={<Link href="/courses">Course Management</Link>} />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -733,12 +689,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
       </Breadcrumb>
 
       <header>
-        <h1 className="text-2xl font-bold text-foreground">
-          Course Specification
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Design and manage your course in OBE format.
-        </p>
+        <h1 className="text-2xl font-bold text-foreground">Course Specification</h1>
+        <p className="text-sm text-muted-foreground">Design and manage your course in OBE format.</p>
       </header>
 
       {error ? (
@@ -763,10 +715,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 : "Editing is unavailable while the course specification is in the review workflow."}
             </div>
           ) : null}
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => setActiveTab(v as TabId)}
-          >
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
             <div className="rounded-xl border border-border bg-card p-1.5 shadow-sm">
               <TabsList
                 variant="line"
@@ -776,15 +725,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                   <TabsTrigger
                     key={t.id}
                     value={t.id}
-                    className="
-                      shrink-0 rounded-lg px-3 py-2 text-sm font-medium
-                      text-muted-foreground transition-all duration-200
-                      hover:bg-muted/60 hover:text-foreground
-                      data-[state=active]:bg-primary
-                      data-[state=active]:text-primary-foreground
-                      data-[state=active]:font-semibold
-                      data-[state=active]:shadow-sm
-                    "
+                    className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-semibold data-[state=active]:shadow-sm"
                   >
                     {t.label}
                   </TabsTrigger>
@@ -802,10 +743,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 courseTotalSlt={courseTotalSlt}
                 onEditCourseInfo={() => {
                   if (!editingLocked) setCourseInfoDialogOpen(true);
-                  else
-                    setError(
-                      "This course specification is locked while it is in the review workflow.",
-                    );
+                  else setError("This course specification is locked while it is in the review workflow.");
                 }}
                 onGoToTab={(id) => setActiveTab(id)}
                 readOnly={editingLocked}
@@ -832,21 +770,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
             </TabsContent>
 
             <TabsContent value="slt" className="mt-4">
-              {/* <WeeklyPlanSectionForm
-              value={weeklyPlan}
-              onPersist={persistWeeklyPlan}
-              courseName={
-                course ? `${course.code} - ${course.title}` : undefined
-              }
-              clos={clos}
-            /> */}
               <WeeklyPlanSectionForm
                 value={weeklyPlan}
                 onPersist={persistWeeklyPlan}
                 courseId={courseId}
-                courseName={
-                  course ? `${course.code} - ${course.title}` : undefined
-                }
+                courseName={course ? `${course.code} - ${course.title}` : undefined}
                 clos={clos}
                 teachingMethods={teachingMethods}
                 assessmentMethods={assessmentMethods}
@@ -869,9 +797,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 assessments={assessments}
                 value={mapping}
                 onChange={setMapping}
-                courseName={
-                  course ? `${course.code} - ${course.title}` : undefined
-                }
+                courseName={course ? `${course.code} - ${course.title}` : undefined}
               />
             </TabsContent>
 
@@ -884,10 +810,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
             </TabsContent>
 
             <TabsContent value="references" className="mt-4">
-              <ReferencesSectionForm
-                value={references}
-                onPersist={persistReferences}
-              />
+              <ReferencesSectionForm value={references} onPersist={persistReferences} />
             </TabsContent>
 
             <TabsContent value="responsibility" className="mt-4">
@@ -907,15 +830,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
               />
             </TabsContent>
 
+            <TabsContent value="date" className="mt-4">
+              <DateSection value={specDate} onPersist={persistDate} disabled={editingLocked} />
+            </TabsContent>
+
             <TabsContent value="documentPreview" className="mt-4">
               {course ? (
-                // <DocumentPreview
-                //   course={course}
-                //   courseInfo={courseInfo}
-                //   clos={clos}
-                //   weeklyPlan={weeklyPlan}
-                //   assessments={assessments}
-                // />
                 <DocumentPreview document={courseDocument} />
               ) : (
                 <SectionPanel>
@@ -947,9 +867,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
             {canSaveActive ? (
               <div className="mt-4 flex items-center justify-end gap-3">
-                {savedFlash ? (
-                  <span className="text-sm text-emerald-600">Saved ✓</span>
-                ) : null}
+                {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
                 <Button
                   variant="outline"
                   onClick={() => saveSection("mapping")}
@@ -978,10 +896,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
             onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
           />
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setCourseInfoDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setCourseInfoDialogOpen(false)}>
               Cancel
             </Button>
             <Button
