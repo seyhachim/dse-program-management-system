@@ -209,20 +209,22 @@ export const resultsLifecycleService = {
           `${readiness.invalidEnrollmentIds.length} student result(s) contain invalid marks and must be corrected before publication.`,
         );
       }
-      if (readiness.publishedEnrollmentIds.length) {
-        throw new PortalConflictError(
-          "This assessment already contains published results and cannot be republished through the normal workflow.",
-        );
+
+      const unpublishedIds = results
+        .filter((result) => !result.publishedAt)
+        .map((result) => result.id);
+      if (!unpublishedIds.length) {
+        throw new PortalConflictError("All results for this assessment are already published and locked");
       }
 
       const updated = await tx.assessmentResult.updateMany({
         where: {
-          id: { in: results.map((result) => result.id) },
+          id: { in: unpublishedIds },
           publishedAt: null,
         },
         data: { publishedAt: now },
       });
-      if (updated.count !== enrollmentIds.length) {
+      if (updated.count !== unpublishedIds.length) {
         throw new PortalConflictError(
           "Result publication changed concurrently. Reload the markbook and review it before trying again.",
         );
@@ -231,6 +233,7 @@ export const resultsLifecycleService = {
         offeringId: offering.id,
         assessmentItemId: assessment.id,
         publishedCount: updated.count,
+        previouslyPublishedCount: readiness.publishedEnrollmentIds.length,
         publishedAt: now.toISOString(),
       };
     });
