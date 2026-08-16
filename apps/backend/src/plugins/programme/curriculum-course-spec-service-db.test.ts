@@ -174,6 +174,7 @@ describeDb("curriculum CourseSpec binding", () => {
       courseId: course.id,
       yearLevel: 1,
       semester: "First",
+      sortOrder: 0,
     });
     await curriculumWorkflowService.submit(initial.selectedVersion.id, actor.id, "Review");
     await curriculumWorkflowService.approve(initial.selectedVersion.id, actor.id, "Approve");
