@@ -159,6 +159,12 @@ jobs:
         env:
           CURRICULUM_DB_TESTS: "1"
 
+      - name: Verify Telegram identity and revocation security
+        run: bun test apps/backend/src/plugins/telegram/telegram-security-db.test.ts
+        env:
+          TELEGRAM_DB_TESTS: "1"
+          JWT_SECRET: telegram-ci-security-secret-at-least-32-characters
+
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
