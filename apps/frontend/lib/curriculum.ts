@@ -1,6 +1,7 @@
 import type {
   AddCurriculumCourseInput,
   CurriculumVersionSummary,
+  CurriculumWorkflowState,
   ProgrammeCurriculumRead,
   ReorderCurriculumCoursesInput,
   UpdateCurriculumCourseInput,
@@ -16,6 +17,9 @@ export interface ProgrammeCurriculumListItem {
   name: string;
   versions: CurriculumVersionSummary[];
 }
+
+const workflowPath = (versionId: string) =>
+  `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/workflow`;
 
 export const curriculumApi = {
   list(): Promise<ProgrammeCurriculumListItem[]> {
@@ -37,10 +41,25 @@ export const curriculumApi = {
   reorder(versionId: string, input: ReorderCurriculumCoursesInput): Promise<ProgrammeCurriculumRead> {
     return api.put<ProgrammeCurriculumRead>(`/api/programme/curricula/versions/${encodeURIComponent(versionId)}/reorder`, input);
   },
+  workflow(versionId: string): Promise<CurriculumWorkflowState> {
+    return api.get<CurriculumWorkflowState>(workflowPath(versionId));
+  },
+  submit(versionId: string, comment = ""): Promise<CurriculumWorkflowState> {
+    return api.post<CurriculumWorkflowState>(`${workflowPath(versionId)}/submit`, { comment });
+  },
+  requestChanges(versionId: string, comment: string): Promise<CurriculumWorkflowState> {
+    return api.post<CurriculumWorkflowState>(`${workflowPath(versionId)}/request-changes`, { comment });
+  },
+  approve(versionId: string, comment = ""): Promise<CurriculumWorkflowState> {
+    return api.post<CurriculumWorkflowState>(`${workflowPath(versionId)}/approve`, { comment });
+  },
+  activate(versionId: string, comment = ""): Promise<CurriculumWorkflowState> {
+    return api.post<CurriculumWorkflowState>(`${workflowPath(versionId)}/activate`, { comment });
+  },
 };
 
-export function curriculumStatusLabel(status: CurriculumVersionSummary["status"]): string {
-  return status;
+export function curriculumStatusLabel(status: CurriculumVersionSummary["status"] | CurriculumWorkflowState["status"]): string {
+  return status === "UnderReview" ? "Under Review" : status;
 }
 
 export function curriculumVersionLabel(version: CurriculumVersionSummary): string {
