@@ -1,10 +1,12 @@
 import { Router } from "express";
 import {
+  AssignClassResponsibilityInput,
   AttendanceDateSchema,
   CreateOfferingInput,
   EnrollInput,
   ListLecturerWorkloadQuery,
   ListOfferingsQuery,
+  RevokeClassResponsibilityInput,
   SaveAttendanceInput,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
@@ -12,6 +14,12 @@ import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { attendanceService } from "./attendance-service.ts";
+import {
+  ClassResponsibilityConflictError,
+  ClassResponsibilityEligibilityError,
+  ClassResponsibilityNotFoundError,
+  classResponsibilityService,
+} from "./class-responsibility-service.ts";
 import { CapacityError, offeringService, ReferenceError } from "./service.ts";
 
 export function createOfferingRouter(): Router {
@@ -38,6 +46,69 @@ export function createOfferingRouter(): Router {
       return;
     }
     res.json(await offeringService.workloadForLecturer(req.user!.id, parsed.data));
+  });
+
+  router.get("/:id/responsibilities", async (req, res) => {
+    try {
+      if (!(await assertCanManageClassResponsibilities(req, res))) return;
+      res.json(await classResponsibilityService.list(req.params.id!));
+    } catch (err) {
+      handleClassResponsibilityError(err, res);
+    }
+  });
+
+  router.get("/:id/responsibilities/history", async (req, res) => {
+    try {
+      if (!(await assertCanManageClassResponsibilities(req, res))) return;
+      res.json(await classResponsibilityService.history(req.params.id!));
+    } catch (err) {
+      handleClassResponsibilityError(err, res);
+    }
+  });
+
+  router.post("/:id/responsibilities", async (req, res) => {
+    const parsed = AssignClassResponsibilityInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid class responsibility", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      if (!(await assertCanManageClassResponsibilities(req, res))) return;
+      res.status(201).json(
+        await classResponsibilityService.assign(
+          req.params.id!,
+          parsed.data.studentId,
+          parsed.data.role,
+          req.user!.id,
+        ),
+      );
+    } catch (err) {
+      handleClassResponsibilityError(err, res);
+    }
+  });
+
+  router.delete("/:id/responsibilities/:assignmentId", async (req, res) => {
+    const parsed = RevokeClassResponsibilityInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "A revocation reason is required", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      if (!(await assertCanManageClassResponsibilities(req, res))) return;
+      const changed = await classResponsibilityService.revoke(
+        req.params.id!,
+        req.params.assignmentId!,
+        req.user!.id,
+        parsed.data.reason,
+      );
+      if (!changed) {
+        res.status(409).json({ error: "Class responsibility assignment is already revoked" });
+        return;
+      }
+      res.status(204).end();
+    } catch (err) {
+      handleClassResponsibilityError(err, res);
+    }
   });
 
   router.get("/:id/attendance", requirePermission("offerings:read"), async (req, res) => {
@@ -165,14 +236,20 @@ export function createOfferingRouter(): Router {
   return router;
 }
 
-/**
- * Roles that may manage any offering's roster without being its assigned
- * lecturer — admin plus the two academic/administrative roles the roster
- * workflow (§9 of issue #101) names explicitly. `qa_reviewer` is deliberately
- * excluded: it never holds `offerings:write`, so it would never reach this
- * check anyway.
- */
+const CLASS_RESPONSIBILITY_ADMIN_ROLES: Role[] = ["admin", "program_coordinator"];
 const OFFERING_ROSTER_WIDE_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"];
+
+async function assertCanManageClassResponsibilities(
+  req: import("express").Request,
+  res: import("express").Response,
+): Promise<boolean> {
+  const programmeId = await classResponsibilityService.programmeIdForOffering(req.params.id!);
+  if (!hasAnyRoleInProgramme(req.user!, CLASS_RESPONSIBILITY_ADMIN_ROLES, programmeId)) {
+    res.status(403).json({ error: "Only an administrator or programme coordinator can manage class responsibilities" });
+    return false;
+  }
+  return true;
+}
 
 /**
  * True (and untouched response) if the caller may manage this offering —
@@ -200,6 +277,28 @@ async function assertOwnOfferingOrAdmin(
     return false;
   }
   return true;
+}
+
+function handleClassResponsibilityError(err: unknown, res: import("express").Response): void {
+  if (err instanceof ClassResponsibilityNotFoundError) {
+    res.status(404).json({ error: err.message });
+    return;
+  }
+  if (err instanceof ClassResponsibilityEligibilityError) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  if (err instanceof ClassResponsibilityConflictError) {
+    res.status(409).json({ error: err.message });
+    return;
+  }
+  const code = (err as { code?: string }).code;
+  if (code === "P2002" || code === "23505") {
+    res.status(409).json({ error: "Another active class responsibility conflicts with this assignment" });
+    return;
+  }
+  console.error("Class responsibility request failed", err);
+  res.status(500).json({ error: "Could not complete the class responsibility request" });
 }
 
 function handleError(err: unknown, res: import("express").Response, fallback: string): void {

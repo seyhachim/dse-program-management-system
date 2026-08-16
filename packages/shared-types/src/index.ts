@@ -12,6 +12,7 @@ export * from "./lecturers.ts";
 export * from "./courses.ts";
 export * from "./offerings.ts";
 export * from "./attendance.ts";
+export * from "./class-responsibilities.ts";
 export * from "./course-spec.ts";
 export * from "./methods.ts";
 export * from "./rubrics.ts";

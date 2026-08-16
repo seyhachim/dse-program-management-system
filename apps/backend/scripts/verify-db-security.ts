@@ -39,6 +39,8 @@ const EXPECTED_PUBLIC_TABLES = [
   "OfferingMeeting",
   "OfferingCoLecturer",
   "Enrollment",
+  "ClassResponsibilityAssignment",
+  "ClassResponsibilityAuditEvent",
   "OfferingAssessmentDeadline",
   "AssessmentResult",
   "AssessmentCriterionScore",
