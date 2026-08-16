@@ -1,6 +1,8 @@
 import type {
   AddCurriculumCourseInput,
+  BindCurriculumCourseSpecInput,
   CurriculumComparison,
+  CurriculumCourseSpecBindings,
   CurriculumVersionHistory,
   CurriculumVersionSummary,
   CurriculumWorkflowState,
@@ -64,6 +66,12 @@ export const curriculumApi = {
   compare(curriculumId: string, fromVersionId: string, toVersionId: string): Promise<CurriculumComparison> {
     const query = new URLSearchParams({ fromVersionId, toVersionId }).toString();
     return api.get<CurriculumComparison>(`/api/programme/curricula/${encodeURIComponent(curriculumId)}/compare?${query}`);
+  },
+  courseSpecBindings(versionId: string): Promise<CurriculumCourseSpecBindings> {
+    return api.get<CurriculumCourseSpecBindings>(`/api/programme/curricula/versions/${encodeURIComponent(versionId)}/course-spec-bindings`);
+  },
+  bindCourseSpec(versionId: string, placementId: string, input: BindCurriculumCourseSpecInput): Promise<CurriculumCourseSpecBindings> {
+    return api.put<CurriculumCourseSpecBindings>(`/api/programme/curricula/versions/${encodeURIComponent(versionId)}/courses/${encodeURIComponent(placementId)}/course-spec-version`, input);
   },
 };
 
