@@ -167,6 +167,11 @@ jobs:
           TELEGRAM_DB_TESTS: "1"
           JWT_SECRET: telegram-ci-security-secret-at-least-32-characters
 
+      - name: Verify class responsibility integrity and revocation
+        run: bun test apps/backend/src/plugins/offerings/class-responsibility-db.test.ts
+        env:
+          CLASS_RESPONSIBILITY_DB_TESTS: "1"
+
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
