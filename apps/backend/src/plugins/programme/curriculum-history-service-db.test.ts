@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { CourseType, PrismaClient } from "@prisma/client";
+import { curriculumCourseSpecService } from "./curriculum-course-spec-service.ts";
 import { curriculumDraftService } from "./curriculum-draft-service.ts";
 import { curriculumHistoryService } from "./curriculum-history-service.ts";
 import { curriculumService } from "./curriculum-service.ts";
@@ -21,7 +22,16 @@ describeDb("curriculum history service", () => {
       intakeYear: 2026,
     });
     const course = await prisma.course.create({ data: { programmeId: programme.id, code: `C-${token}`, title: "History Course", credits: 3, courseType: CourseType.Core } });
-    await curriculumDraftService.addCourse(initial.selectedVersion.id, user.id, { courseId: course.id, yearLevel: 1, semester: "First", sortOrder: 0 });
+    const spec = await prisma.courseSpec.create({
+      data: { courseId: course.id, reviewStatus: "Approved", approvedAt: new Date() },
+    });
+    const read = await curriculumDraftService.addCourse(initial.selectedVersion.id, user.id, { courseId: course.id, yearLevel: 1, semester: "First", sortOrder: 0 });
+    await curriculumCourseSpecService.bind(
+      initial.selectedVersion.id,
+      read.years[0]!.semesters[0]!.courses[0]!.placementId,
+      user.id,
+      { courseSpecVersionId: spec.id },
+    );
     await curriculumWorkflowService.submit(initial.selectedVersion.id, user.id, "Review initial");
     await curriculumWorkflowService.approve(initial.selectedVersion.id, user.id, "Approve initial");
     await curriculumWorkflowService.activate(initial.selectedVersion.id, user.id, "Activate initial");
@@ -39,7 +49,7 @@ describeDb("curriculum history service", () => {
       initial.selectedVersion.id,
     ]);
     const initialActions = history.versions.find((item) => item.version.id === initial.selectedVersion.id)!.auditActions;
-    expect(initialActions.length).toBeGreaterThanOrEqual(5);
+    expect(initialActions.length).toBeGreaterThanOrEqual(6);
     for (let index = 1; index < initialActions.length; index += 1) {
       expect(new Date(initialActions[index - 1]!.createdAt).getTime()).toBeLessThanOrEqual(
         new Date(initialActions[index]!.createdAt).getTime(),

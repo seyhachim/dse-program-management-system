@@ -349,6 +349,8 @@ model ProgrammeCurriculumCourse {
   curriculumVersion   ProgrammeCurriculumVersion @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
   courseId            String
   course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  courseSpecVersionId String?
+  courseSpecVersion   CourseSpec?                 @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)
   yearLevel           Int
   semester            Semester
   creditsSnapshot     Int
@@ -359,6 +361,7 @@ model ProgrammeCurriculumCourse {
 
   @@unique([curriculumVersionId, courseId])
   @@index([courseId])
+  @@index([courseSpecVersionId])
   @@index([curriculumVersionId, yearLevel, semester, sortOrder])
 }
 
@@ -1150,6 +1153,7 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+  curriculumPlacements     ProgrammeCurriculumCourse[] @relation("ProgrammeCurriculumCourseSpecVersion")
 
   approvedAt      DateTime?
   effectiveFrom   DateTime?

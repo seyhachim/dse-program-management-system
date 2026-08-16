@@ -4,6 +4,7 @@ import type {
   CurriculumWorkflowState,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { findInvalidCurriculumCourseSpecBindings } from "./curriculum-course-spec-integrity.ts";
 import { curriculumService } from "./curriculum-service.ts";
 
 export class CurriculumWorkflowNotFoundError extends Error {}
@@ -174,6 +175,15 @@ export const curriculumWorkflowService = {
     if (initial.status === "Active") return getCurriculumWorkflowState(versionId);
     if (initial.status !== "Approved") {
       throw new CurriculumWorkflowTransitionError("Only an Approved curriculum can be activated");
+    }
+
+    const invalidCourseCodes = await findInvalidCurriculumCourseSpecBindings(versionId);
+    if (invalidCourseCodes.length > 0) {
+      const preview = invalidCourseCodes.slice(0, 5).join(", ");
+      const suffix = invalidCourseCodes.length > 5 ? ` and ${invalidCourseCodes.length - 5} more` : "";
+      throw new CurriculumWorkflowValidationError(
+        `Every curriculum course needs an Approved CourseSpec before activation. Missing or invalid: ${preview}${suffix}`,
+      );
     }
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
