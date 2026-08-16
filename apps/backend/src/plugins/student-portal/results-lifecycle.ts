@@ -1,8 +1,11 @@
 import type {
+  CourseDeliveryResultReview,
+  PortalCloAchievement,
   PublishAssessmentResultsInput,
   SaveAssessmentResultInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
 import {
   PortalAccessError,
   PortalConflictError,
@@ -10,6 +13,13 @@ import {
 } from "./service.ts";
 
 type ResultContext = Awaited<ReturnType<typeof resultContext>>;
+
+function achievementStatus(percentage: number | null): PortalCloAchievement["status"] {
+  if (percentage === null) return "not-enough-evidence";
+  if (percentage >= 70) return "achieved";
+  if (percentage >= 50) return "developing";
+  return "needs-attention";
+}
 
 async function resultContext(
   enrollmentId: string,
@@ -103,6 +113,107 @@ export function publicationReadiness(
 }
 
 export const resultsLifecycleService = {
+  async review(
+    authorId: string,
+    programmeWide: boolean,
+    offeringId: string,
+  ): Promise<CourseDeliveryResultReview> {
+    const offering = await prisma.offering.findUnique({
+      where: { id: offeringId },
+      include: {
+        coLecturers: true,
+        course: {
+          include: {
+            specs: {
+              where: { reviewStatus: "Approved" },
+              orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
+              take: 1,
+              include: {
+                clos: { orderBy: { order: "asc" } },
+                assessmentItems: { orderBy: { order: "asc" } },
+              },
+            },
+          },
+        },
+        enrollments: {
+          include: {
+            student: { select: { id: true, studentId: true, name: true } },
+            results: true,
+          },
+          orderBy: { student: { name: "asc" } },
+        },
+      },
+    });
+    if (!offering) throw new PortalNotFoundError("Offering not found");
+
+    const assigned =
+      offering.lecturerId === authorId ||
+      offering.coLecturers.some((item) => item.lecturerId === authorId);
+    if (!programmeWide && !assigned) {
+      throw new PortalAccessError("You are not assigned to this offering");
+    }
+
+    const spec = offering.course.specs[0] ?? null;
+    if (!spec) throw new PortalNotFoundError("Approved course specification not found");
+    const assessments = spec.assessmentItems.filter((item) => item.status === "Active");
+    const assessmentById = new Map(assessments.map((item) => [item.id, item]));
+
+    return {
+      offeringId: offering.id,
+      courseSpecId: spec.id,
+      courseCode: offering.course.code,
+      courseTitle: offering.course.title,
+      sectionCode: offering.sectionCode,
+      rows: offering.enrollments.map((enrollment) => {
+        // Lecturer review deliberately includes private draft rows. The endpoint
+        // remains courses:write protected and is never reused by student reads.
+        const results = enrollment.results
+          .filter((result) => result.courseSpecId === spec.id)
+          .map((result) => ({
+            assessmentItemId: result.assessmentItemId,
+            score: result.score,
+            maxScore: result.maxScore,
+          }));
+        const grade = calculateCourseGrade(assessments, results);
+        const achievements = spec.clos
+          .filter((clo) => clo.status === "Active")
+          .map((clo) => {
+            const code = `CLO${clo.order + 1}`;
+            const calculation = calculateCloEvidence(code, assessments, results);
+            return {
+              code,
+              description: clo.description,
+              percentage: calculation.percentage,
+              status: achievementStatus(calculation.percentage),
+              evidenceCount: calculation.evidence.length,
+              evidence: calculation.evidence.map((evidence) => ({
+                assessmentItemId: evidence.assessmentItemId,
+                assessmentName: assessmentById.get(evidence.assessmentItemId)?.name ?? "Assessment",
+                rawPercentage: evidence.rawPercentage,
+              })),
+            } satisfies PortalCloAchievement;
+          });
+        const measured = achievements.flatMap((item) =>
+          item.percentage === null ? [] : [item.percentage],
+        );
+        return {
+          enrollmentId: enrollment.id,
+          studentId: enrollment.student.id,
+          studentCode: enrollment.student.studentId,
+          studentName: enrollment.student.name,
+          totalCourseGrade: grade.totalGrade,
+          courseGradeComplete: grade.complete,
+          completedGradeWeight: grade.completedWeight,
+          configuredGradeWeight: grade.configuredWeight,
+          achievements,
+          overallAchievement: measured.length
+            ? Math.round(measured.reduce((sum, item) => sum + item, 0) / measured.length)
+            : null,
+        };
+      }),
+    };
+  },
+
   async saveDraft(
     authorId: string,
     programmeWide: boolean,
