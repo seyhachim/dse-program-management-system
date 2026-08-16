@@ -216,3 +216,53 @@ jobs:
 
       - name: Verify database security after fail-closed probes
         run: bun run --cwd apps/backend db:security:verify
+
+  backend-integration:
+    name: Backend integration authorization
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_integration
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_integration"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_integration?schema=public
+      AUTH_MODE: dev
+      JWT_SECRET: issue-130-ci-integration-secret-at-least-32-characters
+      BACKEND_INTEGRATION_TESTS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client explicitly
+        run: bun run db:generate
+
+      - name: Apply migrations to isolated integration database
+        run: bun run db:migrate:deploy
+
+      - name: Seed isolated integration database
+        run: bun run seed
+
+      - name: Run backend route/database authorization integration suite
+        run: bun run test:backend:integration
