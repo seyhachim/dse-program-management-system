@@ -1,5 +1,6 @@
 import type {
   CourseDeliveryResultReview,
+  CourseDeliveryStudentResultReview,
   PortalCloAchievement,
   PublishAssessmentResultsInput,
   SaveAssessmentResultInput,
@@ -13,12 +14,85 @@ import {
 } from "./service.ts";
 
 type ResultContext = Awaited<ReturnType<typeof resultContext>>;
+type ReviewAssessment = {
+  id: string;
+  name: string;
+  status: string;
+  weight: number | null;
+  cloCodes: string[];
+};
+type ReviewClo = {
+  order: number;
+  description: string;
+  status: string;
+};
+type ReviewResult = {
+  assessmentItemId: string;
+  score: number;
+  maxScore: number;
+};
 
 function achievementStatus(percentage: number | null): PortalCloAchievement["status"] {
   if (percentage === null) return "not-enough-evidence";
   if (percentage >= 70) return "achieved";
   if (percentage >= 50) return "developing";
   return "needs-attention";
+}
+
+export function canManageOfferingResults(
+  authorId: string,
+  programmeWide: boolean,
+  lecturerId: string | null,
+  coLecturerIds: string[],
+): boolean {
+  return programmeWide || lecturerId === authorId || coLecturerIds.includes(authorId);
+}
+
+export function buildStudentResultReview(input: {
+  enrollmentId: string;
+  student: { id: string; studentId: string; name: string };
+  clos: ReviewClo[];
+  assessments: ReviewAssessment[];
+  results: ReviewResult[];
+}): CourseDeliveryStudentResultReview {
+  const grade = calculateCourseGrade(input.assessments, input.results);
+  const assessmentById = new Map(input.assessments.map((item) => [item.id, item]));
+  const achievements = input.clos
+    .filter((clo) => clo.status === "Active")
+    .map((clo) => {
+      const code = `CLO${clo.order + 1}`;
+      const calculation = calculateCloEvidence(code, input.assessments, input.results);
+      return {
+        code,
+        description: clo.description,
+        percentage: calculation.percentage,
+        status: achievementStatus(calculation.percentage),
+        evidenceCount: calculation.evidence.length,
+        evidence: calculation.evidence.map((evidence) => ({
+          assessmentItemId: evidence.assessmentItemId,
+          assessmentName: assessmentById.get(evidence.assessmentItemId)?.name ?? "Assessment",
+          rawPercentage: evidence.rawPercentage,
+        })),
+      } satisfies PortalCloAchievement;
+    });
+  const measured = achievements.flatMap((item) =>
+    item.percentage === null ? [] : [item.percentage],
+  );
+
+  return {
+    enrollmentId: input.enrollmentId,
+    studentId: input.student.id,
+    studentCode: input.student.studentId,
+    studentName: input.student.name,
+    totalCourseGrade: grade.totalGrade,
+    courseGradeComplete: grade.complete,
+    completedGradeWeight: grade.completedWeight,
+    configuredGradeWeight: grade.configuredWeight,
+    achievements,
+    overallAchievement: measured.length
+      ? Math.round(measured.reduce((sum, item) => sum + item, 0) / measured.length)
+      : null,
+  };
 }
 
 async function resultContext(
@@ -48,10 +122,12 @@ async function resultContext(
   });
   if (!enrollment) throw new PortalNotFoundError("Enrollment not found");
 
-  const assigned =
-    enrollment.offering.lecturerId === userId ||
-    enrollment.offering.coLecturers.some((item) => item.lecturerId === userId);
-  if (!programmeWide && !assigned) {
+  if (!canManageOfferingResults(
+    userId,
+    programmeWide,
+    enrollment.offering.lecturerId,
+    enrollment.offering.coLecturers.map((item) => item.lecturerId),
+  )) {
     throw new PortalAccessError("You are not assigned to this offering");
   }
 
@@ -146,17 +222,18 @@ export const resultsLifecycleService = {
     });
     if (!offering) throw new PortalNotFoundError("Offering not found");
 
-    const assigned =
-      offering.lecturerId === authorId ||
-      offering.coLecturers.some((item) => item.lecturerId === authorId);
-    if (!programmeWide && !assigned) {
+    if (!canManageOfferingResults(
+      authorId,
+      programmeWide,
+      offering.lecturerId,
+      offering.coLecturers.map((item) => item.lecturerId),
+    )) {
       throw new PortalAccessError("You are not assigned to this offering");
     }
 
     const spec = offering.course.specs[0] ?? null;
     if (!spec) throw new PortalNotFoundError("Approved course specification not found");
     const assessments = spec.assessmentItems.filter((item) => item.status === "Active");
-    const assessmentById = new Map(assessments.map((item) => [item.id, item]));
 
     return {
       offeringId: offering.id,
@@ -164,53 +241,23 @@ export const resultsLifecycleService = {
       courseCode: offering.course.code,
       courseTitle: offering.course.title,
       sectionCode: offering.sectionCode,
-      rows: offering.enrollments.map((enrollment) => {
-        // Lecturer review deliberately includes private draft rows. The endpoint
-        // remains courses:write protected and is never reused by student reads.
-        const results = enrollment.results
-          .filter((result) => result.courseSpecId === spec.id)
-          .map((result) => ({
-            assessmentItemId: result.assessmentItemId,
-            score: result.score,
-            maxScore: result.maxScore,
-          }));
-        const grade = calculateCourseGrade(assessments, results);
-        const achievements = spec.clos
-          .filter((clo) => clo.status === "Active")
-          .map((clo) => {
-            const code = `CLO${clo.order + 1}`;
-            const calculation = calculateCloEvidence(code, assessments, results);
-            return {
-              code,
-              description: clo.description,
-              percentage: calculation.percentage,
-              status: achievementStatus(calculation.percentage),
-              evidenceCount: calculation.evidence.length,
-              evidence: calculation.evidence.map((evidence) => ({
-                assessmentItemId: evidence.assessmentItemId,
-                assessmentName: assessmentById.get(evidence.assessmentItemId)?.name ?? "Assessment",
-                rawPercentage: evidence.rawPercentage,
-              })),
-            } satisfies PortalCloAchievement;
-          });
-        const measured = achievements.flatMap((item) =>
-          item.percentage === null ? [] : [item.percentage],
-        );
-        return {
+      rows: offering.enrollments.map((enrollment) =>
+        buildStudentResultReview({
           enrollmentId: enrollment.id,
-          studentId: enrollment.student.id,
-          studentCode: enrollment.student.studentId,
-          studentName: enrollment.student.name,
-          totalCourseGrade: grade.totalGrade,
-          courseGradeComplete: grade.complete,
-          completedGradeWeight: grade.completedWeight,
-          configuredGradeWeight: grade.configuredWeight,
-          achievements,
-          overallAchievement: measured.length
-            ? Math.round(measured.reduce((sum, item) => sum + item, 0) / measured.length)
-            : null,
-        };
-      }),
+          student: enrollment.student,
+          clos: spec.clos,
+          assessments,
+          // Lecturer review deliberately includes private draft rows. The endpoint
+          // remains courses:write protected and is never reused by student reads.
+          results: enrollment.results
+            .filter((result) => result.courseSpecId === spec.id)
+            .map((result) => ({
+              assessmentItemId: result.assessmentItemId,
+              score: result.score,
+              maxScore: result.maxScore,
+            })),
+        }),
+      ),
     };
   },
 
@@ -275,10 +322,12 @@ export const resultsLifecycleService = {
     });
     if (!offering) throw new PortalNotFoundError("Offering not found");
 
-    const assigned =
-      offering.lecturerId === authorId ||
-      offering.coLecturers.some((item) => item.lecturerId === authorId);
-    if (!programmeWide && !assigned) {
+    if (!canManageOfferingResults(
+      authorId,
+      programmeWide,
+      offering.lecturerId,
+      offering.coLecturers.map((item) => item.lecturerId),
+    )) {
       throw new PortalAccessError("You are not assigned to this offering");
     }
 
