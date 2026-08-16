@@ -746,6 +746,7 @@ export const resultsLifecycleService = {
           createdAt: correctedAt,
         },
       });
+      await tx.$executeRaw`SELECT set_config('dse.result_correction_id', ${correction.id}, true)`;
       const updated = await tx.assessmentResult.update({
         where: { id: result.id },
         data: { score: input.score, maxScore: input.maxScore, feedback: input.feedback },

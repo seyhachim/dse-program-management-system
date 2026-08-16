@@ -64,6 +64,26 @@ BEGIN
     THEN
       RAISE EXCEPTION 'Finalized result identity and publication/finalization provenance are immutable';
     END IF;
+
+    IF NEW."score" IS DISTINCT FROM OLD."score"
+      OR NEW."maxScore" IS DISTINCT FROM OLD."maxScore"
+      OR NEW."feedback" IS DISTINCT FROM OLD."feedback"
+    THEN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM "AssessmentResultCorrection" c
+        WHERE c."id" = NULLIF(current_setting('dse.result_correction_id', true), '')
+          AND c."assessmentResultId" = OLD."id"
+          AND c."beforeScore" IS NOT DISTINCT FROM OLD."score"
+          AND c."beforeMaxScore" IS NOT DISTINCT FROM OLD."maxScore"
+          AND c."beforeFeedback" IS NOT DISTINCT FROM OLD."feedback"
+          AND c."afterScore" IS NOT DISTINCT FROM NEW."score"
+          AND c."afterMaxScore" IS NOT DISTINCT FROM NEW."maxScore"
+          AND c."afterFeedback" IS NOT DISTINCT FROM NEW."feedback"
+      ) THEN
+        RAISE EXCEPTION 'Finalized result values require a matching append-only correction record';
+      END IF;
+    END IF;
   END IF;
 
   RETURN NEW;

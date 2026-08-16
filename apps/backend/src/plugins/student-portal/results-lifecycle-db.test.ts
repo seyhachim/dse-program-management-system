@@ -228,6 +228,12 @@ dbDescribe("finalized result correction database integrity", () => {
     await expectDatabaseRejection(() =>
       prisma.assessmentResult.update({
         where: { id: finalized.id },
+        data: { score: 81 },
+      }),
+    );
+    await expectDatabaseRejection(() =>
+      prisma.assessmentResult.update({
+        where: { id: finalized.id },
         data: { score: 101 },
       }),
     );
