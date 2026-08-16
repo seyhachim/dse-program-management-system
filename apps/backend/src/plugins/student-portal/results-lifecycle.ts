@@ -7,8 +7,10 @@ import type {
   PublishAssessmentResultsInput,
   PublishAssessmentResultsResponse,
   SaveAssessmentResultInput,
+  SaveAssessmentCriterionScoresInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
 import {
   PortalAccessError,
@@ -33,6 +35,10 @@ type ReviewResult = {
   assessmentItemId: string;
   score: number;
   maxScore: number;
+  criterionScores?: Array<{
+    assessmentItemId: string; rubricId: string; criterionId: string; criterionName: string; rubricContentHash: string;
+    score: number; maxScore: number; cloCodes: string[];
+  }>;
 };
 
 function achievementStatus(percentage: number | null): PortalCloAchievement["status"] {
@@ -64,7 +70,12 @@ export function buildStudentResultReview(input: {
     .filter((clo) => clo.status === "Active")
     .map((clo) => {
       const code = `CLO${clo.order + 1}`;
-      const calculation = calculateCloEvidence(code, input.assessments, input.results);
+      const calculation = calculateCloEvidence(
+        code,
+        input.assessments,
+        input.results,
+        input.results.flatMap((result) => result.criterionScores ?? []),
+      );
       return {
         code,
         description: clo.description,
@@ -75,6 +86,17 @@ export function buildStudentResultReview(input: {
           assessmentItemId: evidence.assessmentItemId,
           assessmentName: assessmentById.get(evidence.assessmentItemId)?.name ?? "Assessment",
           rawPercentage: evidence.rawPercentage,
+          source: evidence.source,
+          ...(evidence.source === "criterion"
+            ? {
+                rubricId: evidence.rubricId,
+                criterionId: evidence.criterionId,
+                criterionName: evidence.criterionName,
+                score: evidence.score,
+                maxScore: evidence.maxScore,
+                rubricContentHash: evidence.rubricContentHash,
+              }
+            : {}),
         })),
       } satisfies PortalCloAchievement;
     });
@@ -115,7 +137,14 @@ async function resultContext(
                 where: { reviewStatus: "Approved" },
                 orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
                 take: 1,
-                include: { assessmentItems: true },
+                include: {
+                  assessmentItems: {
+                    include: {
+                      criterionCloMappings: true,
+                      rubric: { include: { levelRows: true, criterionRows: true } },
+                    },
+                  },
+                },
               },
             },
           },
@@ -284,7 +313,10 @@ export const resultsLifecycleService = {
               take: 1,
               include: {
                 clos: { orderBy: { order: "asc" } },
-                assessmentItems: { orderBy: { order: "asc" } },
+                assessmentItems: {
+                  orderBy: { order: "asc" },
+                  include: { criterionCloMappings: true },
+                },
               },
             },
           },
@@ -292,7 +324,7 @@ export const resultsLifecycleService = {
         enrollments: {
           include: {
             student: { select: { id: true, studentId: true, name: true } },
-            results: true,
+            results: { include: { criterionScores: true } },
           },
           orderBy: { student: { name: "asc" } },
         },
@@ -333,6 +365,22 @@ export const resultsLifecycleService = {
               assessmentItemId: result.assessmentItemId,
               score: result.score,
               maxScore: result.maxScore,
+              criterionScores: result.criterionScores.map((score) => ({
+                assessmentItemId: result.assessmentItemId,
+                rubricId: score.rubricId,
+                criterionId: score.criterionId,
+                criterionName: score.criterionName,
+                rubricContentHash: score.rubricContentHash,
+                score: score.score,
+                maxScore: score.maxScore,
+                cloCodes: assessments
+                  .find((assessment) => assessment.id === result.assessmentItemId)
+                  ?.criterionCloMappings
+                  .filter((mapping) =>
+                    mapping.rubricId === score.rubricId && mapping.criterionId === score.criterionId,
+                  )
+                  .map((mapping) => mapping.cloCode) ?? [],
+              })),
             })),
         }),
       ),
@@ -354,9 +402,9 @@ export const resultsLifecycleService = {
     };
     const existing = await prisma.assessmentResult.findUnique({
       where: { enrollmentId_courseSpecId_assessmentItemId: key },
-      select: { publishedAt: true },
+      select: { publishedAt: true, finalizedAt: true },
     });
-    assertDraftWritable(existing?.publishedAt);
+    assertDraftWritable(existing?.publishedAt ?? existing?.finalizedAt);
 
     return prisma.assessmentResult.upsert({
       where: { enrollmentId_courseSpecId_assessmentItemId: key },
@@ -379,6 +427,74 @@ export const resultsLifecycleService = {
         finalizedAt: null,
         finalizedById: null,
       },
+    });
+  },
+
+  async saveCriterionScores(
+    authorId: string,
+    programmeWide: boolean,
+    input: SaveAssessmentCriterionScoresInput,
+  ) {
+    const context = await resultContext(input.enrollmentId, authorId, programmeWide);
+    const assessment = assessmentFrom(context, input.assessmentItemId);
+    if (!assessment.rubricId || !assessment.rubric) {
+      throw new PortalConflictError("This assessment has no linked rubric");
+    }
+    const key = {
+      enrollmentId: context.enrollment.id,
+      courseSpecId: context.spec.id,
+      assessmentItemId: input.assessmentItemId,
+    };
+    const result = await prisma.assessmentResult.findUnique({
+      where: { enrollmentId_courseSpecId_assessmentItemId: key },
+      select: { id: true, publishedAt: true, finalizedAt: true },
+    });
+    if (!result) {
+      throw new PortalConflictError("Save the whole-assessment draft before entering rubric criterion scores");
+    }
+    assertDraftWritable(result.publishedAt ?? result.finalizedAt);
+
+    const currentHash = rubricContentHash(assessment.rubric);
+    const mappedHashes = new Set(assessment.criterionCloMappings.map((mapping) => mapping.rubricContentHash));
+    if (mappedHashes.size > 1 || (mappedHashes.size === 1 && !mappedHashes.has(currentHash))) {
+      throw new PortalConflictError(
+        "The linked rubric changed after this course specification was configured. Revise the specification before criterion grading.",
+      );
+    }
+
+    const criterionById = new Map(assessment.rubric.criterionRows.map((criterion) => [criterion.id, criterion]));
+    const levelById = new Map(assessment.rubric.levelRows.map((level) => [level.id, level]));
+    const maxScore = Math.max(0, ...assessment.rubric.levelRows.map((level) => level.points));
+    if (maxScore <= 0) throw new PortalConflictError("The linked rubric has no positive scoring scale");
+    const seen = new Set<string>();
+    const rows = input.scores.map((inputScore) => {
+      if (seen.has(inputScore.criterionId)) throw new PortalConflictError("Duplicate rubric criterion score");
+      seen.add(inputScore.criterionId);
+      const criterion = criterionById.get(inputScore.criterionId);
+      if (!criterion) throw new PortalNotFoundError("Rubric criterion does not belong to this assessment's linked rubric");
+      if (inputScore.score > maxScore) throw new PortalConflictError("Criterion score cannot exceed the rubric maximum");
+      const level = inputScore.rubricLevelId ? levelById.get(inputScore.rubricLevelId) : undefined;
+      if (inputScore.rubricLevelId && !level) throw new PortalNotFoundError("Rubric level does not belong to this assessment's linked rubric");
+      if (level && Math.abs(level.points - inputScore.score) > 1e-9) {
+        throw new PortalConflictError("Selected rubric level points do not match the criterion score");
+      }
+      return {
+        assessmentResultId: result.id,
+        rubricId: assessment.rubricId!,
+        criterionId: criterion.id,
+        criterionName: criterion.name,
+        rubricContentHash: currentHash,
+        score: inputScore.score,
+        maxScore,
+        rubricLevelId: level?.id ?? null,
+        rubricLevelLabel: level?.label ?? null,
+      };
+    });
+
+    return prisma.$transaction(async (tx) => {
+      await tx.assessmentCriterionScore.deleteMany({ where: { assessmentResultId: result.id } });
+      if (rows.length > 0) await tx.assessmentCriterionScore.createMany({ data: rows });
+      return { savedCount: rows.length, rubricContentHash: currentHash };
     });
   },
 

@@ -180,6 +180,9 @@ export function AssessmentFormPage({
         ...current,
         cloCodes,
         mappedPlos: deriveMappedPlos(cloCodes, clos),
+        criterionCloMappings: current.criterionCloMappings
+          .map((mapping) => ({ ...mapping, cloCodes: mapping.cloCodes.filter((mapped) => cloCodes.includes(mapped)) }))
+          .filter((mapping) => mapping.cloCodes.length > 0),
       };
     });
   };

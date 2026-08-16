@@ -1396,11 +1396,32 @@ model CourseSpecAssessmentItem {
   instructions        String               @default("")
   rubricId            String?
   rubric              Rubric?              @relation(fields: [rubricId], references: [id], onDelete: SetNull)
+  criterionCloMappings CourseSpecCriterionCloMapping[]
   mappedPlos          String[]             @default([])
   notes               String               @default("")
 
   @@id([courseSpecId, id])
   @@index([rubricId])
+}
+
+/// Issue #282: explicit rubric-criterion -> CLO evidence mapping scoped to one exact
+/// CourseSpec assessment. Criterion/rubric identity is snapshotted rather than
+/// FK'd to the mutable rubric library so historical approved-spec evidence cannot
+/// disappear or be reinterpreted by a later rubric edit.
+model CourseSpecCriterionCloMapping {
+  courseSpecId       String
+  assessmentItemId  String
+  assessmentItem     CourseSpecAssessmentItem @relation(fields: [courseSpecId, assessmentItemId], references: [courseSpecId, id], onDelete: Cascade)
+  rubricId           String
+  criterionId        String
+  criterionName      String
+  rubricContentHash  String
+  cloCode            String
+  createdAt          DateTime                 @default(now())
+
+  @@id([courseSpecId, assessmentItemId, rubricId, criterionId, cloCode])
+  @@index([courseSpecId, assessmentItemId, cloCode])
+  @@index([rubricId, criterionId])
 }
 
 /// Issue #103: normalized CLO Alignment Mapping cells (previously the `mapping`
@@ -1596,6 +1617,7 @@ model AssessmentResult {
   finalizedAt      DateTime?
   finalizedById    String?
   finalizedBy      User?      @relation("AssessmentResultFinalizedBy", fields: [finalizedById], references: [id], onDelete: Restrict)
+  criterionScores  AssessmentCriterionScore[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
@@ -1604,6 +1626,29 @@ model AssessmentResult {
   @@index([publishedById])
   @@index([finalizedAt])
   @@index([finalizedById])
+}
+
+/// Issue #282: per-student rubric criterion score evidence. Whole-assessment
+/// AssessmentResult remains authoritative for local course grading; these rows
+/// are independent criterion-level evidence and snapshot the rubric context used.
+model AssessmentCriterionScore {
+  id                 String           @id @default(uuid())
+  assessmentResultId String
+  assessmentResult   AssessmentResult @relation(fields: [assessmentResultId], references: [id], onDelete: Cascade)
+  rubricId           String
+  criterionId        String
+  criterionName      String
+  rubricContentHash  String
+  score              Float
+  maxScore           Float
+  rubricLevelId      String?
+  rubricLevelLabel   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([assessmentResultId, rubricId, criterionId])
+  @@index([assessmentResultId])
+  @@index([rubricId, criterionId])
 }
 
 /// Section-level notices. Draft notices have a null `publishedAt` and never

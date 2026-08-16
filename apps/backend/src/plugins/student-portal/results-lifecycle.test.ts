@@ -141,8 +141,8 @@ describe("results lifecycle", () => {
       evidenceCount: 2,
     });
     expect(review.achievements[0]?.evidence).toEqual([
-      { assessmentItemId: "a1", assessmentName: "Project", rawPercentage: 80 },
-      { assessmentItemId: "a2", assessmentName: "Final", rawPercentage: 90 },
+      { assessmentItemId: "a1", assessmentName: "Project", rawPercentage: 80, source: "assessment" },
+      { assessmentItemId: "a2", assessmentName: "Final", rawPercentage: 90, source: "assessment" },
     ]);
     expect(review.achievements[1]).toMatchObject({
       code: "CLO2",

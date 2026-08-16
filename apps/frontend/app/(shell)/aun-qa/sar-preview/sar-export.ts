@@ -13,59 +13,51 @@ import {
   WidthType,
 } from "docx";
 import { jsPDF } from "jspdf";
-import type { QaSarBlock, QaSarDocumentModelView } from "@dse-pms/shared-types";
+import type { QaSarDocumentModelView } from "@dse-pms/shared-types";
+import {
+  SAR_DOCUMENT_STYLE,
+  buildSarDocumentLayout,
+  buildSarEvidenceNumberMap,
+  type SarLayoutBlock,
+} from "./sar-document-layout";
 
 export function sarEvidenceNumberMap(model: QaSarDocumentModelView): Map<string, string> {
-  return new Map(
-    model.evidenceRegister.map((item, index) => [item.evidenceId, `E${String(index + 1).padStart(3, "0")}`]),
-  );
-}
-
-function blockText(block: QaSarBlock, evidenceNumbers: Map<string, string>): string {
-  if (block.type === "evidenceReference") {
-    return `[${evidenceNumbers.get(block.evidenceId) ?? "Evidence"}] ${block.label}`;
-  }
-  if (block.type === "pmsData") return `[PMS data] ${block.label}`;
-  if (block.type === "bullet") return `• ${block.text}`;
-  return block.text;
+  return buildSarEvidenceNumberMap(model);
 }
 
 export function sarDocumentLines(model: QaSarDocumentModelView): string[] {
-  const evidenceNumbers = sarEvidenceNumberMap(model);
+  const layout = buildSarDocumentLayout(model);
   const lines: string[] = [
-    "SELF-ASSESSMENT REPORT",
-    model.programmeName,
-    model.cycleTitle,
-    model.mode === "working" ? "WORKING DRAFT" : "OFFICIAL SAR",
+    layout.title,
+    layout.programmeName,
+    layout.cycleTitle,
+    layout.modeLabel,
     "",
   ];
 
-  for (const criterion of model.criteria) {
+  for (const criterion of layout.criteria) {
     lines.push(`Criterion ${criterion.code}: ${criterion.title}`, "");
     for (const section of criterion.sections) {
       lines.push(`${section.requirementCode} ${section.requirementTitle}`);
-      if (!section.content) {
-        lines.push(
-          model.mode === "official"
-            ? "[No approved submission; excluded from official SAR]"
-            : "[SAR writing has not started]",
-          "",
-        );
+      lines.push(`Status: ${section.statusLabel}`);
+      if (section.submissionLabel) lines.push(section.submissionLabel);
+      if (section.missingMessage) {
+        lines.push(`[${section.missingMessage}]`, "");
         continue;
       }
-      for (const block of section.content.blocks) {
-        const text = blockText(block, evidenceNumbers).trim();
-        if (text) lines.push(text);
+      for (const block of section.blocks) {
+        const text = block.type === "bullet" ? `• ${block.text}` : block.text;
+        if (text.trim()) lines.push(text);
       }
       lines.push("");
     }
   }
 
   lines.push("Evidence Register", "");
-  for (const item of model.evidenceRegister) {
-    const number = evidenceNumbers.get(item.evidenceId) ?? "Evidence";
-    const source = item.sourceRef || item.sourceUrl || "—";
-    lines.push(`${number} — ${item.title} | ${item.reportingPeriod || "—"} | ${item.requirementCodes.join(", ")} | ${source}`);
+  for (const item of layout.evidenceRows) {
+    lines.push(
+      `${item.number} — ${item.title} | ${item.reportingPeriod} | ${item.requirementCodes} | ${item.source}`,
+    );
   }
   return lines;
 }
@@ -85,37 +77,54 @@ function safeFilename(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+function docxBlock(block: SarLayoutBlock): Paragraph {
+  if (block.type === "heading") {
+    return new Paragraph({ text: block.text, heading: HeadingLevel.HEADING_3 });
+  }
+  if (block.type === "bullet") {
+    return new Paragraph({ text: block.text, bullet: { level: 0 } });
+  }
+  if (block.type === "evidenceReference") {
+    return new Paragraph({
+      children: [new TextRun({ text: block.text, bold: true })],
+      spacing: { before: 80, after: 80 },
+    });
+  }
+  if (block.type === "pmsData") {
+    return new Paragraph({
+      children: [new TextRun({ text: block.text, italics: true })],
+      spacing: { before: 80, after: 80 },
+    });
+  }
+  return new Paragraph({ text: block.text, spacing: { after: 100 } });
+}
+
 export async function exportSarDocx(model: QaSarDocumentModelView, baseName?: string) {
-  const evidenceNumbers = sarEvidenceNumberMap(model);
+  const layout = buildSarDocumentLayout(model);
   const children: Array<Paragraph | Table> = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: "SELF-ASSESSMENT REPORT", bold: true, size: 30 })],
+      children: [new TextRun({ text: layout.title, bold: true, size: SAR_DOCUMENT_STYLE.titleSize })],
       spacing: { after: 160 },
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: model.programmeName, bold: true, size: 28 })],
+      children: [new TextRun({ text: layout.programmeName, bold: true, size: SAR_DOCUMENT_STYLE.programmeSize })],
       spacing: { after: 100 },
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: model.cycleTitle, size: 22 })],
-      spacing: { after: 200 },
+      children: [new TextRun({ text: layout.cycleTitle, size: SAR_DOCUMENT_STYLE.cycleSize })],
+      spacing: { after: 120 },
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: layout.modeLabel, bold: true })],
+      spacing: { after: 240 },
     }),
   ];
 
-  if (model.mode === "working") {
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "WORKING DRAFT", bold: true })],
-        spacing: { after: 240 },
-      }),
-    );
-  }
-
-  for (const criterion of model.criteria) {
+  for (const criterion of layout.criteria) {
     children.push(
       new Paragraph({
         text: `Criterion ${criterion.code}: ${criterion.title}`,
@@ -123,77 +132,71 @@ export async function exportSarDocx(model: QaSarDocumentModelView, baseName?: st
         spacing: { before: 240, after: 120 },
       }),
     );
+
     for (const section of criterion.sections) {
       children.push(
         new Paragraph({
           text: `${section.requirementCode} ${section.requirementTitle}`,
           heading: HeadingLevel.HEADING_2,
-          spacing: { before: 180, after: 80 },
+          spacing: { before: 180, after: 40 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: `Status: ${section.statusLabel}`, bold: true }),
+            ...(section.submissionLabel
+              ? [new TextRun({ text: `  ·  ${section.submissionLabel}`, italics: true })]
+              : []),
+          ],
+          spacing: { after: 100 },
         }),
       );
-      if (!section.content) {
+
+      if (section.missingMessage) {
         children.push(
           new Paragraph({
-            children: [
-              new TextRun({
-                text:
-                  model.mode === "official"
-                    ? "No approved submission yet; excluded from official SAR."
-                    : "SAR writing has not started.",
-                italics: true,
-              }),
-            ],
+            children: [new TextRun({ text: section.missingMessage, italics: true })],
+            spacing: { after: 120 },
           }),
         );
         continue;
       }
-      for (const block of section.content.blocks) {
-        if (block.type === "heading") {
-          children.push(new Paragraph({ text: block.text, heading: HeadingLevel.HEADING_3 }));
-        } else if (block.type === "bullet") {
-          children.push(new Paragraph({ text: block.text, bullet: { level: 0 } }));
-        } else if (block.type === "evidenceReference") {
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `[${evidenceNumbers.get(block.evidenceId) ?? "Evidence"}] ${block.label}`,
-                  bold: true,
-                }),
-              ],
-            }),
-          );
-        } else if (block.type === "pmsData") {
-          children.push(
-            new Paragraph({
-              children: [new TextRun({ text: `[PMS data] ${block.label}`, italics: true })],
-            }),
-          );
-        } else if (block.text.trim()) {
-          children.push(new Paragraph({ text: block.text, spacing: { after: 100 } }));
-        }
-      }
+
+      children.push(...section.blocks.map(docxBlock));
     }
   }
 
   children.push(
-    new Paragraph({ text: "Evidence Register", heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 120 } }),
+    new Paragraph({
+      text: "Evidence Register",
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 300, after: 80 },
+    }),
+    new Paragraph({
+      text: "Canonical evidence is listed once even when reused across multiple requirements.",
+      spacing: { after: 120 },
+    }),
   );
+
   const evidenceRows = [
     new TableRow({
       children: ["ID", "Evidence", "Period", "Used in", "Source"].map(
-        (label) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: label, bold: true })] })] }),
+        (label) =>
+          new TableCell({
+            children: [
+              new Paragraph({ children: [new TextRun({ text: label, bold: true })] }),
+            ],
+          }),
       ),
     }),
-    ...model.evidenceRegister.map(
+    ...layout.evidenceRows.map(
       (item) =>
         new TableRow({
           children: [
-            evidenceNumbers.get(item.evidenceId) ?? "Evidence",
+            item.number,
             item.title,
-            item.reportingPeriod || "—",
-            item.requirementCodes.join(", "),
-            item.sourceRef || item.sourceUrl || "—",
+            item.reportingPeriod,
+            item.requirementCodes,
+            item.source,
           ].map((value) => new TableCell({ children: [new Paragraph(String(value))] })),
         }),
     ),
@@ -201,18 +204,31 @@ export async function exportSarDocx(model: QaSarDocumentModelView, baseName?: st
   children.push(new Table({ rows: evidenceRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
 
   const doc = new Document({
-    sections: [{
-      properties: {
-        page: { margin: { top: 900, right: 900, bottom: 900, left: 900 } },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: SAR_DOCUMENT_STYLE.pageMarginTwips,
+              right: SAR_DOCUMENT_STYLE.pageMarginTwips,
+              bottom: SAR_DOCUMENT_STYLE.pageMarginTwips,
+              left: SAR_DOCUMENT_STYLE.pageMarginTwips,
+            },
+          },
+        },
+        children,
       },
-      children,
-    }],
+    ],
   });
   const blob = await Packer.toBlob(doc);
-  downloadBlob(blob, `${safeFilename(baseName || `${model.programmeCode}-${model.cycleTitle}-${model.mode}-SAR`)}.docx`);
+  downloadBlob(
+    blob,
+    `${safeFilename(baseName || `${layout.programmeCode}-${layout.cycleTitle}-${layout.mode}-SAR`)}.docx`,
+  );
 }
 
 export function exportSarPdf(model: QaSarDocumentModelView, baseName?: string) {
+  const layout = buildSarDocumentLayout(model);
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const margin = 18;
   const maxWidth = 210 - margin * 2;
@@ -237,11 +253,13 @@ export function exportSarPdf(model: QaSarDocumentModelView, baseName?: string) {
   };
 
   for (const line of sarDocumentLines(model)) {
-    if (line === "SELF-ASSESSMENT REPORT") addWrapped(line, { bold: true, size: 16, gap: 2 });
+    if (line === layout.title) addWrapped(line, { bold: true, size: 16, gap: 2 });
     else if (/^Criterion \d/.test(line)) addWrapped(line, { bold: true, size: 13, gap: 2 });
     else if (/^\d\.\d\s/.test(line) || line === "Evidence Register") addWrapped(line, { bold: true, size: 11, gap: 1.5 });
     else addWrapped(line, { size: 10 });
   }
 
-  pdf.save(`${safeFilename(baseName || `${model.programmeCode}-${model.cycleTitle}-${model.mode}-SAR`)}.pdf`);
+  pdf.save(
+    `${safeFilename(baseName || `${layout.programmeCode}-${layout.cycleTitle}-${layout.mode}-SAR`)}.pdf`,
+  );
 }

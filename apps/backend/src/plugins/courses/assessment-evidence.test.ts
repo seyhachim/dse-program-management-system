@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   ReferenceError,
   validateAssessmentCloEvidence,
+  validateCriterionCloMappings,
   validateCourseSpecMappingEvidence,
 } from "./service.ts";
 
@@ -98,5 +99,31 @@ describe("course-spec alignment mapping validation", () => {
         assessmentIds,
       ),
     ).toThrow("Duplicate CLO alignment mapping");
+  });
+});
+
+
+describe("criterion CLO evidence ownership", () => {
+  const validClos = new Set(["CLO1", "CLO2"]);
+  test("accepts explicit mappings for criteria in the linked rubric", () => {
+    expect(() => validateCriterionCloMappings(
+      { name: "Project", rubricId: "r1", cloCodes: ["CLO1"], criterionCloMappings: [{ criterionId: "c1", cloCodes: ["CLO1"] }] },
+      validClos,
+      new Set(["c1", "c2"]),
+    )).not.toThrow();
+  });
+  test("rejects a foreign rubric criterion", () => {
+    expect(() => validateCriterionCloMappings(
+      { name: "Project", rubricId: "r1", cloCodes: ["CLO1"], criterionCloMappings: [{ criterionId: "foreign", cloCodes: ["CLO1"] }] },
+      validClos,
+      new Set(["c1"]),
+    )).toThrow("does not belong to its linked rubric");
+  });
+  test("rejects criterion CLO evidence outside the assessment-level CLO set", () => {
+    expect(() => validateCriterionCloMappings(
+      { name: "Project", rubricId: "r1", cloCodes: ["CLO1"], criterionCloMappings: [{ criterionId: "c1", cloCodes: ["CLO2"] }] },
+      validClos,
+      new Set(["c1"]),
+    )).toThrow("not mapped at assessment level");
   });
 });
