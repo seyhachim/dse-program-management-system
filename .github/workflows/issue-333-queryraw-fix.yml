@@ -1,0 +1,27 @@
+name: Issue 333 queryraw fix
+
+on:
+  push:
+    branches:
+      - agent/issue-333-finalized-result-corrections
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-333-finalized-result-corrections
+      - run: python scripts/issue-333-queryraw-fix.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/issue-333-queryraw-fix.yml scripts/issue-333-queryraw-fix.py
+          git add apps/backend/src/plugins/student-portal/results-lifecycle.ts
+          git diff --cached --check
+          git commit -m "fix(results): set correction audit token with query raw"
+          git push origin HEAD:agent/issue-333-finalized-result-corrections
