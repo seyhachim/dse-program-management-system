@@ -6,6 +6,7 @@ import { createQaLlmRouter } from "./analysis/llm-router.ts";
 import { createQaAssignmentsRouter } from "./assignments/router.ts";
 import { createQaEvidenceLibraryRouter } from "./evidence/router.ts";
 import { createQaEvaluationRouter } from "./evaluation/router.ts";
+import { createQaPilotRouter } from "./evaluation/pilot-router.ts";
 import { createQaReviewRouter } from "./reviews/router.ts";
 import { createQaRouter } from "./router.ts";
 import { createQaSarProgressRouter } from "./sar-review/progress-router.ts";
@@ -26,6 +27,7 @@ router.use(createQaLlmRouter());
 router.use(createQaReviewRouter());
 router.use(createQaActionRouter());
 router.use(createQaEvaluationRouter());
+router.use(createQaPilotRouter());
 
 export const qaPlugin: BackendPlugin<QaService> = {
   manifest: qaManifest,
