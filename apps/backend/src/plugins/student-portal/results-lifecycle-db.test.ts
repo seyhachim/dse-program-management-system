@@ -27,12 +27,11 @@ dbDescribe("finalized result correction database integrity", () => {
       where: { id: { not: actor.id } },
       select: { id: true },
     });
-    const course = await prisma.course.findFirstOrThrow({
-      where: { specs: { some: { reviewStatus: "Approved" } } },
-      select: { id: true },
-    });
     const spec = await prisma.courseSpec.findFirstOrThrow({
-      where: { courseId: course.id, reviewStatus: "Approved" },
+      where: {
+        reviewStatus: "Approved",
+        assessmentItems: { some: { status: "Active" } },
+      },
       orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
       include: { assessmentItems: { where: { status: "Active" }, orderBy: { order: "asc" } } },
     });
@@ -41,7 +40,7 @@ dbDescribe("finalized result correction database integrity", () => {
 
     const offering = await prisma.offering.create({
       data: {
-        courseId: course.id,
+        courseId: spec.courseId,
         lecturerId: actor.id,
         term: `issue333-${suffix}`,
         sectionCode: `I333-${suffix.slice(0, 8)}`,
