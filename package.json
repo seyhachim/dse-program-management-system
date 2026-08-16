@@ -8,9 +8,12 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "bun run db:generate",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "test": "bun test",
+    "test:backend": "bun test apps/backend",
     "typecheck": "turbo run typecheck",
     "db:migrate": "bun run --cwd apps/backend db:migrate",
     "db:migrate:deploy": "bun run --cwd apps/backend db:migrate:deploy",
