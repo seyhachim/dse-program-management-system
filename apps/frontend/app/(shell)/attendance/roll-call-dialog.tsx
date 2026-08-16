@@ -19,6 +19,7 @@ import {
   getAttendanceCounts,
   getNextIndex,
   getPreviousIndex,
+  getSkipFeedback,
   getUnmarkedStudentIds,
 } from "./roll-call-state";
 
@@ -158,7 +159,7 @@ export function RollCallDialog({
 
   function skip() {
     if (!current) return;
-    setFeedback(`${current.studentName} skipped and left Unmarked.`);
+    setFeedback(getSkipFeedback(current));
     setIndex((currentIndex) => getNextIndex(currentIndex, sequence.length));
   }
 
@@ -274,7 +275,10 @@ export function RollCallDialog({
                     </h3>
                     <p className="mt-4 font-mono text-base text-muted-foreground">{current.studentNumber}</p>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      Current status: <span className="font-medium text-foreground">{current.status === "Excused" ? "Excused Absence" : current.status ?? "Unmarked"}</span>
+                      Current status:{" "}
+                      <span className="font-medium text-foreground">
+                        {current.status === "Excused" ? "Excused Absence" : current.status ?? "Unmarked"}
+                      </span>
                     </p>
                   </div>
 
@@ -292,7 +296,9 @@ export function RollCallDialog({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <Icon className="h-6 w-6" />
-                            <kbd className="rounded border border-current/20 px-1.5 py-0.5 text-[11px] font-semibold opacity-80">{action.shortcut}</kbd>
+                            <kbd className="rounded border border-current/20 px-1.5 py-0.5 text-[11px] font-semibold opacity-80">
+                              {action.shortcut}
+                            </kbd>
                           </div>
                           <div className="mt-3 font-semibold">{action.label}</div>
                           {selected ? (
@@ -310,10 +316,14 @@ export function RollCallDialog({
                     >
                       <div className="flex items-start justify-between gap-2">
                         <SkipForward className="h-6 w-6" />
-                        <kbd className="rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">S</kbd>
+                        <kbd className="rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                          S
+                        </kbd>
                       </div>
                       <div className="mt-3 font-semibold">Skip</div>
-                      <div className="mt-1 text-xs text-muted-foreground">Leave Unmarked</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {current.status === null ? "Leave Unmarked" : "Keep existing status"}
+                      </div>
                     </button>
                   </div>
 
@@ -412,7 +422,11 @@ export function RollCallDialog({
 
 function SummaryRow({ label, value, emphasized = false }: { label: string; value: number; emphasized?: boolean }) {
   return (
-    <div className={`flex items-center justify-between rounded-md px-3 py-2 ${emphasized ? "bg-status-upcoming-bg" : "bg-background"}`}>
+    <div
+      className={`flex items-center justify-between rounded-md px-3 py-2 ${
+        emphasized ? "bg-status-upcoming-bg" : "bg-background"
+      }`}
+    >
       <span className={emphasized ? "font-medium text-foreground" : "text-muted-foreground"}>{label}</span>
       <span className="font-semibold tabular-nums text-foreground">{value}</span>
     </div>
