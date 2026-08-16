@@ -54,6 +54,9 @@ export function createStudentPortalRouter(): Router {
   router.get("/manage/offerings", requirePermission("courses:write"), async (req, res) => {
     try { res.json(await studentPortalService.deliveryOfferings(req.user!.id, programmeWide(req.user!.roles))); } catch (error) { handleError(error, res); }
   });
+  router.get("/manage/results/review/:offeringId", requirePermission("courses:write"), async (req, res) => {
+    try { res.json(await resultsLifecycleService.review(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!)); } catch (error) { handleError(error, res); }
+  });
   router.post("/manage/announcements", requirePermission("courses:write"), async (req, res) => {
     const parsed = PublishAnnouncementInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid announcement", details: parsed.error.flatten() });
