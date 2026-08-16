@@ -11,6 +11,7 @@ import { qaService } from "../service.ts";
 import { createQaEvaluationScenario } from "./service.ts";
 
 type EvidenceInput = z.infer<typeof QaEvaluationScenarioEvidenceInputSchema>;
+type PrimitiveAttributes = Record<string, string | number | boolean | null>;
 type ChallengeMode = "omit" | "incomplete" | "stale" | "ambiguous" | "conflicting" | "partialCoverage";
 
 interface Challenge {
@@ -71,7 +72,7 @@ const completeText: Record<string, string> = {
   "supporting-cv": "The current staff CV records qualifications and experience relevant to the assigned teaching area.",
 };
 
-function completeAttributes(evidenceType: string): Record<string, string | number | boolean | null> {
+function completeAttributes(evidenceType: string): PrimitiveAttributes {
   switch (evidenceType) {
     case "educational-philosophy":
       return { items: 1 };
@@ -107,7 +108,7 @@ function completeAttributes(evidenceType: string): Record<string, string | numbe
   }
 }
 
-function incompleteAttributes(evidenceType: string) {
+function incompleteAttributes(evidenceType: string): PrimitiveAttributes {
   switch (evidenceType) {
     case "clo-plo-mappings":
     case "course-clo-plo-coverage":
@@ -164,7 +165,7 @@ function buildEvidenceForDefinition(options: {
 
   return Array.from({ length: count }, (_, index) => {
     let text = completeText[definition.evidenceType] ?? `Controlled evidence record for ${definition.description}`;
-    let attributes = completeAttributes(definition.evidenceType);
+    let attributes: PrimitiveAttributes = completeAttributes(definition.evidenceType);
 
     if (challenged && challenge.mode === "incomplete") {
       text = `The controlled record is present, but one or more required fields or mappings are incomplete for ${definition.description}`;
