@@ -1,6 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { CourseType, PrismaClient, Semester } from "@prisma/client";
+import type { SaveCurriculumDraftInput } from "@dse-pms/shared-types";
+import { curriculumDraftService } from "./curriculum-draft-service.ts";
 import {
+  CurriculumConflictError,
   InvalidCurriculumRevisionError,
   curriculumService,
 } from "./curriculum-service.ts";
@@ -238,6 +241,190 @@ describeDb("programme curriculum revision/read service", () => {
     });
     expect(result.years[0]?.semesters[0]?.courses[0]?.credits).toBe(3);
     expect(result.years[0]?.semesters[0]?.courses[0]?.courseType).toBe("Basic");
+  });
+
+  test("atomically edits Draft metadata and placements and records audit actions", async () => {
+    const { user, programme, token } = await createBase();
+    const initial = await curriculumService.createInitial(programme.id, user.id, {
+      code: `EDIT-${token}`,
+      name: `Editable Curriculum ${token}`,
+      cohortLabel: "Original cohort",
+      intakeYear: 2026,
+      academicYear: "2026-2027",
+      effectiveFrom: null,
+    });
+    const course = await prisma.course.create({
+      data: {
+        programmeId: programme.id,
+        code: `EDIT-COURSE-${token}`,
+        title: "Editable course",
+        credits: 3,
+        courseType: CourseType.Core,
+      },
+    });
+
+    const saved = await curriculumDraftService.save(
+      initial.curriculum.id,
+      initial.selectedVersion.id,
+      user.id,
+      {
+        expectedUpdatedAt: initial.selectedVersion.updatedAt,
+        cohortLabel: "2027 intake",
+        intakeYear: 2027,
+        academicYear: "2027-2028",
+        effectiveFrom: "2027-09-01",
+        placements: [
+          {
+            courseId: course.id,
+            yearLevel: 2,
+            semester: "Second",
+            credits: 5,
+            courseType: "Specialization",
+            sortOrder: 0,
+          },
+        ],
+      },
+    );
+
+    expect(saved.selectedVersion.cohortLabel).toBe("2027 intake");
+    expect(saved.selectedVersion.updatedAt).not.toBe(initial.selectedVersion.updatedAt);
+    expect(saved.totals.programmeCredits).toBe(5);
+    expect(saved.years[1]?.semesters[1]?.courses[0]).toMatchObject({
+      courseId: course.id,
+      credits: 5,
+      courseType: "Specialization",
+    });
+
+    const actions = await prisma.programmeCurriculumAuditAction.findMany({
+      where: { curriculumVersionId: initial.selectedVersion.id },
+      select: { action: true },
+    });
+    expect(actions.map((action) => action.action)).toContain("MetadataUpdated");
+    expect(actions.map((action) => action.action)).toContain("CourseAdded");
+  });
+
+  test("rejects stale Draft saves instead of overwriting newer work", async () => {
+    const { user, programme, token } = await createBase();
+    const initial = await curriculumService.createInitial(programme.id, user.id, {
+      code: `STALE-${token}`,
+      name: `Stale Curriculum ${token}`,
+      cohortLabel: "Original",
+      intakeYear: 2026,
+      academicYear: "2026-2027",
+      effectiveFrom: null,
+    });
+    const input: SaveCurriculumDraftInput = {
+      expectedUpdatedAt: initial.selectedVersion.updatedAt,
+      cohortLabel: "First save",
+      intakeYear: 2026,
+      academicYear: "2026-2027",
+      effectiveFrom: null,
+      placements: [],
+    };
+
+    await curriculumDraftService.save(
+      initial.curriculum.id,
+      initial.selectedVersion.id,
+      user.id,
+      input,
+    );
+
+    await expect(
+      curriculumDraftService.save(
+        initial.curriculum.id,
+        initial.selectedVersion.id,
+        user.id,
+        { ...input, cohortLabel: "Stale overwrite" },
+      ),
+    ).rejects.toBeInstanceOf(CurriculumConflictError);
+  });
+
+  test("never edits Approved curriculum snapshots", async () => {
+    const { user, programme, token } = await createBase();
+    const initial = await curriculumService.createInitial(programme.id, user.id, {
+      code: `LOCKED-${token}`,
+      name: `Locked Curriculum ${token}`,
+      cohortLabel: "Original cohort",
+      intakeYear: 2026,
+      academicYear: "2026-2027",
+      effectiveFrom: null,
+    });
+    await approve(initial.selectedVersion.id);
+    const approved = await curriculumService.getById(
+      initial.curriculum.id,
+      initial.selectedVersion.id,
+    );
+
+    await expect(
+      curriculumDraftService.save(
+        initial.curriculum.id,
+        initial.selectedVersion.id,
+        user.id,
+        {
+          expectedUpdatedAt: approved.selectedVersion.updatedAt,
+          cohortLabel: "Must not change",
+          intakeYear: 2030,
+          academicYear: "2030-2031",
+          effectiveFrom: null,
+          placements: [],
+        },
+      ),
+    ).rejects.toBeInstanceOf(InvalidCurriculumRevisionError);
+
+    const unchanged = await curriculumService.getById(
+      initial.curriculum.id,
+      initial.selectedVersion.id,
+    );
+    expect(unchanged.selectedVersion.cohortLabel).toBe("Original cohort");
+  });
+
+  test("rejects placements that reference another programme", async () => {
+    const { user, programme, token } = await createBase();
+    const initial = await curriculumService.createInitial(programme.id, user.id, {
+      code: `SCOPE-${token}`,
+      name: `Scoped Curriculum ${token}`,
+      cohortLabel: "",
+      intakeYear: null,
+      academicYear: "",
+      effectiveFrom: null,
+    });
+    const otherProgramme = await prisma.programme.create({
+      data: { id: `other-${token}`, code: `OT${token}`, name: `Other ${token}` },
+    });
+    const otherCourse = await prisma.course.create({
+      data: {
+        programmeId: otherProgramme.id,
+        code: `OTHER-${token}`,
+        title: "Wrong programme course",
+        credits: 3,
+        courseType: CourseType.Core,
+      },
+    });
+
+    await expect(
+      curriculumDraftService.save(
+        initial.curriculum.id,
+        initial.selectedVersion.id,
+        user.id,
+        {
+          expectedUpdatedAt: initial.selectedVersion.updatedAt,
+          cohortLabel: "",
+          intakeYear: null,
+          academicYear: "",
+          effectiveFrom: null,
+          placements: [
+            {
+              courseId: otherCourse.id,
+              yearLevel: 1,
+              semester: "First",
+              credits: 3,
+              courseType: "Core",
+              sortOrder: 0,
+            },
+          ],
+        },
+      ),
+    ).rejects.toBeInstanceOf(InvalidCurriculumRevisionError);
   });
 });
 
