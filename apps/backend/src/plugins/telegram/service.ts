@@ -88,6 +88,7 @@ export function createTelegramService(
         telegramUser: verified.telegramUser,
         authDate: verified.authDate.toISOString(),
         expiresAt: verified.expiresAt.toISOString(),
+        linked: false,
       };
     },
   };
