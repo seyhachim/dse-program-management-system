@@ -1,5 +1,7 @@
 import type {
   AddCurriculumCourseInput,
+  CurriculumComparison,
+  CurriculumVersionHistory,
   CurriculumVersionSummary,
   CurriculumWorkflowState,
   ProgrammeCurriculumRead,
@@ -55,6 +57,13 @@ export const curriculumApi = {
   },
   activate(versionId: string, comment = ""): Promise<CurriculumWorkflowState> {
     return api.post<CurriculumWorkflowState>(`${workflowPath(versionId)}/activate`, { comment });
+  },
+  history(curriculumId: string): Promise<CurriculumVersionHistory> {
+    return api.get<CurriculumVersionHistory>(`/api/programme/curricula/${encodeURIComponent(curriculumId)}/history`);
+  },
+  compare(curriculumId: string, fromVersionId: string, toVersionId: string): Promise<CurriculumComparison> {
+    const query = new URLSearchParams({ fromVersionId, toVersionId }).toString();
+    return api.get<CurriculumComparison>(`/api/programme/curricula/${encodeURIComponent(curriculumId)}/compare?${query}`);
   },
 };
 
