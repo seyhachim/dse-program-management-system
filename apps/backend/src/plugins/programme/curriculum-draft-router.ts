@@ -25,18 +25,24 @@ function canWriteProgramme(
   return hasAnyRoleInProgramme(user, [...WRITE_ROLES], programmeId);
 }
 
-async function getPlacementProgrammeId(placementId: string) {
+async function getPlacementScope(placementId: string) {
   const placement = await prisma.programmeCurriculumCourse.findUnique({
     where: { id: placementId },
     select: {
       curriculumVersion: {
         select: {
+          id: true,
           curriculum: { select: { programmeId: true } },
         },
       },
     },
   });
-  return placement?.curriculumVersion.curriculum.programmeId ?? null;
+  return placement
+    ? {
+        versionId: placement.curriculumVersion.id,
+        programmeId: placement.curriculumVersion.curriculum.programmeId,
+      }
+    : null;
 }
 
 function sendError(res: Parameters<Parameters<Router["post"]>[1]>[1], error: unknown) {
@@ -105,24 +111,23 @@ export function createCurriculumDraftRouter(): Router {
       }
       try {
         const context = await curriculumDraftService.getDraftContext(versionId);
-        const placementProgrammeId = await getPlacementProgrammeId(placementId);
-        if (!placementProgrammeId) {
+        const placementScope = await getPlacementScope(placementId);
+        if (!placementScope) {
           res.status(404).json({ error: "Curriculum course placement not found" });
           return;
         }
+        if (placementScope.versionId !== versionId) {
+          res.status(409).json({ error: "Placement does not belong to the selected curriculum version" });
+          return;
+        }
         if (
-          placementProgrammeId !== context.curriculum.programmeId ||
-          !canWriteProgramme(req.user, placementProgrammeId)
+          placementScope.programmeId !== context.curriculum.programmeId ||
+          !canWriteProgramme(req.user, placementScope.programmeId)
         ) {
           res.status(403).json({ error: "No curriculum write access for this placement" });
           return;
         }
-        const result = await curriculumDraftService.updateCourse(placementId, req.user.id, parsed.data);
-        if (result.selectedVersion.id !== versionId) {
-          res.status(409).json({ error: "Placement does not belong to the selected curriculum version" });
-          return;
-        }
-        res.json(result);
+        res.json(await curriculumDraftService.updateCourse(placementId, req.user.id, parsed.data));
       } catch (error) {
         sendError(res, error);
       }
@@ -147,24 +152,23 @@ export function createCurriculumDraftRouter(): Router {
       }
       try {
         const context = await curriculumDraftService.getDraftContext(versionId);
-        const placementProgrammeId = await getPlacementProgrammeId(placementId);
-        if (!placementProgrammeId) {
+        const placementScope = await getPlacementScope(placementId);
+        if (!placementScope) {
           res.status(404).json({ error: "Curriculum course placement not found" });
           return;
         }
+        if (placementScope.versionId !== versionId) {
+          res.status(409).json({ error: "Placement does not belong to the selected curriculum version" });
+          return;
+        }
         if (
-          placementProgrammeId !== context.curriculum.programmeId ||
-          !canWriteProgramme(req.user, placementProgrammeId)
+          placementScope.programmeId !== context.curriculum.programmeId ||
+          !canWriteProgramme(req.user, placementScope.programmeId)
         ) {
           res.status(403).json({ error: "No curriculum write access for this placement" });
           return;
         }
-        const result = await curriculumDraftService.removeCourse(placementId, req.user.id, parsed.data.reason);
-        if (result.selectedVersion.id !== versionId) {
-          res.status(409).json({ error: "Placement does not belong to the selected curriculum version" });
-          return;
-        }
-        res.json(result);
+        res.json(await curriculumDraftService.removeCourse(placementId, req.user.id, parsed.data.reason));
       } catch (error) {
         sendError(res, error);
       }
