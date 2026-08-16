@@ -14,6 +14,7 @@
     "lint": "turbo run lint",
     "test": "bun test",
     "test:backend": "bun test apps/backend",
+    "test:backend:integration": "bun test apps/backend/src/integration/auth-authorization.integration.test.ts",
     "typecheck": "turbo run typecheck",
     "db:migrate": "bun run --cwd apps/backend db:migrate",
     "db:migrate:deploy": "bun run --cwd apps/backend db:migrate:deploy",
