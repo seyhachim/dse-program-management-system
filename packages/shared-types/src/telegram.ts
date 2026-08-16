@@ -61,7 +61,7 @@ export const TelegramInitDataVerifyResponseSchema = z.object({
   telegramUser: TelegramVerifiedUserSchema,
   authDate: z.string().regex(ISO_DATE_TIME_PATTERN),
   expiresAt: z.string().regex(ISO_DATE_TIME_PATTERN),
-  linked: z.boolean().default(false),
+  linked: z.boolean().optional(),
   sessionToken: z.string().min(1).optional(),
   sessionExpiresAt: z.string().regex(ISO_DATE_TIME_PATTERN).optional(),
   roles: z.array(TelegramMiniRoleSchema).optional(),
