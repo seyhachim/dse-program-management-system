@@ -58,7 +58,7 @@ jobs:
           echo "Issue #127 tracks replacing the broken Next.js 'next lint' command with a reliable ESLint command."
 
   database:
-    name: Fresh database migration and seed
+    name: Fresh database migration, seed, and security
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -95,6 +95,43 @@ jobs:
       - name: Generate Prisma Client
         run: bun run db:generate
 
+      # Reproduce the Supabase-side risk on ordinary PostgreSQL. The migration
+      # series must remove broad Data API-role grants/defaults in both public and
+      # custom backend-only application schemas.
+      - name: Simulate Supabase Data API roles and defaults
+        run: |
+          cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+              CREATE ROLE service_role NOLOGIN;
+            END IF;
+          END
+          $$;
+
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+
+          CREATE SCHEMA IF NOT EXISTS telegram_security;
+          GRANT USAGE, CREATE ON SCHEMA telegram_security TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+          SQL
+
       - name: Apply migrations
         run: bun run db:migrate:deploy
 
@@ -110,3 +147,61 @@ jobs:
         run: bun test apps/backend/src/plugins/programme/curriculum-service-db.test.ts
         env:
           CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify database security
+        run: bun run --cwd apps/backend db:security:verify
+
+      - name: Prove verifier rejects an unclassified public table
+        run: |
+          echo 'CREATE TABLE public."SecurityVerifierProbe" ("id" text PRIMARY KEY);' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted an unclassified public table."
+            exit 1
+          fi
+
+          echo 'DROP TABLE public."SecurityVerifierProbe";' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects an unclassified Telegram security table
+        run: |
+          echo 'CREATE TABLE telegram_security."SecurityVerifierProbe" ("id" text PRIMARY KEY);' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted an unclassified Telegram security table."
+            exit 1
+          fi
+
+          echo 'DROP TABLE telegram_security."SecurityVerifierProbe";' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects a forbidden Data API grant
+        run: |
+          echo 'GRANT SELECT ON TABLE public."User" TO authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted a forbidden authenticated grant."
+            exit 1
+          fi
+
+          echo 'REVOKE SELECT ON TABLE public."User" FROM authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects a forbidden protected-schema grant
+        run: |
+          echo 'GRANT USAGE ON SCHEMA telegram_security TO authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted a forbidden Telegram schema grant."
+            exit 1
+          fi
+
+          echo 'REVOKE USAGE ON SCHEMA telegram_security FROM authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Verify database security after fail-closed probes
+        run: bun run --cwd apps/backend db:security:verify
