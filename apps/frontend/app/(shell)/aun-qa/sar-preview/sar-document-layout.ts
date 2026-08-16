@@ -91,8 +91,8 @@ export function buildSarDocumentLayout(model: QaSarDocumentModelView): SarDocume
         missingMessage: section.content
           ? null
           : model.mode === "official"
-            ? "No approved submission yet; excluded from the official SAR."
-            : "SAR writing has not started.",
+            ? "No approved submission; excluded from official SAR"
+            : "SAR writing has not started",
         blocks: section.content?.blocks.map((block): SarLayoutBlock => {
           if (block.type === "heading") {
             return { id: block.id, type: "heading", text: block.text, level: block.level };
