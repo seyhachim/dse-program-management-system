@@ -14,6 +14,7 @@ import {
   type Role,
 } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import { createCurriculumDraftRouter } from "./curriculum-draft-router.ts";
 import {
   CurriculumConflictError,
   CurriculumNotFoundError,
@@ -58,6 +59,7 @@ export function createProgrammeRouter(): Router {
   const router = Router();
 
   router.use(requireAuth);
+  router.use("/curricula", createCurriculumDraftRouter());
 
   router.get("/", requirePermission("programme:read"), async (_req, res) => {
     try {
