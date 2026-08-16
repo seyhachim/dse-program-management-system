@@ -287,7 +287,6 @@ model QaRequirement {
   order       Int
 
   evidenceMappings QaEvidenceMapping[]
-  evaluationScenarios QaEvaluationScenario[]
   assessments      QaRequirementAssessment[]
   expectations     QaQualityExpectation[]
   analyses         QaEvidenceAnalysis[]
@@ -317,6 +316,7 @@ model QaQualityExpectation {
   expectedEvidence QaExpectedEvidence[]
   analyses         QaEvidenceAnalysis[]
   evidenceMappings QaEvidenceMapping[]
+  evaluationScenarios QaEvaluationScenario[]
 
   @@unique([requirementId, order])
   @@index([requirementId, active])
