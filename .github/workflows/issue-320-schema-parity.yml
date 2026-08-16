@@ -25,40 +25,25 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('apps/backend/prisma/schema.prisma')
           text = path.read_text()
 
-          placement_anchor = '''  courseId            String
-          course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
-          yearLevel           Int'''
-          placement_replacement = '''  courseId            String
-          course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
-          courseSpecVersionId String?
-          courseSpecVersion   CourseSpec?                 @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)
-          yearLevel           Int'''
-          assert text.count(placement_anchor) == 1, 'ProgrammeCurriculumCourse field anchor changed'
-          text = text.replace(placement_anchor, placement_replacement)
+          pattern = r'(model ProgrammeCurriculumCourse \{.*?\n\s+courseId\s+String\n\s+course\s+Course\s+@relation\([^\n]+\)\n)(\s+yearLevel\s+Int)'
+          replacement = r'\1  courseSpecVersionId String?\n  courseSpecVersion   CourseSpec?                 @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)\n\2'
+          text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+          assert count == 1, 'ProgrammeCurriculumCourse field anchor changed'
 
-          placement_index_anchor = '''  @@unique([curriculumVersionId, courseId])
-          @@index([courseId])
-          @@index([curriculumVersionId, yearLevel, semester, sortOrder])'''
-          placement_index_replacement = '''  @@unique([curriculumVersionId, courseId])
-          @@index([courseId])
-          @@index([courseSpecVersionId])
-          @@index([curriculumVersionId, yearLevel, semester, sortOrder])'''
-          assert text.count(placement_index_anchor) == 1, 'ProgrammeCurriculumCourse index anchor changed'
-          text = text.replace(placement_index_anchor, placement_index_replacement)
+          pattern = r'(model ProgrammeCurriculumCourse \{.*?@@unique\(\[curriculumVersionId, courseId\]\)\n\s+@@index\(\[courseId\]\)\n)(\s+@@index\(\[curriculumVersionId, yearLevel, semester, sortOrder\]\))'
+          replacement = r'\1  @@index([courseSpecVersionId])\n\2'
+          text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+          assert count == 1, 'ProgrammeCurriculumCourse index anchor changed'
 
-          spec_anchor = '''  reviewActions           CourseSpecReviewAction[]
-
-          approvedAt      DateTime?'''
-          spec_replacement = '''  reviewActions           CourseSpecReviewAction[]
-          curriculumPlacements ProgrammeCurriculumCourse[] @relation("ProgrammeCurriculumCourseSpecVersion")
-
-          approvedAt      DateTime?'''
-          assert text.count(spec_anchor) == 1, 'CourseSpec relation anchor changed'
-          text = text.replace(spec_anchor, spec_replacement)
+          pattern = r'(model CourseSpec \{.*?\n\s+reviewActions\s+CourseSpecReviewAction\[\]\n)(\n\s+approvedAt\s+DateTime\?)'
+          replacement = r'\1  curriculumPlacements     ProgrammeCurriculumCourse[] @relation("ProgrammeCurriculumCourseSpecVersion")\n\2'
+          text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+          assert count == 1, 'CourseSpec relation anchor changed'
 
           path.write_text(text)
           PY
