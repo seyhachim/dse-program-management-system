@@ -24,9 +24,7 @@ export type TelegramHealthResponse = z.infer<typeof TelegramHealthResponseSchema
 export const TelegramInitDataVerifyRequestSchema = z.object({
   initData: z.string().min(1).max(16_384),
 });
-export type TelegramInitDataVerifyRequest = z.infer<
-  typeof TelegramInitDataVerifyRequestSchema
->;
+export type TelegramInitDataVerifyRequest = z.infer<typeof TelegramInitDataVerifyRequestSchema>;
 
 export const TelegramVerifiedUserSchema = z.object({
   id: z.string().regex(/^\d+$/),
@@ -68,9 +66,7 @@ export const TelegramInitDataVerifyResponseSchema = z.object({
   sessionExpiresAt: z.string().regex(ISO_DATE_TIME_PATTERN).optional(),
   roles: z.array(TelegramMiniRoleSchema).optional(),
 });
-export type TelegramInitDataVerifyResponse = z.infer<
-  typeof TelegramInitDataVerifyResponseSchema
->;
+export type TelegramInitDataVerifyResponse = z.infer<typeof TelegramInitDataVerifyResponseSchema>;
 
 export const TelegramLinkRequestSchema = z.object({
   verificationId: z.string().regex(UUID_PATTERN),
@@ -84,15 +80,13 @@ export const TelegramCourseCardSchema = z.object({
   sectionCode: z.string(),
   term: z.string(),
   role: z.enum(["student", "lecturer"]),
-  nextMeeting: z
-    .object({
-      dayOfWeek: z.string(),
-      startTime: z.string(),
-      endTime: z.string(),
-      room: z.string().nullable(),
-      activityType: z.string(),
-    })
-    .nullable(),
+  nextMeeting: z.object({
+    dayOfWeek: z.string(),
+    startTime: z.string(),
+    endTime: z.string(),
+    room: z.string().nullable(),
+    activityType: z.string(),
+  }).nullable(),
 });
 export type TelegramCourseCard = z.infer<typeof TelegramCourseCardSchema>;
 
@@ -110,9 +104,7 @@ export const TelegramHomeResponseSchema = z.object({
 });
 export type TelegramHomeResponse = z.infer<typeof TelegramHomeResponseSchema>;
 
-export const TelegramScheduleResponseSchema = z.object({
-  courses: z.array(TelegramCourseCardSchema),
-});
+export const TelegramScheduleResponseSchema = z.object({ courses: z.array(TelegramCourseCardSchema) });
 export type TelegramScheduleResponse = z.infer<typeof TelegramScheduleResponseSchema>;
 
 export const TelegramAnnouncementSchema = z.object({
@@ -153,7 +145,7 @@ export const TelegramSurveySubmitSchema = z.object({
   overallRating: z.number().int().min(1).max(5),
   teachingClarityRating: z.number().int().min(1).max(5),
   assessmentClarityRating: z.number().int().min(1).max(5),
-  workload: z.enum(["light", "reasonable", "heavy"]),
+  workload: z.enum(["light", "appropriate", "heavy"]),
   positiveComment: z.string().max(2000).default(""),
   improvementComment: z.string().max(2000).default(""),
 });
@@ -168,9 +160,7 @@ export const TelegramInitVerificationErrorCodeSchema = z.enum([
   "TELEGRAM_LINK_CONFLICT",
   "TELEGRAM_SESSION_INVALID",
 ]);
-export type TelegramInitVerificationErrorCode = z.infer<
-  typeof TelegramInitVerificationErrorCodeSchema
->;
+export type TelegramInitVerificationErrorCode = z.infer<typeof TelegramInitVerificationErrorCodeSchema>;
 
 export const TelegramInitVerificationErrorSchema = z.object({
   error: z.object({
@@ -178,9 +168,7 @@ export const TelegramInitVerificationErrorSchema = z.object({
     message: z.string().min(1),
   }),
 });
-export type TelegramInitVerificationError = z.infer<
-  typeof TelegramInitVerificationErrorSchema
->;
+export type TelegramInitVerificationError = z.infer<typeof TelegramInitVerificationErrorSchema>;
 
 export const telegramManifest: PluginManifest = {
   id: "telegram",
