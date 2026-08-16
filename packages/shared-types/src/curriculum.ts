@@ -70,6 +70,43 @@ export type CreateCurriculumRevisionInput = z.infer<
   typeof CreateCurriculumRevisionSchema
 >;
 
+const CurriculumPlacementLocationSchema = z.object({
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  sortOrder: z.number().int().min(0).default(0),
+});
+
+export const AddCurriculumCourseSchema = CurriculumPlacementLocationSchema.extend({
+  courseId: z.string().uuid(),
+  credits: z.number().int().min(0).optional(),
+  courseType: CourseTypeSchema.optional(),
+});
+export type AddCurriculumCourseInput = z.infer<typeof AddCurriculumCourseSchema>;
+
+export const UpdateCurriculumCourseSchema = CurriculumPlacementLocationSchema.extend({
+  credits: z.number().int().min(0).optional(),
+  courseType: CourseTypeSchema.optional(),
+});
+export type UpdateCurriculumCourseInput = z.infer<
+  typeof UpdateCurriculumCourseSchema
+>;
+
+export const ReorderCurriculumCoursesSchema = z.object({
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  placementIds: z.array(z.string().uuid()).min(1),
+});
+export type ReorderCurriculumCoursesInput = z.infer<
+  typeof ReorderCurriculumCoursesSchema
+>;
+
+export const RemoveCurriculumCourseSchema = z.object({
+  reason: z.string().trim().min(1).max(1000),
+});
+export type RemoveCurriculumCourseInput = z.infer<
+  typeof RemoveCurriculumCourseSchema
+>;
+
 export const CurriculumCourseSchema = z.object({
   placementId: z.string().uuid(),
   courseId: z.string().uuid(),
