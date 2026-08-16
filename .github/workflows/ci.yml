@@ -161,6 +161,11 @@ jobs:
         env:
           CURRICULUM_DB_TESTS: "1"
 
+      - name: Verify curriculum CourseSpec bindings
+        run: bun test apps/backend/src/plugins/programme/curriculum-course-spec-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
       - name: Verify Telegram identity and revocation security
         run: bun test apps/backend/src/plugins/telegram/telegram-security-db.test.ts
         env:
