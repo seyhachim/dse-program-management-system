@@ -87,6 +87,8 @@ const EXPECTED_ATTENDANCE_TABLES = [
   "AttendanceRecord",
 ] as const;
 
+const EXPECTED_TELEGRAM_SECURITY_TABLES = ["TelegramInitVerification"] as const;
+
 const FORBIDDEN_GRANTEES = new Set([
   "PUBLIC",
   "anon",
@@ -139,33 +141,32 @@ function compareInventory(
   return errors;
 }
 
+async function tablesForSchema(schemaName: string): Promise<TableRow[]> {
+  return prisma.$queryRawUnsafe<TableRow[]>(
+    `
+      SELECT
+        n.nspname::text AS schema_name,
+        c.relname::text AS table_name,
+        c.relrowsecurity AS rls_enabled
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = $1
+        AND c.relkind IN ('r', 'p')
+        AND c.relname <> '_prisma_migrations'
+      ORDER BY c.relname
+    `,
+    schemaName,
+  );
+}
+
 async function main(): Promise<void> {
   const errors: string[] = [];
 
-  const publicTables = await prisma.$queryRaw<TableRow[]>`
-    SELECT
-      n.nspname::text AS schema_name,
-      c.relname::text AS table_name,
-      c.relrowsecurity AS rls_enabled
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public'
-      AND c.relkind IN ('r', 'p')
-      AND c.relname <> '_prisma_migrations'
-    ORDER BY c.relname
-  `;
-
-  const attendanceTables = await prisma.$queryRaw<TableRow[]>`
-    SELECT
-      n.nspname::text AS schema_name,
-      c.relname::text AS table_name,
-      c.relrowsecurity AS rls_enabled
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'pms_attendance'
-      AND c.relkind IN ('r', 'p')
-    ORDER BY c.relname
-  `;
+  const [publicTables, attendanceTables, telegramSecurityTables] = await Promise.all([
+    tablesForSchema("public"),
+    tablesForSchema("pms_attendance"),
+    tablesForSchema("telegram_security"),
+  ]);
 
   errors.push(
     ...compareInventory(
@@ -181,8 +182,19 @@ async function main(): Promise<void> {
       attendanceTables.map((table) => table.table_name),
     ),
   );
+  errors.push(
+    ...compareInventory(
+      "telegram_security schema",
+      EXPECTED_TELEGRAM_SECURITY_TABLES,
+      telegramSecurityTables.map((table) => table.table_name),
+    ),
+  );
 
-  for (const table of [...publicTables, ...attendanceTables]) {
+  for (const table of [
+    ...publicTables,
+    ...attendanceTables,
+    ...telegramSecurityTables,
+  ]) {
     if (!table.rls_enabled) {
       errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
     }
@@ -200,7 +212,7 @@ async function main(): Promise<void> {
       COALESCE(c.relacl, acldefault('r', c.relowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security')
       AND c.relkind IN ('r', 'p')
       AND c.relname <> '_prisma_migrations'
       AND (
@@ -229,12 +241,12 @@ async function main(): Promise<void> {
       COALESCE(n.nspacl, acldefault('n', n.nspowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname = 'pms_attendance'
+    WHERE n.nspname IN ('pms_attendance', 'telegram_security')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
       )
-    ORDER BY grantee, acl.privilege_type
+    ORDER BY n.nspname, grantee, acl.privilege_type
   `;
 
   for (const grant of schemaGrants) {
@@ -260,7 +272,7 @@ async function main(): Promise<void> {
     JOIN pg_namespace n ON n.oid = d.defaclnamespace
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
@@ -286,7 +298,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables and ${attendanceTables.length} attendance tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, and ${telegramSecurityTables.length} Telegram security tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 
