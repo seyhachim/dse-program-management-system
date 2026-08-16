@@ -14,7 +14,7 @@ const input = {
 
 describe("Telegram replay store", () => {
   test("stores only a digest and returns a verification id", async () => {
-    let persisted: Record<string, unknown> | undefined;
+    let persisted: unknown;
     const store = createTelegramReplayStore(async (record) => {
       persisted = record;
       return true;
@@ -23,7 +23,9 @@ describe("Telegram replay store", () => {
     const result = await store.record(input);
     expect(result.verificationId).toBeTruthy();
     expect(result.initDataDigest).toMatch(/^[0-9a-f]{64}$/);
-    expect(persisted?.initDataDigest).toBe(result.initDataDigest);
+    expect((persisted as { initDataDigest: string }).initDataDigest).toBe(
+      result.initDataDigest,
+    );
     expect(JSON.stringify(persisted)).not.toContain(input.rawInitData);
   });
 
