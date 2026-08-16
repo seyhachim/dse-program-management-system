@@ -58,6 +58,19 @@ export const curriculumDraftService = {
       );
     }
 
+    const creditsSnapshot = input.credits ?? course.credits;
+    const courseTypeSnapshot = input.courseType ?? course.courseType;
+    if (creditsSnapshot === null) {
+      throw new CurriculumDraftMutationError(
+        "Course credits must be set before the course can be added to a curriculum",
+      );
+    }
+    if (courseTypeSnapshot === null) {
+      throw new CurriculumDraftMutationError(
+        "Course type must be set before the course can be added to a curriculum",
+      );
+    }
+
     try {
       await prisma.$transaction(async (tx) => {
         const placement = await tx.programmeCurriculumCourse.create({
@@ -66,8 +79,8 @@ export const curriculumDraftService = {
             courseId: course.id,
             yearLevel: input.yearLevel,
             semester: input.semester,
-            creditsSnapshot: input.credits ?? course.credits,
-            courseTypeSnapshot: input.courseType ?? course.courseType,
+            creditsSnapshot,
+            courseTypeSnapshot,
             sortOrder: input.sortOrder,
           },
           select: { id: true },
@@ -84,8 +97,8 @@ export const curriculumDraftService = {
               courseCode: course.code,
               yearLevel: input.yearLevel,
               semester: input.semester,
-              credits: input.credits ?? course.credits,
-              courseType: input.courseType ?? course.courseType,
+              credits: creditsSnapshot,
+              courseType: courseTypeSnapshot,
               sortOrder: input.sortOrder,
             },
           },
