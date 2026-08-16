@@ -1,6 +1,8 @@
 import type {
+  CreateCurriculumRevisionInput,
   CurriculumVersionSummary,
   ProgrammeCurriculumRead,
+  SaveCurriculumDraftInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
@@ -31,6 +33,26 @@ export const curriculumApi = {
       : "";
     return api.get<ProgrammeCurriculumRead>(
       `/api/programme/curricula/${encodeURIComponent(curriculumId)}${query}`,
+    );
+  },
+  saveDraft(
+    curriculumId: string,
+    versionId: string,
+    input: SaveCurriculumDraftInput,
+  ): Promise<ProgrammeCurriculumRead> {
+    return api.put<ProgrammeCurriculumRead>(
+      `/api/programme/curricula/${encodeURIComponent(curriculumId)}/versions/${encodeURIComponent(versionId)}/draft`,
+      input,
+    );
+  },
+  createRevision(
+    curriculumId: string,
+    versionId: string,
+    input: CreateCurriculumRevisionInput,
+  ): Promise<ProgrammeCurriculumRead> {
+    return api.post<ProgrammeCurriculumRead>(
+      `/api/programme/curricula/${encodeURIComponent(curriculumId)}/versions/${encodeURIComponent(versionId)}/revisions`,
+      input,
     );
   },
 };
