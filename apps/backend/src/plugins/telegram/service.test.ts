@@ -90,6 +90,7 @@ describe("Telegram service", () => {
       telegramUser: { id: "123", username: "seyha" },
       authDate: "2026-08-16T05:00:00.000Z",
       expiresAt: "2026-08-16T05:05:00.000Z",
+      linked: false,
     });
     expect(replayInput).toMatchObject({
       rawInitData: "signed-data",
