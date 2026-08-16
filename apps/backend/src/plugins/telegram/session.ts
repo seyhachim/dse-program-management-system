@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import type { NextFunction, Request, Response } from "express";
-import type { Role } from "../../core/auth/token.ts";
+import type { ProgrammeRoleAssignment, Role } from "../../core/auth/token.ts";
 import { prisma } from "../../core/db/prisma.ts";
 import { telegramIdentityStore, type TelegramIdentityRecord } from "./identity-store.ts";
 
@@ -11,6 +11,7 @@ export interface TelegramSessionUser {
   name: string;
   email: string;
   roles: Role[];
+  programmeRoles: ProgrammeRoleAssignment[];
   identity: TelegramIdentityRecord;
 }
 
@@ -62,10 +63,22 @@ export async function resolveTelegramSession(token: string): Promise<TelegramSes
     include: { roleAssignments: { include: { role: true } } },
   });
   if (!user) throw new Error("PMS user no longer exists");
-  const roles = user.roleAssignments.map((assignment) => assignment.role.slug as Role);
+
+  const programmeRoles = user.roleAssignments.map((assignment) => ({
+    role: assignment.role.slug as Role,
+    programmeId: assignment.programmeId,
+  }));
+  const roles = [...new Set(programmeRoles.map((assignment) => assignment.role))];
   if (!roles.length) throw new Error("PMS user has no active roles");
 
-  return { id: user.id, name: user.name, email: user.email, roles, identity };
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    roles,
+    programmeRoles,
+    identity,
+  };
 }
 
 export async function requireTelegramSession(
