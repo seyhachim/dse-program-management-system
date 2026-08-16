@@ -1,0 +1,74 @@
+name: Issue 320 Prisma schema parity
+
+on:
+  push:
+    branches:
+      - feat/320-curriculum-course-spec-binding
+    paths:
+      - .github/workflows/issue-320-schema-parity.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-schema:
+    if: github.repository == 'thymadona/dse-program-management-system'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/320-curriculum-course-spec-binding
+
+      - name: Add exact CourseSpec relation to Prisma schema
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/backend/prisma/schema.prisma')
+          text = path.read_text()
+
+          placement_anchor = '''  courseId            String
+          course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+          yearLevel           Int'''
+          placement_replacement = '''  courseId            String
+          course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+          courseSpecVersionId String?
+          courseSpecVersion   CourseSpec?                 @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)
+          yearLevel           Int'''
+          assert text.count(placement_anchor) == 1, 'ProgrammeCurriculumCourse field anchor changed'
+          text = text.replace(placement_anchor, placement_replacement)
+
+          placement_index_anchor = '''  @@unique([curriculumVersionId, courseId])
+          @@index([courseId])
+          @@index([curriculumVersionId, yearLevel, semester, sortOrder])'''
+          placement_index_replacement = '''  @@unique([curriculumVersionId, courseId])
+          @@index([courseId])
+          @@index([courseSpecVersionId])
+          @@index([curriculumVersionId, yearLevel, semester, sortOrder])'''
+          assert text.count(placement_index_anchor) == 1, 'ProgrammeCurriculumCourse index anchor changed'
+          text = text.replace(placement_index_anchor, placement_index_replacement)
+
+          spec_anchor = '''  reviewActions           CourseSpecReviewAction[]
+
+          approvedAt      DateTime?'''
+          spec_replacement = '''  reviewActions           CourseSpecReviewAction[]
+          curriculumPlacements ProgrammeCurriculumCourse[] @relation("ProgrammeCurriculumCourseSpecVersion")
+
+          approvedAt      DateTime?'''
+          assert text.count(spec_anchor) == 1, 'CourseSpec relation anchor changed'
+          text = text.replace(spec_anchor, spec_replacement)
+
+          path.write_text(text)
+          PY
+
+      - name: Commit schema parity
+        shell: bash
+        run: |
+          git config user.name "Seyha Chim"
+          git config user.email "32429415+seyhachim@users.noreply.github.com"
+          git add apps/backend/prisma/schema.prisma
+          git diff --cached --check
+          git commit -m "feat(curriculum): represent CourseSpec binding in Prisma schema"
+          git push origin HEAD:feat/320-curriculum-course-spec-binding
