@@ -5,13 +5,16 @@ import Link from "next/link";
 import { CheckCircle2, Download, FileWarning, LockKeyhole, RefreshCw } from "lucide-react";
 import type {
   QaDashboardView,
-  QaSarBlock,
   QaSarDocumentModelView,
   QaSarDocumentMode,
   QaSarReleaseView,
 } from "@dse-pms/shared-types";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
+import {
+  buildSarDocumentLayout,
+  type SarLayoutBlock,
+} from "./sar-document-layout";
 import { exportSarDocx, exportSarPdf } from "./sar-export";
 
 const PROGRAMME_ID = "dse";
@@ -88,6 +91,7 @@ export function SarPreviewClient() {
     return <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">No assessment cycle is available for SAR preview.</div>;
   }
 
+  const layout = buildSarDocumentLayout(model);
   const officialReady = model.mode === "official" && model.totals.missingSections === 0 && model.totals.requiredSections > 0;
 
   return (
@@ -145,14 +149,16 @@ export function SarPreviewClient() {
 
       <article className="rounded-2xl border bg-white px-6 py-8 shadow-sm md:px-10">
         <header className="border-b pb-6 text-center">
-          <div className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Self-Assessment Report</div>
-          <h1 className="mt-3 text-2xl font-bold">{model.programmeName}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{model.cycleTitle}</p>
-          {mode === "working" ? <div className="mt-3 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">WORKING DRAFT</div> : null}
+          <div className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">{layout.title}</div>
+          <h1 className="mt-3 text-2xl font-bold">{layout.programmeName}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{layout.cycleTitle}</p>
+          <div className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-semibold ${layout.mode === "working" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+            {layout.modeLabel}
+          </div>
         </header>
 
         <div className="mt-8 space-y-10">
-          {model.criteria.map((criterion) => (
+          {layout.criteria.map((criterion) => (
             <section key={criterion.code}>
               <h2 className="text-xl font-bold">Criterion {criterion.code}: {criterion.title}</h2>
               <div className="mt-5 space-y-7">
@@ -160,16 +166,16 @@ export function SarPreviewClient() {
                   <div key={section.requirementCode} className="border-l-2 border-slate-200 pl-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <h3 className="font-semibold">{section.requirementCode} {section.requirementTitle}</h3>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${section.status === "approved" ? "bg-emerald-50 text-emerald-700" : section.status === "missing" ? "bg-slate-100 text-slate-500" : "bg-amber-50 text-amber-700"}`}>{section.status}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${section.status === "approved" ? "bg-emerald-50 text-emerald-700" : section.status === "missing" ? "bg-slate-100 text-slate-500" : "bg-amber-50 text-amber-700"}`}>{section.statusLabel}</span>
                     </div>
-                    {section.content ? (
-                      <div className="mt-3 space-y-3 text-sm leading-7 text-slate-800">
-                        {section.content.blocks.map((block) => <RenderedBlock key={block.id} block={block} />)}
-                      </div>
+                    {section.missingMessage ? (
+                      <div className="mt-3 rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-muted-foreground">{section.missingMessage}</div>
                     ) : (
-                      <div className="mt-3 rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-muted-foreground">{mode === "official" ? "No approved submission yet; excluded from the official SAR." : "SAR writing has not started."}</div>
+                      <div className="mt-3 space-y-3 text-sm leading-7 text-slate-800">
+                        {section.blocks.map((block) => <RenderedBlock key={block.id} block={block} />)}
+                      </div>
                     )}
-                    {section.submissionVersion ? <div className="mt-2 text-[11px] text-muted-foreground">Approved submission v{section.submissionVersion}</div> : null}
+                    {section.submissionLabel ? <div className="mt-2 text-[11px] text-muted-foreground">{section.submissionLabel}</div> : null}
                   </div>
                 ))}
               </div>
@@ -184,15 +190,15 @@ export function SarPreviewClient() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="py-2 pr-4">Evidence</th><th className="py-2 pr-4">Period</th><th className="py-2 pr-4">Used in</th><th className="py-2">Source</th></tr></thead>
               <tbody className="divide-y">
-                {model.evidenceRegister.map((item, index) => (
+                {layout.evidenceRows.map((item) => (
                   <tr key={item.evidenceId}>
-                    <td className="py-3 pr-4"><span className="font-mono text-xs text-muted-foreground">E{String(index + 1).padStart(3, "0")}</span> <span className="font-medium">{item.title}</span></td>
-                    <td className="py-3 pr-4">{item.reportingPeriod || "—"}</td>
-                    <td className="py-3 pr-4">{item.requirementCodes.join(", ")}</td>
-                    <td className="py-3">{item.sourceRef || item.sourceUrl || "—"}</td>
+                    <td className="py-3 pr-4"><span className="font-mono text-xs text-muted-foreground">{item.number}</span> <span className="font-medium">{item.title}</span></td>
+                    <td className="py-3 pr-4">{item.reportingPeriod}</td>
+                    <td className="py-3 pr-4">{item.requirementCodes}</td>
+                    <td className="py-3">{item.source}</td>
                   </tr>
                 ))}
-                {model.evidenceRegister.length === 0 ? <tr><td colSpan={4} className="py-5 text-center text-muted-foreground">No explicit evidence references are included in this document.</td></tr> : null}
+                {layout.evidenceRows.length === 0 ? <tr><td colSpan={4} className="py-5 text-center text-muted-foreground">No explicit evidence references are included in this document.</td></tr> : null}
               </tbody>
             </table>
           </div>
@@ -224,10 +230,10 @@ function Metric({ label, value, warning = false }: { label: string; value: numbe
   return <div className="rounded-xl border bg-white p-4 shadow-sm"><div className="text-sm text-muted-foreground">{label}</div><div className={`mt-2 text-2xl font-semibold ${warning ? "text-amber-700" : ""}`}>{value}</div></div>;
 }
 
-function RenderedBlock({ block }: { block: QaSarBlock }) {
+function RenderedBlock({ block }: { block: SarLayoutBlock }) {
   if (block.type === "heading") return <h4 className={block.level === 2 ? "text-lg font-semibold" : "font-semibold"}>{block.text}</h4>;
   if (block.type === "bullet") return <div className="flex gap-2"><span>•</span><p>{block.text}</p></div>;
-  if (block.type === "evidenceReference") return <span className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800">Evidence: {block.label}</span>;
-  if (block.type === "pmsData") return <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-800">PMS data: {block.label}</div>;
+  if (block.type === "evidenceReference") return <span className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800">{block.text}</span>;
+  if (block.type === "pmsData") return <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-800">{block.text}</div>;
   return <p className="whitespace-pre-wrap">{block.text}</p>;
 }
