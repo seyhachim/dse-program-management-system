@@ -9,7 +9,10 @@ CREATE TABLE "CourseSpecCriterionCloMapping" (
   "rubricContentHash" TEXT NOT NULL,
   "cloCode" TEXT NOT NULL,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "CourseSpecCriterionCloMapping_pkey" PRIMARY KEY ("courseSpecId", "assessmentItemId", "rubricId", "criterionId", "cloCode")
+  CONSTRAINT "CourseSpecCriterionCloMapping_pkey" PRIMARY KEY ("courseSpecId", "assessmentItemId", "rubricId", "criterionId", "cloCode"),
+  CONSTRAINT "CourseSpecCriterionCloMapping_criterionName_not_blank" CHECK (length(btrim("criterionName")) > 0),
+  CONSTRAINT "CourseSpecCriterionCloMapping_rubricContentHash_not_blank" CHECK (length(btrim("rubricContentHash")) > 0),
+  CONSTRAINT "CourseSpecCriterionCloMapping_cloCode_not_blank" CHECK (length(btrim("cloCode")) > 0)
 );
 CREATE INDEX "CourseSpecCriterionCloMapping_courseSpecId_assessmentItemId_cloCode_idx" ON "CourseSpecCriterionCloMapping"("courseSpecId", "assessmentItemId", "cloCode");
 CREATE INDEX "CourseSpecCriterionCloMapping_rubricId_criterionId_idx" ON "CourseSpecCriterionCloMapping"("rubricId", "criterionId");
@@ -28,7 +31,12 @@ CREATE TABLE "AssessmentCriterionScore" (
   "rubricLevelLabel" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
-  CONSTRAINT "AssessmentCriterionScore_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "AssessmentCriterionScore_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "AssessmentCriterionScore_score_nonnegative" CHECK ("score" >= 0),
+  CONSTRAINT "AssessmentCriterionScore_maxScore_positive" CHECK ("maxScore" > 0),
+  CONSTRAINT "AssessmentCriterionScore_score_lte_maxScore" CHECK ("score" <= "maxScore"),
+  CONSTRAINT "AssessmentCriterionScore_criterionName_not_blank" CHECK (length(btrim("criterionName")) > 0),
+  CONSTRAINT "AssessmentCriterionScore_rubricContentHash_not_blank" CHECK (length(btrim("rubricContentHash")) > 0)
 );
 CREATE UNIQUE INDEX "AssessmentCriterionScore_assessmentResultId_rubricId_criterionId_key" ON "AssessmentCriterionScore"("assessmentResultId", "rubricId", "criterionId");
 CREATE INDEX "AssessmentCriterionScore_assessmentResultId_idx" ON "AssessmentCriterionScore"("assessmentResultId");
