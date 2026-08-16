@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { PluginManifest } from "./plugins.ts";
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ISO_DATE_TIME_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+
 export const TelegramPublicConfigSchema = z.object({
   enabled: z.boolean(),
   botUsername: z.string().min(1).optional(),
@@ -34,10 +39,10 @@ export type TelegramVerifiedUser = z.infer<typeof TelegramVerifiedUserSchema>;
 
 export const TelegramInitDataVerifyResponseSchema = z.object({
   verified: z.literal(true),
-  verificationId: z.string().uuid(),
+  verificationId: z.string().regex(UUID_PATTERN),
   telegramUser: TelegramVerifiedUserSchema,
-  authDate: z.string().datetime(),
-  expiresAt: z.string().datetime(),
+  authDate: z.string().regex(ISO_DATE_TIME_PATTERN),
+  expiresAt: z.string().regex(ISO_DATE_TIME_PATTERN),
 });
 export type TelegramInitDataVerifyResponse = z.infer<
   typeof TelegramInitDataVerifyResponseSchema
