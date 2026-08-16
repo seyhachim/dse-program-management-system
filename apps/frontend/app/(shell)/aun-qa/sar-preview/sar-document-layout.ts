@@ -43,6 +43,8 @@ export type SarDocumentLayout = {
     reportingPeriod: string;
     requirementCodes: string;
     source: string;
+    referenceCode: string | null;
+    externalUrl: string | null;
   }>;
 };
 
@@ -129,7 +131,11 @@ export function buildSarDocumentLayout(model: QaSarDocumentModelView): SarDocume
       title: item.title,
       reportingPeriod: item.reportingPeriod || "—",
       requirementCodes: item.requirementCodes.join(", "),
-      source: item.sourceRef || item.sourceUrl || "—",
+      source: item.referenceCode
+        ? `${item.referenceCode}${item.externalUrl ? ` · ${item.externalUrl}` : ""}`
+        : item.sourceRef || item.sourceUrl || "—",
+      referenceCode: item.referenceCode ?? null,
+      externalUrl: item.externalUrl ?? null,
     })),
   };
 }
