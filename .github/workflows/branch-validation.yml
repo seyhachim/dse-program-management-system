@@ -42,3 +42,7 @@ jobs:
       - run: bun run --cwd apps/backend seed
       - run: bun apps/backend/scripts/qa-evaluation-smoke.ts
       - run: bun run build
+        env:
+          NEXT_PUBLIC_AUTH_MODE: supabase
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
