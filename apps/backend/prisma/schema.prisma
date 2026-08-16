@@ -87,6 +87,43 @@ enum CourseSpecRevisionTrigger {
   Other
 }
 
+enum ProgrammeCurriculumStatus {
+  Draft
+  Approved
+  Active
+  Superseded
+}
+
+enum ProgrammeCurriculumRevisionType {
+  Initial
+  Minor
+  Major
+}
+
+enum ProgrammeCurriculumRevisionTrigger {
+  ScheduledReview
+  StudentFeedback
+  AlumniFeedback
+  EmployerFeedback
+  LecturerReflection
+  ProgrammeCoordinator
+  ExternalExaminer
+  QaFinding
+  RegulatoryChange
+  Other
+}
+
+enum ProgrammeCurriculumAuditActionType {
+  Created
+  MetadataUpdated
+  CourseAdded
+  CourseUpdated
+  CourseRemoved
+  Approved
+  Activated
+  Superseded
+}
+
 /// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
 /// normalized CLO row.
 enum CloRowStatus {
@@ -175,28 +212,30 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed               Course[]                   @relation("CourseLecturer")
-  offeringsLed             Offering[]                 @relation("OfferingLecturer")
-  rubricsOwned             Rubric[]                   @relation("RubricOwner")
-  coLecturerOf             OfferingCoLecturer[]       @relation("OfferingCoLecturer")
+  coursesLed               Course[]                         @relation("CourseLecturer")
+  offeringsLed             Offering[]                       @relation("OfferingLecturer")
+  rubricsOwned             Rubric[]                         @relation("RubricOwner")
+  coLecturerOf             OfferingCoLecturer[]             @relation("OfferingCoLecturer")
   roleAssignments          UserRoleAssignment[]
-  courseSpecSubmissions    CourseSpec[]               @relation("CourseSpecSubmittedBy")
-  courseSpecReviewActions  CourseSpecReviewAction[]   @relation("CourseSpecReviewActor")
+  courseSpecSubmissions    CourseSpec[]                     @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions  CourseSpecReviewAction[]         @relation("CourseSpecReviewActor")
+  curriculumVersionsCreated ProgrammeCurriculumVersion[]    @relation("ProgrammeCurriculumVersionCreatedBy")
+  curriculumAuditActions   ProgrammeCurriculumAuditAction[] @relation("ProgrammeCurriculumAuditActor")
   studentProfile           Student?
-  announcementsAuthored    CourseAnnouncement[]       @relation("AnnouncementAuthor")
-  qaCyclesCreated          QaAssessmentCycle[]        @relation("QaCycleCreator")
-  qaEvidenceCreated        QaEvidence[]               @relation("QaEvidenceCreator")
-  qaEvidenceMappings       QaEvidenceMapping[]        @relation("QaEvidenceMapper")
-  qaAssessmentsReviewed    QaRequirementAssessment[]  @relation("QaAssessmentReviewer")
-  qaAnalysisReviews        QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
-  qaRequirementAssignments QaRequirementAssignment[]  @relation("QaRequirementAssignee")
-  qaAssignmentsCreated     QaRequirementAssignment[]  @relation("QaRequirementAssignedBy")
-  qaSarSectionsUpdated     QaSarSection[]             @relation("QaSarSectionUpdatedBy")
-  qaSarSubmissions         QaSarSubmission[]          @relation("QaSarSubmittedBy")
-  qaSarReviews             QaSarReview[]              @relation("QaSarReviewer")
-  qaSarReleasesFinalized   QaSarRelease[]             @relation("QaSarReleaseFinalizedBy")
-  qaEvaluationGoldReviews  QaEvaluationScenario[]      @relation("QaEvaluationGoldReviewer")
-  qaEvaluationRatings      QaEvaluationHumanRating[]   @relation("QaEvaluationHumanReviewer")
+  announcementsAuthored    CourseAnnouncement[]             @relation("AnnouncementAuthor")
+  qaCyclesCreated          QaAssessmentCycle[]              @relation("QaCycleCreator")
+  qaEvidenceCreated        QaEvidence[]                     @relation("QaEvidenceCreator")
+  qaEvidenceMappings       QaEvidenceMapping[]              @relation("QaEvidenceMapper")
+  qaAssessmentsReviewed    QaRequirementAssessment[]        @relation("QaAssessmentReviewer")
+  qaAnalysisReviews        QaEvidenceAnalysisReview[]       @relation("QaAnalysisReviewer")
+  qaRequirementAssignments QaRequirementAssignment[]        @relation("QaRequirementAssignee")
+  qaAssignmentsCreated     QaRequirementAssignment[]        @relation("QaRequirementAssignedBy")
+  qaSarSectionsUpdated     QaSarSection[]                   @relation("QaSarSectionUpdatedBy")
+  qaSarSubmissions         QaSarSubmission[]                @relation("QaSarSubmittedBy")
+  qaSarReviews             QaSarReview[]                    @relation("QaSarReviewer")
+  qaSarReleasesFinalized   QaSarRelease[]                   @relation("QaSarReleaseFinalizedBy")
+  qaEvaluationGoldReviews  QaEvaluationScenario[]           @relation("QaEvaluationGoldReviewer")
+  qaEvaluationRatings      QaEvaluationHumanRating[]        @relation("QaEvaluationHumanReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -232,6 +271,7 @@ model Programme {
 
   roleAssignments          UserRoleAssignment[]
   courses                  Course[]
+  curricula                ProgrammeCurriculum[]
   qaCycles                 QaAssessmentCycle[]
   qaEvidence               QaEvidence[]
   qaEvidenceMappings       QaEvidenceMapping[]
@@ -243,6 +283,98 @@ model Programme {
   qaSarSections            QaSarSection[]
   qaSarSubmissions         QaSarSubmission[]
   qaSarReleases            QaSarRelease[]
+}
+
+/// Canonical curriculum identity for one programme. Versions are immutable
+/// academic snapshots once approved; the root remains stable across revisions.
+model ProgrammeCurriculum {
+  id          String     @id @default(uuid())
+  programmeId String
+  programme   Programme  @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  code        String
+  name        String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  versions ProgrammeCurriculumVersion[]
+
+  @@unique([programmeId, code])
+  @@index([programmeId])
+}
+
+/// One academic version of a programme curriculum. `versionMajor` and
+/// `versionMinor` form the authoritative version identity; API/domain code
+/// renders them as `major.minor`. Approved/Active/Superseded rows are immutable.
+model ProgrammeCurriculumVersion {
+  id               String                             @id @default(uuid())
+  curriculumId     String
+  curriculum       ProgrammeCurriculum                @relation(fields: [curriculumId], references: [id], onDelete: Restrict)
+  versionMajor     Int                                @default(1)
+  versionMinor     Int                                @default(0)
+  status           ProgrammeCurriculumStatus          @default(Draft)
+  revisionType     ProgrammeCurriculumRevisionType    @default(Initial)
+  revisionTriggers ProgrammeCurriculumRevisionTrigger[] @default([])
+  revisionReason   String                             @default("")
+  changeSummary    String                             @default("")
+  basedOnVersionId String?
+  basedOnVersion   ProgrammeCurriculumVersion?        @relation("ProgrammeCurriculumVersionHistory", fields: [basedOnVersionId], references: [id], onDelete: Restrict)
+  derivedVersions  ProgrammeCurriculumVersion[]       @relation("ProgrammeCurriculumVersionHistory")
+  cohortLabel      String                             @default("")
+  intakeYear       Int?
+  academicYear     String                             @default("")
+  effectiveFrom    DateTime?                          @db.Date
+  approvedAt       DateTime?
+  createdById      String
+  createdBy        User                               @relation("ProgrammeCurriculumVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt        DateTime                           @default(now())
+  updatedAt        DateTime                           @updatedAt
+
+  courses      ProgrammeCurriculumCourse[]
+  auditActions ProgrammeCurriculumAuditAction[]
+
+  @@unique([curriculumId, versionMajor, versionMinor])
+  @@index([curriculumId, status])
+  @@index([basedOnVersionId])
+  @@index([createdById])
+}
+
+/// A course's placement in one exact curriculum version. Credits and course type
+/// are copied when the placement is created so later edits to Course cannot
+/// rewrite historical curriculum evidence.
+model ProgrammeCurriculumCourse {
+  id                  String                     @id @default(uuid())
+  curriculumVersionId String
+  curriculumVersion   ProgrammeCurriculumVersion @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
+  courseId            String
+  course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  yearLevel           Int
+  semester            Semester
+  creditsSnapshot     Int
+  courseTypeSnapshot  CourseType
+  sortOrder           Int                        @default(0)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@unique([curriculumVersionId, courseId])
+  @@index([courseId])
+  @@index([curriculumVersionId, yearLevel, semester, sortOrder])
+}
+
+/// Append-only workflow/revision history for curriculum versions. Database
+/// triggers reject UPDATE/DELETE so corrections are represented by new actions.
+model ProgrammeCurriculumAuditAction {
+  id                  String                             @id @default(uuid())
+  curriculumVersionId String
+  curriculumVersion   ProgrammeCurriculumVersion         @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
+  actorId             String
+  actor               User                               @relation("ProgrammeCurriculumAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action              ProgrammeCurriculumAuditActionType
+  note                String                             @default("")
+  details             Json?
+  createdAt           DateTime                           @default(now())
+
+  @@index([curriculumVersionId, createdAt])
+  @@index([actorId])
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -286,13 +418,13 @@ model QaRequirement {
   title       String
   order       Int
 
-  evidenceMappings QaEvidenceMapping[]
-  assessments      QaRequirementAssessment[]
-  expectations     QaQualityExpectation[]
-  analyses         QaEvidenceAnalysis[]
-  assignments      QaRequirementAssignment[]
-  sarSections      QaSarSection[]
-  sarSubmissions   QaSarSubmission[]
+  evidenceMappings    QaEvidenceMapping[]
+  assessments         QaRequirementAssessment[]
+  expectations        QaQualityExpectation[]
+  analyses            QaEvidenceAnalysis[]
+  assignments         QaRequirementAssignment[]
+  sarSections         QaSarSection[]
+  sarSubmissions      QaSarSubmission[]
   evaluationScenarios QaEvaluationScenario[]
 
   @@unique([criterionId, code])
@@ -313,9 +445,9 @@ model QaQualityExpectation {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now())
 
-  expectedEvidence QaExpectedEvidence[]
-  analyses         QaEvidenceAnalysis[]
-  evidenceMappings QaEvidenceMapping[]
+  expectedEvidence    QaExpectedEvidence[]
+  analyses            QaEvidenceAnalysis[]
+  evidenceMappings    QaEvidenceMapping[]
   evaluationScenarios QaEvaluationScenario[]
 
   @@unique([requirementId, order])
@@ -725,7 +857,7 @@ model QaEvaluationScenarioEvidence {
   reportingDate DateTime?
   attributes    Json                 @default("{}")
   goldRelevant  Boolean?
-  runLinks       QaEvaluationRunEvidence[]
+  runLinks      QaEvaluationRunEvidence[]
 
   @@unique([scenarioId, order])
   @@index([scenarioId, goldRelevant])
@@ -968,8 +1100,9 @@ model Course {
   programme     Programme   @relation(fields: [programmeId], references: [id], onDelete: Restrict)
   createdAt     DateTime    @default(now())
 
-  offerings Offering[]
-  specs     CourseSpec[]
+  offerings            Offering[]
+  specs                CourseSpec[]
+  curriculumPlacements ProgrammeCurriculumCourse[]
 
   @@index([lecturerId])
   @@index([programmeId])
@@ -1536,11 +1669,11 @@ model ActiveLearningCluster {
 /// Programme-managed active-learning vocabulary. `id` is the stable slug already
 /// stored by CourseSpecTeachingLearning and CourseSpecClo, so existing specs need no rewrite.
 model ActiveLearningStrategy {
-  id        String                @id
+  id        String                 @id
   name      String
   clusterId String
   cluster   ActiveLearningCluster @relation(fields: [clusterId], references: [id], onDelete: Restrict)
-  sortOrder Int                   @default(0)
+  sortOrder Int                    @default(0)
   active    Boolean               @default(true)
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
