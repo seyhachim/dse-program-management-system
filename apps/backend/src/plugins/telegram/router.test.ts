@@ -60,11 +60,15 @@ async function verify(body: unknown) {
   });
 }
 
+async function jsonBody(response: Response): Promise<Record<string, any>> {
+  return (await response.json()) as Record<string, any>;
+}
+
 describe("Telegram router", () => {
   test("returns public configuration without secrets", async () => {
     const response = await fetch(`${baseUrl}/api/telegram/config`);
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body = await jsonBody(response);
     expect(body).toEqual({
       enabled: true,
       botUsername: "DSEPMSBot",
@@ -78,14 +82,14 @@ describe("Telegram router", () => {
   test("returns local integration readiness", async () => {
     const response = await fetch(`${baseUrl}/api/telegram/health`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, enabled: true, configured: true });
+    expect(await jsonBody(response)).toEqual({ ok: true, enabled: true, configured: true });
   });
 
   test("returns the verified pre-link identity contract", async () => {
     verifyFailure = undefined;
     const response = await verify({ initData: "signed-init-data" });
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body = await jsonBody(response);
     expect(body).toEqual({
       verified: true,
       verificationId: "550e8400-e29b-41d4-a716-446655440000",
@@ -102,7 +106,7 @@ describe("Telegram router", () => {
     for (const body of [{}, { initData: "" }]) {
       const response = await verify(body);
       expect(response.status).toBe(400);
-      expect((await response.json()).error.code).toBe("INVALID_INIT_DATA");
+      expect((await jsonBody(response)).error.code).toBe("INVALID_INIT_DATA");
     }
   });
 
@@ -110,7 +114,7 @@ describe("Telegram router", () => {
     verifyFailure = new TelegramInitDataError("INVALID_INIT_DATA", "sensitive detail");
     const response = await verify({ initData: "signed-init-data" });
     expect(response.status).toBe(401);
-    const body = await response.json();
+    const body = await jsonBody(response);
     expect(body.error.code).toBe("INVALID_INIT_DATA");
     expect(JSON.stringify(body)).not.toContain("sensitive detail");
   });
@@ -119,20 +123,20 @@ describe("Telegram router", () => {
     verifyFailure = new TelegramInitDataError("INIT_DATA_EXPIRED", "sensitive detail");
     const response = await verify({ initData: "signed-init-data" });
     expect(response.status).toBe(401);
-    expect((await response.json()).error.code).toBe("INIT_DATA_EXPIRED");
+    expect((await jsonBody(response)).error.code).toBe("INIT_DATA_EXPIRED");
   });
 
   test("maps replayed valid init data to 409", async () => {
     verifyFailure = new TelegramInitDataReplayError();
     const response = await verify({ initData: "signed-init-data" });
     expect(response.status).toBe(409);
-    expect((await response.json()).error.code).toBe("INIT_DATA_REPLAYED");
+    expect((await jsonBody(response)).error.code).toBe("INIT_DATA_REPLAYED");
   });
 
   test("fails closed when Telegram is disabled", async () => {
     verifyFailure = new TelegramDisabledError();
     const response = await verify({ initData: "signed-init-data" });
     expect(response.status).toBe(503);
-    expect((await response.json()).error.code).toBe("TELEGRAM_DISABLED");
+    expect((await jsonBody(response)).error.code).toBe("TELEGRAM_DISABLED");
   });
 });
