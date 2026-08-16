@@ -54,24 +54,25 @@ export const telegramNotificationService = {
   async deliverAnnouncement(input: {
     announcementId: string;
     offeringId: string;
-    courseCode: string;
     title: string;
     body: string;
   }) {
+    const offering = await prisma.offering.findUnique({
+      where: { id: input.offeringId },
+      select: { course: { select: { code: true } } },
+    });
+    if (!offering) return;
     const recipients = await eligibleAnnouncementRecipients(input.offeringId);
     const eventKey = `announcement:${input.announcementId}`;
     const deepLink = createTelegramDeepLink(`/telegram/classes/${encodeURIComponent(input.offeringId)}?announcement=${encodeURIComponent(input.announcementId)}`);
 
-    // Notification delivery is intentionally best-effort. Every attempt is
-    // persisted, but a transient Telegram outage must never roll back the PMS
-    // announcement transaction that already succeeded.
     await Promise.allSettled(recipients.map(async (recipient) => {
       const deliveryId = await claimDelivery(recipient.identityId, eventKey, input.announcementId);
       if (!deliveryId) return;
       try {
         const messageId = await sendTelegramMessage(
           recipient.telegramUserId,
-          `${input.courseCode}: ${input.title}\n\n${input.body}`,
+          `${offering.course.code}: ${input.title}\n\n${input.body}`,
           deepLink,
         );
         await prisma.$executeRaw`
