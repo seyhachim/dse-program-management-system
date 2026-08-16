@@ -3,6 +3,7 @@ import { requireAuth } from "../../../core/auth/middleware.ts";
 import { requirePermission } from "../../../core/permissions/index.ts";
 import { QaLlmProviderError } from "../analysis/llm-provider.ts";
 import { QaEvaluationResourceNotFoundError } from "./service.ts";
+import { getQaPilotMetrics } from "./pilot-metrics.ts";
 import { initializeQaPilotScenarios } from "./pilot-scenarios.ts";
 import {
   QaPilotLlmOutputValidationError,
@@ -45,6 +46,14 @@ export function createQaPilotRouter(): Router {
   router.get("/evaluation/pilot/status", requirePermission("qa:read"), async (_req, res) => {
     try {
       res.json(await getQaPilotStatus());
+    } catch (error) {
+      sendPilotError(res, error);
+    }
+  });
+
+  router.get("/evaluation/pilot/metrics", requirePermission("qa:read"), async (_req, res) => {
+    try {
+      res.json(await getQaPilotMetrics());
     } catch (error) {
       sendPilotError(res, error);
     }
