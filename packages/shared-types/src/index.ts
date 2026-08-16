@@ -21,6 +21,7 @@ export * from "./qa.ts";
 export * from "./qa-knowledge.ts";
 export * from "./qa-evidence-candidates.ts";
 export * from "./qa-evidence-library.ts";
+export * from "./qa-evidence-sharing.ts";
 export * from "./qa-analysis.ts";
 export * from "./qa-documents.ts";
 export * from "./qa-llm.ts";
