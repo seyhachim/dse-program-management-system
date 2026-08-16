@@ -62,6 +62,10 @@ async function createDraftVersion(
   });
 }
 
+function asPromise<T>(value: PromiseLike<T>): Promise<T> {
+  return Promise.resolve(value);
+}
+
 describeDb("programme curriculum database invariants", () => {
   test("creates initial 1.0 draft metadata", async () => {
     const fixture = await createFixture();
@@ -119,7 +123,7 @@ describeDb("programme curriculum database invariants", () => {
 
     await prisma.programmeCurriculumCourse.create({ data: placement });
     await expect(
-      prisma.programmeCurriculumCourse.create({ data: placement }),
+      asPromise(prisma.programmeCurriculumCourse.create({ data: placement })),
     ).rejects.toMatchObject({ code: "P2002" });
   });
 
@@ -128,17 +132,19 @@ describeDb("programme curriculum database invariants", () => {
     const version = await createDraftVersion(fixture);
 
     await expect(
-      prisma.programmeCurriculumCourse.create({
-        data: {
-          curriculumVersionId: version.id,
-          courseId: fixture.course.id,
-          yearLevel,
-          semester: Semester.First,
-          creditsSnapshot: 3,
-          courseTypeSnapshot: CourseType.Core,
-        },
-      }),
-    ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      asPromise(
+        prisma.programmeCurriculumCourse.create({
+          data: {
+            curriculumVersionId: version.id,
+            courseId: fixture.course.id,
+            yearLevel,
+            semester: Semester.First,
+            creditsSnapshot: 3,
+            courseTypeSnapshot: CourseType.Core,
+          },
+        }),
+      ),
+    ).rejects.toThrow("ProgrammeCurriculumCourse_yearLevel_check");
   });
 
   test("reuses the canonical Semester enum", async () => {
@@ -168,7 +174,7 @@ describeDb("programme curriculum database invariants", () => {
         revisionReason: "",
         changeSummary: "",
       }),
-    ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    ).rejects.toThrow("ProgrammeCurriculumVersion_revision_metadata_check");
   });
 
   test("predecessor resolves and must belong to the same curriculum", async () => {
@@ -246,10 +252,12 @@ describeDb("programme curriculum database invariants", () => {
     });
 
     await expect(
-      prisma.programmeCurriculumCourse.update({
-        where: { id: placement.id },
-        data: { yearLevel: 4 },
-      }),
+      asPromise(
+        prisma.programmeCurriculumCourse.update({
+          where: { id: placement.id },
+          data: { yearLevel: 4 },
+        }),
+      ),
     ).rejects.toThrow("Cannot mutate course placements of an immutable curriculum version");
   });
 
@@ -262,7 +270,9 @@ describeDb("programme curriculum database invariants", () => {
     });
 
     await expect(
-      prisma.programmeCurriculumVersion.delete({ where: { id: version.id } }),
+      asPromise(
+        prisma.programmeCurriculumVersion.delete({ where: { id: version.id } }),
+      ),
     ).rejects.toThrow(
       "Approved, Active, and Superseded curriculum versions cannot be deleted",
     );
@@ -281,10 +291,12 @@ describeDb("programme curriculum database invariants", () => {
     });
 
     await expect(
-      prisma.programmeCurriculumAuditAction.update({
-        where: { id: action.id },
-        data: { note: "rewritten" },
-      }),
+      asPromise(
+        prisma.programmeCurriculumAuditAction.update({
+          where: { id: action.id },
+          data: { note: "rewritten" },
+        }),
+      ),
     ).rejects.toThrow("Programme curriculum audit actions are append-only");
   });
 });
