@@ -49,6 +49,7 @@ Course-spec data includes normalized structures for CLOs, assessments, CLO align
 │   ├── config/                # Shared TypeScript/configuration
 │   ├── shared-types/          # Shared schemas, types and plugin contracts
 │   └── ui/                    # Shared UI components
+├── AGENTS.md                  # Canonical verification and agent workflow
 ├── DEPLOY.md                  # Deployment and Supabase Auth guide
 ├── package.json               # Root workspace commands
 └── turbo.json                 # Turborepo task configuration
@@ -84,7 +85,7 @@ GET /health
 
 Install:
 
-- [Bun](https://bun.sh/) — the repository currently targets Bun `1.2.x`
+- [Bun](https://bun.sh/) `1.2.23`
 - PostgreSQL access — local PostgreSQL or a hosted PostgreSQL database such as Supabase
 - Git
 
@@ -94,9 +95,13 @@ DSE-PMS runs directly with Bun; Docker is not part of the current development wo
 
 ### 1. Install dependencies
 
+From a fresh checkout:
+
 ```bash
-bun install
+bun install --frozen-lockfile
 ```
+
+The root `postinstall` automatically generates Prisma Client. A successful install therefore prepares the generated client needed by typecheck and build; no undocumented manual generation step is required.
 
 ### 2. Configure the backend environment
 
@@ -123,13 +128,13 @@ bun run db:migrate
 For production-style migration deployment:
 
 ```bash
-bun run --cwd apps/backend db:migrate:deploy
+bun run db:migrate:deploy
 ```
 
-If Prisma Client needs regeneration:
+Prisma Client generation is automatic during install, but it can also be rerun explicitly after schema work:
 
 ```bash
-bun run --cwd apps/backend db:generate
+bun run db:generate
 ```
 
 ### 4. Seed development data
@@ -197,9 +202,11 @@ Run these from the repository root unless otherwise noted.
 bun run dev          # Start workspace development servers
 bun run build        # Build all workspaces
 bun run typecheck    # Type-check all workspaces
-bun run lint         # Run workspace lint tasks
-bun test             # Run Bun tests
+bun run lint         # Run the real ESLint gate for lint-enabled workspaces
+bun run test         # Run the complete Bun test suite
+bun run test:backend # Explicitly discover and run backend tests
 bun run db:migrate   # Run Prisma development migrations
+bun run db:generate  # Generate Prisma Client explicitly
 bun run seed         # Seed the backend database
 bun run gen-token    # Generate a local development JWT
 ```
@@ -211,6 +218,7 @@ bun run --cwd apps/backend test
 bun run --cwd apps/backend typecheck
 bun run --cwd apps/backend db:migrate:deploy
 bun run --cwd apps/backend db:generate
+bun run --cwd apps/backend db:security:verify
 ```
 
 Frontend-specific commands:
@@ -218,8 +226,34 @@ Frontend-specific commands:
 ```bash
 bun run --cwd apps/frontend dev
 bun run --cwd apps/frontend typecheck
+bun run --cwd apps/frontend lint
 bun run --cwd apps/frontend build
 ```
+
+## Canonical verification
+
+For a fresh checkout, start with:
+
+```bash
+bun install --frozen-lockfile
+```
+
+Then run the repository definition of done:
+
+```bash
+bunx prisma validate --schema apps/backend/prisma/schema.prisma
+bun run typecheck
+bun run lint
+bun run test
+bun run test:backend
+bun run build
+```
+
+These commands are CI gates. They must return non-zero for real failures. The explicit backend command prevents backend test discovery from silently becoming empty.
+
+A production frontend build requires the Supabase public environment variables described in `DEPLOY.md`; CI supplies non-secret placeholder values so the fail-closed production configuration is exercised without using real credentials.
+
+For Prisma/database changes, also verify the intended upgrade path and a fresh database. CI applies all migrations to PostgreSQL from zero, seeds it, runs curriculum database checks, and verifies the database security posture.
 
 ## Course specification import
 
@@ -255,24 +289,16 @@ feature/fix branch
     ↓
 implementation + migration when needed
     ↓
-typecheck / tests / build
+typecheck / lint / tests / build
     ↓
 Pull Request
     ↓
 review + merge
 ```
 
-Before opening or merging a PR, run the checks relevant to your change. A good repository-level baseline is:
+Before opening or merging a PR, run the canonical verification commands above. If a change modifies Prisma models, also verify migrations against both the intended existing database path and a fresh database where appropriate.
 
-```bash
-bun run typecheck
-bun test
-bun run build
-```
-
-A production frontend build requires the Supabase public environment variables described in `DEPLOY.md`; CI supplies non-secret placeholder values so the fail-closed production configuration is exercised without using real credentials.
-
-If a change modifies Prisma models, also verify migrations against both the intended existing database path and a fresh database where appropriate.
+Before creating or updating a PR, read the root [`pull_request_template.md`](./pull_request_template.md). Before merge, compare the finished PR against both that template and the issue acceptance criteria.
 
 ## Adding or changing a backend plugin
 
@@ -302,7 +328,7 @@ See [`DEPLOY.md`](./DEPLOY.md) for environment variables, database migration ste
 Production database migrations should use:
 
 ```bash
-bun run --cwd apps/backend db:migrate:deploy
+bun run db:migrate:deploy
 ```
 
 Do not run `prisma migrate dev` against the production database.
@@ -314,11 +340,14 @@ Do not run `prisma migrate dev` against the production database.
 - `NEXT_PUBLIC_*` variables are exposed to the browser and must not contain private secrets.
 - `NEXT_PUBLIC_DEV_TOKEN` is forbidden in production frontend builds.
 - Development JWT authentication is forbidden when the backend runs with `NODE_ENV=production`.
+- PMS application tables and protected custom schemas are backend-only; run `bun run --cwd apps/backend db:security:verify` after database-security changes.
 
 ## Documentation
 
+- [`AGENTS.md`](./AGENTS.md) — canonical repository verification and agent workflow
 - [`DEPLOY.md`](./DEPLOY.md) — production deployment and Supabase Auth setup
 - [`CLAUDE.md`](./CLAUDE.md) — repository-specific development guidance and architecture notes
+- [`docs/database-security.md`](./docs/database-security.md) — backend-only database access model and verifier
 
 ## Project status
 

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Typecheck, test, build
+    name: Typecheck, lint, test, build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -28,10 +28,10 @@ jobs:
         with:
           bun-version: 1.2.23
 
-      - name: Install dependencies
+      - name: Install dependencies and generate Prisma Client
         run: bun install --frozen-lockfile
 
-      - name: Generate Prisma Client
+      - name: Generate Prisma Client explicitly
         run: bun run db:generate
 
       - name: Validate Prisma schema
@@ -42,8 +42,14 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Test
-        run: bun test
+      - name: Lint
+        run: bun run lint
+
+      - name: Test all suites
+        run: bun run test
+
+      - name: Verify backend test discovery
+        run: bun run test:backend
 
       - name: Build
         run: bun run build
@@ -51,11 +57,6 @@ jobs:
           NEXT_PUBLIC_AUTH_MODE: supabase
           NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
-
-      - name: Lint status
-        run: |
-          echo "Lint is intentionally not a required CI gate yet."
-          echo "Issue #127 tracks replacing the broken Next.js 'next lint' command with a reliable ESLint command."
 
   database:
     name: Fresh database migration, seed, and security
@@ -89,10 +90,10 @@ jobs:
         with:
           bun-version: 1.2.23
 
-      - name: Install dependencies
+      - name: Install dependencies and generate Prisma Client
         run: bun install --frozen-lockfile
 
-      - name: Generate Prisma Client
+      - name: Generate Prisma Client explicitly
         run: bun run db:generate
 
       # Reproduce the Supabase-side risk on ordinary PostgreSQL. The migration
