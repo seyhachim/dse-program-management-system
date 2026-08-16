@@ -2,12 +2,14 @@ import { Router } from "express";
 import {
   CourseFeedbackInput,
   PublishAnnouncementInput,
-  PublishAssessmentResultInput,
+  PublishAssessmentResultsInput,
+  SaveAssessmentResultInput,
   SetAssessmentDeadlineInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import { resultsLifecycleService } from "./results-lifecycle.ts";
 import {
   PortalAccessError,
   PortalConflictError,
@@ -58,9 +60,14 @@ export function createStudentPortalRouter(): Router {
     try { res.status(201).json(await studentPortalService.publishAnnouncement(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
   });
   router.put("/manage/results", requirePermission("courses:write"), async (req, res) => {
-    const parsed = PublishAssessmentResultInput.safeParse(req.body);
+    const parsed = SaveAssessmentResultInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid result", details: parsed.error.flatten() });
-    try { res.json(await studentPortalService.publishResult(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
+    try { res.json(await resultsLifecycleService.saveDraft(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.post("/manage/results/publish", requirePermission("courses:write"), async (req, res) => {
+    const parsed = PublishAssessmentResultsInput.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid publication request", details: parsed.error.flatten() });
+    try { res.json(await resultsLifecycleService.publishAssessment(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
   });
   router.put("/manage/deadlines", requirePermission("courses:write"), async (req, res) => {
     const parsed = SetAssessmentDeadlineInput.safeParse(req.body);
