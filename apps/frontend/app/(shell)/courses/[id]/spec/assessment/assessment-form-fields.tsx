@@ -51,6 +51,15 @@ export function AssessmentFormFields({
   const selectedRubric = rubrics.find((rubric) => rubric.id === draft.rubricId);
   const missingRubric = draft.rubricId !== "" && !selectedRubric;
   const totalAssessmentSlt = assessmentSltHours(draft);
+  const toggleCriterionClo = (criterionId: string, cloCode: string) => {
+    const current = draft.criterionCloMappings.find((mapping) => mapping.criterionId === criterionId);
+    const selected = current?.cloCodes.includes(cloCode) ?? false;
+    const cloCodes = selected
+      ? (current?.cloCodes ?? []).filter((code) => code !== cloCode)
+      : [...(current?.cloCodes ?? []), cloCode];
+    const other = draft.criterionCloMappings.filter((mapping) => mapping.criterionId !== criterionId);
+    set({ criterionCloMappings: cloCodes.length ? [...other, { criterionId, cloCodes }] : other });
+  };
 
   const toggleTopic = (topic: number) => {
     const next = draft.topicNumbers.includes(topic)
@@ -354,7 +363,7 @@ export function AssessmentFormFields({
           <Field label="Rubric">
             <select
               value={draft.rubricId}
-              onChange={(event) => set({ rubricId: event.target.value })}
+              onChange={(event) => set({ rubricId: event.target.value, criterionCloMappings: [] })}
               className={selectCls}
             >
               <option value="">— No rubric —</option>
@@ -399,12 +408,27 @@ export function AssessmentFormFields({
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
                     {index + 1}
                   </span>
-                  <span className="text-foreground">{criterion.name}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-foreground">{criterion.name}</span>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {draft.cloCodes.map((cloCode) => {
+                        const checked = draft.criterionCloMappings
+                          .find((mapping) => mapping.criterionId === criterion.id)?.cloCodes.includes(cloCode) ?? false;
+                        return (
+                          <label key={`${criterion.id}-${cloCode}`} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs">
+                            <input type="checkbox" checked={checked} onChange={() => toggleCriterionClo(criterion.id, cloCode)} />
+                            {cloCode}
+                          </label>
+                        );
+                      })}
+                      {draft.cloCodes.length === 0 ? <span className="text-xs text-muted-foreground">Select assessment CLOs above first.</span> : null}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
             <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-              Criterion-level CLO evidence is not inferred from the rubric. Until criterion-level student scores are stored, CLO evidence is mapped explicitly at assessment level above.
+              Map only the CLOs each rubric criterion directly measures. Criterion mappings refine evidence traceability and never inherit or reuse the local course-grade weight.
             </div>
           </div>
         ) : (

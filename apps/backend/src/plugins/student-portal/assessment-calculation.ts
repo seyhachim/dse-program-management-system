@@ -84,9 +84,27 @@ export function calculateCourseGrade(
   };
 }
 
+export type CriterionCloEvidenceInput = {
+  assessmentItemId: string;
+  rubricId: string;
+  criterionId: string;
+  criterionName: string;
+  rubricContentHash: string;
+  score: number;
+  maxScore: number;
+  cloCodes: string[];
+};
+
 export type CloEvidenceTrace = {
   assessmentItemId: string;
   rawPercentage: number;
+  source: "assessment" | "criterion";
+  rubricId?: string;
+  criterionId?: string;
+  criterionName?: string;
+  score?: number;
+  maxScore?: number;
+  rubricContentHash?: string;
 };
 
 export type CloAchievementCalculation = {
@@ -103,25 +121,45 @@ export function calculateCloEvidence(
   cloCode: string,
   assessments: GradeAssessment[],
   results: PublishedAssessmentResult[],
+  criterionEvidence: CriterionCloEvidenceInput[] = [],
 ): CloAchievementCalculation {
   const resultByAssessment = new Map(
     results.map((result) => [result.assessmentItemId, result]),
   );
-  const evidence = assessments
+  const criterionForClo = criterionEvidence.filter(
+    (item) => item.cloCodes.includes(cloCode) && item.maxScore > 0,
+  );
+  const criterionAssessmentIds = new Set(
+    criterionForClo.map((item) => item.assessmentItemId),
+  );
+  const criterionTraces: CloEvidenceTrace[] = criterionForClo.map((item) => ({
+    assessmentItemId: item.assessmentItemId,
+    rawPercentage: Math.round((item.score / item.maxScore) * 10000) / 100,
+    source: "criterion",
+    rubricId: item.rubricId,
+    criterionId: item.criterionId,
+    criterionName: item.criterionName,
+    score: item.score,
+    maxScore: item.maxScore,
+    rubricContentHash: item.rubricContentHash,
+  }));
+  const assessmentTraces: CloEvidenceTrace[] = assessments
     .filter(
       (assessment) =>
         assessment.status === "Active" &&
-        assessment.cloCodes.includes(cloCode),
+        assessment.cloCodes.includes(cloCode) &&
+        !criterionAssessmentIds.has(assessment.id),
     )
     .flatMap((assessment) => {
       const result = resultByAssessment.get(assessment.id);
       if (!result || result.maxScore <= 0) return [];
       return [{
         assessmentItemId: assessment.id,
-        rawPercentage:
-          Math.round((result.score / result.maxScore) * 10000) / 100,
+        rawPercentage: Math.round((result.score / result.maxScore) * 10000) / 100,
+        source: "assessment" as const,
       }];
     });
+  const evidence = [...criterionTraces, ...assessmentTraces];
   return {
     percentage: evidence.length
       ? Math.round(
