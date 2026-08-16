@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { TelegramHomeResponse, TelegramInitDataVerifyResponse } from "@dse-pms/shared-types";
 import { API_URL } from "../../lib/api";
@@ -68,12 +69,12 @@ export function TelegramStatus() {
       <div className="space-y-3">
         <p className="font-medium">Link your PMS account</p>
         <p className="text-sm text-slate-600">Telegram has been verified. Sign in to PMS once to confirm which account this Telegram identity belongs to.</p>
-        <a
+        <Link
           href={`/telegram/link?verificationId=${encodeURIComponent(state.verificationId)}`}
           className="inline-flex min-h-11 items-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white"
         >
           Link PMS account
-        </a>
+        </Link>
       </div>
     );
   }
@@ -89,10 +90,10 @@ export function TelegramStatus() {
       </div>
 
       <nav className="grid grid-cols-2 gap-2 text-sm">
-        <a href="/telegram/announcements" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Announcements</a>
-        {student ? <a href="/telegram/results" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Results & CLO</a> : null}
-        {student ? <a href="/telegram/surveys" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Course surveys</a> : null}
-        <a href="/telegram/settings" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Notifications</a>
+        <Link href="/telegram/announcements" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Announcements</Link>
+        {student ? <Link href="/telegram/results" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Results & CLO</Link> : null}
+        {student ? <Link href="/telegram/surveys" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Course surveys</Link> : null}
+        <Link href="/telegram/settings" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Notifications</Link>
       </nav>
 
       <div className="grid grid-cols-3 gap-2 text-center">
@@ -104,13 +105,13 @@ export function TelegramStatus() {
       <div className="space-y-2">
         <h2 className="text-sm font-semibold">Your classes</h2>
         {home.courses.map((course) => (
-          <a key={course.offeringId} href={`/telegram/classes/${course.offeringId}`} className="block rounded-xl border border-slate-200 bg-white p-3">
+          <Link key={course.offeringId} href={`/telegram/classes/${course.offeringId}`} className="block rounded-xl border border-slate-200 bg-white p-3">
             <div className="flex items-start justify-between gap-3">
               <div><p className="font-medium">{course.courseCode}</p><p className="text-sm text-slate-600">{course.courseTitle}</p></div>
               <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{course.sectionCode}</span>
             </div>
             {course.nextMeeting ? <p className="mt-2 text-xs text-slate-500">{course.nextMeeting.dayOfWeek} · {course.nextMeeting.startTime}–{course.nextMeeting.endTime}{course.nextMeeting.room ? ` · ${course.nextMeeting.room}` : ""}</p> : null}
-          </a>
+          </Link>
         ))}
       </div>
     </div>
