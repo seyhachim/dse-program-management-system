@@ -1,0 +1,63 @@
+name: Issue 333 schema comment fix
+
+on:
+  push:
+    branches:
+      - agent/issue-333-finalized-result-corrections
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-333-finalized-result-corrections
+      - name: Move criterion documentation to its model
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/backend/prisma/schema.prisma')
+          text = path.read_text()
+          old_prefix = '''/// Issue #282: per-student rubric criterion score evidence. Whole-assessment
+          /// AssessmentResult remains authoritative for local course grading; these rows
+          /// are independent criterion-level evidence and snapshot the rubric context used.
+          /// Append-only, reasoned history for controlled changes to an official finalized result.
+          /// Database triggers reject UPDATE/DELETE so every correction remains auditable.
+          model AssessmentResultCorrection {
+          '''
+          new_prefix = '''/// Append-only, reasoned history for controlled changes to an official finalized result.
+          /// Database triggers reject UPDATE/DELETE so every correction remains auditable.
+          model AssessmentResultCorrection {
+          '''
+          old_suffix = '''  @@index([correctedById])
+          }
+
+          model AssessmentCriterionScore {
+          '''
+          new_suffix = '''  @@index([correctedById])
+          }
+
+          /// Issue #282: per-student rubric criterion score evidence. Whole-assessment
+          /// AssessmentResult remains authoritative for local course grading; these rows
+          /// are independent criterion-level evidence and snapshot the rubric context used.
+          model AssessmentCriterionScore {
+          '''
+          for old, new in [(old_prefix, new_prefix), (old_suffix, new_suffix)]:
+              if text.count(old) != 1:
+                  raise SystemExit('Expected exactly one schema documentation match')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+      - name: Commit cleanup and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/issue-333-schema-comment-fix.yml
+          git add apps/backend/prisma/schema.prisma
+          git diff --cached --check
+          git commit -m "docs(results): align correction schema comments"
+          git push origin HEAD:agent/issue-333-finalized-result-corrections
