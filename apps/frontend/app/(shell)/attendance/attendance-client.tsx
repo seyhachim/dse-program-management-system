@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, Save, UserCheck, UserMinus, UsersRound } from "lucide-react";
+import { CheckCircle2, Clock3, Play, Save, Search, UserCheck, UserMinus, UsersRound } from "lucide-react";
 import type {
   AttendanceRecordView,
   AttendanceSessionSummary,
@@ -13,6 +13,15 @@ import { ATTENDANCE_STATUSES } from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
 import { offeringsApi } from "@/lib/offerings";
 import { Topbar } from "../topbar";
+import { RollCallDialog } from "./roll-call-dialog";
+import {
+  attendanceRecordsEqual,
+  cloneAttendanceRecords,
+  getAttendanceCounts,
+  getTeachingWeek,
+  toSaveAttendanceRecords,
+  updateAttendanceRecord,
+} from "./roll-call-state";
 
 function localDateValue(date = new Date()): string {
   const year = date.getFullYear();
@@ -27,12 +36,27 @@ function offeringLabel(offering: OfferingView): string {
     : `${offering.sectionCode} · ${offering.term}`;
 }
 
+function formatSessionDate(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    weekday: "short",
+  }).format(parsed);
+}
+
 function statusClass(status: AttendanceStatus | null): string {
   if (status === "Present") return "border-status-live/30 bg-status-live-bg text-status-live";
   if (status === "Absent") return "border-destructive/30 bg-destructive/5 text-destructive";
   if (status === "Late") return "border-status-upcoming/30 bg-status-upcoming-bg text-status-upcoming";
   if (status === "Excused") return "border-border bg-muted/40 text-muted-foreground";
   return "border-border bg-background text-muted-foreground";
+}
+
+function attendanceStatusLabel(status: AttendanceStatus): string {
+  return status === "Excused" ? "Excused Absence" : status;
 }
 
 export function AttendanceClient() {
@@ -46,6 +70,9 @@ export function AttendanceClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [rollCallOpen, setRollCallOpen] = useState(false);
+  const [rollCallSnapshot, setRollCallSnapshot] = useState<AttendanceRecordView[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +107,8 @@ export function AttendanceClient() {
     setLoading(true);
     setError(null);
     setSavedMessage(null);
+    setRollCallOpen(false);
+    setRollCallSnapshot(null);
     Promise.all([offeringsApi.attendance(offeringId, date), offeringsApi.attendanceSessions(offeringId)])
       .then(([attendance, sessions]) => {
         if (cancelled) return;
@@ -100,21 +129,20 @@ export function AttendanceClient() {
   }, [offeringId, date]);
 
   const selectedOffering = offerings.find((offering) => offering.id === offeringId) ?? null;
-
-  const counts = useMemo(() => {
-    const next = { Present: 0, Absent: 0, Late: 0, Excused: 0, Unmarked: 0 };
-    for (const record of records) {
-      if (record.status) next[record.status] += 1;
-      else next.Unmarked += 1;
-    }
-    return next;
-  }, [records]);
+  const teachingWeek = getTeachingWeek(selectedOffering?.startDate, selectedOffering?.endDate, date);
+  const counts = useMemo(() => getAttendanceCounts(records), [records]);
+  const filteredRecords = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return records;
+    return records.filter(
+      (record) =>
+        record.studentName.toLowerCase().includes(query) || record.studentNumber.toLowerCase().includes(query),
+    );
+  }, [records, search]);
 
   function updateRecord(studentId: string, patch: Partial<Pick<AttendanceRecordView, "status" | "note">>) {
     setSavedMessage(null);
-    setRecords((current) =>
-      current.map((record) => (record.studentId === studentId ? { ...record, ...patch } : record)),
-    );
+    setRecords((current) => updateAttendanceRecord(current, studentId, patch));
   }
 
   function markAll(status: AttendanceStatus | null) {
@@ -122,31 +150,57 @@ export function AttendanceClient() {
     setRecords((current) => current.map((record) => ({ ...record, status })));
   }
 
-  async function save() {
-    if (!offeringId) return;
+  async function save(): Promise<boolean> {
+    if (!offeringId) return false;
     setSaving(true);
     setError(null);
     setSavedMessage(null);
     try {
       const saved = await offeringsApi.saveAttendance(offeringId, date, {
-        records: records
-          .filter((record) => record.status !== null)
-          .map((record) => ({
-            studentId: record.studentId,
-            status: record.status!,
-            note: record.note.trim(),
-          })),
+        records: toSaveAttendanceRecords(records),
       });
       setSession(saved);
       setRecords(saved.records);
       setHistory(await offeringsApi.attendanceSessions(offeringId));
-      setSavedMessage(`Attendance saved for ${date}.`);
+      setSavedMessage(`Attendance saved for ${formatSessionDate(date)}.`);
+      return true;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save attendance");
+      return false;
     } finally {
       setSaving(false);
     }
   }
+
+  function startRollCall() {
+    setRollCallSnapshot(cloneAttendanceRecords(records));
+    setRollCallOpen(true);
+  }
+
+  function requestRollCallClose() {
+    const snapshot = rollCallSnapshot;
+    const changed = snapshot !== null && !attendanceRecordsEqual(records, snapshot);
+    if (changed) {
+      const discard = window.confirm("Discard the unsaved Roll Call changes made since you opened this mode?");
+      if (!discard) return;
+      setRecords(cloneAttendanceRecords(snapshot));
+    }
+    setRollCallOpen(false);
+    setRollCallSnapshot(null);
+  }
+
+  async function saveRollCallAndClose() {
+    const saved = await save();
+    if (!saved) return;
+    setRollCallOpen(false);
+    setRollCallSnapshot(null);
+  }
+
+  const sessionContext = selectedOffering
+    ? `${selectedOffering.course?.title ?? selectedOffering.course?.code ?? "Course"} · Class ${selectedOffering.sectionCode} · ${
+        teachingWeek ? `Week ${teachingWeek}` : "Week not scheduled"
+      } · ${formatSessionDate(date)}`
+    : "Select a class section to load attendance.";
 
   return (
     <>
@@ -157,37 +211,65 @@ export function AttendanceClient() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-7xl space-y-6">
-          <section className="grid gap-4 rounded-xl border border-border bg-card p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_220px]">
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Class section</label>
-              <select
-                value={offeringId}
-                onChange={(event) => setOfferingId(event.target.value)}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-              >
-                {offerings.length === 0 ? <option value="">No assigned classes</option> : null}
-                {offerings.map((offering) => (
-                  <option key={offering.id} value={offering.id}>
-                    {offeringLabel(offering)}
-                  </option>
-                ))}
-              </select>
-              {selectedOffering?.course ? (
-                <p className="text-sm text-muted-foreground">
-                  {selectedOffering.course.title} · {selectedOffering.enrolledCount} enrolled
-                </p>
-              ) : null}
-            </div>
+          <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="mb-4 text-sm font-medium text-foreground">{sessionContext}</p>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_160px_210px_minmax(0,1fr)]">
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Class section</label>
+                <select
+                  value={offeringId}
+                  onChange={(event) => setOfferingId(event.target.value)}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {offerings.length === 0 ? <option value="">No assigned classes</option> : null}
+                  {offerings.map((offering) => (
+                    <option key={offering.id} value={offering.id}>
+                      {offeringLabel(offering)}
+                    </option>
+                  ))}
+                </select>
+                {selectedOffering?.course ? (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedOffering.course.title} · {selectedOffering.enrolledCount} enrolled
+                  </p>
+                ) : null}
+              </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-              />
-              <p className="text-xs text-muted-foreground">One register per class section and calendar date.</p>
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Week</label>
+                <div className="flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm font-medium text-foreground">
+                  {teachingWeek ? `Week ${teachingWeek}` : "—"}
+                </div>
+                <p className="text-xs text-muted-foreground">Derived from the teaching period.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                />
+                <p className="text-xs text-muted-foreground">One register per section and date.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="attendance-search" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Student search
+                </label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    id="attendance-search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Name or student ID"
+                    className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Filters the overview table only.</p>
+              </div>
             </div>
           </section>
 
@@ -206,7 +288,7 @@ export function AttendanceClient() {
             <SummaryCard icon={<UserCheck className="h-4 w-4" />} label="Present" value={counts.Present} />
             <SummaryCard icon={<UserMinus className="h-4 w-4" />} label="Absent" value={counts.Absent} />
             <SummaryCard icon={<Clock3 className="h-4 w-4" />} label="Late" value={counts.Late} />
-            <SummaryCard icon={<CheckCircle2 className="h-4 w-4" />} label="Excused" value={counts.Excused} />
+            <SummaryCard icon={<CheckCircle2 className="h-4 w-4" />} label="Excused Absence" value={counts.Excused} />
             <SummaryCard icon={<UsersRound className="h-4 w-4" />} label="Unmarked" value={counts.Unmarked} />
           </section>
 
@@ -215,10 +297,18 @@ export function AttendanceClient() {
               <div>
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Mark everyone present first, then change only absences, late arrivals, or excused students.
+                  Use Roll Call Mode for fast live marking, then use this table for overview, notes, and corrections.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={startRollCall}
+                  disabled={records.length === 0 || loading || saving}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-primary bg-primary/5 px-3 text-sm font-medium text-primary outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  <Play className="h-4 w-4" /> Start Roll Call
+                </button>
                 <button
                   type="button"
                   onClick={() => markAll("Present")}
@@ -237,7 +327,7 @@ export function AttendanceClient() {
                 </button>
                 <button
                   type="button"
-                  onClick={save}
+                  onClick={() => void save()}
                   disabled={!offeringId || loading || saving || records.length === 0}
                   className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
                 >
@@ -253,6 +343,8 @@ export function AttendanceClient() {
               <div className="p-10 text-center text-sm text-muted-foreground">
                 This class has no enrolled students yet. Add students to the offering before recording attendance.
               </div>
+            ) : filteredRecords.length === 0 ? (
+              <div className="p-10 text-center text-sm text-muted-foreground">No students match your search.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-sm">
@@ -265,7 +357,7 @@ export function AttendanceClient() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {records.map((record) => (
+                    {filteredRecords.map((record) => (
                       <tr key={record.studentId} className="align-middle hover:bg-muted/20">
                         <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{record.studentNumber}</td>
                         <td className="px-4 py-3 font-medium text-foreground">{record.studentName}</td>
@@ -277,12 +369,12 @@ export function AttendanceClient() {
                                 status: (event.target.value || null) as AttendanceStatus | null,
                               })
                             }
-                            className={`h-9 min-w-[130px] rounded-md border px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record.status)}`}
+                            className={`h-9 min-w-[150px] rounded-md border px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record.status)}`}
                           >
                             <option value="">Unmarked</option>
                             {ATTENDANCE_STATUSES.map((status) => (
                               <option key={status} value={status}>
-                                {status}
+                                {attendanceStatusLabel(status)}
                               </option>
                             ))}
                           </select>
@@ -320,14 +412,14 @@ export function AttendanceClient() {
                       <th className="px-4 py-3">Present</th>
                       <th className="px-4 py-3">Absent</th>
                       <th className="px-4 py-3">Late</th>
-                      <th className="px-4 py-3">Excused</th>
+                      <th className="px-4 py-3">Excused Absence</th>
                       <th className="px-4 py-3">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {history.map((item) => (
                       <tr key={item.sessionId} className="hover:bg-muted/20">
-                        <td className="px-4 py-3 font-medium text-foreground">{item.date}</td>
+                        <td className="px-4 py-3 font-medium text-foreground">{formatSessionDate(item.date)}</td>
                         <td className="px-4 py-3 tabular-nums">{item.counts.Present}</td>
                         <td className="px-4 py-3 tabular-nums">{item.counts.Absent}</td>
                         <td className="px-4 py-3 tabular-nums">{item.counts.Late}</td>
@@ -356,6 +448,18 @@ export function AttendanceClient() {
           ) : null}
         </div>
       </main>
+
+      <RollCallDialog
+        open={rollCallOpen}
+        offering={selectedOffering}
+        date={date}
+        week={teachingWeek}
+        records={records}
+        saving={saving}
+        onUpdateRecord={updateRecord}
+        onRequestClose={requestRollCallClose}
+        onSaveAndClose={saveRollCallAndClose}
+      />
     </>
   );
 }
