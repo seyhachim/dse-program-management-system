@@ -6,6 +6,7 @@ import {
   getAttendanceCounts,
   getNextIndex,
   getPreviousIndex,
+  getSkipFeedback,
   getTeachingWeek,
   getUnmarkedStudentIds,
   markAttendanceStatus,
@@ -55,10 +56,18 @@ describe("roll call counts and status", () => {
     expect(next[2]!.status).toBe("Late");
   });
 
-  test("skip leaves the record unmarked by making no status mutation", () => {
+  test("skip leaves an unmarked record unmarked by making no status mutation", () => {
     const skipped = cloneAttendanceRecords(records);
     expect(skipped[1]!.status).toBeNull();
     expect(getUnmarkedStudentIds(skipped)).toEqual([records[1]!.studentId]);
+    expect(getSkipFeedback(skipped[1]!)).toBe("Student Two skipped and left Unmarked.");
+  });
+
+  test("skip preserves a reopened saved status for historical-session compatibility", () => {
+    const reopenedHistorical = cloneAttendanceRecords(records);
+    expect(reopenedHistorical[0]!.status).toBe("Present");
+    expect(getSkipFeedback(reopenedHistorical[0]!)).toBe("Student One skipped; existing Present status kept.");
+    expect(reopenedHistorical[0]!.status).toBe("Present");
   });
 });
 
