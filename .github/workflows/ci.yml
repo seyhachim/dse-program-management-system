@@ -167,6 +167,11 @@ jobs:
           TELEGRAM_DB_TESTS: "1"
           JWT_SECRET: telegram-ci-security-secret-at-least-32-characters
 
+      - name: Verify criterion evidence database invariants and revision provenance
+        run: bun test apps/backend/src/plugins/student-portal/criterion-evidence-db.test.ts
+        env:
+          CRITERION_EVIDENCE_DB_TESTS: "1"
+
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 

@@ -4,6 +4,7 @@ import {
   FinalizeAssessmentResultsInput,
   PublishAnnouncementInput,
   PublishAssessmentResultsInput,
+  SaveAssessmentCriterionScoresInput,
   SaveAssessmentResultInput,
   SetAssessmentDeadlineInput,
 } from "@dse-pms/shared-types";
@@ -95,6 +96,16 @@ export function createStudentPortalRouter(): Router {
     const parsed = SaveAssessmentResultInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid result", details: parsed.error.flatten() });
     try { res.json(await resultsLifecycleService.saveDraft(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.put("/manage/results/criteria", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SaveAssessmentCriterionScoresInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid criterion scores", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await resultsLifecycleService.saveCriterionScores(req.user!.id, programmeWide(req.user!.roles), parsed.data));
+    } catch (error) { handleError(error, res); }
   });
   router.post("/manage/results/publish", requirePermission("courses:write"), async (req, res) => {
     const parsed = PublishAssessmentResultsInput.safeParse(req.body);
