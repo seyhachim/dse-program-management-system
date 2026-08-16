@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   CalendarClock,
@@ -57,7 +57,7 @@ export function CourseDeliveryClient() {
     <>
       <Topbar
         title="Course Delivery"
-        subtitle="Keep students informed, publish results, and review privacy-safe feedback."
+        subtitle="Keep students informed, manage draft marks safely, publish results, and review privacy-safe feedback."
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-7xl space-y-5">
@@ -125,7 +125,7 @@ function CourseHeader({ offerings, selected, onSelect }: {
           </div>
           <h2 className="mt-3 text-2xl font-bold tracking-tight">{selected.title}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Changes published here are shown only to students enrolled in this section.
+            Draft marks remain private until you explicitly publish a complete assessment.
           </p>
         </div>
         <label className="text-sm font-medium">
@@ -236,23 +236,66 @@ function DeadlineRow({ offeringId, assessment, onChanged }: { offeringId: string
 
 function ResultsPanel({ offering, onChanged }: PanelProps) {
   const [assessmentId, setAssessmentId] = useState(offering.assessments[0]?.id ?? "");
+  const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => { setAssessmentId(offering.assessments[0]?.id ?? ""); }, [offering.offeringId, offering.assessments]);
   const assessment = offering.assessments.find((item) => item.id === assessmentId) ?? offering.assessments[0];
+  const publishedCount = assessment?.results.filter((row) => row.publishedAt).length ?? 0;
+  const draftCount = assessment?.results.filter((row) => row.score !== null && !row.publishedAt).length ?? 0;
+  const missingCount = assessment?.results.filter((row) => row.score === null).length ?? 0;
+  const allPublished = Boolean(assessment?.results.length) && publishedCount === assessment?.results.length;
+  const readyToPublish = Boolean(assessment?.results.length) && missingCount === 0 && !allPublished;
+
+  const publishAssessment = async () => {
+    if (!assessment || !readyToPublish) return;
+    const confirmed = window.confirm(
+      `Publish ${assessment.name} results for all ${assessment.results.length} students? Published marks will be visible to students and locked against ordinary edits.`,
+    );
+    if (!confirmed) return;
+    setPublishing(true); setError(null);
+    try {
+      await courseDeliveryApi.publishAssessmentResults({
+        offeringId: offering.offeringId,
+        assessmentItemId: assessment.id,
+      });
+      await onChanged(`${assessment.name} results published for the full section.`);
+    } catch (reason) {
+      setError(messageFrom(reason, "Could not publish assessment results"));
+    } finally { setPublishing(false); }
+  };
+
   return (
     <div className="space-y-4">
-      <Panel title="Publish assessment results" description="A published result becomes visible to the student immediately and contributes to CLO achievement.">
+      <Panel title="Assessment markbook" description="Save marks as private drafts first. Publication is a separate class-level action after every student row is complete.">
         {offering.assessments.length ? (
-          <label className="block max-w-xl text-sm font-medium">Assessment
-            <select value={assessment?.id} onChange={(e) => setAssessmentId(e.target.value)} className="mt-1 block h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring">
-              {offering.assessments.map((item) => <option key={item.id} value={item.id}>{item.name} {item.weight === null ? "" : `(${item.weight}%)`}</option>)}
-            </select>
-          </label>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <label className="block max-w-xl flex-1 text-sm font-medium">Assessment
+              <select value={assessment?.id} onChange={(e) => setAssessmentId(e.target.value)} className="mt-1 block h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring">
+                {offering.assessments.map((item) => <option key={item.id} value={item.id}>{item.name} {item.weight === null ? "" : `(${item.weight}%)`}</option>)}
+              </select>
+            </label>
+            {assessment ? (
+              <Button type="button" onClick={publishAssessment} disabled={publishing || !readyToPublish}>
+                <CheckCircle2 />{publishing ? "Publishing…" : allPublished ? "Published & locked" : "Publish assessment"}
+              </Button>
+            ) : null}
+          </div>
         ) : <Muted>Add active assessments to the course specification first.</Muted>}
+        {assessment ? (
+          <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="rounded-full bg-muted px-3 py-1">{draftCount} draft</span>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{publishedCount} published</span>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">{missingCount} missing</span>
+          </div>
+        ) : null}
+        {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
+        {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
+        {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
       {assessment ? (
-        <Panel title={assessment.name} description={`${assessment.results.filter((row) => row.publishedAt).length} of ${assessment.results.length} student results published.`}>
+        <Panel title={assessment.name} description={allPublished ? "Published results are locked against ordinary edits." : `${draftCount} of ${assessment.results.length} student marks saved as drafts.`}>
           <div className="space-y-3">
-            {assessment.results.map((row) => <ResultRow key={`${row.enrollmentId}-${row.publishedAt}`} assessmentId={assessment.id} row={row} onChanged={onChanged} />)}
+            {assessment.results.map((row) => <ResultRow key={row.enrollmentId} assessmentId={assessment.id} row={row} onChanged={onChanged} />)}
             {!assessment.results.length ? <Muted>No students are enrolled in this section.</Muted> : null}
           </div>
         </Panel>
@@ -267,25 +310,43 @@ function ResultRow({ assessmentId, row, onChanged }: { assessmentId: string; row
   const [feedback, setFeedback] = useState(row.feedback);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const publish = async () => {
+  const locked = Boolean(row.publishedAt);
+  const save = async () => {
     const numericScore = Number(score), numericMax = Number(maxScore);
     if (!Number.isFinite(numericScore) || !Number.isFinite(numericMax) || numericScore < 0 || numericMax <= 0 || numericScore > numericMax) {
       setError("Enter a valid score that does not exceed the maximum."); return;
     }
     setSaving(true); setError(null);
     try {
-      await courseDeliveryApi.publishResult({ enrollmentId: row.enrollmentId, assessmentItemId: assessmentId, score: numericScore, maxScore: numericMax, feedback });
-      await onChanged(`${row.studentName}'s result published.`);
-    } catch (reason) { setError(messageFrom(reason, "Could not publish result")); }
+      await courseDeliveryApi.saveResult({ enrollmentId: row.enrollmentId, assessmentItemId: assessmentId, score: numericScore, maxScore: numericMax, feedback });
+      await onChanged(`${row.studentName}'s draft mark saved.`);
+    } catch (reason) { setError(messageFrom(reason, "Could not save draft result")); }
     finally { setSaving(false); }
   };
   return (
     <div className="rounded-xl border border-border p-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-        <div className="min-w-52 flex-1"><div className="flex items-center gap-2"><p className="font-semibold">{row.studentName}</p>{row.publishedAt ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Published</span> : null}</div><p className="text-xs text-muted-foreground">{row.studentCode}</p></div>
-        <div className="grid grid-cols-2 gap-2 xl:w-52"><Field label="Score"><Input type="number" min="0" step="0.01" value={score} onChange={(e) => setScore(e.target.value)} /></Field><Field label="Out of"><Input type="number" min="0.01" step="0.01" value={maxScore} onChange={(e) => setMaxScore(e.target.value)} /></Field></div>
-        <Field label="Student feedback" className="xl:min-w-72 xl:flex-[1.5]"><Input value={feedback} onChange={(e) => setFeedback(e.target.value)} maxLength={5000} placeholder="Optional feedback" /></Field>
-        <Button type="button" onClick={publish} disabled={saving || score === ""}><CheckCircle2 />{saving ? "Publishing…" : row.publishedAt ? "Update result" : "Publish result"}</Button>
+        <div className="min-w-52 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold">{row.studentName}</p>
+            {locked ? (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Published · locked</span>
+            ) : row.score !== null ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">Draft</span>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">{row.studentCode}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 xl:w-52">
+          <Field label="Score"><Input type="number" min="0" step="0.01" value={score} onChange={(e) => setScore(e.target.value)} disabled={locked} /></Field>
+          <Field label="Out of"><Input type="number" min="0.01" step="0.01" value={maxScore} onChange={(e) => setMaxScore(e.target.value)} disabled={locked} /></Field>
+        </div>
+        <Field label="Student feedback" className="xl:min-w-72 xl:flex-[1.5]"><Input value={feedback} onChange={(e) => setFeedback(e.target.value)} maxLength={5000} placeholder="Optional feedback" disabled={locked} /></Field>
+        {locked ? (
+          <Button type="button" variant="outline" disabled><LockKeyhole />Locked</Button>
+        ) : (
+          <Button type="button" onClick={save} disabled={saving || score === ""}><CheckCircle2 />{saving ? "Saving…" : "Save draft"}</Button>
+        )}
       </div>
       {error ? <InlineError>{error}</InlineError> : null}
     </div>

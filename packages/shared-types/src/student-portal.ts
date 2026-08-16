@@ -164,7 +164,8 @@ export const PublishAnnouncementInput = z.object({
 });
 export type PublishAnnouncementInput = z.infer<typeof PublishAnnouncementInput>;
 
-export const PublishAssessmentResultInput = z.object({
+/** Save one lecturer-entered assessment result without making it student-visible. */
+export const SaveAssessmentResultInput = z.object({
   enrollmentId: z.string().uuid(),
   assessmentItemId: z.string().min(1),
   score: z.coerce.number().min(0),
@@ -174,7 +175,18 @@ export const PublishAssessmentResultInput = z.object({
   message: "Score cannot exceed maximum score",
   path: ["score"],
 });
-export type PublishAssessmentResultInput = z.infer<typeof PublishAssessmentResultInput>;
+export type SaveAssessmentResultInput = z.infer<typeof SaveAssessmentResultInput>;
+
+/** Explicitly publish every complete draft row for one assessment in one offering. */
+export const PublishAssessmentResultsInput = z.object({
+  offeringId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+});
+export type PublishAssessmentResultsInput = z.infer<typeof PublishAssessmentResultsInput>;
+
+/** @deprecated Use SaveAssessmentResultInput. Kept temporarily for source compatibility. */
+export const PublishAssessmentResultInput = SaveAssessmentResultInput;
+export type PublishAssessmentResultInput = SaveAssessmentResultInput;
 
 export const SetAssessmentDeadlineInput = z.object({
   offeringId: z.string().uuid(),
