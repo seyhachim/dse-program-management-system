@@ -3,309 +3,124 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const EXPECTED_PUBLIC_TABLES = [
-  "User",
-  "Role",
-  "Programme",
-  "Permission",
-  "RolePermission",
-  "UserRoleAssignment",
-  "Student",
-  "ProgramLearningOutcome",
-  "ProgramCompetency",
-  "ProgramCompetencyPlo",
-  "ProgrammeProfile",
-  "ProgramPolicy",
-  "ProgrammeCurriculum",
-  "ProgrammeCurriculumVersion",
-  "ProgrammeCurriculumCourse",
-  "ProgrammeCurriculumAuditAction",
-  "Course",
-  "CourseSpec",
-  "CourseSpecReviewAction",
-  "CourseSpecPolicy",
-  "CourseSpecTeachingLearning",
-  "CourseSpecWeekProjectProgress",
-  "CourseSpecSection",
-  "CourseSpecClo",
-  "CourseSpecCloTeachingMethod",
-  "CourseSpecCloAssessmentMethod",
-  "CourseSpecWeek",
-  "CourseSpecAssessmentItem",
-  "CourseSpecCriterionCloMapping",
-  "CourseSpecMappingCell",
-  "CourseSpecResource",
-  "CourseSpecStudentResponsibility",
-  "Offering",
-  "OfferingMeeting",
-  "OfferingCoLecturer",
-  "Enrollment",
-  "OfferingAssessmentDeadline",
-  "AssessmentResult",
-  "AssessmentCriterionScore",
-  "CourseAnnouncement",
-  "CourseFeedback",
-  "TeachingMethod",
-  "AssessmentMethod",
-  "ActiveLearningCluster",
-  "ActiveLearningStrategy",
-  "Rubric",
-  "RubricLevel",
-  "RubricCriterion",
-  "RubricCell",
-  "QaFramework",
-  "QaCriterion",
-  "QaRequirement",
-  "QaQualityExpectation",
-  "QaExpectedEvidence",
-  "QaAssessmentCycle",
-  "QaRequirementAssignment",
-  "QaEvidence",
-  "QaEvidenceMapping",
-  "QaRequirementAssessment",
-  "QaEvidenceAnalysis",
-  "QaEvidenceAnalysisSource",
-  "QaEvidenceAnalysisReview",
-  "QaDocument",
-  "QaDocumentChunk",
-  "QaImprovementAction",
-  "QaSarSection",
-  "QaSarSubmission",
-  "QaSarReview",
-  "QaSarRelease",
-  "QaEvaluationScenario",
-  "QaEvaluationScenarioEvidence",
-  "QaEvaluationRun",
-  "QaEvaluationRunEvidence",
-  "QaEvaluationHumanRating",
-  "CopCommunity",
-  "CopMembership",
-  "CopDiscussion",
-  "CopComment",
-  "CopAction",
+  "User", "Role", "Programme", "Permission", "RolePermission", "UserRoleAssignment", "Student",
+  "ProgramLearningOutcome", "ProgramCompetency", "ProgramCompetencyPlo", "ProgrammeProfile", "ProgramPolicy",
+  "ProgrammeCurriculum", "ProgrammeCurriculumVersion", "ProgrammeCurriculumCourse", "ProgrammeCurriculumAuditAction",
+  "Course", "CourseSpec", "CourseSpecReviewAction", "CourseSpecPolicy", "CourseSpecTeachingLearning",
+  "CourseSpecWeekProjectProgress", "CourseSpecSection", "CourseSpecClo", "CourseSpecCloTeachingMethod",
+  "CourseSpecCloAssessmentMethod", "CourseSpecWeek", "CourseSpecAssessmentItem", "CourseSpecCriterionCloMapping",
+  "CourseSpecMappingCell", "CourseSpecResource", "CourseSpecStudentResponsibility", "Offering", "OfferingMeeting",
+  "OfferingCoLecturer", "Enrollment", "OfferingAssessmentDeadline", "AssessmentResult", "AssessmentCriterionScore",
+  "CourseAnnouncement", "CourseFeedback", "TeachingMethod", "AssessmentMethod", "ActiveLearningCluster",
+  "ActiveLearningStrategy", "Rubric", "RubricLevel", "RubricCriterion", "RubricCell", "QaFramework", "QaCriterion",
+  "QaRequirement", "QaQualityExpectation", "QaExpectedEvidence", "QaAssessmentCycle", "QaRequirementAssignment",
+  "QaEvidence", "QaEvidenceMapping", "QaRequirementAssessment", "QaEvidenceAnalysis", "QaEvidenceAnalysisSource",
+  "QaEvidenceAnalysisReview", "QaDocument", "QaDocumentChunk", "QaImprovementAction", "QaSarSection",
+  "QaSarSubmission", "QaSarReview", "QaSarRelease", "QaEvaluationScenario", "QaEvaluationScenarioEvidence",
+  "QaEvaluationRun", "QaEvaluationRunEvidence", "QaEvaluationHumanRating", "CopCommunity", "CopMembership",
+  "CopDiscussion", "CopComment", "CopAction",
 ] as const;
 
-const EXPECTED_ATTENDANCE_TABLES = [
-  "AttendanceSession",
-  "AttendanceRecord",
+const EXPECTED_ATTENDANCE_TABLES = ["AttendanceSession", "AttendanceRecord"] as const;
+const EXPECTED_TELEGRAM_SECURITY_TABLES = [
+  "TelegramInitVerification",
+  "TelegramIdentity",
+  "TelegramAuditEvent",
+  "TelegramNotificationPreference",
+  "TelegramNotificationDelivery",
 ] as const;
+const FORBIDDEN_GRANTEES = new Set(["PUBLIC", "anon", "authenticated", "service_role"]);
 
-const EXPECTED_TELEGRAM_SECURITY_TABLES = ["TelegramInitVerification"] as const;
+type TableRow = { schema_name: string; table_name: string; rls_enabled: boolean };
+type GrantRow = { schema_name: string; object_name: string; grantee: string; privilege_type: string };
+type DefaultGrantRow = { schema_name: string; object_type: string; grantee: string; privilege_type: string };
 
-const FORBIDDEN_GRANTEES = new Set([
-  "PUBLIC",
-  "anon",
-  "authenticated",
-  "service_role",
-]);
-
-type TableRow = {
-  schema_name: string;
-  table_name: string;
-  rls_enabled: boolean;
-};
-
-type GrantRow = {
-  schema_name: string;
-  object_name: string;
-  grantee: string;
-  privilege_type: string;
-};
-
-type DefaultGrantRow = {
-  schema_name: string;
-  object_type: string;
-  grantee: string;
-  privilege_type: string;
-};
-
-function compareInventory(
-  label: string,
-  expected: readonly string[],
-  actual: string[],
-): string[] {
+function compareInventory(label: string, expected: readonly string[], actual: string[]): string[] {
   const expectedSet = new Set(expected);
   const actualSet = new Set(actual);
   const errors: string[] = [];
-
   const missing = [...expectedSet].filter((name) => !actualSet.has(name)).sort();
-  const unexpected = [...actualSet]
-    .filter((name) => !expectedSet.has(name))
-    .sort();
-
-  if (missing.length > 0) {
-    errors.push(`${label}: missing expected tables: ${missing.join(", ")}`);
-  }
-
-  if (unexpected.length > 0) {
-    errors.push(`${label}: unclassified tables: ${unexpected.join(", ")}`);
-  }
-
+  const unexpected = [...actualSet].filter((name) => !expectedSet.has(name)).sort();
+  if (missing.length > 0) errors.push(`${label}: missing expected tables: ${missing.join(", ")}`);
+  if (unexpected.length > 0) errors.push(`${label}: unclassified tables: ${unexpected.join(", ")}`);
   return errors;
 }
 
 async function tablesForSchema(schemaName: string): Promise<TableRow[]> {
-  return prisma.$queryRawUnsafe<TableRow[]>(
-    `
-      SELECT
-        n.nspname::text AS schema_name,
-        c.relname::text AS table_name,
-        c.relrowsecurity AS rls_enabled
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = $1
-        AND c.relkind IN ('r', 'p')
-        AND c.relname <> '_prisma_migrations'
-      ORDER BY c.relname
-    `,
-    schemaName,
-  );
+  return prisma.$queryRawUnsafe<TableRow[]>(`
+    SELECT n.nspname::text AS schema_name, c.relname::text AS table_name, c.relrowsecurity AS rls_enabled
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = $1 AND c.relkind IN ('r', 'p') AND c.relname <> '_prisma_migrations'
+    ORDER BY c.relname
+  `, schemaName);
 }
 
 async function main(): Promise<void> {
   const errors: string[] = [];
-
   const [publicTables, attendanceTables, telegramSecurityTables] = await Promise.all([
-    tablesForSchema("public"),
-    tablesForSchema("pms_attendance"),
-    tablesForSchema("telegram_security"),
+    tablesForSchema("public"), tablesForSchema("pms_attendance"), tablesForSchema("telegram_security"),
   ]);
 
-  errors.push(
-    ...compareInventory(
-      "public schema",
-      EXPECTED_PUBLIC_TABLES,
-      publicTables.map((table) => table.table_name),
-    ),
-  );
-  errors.push(
-    ...compareInventory(
-      "pms_attendance schema",
-      EXPECTED_ATTENDANCE_TABLES,
-      attendanceTables.map((table) => table.table_name),
-    ),
-  );
-  errors.push(
-    ...compareInventory(
-      "telegram_security schema",
-      EXPECTED_TELEGRAM_SECURITY_TABLES,
-      telegramSecurityTables.map((table) => table.table_name),
-    ),
-  );
+  errors.push(...compareInventory("public schema", EXPECTED_PUBLIC_TABLES, publicTables.map((t) => t.table_name)));
+  errors.push(...compareInventory("pms_attendance schema", EXPECTED_ATTENDANCE_TABLES, attendanceTables.map((t) => t.table_name)));
+  errors.push(...compareInventory("telegram_security schema", EXPECTED_TELEGRAM_SECURITY_TABLES, telegramSecurityTables.map((t) => t.table_name)));
 
-  for (const table of [
-    ...publicTables,
-    ...attendanceTables,
-    ...telegramSecurityTables,
-  ]) {
-    if (!table.rls_enabled) {
-      errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
-    }
+  for (const table of [...publicTables, ...attendanceTables, ...telegramSecurityTables]) {
+    if (!table.rls_enabled) errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
   }
 
   const tableGrants = await prisma.$queryRaw<GrantRow[]>`
-    SELECT
-      n.nspname::text AS schema_name,
-      c.relname::text AS object_name,
+    SELECT n.nspname::text AS schema_name, c.relname::text AS object_name,
       CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
       acl.privilege_type::text AS privilege_type
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(
-      COALESCE(c.relacl, acldefault('r', c.relowner))
-    ) AS acl
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
     WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security')
-      AND c.relkind IN ('r', 'p')
-      AND c.relname <> '_prisma_migrations'
-      AND (
-        acl.grantee = 0
-        OR r.rolname IN ('anon', 'authenticated', 'service_role')
-      )
+      AND c.relkind IN ('r', 'p') AND c.relname <> '_prisma_migrations'
+      AND (acl.grantee = 0 OR r.rolname IN ('anon', 'authenticated', 'service_role'))
     ORDER BY n.nspname, c.relname, grantee, acl.privilege_type
   `;
-
-  for (const grant of tableGrants) {
-    if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
-      errors.push(
-        `Forbidden table grant: ${grant.grantee} has ${grant.privilege_type} on ${grant.schema_name}.${grant.object_name}`,
-      );
-    }
+  for (const grant of tableGrants) if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
+    errors.push(`Forbidden table grant: ${grant.grantee} has ${grant.privilege_type} on ${grant.schema_name}.${grant.object_name}`);
   }
 
   const schemaGrants = await prisma.$queryRaw<GrantRow[]>`
-    SELECT
-      n.nspname::text AS schema_name,
-      n.nspname::text AS object_name,
+    SELECT n.nspname::text AS schema_name, n.nspname::text AS object_name,
       CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
       acl.privilege_type::text AS privilege_type
-    FROM pg_namespace n
-    CROSS JOIN LATERAL aclexplode(
-      COALESCE(n.nspacl, acldefault('n', n.nspowner))
-    ) AS acl
+    FROM pg_namespace n CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n', n.nspowner))) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
     WHERE n.nspname IN ('pms_attendance', 'telegram_security')
-      AND (
-        acl.grantee = 0
-        OR r.rolname IN ('anon', 'authenticated', 'service_role')
-      )
+      AND (acl.grantee = 0 OR r.rolname IN ('anon', 'authenticated', 'service_role'))
     ORDER BY n.nspname, grantee, acl.privilege_type
   `;
-
-  for (const grant of schemaGrants) {
-    if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
-      errors.push(
-        `Forbidden schema grant: ${grant.grantee} has ${grant.privilege_type} on ${grant.schema_name}`,
-      );
-    }
+  for (const grant of schemaGrants) if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
+    errors.push(`Forbidden schema grant: ${grant.grantee} has ${grant.privilege_type} on ${grant.schema_name}`);
   }
 
   const defaultGrants = await prisma.$queryRaw<DefaultGrantRow[]>`
-    SELECT
-      n.nspname::text AS schema_name,
-      CASE d.defaclobjtype
-        WHEN 'r' THEN 'table'
-        WHEN 'S' THEN 'sequence'
-        WHEN 'f' THEN 'function'
-        ELSE d.defaclobjtype::text
-      END AS object_type,
+    SELECT n.nspname::text AS schema_name,
+      CASE d.defaclobjtype WHEN 'r' THEN 'table' WHEN 'S' THEN 'sequence' WHEN 'f' THEN 'function' ELSE d.defaclobjtype::text END AS object_type,
       CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
       acl.privilege_type::text AS privilege_type
-    FROM pg_default_acl d
-    JOIN pg_namespace n ON n.oid = d.defaclnamespace
-    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
-    LEFT JOIN pg_roles r ON r.oid = acl.grantee
+    FROM pg_default_acl d JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl LEFT JOIN pg_roles r ON r.oid = acl.grantee
     WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security')
-      AND (
-        acl.grantee = 0
-        OR r.rolname IN ('anon', 'authenticated', 'service_role')
-      )
+      AND (acl.grantee = 0 OR r.rolname IN ('anon', 'authenticated', 'service_role'))
     ORDER BY n.nspname, object_type, grantee, acl.privilege_type
   `;
-
-  for (const grant of defaultGrants) {
-    if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
-      errors.push(
-        `Forbidden default grant: future ${grant.schema_name} ${grant.object_type}s grant ${grant.privilege_type} to ${grant.grantee}`,
-      );
-    }
+  for (const grant of defaultGrants) if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
+    errors.push(`Forbidden default grant: future ${grant.schema_name} ${grant.object_type}s grant ${grant.privilege_type} to ${grant.grantee}`);
   }
 
   if (errors.length > 0) {
     console.error("Database security verification failed:\n");
-    for (const error of errors) {
-      console.error(`- ${error}`);
-    }
+    for (const error of errors) console.error(`- ${error}`);
     process.exitCode = 1;
     return;
   }
-
-  console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, and ${telegramSecurityTables.length} Telegram security tables are classified, RLS-protected, and not granted to Data API roles.`,
-  );
+  console.log(`Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, and ${telegramSecurityTables.length} Telegram security tables are classified, RLS-protected, and not granted to Data API roles.`);
 }
 
-try {
-  await main();
-} finally {
-  await prisma.$disconnect();
-}
+try { await main(); } finally { await prisma.$disconnect(); }
