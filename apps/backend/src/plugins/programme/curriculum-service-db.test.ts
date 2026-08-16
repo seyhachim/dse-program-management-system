@@ -8,8 +8,6 @@ import {
 const dbTestsEnabled = process.env.CURRICULUM_DB_TESTS === "1";
 const describeDb = dbTestsEnabled ? describe : describe.skip;
 const prisma = new PrismaClient();
-const createdProgrammeIds: string[] = [];
-const createdUserIds: string[] = [];
 
 const suffix = () => crypto.randomUUID().slice(0, 8);
 
@@ -28,8 +26,6 @@ async function createBase() {
       name: `Curriculum Service Programme ${token}`,
     },
   });
-  createdProgrammeIds.push(programme.id);
-  createdUserIds.push(user.id);
   return { user, programme, token };
 }
 
@@ -246,24 +242,7 @@ describeDb("programme curriculum revision/read service", () => {
 });
 
 afterAll(async () => {
-  if (createdProgrammeIds.length > 0) {
-    await prisma.programmeCurriculumAuditAction.deleteMany({
-      where: { curriculumVersion: { curriculum: { programmeId: { in: createdProgrammeIds } } } },
-    });
-    await prisma.programmeCurriculumCourse.deleteMany({
-      where: { curriculumVersion: { curriculum: { programmeId: { in: createdProgrammeIds } } } },
-    });
-    await prisma.programmeCurriculumVersion.deleteMany({
-      where: { curriculum: { programmeId: { in: createdProgrammeIds } } },
-    });
-    await prisma.programmeCurriculum.deleteMany({
-      where: { programmeId: { in: createdProgrammeIds } },
-    });
-    await prisma.course.deleteMany({ where: { programmeId: { in: createdProgrammeIds } } });
-    await prisma.programme.deleteMany({ where: { id: { in: createdProgrammeIds } } });
-  }
-  if (createdUserIds.length > 0) {
-    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
-  }
+  // The test database is disposable per CI job. Approved curriculum fixtures are
+  // intentionally immutable and therefore must not be deleted as test cleanup.
   await prisma.$disconnect();
 });
