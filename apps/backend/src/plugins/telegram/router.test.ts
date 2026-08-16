@@ -93,9 +93,9 @@ describe("Telegram router", () => {
       authDate: "2026-08-16T05:00:00.000Z",
       expiresAt: "2026-08-16T05:05:00.000Z",
     });
-    expect(body).not.toHaveProperty("userId");
-    expect(body).not.toHaveProperty("role");
-    expect(body).not.toHaveProperty("permissions");
+    expect("userId" in body).toBe(false);
+    expect("role" in body).toBe(false);
+    expect("permissions" in body).toBe(false);
   });
 
   test("rejects malformed request bodies before verification", async () => {
