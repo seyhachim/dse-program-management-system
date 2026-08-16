@@ -260,3 +260,26 @@ export interface CourseDeliveryOffering {
   announcements: CourseDeliveryAnnouncement[];
   feedback: CourseFeedbackSummary;
 }
+
+/** Lecturer-only calculation preview. Draft marks are included and must never be sent to student endpoints. */
+export interface CourseDeliveryStudentResultReview {
+  enrollmentId: string;
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  totalCourseGrade: number | null;
+  courseGradeComplete: boolean;
+  completedGradeWeight: number;
+  configuredGradeWeight: number;
+  achievements: PortalCloAchievement[];
+  overallAchievement: number | null;
+}
+
+export interface CourseDeliveryResultReview {
+  offeringId: string;
+  courseSpecId: string;
+  courseCode: string;
+  courseTitle: string;
+  sectionCode: string;
+  rows: CourseDeliveryStudentResultReview[];
+}
