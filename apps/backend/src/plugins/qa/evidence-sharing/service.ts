@@ -67,7 +67,9 @@ type PublicReferenceRow = SnapshotRow & {
 
 const BLOCKED_KEYS = new Set([
   "authid",
+  "description",
   "email",
+  "excerpt",
   "individualgrade",
   "individualgrades",
   "mark",
@@ -76,11 +78,15 @@ const BLOCKED_KEYS = new Set([
   "phone",
   "rawgrade",
   "rawgrades",
+  "relevance",
+  "relevancenote",
   "score",
   "studentemail",
   "studentid",
   "studentname",
   "studentuserid",
+  "summary",
+  "text",
   "userid",
 ]);
 
@@ -131,6 +137,10 @@ export function hashQaEvidenceSnapshotEnvelope(input: {
     provenance: input.provenance,
   });
   return createHash("sha256").update(JSON.stringify(envelope)).digest("hex");
+}
+
+export function isQaEvidenceRedactionPolicyCurrent(version: string): boolean {
+  return version === QA_EVIDENCE_REDACTION_POLICY_VERSION;
 }
 
 export function redactQaEvidenceForExternalView(value: unknown): {
@@ -273,7 +283,7 @@ function snapshotToView(row: SnapshotRow): QaEvidenceSnapshotView {
     reportingPeriod: row.reportingPeriod as QaEvidenceReportingPeriod,
     provenance: row.provenance as QaEvidenceSnapshotProvenance,
     contentHash: row.contentHash,
-    redactionPolicyVersion: QA_EVIDENCE_REDACTION_POLICY_VERSION,
+    redactionPolicyVersion: row.redactionPolicyVersion,
     capturedBy: { id: row.capturedById, name: row.capturedByName },
     capturedAt: row.capturedAt.toISOString(),
   };
@@ -491,6 +501,9 @@ export async function createQaEvidenceExternalReference(
   createdById: string,
 ): Promise<CreatedQaEvidenceExternalReferenceView> {
   const snapshot = await getQaEvidenceSnapshot(input.programmeId, snapshotId);
+  if (!isQaEvidenceRedactionPolicyCurrent(snapshot.redactionPolicyVersion)) {
+    throw new QaEvidenceSharingUnsupportedError("Recapture this evidence with the current external redaction policy before sharing it");
+  }
   if (input.expiresAt && input.expiresAt.getTime() <= Date.now()) {
     throw new QaEvidenceSharingUnsupportedError("External evidence reference expiry must be in the future");
   }
@@ -581,7 +594,12 @@ export async function resolveExternalQaEvidence(accessToken: string): Promise<Qa
   `;
   const row = rows[0];
   if (!row) throw new QaEvidenceSharingResourceNotFoundError("External evidence reference not found");
-  if (!row.active || row.revokedAt || (row.expiresAt && row.expiresAt.getTime() <= Date.now())) {
+  if (
+    !isQaEvidenceRedactionPolicyCurrent(row.redactionPolicyVersion) ||
+    !row.active ||
+    row.revokedAt ||
+    (row.expiresAt && row.expiresAt.getTime() <= Date.now())
+  ) {
     throw new QaEvidenceExternalReferenceGoneError("External evidence reference is no longer available");
   }
 
