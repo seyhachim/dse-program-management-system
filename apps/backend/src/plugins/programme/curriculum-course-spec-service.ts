@@ -5,6 +5,7 @@ import type {
   CurriculumCourseSpecVersion,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { findInvalidCurriculumCourseSpecBindings } from "./curriculum-course-spec-integrity.ts";
 import { getCurriculumWorkflowState } from "./curriculum-workflow-service.ts";
 
 export class CurriculumCourseSpecNotFoundError extends Error {}
@@ -71,31 +72,6 @@ async function loadPlacements(versionId: string): Promise<PlacementRow[]> {
   `);
 }
 
-export async function assertCurriculumCourseSpecActivationReady(versionId: string) {
-  const rows = await prisma.$queryRaw<Array<{ courseCode: string }>>(Prisma.sql`
-    SELECT course."code" AS "courseCode"
-    FROM "ProgrammeCurriculumCourse" placement
-    INNER JOIN "Course" course ON course."id" = placement."courseId"
-    LEFT JOIN "CourseSpec" spec ON spec."id" = placement."courseSpecVersionId"
-    WHERE placement."curriculumVersionId" = ${versionId}
-      AND (
-        placement."courseSpecVersionId" IS NULL
-        OR spec."id" IS NULL
-        OR spec."courseId" <> placement."courseId"
-        OR spec."reviewStatus" <> 'Approved'::"CourseSpecReviewStatus"
-      )
-    ORDER BY course."code"
-  `);
-
-  if (rows.length > 0) {
-    const preview = rows.slice(0, 5).map((row) => row.courseCode).join(", ");
-    const suffix = rows.length > 5 ? ` and ${rows.length - 5} more` : "";
-    throw new CurriculumCourseSpecValidationError(
-      `Every curriculum course needs an Approved CourseSpec before activation. Missing or invalid: ${preview}${suffix}`,
-    );
-  }
-}
-
 export const curriculumCourseSpecService = {
   async programmeId(versionId: string) {
     return (await loadVersion(versionId)).curriculum.programmeId;
@@ -153,16 +129,14 @@ export const curriculumCourseSpecService = {
       };
     });
 
-    const missingBindingCount = bindings.filter(
-      (binding) => !binding.linkedVersion,
-    ).length;
+    const invalidCourseCodes = await findInvalidCurriculumCourseSpecBindings(versionId);
 
     return {
       curriculumId: version.curriculumId,
       versionId: version.id,
       versionStatus: version.status,
-      activationReady: bindings.length > 0 && missingBindingCount === 0,
-      missingBindingCount,
+      activationReady: placements.length > 0 && invalidCourseCodes.length === 0,
+      missingBindingCount: invalidCourseCodes.length,
       bindings,
     };
   },
@@ -210,14 +184,17 @@ export const curriculumCourseSpecService = {
       }
     }
 
-    const previous = await prisma.$queryRaw<Array<{ courseSpecVersionId: string | null }>>(Prisma.sql`
-      SELECT "courseSpecVersionId" AS "courseSpecVersionId"
-      FROM "ProgrammeCurriculumCourse"
-      WHERE "id" = ${placementId}
-      FOR UPDATE
-    `);
-
     await prisma.$transaction(async (tx) => {
+      const previous = await tx.$queryRaw<Array<{ courseSpecVersionId: string | null }>>(Prisma.sql`
+        SELECT "courseSpecVersionId" AS "courseSpecVersionId"
+        FROM "ProgrammeCurriculumCourse"
+        WHERE "id" = ${placementId}
+        FOR UPDATE
+      `);
+      if (previous.length === 0) {
+        throw new CurriculumCourseSpecNotFoundError("Curriculum placement not found");
+      }
+
       await tx.$executeRaw(Prisma.sql`
         UPDATE "ProgrammeCurriculumCourse"
         SET "courseSpecVersionId" = ${input.courseSpecVersionId}, "updatedAt" = CURRENT_TIMESTAMP
@@ -234,7 +211,7 @@ export const curriculumCourseSpecService = {
           details: {
             placementId,
             courseId: placement.courseId,
-            beforeCourseSpecVersionId: previous[0]?.courseSpecVersionId ?? null,
+            beforeCourseSpecVersionId: previous[0]!.courseSpecVersionId,
             afterCourseSpecVersionId: input.courseSpecVersionId,
           },
         },
