@@ -1703,9 +1703,6 @@ model AssessmentResult {
   @@index([finalizedById])
 }
 
-/// Issue #282: per-student rubric criterion score evidence. Whole-assessment
-/// AssessmentResult remains authoritative for local course grading; these rows
-/// are independent criterion-level evidence and snapshot the rubric context used.
 /// Append-only, reasoned history for controlled changes to an official finalized result.
 /// Database triggers reject UPDATE/DELETE so every correction remains auditable.
 model AssessmentResultCorrection {
@@ -1727,6 +1724,9 @@ model AssessmentResultCorrection {
   @@index([correctedById])
 }
 
+/// Issue #282: per-student rubric criterion score evidence. Whole-assessment
+/// AssessmentResult remains authoritative for local course grading; these rows
+/// are independent criterion-level evidence and snapshot the rubric context used.
 model AssessmentCriterionScore {
   id                 String           @id @default(uuid())
   assessmentResultId String
