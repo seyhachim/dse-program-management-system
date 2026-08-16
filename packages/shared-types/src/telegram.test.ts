@@ -64,9 +64,9 @@ describe("Telegram public contracts", () => {
       expiresAt: "2026-08-16T05:05:00.000Z",
     });
     expect(result.telegramUser.id).toBe("123456789");
-    expect(result).not.toHaveProperty("userId");
-    expect(result).not.toHaveProperty("role");
-    expect(result).not.toHaveProperty("token");
+    expect("userId" in result).toBe(false);
+    expect("role" in result).toBe(false);
+    expect("token" in result).toBe(false);
   });
 
   test("rejects numeric Telegram ids in the API contract", () => {
