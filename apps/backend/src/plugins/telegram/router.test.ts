@@ -27,6 +27,7 @@ const service: TelegramService = {
       telegramUser: { id: "123456789", username: "seyha" },
       authDate: "2026-08-16T05:00:00.000Z",
       expiresAt: "2026-08-16T05:05:00.000Z",
+      linked: false,
     };
   },
 };
@@ -96,6 +97,7 @@ describe("Telegram router", () => {
       telegramUser: { id: "123456789", username: "seyha" },
       authDate: "2026-08-16T05:00:00.000Z",
       expiresAt: "2026-08-16T05:05:00.000Z",
+      linked: false,
     });
     expect("userId" in body).toBe(false);
     expect("role" in body).toBe(false);
