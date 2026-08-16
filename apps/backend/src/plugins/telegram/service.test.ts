@@ -97,8 +97,8 @@ describe("Telegram service", () => {
       queryId: "query-1",
     });
     expect(JSON.stringify(result)).not.toContain("server-only-token");
-    expect(result).not.toHaveProperty("userId");
-    expect(result).not.toHaveProperty("role");
-    expect(result).not.toHaveProperty("permissions");
+    expect("userId" in result).toBe(false);
+    expect("role" in result).toBe(false);
+    expect("permissions" in result).toBe(false);
   });
 });
