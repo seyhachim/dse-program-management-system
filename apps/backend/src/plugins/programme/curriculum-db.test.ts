@@ -253,6 +253,21 @@ describeDb("programme curriculum database invariants", () => {
     ).rejects.toThrow("Cannot mutate course placements of an immutable curriculum version");
   });
 
+  test("approved versions cannot be deleted even without dependent rows", async () => {
+    const fixture = await createFixture();
+    const version = await createDraftVersion(fixture);
+    await prisma.programmeCurriculumVersion.update({
+      where: { id: version.id },
+      data: { status: "Approved", approvedAt: new Date() },
+    });
+
+    await expect(
+      prisma.programmeCurriculumVersion.delete({ where: { id: version.id } }),
+    ).rejects.toThrow(
+      "Approved, Active, and Superseded curriculum versions cannot be deleted",
+    );
+  });
+
   test("audit actions are append-only", async () => {
     const fixture = await createFixture();
     const version = await createDraftVersion(fixture);
