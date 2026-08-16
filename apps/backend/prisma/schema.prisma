@@ -236,6 +236,7 @@ model User {
   announcementsAuthored            CourseAnnouncement[]             @relation("AnnouncementAuthor")
   assessmentResultsPublished       AssessmentResult[]               @relation("AssessmentResultPublishedBy")
   assessmentResultsFinalized       AssessmentResult[]               @relation("AssessmentResultFinalizedBy")
+  assessmentResultCorrections      AssessmentResultCorrection[]     @relation("AssessmentResultCorrectionActor")
   classResponsibilitiesAssigned    ClassResponsibilityAssignment[]  @relation("ClassResponsibilityAssignedBy")
   classResponsibilitiesRevoked     ClassResponsibilityAssignment[]  @relation("ClassResponsibilityRevokedBy")
   classResponsibilityAuditEvents   ClassResponsibilityAuditEvent[]  @relation("ClassResponsibilityAuditActor")
@@ -1691,6 +1692,7 @@ model AssessmentResult {
   finalizedById    String?
   finalizedBy      User?      @relation("AssessmentResultFinalizedBy", fields: [finalizedById], references: [id], onDelete: Restrict)
   criterionScores  AssessmentCriterionScore[]
+  corrections      AssessmentResultCorrection[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
@@ -1704,6 +1706,27 @@ model AssessmentResult {
 /// Issue #282: per-student rubric criterion score evidence. Whole-assessment
 /// AssessmentResult remains authoritative for local course grading; these rows
 /// are independent criterion-level evidence and snapshot the rubric context used.
+/// Append-only, reasoned history for controlled changes to an official finalized result.
+/// Database triggers reject UPDATE/DELETE so every correction remains auditable.
+model AssessmentResultCorrection {
+  id                 String           @id @default(uuid())
+  assessmentResultId String
+  assessmentResult   AssessmentResult @relation(fields: [assessmentResultId], references: [id], onDelete: Restrict)
+  beforeScore        Float
+  beforeMaxScore     Float
+  beforeFeedback     String
+  afterScore         Float
+  afterMaxScore      Float
+  afterFeedback      String
+  reason             String
+  correctedById      String
+  correctedBy        User             @relation("AssessmentResultCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
+  createdAt          DateTime         @default(now())
+
+  @@index([assessmentResultId, createdAt])
+  @@index([correctedById])
+}
+
 model AssessmentCriterionScore {
   id                 String           @id @default(uuid())
   assessmentResultId String
