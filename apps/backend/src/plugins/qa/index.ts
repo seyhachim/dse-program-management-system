@@ -5,6 +5,8 @@ import { createQaActionRouter } from "./actions/router.ts";
 import { createQaLlmRouter } from "./analysis/llm-router.ts";
 import { createQaAssignmentsRouter } from "./assignments/router.ts";
 import { createQaEvidenceLibraryRouter } from "./evidence/router.ts";
+import { createQaEvidenceSharingRouter } from "./evidence-sharing/router.ts";
+import { createQaExternalEvidenceRouter } from "./evidence-sharing/public-router.ts";
 import { createQaEvaluationRouter } from "./evaluation/router.ts";
 import { createQaPilotRouter } from "./evaluation/pilot-router.ts";
 import { createQaReviewRouter } from "./reviews/router.ts";
@@ -16,9 +18,12 @@ import { qaService, type QaService } from "./service.ts";
 import { createQaWorkspaceRouter } from "./workspace/router.ts";
 
 const router = Router();
+// Public token resolver must remain outside routers that apply requireAuth.
+router.use(createQaExternalEvidenceRouter());
 router.use(createQaRouter());
 router.use(createQaAssignmentsRouter());
 router.use(createQaEvidenceLibraryRouter());
+router.use(createQaEvidenceSharingRouter());
 router.use(createQaWorkspaceRouter());
 router.use(createQaSarRouter());
 router.use(createQaSarReviewRouter());
