@@ -195,6 +195,8 @@ model User {
   qaSarSubmissions         QaSarSubmission[]          @relation("QaSarSubmittedBy")
   qaSarReviews             QaSarReview[]              @relation("QaSarReviewer")
   qaSarReleasesFinalized   QaSarRelease[]             @relation("QaSarReleaseFinalizedBy")
+  qaEvaluationGoldReviews  QaEvaluationScenario[]      @relation("QaEvaluationGoldReviewer")
+  qaEvaluationRatings      QaEvaluationHumanRating[]   @relation("QaEvaluationHumanReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -291,6 +293,7 @@ model QaRequirement {
   assignments      QaRequirementAssignment[]
   sarSections      QaSarSection[]
   sarSubmissions   QaSarSubmission[]
+  evaluationScenarios QaEvaluationScenario[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
@@ -313,6 +316,7 @@ model QaQualityExpectation {
   expectedEvidence QaExpectedEvidence[]
   analyses         QaEvidenceAnalysis[]
   evidenceMappings QaEvidenceMapping[]
+  evaluationScenarios QaEvaluationScenario[]
 
   @@unique([requirementId, order])
   @@index([requirementId, active])
@@ -680,6 +684,99 @@ model QaDocumentChunk {
   @@unique([documentId, chunkIndex])
   @@index([documentId])
   @@index([embeddingModel])
+}
+
+/// Controlled/synthetic research scenario. Intentionally has no Programme FK so
+/// evaluation data remains isolated from operational institutional QA records.
+model QaEvaluationScenario {
+  id              String                     @id @default(uuid())
+  requirementId   String
+  requirement     QaRequirement              @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  expectationId   String
+  expectation     QaQualityExpectation       @relation(fields: [expectationId], references: [id], onDelete: Restrict)
+  name            String
+  description     String
+  goldState       QaEvidenceAnalysisState?
+  goldReviewerId  String?
+  goldReviewer    User?                      @relation("QaEvaluationGoldReviewer", fields: [goldReviewerId], references: [id], onDelete: SetNull)
+  goldAnnotatedAt DateTime?
+  goldNote        String                     @default("")
+  evidence        QaEvaluationScenarioEvidence[]
+  runs            QaEvaluationRun[]
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([requirementId])
+  @@index([expectationId])
+  @@index([goldState])
+}
+
+model QaEvaluationScenarioEvidence {
+  id            String               @id @default(uuid())
+  scenarioId    String
+  scenario      QaEvaluationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  order         Int
+  sourceDomain  String
+  entityType    String
+  label         String
+  text          String
+  referenceKey  String               @default("")
+  reportingDate DateTime?
+  goldRelevant  Boolean?
+  runLinks       QaEvaluationRunEvidence[]
+
+  @@unique([scenarioId, order])
+  @@index([scenarioId, goldRelevant])
+}
+
+/// Immutable prototype output for one controlled scenario. Gold labels are read
+/// from the separate human annotation fields and are never generated here.
+model QaEvaluationRun {
+  id             String                     @id @default(uuid())
+  scenarioId     String
+  scenario       QaEvaluationScenario       @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  predictedState QaEvidenceAnalysisState
+  engine         String
+  engineVersion  String
+  promptVersion  String                     @default("")
+  explanation    String
+  createdAt      DateTime                   @default(now())
+  retrieved      QaEvaluationRunEvidence[]
+  humanRatings   QaEvaluationHumanRating[]
+
+  @@index([scenarioId, createdAt])
+  @@index([engine, engineVersion, promptVersion])
+}
+
+model QaEvaluationRunEvidence {
+  runId              String
+  run                QaEvaluationRun              @relation(fields: [runId], references: [id], onDelete: Cascade)
+  scenarioEvidenceId String
+  scenarioEvidence   QaEvaluationScenarioEvidence @relation(fields: [scenarioEvidenceId], references: [id], onDelete: Cascade)
+  relevance          Float?
+
+  @@id([runId, scenarioEvidenceId])
+  @@index([scenarioEvidenceId])
+}
+
+/// Human assessment of evidence relevance and explanation usefulness for one
+/// exact prototype run. One reviewer contributes at most one immutable rating.
+model QaEvaluationHumanRating {
+  id                 String          @id @default(uuid())
+  runId              String
+  run                QaEvaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  reviewerId         String
+  reviewer           User            @relation("QaEvaluationHumanReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  evidenceRelevance  Int
+  explanationClarity Int
+  understandability  Int
+  usefulness         Int
+  traceability       Int
+  comment            String          @default("")
+  createdAt          DateTime        @default(now())
+
+  @@unique([runId, reviewerId])
+  @@index([reviewerId])
 }
 
 model Permission {

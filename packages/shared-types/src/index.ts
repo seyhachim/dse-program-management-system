@@ -26,5 +26,6 @@ export * from "./qa-actions.ts";
 export * from "./qa-sar.ts";
 export * from "./qa-sar-review.ts";
 export * from "./qa-sar-document.ts";
+export * from "./qa-evaluation.ts";
 export * from "./community.ts";
 export * from "./community-plugin.ts";
