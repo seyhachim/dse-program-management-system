@@ -107,19 +107,39 @@ EXECUTE FUNCTION "protect_finalized_criterion_evidence"();
 CREATE OR REPLACE FUNCTION "protect_roster_after_result_finalization"()
 RETURNS TRIGGER AS $$
 DECLARE
-  offering_id TEXT;
+  old_offering_id TEXT;
+  new_offering_id TEXT;
 BEGIN
-  offering_id := CASE WHEN TG_OP = 'INSERT' THEN NEW."offeringId" ELSE OLD."offeringId" END;
+  old_offering_id := CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE OLD."offeringId" END;
+  new_offering_id := CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE NEW."offeringId" END;
 
-  PERFORM 1 FROM "Offering" WHERE "id" = offering_id FOR UPDATE;
+  -- Lock in deterministic id order when an UPDATE could involve two offerings.
+  PERFORM 1
+  FROM "Offering"
+  WHERE "id" IN (old_offering_id, new_offering_id)
+  ORDER BY "id"
+  FOR UPDATE;
 
-  IF EXISTS (
+  IF old_offering_id IS NOT NULL AND EXISTS (
     SELECT 1
     FROM "AssessmentResult" ar
     JOIN "Enrollment" e ON e."id" = ar."enrollmentId"
-    WHERE e."offeringId" = offering_id
+    WHERE e."offeringId" = old_offering_id
       AND ar."finalizedAt" IS NOT NULL
   ) THEN
+    RAISE EXCEPTION 'Offering roster is locked because finalized results exist';
+  END IF;
+
+  IF new_offering_id IS NOT NULL
+    AND new_offering_id IS DISTINCT FROM old_offering_id
+    AND EXISTS (
+      SELECT 1
+      FROM "AssessmentResult" ar
+      JOIN "Enrollment" e ON e."id" = ar."enrollmentId"
+      WHERE e."offeringId" = new_offering_id
+        AND ar."finalizedAt" IS NOT NULL
+    )
+  THEN
     RAISE EXCEPTION 'Offering roster is locked because finalized results exist';
   END IF;
 
@@ -131,7 +151,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "Enrollment_protect_finalized_roster"
-BEFORE INSERT OR DELETE ON "Enrollment"
+BEFORE INSERT OR UPDATE OR DELETE ON "Enrollment"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_roster_after_result_finalization"();
 
