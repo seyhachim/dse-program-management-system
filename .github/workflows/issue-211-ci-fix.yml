@@ -1,0 +1,23 @@
+name: Issue 211 CI fix
+on:
+  push:
+    branches:
+      - agent/issue-211-offering-course-spec-binding
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-211-offering-course-spec-binding
+      - run: python scripts/issue-211-ci-fix.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- .github/workflows/ci.yml
+          git add -A
+          git commit -m "fix(offerings): integrate exact spec binding with existing result tests"
+          git push
