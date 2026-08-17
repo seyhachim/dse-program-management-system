@@ -62,6 +62,12 @@ function inferScope(programmeId: string, candidate: QaEvidenceCandidateView): Qa
   const term = candidate.attributes.term;
   const cohortId = candidate.attributes.cohortId;
   const population = candidate.attributes.population;
+  const courseSpecVersionId = candidate.attributes.courseSpecVersionId;
+  const offeringId = candidate.attributes.offeringId;
+  const assessmentId = candidate.attributes.assessmentId;
+  if (typeof courseSpecVersionId === "string" && courseSpecVersionId.trim()) scope.courseSpecVersionId = courseSpecVersionId;
+  if (typeof offeringId === "string" && offeringId.trim()) scope.offeringId = offeringId;
+  if (typeof assessmentId === "string" && assessmentId.trim()) scope.assessmentId = assessmentId;
   if (typeof academicYear === "string" && academicYear.trim()) scope.academicYear = academicYear;
   if (typeof term === "string" && term.trim()) scope.term = term;
   if (typeof cohortId === "string" && cohortId.trim()) scope.cohortId = cohortId;

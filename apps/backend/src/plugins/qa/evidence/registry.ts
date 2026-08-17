@@ -89,6 +89,29 @@ async function queryRows(
   evidenceType: string,
 ): Promise<CandidateRow[]> {
   switch (evidenceType) {
+    case "clo-attainment-snapshots":
+      return prisma.$queryRaw<CandidateRow[]>`
+        SELECT
+          s.id AS "entityId",
+          'QaCloAttainmentSnapshot' AS "entityType",
+          c.code || ' — ' || s."cloCode" || ' attainment (' || s."periodKey" || ')' AS title,
+          CASE WHEN s."studentCount" = 0 THEN 'No finalized mapped-result population for this snapshot.'
+            ELSE s."achievedCount"::text || '/' || s."studentCount"::text || ' students met the ' || s."thresholdPercentage"::text || '% threshold (' || s."achievedRate"::text || '%).' END AS summary,
+          '/courses/' || c.id || '/spec' AS route,
+          s."generatedAt" AS "reportingDate",
+          jsonb_build_object(
+            'courseSpecVersionId', s."courseSpecId", 'offeringId', s."offeringId", 'population', 'enrolled-students',
+            'term', s."periodKey", 'periodKey', s."periodKey", 'cloCode', s."cloCode",
+            'calculationVersion', s."calculationVersion", 'calculationHash', s."calculationHash",
+            'thresholdPercentage', s."thresholdPercentage", 'populationSize', s."populationSize",
+            'studentCount', s."studentCount", 'achievedCount', s."achievedCount", 'achievedRate', s."achievedRate"
+          ) AS attributes
+        FROM "QaCloAttainmentSnapshot" s
+        JOIN "Course" c ON c.id = s."courseId"
+        WHERE s."programmeId" = ${programmeId}
+        ORDER BY s."generatedAt" DESC, c.code, s."cloCode"
+      `;
+
     case "cohort-membership":
       return prisma.$queryRaw<CandidateRow[]>`
         SELECT
