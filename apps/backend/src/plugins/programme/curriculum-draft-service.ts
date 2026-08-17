@@ -263,15 +263,20 @@ export const curriculumDraftService = {
       throw new CurriculumDraftMutationError("Placement ids in a reorder request must be unique");
     }
 
-    const existing = await prisma.programmeCurriculumCourse.findMany({
-      where: {
-        curriculumVersionId: version.id,
-        yearLevel: input.yearLevel,
-        semester: input.semester,
-      },
-      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-      select: { id: true },
-    });
+    // The curriculum read model intentionally exposes common placements plus the
+    // selected/default route only. Reorder validation must use that exact same
+    // visibility predicate so hidden alternative-pathway rows never make a valid
+    // editor request impossible to satisfy.
+    const existing = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT pc."id"
+      FROM public."ProgrammeCurriculumCourse" pc
+      LEFT JOIN public."ProgrammeCurriculumPathway" p ON p."id" = pc."pathwayId"
+      WHERE pc."curriculumVersionId" = ${version.id}
+        AND pc."yearLevel" = ${input.yearLevel}
+        AND pc."semester" = ${input.semester}::"Semester"
+        AND (pc."pathwayId" IS NULL OR p."isDefault" = TRUE)
+      ORDER BY pc."sortOrder", pc."id"
+    `);
     const existingIds = existing.map((item) => item.id).sort();
     const requestedIds = [...input.placementIds].sort();
     if (
@@ -279,7 +284,7 @@ export const curriculumDraftService = {
       existingIds.some((id, index) => id !== requestedIds[index])
     ) {
       throw new CurriculumDraftMutationError(
-        "Reorder request must contain every placement in the selected year and semester exactly once",
+        "Reorder request must contain every visible placement in the selected default route exactly once",
       );
     }
 
