@@ -190,6 +190,15 @@ function buildEvidenceForDefinition(options: {
       text,
       referenceKey: `${QA_PILOT_SCENARIO_VERSION}:${requirementCode}:${variant}:${definition.evidenceType}:${index + 1}`,
       reportingDate,
+      scope: { programmeId: "controlled-evaluation" },
+      provenance: {
+        authority: "controlledInternalRecord",
+        ownerUnit: "Controlled research fixture",
+        version: QA_PILOT_SCENARIO_VERSION,
+        approvalStatus: "controlled",
+        sourceUri: null,
+      },
+      periodKey: String(reportingDate.getUTCFullYear()),
       attributes,
     };
   });
