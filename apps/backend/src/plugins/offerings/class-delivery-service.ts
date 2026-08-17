@@ -63,8 +63,13 @@ export const classDeliveryService = {
     actorId: string,
   ): Promise<SaveLecturerArrivalConfirmationResult> {
     const result = await prisma.$transaction(async (tx) => {
-      const offering = await tx.offering.findUnique({ where: { id: offeringId }, select: { id: true } });
-      if (!offering) throw new ReferenceError("Offering not found");
+      const offerings = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "Offering"
+        WHERE "id" = ${offeringId}
+        FOR UPDATE
+      `;
+      if (!offerings[0]) throw new ReferenceError("Offering not found");
 
       const existing = await tx.$queryRaw<ConfirmationRow[]>`
         SELECT
