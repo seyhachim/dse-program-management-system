@@ -76,11 +76,15 @@ export function matchEvidenceScope(
     const key = SCOPE_KEYS[dimension];
     const expectedValue = expected[key];
     const candidateValue = candidate[key];
-    if (!expectedValue || !candidateValue) {
+
+    if (!candidateValue) {
       unknown += 1;
       continue;
     }
-    if (expectedValue !== candidateValue) return "mismatch";
+    // A programme-wide expectation can require a dimension to be present without
+    // naming one target value (for example every candidate must identify its course).
+    // When a target value is supplied, mismatches remain explicit.
+    if (expectedValue && expectedValue !== candidateValue) return "mismatch";
     matched += 1;
   }
 
@@ -116,6 +120,18 @@ export function matchEvidenceTime(
   const ageMs = context.cycleEnd.getTime() - context.candidateDate.getTime();
   const maximumAgeMs = rule.maximumAgeDays * 24 * 60 * 60 * 1000;
   return ageMs <= maximumAgeMs ? "current" : "stale";
+}
+
+/** Whether the temporal decision can support coverage for this rule. */
+export function temporalMatchSupportsEvidence(
+  rule: QaTemporalRule,
+  match: QaTemporalMatch,
+): boolean {
+  if (match === "current") return true;
+  // Compatibility / point-in-time evidence may be older than the reporting-cycle
+  // start while still being the authoritative current record. Explicit withinCycle,
+  // recent, multiPeriod and longitudinal rules remain strict.
+  return rule.kind === "pointInTime" && match === "historicalRelevant";
 }
 
 export function meetsSourceAuthority(
