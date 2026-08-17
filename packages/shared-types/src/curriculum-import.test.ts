@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { DseCurriculumImportSchema } from "./curriculum-import.ts";
+import {
+  CurriculumImportApplyInputSchema,
+  DseCurriculumImportSchema,
+} from "./curriculum-import.ts";
 
 function baseImport() {
   return {
@@ -76,6 +79,24 @@ describe("dse curriculum JSON import contract", () => {
     expect(result.success).toBe(true);
   });
 
+  test("accepts official declared totals separately from row arithmetic", () => {
+    const input = structuredClone(baseImport());
+    Object.assign(input, {
+      declaredTotals: {
+        semesterCredits: [{ yearLevel: 1, semester: "First", credits: 18 }],
+        pathwayCredits: [
+          { pathwayCode: "COURSEWORK", credits: 18 },
+          { pathwayCode: "RESEARCH", credits: 18 },
+        ],
+        programmeCourseCount: 48,
+        programmeCredits: 143,
+      },
+    });
+    const parsed = DseCurriculumImportSchema.parse(input);
+    expect(parsed.declaredTotals?.programmeCredits).toBe(143);
+    expect(parsed.declaredTotals?.programmeCourseCount).toBe(48);
+  });
+
   test("rejects an unknown format version", () => {
     const input = { ...baseImport(), formatVersion: "legacy-v0" };
     expect(DseCurriculumImportSchema.safeParse(input).success).toBe(false);
@@ -123,5 +144,54 @@ describe("dse curriculum JSON import contract", () => {
     const input = structuredClone(baseImport());
     input.courses.push(structuredClone(input.courses[0]!));
     expect(DseCurriculumImportSchema.safeParse(input).success).toBe(false);
+  });
+
+  test("rejects duplicate and unknown declared totals", () => {
+    const input = {
+      ...structuredClone(baseImport()),
+      declaredTotals: {
+        semesterCredits: [
+          { yearLevel: 1, semester: "First", credits: 18 },
+          { yearLevel: 1, semester: "First", credits: 19 },
+        ],
+        pathwayCredits: [{ pathwayCode: "UNKNOWN", credits: 18 }],
+        programmeCourseCount: 48,
+        programmeCredits: 143,
+      },
+    };
+    expect(DseCurriculumImportSchema.safeParse(input).success).toBe(false);
+  });
+
+  test("create-course decision requires explicit course type", () => {
+    const upload = {
+      fileName: "curriculum.json",
+      jsonText: JSON.stringify(baseImport()),
+    };
+    expect(
+      CurriculumImportApplyInputSchema.safeParse({
+        ...upload,
+        decisions: [{ courseCode: "NEW101", action: "create-course" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      CurriculumImportApplyInputSchema.safeParse({
+        ...upload,
+        decisions: [
+          { courseCode: "NEW101", action: "create-course", courseType: "Core" },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  test("rejects duplicate import decisions for one code", () => {
+    const upload = {
+      fileName: "curriculum.json",
+      jsonText: JSON.stringify(baseImport()),
+      decisions: [
+        { courseCode: "ABC101", action: "keep-existing-course" },
+        { courseCode: "ABC101", action: "keep-existing-course" },
+      ],
+    };
+    expect(CurriculumImportApplyInputSchema.safeParse(upload).success).toBe(false);
   });
 });
