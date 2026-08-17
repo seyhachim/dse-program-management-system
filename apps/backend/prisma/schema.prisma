@@ -1171,6 +1171,7 @@ model CourseSpec {
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
   curriculumPlacements    ProgrammeCurriculumCourse[]       @relation("ProgrammeCurriculumCourseSpecVersion")
+  offerings               Offering[]                         @relation("OfferingCourseSpecVersion")
 
   approvedAt      DateTime?
   effectiveFrom   DateTime?
@@ -1527,6 +1528,8 @@ model Offering {
   id             String         @id @default(uuid())
   courseId       String
   course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseSpecId   String?
+  courseSpec     CourseSpec?     @relation("OfferingCourseSpecVersion", fields: [courseSpecId], references: [id], onDelete: Restrict)
   lecturerId     String?
   lecturer       User?          @relation("OfferingLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
   term           String
@@ -1555,6 +1558,7 @@ model Offering {
   @@unique([courseId, term, sectionCode])
   @@index([status])
   @@index([lecturerId])
+  @@index([courseSpecId])
 }
 
 /// A recurring weekly class session. Duration is derived from startTime/endTime

@@ -1206,6 +1206,12 @@ async function main() {
         submissionVersion: 1,
       },
     });
+    // Direct seed writes bypass the Offering API, so explicitly establish the
+    // same exact Approved CourseSpec binding required for real new offerings.
+    await prisma.offering.update({
+      where: { id: offering.id },
+      data: { courseSpecId: spec.id },
+    });
     for (const sectionKey of ["clos", "slt", "assessmentPlan", "resources"] as const) {
       await prisma.courseSpecSection.upsert({
         where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey } },

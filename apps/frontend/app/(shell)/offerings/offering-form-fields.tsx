@@ -5,6 +5,7 @@ import {
   MEETING_ACTIVITY_TYPES,
   MEETING_DAYS,
   OFFERING_STATUSES,
+  type CourseSpecVersionRef,
   type Lecturer,
   type OfferingMeetingInput,
   type Semester,
@@ -23,6 +24,7 @@ import { LecturerChecklist } from "./lecturer-checklist";
 
 export type OfferingFormValues = {
   courseId: string;
+  courseSpecId: string;
   term: string;
   sectionCode: string;
   meetings: OfferingMeetingInput[];
@@ -62,6 +64,8 @@ interface OfferingFormFieldsProps {
   register: UseFormRegister<OfferingFormValues>;
   errors: FieldErrors<OfferingFormValues>;
   courses: CourseView[];
+  courseSpecVersions: CourseSpecVersionRef[];
+  courseSpecLoading: boolean;
   lecturers: Lecturer[];
   lecturerId: string | null;
   /** Course is fixed once an offering exists — an offering can't change its course. */
@@ -81,6 +85,8 @@ export function OfferingFormFields({
   register,
   errors,
   courses,
+  courseSpecVersions,
+  courseSpecLoading,
   lecturers,
   lecturerId,
   courseLocked,
@@ -95,6 +101,9 @@ export function OfferingFormFields({
 }: OfferingFormFieldsProps) {
   const courseItems: Record<string, string> = Object.fromEntries(
     courses.map((c) => [c.id, `${c.code} — ${c.title}`]),
+  );
+  const courseSpecItems: Record<string, string> = Object.fromEntries(
+    courseSpecVersions.map((spec) => [spec.id, `Version ${spec.version}`]),
   );
   const lecturerItems: Record<string, string> = {
     [UNASSIGNED_SENTINEL]: "— Unassigned —",
@@ -137,6 +146,34 @@ export function OfferingFormFields({
             </Select>
           )}
         />
+      </Field>
+      <Field label="Approved CourseSpec version" error={errors.courseSpecId?.message}>
+        <Controller
+          control={control}
+          name="courseSpecId"
+          render={({ field }) => (
+            <Select
+              items={courseSpecItems}
+              value={field.value || null}
+              onValueChange={(v) => field.onChange(v ?? "")}
+              disabled={!courseSpecVersions.length || courseSpecLoading}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={courseSpecLoading ? "Loading approved versions…" : "— Select approved version —"} />
+              </SelectTrigger>
+              <SelectContent>
+                {courseSpecVersions.map((spec) => (
+                  <SelectItem key={spec.id} value={spec.id}>
+                    Version {spec.version}{spec.effectiveFrom ? ` · effective ${spec.effectiveFrom}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {!courseSpecLoading && courses.length > 0 && courseSpecVersions.length === 0 ? (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">This course has no Approved CourseSpec version yet.</p>
+        ) : null}
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Term" error={errors.term?.message}>

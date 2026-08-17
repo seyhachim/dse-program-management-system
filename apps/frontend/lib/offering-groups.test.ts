@@ -28,6 +28,7 @@ function offering(
       title: "Predictive Analytics",
       programmeId: "dse",
     },
+    courseSpec: null,
     lecturer: {
       id: lecturerId,
       name: lecturerId,
