@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { CurriculumJsonUploadSchema } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type Role } from "../../core/auth/token.ts";
@@ -18,7 +18,7 @@ const READ_ROLES: Role[] = [
 ];
 const WRITE_ROLES: Role[] = ["admin", "program_coordinator"];
 
-function sendImportError(res: Parameters<Parameters<Router["get"]>[1]>[1], error: unknown) {
+function sendImportError(res: Response, error: unknown) {
   if (error instanceof CurriculumImportNotFoundError) {
     res.status(404).json({ error: error.message });
     return;
