@@ -36,6 +36,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "CourseSpecResource",
   "CourseSpecStudentResponsibility",
   "Offering",
+  "OfferingResultAccessPolicy",
   "OfferingMeeting",
   "OfferingCoLecturer",
   "Enrollment",
