@@ -8,6 +8,16 @@ import { courseSpecRevisionService } from "./revision-service.ts";
 const runDbTests = process.env.COURSE_INFO_SNAPSHOT_DB_TESTS === "1";
 const dbDescribe = runDbTests ? describe : describe.skip;
 
+async function expectDatabaseRejection(operation: () => Promise<unknown>): Promise<void> {
+  let rejected = false;
+  try {
+    await operation();
+  } catch {
+    rejected = true;
+  }
+  expect(rejected).toBe(true);
+}
+
 dbDescribe("CourseSpec Course Information snapshots", () => {
   test("approved historical output survives live administrative edits and revisions snapshot the new values", async () => {
     const suffix = randomUUID();
@@ -125,12 +135,12 @@ dbDescribe("CourseSpec Course Information snapshots", () => {
       programmeYear: 2,
     });
 
-    await expect(
+    await expectDatabaseRejection(() =>
       prisma.courseSpecCourseInfo.update({
         where: { courseSpecId: source.id },
         data: { courseTitle: "Illegal historical rewrite" },
       }),
-    ).rejects.toThrow();
+    );
 
     const revision = await courseSpecRevisionService.createCourseSpecRevision({
       courseId: course.id,
@@ -163,8 +173,5 @@ dbDescribe("CourseSpec Course Information snapshots", () => {
       where: { courseSpecId: source.id },
     });
     expect(frozenAfter).toEqual(frozenBefore);
-
-    await prisma.course.delete({ where: { id: course.id } });
-    await prisma.user.delete({ where: { id: lecturer.id } });
   });
 });
