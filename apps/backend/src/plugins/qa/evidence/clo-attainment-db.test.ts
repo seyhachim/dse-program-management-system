@@ -6,7 +6,7 @@ import { getQaEvidenceCandidates } from "./service.ts";
 const enabled = process.env.CLO_ATTAINMENT_DB_TESTS === "1";
 const db = new PrismaClient();
 const id = () => crypto.randomUUID();
-const ids = { course: id(), spec1: id(), spec2: id(), clo1: id(), clo2: id(), assessment1: id(), assessment2: id(), assessment3: id(), offering1: id(), offering2: id(), student1: id(), student2: id(), enrollment1: id(), enrollment2: id() };
+const ids = { course: id(), spec1: id(), spec2: id(), clo1: id(), clo2: id(), assessment1: id(), assessment2: id(), assessment3: id(), offering1: id(), offering2: id(), student1: id(), student2: id(), student3: id(), enrollment1: id(), enrollment2: id(), enrollment3: id() };
 
 describe.skipIf(!enabled)("CLO attainment snapshot integrity", () => {
   beforeAll(async () => {
@@ -22,21 +22,25 @@ describe.skipIf(!enabled)("CLO attainment snapshot integrity", () => {
     await db.offering.create({ data: { id: ids.offering2, courseId: ids.course, courseSpecId: ids.spec2, term: "2027-S1", sectionCode: "B" } });
     await db.student.create({ data: { id: ids.student1, name: "S1", email: `i303-${ids.student1}@example.test`, studentId: `I303-${ids.student1.slice(0,8)}` } });
     await db.student.create({ data: { id: ids.student2, name: "S2", email: `i303-${ids.student2}@example.test`, studentId: `I303-${ids.student2.slice(0,8)}` } });
+    await db.student.create({ data: { id: ids.student3, name: "S3", email: `i303-${ids.student3}@example.test`, studentId: `I303-${ids.student3.slice(0,8)}` } });
     await db.enrollment.create({ data: { id: ids.enrollment1, offeringId: ids.offering1, studentId: ids.student1 } });
     await db.enrollment.create({ data: { id: ids.enrollment2, offeringId: ids.offering1, studentId: ids.student2 } });
+    await db.enrollment.create({ data: { id: ids.enrollment3, offeringId: ids.offering1, studentId: ids.student3 } });
     const now = new Date();
     await db.assessmentResult.createMany({ data: [
       { enrollmentId: ids.enrollment1, courseSpecId: ids.spec1, assessmentItemId: ids.assessment1, score: 80, maxScore: 100, publishedAt: now, finalizedAt: now },
       { enrollmentId: ids.enrollment1, courseSpecId: ids.spec1, assessmentItemId: ids.assessment2, score: 60, maxScore: 100, publishedAt: now, finalizedAt: now },
       { enrollmentId: ids.enrollment2, courseSpecId: ids.spec1, assessmentItemId: ids.assessment1, score: 50, maxScore: 100, publishedAt: now, finalizedAt: now },
       { enrollmentId: ids.enrollment2, courseSpecId: ids.spec1, assessmentItemId: ids.assessment2, score: 60, maxScore: 100, publishedAt: now, finalizedAt: now },
+      { enrollmentId: ids.enrollment3, courseSpecId: ids.spec1, assessmentItemId: ids.assessment1, score: 100, maxScore: 100, finalizedAt: now },
     ] });
   });
   afterAll(async () => { await db.$disconnect(); });
 
-  test("creates deterministic exact-input snapshot and reuses identical calculation", async () => {
+  test("creates deterministic exact-input snapshot and excludes unpublished finalized inputs", async () => {
     const first = await generateCloAttainmentSnapshots({ programmeId: "dse", offeringId: ids.offering1, thresholdPercentage: 70 });
     expect(first).toHaveLength(1);
+    expect(first[0]?.populationSize).toBe(3);
     expect(first[0]?.studentCount).toBe(2);
     expect(first[0]?.achievedCount).toBe(1);
     expect(first[0]?.achievedRate).toBe(50);
@@ -67,14 +71,19 @@ describe.skipIf(!enabled)("CLO attainment snapshot integrity", () => {
     expect(snapshots[0]?.achievedRate).toBeNull();
   });
 
-  test("Criterion 4 retrieval exposes exact version/offering scope and calculation lineage", async () => {
-    const evidence = await getQaEvidenceCandidates("dse", "aun-qa-v4:4.5:research:c4-e05:evidence:3");
-    const candidate = evidence.candidates.find((item) => item.attributes.offeringId === ids.offering1);
-    expect(candidate?.scope?.courseSpecVersionId).toBe(ids.spec1);
-    expect(candidate?.scope?.offeringId).toBe(ids.offering1);
-    expect(candidate?.scope?.population).toBe("enrolled-students");
-    expect(candidate?.periodKey).toBe("2026-S1");
-    expect(candidate?.provenance?.authority).toBe("controlledInternalRecord");
-    expect(candidate?.attributes.calculationHash).toBeTruthy();
+  test("Criteria 4 and 8 retrieval cite the same exact snapshot scope and lineage", async () => {
+    for (const expectedEvidenceId of [
+      "aun-qa-v4:4.5:research:c4-e05:evidence:3",
+      "aun-qa-v4:8.4:research:c8-e03:evidence:1",
+    ]) {
+      const evidence = await getQaEvidenceCandidates("dse", expectedEvidenceId);
+      const candidate = evidence.candidates.find((item) => item.attributes.offeringId === ids.offering1);
+      expect(candidate?.scope?.courseSpecVersionId).toBe(ids.spec1);
+      expect(candidate?.scope?.offeringId).toBe(ids.offering1);
+      expect(candidate?.scope?.population).toBe("enrolled-students");
+      expect(candidate?.periodKey).toBe("2026-S1");
+      expect(candidate?.provenance?.authority).toBe("controlledInternalRecord");
+      expect(candidate?.attributes.calculationHash).toBeTruthy();
+    }
   });
 });
