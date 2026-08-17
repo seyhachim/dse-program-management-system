@@ -5,10 +5,12 @@ import { classDeliveryService } from "./class-delivery-service.ts";
 import { classResponsibilityService } from "./class-responsibility-service.ts";
 import { createOfferingRouter } from "./router.ts";
 import { offeringService } from "./service.ts";
+import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
 
 export const offeringsService = {
   ...offeringService,
   attendance: attendanceService,
+  studentAttendanceHistory: studentAttendanceHistoryService,
   classResponsibilities: classResponsibilityService,
   classDelivery: classDeliveryService,
 };
