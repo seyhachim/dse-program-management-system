@@ -2,6 +2,9 @@ import {
   AUN_QA_V4_ID,
   QaEvidenceSourceDomainSchema,
   type QaEvidenceCandidateResultView,
+  type QaEvidenceCandidateView,
+  type QaEvidenceProvenance,
+  type QaEvidenceScope,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import {
@@ -25,6 +28,94 @@ type DefinitionRow = {
 export class QaEvidenceCandidateResourceNotFoundError extends Error {}
 
 const semanticDomains = new Set(["document", "survey", "minutes", "policy"]);
+
+function routeCourseId(route: string | null): string | undefined {
+  const match = route?.match(/^\/courses\/([^/]+)/);
+  return match?.[1];
+}
+
+function inferScope(programmeId: string, candidate: QaEvidenceCandidateView): QaEvidenceScope {
+  const scope: QaEvidenceScope = { programmeId };
+  const courseId = routeCourseId(candidate.route);
+  if (courseId) scope.courseId = courseId;
+
+  const entityParts = candidate.entityId.split(":");
+  if (candidate.entityType === "Course") scope.courseId = candidate.entityId;
+  if (candidate.entityType === "Offering") scope.offeringId = candidate.entityId;
+  if (candidate.entityType === "CourseSpec" || candidate.entityType === "CourseSpecTeachingLearning") {
+    scope.courseSpecVersionId = candidate.entityId;
+  }
+  if (
+    ["CourseSpecWeek", "CourseSpecClo", "CourseSpecAssessmentItem"].includes(candidate.entityType) &&
+    entityParts.length >= 2
+  ) {
+    scope.courseSpecVersionId = entityParts[0];
+  }
+  if (candidate.entityType === "CourseSpecAssessmentItem" && entityParts.length >= 2) {
+    scope.assessmentId = entityParts.slice(1).join(":");
+  }
+
+  const academicYear = candidate.attributes.academicYear;
+  const term = candidate.attributes.term;
+  const cohortId = candidate.attributes.cohortId;
+  const population = candidate.attributes.population;
+  if (typeof academicYear === "string" && academicYear.trim()) scope.academicYear = academicYear;
+  if (typeof term === "string" && term.trim()) scope.term = term;
+  if (typeof cohortId === "string" && cohortId.trim()) scope.cohortId = cohortId;
+  if (typeof population === "string" && population.trim()) scope.population = population;
+  return scope;
+}
+
+function inferProvenance(candidate: QaEvidenceCandidateView): QaEvidenceProvenance {
+  const reviewStatus = candidate.attributes.reviewStatus;
+  const submissionVersion = candidate.attributes.submissionVersion;
+  const finalized = candidate.attributes.finalized;
+
+  let authority: QaEvidenceProvenance["authority"];
+  if (["document", "survey", "minutes", "policy"].includes(candidate.sourceDomain)) {
+    authority = "uploadedExternalDocument";
+  } else if (reviewStatus === "Approved") {
+    authority = "approvedDocument";
+  } else if (finalized === true) {
+    authority = "officialInstitutionalRecord";
+  } else {
+    authority = "controlledInternalRecord";
+  }
+
+  return {
+    authority,
+    ownerUnit: "DSE",
+    version:
+      typeof submissionVersion === "number" || typeof submissionVersion === "string"
+        ? String(submissionVersion)
+        : null,
+    approvalStatus: typeof reviewStatus === "string" ? reviewStatus : null,
+    sourceUri: candidate.route,
+  };
+}
+
+function inferPeriodKey(candidate: QaEvidenceCandidateView): string | null {
+  const explicit = candidate.attributes.periodKey ?? candidate.attributes.academicYear ?? candidate.attributes.term;
+  if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
+  if (!candidate.reportingDate) return null;
+  const date = new Date(candidate.reportingDate);
+  return Number.isNaN(date.getTime()) ? null : String(date.getUTCFullYear());
+}
+
+function normalizeCandidateSemantics(
+  programmeId: string,
+  result: QaEvidenceCandidateResultView,
+): QaEvidenceCandidateResultView {
+  return {
+    ...result,
+    candidates: result.candidates.map((candidate) => ({
+      ...candidate,
+      scope: candidate.scope ?? inferScope(programmeId, candidate),
+      provenance: candidate.provenance ?? inferProvenance(candidate),
+      periodKey: candidate.periodKey ?? inferPeriodKey(candidate),
+    })),
+  };
+}
 
 export async function getQaEvidenceCandidates(
   programmeId: string,
@@ -72,12 +163,13 @@ export async function getQaEvidenceCandidates(
       sourceDomain: sourceDomain.data,
       expectationStatement: row.expectationStatement,
     };
-    return retrieveSemanticDocumentEvidence(
+    const result = await retrieveSemanticDocumentEvidence(
       programmeId,
       definition,
       options.topK ?? 10,
       options.embeddingProvider,
     );
+    return normalizeCandidateSemantics(programmeId, result);
   }
 
   const definition: ExpectedEvidenceDefinition = {
@@ -85,5 +177,8 @@ export async function getQaEvidenceCandidates(
     evidenceType: row.evidenceType,
     sourceDomain: sourceDomain.data,
   };
-  return retrieveEvidenceCandidates(programmeId, definition);
+  return normalizeCandidateSemantics(
+    programmeId,
+    await retrieveEvidenceCandidates(programmeId, definition),
+  );
 }
