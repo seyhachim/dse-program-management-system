@@ -52,7 +52,8 @@ export const classDeliveryService = {
     offeringId: string,
     date: string,
   ): Promise<LecturerArrivalConfirmationView | null> {
-    return (await readRow(offeringId, date)) ? view((await readRow(offeringId, date))!) : null;
+    const row = await readRow(offeringId, date);
+    return row ? view(row) : null;
   },
 
   async saveLecturerArrival(
