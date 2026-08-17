@@ -13,6 +13,7 @@ describe("QA evidence semantics contracts", () => {
       applicabilityRule: { kind: "always" },
       scopeRequirement: { requiredDimensions: [] },
       temporalRule: { kind: "pointInTime" },
+      relationshipRequirement: { requiredLinks: [] },
     });
     expect(QaExpectedEvidenceSemanticsSchema.parse({})).toEqual({
       scopeRequirement: { requiredDimensions: [] },
@@ -37,6 +38,32 @@ describe("QA evidence semantics contracts", () => {
       temporalRule: { kind: "longitudinal", minimumPeriods: 3 },
       authorityRequirement: { minimumAuthority: "approvedDocument" },
     });
+  });
+
+  it("supports explicit evidence relationship chains without making them matcher behavior yet", () => {
+    expect(
+      QaQualityExpectationSemanticsSchema.parse({
+        relationshipRequirement: {
+          requiredLinks: [
+            {
+              fromEvidenceType: "outcome-concerns",
+              toEvidenceType: "qa-review-records",
+              relation: "reviewedBy",
+            },
+            {
+              fromEvidenceType: "qa-review-records",
+              toEvidenceType: "improvement-actions",
+              relation: "resultsIn",
+            },
+            {
+              fromEvidenceType: "improvement-actions",
+              toEvidenceType: "follow-up-evidence",
+              relation: "followedUpBy",
+            },
+          ],
+        },
+      }).relationshipRequirement.requiredLinks,
+    ).toHaveLength(3);
   });
 
   it("normalizes candidate scope and provenance", () => {
