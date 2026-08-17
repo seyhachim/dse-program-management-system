@@ -33,6 +33,13 @@ export interface QaEvidenceCandidateResultView {
   sourceDomain: z.infer<typeof QaEvidenceSourceDomainSchema>;
   status: QaEvidenceRetrievalStatus;
   reason: string;
+  /**
+   * Concrete target scope when the caller is evaluating one known course,
+   * course-spec version, offering, cohort, assessment, term, or population.
+   * Programme-wide retrievals may omit it; required dimensions are then checked
+   * for presence without inventing a target value.
+   */
+  expectedScope?: QaEvidenceScope;
   candidates: QaEvidenceCandidateView[];
 }
 
