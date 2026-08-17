@@ -548,7 +548,7 @@ async function resolveCanonicalCourses(
       resolved.set(code, {
         courseId: created.id,
         title: created.title,
-        courseType: created.courseType,
+        courseType: created.courseType as CourseType,
       });
       continue;
     }
@@ -819,11 +819,7 @@ export const curriculumImportService = {
 
   async artifactForExport(versionId: string): Promise<CurriculumArtifactView> {
     const workflow = await getCurriculumWorkflowState(versionId);
-    if (![
-      "Approved",
-      "Active",
-      "Superseded",
-    ].includes(workflow.status)) {
+    if (!["Approved", "Active", "Superseded"].includes(workflow.status)) {
       throw new CurriculumImportConflictError(
         `Curriculum export is unavailable while version status is ${workflow.status}`,
       );
