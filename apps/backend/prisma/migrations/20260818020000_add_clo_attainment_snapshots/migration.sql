@@ -48,6 +48,12 @@ BEGIN
   RAISE EXCEPTION 'CLO attainment snapshots are immutable; create a superseding snapshot instead';
 END;
 $$ LANGUAGE plpgsql;
+REVOKE ALL ON FUNCTION prevent_clo_attainment_snapshot_rewrite() FROM PUBLIC;
+DO $$ DECLARE api_role text; BEGIN
+  FOR api_role IN SELECT rolname FROM pg_roles WHERE rolname = ANY (ARRAY['anon','authenticated','service_role']) LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION public.prevent_clo_attainment_snapshot_rewrite() FROM %I', api_role);
+  END LOOP;
+END $$;
 CREATE TRIGGER "QaCloAttainmentSnapshot_no_update" BEFORE UPDATE ON "QaCloAttainmentSnapshot" FOR EACH ROW EXECUTE FUNCTION prevent_clo_attainment_snapshot_rewrite();
 CREATE TRIGGER "QaCloAttainmentSnapshot_no_delete" BEFORE DELETE ON "QaCloAttainmentSnapshot" FOR EACH ROW EXECUTE FUNCTION prevent_clo_attainment_snapshot_rewrite();
 
