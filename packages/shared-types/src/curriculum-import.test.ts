@@ -146,6 +146,16 @@ describe("dse curriculum JSON import contract", () => {
     expect(DseCurriculumImportSchema.safeParse(input).success).toBe(false);
   });
 
+  test("rejects the same canonical course code across different pathways", () => {
+    const input = structuredClone(baseImport());
+    input.courses.push({
+      ...structuredClone(input.courses[1]!),
+      pathwayCode: "RESEARCH",
+      sortOrder: 1,
+    });
+    expect(DseCurriculumImportSchema.safeParse(input).success).toBe(false);
+  });
+
   test("rejects duplicate and unknown declared totals", () => {
     const input = {
       ...structuredClone(baseImport()),
