@@ -1,6 +1,10 @@
 import {
   AUN_QA_V4_ID,
   QA_PILOT_REQUIREMENT_CODES,
+  QaApplicabilityRuleSchema,
+  QaEvidenceScopeRequirementSchema,
+  QaSourceAuthorityRequirementSchema,
+  QaTemporalRuleSchema,
   type CreateQaCycleInput,
   type CreateQaEvidenceInput,
   type QaCycleView,
@@ -101,12 +105,18 @@ type QaKnowledgeRow = {
   statement: string;
   purpose: string;
   expectationOrder: number;
+  applicabilityRule: unknown;
+  expectationScopeRequirement: unknown;
+  expectationTemporalRule: unknown;
   evidenceId: string | null;
   evidenceType: string | null;
   evidenceDescription: string | null;
   evidenceRole: string | null;
   sourceDomain: string | null;
   evidenceOrder: number | null;
+  evidenceScopeRequirement: unknown | null;
+  evidenceTemporalRule: unknown | null;
+  authorityRequirement: unknown | null;
 };
 
 export class QaResourceNotFoundError extends Error {}
@@ -123,12 +133,18 @@ export const qaService = {
         e.statement,
         e.purpose,
         e."order" AS "expectationOrder",
+        e."applicabilityRule",
+        e."scopeRequirement" AS "expectationScopeRequirement",
+        e."temporalRule" AS "expectationTemporalRule",
         x.id AS "evidenceId",
         x."evidenceType",
         x.description AS "evidenceDescription",
         x.role AS "evidenceRole",
         x."sourceDomain",
-        x."order" AS "evidenceOrder"
+        x."order" AS "evidenceOrder",
+        x."scopeRequirement" AS "evidenceScopeRequirement",
+        x."temporalRule" AS "evidenceTemporalRule",
+        x."authorityRequirement"
       FROM "QaQualityExpectation" e
       JOIN "QaRequirement" r ON r.id = e."requirementId"
       JOIN "QaCriterion" c ON c.id = r."criterionId"
@@ -154,6 +170,9 @@ export const qaService = {
           statement: row.statement,
           purpose: row.purpose,
           order: row.expectationOrder,
+          applicabilityRule: QaApplicabilityRuleSchema.parse(row.applicabilityRule),
+          scopeRequirement: QaEvidenceScopeRequirementSchema.parse(row.expectationScopeRequirement),
+          temporalRule: QaTemporalRuleSchema.parse(row.expectationTemporalRule),
           expectedEvidence: [],
         };
         expectations.set(row.expectationId, expectation);
@@ -174,6 +193,9 @@ export const qaService = {
           role: row.evidenceRole as QaExpectedEvidenceRole,
           sourceDomain: row.sourceDomain as QaEvidenceSourceDomain,
           order: row.evidenceOrder,
+          scopeRequirement: QaEvidenceScopeRequirementSchema.parse(row.evidenceScopeRequirement),
+          temporalRule: QaTemporalRuleSchema.parse(row.evidenceTemporalRule),
+          authorityRequirement: QaSourceAuthorityRequirementSchema.parse(row.authorityRequirement),
         });
       }
     }
