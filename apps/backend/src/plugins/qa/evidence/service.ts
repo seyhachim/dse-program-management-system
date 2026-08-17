@@ -46,12 +46,15 @@ function inferScope(programmeId: string, candidate: QaEvidenceCandidateView): Qa
     scope.courseSpecVersionId = candidate.entityId;
   }
   if (
-    ["CourseSpecWeek", "CourseSpecClo", "CourseSpecAssessmentItem"].includes(candidate.entityType) &&
+    ["CourseSpecWeek", "CourseSpecClo", "CourseSpecAssessmentItem", "AssessmentResultSet"].includes(candidate.entityType) &&
     entityParts.length >= 2
   ) {
     scope.courseSpecVersionId = entityParts[0];
   }
-  if (candidate.entityType === "CourseSpecAssessmentItem" && entityParts.length >= 2) {
+  if (
+    ["CourseSpecAssessmentItem", "AssessmentResultSet"].includes(candidate.entityType) &&
+    entityParts.length >= 2
+  ) {
     scope.assessmentId = entityParts.slice(1).join(":");
   }
 
