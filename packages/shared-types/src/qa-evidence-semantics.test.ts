@@ -57,14 +57,16 @@ describe("QA evidence semantics contracts", () => {
   });
 
   it("exposes all temporal decision states needed by #298", () => {
-    for (const state of [
+    const states = [
       "current",
       "historicalRelevant",
       "stale",
       "future",
       "insufficientHistory",
       "unknown",
-    ]) {
+    ] as const;
+
+    for (const state of states) {
       expect(QaTemporalMatchSchema.parse(state)).toBe(state);
     }
   });
