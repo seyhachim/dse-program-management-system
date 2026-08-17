@@ -1,0 +1,55 @@
+name: PR384 rebase probe
+
+on:
+  push:
+    branches:
+      - agent/issue-382-finalized-result-correction-ui
+    paths:
+      - .github/workflows/pr384-rebase.yml
+
+permissions:
+  contents: write
+
+jobs:
+  probe-rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-382-finalized-result-correction-ui
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Rebase onto current main or publish conflicts
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          before=$(git rev-parse HEAD)
+          main=$(git rev-parse origin/main)
+
+          set +e
+          GIT_EDITOR=true git rebase origin/main
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            git push --force-with-lease origin HEAD:agent/issue-382-finalized-result-correction-ui
+            exit 0
+          fi
+
+          git diff --name-only --diff-filter=U | sort -u > /tmp/conflicts.txt
+          git rebase --abort
+          mkdir -p docs
+          {
+            echo "PR #384 rebase conflict probe"
+            echo "main: $main"
+            echo "branch-before-rebase: $before"
+            echo "conflicts:"
+            cat /tmp/conflicts.txt
+          } > docs/pr384-rebase-conflicts.txt
+          git add docs/pr384-rebase-conflicts.txt
+          git commit -m "chore(results): record PR384 rebase conflicts"
+          git push origin HEAD:agent/issue-382-finalized-result-correction-ui
+          exit 1
