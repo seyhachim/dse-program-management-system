@@ -25,6 +25,17 @@ export class ApiError extends Error {
   }
 }
 
+function errorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object") return fallback;
+  const error = (payload as { error?: unknown }).error;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
 async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -48,8 +59,8 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
   if (!res.ok) {
     let message = res.statusText;
     try {
-      const body = await res.json();
-      message = body.error ?? message;
+      const body = await res.json() as unknown;
+      message = errorMessage(body, message);
     } catch {
       /* ignore non-JSON error bodies */
     }
