@@ -106,7 +106,34 @@ export const QaSourceAuthorityRequirementSchema = z.object({
 });
 export type QaSourceAuthorityRequirement = z.infer<typeof QaSourceAuthorityRequirementSchema>;
 
-/** Machine-operable expectation semantics introduced by #296-#298. */
+export const QaEvidenceRelationshipKindSchema = z.enum([
+  "supports",
+  "derivedFrom",
+  "reviewedBy",
+  "resultsIn",
+  "followedUpBy",
+]);
+export type QaEvidenceRelationshipKind = z.infer<typeof QaEvidenceRelationshipKindSchema>;
+
+export const QaEvidenceRelationshipLinkSchema = z.object({
+  fromEvidenceType: z.string().trim().min(1).max(120),
+  toEvidenceType: z.string().trim().min(1).max(120),
+  relation: QaEvidenceRelationshipKindSchema,
+});
+export type QaEvidenceRelationshipLink = z.infer<typeof QaEvidenceRelationshipLinkSchema>;
+
+/**
+ * Declarative evidence relationships required by an expectation. #300 records
+ * these requirements; #306/#308 add the operational records and matcher logic.
+ */
+export const QaEvidenceRelationshipRequirementSchema = z.object({
+  requiredLinks: z.array(QaEvidenceRelationshipLinkSchema).max(20).default([]),
+});
+export type QaEvidenceRelationshipRequirement = z.infer<
+  typeof QaEvidenceRelationshipRequirementSchema
+>;
+
+/** Machine-operable expectation semantics introduced by #296-#298 and #300. */
 export const QaQualityExpectationSemanticsSchema = z.object({
   applicabilityRule: QaApplicabilityRuleSchema.default({ kind: "always" }),
   scopeRequirement: QaEvidenceScopeRequirementSchema.default({ requiredDimensions: [] }),
@@ -114,6 +141,7 @@ export const QaQualityExpectationSemanticsSchema = z.object({
   // reporting cycle but remain the current approved/controlled record. Stricter
   // current-cycle expectations opt into withinCycle or recent explicitly.
   temporalRule: QaTemporalRuleSchema.default({ kind: "pointInTime" }),
+  relationshipRequirement: QaEvidenceRelationshipRequirementSchema.default({ requiredLinks: [] }),
 });
 export type QaQualityExpectationSemantics = z.infer<typeof QaQualityExpectationSemanticsSchema>;
 
