@@ -4,6 +4,7 @@ import {
   matchEvidenceScope,
   matchEvidenceTime,
   meetsSourceAuthority,
+  temporalMatchSupportsEvidence,
 } from "./evidence-semantics.ts";
 
 describe("QA evidence semantics", () => {
@@ -38,6 +39,23 @@ describe("QA evidence semantics", () => {
     ).toBe("exact");
   });
 
+  it("allows programme-wide expectations to require course/version scope presence", () => {
+    expect(
+      matchEvidenceScope(
+        { requiredDimensions: ["programme", "course", "courseSpecVersion"] },
+        { programmeId: "dse" },
+        { programmeId: "dse", courseId: "course-1", courseSpecVersionId: "spec-2" },
+      ),
+    ).toBe("exact");
+    expect(
+      matchEvidenceScope(
+        { requiredDimensions: ["programme", "course", "courseSpecVersion"] },
+        { programmeId: "dse" },
+        { programmeId: "dse", courseId: "course-1" },
+      ),
+    ).toBe("partial");
+  });
+
   it("rejects wrong-course evidence as a scope mismatch", () => {
     expect(
       matchEvidenceScope(
@@ -48,7 +66,7 @@ describe("QA evidence semantics", () => {
     ).toBe("mismatch");
   });
 
-  it("marks stale and future evidence explicitly", () => {
+  it("marks stale, future, and current evidence explicitly", () => {
     const cycle = {
       cycleStart: new Date("2025-01-01T00:00:00.000Z"),
       cycleEnd: new Date("2025-12-31T23:59:59.999Z"),
@@ -65,6 +83,18 @@ describe("QA evidence semantics", () => {
         { ...cycle, candidateDate: new Date("2026-01-01T00:00:00.000Z") },
       ),
     ).toBe("future");
+    expect(
+      matchEvidenceTime(
+        { kind: "withinCycle" },
+        { ...cycle, candidateDate: new Date("2025-06-01T00:00:00.000Z") },
+      ),
+    ).toBe("current");
+  });
+
+  it("keeps historical point-in-time records usable but keeps explicit current-window rules strict", () => {
+    expect(temporalMatchSupportsEvidence({ kind: "pointInTime" }, "historicalRelevant")).toBe(true);
+    expect(temporalMatchSupportsEvidence({ kind: "withinCycle" }, "historicalRelevant")).toBe(false);
+    expect(temporalMatchSupportsEvidence({ kind: "recent", maximumAgeDays: 365 }, "stale")).toBe(false);
   });
 
   it("requires sufficient comparable periods for longitudinal evidence", () => {
