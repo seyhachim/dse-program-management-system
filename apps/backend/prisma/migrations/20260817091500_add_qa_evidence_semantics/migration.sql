@@ -1,15 +1,18 @@
 -- Issues #296-#299: persist applicability, scope, temporal and provenance semantics.
 -- These columns are additive except that analysis/evaluation coverage state becomes
 -- nullable when applicability prevents the evidence-coverage classifier from running.
+-- pointInTime is the backward-compatible temporal default: a record that pre-dates
+-- the assessment-cycle start can remain the authoritative current record unless an
+-- expectation explicitly opts into withinCycle/recent/multiPeriod/longitudinal rules.
 
 ALTER TABLE "QaQualityExpectation"
   ADD COLUMN "applicabilityRule" JSONB NOT NULL DEFAULT '{"kind":"always"}'::jsonb,
   ADD COLUMN "scopeRequirement" JSONB NOT NULL DEFAULT '{"requiredDimensions":[]}'::jsonb,
-  ADD COLUMN "temporalRule" JSONB NOT NULL DEFAULT '{"kind":"withinCycle"}'::jsonb;
+  ADD COLUMN "temporalRule" JSONB NOT NULL DEFAULT '{"kind":"pointInTime"}'::jsonb;
 
 ALTER TABLE "QaExpectedEvidence"
   ADD COLUMN "scopeRequirement" JSONB NOT NULL DEFAULT '{"requiredDimensions":[]}'::jsonb,
-  ADD COLUMN "temporalRule" JSONB NOT NULL DEFAULT '{"kind":"withinCycle"}'::jsonb,
+  ADD COLUMN "temporalRule" JSONB NOT NULL DEFAULT '{"kind":"pointInTime"}'::jsonb,
   ADD COLUMN "authorityRequirement" JSONB NOT NULL DEFAULT '{"minimumAuthority":"unknown"}'::jsonb;
 
 ALTER TABLE "QaEvidenceAnalysis"
