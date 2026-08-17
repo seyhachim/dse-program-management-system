@@ -8,12 +8,18 @@ import {
   SaveAssessmentCriterionScoresInput,
   SaveAssessmentResultInput,
   SetAssessmentDeadlineInput,
+  SetOfferingResultAccessPolicyInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
+import {
+  applyProvisionalResultAccessPolicy,
+  getOfferingResultAccessPolicy,
+  setOfferingResultAccessPolicy,
+} from "./result-access-policy.ts";
 import {
   PortalAccessError,
   PortalConflictError,
@@ -55,7 +61,11 @@ export function createStudentPortalRouter(): Router {
     try { res.json(await studentPortalService.courses(req.user!.id)); } catch (error) { handleError(error, res); }
   });
   router.get("/courses/:offeringId", requirePermission("student-portal:read"), async (req, res) => {
-    try { res.json(await studentPortalService.course(req.user!.id, req.params.offeringId!)); } catch (error) { handleError(error, res); }
+    try {
+      const offeringId = req.params.offeringId!;
+      const detail = await studentPortalService.course(req.user!.id, offeringId);
+      res.json(await applyProvisionalResultAccessPolicy(offeringId, detail));
+    } catch (error) { handleError(error, res); }
   });
   router.get("/announcements", requirePermission("student-portal:read"), async (req, res) => {
     try { res.json(await studentPortalService.announcements(req.user!.id)); } catch (error) { handleError(error, res); }
@@ -68,6 +78,29 @@ export function createStudentPortalRouter(): Router {
 
   router.get("/manage/offerings", requirePermission("courses:write"), async (req, res) => {
     try { res.json(await studentPortalService.deliveryOfferings(req.user!.id, programmeWide(req.user!.roles))); } catch (error) { handleError(error, res); }
+  });
+  router.get("/manage/offerings/:offeringId/result-access", requirePermission("courses:write"), async (req, res) => {
+    try {
+      res.json(await getOfferingResultAccessPolicy(
+        req.params.offeringId!,
+        req.user!.id,
+        programmeWide(req.user!.roles),
+      ));
+    } catch (error) { handleError(error, res); }
+  });
+  router.put("/manage/offerings/:offeringId/result-access", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SetOfferingResultAccessPolicyInput.safeParse(req.body);
+    if (!parsed.success) {
+      return void res.status(400).json({ error: "Invalid result access policy", details: parsed.error.flatten() });
+    }
+    try {
+      res.json(await setOfferingResultAccessPolicy(
+        req.params.offeringId!,
+        req.user!.id,
+        programmeWide(req.user!.roles),
+        parsed.data.requireSurveyBeforeResults,
+      ));
+    } catch (error) { handleError(error, res); }
   });
   router.get("/manage/results/review/:offeringId", requirePermission("courses:write"), async (req, res) => {
     try { res.json(await resultsLifecycleService.review(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!)); } catch (error) { handleError(error, res); }
