@@ -1,7 +1,6 @@
 import type { AttendanceStatus } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
-import type { StudentService } from "../students/service.ts";
 import { ReferenceError } from "./service.ts";
 
 type SessionRow = {
@@ -15,7 +14,15 @@ type StudentRecordRow = {
   note: string;
 };
 
-const students = () => registry.get<StudentService>("students").service;
+type StudentLookup = {
+  getByUserId(userId: string): Promise<{
+    id: string;
+    studentId: string;
+    status: string;
+  } | null>;
+};
+
+const students = () => registry.get<StudentLookup>("students").service;
 
 function emptyCounts(): Record<AttendanceStatus, number> {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0 };
