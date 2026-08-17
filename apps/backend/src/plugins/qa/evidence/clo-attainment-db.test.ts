@@ -26,10 +26,10 @@ describe.skipIf(!enabled)("CLO attainment snapshot integrity", () => {
     await db.enrollment.create({ data: { id: ids.enrollment2, offeringId: ids.offering1, studentId: ids.student2 } });
     const now = new Date();
     await db.assessmentResult.createMany({ data: [
-      { enrollmentId: ids.enrollment1, courseSpecId: ids.spec1, assessmentItemId: ids.assessment1, score: 80, maxScore: 100, finalizedAt: now },
-      { enrollmentId: ids.enrollment1, courseSpecId: ids.spec1, assessmentItemId: ids.assessment2, score: 60, maxScore: 100, finalizedAt: now },
-      { enrollmentId: ids.enrollment2, courseSpecId: ids.spec1, assessmentItemId: ids.assessment1, score: 50, maxScore: 100, finalizedAt: now },
-      { enrollmentId: ids.enrollment2, courseSpecId: ids.spec1, assessmentItemId: ids.assessment2, score: 60, maxScore: 100, finalizedAt: now },
+      { enrollmentId: ids.enrollment1, courseSpecId: ids.spec1, assessmentItemId: ids.assessment1, score: 80, maxScore: 100, publishedAt: now, finalizedAt: now },
+      { enrollmentId: ids.enrollment1, courseSpecId: ids.spec1, assessmentItemId: ids.assessment2, score: 60, maxScore: 100, publishedAt: now, finalizedAt: now },
+      { enrollmentId: ids.enrollment2, courseSpecId: ids.spec1, assessmentItemId: ids.assessment1, score: 50, maxScore: 100, publishedAt: now, finalizedAt: now },
+      { enrollmentId: ids.enrollment2, courseSpecId: ids.spec1, assessmentItemId: ids.assessment2, score: 60, maxScore: 100, publishedAt: now, finalizedAt: now },
     ] });
   });
   afterAll(async () => { await db.$disconnect(); });
