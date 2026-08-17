@@ -9,13 +9,13 @@ import {
   type CourseSpecRevisionTrigger,
   type CourseSpecRevisionType,
   CreateCourseSpecRevisionRequestSchema,
-  recommendedCourseSpecRevisionType,
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { useMe } from "@/lib/auth";
 import { courseSpecApi } from "@/lib/course-spec";
 import { courseSpecRevisionApi } from "@/lib/course-spec-revision";
 import { coursesApi, type CourseView } from "@/lib/courses";
+import { revisionRequestUiDecision } from "./revision-request-ui";
 
 const TRIGGERS: { value: CourseSpecRevisionTrigger; label: string }[] = [
   { value: "ScheduledReview", label: "Scheduled review" },
@@ -69,12 +69,10 @@ export function RevisionRequestClient({ courseId }: { courseId: string }) {
   const [effectiveAcademicTerm, setEffectiveAcademicTerm] = useState("");
   const [overrideJustification, setOverrideJustification] = useState("");
 
-  const recommendedRevisionType = useMemo(
-    () => recommendedCourseSpecRevisionType(impact),
-    [impact],
+  const { recommendedRevisionType, showOverrideJustification } = useMemo(
+    () => revisionRequestUiDecision(impact, proposedRevisionType),
+    [impact, proposedRevisionType],
   );
-  const overridingMajor =
-    recommendedRevisionType === "Major" && proposedRevisionType === "Minor";
   const hasGovernanceRole =
     me?.roles.some((role) => role === "admin" || role === "program_coordinator") ?? false;
 
@@ -277,7 +275,7 @@ export function RevisionRequestClient({ courseId }: { courseId: string }) {
           />
         </label>
 
-        {overridingMajor ? (
+        {showOverrideJustification ? (
           <label className="space-y-2 text-sm font-medium lg:col-span-2">
             <span>Required override justification</span>
             <textarea
