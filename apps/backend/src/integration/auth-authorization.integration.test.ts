@@ -190,14 +190,39 @@ integrationDescribe("backend integration authorization boundaries", () => {
     }
   });
 
-  test("students cannot perform protected academic mutations", async () => {
+  test("students cannot perform protected academic mutations or read result-correction audit data", async () => {
+    const token = signToken(context.users.student);
     const response = await request("/api/courses", {
       method: "POST",
-      token: signToken(context.users.student),
+      token,
       body: {},
     });
     expect(response.status).toBe(403);
     expect(errorMessage(response.body)).toContain("courses:manage");
+
+    const targetId = "8da4e4dd-e41c-42ab-bbad-d36d001ab077";
+    const history = await request(`/api/student-portal/manage/results/${targetId}/corrections`, { token });
+    expect(history.status).toBe(403);
+    expect(errorMessage(history.body)).toContain("courses:write");
+
+    const workspace = await request(`/api/student-portal/manage/results/corrections/${targetId}`, { token });
+    expect(workspace.status).toBe(403);
+    expect(errorMessage(workspace.body)).toContain("courses:write");
+
+    const correction = await request("/api/student-portal/manage/results/correct", {
+      method: "POST",
+      token,
+      body: {
+        assessmentResultId: targetId,
+        score: 80,
+        maxScore: 100,
+        feedback: "Unauthorized",
+        reason: "Unauthorized",
+        expectedUpdatedAt: "2026-08-17T12:00:00.000Z",
+      },
+    });
+    expect(correction.status).toBe(403);
+    expect(errorMessage(correction.body)).toContain("courses:write");
   });
 
   test("QA reviewers can read QA knowledge but cannot edit academic course content", async () => {

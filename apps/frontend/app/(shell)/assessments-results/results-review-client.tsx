@@ -21,6 +21,7 @@ import { Button } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { courseDeliveryApi } from "@/lib/course-delivery";
 import { Topbar } from "../topbar";
+import { FinalizedResultCorrections } from "./finalized-result-corrections";
 
 export function ResultsReviewClient() {
   const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
@@ -68,6 +69,11 @@ export function ResultsReviewClient() {
   useEffect(() => { void loadOfferings(); }, [loadOfferings]);
   useEffect(() => { void loadReview(selectedId); }, [selectedId, loadReview]);
 
+  const refreshReviewAfterCorrection = useCallback(
+    () => loadReview(selectedId),
+    [loadReview, selectedId],
+  );
+
   const selected = offerings.find((item) => item.offeringId === selectedId) ?? null;
   const configuredWeight = review?.rows[0]?.configuredGradeWeight ?? 0;
   const completeCount = review?.rows.filter((row) => row.courseGradeComplete).length ?? 0;
@@ -89,7 +95,7 @@ export function ResultsReviewClient() {
     <>
       <Topbar
         title="Assessments / Results"
-        subtitle="Review draft and published marks, weighted course grades, and CLO evidence before release."
+        subtitle="Review draft and published marks, weighted course grades, CLO evidence, and controlled corrections."
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-7xl space-y-5">
@@ -200,6 +206,13 @@ export function ResultsReviewClient() {
                   </div>
                 )}
               </section>
+
+              {selectedId ? (
+                <FinalizedResultCorrections
+                  offeringId={selectedId}
+                  onCorrectionApplied={refreshReviewAfterCorrection}
+                />
+              ) : null}
             </>
           ) : null}
         </div>

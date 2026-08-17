@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../../core/db/prisma.ts";
+import { resultCorrectionsService } from "./result-corrections.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
 import { PortalAccessError, PortalConflictError, studentPortalService } from "./service.ts";
 
@@ -27,6 +28,10 @@ dbDescribe("finalized result correction database integrity", () => {
       where: { id: { not: actor.id } },
       select: { id: true },
     });
+    const coLecturer = await prisma.user.findFirstOrThrow({
+      where: { id: { notIn: [actor.id, unrelated.id] } },
+      select: { id: true },
+    });
     const spec = await prisma.courseSpec.findFirstOrThrow({
       where: {
         reviewStatus: "Approved",
@@ -48,6 +53,9 @@ dbDescribe("finalized result correction database integrity", () => {
         capacity: 10,
         status: "Active",
       },
+    });
+    await prisma.offeringCoLecturer.create({
+      data: { offeringId: offering.id, lecturerId: coLecturer.id },
     });
 
     const studentUser = await prisma.user.create({
@@ -132,6 +140,25 @@ dbDescribe("finalized result correction database integrity", () => {
       },
     });
 
+    const initialWorkspace = await resultCorrectionsService.workspace(actor.id, false, offering.id);
+    expect(initialWorkspace.results).toHaveLength(1);
+    expect(initialWorkspace.results[0]).toMatchObject({
+      assessmentResultId: finalized.id,
+      score: 70,
+      correctionSummary: { count: 0, lastCorrectedAt: null, lastCorrectedByName: null },
+    });
+
+    const emptyHistory = await resultCorrectionsService.history(actor.id, false, finalized.id);
+    expect(emptyHistory.corrections).toEqual([]);
+    expect((await resultCorrectionsService.history(coLecturer.id, false, finalized.id)).corrections).toEqual([]);
+    expect((await resultCorrectionsService.history(unrelated.id, true, finalized.id)).corrections).toEqual([]);
+    await expect(
+      resultCorrectionsService.history(unrelated.id, false, finalized.id),
+    ).rejects.toBeInstanceOf(PortalAccessError);
+    await expect(
+      resultCorrectionsService.history(actor.id, false, nonFinalized.id),
+    ).rejects.toBeInstanceOf(PortalConflictError);
+
     await expect(
       resultsLifecycleService.correctFinalized(unrelated.id, false, {
         assessmentResultId: finalized.id,
@@ -162,24 +189,32 @@ dbDescribe("finalized result correction database integrity", () => {
       reason: "Moderation identified a transcription error",
       expectedUpdatedAt: finalized.updatedAt.toISOString(),
     });
+    const correctedAgain = await resultsLifecycleService.correctFinalized(actor.id, false, {
+      assessmentResultId: finalized.id,
+      score: 84,
+      maxScore: 100,
+      feedback: "Corrected after second moderation review",
+      reason: "Second moderation confirmed two additional marks",
+      expectedUpdatedAt: corrected.updatedAt,
+    });
 
     const stored = await prisma.assessmentResult.findUniqueOrThrow({ where: { id: finalized.id } });
     expect(stored).toMatchObject({
-      score: 82,
+      score: 84,
       maxScore: 100,
-      feedback: "Corrected after moderation review",
+      feedback: "Corrected after second moderation review",
       publishedById: actor.id,
       finalizedById: actor.id,
     });
     expect(stored.publishedAt?.toISOString()).toBe(publishedAt.toISOString());
     expect(stored.finalizedAt?.toISOString()).toBe(finalizedAt.toISOString());
-    expect(corrected.updatedAt).toBe(stored.updatedAt.toISOString());
+    expect(correctedAgain.updatedAt).toBe(stored.updatedAt.toISOString());
 
     const history = await prisma.assessmentResultCorrection.findMany({
       where: { assessmentResultId: finalized.id },
       orderBy: { createdAt: "asc" },
     });
-    expect(history).toHaveLength(1);
+    expect(history).toHaveLength(2);
     expect(history[0]).toMatchObject({
       id: corrected.correctionId,
       assessmentResultId: finalized.id,
@@ -192,6 +227,36 @@ dbDescribe("finalized result correction database integrity", () => {
       reason: "Moderation identified a transcription error",
       correctedById: actor.id,
     });
+    expect(history[1]).toMatchObject({
+      id: correctedAgain.correctionId,
+      assessmentResultId: finalized.id,
+      beforeScore: 82,
+      afterScore: 84,
+      reason: "Second moderation confirmed two additional marks",
+      correctedById: actor.id,
+    });
+
+    const staffHistory = await resultCorrectionsService.history(actor.id, false, finalized.id);
+    expect(staffHistory.corrections).toHaveLength(2);
+    expect(staffHistory.corrections.map((item) => item.correctionId)).toEqual([
+      correctedAgain.correctionId,
+      corrected.correctionId,
+    ]);
+    expect(staffHistory).toMatchObject({
+      score: 84,
+      maxScore: 100,
+      feedback: "Corrected after second moderation review",
+      publishedAt: publishedAt.toISOString(),
+      finalizedAt: finalizedAt.toISOString(),
+    });
+
+    const correctedWorkspace = await resultCorrectionsService.workspace(actor.id, false, offering.id);
+    expect(correctedWorkspace.results[0]).toMatchObject({
+      assessmentResultId: finalized.id,
+      score: 84,
+      correctionSummary: { count: 2 },
+    });
+    expect(correctedWorkspace.results[0]?.correctionSummary.lastCorrectedAt).not.toBeNull();
 
     const criterionAfter = await prisma.assessmentCriterionScore.findUniqueOrThrow({
       where: { id: criterion.id },
@@ -201,14 +266,14 @@ dbDescribe("finalized result correction database integrity", () => {
     await expect(
       resultsLifecycleService.correctFinalized(actor.id, false, {
         assessmentResultId: finalized.id,
-        score: 84,
+        score: 86,
         maxScore: 100,
         feedback: "Stale overwrite attempt",
-        reason: "A second correction from an out-of-date screen",
-        expectedUpdatedAt: finalized.updatedAt.toISOString(),
+        reason: "A correction from an out-of-date screen",
+        expectedUpdatedAt: corrected.updatedAt,
       }),
     ).rejects.toBeInstanceOf(PortalConflictError);
-    expect(await prisma.assessmentResultCorrection.count({ where: { assessmentResultId: finalized.id } })).toBe(1);
+    expect(await prisma.assessmentResultCorrection.count({ where: { assessmentResultId: finalized.id } })).toBe(2);
 
     await expectDatabaseRejection(() =>
       prisma.assessmentResultCorrection.update({
@@ -248,11 +313,13 @@ dbDescribe("finalized result correction database integrity", () => {
 
     const studentView = await studentPortalService.course(studentUser.id, offering.id);
     const visible = studentView.assessments.find((item) => item.id === assessment.id)?.result;
-    expect(visible?.score).toBe(82);
-    expect(visible?.feedback).toBe("Corrected after moderation review");
+    expect(visible?.score).toBe(84);
+    expect(visible?.feedback).toBe("Corrected after second moderation review");
     const serialized = JSON.stringify(studentView);
     expect(serialized).not.toContain("Moderation identified a transcription error");
+    expect(serialized).not.toContain("Second moderation confirmed two additional marks");
     expect(serialized).not.toContain("correctionId");
     expect(serialized).not.toContain("correctedById");
+    expect(serialized).not.toContain("corrections");
   });
 });

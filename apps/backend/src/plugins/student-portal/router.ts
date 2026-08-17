@@ -14,6 +14,7 @@ import { requireAuth } from "../../core/auth/middleware.ts";
 import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { registry } from "../../core/plugins/registry.ts";
+import { resultCorrectionsService } from "./result-corrections.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
 import {
   applyProvisionalResultAccessPolicy,
@@ -104,6 +105,24 @@ export function createStudentPortalRouter(): Router {
   });
   router.get("/manage/results/review/:offeringId", requirePermission("courses:write"), async (req, res) => {
     try { res.json(await resultsLifecycleService.review(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!)); } catch (error) { handleError(error, res); }
+  });
+  router.get("/manage/results/corrections/:offeringId", requirePermission("courses:write"), async (req, res) => {
+    try {
+      res.json(await resultCorrectionsService.workspace(
+        req.user!.id,
+        programmeWide(req.user!.roles),
+        req.params.offeringId!,
+      ));
+    } catch (error) { handleError(error, res); }
+  });
+  router.get("/manage/results/:assessmentResultId/corrections", requirePermission("courses:write"), async (req, res) => {
+    try {
+      res.json(await resultCorrectionsService.history(
+        req.user!.id,
+        programmeWide(req.user!.roles),
+        req.params.assessmentResultId!,
+      ));
+    } catch (error) { handleError(error, res); }
   });
   router.post("/manage/announcements", requirePermission("courses:write"), async (req, res) => {
     const parsed = PublishAnnouncementInput.safeParse(req.body);
