@@ -23,6 +23,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "Course",
   "CourseSpec",
   "CourseSpecCourseInfo",
+  "CourseSpecRevisionRequest",
   "CourseSpecReviewAction",
   "CourseSpecPolicy",
   "CourseSpecTeachingLearning",
@@ -90,7 +91,11 @@ const EXPECTED_PUBLIC_TABLES = [
   "CopAction",
 ] as const;
 
-const EXPECTED_ATTENDANCE_TABLES = ["AttendanceSession", "AttendanceRecord"] as const;
+const EXPECTED_ATTENDANCE_TABLES = [
+  "AttendanceSession",
+  "AttendanceRecord",
+  "LecturerArrivalConfirmation",
+] as const;
 
 const EXPECTED_TELEGRAM_SECURITY_TABLES = [
   "TelegramInitVerification",
@@ -111,15 +116,12 @@ const EXPECTED_CURRICULUM_ARTIFACT_TABLES = [
   "ImportSource",
 ] as const;
 
-const PROTECTED_SCHEMAS = [
-  "public",
-  "pms_attendance",
-  "telegram_security",
-  "qa_security",
-  "curriculum_artifact",
-] as const;
-
-const FORBIDDEN_GRANTEES = new Set(["PUBLIC", "anon", "authenticated", "service_role"]);
+const FORBIDDEN_GRANTEES = new Set([
+  "PUBLIC",
+  "anon",
+  "authenticated",
+  "service_role",
+]);
 
 type TableRow = {
   schema_name: string;
@@ -141,14 +143,28 @@ type DefaultGrantRow = {
   privilege_type: string;
 };
 
-function compareInventory(label: string, expected: readonly string[], actual: string[]): string[] {
+function compareInventory(
+  label: string,
+  expected: readonly string[],
+  actual: string[],
+): string[] {
   const expectedSet = new Set(expected);
   const actualSet = new Set(actual);
   const errors: string[] = [];
+
   const missing = [...expectedSet].filter((name) => !actualSet.has(name)).sort();
-  const unexpected = [...actualSet].filter((name) => !expectedSet.has(name)).sort();
-  if (missing.length > 0) errors.push(`${label}: missing expected tables: ${missing.join(", ")}`);
-  if (unexpected.length > 0) errors.push(`${label}: unclassified tables: ${unexpected.join(", ")}`);
+  const unexpected = [...actualSet]
+    .filter((name) => !expectedSet.has(name))
+    .sort();
+
+  if (missing.length > 0) {
+    errors.push(`${label}: missing expected tables: ${missing.join(", ")}`);
+  }
+
+  if (unexpected.length > 0) {
+    errors.push(`${label}: unclassified tables: ${unexpected.join(", ")}`);
+  }
+
   return errors;
 }
 
@@ -188,11 +204,31 @@ async function main(): Promise<void> {
   ]);
 
   errors.push(
-    ...compareInventory("public schema", EXPECTED_PUBLIC_TABLES, publicTables.map((table) => table.table_name)),
-    ...compareInventory("pms_attendance schema", EXPECTED_ATTENDANCE_TABLES, attendanceTables.map((table) => table.table_name)),
-    ...compareInventory("telegram_security schema", EXPECTED_TELEGRAM_SECURITY_TABLES, telegramSecurityTables.map((table) => table.table_name)),
-    ...compareInventory("qa_security schema", EXPECTED_QA_SECURITY_TABLES, qaSecurityTables.map((table) => table.table_name)),
-    ...compareInventory("curriculum_artifact schema", EXPECTED_CURRICULUM_ARTIFACT_TABLES, curriculumArtifactTables.map((table) => table.table_name)),
+    ...compareInventory(
+      "public schema",
+      EXPECTED_PUBLIC_TABLES,
+      publicTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "pms_attendance schema",
+      EXPECTED_ATTENDANCE_TABLES,
+      attendanceTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "telegram_security schema",
+      EXPECTED_TELEGRAM_SECURITY_TABLES,
+      telegramSecurityTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "qa_security schema",
+      EXPECTED_QA_SECURITY_TABLES,
+      qaSecurityTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "curriculum_artifact schema",
+      EXPECTED_CURRICULUM_ARTIFACT_TABLES,
+      curriculumArtifactTables.map((table) => table.table_name),
+    ),
   );
 
   for (const table of [
@@ -202,7 +238,9 @@ async function main(): Promise<void> {
     ...qaSecurityTables,
     ...curriculumArtifactTables,
   ]) {
-    if (!table.rls_enabled) errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
+    if (!table.rls_enabled) {
+      errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
+    }
   }
 
   const tableGrants = await prisma.$queryRaw<GrantRow[]>`
@@ -213,12 +251,17 @@ async function main(): Promise<void> {
       acl.privilege_type::text AS privilege_type
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) AS acl
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(c.relacl, acldefault('r', c.relowner))
+    ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
     WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
       AND c.relkind IN ('r', 'p')
       AND c.relname <> '_prisma_migrations'
-      AND (acl.grantee = 0 OR r.rolname IN ('anon', 'authenticated', 'service_role'))
+      AND (
+        acl.grantee = 0
+        OR r.rolname IN ('anon', 'authenticated', 'service_role')
+      )
     ORDER BY n.nspname, c.relname, grantee, acl.privilege_type
   `;
 
@@ -237,10 +280,15 @@ async function main(): Promise<void> {
       CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
       acl.privilege_type::text AS privilege_type
     FROM pg_namespace n
-    CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n', n.nspowner))) AS acl
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(n.nspacl, acldefault('n', n.nspowner))
+    ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
     WHERE n.nspname IN ('pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
-      AND (acl.grantee = 0 OR r.rolname IN ('anon', 'authenticated', 'service_role'))
+      AND (
+        acl.grantee = 0
+        OR r.rolname IN ('anon', 'authenticated', 'service_role')
+      )
     ORDER BY n.nspname, grantee, acl.privilege_type
   `;
 
@@ -268,7 +316,10 @@ async function main(): Promise<void> {
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
     WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
-      AND (acl.grantee = 0 OR r.rolname IN ('anon', 'authenticated', 'service_role'))
+      AND (
+        acl.grantee = 0
+        OR r.rolname IN ('anon', 'authenticated', 'service_role')
+      )
     ORDER BY n.nspname, object_type, grantee, acl.privilege_type
   `;
 
@@ -282,7 +333,9 @@ async function main(): Promise<void> {
 
   if (errors.length > 0) {
     console.error("Database security verification failed:\n");
-    for (const error of errors) console.error(`- ${error}`);
+    for (const error of errors) {
+      console.error(`- ${error}`);
+    }
     process.exitCode = 1;
     return;
   }
