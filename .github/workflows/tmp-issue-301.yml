@@ -33,8 +33,7 @@ jobs:
             packages/shared-types/src/student-progression.ts \
             packages/shared-types/src/student-progression.test.ts \
             packages/shared-types/src/index.ts \
-            packages/shared-types/src/qa-evidence-candidates.ts \
-            .github/workflows/ci.yml
+            packages/shared-types/src/qa-evidence-candidates.ts
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "feat(qa): add authoritative cohort progression records (#301)"
           git push origin HEAD:agent/issue-301-cohort-progression
