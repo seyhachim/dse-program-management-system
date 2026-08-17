@@ -38,7 +38,7 @@ function relevanceFor(definition: QaExpectedEvidenceDefinitionView): number {
 
 type Candidate = QaEvidenceCandidateResultView["candidates"][number];
 
-type AssessedCandidate = {
+export type AssessedCandidate = {
   definition: QaExpectedEvidenceDefinitionView;
   candidate: Candidate;
   scopeMatch: "exact" | "partial" | "mismatch" | "unknown";
@@ -51,6 +51,10 @@ type AssessedCandidate = {
     | "unknown";
   authorityMatch: boolean | null;
   temporalRule: QaTemporalRule;
+};
+
+type BaseCandidateAssessment = Omit<AssessedCandidate, "temporalMatch"> & {
+  candidateDate: Date | null;
 };
 
 function effectiveScopeRequirement(
@@ -77,7 +81,17 @@ function effectiveTemporalRule(
   return expectation.temporalRule;
 }
 
-function assessCandidates(
+function candidateDate(candidate: Candidate): Date | null {
+  if (!candidate.reportingDate) return null;
+  const parsed = new Date(candidate.reportingDate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Pure candidate assessment used by the deterministic engine. Exported so the
+ * exact engine semantics can be regression-tested without database fixtures.
+ */
+export function assessCandidates(
   programmeId: string,
   expectation: QaQualityExpectationView,
   definition: QaExpectedEvidenceDefinitionView,
@@ -86,13 +100,9 @@ function assessCandidates(
 ): { finding: QaEvidenceRuleFinding; assessed: AssessedCandidate[] } {
   const scopeRequirement = effectiveScopeRequirement(expectation, definition);
   const temporalRule = effectiveTemporalRule(expectation, definition);
-  const periodCount = new Set(
-    result.candidates
-      .map((candidate) => candidate.periodKey)
-      .filter((value): value is string => Boolean(value)),
-  ).size;
+  const expectedScope = result.expectedScope ?? { programmeId };
 
-  const assessed = result.candidates.map((candidate): AssessedCandidate => {
+  const baseAssessments = result.candidates.map((candidate): BaseCandidateAssessment => {
     const scope = candidate.scope ?? { programmeId };
     const provenance = candidate.provenance ?? {
       authority: "unknown" as const,
@@ -104,17 +114,40 @@ function assessCandidates(
     return {
       definition,
       candidate,
-      scopeMatch: matchEvidenceScope(scopeRequirement, { programmeId }, scope),
+      scopeMatch: matchEvidenceScope(scopeRequirement, expectedScope, scope),
+      authorityMatch: meetsSourceAuthority(definition.authorityRequirement, provenance),
+      temporalRule,
+      candidateDate: candidateDate(candidate),
+    };
+  });
+
+  // Longitudinal/multi-period history must be made only from candidates that
+  // could otherwise support the expectation. Wrong-scope, weak-authority,
+  // future, invalid-date, and missing-period candidates cannot inflate history.
+  const comparablePeriods = new Set(
+    baseAssessments
+      .filter(
+        (item) =>
+          item.scopeMatch === "exact" &&
+          item.authorityMatch === true &&
+          Boolean(item.candidate.periodKey) &&
+          Boolean(item.candidateDate) &&
+          item.candidateDate! <= cycle.reportingEnd,
+      )
+      .map((item) => item.candidate.periodKey as string),
+  ).size;
+
+  const assessed = baseAssessments.map(
+    ({ candidateDate: parsedCandidateDate, ...item }): AssessedCandidate => ({
+      ...item,
       temporalMatch: matchEvidenceTime(temporalRule, {
         cycleStart: cycle.reportingStart,
         cycleEnd: cycle.reportingEnd,
-        candidateDate: candidate.reportingDate ? new Date(candidate.reportingDate) : null,
-        comparablePeriods: periodCount,
+        candidateDate: parsedCandidateDate,
+        comparablePeriods,
       }),
-      authorityMatch: meetsSourceAuthority(definition.authorityRequirement, provenance),
-      temporalRule,
-    };
-  });
+    }),
+  );
 
   const acceptedKeys = new Set(
     assessed
@@ -183,20 +216,57 @@ function sourceSnapshots(assessed: AssessedCandidate[]) {
   return [...byKey.values()];
 }
 
-async function resolveCohortStartDate(programmeId: string): Promise<Date | null> {
-  const rows = await prisma.$queryRaw<Array<{ effectiveFrom: Date | null; intakeYear: number | null }>>`
-    SELECT v."effectiveFrom", v."intakeYear"
+type CohortStartRow = {
+  effectiveFrom: Date | null;
+  intakeYear: number | null;
+  academicYear: string;
+};
+
+function rowStartDate(row: CohortStartRow): Date | null {
+  if (row.effectiveFrom) return row.effectiveFrom;
+  return row.intakeYear ? new Date(Date.UTC(row.intakeYear, 0, 1)) : null;
+}
+
+function academicYearMatchesCycle(
+  academicYear: string,
+  cycle: { reportingStart: Date; reportingEnd: Date },
+): boolean {
+  const normalized = academicYear.trim();
+  if (!normalized) return false;
+  const startYear = String(cycle.reportingStart.getUTCFullYear());
+  const endYear = String(cycle.reportingEnd.getUTCFullYear());
+  return normalized.includes(startYear) && normalized.includes(endYear);
+}
+
+/**
+ * Select a cohort only when the cycle makes that choice unambiguous. Multiple
+ * active curriculum cohorts without one cycle match deliberately resolve to
+ * null so applicability becomes `uncertain` instead of borrowing another
+ * cohort's maturity date.
+ */
+export function selectCohortStartDate(
+  rows: CohortStartRow[],
+  cycle: { reportingStart: Date; reportingEnd: Date },
+): Date | null {
+  const cycleMatches = rows.filter((row) => academicYearMatchesCycle(row.academicYear, cycle));
+  const candidates = cycleMatches.length > 0 ? cycleMatches : rows;
+  if (candidates.length !== 1) return null;
+  return rowStartDate(candidates[0]!);
+}
+
+async function resolveCohortStartDate(
+  programmeId: string,
+  cycle: { reportingStart: Date; reportingEnd: Date },
+): Promise<Date | null> {
+  const rows = await prisma.$queryRaw<CohortStartRow[]>`
+    SELECT v."effectiveFrom", v."intakeYear", v."academicYear"
     FROM "ProgrammeCurriculumVersion" v
     JOIN "ProgrammeCurriculum" c ON c.id = v."curriculumId"
     WHERE c."programmeId" = ${programmeId}
       AND v.status = 'Active'
     ORDER BY v."effectiveFrom" DESC NULLS LAST, v."createdAt" DESC
-    LIMIT 1
   `;
-  const row = rows[0];
-  if (!row) return null;
-  if (row.effectiveFrom) return row.effectiveFrom;
-  return row.intakeYear ? new Date(Date.UTC(row.intakeYear, 0, 1)) : null;
+  return selectCohortStartDate(rows, cycle);
 }
 
 export async function runDeterministicQaAnalysis(
@@ -204,17 +274,17 @@ export async function runDeterministicQaAnalysis(
   cycleId: string,
   requirementCode: string,
 ): Promise<QaEvidenceAnalysisView[]> {
-  const [knowledge, cycle, cohortStartDate] = await Promise.all([
+  const [knowledge, cycle] = await Promise.all([
     qaService.getKnowledge(),
     prisma.qaAssessmentCycle.findUnique({
       where: { id: cycleId },
       select: { programmeId: true, reportingStart: true, reportingEnd: true },
     }),
-    resolveCohortStartDate(programmeId),
   ]);
   if (!cycle || cycle.programmeId !== programmeId) {
     throw new QaAnalysisResourceNotFoundError("QA assessment cycle not found for programme");
   }
+  const cohortStartDate = await resolveCohortStartDate(programmeId, cycle);
 
   const expectations = knowledge.expectations.filter(
     (expectation) => expectation.requirementCode === requirementCode,
