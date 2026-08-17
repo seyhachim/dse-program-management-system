@@ -1,0 +1,22 @@
+name: Issue 211 apply
+on:
+  push:
+    branches:
+      - agent/issue-211-offering-course-spec-binding
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-211-offering-course-spec-binding
+      - run: python scripts/issue-211-apply.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(offerings): bind exact approved CourseSpec versions for #211"
+          git push
