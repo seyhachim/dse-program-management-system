@@ -1,9 +1,14 @@
 import {
   AUN_QA_V4_ID,
   CreateQaEvidenceAnalysisSchema,
+  QaApplicabilityStateSchema,
   QaEvidenceAnalysisSourceKindSchema,
   QaEvidenceAnalysisStateSchema,
+  QaEvidenceProvenanceSchema,
+  QaEvidenceScopeSchema,
   QaEvidenceSourceDomainSchema,
+  QaScopeMatchSchema,
+  QaTemporalMatchSchema,
   type CreateQaEvidenceAnalysisInput,
   type QaEvidenceAnalysisSourceView,
   type QaEvidenceAnalysisView,
@@ -25,22 +30,41 @@ const fromDbState = {
 export class QaAnalysisResourceNotFoundError extends Error {}
 export class QaAnalysisScopeMismatchError extends Error {}
 
-function sourceToView(source: {
+type AnalysisSemanticsRow = {
   id: string;
-  sourceKind: string;
-  candidateKey: string;
-  sourceDomain: string;
-  entityType: string;
-  entityId: string;
-  qaEvidenceId: string | null;
-  title: string;
-  summary: string;
-  excerpt: string;
-  route: string | null;
-  reportingDate: Date | null;
-  relevance: number | null;
-  createdAt: Date;
-}): QaEvidenceAnalysisSourceView {
+  applicability: string;
+  applicabilityReason: string;
+};
+
+type SourceSemanticsRow = {
+  id: string;
+  scope: unknown;
+  scopeMatch: string;
+  temporalMatch: string;
+  provenance: unknown;
+  authorityMatch: boolean | null;
+  periodKey: string | null;
+};
+
+function sourceToView(
+  source: {
+    id: string;
+    sourceKind: string;
+    candidateKey: string;
+    sourceDomain: string;
+    entityType: string;
+    entityId: string;
+    qaEvidenceId: string | null;
+    title: string;
+    summary: string;
+    excerpt: string;
+    route: string | null;
+    reportingDate: Date | null;
+    relevance: number | null;
+    createdAt: Date;
+  },
+  semantics?: SourceSemanticsRow,
+): QaEvidenceAnalysisSourceView {
   const sourceKind = QaEvidenceAnalysisSourceKindSchema.parse(source.sourceKind);
   const sourceDomain = QaEvidenceSourceDomainSchema.parse(source.sourceDomain);
   return {
@@ -57,33 +81,49 @@ function sourceToView(source: {
     route: source.route,
     reportingDate: source.reportingDate?.toISOString() ?? null,
     relevance: source.relevance,
+    scope: QaEvidenceScopeSchema.parse(semantics?.scope ?? {}),
+    scopeMatch: QaScopeMatchSchema.parse(semantics?.scopeMatch ?? "unknown"),
+    temporalMatch: QaTemporalMatchSchema.parse(semantics?.temporalMatch ?? "unknown"),
+    provenance: QaEvidenceProvenanceSchema.parse(
+      semantics?.provenance ?? { authority: "unknown" },
+    ),
+    authorityMatch: semantics?.authorityMatch ?? null,
+    periodKey: semantics?.periodKey ?? null,
     createdAt: source.createdAt.toISOString(),
   };
 }
 
-function analysisToView(analysis: {
-  id: string;
-  programmeId: string;
-  cycleId: string;
-  expectationId: string;
-  state: keyof typeof fromDbState;
-  explanation: string;
-  confidence: number | null;
-  uncertaintyNote: string;
-  engine: string;
-  engineVersion: string;
-  promptVersion: string;
-  createdAt: Date;
-  requirement: { code: string };
-  sources: Array<Parameters<typeof sourceToView>[0]>;
-}): QaEvidenceAnalysisView {
-  const state = QaEvidenceAnalysisStateSchema.parse(fromDbState[analysis.state]);
+function analysisToView(
+  analysis: {
+    id: string;
+    programmeId: string;
+    cycleId: string;
+    expectationId: string;
+    state: keyof typeof fromDbState | null;
+    explanation: string;
+    confidence: number | null;
+    uncertaintyNote: string;
+    engine: string;
+    engineVersion: string;
+    promptVersion: string;
+    createdAt: Date;
+    requirement: { code: string };
+    sources: Array<Parameters<typeof sourceToView>[0]>;
+  },
+  semantics: AnalysisSemanticsRow | undefined,
+  sourceSemantics: Map<string, SourceSemanticsRow>,
+): QaEvidenceAnalysisView {
+  const state = analysis.state
+    ? QaEvidenceAnalysisStateSchema.parse(fromDbState[analysis.state])
+    : null;
   return {
     id: analysis.id,
     programmeId: analysis.programmeId,
     cycleId: analysis.cycleId,
     requirementCode: analysis.requirement.code,
     expectationId: analysis.expectationId,
+    applicability: QaApplicabilityStateSchema.parse(semantics?.applicability ?? "applicable"),
+    applicabilityReason: semantics?.applicabilityReason ?? "",
     state,
     explanation: analysis.explanation,
     confidence: analysis.confidence,
@@ -92,7 +132,7 @@ function analysisToView(analysis: {
     engineVersion: analysis.engineVersion,
     promptVersion: analysis.promptVersion,
     createdAt: analysis.createdAt.toISOString(),
-    sources: analysis.sources.map(sourceToView),
+    sources: analysis.sources.map((source) => sourceToView(source, sourceSemantics.get(source.id))),
   };
 }
 
@@ -161,43 +201,86 @@ export async function createQaEvidenceAnalysis(
     }
   }
 
-  const created = await prisma.qaEvidenceAnalysis.create({
-    data: {
-      programmeId: input.programmeId,
-      cycleId: input.cycleId,
-      requirementId: requirement.id,
-      expectationId: expectation.id,
-      state: toDbState[input.state],
-      explanation: input.explanation,
-      confidence: input.confidence,
-      uncertaintyNote: input.uncertaintyNote,
-      engine: input.engine,
-      engineVersion: input.engineVersion,
-      promptVersion: input.promptVersion,
-      sources: {
-        create: input.sources.map((source) => ({
-          sourceKind: source.sourceKind,
-          candidateKey: source.candidateKey,
-          sourceDomain: source.sourceDomain,
-          entityType: source.entityType,
-          entityId: source.entityId,
-          qaEvidenceId: source.qaEvidenceId,
-          title: source.title,
-          summary: source.summary,
-          excerpt: source.excerpt,
-          route: source.route,
-          reportingDate: source.reportingDate,
-          relevance: source.relevance,
-        })),
+  const createdId = await prisma.$transaction(async (tx) => {
+    const created = await tx.qaEvidenceAnalysis.create({
+      data: {
+        programmeId: input.programmeId,
+        cycleId: input.cycleId,
+        requirementId: requirement.id,
+        expectationId: expectation.id,
+        // Prisma's generated model predates the nullable DB column. The placeholder
+        // is transaction-local and is nulled below before commit when applicability
+        // bypasses coverage classification.
+        state: toDbState[input.state ?? "expertReviewRequired"],
+        explanation: input.explanation,
+        confidence: input.confidence,
+        uncertaintyNote: input.uncertaintyNote,
+        engine: input.engine,
+        engineVersion: input.engineVersion,
+        promptVersion: input.promptVersion,
+        sources: {
+          create: input.sources.map((source) => ({
+            sourceKind: source.sourceKind,
+            candidateKey: source.candidateKey,
+            sourceDomain: source.sourceDomain,
+            entityType: source.entityType,
+            entityId: source.entityId,
+            qaEvidenceId: source.qaEvidenceId,
+            title: source.title,
+            summary: source.summary,
+            excerpt: source.excerpt,
+            route: source.route,
+            reportingDate: source.reportingDate,
+            relevance: source.relevance,
+          })),
+        },
       },
-    },
-    include: {
-      requirement: { select: { code: true } },
-      sources: { orderBy: { createdAt: "asc" } },
-    },
+      include: { sources: true },
+    });
+
+    if (input.applicability === "applicable") {
+      await tx.$executeRaw`
+        UPDATE "QaEvidenceAnalysis"
+        SET "applicability" = ${input.applicability},
+            "applicabilityReason" = ${input.applicabilityReason}
+        WHERE id = ${created.id}
+      `;
+    } else {
+      await tx.$executeRaw`
+        UPDATE "QaEvidenceAnalysis"
+        SET "applicability" = ${input.applicability},
+            "applicabilityReason" = ${input.applicabilityReason},
+            state = NULL
+        WHERE id = ${created.id}
+      `;
+    }
+
+    const inputByKey = new Map(input.sources.map((source) => [source.candidateKey, source]));
+    for (const stored of created.sources) {
+      const source = inputByKey.get(stored.candidateKey);
+      if (!source) continue;
+      await tx.$executeRaw`
+        UPDATE "QaEvidenceAnalysisSource"
+        SET scope = CAST(${JSON.stringify(source.scope)} AS jsonb),
+            "scopeMatch" = ${source.scopeMatch},
+            "temporalMatch" = ${source.temporalMatch},
+            provenance = CAST(${JSON.stringify(source.provenance)} AS jsonb),
+            "authorityMatch" = ${source.authorityMatch},
+            "periodKey" = ${source.periodKey}
+        WHERE id = ${stored.id}
+      `;
+    }
+    return created.id;
   });
 
-  return analysisToView(created);
+  const rows = await listQaEvidenceAnalyses(
+    input.programmeId,
+    input.cycleId,
+    input.requirementCode,
+  );
+  const created = rows.find((row) => row.id === createdId);
+  if (!created) throw new QaAnalysisResourceNotFoundError("Created QA analysis could not be reloaded");
+  return created;
 }
 
 export async function listQaEvidenceAnalyses(
@@ -233,5 +316,27 @@ export async function listQaEvidenceAnalyses(
       sources: { orderBy: { createdAt: "asc" } },
     },
   });
-  return rows.map(analysisToView);
+
+  if (rows.length === 0) return [];
+  const ids = rows.map((row) => row.id);
+  const analysisSemantics = await prisma.$queryRaw<AnalysisSemanticsRow[]>`
+    SELECT id, applicability, "applicabilityReason"
+    FROM "QaEvidenceAnalysis"
+    WHERE id = ANY(${ids}::text[])
+  `;
+  const sourceSemantics = await prisma.$queryRaw<SourceSemanticsRow[]>`
+    SELECT id, scope, "scopeMatch", "temporalMatch", provenance, "authorityMatch", "periodKey"
+    FROM "QaEvidenceAnalysisSource"
+    WHERE "analysisId" = ANY(${ids}::text[])
+  `;
+  const analysisMap = new Map(analysisSemantics.map((row) => [row.id, row]));
+  const sourceMap = new Map(sourceSemantics.map((row) => [row.id, row]));
+
+  return rows.map((row) =>
+    analysisToView(
+      row as typeof row & { state: keyof typeof fromDbState | null },
+      analysisMap.get(row.id),
+      sourceMap,
+    ),
+  );
 }
