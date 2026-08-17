@@ -15,6 +15,55 @@ ALTER TABLE "QaExpectedEvidence"
   ADD COLUMN "temporalRule" JSONB NOT NULL DEFAULT '{"kind":"pointInTime"}'::jsonb,
   ADD COLUMN "authorityRequirement" JSONB NOT NULL DEFAULT '{"minimumAuthority":"unknown"}'::jsonb;
 
+-- Every current QA expectation is programme-scoped. More specific dimensions are
+-- declared on each expected-evidence form so programme-wide analysis can require
+-- a candidate to identify its own course/version/offering without inventing one
+-- target course for the whole requirement.
+UPDATE "QaQualityExpectation"
+SET "scopeRequirement" = '{"requiredDimensions":["programme"]}'::jsonb;
+
+UPDATE "QaExpectedEvidence"
+SET "scopeRequirement" = CASE
+  WHEN "evidenceType" IN (
+    'clo-plo-mappings', 'approved-course-specs', 'approved-course-specifications',
+    'clo-teaching-alignment', 'course-clo-plo-coverage', 'course-teaching-philosophy',
+    'active-learning-strategies', 'weekly-alignment', 'weekly-student-activities',
+    'clo-assessment-alignment', 'clo-assessment-methods'
+  ) THEN '{"requiredDimensions":["programme","course","courseSpecVersion"]}'::jsonb
+  WHEN "evidenceType" IN ('assessment-plan', 'feedback-plan', 'published-results', 'published-feedback')
+    THEN '{"requiredDimensions":["programme","course","courseSpecVersion","assessment"]}'::jsonb
+  WHEN "evidenceType" IN ('approval-history', 'course-spec-review-history', 'programme-structure')
+    THEN '{"requiredDimensions":["programme","course"]}'::jsonb
+  WHEN "evidenceType" IN ('lecturer-assignments', 'teaching-assignments')
+    THEN '{"requiredDimensions":["programme","course","offering","term"]}'::jsonb
+  WHEN "evidenceType" = 'weekly-workload'
+    THEN '{"requiredDimensions":["programme","course","term"]}'::jsonb
+  ELSE '{"requiredDimensions":["programme"]}'::jsonb
+END;
+
+-- Structured PMS records must have at least controlled-internal authority. Approved
+-- specification evidence is stricter. Document-style evidence can start as uploaded
+-- external material and be reviewed by a human later.
+UPDATE "QaExpectedEvidence"
+SET "authorityRequirement" = CASE
+  WHEN "evidenceType" IN ('approved-course-specs', 'approved-course-specifications')
+    THEN '{"minimumAuthority":"approvedDocument"}'::jsonb
+  WHEN "sourceDomain" IN ('document', 'survey', 'minutes', 'policy')
+    THEN '{"minimumAuthority":"uploadedExternalDocument"}'::jsonb
+  ELSE '{"minimumAuthority":"controlledInternalRecord"}'::jsonb
+END;
+
+-- Evidence that represents actual results/feedback must belong to the assessment
+-- cycle rather than silently relying on an old result set. Programme-level outcome
+-- syntheses are explicitly longitudinal and require at least two comparable periods.
+UPDATE "QaExpectedEvidence"
+SET "temporalRule" = '{"kind":"withinCycle"}'::jsonb
+WHERE "evidenceType" IN ('published-results', 'published-feedback', 'clo-achievement');
+
+UPDATE "QaExpectedEvidence"
+SET "temporalRule" = '{"kind":"longitudinal","minimumPeriods":2}'::jsonb
+WHERE "evidenceType" IN ('programme-outcome-analysis', 'plo-synthesis');
+
 ALTER TABLE "QaEvidenceAnalysis"
   ALTER COLUMN "state" DROP NOT NULL,
   ADD COLUMN "applicability" TEXT NOT NULL DEFAULT 'applicable',
