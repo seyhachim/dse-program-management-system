@@ -1,7 +1,7 @@
 import type {
   Course,
   CourseSpecProgress,
-  type CourseSpecVersionRef,
+  CourseSpecVersionRef,
   CreateCourseInput,
   Lecturer,
   UpdateCourseInput,
@@ -25,11 +25,11 @@ export const coursesApi = {
   approvedSpecVersions(id: string): Promise<CourseSpecVersionRef[]> {
     return api.get<CourseSpecVersionRef[]>(`/api/courses/${id}/approved-spec-versions`);
   },
-  create(input: CreateCourseInput): Promise<CourseView> {
-    return api.post<CourseView>("/api/courses", input);
+  create(input: CreateCourseInput): Promise<Course> {
+    return api.post<Course>("/api/courses", input);
   },
-  update(id: string, input: UpdateCourseInput): Promise<CourseView> {
-    return api.patch<CourseView>(`/api/courses/${id}`, input);
+  update(id: string, input: UpdateCourseInput): Promise<Course> {
+    return api.patch<Course>(`/api/courses/${id}`, input);
   },
   remove(id: string): Promise<void> {
     return api.delete<void>(`/api/courses/${id}`);
