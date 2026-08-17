@@ -1,4 +1,10 @@
 import { z } from "zod";
+import type {
+  QaApplicabilityRule,
+  QaEvidenceScopeRequirement,
+  QaSourceAuthorityRequirement,
+  QaTemporalRule,
+} from "./qa-evidence-semantics.ts";
 
 export const QA_PILOT_REQUIREMENT_CODES = [
   "1.1", "1.2", "1.5",
@@ -34,6 +40,9 @@ export interface QaExpectedEvidenceDefinitionView {
   role: QaExpectedEvidenceRole;
   sourceDomain: QaEvidenceSourceDomain;
   order: number;
+  scopeRequirement: QaEvidenceScopeRequirement;
+  temporalRule: QaTemporalRule;
+  authorityRequirement: QaSourceAuthorityRequirement;
 }
 
 export interface QaQualityExpectationView {
@@ -42,6 +51,9 @@ export interface QaQualityExpectationView {
   statement: string;
   purpose: string;
   order: number;
+  applicabilityRule: QaApplicabilityRule;
+  scopeRequirement: QaEvidenceScopeRequirement;
+  temporalRule: QaTemporalRule;
   expectedEvidence: QaExpectedEvidenceDefinitionView[];
 }
 
