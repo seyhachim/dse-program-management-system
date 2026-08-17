@@ -20,6 +20,18 @@ describe("QA evidence semantics", () => {
     ).toBe("notApplicable");
   });
 
+  it("recognizes a mature cohort as applicable", () => {
+    expect(
+      evaluateApplicability(
+        { kind: "cohortMaturity", minimumElapsedYears: 4 },
+        {
+          cohortStartDate: new Date("2020-09-01T00:00:00.000Z"),
+          asOfDate: new Date("2026-08-17T00:00:00.000Z"),
+        },
+      ).state,
+    ).toBe("applicable");
+  });
+
   it("routes missing maturity context to uncertain", () => {
     expect(
       evaluateApplicability(
@@ -56,14 +68,25 @@ describe("QA evidence semantics", () => {
     ).toBe("partial");
   });
 
-  it("rejects wrong-course evidence as a scope mismatch", () => {
-    expect(
-      matchEvidenceScope(
-        { requiredDimensions: ["programme", "course"] },
-        { programmeId: "dse", courseId: "course-1" },
-        { programmeId: "dse", courseId: "course-2" },
-      ),
-    ).toBe("mismatch");
+  it("rejects wrong course, cohort, term, and version as scope mismatches", () => {
+    const requirement = {
+      requiredDimensions: ["programme", "course", "courseSpecVersion", "cohort", "term"] as const,
+    };
+    const expected = {
+      programmeId: "dse",
+      courseId: "course-1",
+      courseSpecVersionId: "spec-2",
+      cohortId: "2024",
+      term: "2026-S1",
+    };
+    for (const candidate of [
+      { ...expected, courseId: "course-2" },
+      { ...expected, cohortId: "2025" },
+      { ...expected, term: "2026-S2" },
+      { ...expected, courseSpecVersionId: "spec-1" },
+    ]) {
+      expect(matchEvidenceScope({ requiredDimensions: [...requirement.requiredDimensions] }, expected, candidate)).toBe("mismatch");
+    }
   });
 
   it("marks stale, future, and current evidence explicitly", () => {
@@ -97,17 +120,27 @@ describe("QA evidence semantics", () => {
     expect(temporalMatchSupportsEvidence({ kind: "recent", maximumAgeDays: 365 }, "stale")).toBe(false);
   });
 
-  it("requires sufficient comparable periods for longitudinal evidence", () => {
+  it("requires sufficient comparable periods and still rejects future longitudinal evidence", () => {
+    const cycle = {
+      cycleStart: new Date("2025-01-01T00:00:00.000Z"),
+      cycleEnd: new Date("2025-12-31T23:59:59.999Z"),
+    };
+    expect(
+      matchEvidenceTime(
+        { kind: "longitudinal", minimumPeriods: 3 },
+        { ...cycle, comparablePeriods: 2 },
+      ),
+    ).toBe("insufficientHistory");
     expect(
       matchEvidenceTime(
         { kind: "longitudinal", minimumPeriods: 3 },
         {
-          cycleStart: new Date("2025-01-01T00:00:00.000Z"),
-          cycleEnd: new Date("2025-12-31T23:59:59.999Z"),
-          comparablePeriods: 2,
+          ...cycle,
+          comparablePeriods: 3,
+          candidateDate: new Date("2026-01-01T00:00:00.000Z"),
         },
       ),
-    ).toBe("insufficientHistory");
+    ).toBe("future");
   });
 
   it("distinguishes source authority from source domain", () => {
