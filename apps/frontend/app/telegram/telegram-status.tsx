@@ -81,6 +81,7 @@ export function TelegramStatus() {
 
   const { home } = state;
   const student = home.user.roles.includes("student");
+  const lecturer = home.user.roles.includes("lecturer");
   return (
     <div className="space-y-5 pb-6">
       <div>
@@ -91,8 +92,11 @@ export function TelegramStatus() {
 
       <nav className="grid grid-cols-2 gap-2 text-sm">
         <Link href="/telegram/announcements" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Announcements</Link>
+        {student ? <Link href="/telegram/deadlines" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Assessment deadlines</Link> : null}
+        {student ? <Link href="/telegram/attendance" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">My attendance</Link> : null}
         {student ? <Link href="/telegram/results" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Results & CLO</Link> : null}
         {student ? <Link href="/telegram/surveys" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Course surveys</Link> : null}
+        {lecturer ? <Link href="/telegram/workload" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Teaching workload</Link> : null}
         <Link href="/telegram/settings" className="rounded-xl border border-slate-200 bg-white p-3 font-medium">Notifications</Link>
       </nav>
 
