@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { QaEvidenceSourceDomainSchema } from "./qa-knowledge.ts";
+import {
+  QaApplicabilityStateSchema,
+  QaEvidenceProvenanceSchema,
+  QaEvidenceScopeSchema,
+  QaScopeMatchSchema,
+  QaTemporalMatchSchema,
+} from "./qa-evidence-semantics.ts";
 
 export const QaEvidenceAnalysisStateSchema = z.enum([
   "evidenceIdentified",
@@ -29,6 +36,12 @@ export const CreateQaEvidenceAnalysisSourceSchema = z.object({
   route: z.string().trim().max(500).nullable().optional().default(null),
   reportingDate: z.coerce.date().nullable().optional().default(null),
   relevance: z.number().min(0).max(1).nullable().optional().default(null),
+  scope: QaEvidenceScopeSchema.default({}),
+  scopeMatch: QaScopeMatchSchema.default("unknown"),
+  temporalMatch: QaTemporalMatchSchema.default("unknown"),
+  provenance: QaEvidenceProvenanceSchema.default({ authority: "unknown" }),
+  authorityMatch: z.boolean().nullable().optional().default(null),
+  periodKey: z.string().trim().max(200).nullable().optional().default(null),
 });
 
 export const CreateQaEvidenceAnalysisSchema = z.object({
@@ -36,7 +49,9 @@ export const CreateQaEvidenceAnalysisSchema = z.object({
   cycleId: z.string().uuid(),
   requirementCode: z.string().regex(/^\d\.\d$/),
   expectationId: z.string().trim().min(1).max(200),
-  state: QaEvidenceAnalysisStateSchema,
+  applicability: QaApplicabilityStateSchema.default("applicable"),
+  applicabilityReason: z.string().trim().max(5000).default(""),
+  state: QaEvidenceAnalysisStateSchema.nullable().optional().default(null),
   explanation: z.string().trim().min(1).max(10000),
   confidence: z.number().min(0).max(1).nullable().optional().default(null),
   uncertaintyNote: z.string().trim().max(5000).default(""),
@@ -45,6 +60,21 @@ export const CreateQaEvidenceAnalysisSchema = z.object({
   promptVersion: z.string().trim().max(100).default(""),
   sources: z.array(CreateQaEvidenceAnalysisSourceSchema).max(500).default([]),
 }).superRefine((value, ctx) => {
+  if (value.applicability === "applicable" && value.state === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Applicable analysis requires an evidence coverage state",
+      path: ["state"],
+    });
+  }
+  if (value.applicability !== "applicable" && value.state !== null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Non-applicable or uncertain analysis must bypass evidence coverage classification",
+      path: ["state"],
+    });
+  }
+
   const keys = new Set<string>();
   for (const [index, source] of value.sources.entries()) {
     if (keys.has(source.candidateKey)) {
@@ -84,6 +114,12 @@ export interface QaEvidenceAnalysisSourceView {
   route: string | null;
   reportingDate: string | null;
   relevance: number | null;
+  scope: z.infer<typeof QaEvidenceScopeSchema>;
+  scopeMatch: z.infer<typeof QaScopeMatchSchema>;
+  temporalMatch: z.infer<typeof QaTemporalMatchSchema>;
+  provenance: z.infer<typeof QaEvidenceProvenanceSchema>;
+  authorityMatch: boolean | null;
+  periodKey: string | null;
   createdAt: string;
 }
 
@@ -93,7 +129,9 @@ export interface QaEvidenceAnalysisView {
   cycleId: string;
   requirementCode: string;
   expectationId: string;
-  state: QaEvidenceAnalysisState;
+  applicability: z.infer<typeof QaApplicabilityStateSchema>;
+  applicabilityReason: string;
+  state: QaEvidenceAnalysisState | null;
   explanation: string;
   confidence: number | null;
   uncertaintyNote: string;
