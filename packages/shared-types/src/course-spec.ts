@@ -438,26 +438,23 @@ export type FocusCode = z.infer<typeof FocusCode>;
 /* -------------------------------------------- §1–13 Course Information */
 
 /**
- * Course Information (§1–13) as returned by `GET /:id/spec` — a read model, not
- * stored verbatim. Programme Title (§1) is fixed config; the administrative
- * scalars (§2–4, §11) come live from the Course row, the instructor block (§6–9)
- * from the assigned lecturer's profile, and availability/other-lecturers (§10,
- * §12) from the course's latest Offering — all recomputed on every read so
- * reassigning a lecturer or editing the course is reflected immediately. Only
- * Pre-requisites (§5) and Course Description (§14) are actually editable; see
- * `CourseInfoInput`, which is what `PUT /:id/spec/courseInfo` accepts.
+ * Course Information (§1–13) as returned by `GET /:id/spec`. Once a CourseSpec
+ * version exists, these values come from that version's normalized snapshot so
+ * later Course, lecturer, Offering, or programme-title edits cannot rewrite
+ * historical approved output. `CourseInfoInput` remains deliberately narrow:
+ * lecturers can edit only prerequisites/description through this workspace.
  */
 export const CourseInfoSection = z.object({
-  // §2 / §3 / §4 / §11 — read live from Course; edited via the Course entity.
+  programmeTitle: z.string().optional(),
   courseTitle: z.string().min(1, "Course title is required"),
   courseCode: z.string().min(1, "Course code is required"),
   credits: z.coerce.number().int().min(1).max(30).nullable().optional(),
   courseType: CourseTypeSchema.nullable().optional(),
-  // §5 / §14 — the only fields a save actually persists.
   prerequisites: z.string().optional(),
   description: z.string().optional(),
-  // §6–9 — read live from the assigned lecturer's profile.
+  totalSltHours: z.coerce.number().int().min(0).nullable().optional(),
   instructorName: z.string().optional(),
+  instructorTitle: z.string().optional(),
   qualification: z.string().optional(),
   email: z
     .string()
@@ -465,9 +462,7 @@ export const CourseInfoSection = z.object({
     .or(z.literal(""))
     .optional(),
   telephone: z.string().optional(),
-  // §10 — read live from the latest Offering; edited via the Offering entity.
   otherLecturers: z.string().optional(),
-  // §12 — read live from the latest Offering; edited via the Offering entity.
   semester: SemesterSchema.nullable().optional(),
   programmeYear: z.coerce.number().int().min(1).max(10).nullable().optional(),
 });

@@ -11,13 +11,16 @@ import { Input } from "@dse-pms/ui";
 
 /** All fields held as strings for input binding; converted on save by the wizard. */
 export type CourseInfoForm = {
+  programmeTitle: string;
   courseTitle: string;
   courseCode: string;
   credits: string;
   prerequisites: string;
   courseType: string;
   description: string;
+  totalSltHours: number | null | undefined;
   instructorName: string;
+  instructorTitle: string;
   qualification: string;
   email: string;
   telephone: string;
@@ -27,13 +30,16 @@ export type CourseInfoForm = {
 };
 
 export const EMPTY_COURSE_INFO: CourseInfoForm = {
+  programmeTitle: PROGRAMME_TITLE,
   courseTitle: "",
   courseCode: "",
   credits: "",
   prerequisites: "",
   courseType: "",
   description: "",
+  totalSltHours: undefined,
   instructorName: "",
+  instructorTitle: "",
   qualification: "",
   email: "",
   telephone: "",
@@ -47,13 +53,20 @@ export function toCourseInfoForm(data: Record<string, unknown> | undefined): Cou
   const d = (data ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (v == null ? "" : String(v));
   return {
+    programmeTitle: str(d.programmeTitle) || PROGRAMME_TITLE,
     courseTitle: str(d.courseTitle),
     courseCode: str(d.courseCode),
     credits: str(d.credits),
     prerequisites: str(d.prerequisites),
     courseType: str(d.courseType),
     description: str(d.description),
+    totalSltHours: Object.prototype.hasOwnProperty.call(d, "totalSltHours")
+      ? d.totalSltHours == null
+        ? null
+        : Number(d.totalSltHours)
+      : undefined,
     instructorName: str(d.instructorName),
+    instructorTitle: str(d.instructorTitle),
     qualification: str(d.qualification),
     email: str(d.email),
     telephone: str(d.telephone),
@@ -100,7 +113,7 @@ export function CourseInfoSection({
           Course & Programme Information
         </legend>
         <Field label="1. Programme Title" hint="Fixed for this programme.">
-          <Input value={PROGRAMME_TITLE} disabled readOnly />
+          <Input value={value.programmeTitle || PROGRAMME_TITLE} disabled readOnly />
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="2. Course Title" hint="Managed in Course Management.">

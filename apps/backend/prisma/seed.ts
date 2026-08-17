@@ -4,6 +4,7 @@ import {
   AUN_QA_V4_ID,
   AUN_QA_V4_SOURCE_URL,
   PLOS,
+  PROGRAMME_TITLE,
   pluginManifests,
 } from "@dse-pms/shared-types";
 import { syncNormalizedRubricTables } from "../src/plugins/rubrics/service.ts";
@@ -1206,6 +1207,37 @@ async function main() {
         submissionVersion: 1,
       },
     });
+    const seededSpecSnapshot = await prisma.courseSpecCourseInfo.findUnique({
+      where: { courseSpecId: spec.id },
+      select: { courseSpecId: true },
+    });
+    if (!seededSpecSnapshot) {
+      const specLecturer = cs101.lecturerId
+        ? await prisma.user.findUnique({ where: { id: cs101.lecturerId } })
+        : null;
+      await prisma.courseSpecCourseInfo.create({
+        data: {
+          courseSpecId: spec.id,
+          programmeTitle: PROGRAMME_TITLE,
+          courseTitle: cs101.title,
+          courseCode: cs101.code,
+          credits: cs101.credits,
+          prerequisites: cs101.prerequisites ?? "",
+          courseType: cs101.courseType,
+          description: cs101.description ?? "",
+          totalSltHours: cs101.totalSltHours,
+          instructorName: specLecturer?.name ?? "",
+          instructorTitle: specLecturer?.title ?? "",
+          qualification: specLecturer?.qualification ?? "",
+          email: specLecturer?.email ?? "",
+          telephone: specLecturer?.phone ?? "",
+          otherLecturers: offering.otherLecturers ?? "",
+          semester: offering.semester,
+          programmeYear: offering.programmeYear,
+        },
+      });
+    }
+
     // Direct seed writes bypass the Offering API, so explicitly establish the
     // same exact Approved CourseSpec binding required for real new offerings.
     await prisma.offering.update({

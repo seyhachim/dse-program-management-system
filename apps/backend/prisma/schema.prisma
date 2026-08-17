@@ -1131,7 +1131,8 @@ model Course {
 }
 
 /// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a
-/// single document per course. Overlapping §1–13 scalars are mirrored onto Course.
+/// versioned academic document. Course Information is snapshotted per version while
+/// editable prerequisites/description remain mirrored onto Course for administration.
 /// `data`/`status` are the pre-issue-#81 storage: one JSON blob for every section,
 /// so saving any one section required rewriting the whole row. Superseded by
 /// `sections` (one `CourseSpecSection` row per section) and `clos` (normalized CLO
@@ -1158,6 +1159,7 @@ model CourseSpec {
   mappingCells            CourseSpecMappingCell[]
   resources               CourseSpecResource[]
   studentResponsibilities CourseSpecStudentResponsibility[]
+  courseInfo              CourseSpecCourseInfo?
   policy                  CourseSpecPolicy?
   teachingLearning        CourseSpecTeachingLearning?
   weekProjectProgress     CourseSpecWeekProjectProgress[]
@@ -1190,9 +1192,33 @@ model CourseSpec {
   @@index([basedOnVersionId])
 }
 
+/// Version-specific snapshot of Course Information (§1–13) and document-critical
+/// administrative metadata. Values are intentionally copied rather than FK-linked to
+/// Course/User/Offering so later administrative edits cannot rewrite historical output.
+model CourseSpecCourseInfo {
+  courseSpecId     String     @id
+  courseSpec       CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  programmeTitle   String
+  courseTitle      String
+  courseCode       String
+  credits          Int?
+  prerequisites    String     @default("")
+  courseType       CourseType?
+  description      String     @default("")
+  totalSltHours    Int?
+  instructorName   String     @default("")
+  instructorTitle  String     @default("")
+  qualification    String     @default("")
+  email            String     @default("")
+  telephone        String     @default("")
+  otherLecturers   String     @default("")
+  semester         Semester?
+  programmeYear    Int?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
 /// Immutable workflow events for Course Specification submission/review actions.
-/// Notes are retained so requested changes and approval decisions remain traceable
-/// across submission versions without overwriting earlier review history.
 model CourseSpecReviewAction {
   id                String                     @id @default(uuid())
   courseSpecId      String
@@ -1211,9 +1237,9 @@ model CourseSpecReviewAction {
 /// Issue #81: one row per wizard section, replacing the CourseSpec.data/status
 /// blob so saving one section doesn't touch another's `updatedAt`/content.
 /// Every saveable section's actual payload lives in its own normalized table
-/// (CourseSpecClo for "clos", CourseSpecWeek for "slt", CourseSpecAssessmentItem
-/// for "assessmentPlan", CourseSpecMappingCell for "mapping"; "courseInfo" is
-/// mirrored onto Course.prerequisites/description and always live-recomputed) —
+/// (CourseSpecCourseInfo for "courseInfo", CourseSpecClo for "clos",
+/// CourseSpecWeek for "slt", CourseSpecAssessmentItem for "assessmentPlan",
+/// CourseSpecMappingCell for "mapping") —
 /// this row exists purely to track per-section save status for the spec-progress
 /// dashboard. Issue #103 phase C dropped the last `Json` column (`content`) once
 /// its backfill was verified against production — there is no jsonb column left
