@@ -1,12 +1,16 @@
-import type {
-  CourseDeliveryOffering,
-  CourseDeliveryResultReview,
-  OfferingResultAccessPolicy,
-  PublishAnnouncementInput,
-  PublishAssessmentResultsInput,
-  SaveAssessmentResultInput,
-  SaveAssessmentCriterionScoresInput,
-  SetAssessmentDeadlineInput,
+import {
+  FinalizedResultCorrectionHistorySchema,
+  FinalizedResultCorrectionWorkspaceSchema,
+  type CorrectFinalizedAssessmentResultInput,
+  type CorrectFinalizedAssessmentResultResponse,
+  type CourseDeliveryOffering,
+  type CourseDeliveryResultReview,
+  type OfferingResultAccessPolicy,
+  type PublishAnnouncementInput,
+  type PublishAssessmentResultsInput,
+  type SaveAssessmentResultInput,
+  type SaveAssessmentCriterionScoresInput,
+  type SetAssessmentDeadlineInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
@@ -15,6 +19,17 @@ export const courseDeliveryApi = {
     api.get<CourseDeliveryOffering[]>("/api/student-portal/manage/offerings"),
   resultReview: (offeringId: string) =>
     api.get<CourseDeliveryResultReview>(`/api/student-portal/manage/results/review/${offeringId}`),
+  correctionWorkspace: (offeringId: string) =>
+    api.get<unknown>(`/api/student-portal/manage/results/corrections/${offeringId}`)
+      .then((data) => FinalizedResultCorrectionWorkspaceSchema.parse(data)),
+  correctionHistory: (assessmentResultId: string) =>
+    api.get<unknown>(`/api/student-portal/manage/results/${assessmentResultId}/corrections`)
+      .then((data) => FinalizedResultCorrectionHistorySchema.parse(data)),
+  correctFinalizedResult: (input: CorrectFinalizedAssessmentResultInput) =>
+    api.post<CorrectFinalizedAssessmentResultResponse>(
+      "/api/student-portal/manage/results/correct",
+      input,
+    ),
   resultAccessPolicy: (offeringId: string) =>
     api.get<OfferingResultAccessPolicy>(`/api/student-portal/manage/offerings/${offeringId}/result-access`),
   setResultAccessPolicy: (offeringId: string, requireSurveyBeforeResults: boolean) =>
