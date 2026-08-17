@@ -55,7 +55,8 @@ export interface QaQualityExpectationView {
   applicabilityRule: QaApplicabilityRule;
   scopeRequirement: QaEvidenceScopeRequirement;
   temporalRule: QaTemporalRule;
-  relationshipRequirement: QaEvidenceRelationshipRequirement;
+  /** Present on current API responses; optional so older constructed fixtures remain source-compatible. */
+  relationshipRequirement?: QaEvidenceRelationshipRequirement;
   expectedEvidence: QaExpectedEvidenceDefinitionView[];
 }
 
