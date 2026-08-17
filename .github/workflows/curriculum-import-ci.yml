@@ -5,11 +5,16 @@ on:
     paths:
       - "apps/backend/prisma/migrations/**curriculum_json_artifacts/**"
       - "apps/backend/prisma/migrations/**sync_curriculum_artifact**"
+      - "apps/backend/prisma/migrations/**canonical_curriculum_pathway**"
+      - "apps/backend/prisma/migrations/**canonicalize_curriculum_pathways/**"
       - "apps/backend/src/plugins/programme/curriculum-import-*.ts"
+      - "apps/backend/src/plugins/programme/curriculum-service.ts"
       - "apps/backend/scripts/verify-db-security.ts"
       - "packages/shared-types/src/curriculum-import*"
-      - "apps/frontend/app/(shell)/curriculum/curriculum-*.tsx"
+      - "apps/frontend/app/(shell)/curriculum/curriculum-*"
+      - "apps/frontend/lib/curriculum.ts"
       - "docs/curriculum/**"
+      - "scripts/generate-curriculum-docx-smoke.ts"
       - ".github/workflows/curriculum-import-ci.yml"
   push:
     branches:
@@ -17,10 +22,15 @@ on:
     paths:
       - "apps/backend/prisma/migrations/**curriculum_json_artifacts/**"
       - "apps/backend/prisma/migrations/**sync_curriculum_artifact**"
+      - "apps/backend/prisma/migrations/**canonical_curriculum_pathway**"
+      - "apps/backend/prisma/migrations/**canonicalize_curriculum_pathways/**"
       - "apps/backend/src/plugins/programme/curriculum-import-*.ts"
+      - "apps/backend/src/plugins/programme/curriculum-service.ts"
       - "packages/shared-types/src/curriculum-import*"
-      - "apps/frontend/app/(shell)/curriculum/curriculum-*.tsx"
+      - "apps/frontend/app/(shell)/curriculum/curriculum-*"
+      - "apps/frontend/lib/curriculum.ts"
       - "docs/curriculum/**"
+      - "scripts/generate-curriculum-docx-smoke.ts"
 
 permissions:
   contents: read
@@ -86,3 +96,13 @@ jobs:
 
       - name: Verify database security classification
         run: bun run --cwd apps/backend db:security:verify
+
+      - name: Generate official DSE 2026 DOCX smoke artifact
+        run: bun scripts/generate-curriculum-docx-smoke.ts
+
+      - name: Upload DOCX smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dse-curriculum-2026-docx-smoke
+          path: artifacts/DSE-Curriculum-2026-v1.0-smoke.docx
+          if-no-files-found: error
