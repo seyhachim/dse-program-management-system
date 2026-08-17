@@ -104,13 +104,14 @@ export function matchEvidenceTime(
   rule: QaTemporalRule,
   context: QaTemporalContext,
 ): QaTemporalMatch {
+  if (context.candidateDate && context.candidateDate > context.cycleEnd) return "future";
+
   if (rule.kind === "multiPeriod" || rule.kind === "longitudinal") {
     const periods = context.comparablePeriods ?? 0;
     return periods >= rule.minimumPeriods ? "current" : "insufficientHistory";
   }
 
   if (!context.candidateDate) return "unknown";
-  if (context.candidateDate > context.cycleEnd) return "future";
 
   if (rule.kind === "withinCycle" || rule.kind === "pointInTime") {
     if (context.candidateDate >= context.cycleStart) return "current";
