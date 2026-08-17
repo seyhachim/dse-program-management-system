@@ -2,6 +2,7 @@ import {
   AUN_QA_V4_ID,
   QA_PILOT_REQUIREMENT_CODES,
   QaApplicabilityRuleSchema,
+  QaEvidenceRelationshipRequirementSchema,
   QaEvidenceScopeRequirementSchema,
   QaSourceAuthorityRequirementSchema,
   QaTemporalRuleSchema,
@@ -108,6 +109,7 @@ type QaKnowledgeRow = {
   applicabilityRule: unknown;
   expectationScopeRequirement: unknown;
   expectationTemporalRule: unknown;
+  relationshipRequirement: unknown;
   evidenceId: string | null;
   evidenceType: string | null;
   evidenceDescription: string | null;
@@ -136,6 +138,7 @@ export const qaService = {
         e."applicabilityRule",
         e."scopeRequirement" AS "expectationScopeRequirement",
         e."temporalRule" AS "expectationTemporalRule",
+        e."relationshipRequirement",
         x.id AS "evidenceId",
         x."evidenceType",
         x.description AS "evidenceDescription",
@@ -173,6 +176,9 @@ export const qaService = {
           applicabilityRule: QaApplicabilityRuleSchema.parse(row.applicabilityRule),
           scopeRequirement: QaEvidenceScopeRequirementSchema.parse(row.expectationScopeRequirement),
           temporalRule: QaTemporalRuleSchema.parse(row.expectationTemporalRule),
+          relationshipRequirement: QaEvidenceRelationshipRequirementSchema.parse(
+            row.relationshipRequirement,
+          ),
           expectedEvidence: [],
         };
         expectations.set(row.expectationId, expectation);

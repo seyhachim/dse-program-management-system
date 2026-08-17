@@ -484,15 +484,16 @@ model QaRequirement {
 /// Framework-level operational interpretation of a QA requirement. Expectations
 /// are reusable across programmes; programme/cycle evidence remains in QaEvidence.
 model QaQualityExpectation {
-  id            String        @id
-  requirementId String
-  requirement   QaRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
-  statement     String
-  purpose       String        @default("")
-  order         Int
-  active        Boolean       @default(true)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now())
+  id                      String        @id
+  requirementId           String
+  requirement             QaRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  statement               String
+  purpose                 String        @default("")
+  order                   Int
+  active                  Boolean       @default(true)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @default(now())
+  relationshipRequirement Json          @default("{\"requiredLinks\":[]}")
 
   expectedEvidence    QaExpectedEvidence[]
   analyses            QaEvidenceAnalysis[]

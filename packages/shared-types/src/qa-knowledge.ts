@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type {
   QaApplicabilityRule,
+  QaEvidenceRelationshipRequirement,
   QaEvidenceScopeRequirement,
   QaSourceAuthorityRequirement,
   QaTemporalRule,
@@ -54,6 +55,8 @@ export interface QaQualityExpectationView {
   applicabilityRule: QaApplicabilityRule;
   scopeRequirement: QaEvidenceScopeRequirement;
   temporalRule: QaTemporalRule;
+  /** Present on current API responses; optional so older constructed fixtures remain source-compatible. */
+  relationshipRequirement?: QaEvidenceRelationshipRequirement;
   expectedEvidence: QaExpectedEvidenceDefinitionView[];
 }
 
