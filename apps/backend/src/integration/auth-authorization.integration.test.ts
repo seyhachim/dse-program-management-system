@@ -19,6 +19,7 @@ const TEST_SECRET = "issue-130-integration-secret-at-least-32-characters";
 
 type SeededContext = {
   users: {
+    admin: AuthUser;
     lecturer: AuthUser;
     coLecturer: AuthUser;
     coordinator: AuthUser;
@@ -31,6 +32,10 @@ type SeededContext = {
     cs201: { id: string };
   };
   cs101SpecId: string;
+  curriculum: {
+    draftVersionId: string;
+    approvedVersionId: string;
+  };
 };
 
 type HttpResult = {
@@ -227,6 +232,92 @@ integrationDescribe("backend integration authorization boundaries", () => {
     expect((response.body as { id?: string }).id).toBe(context.courses.cs201.id);
   });
 
+  test("curriculum import preview and apply require programme writer scope", async () => {
+    const probeBody = {
+      fileName: "authorization-probe.json",
+      jsonText: "{}",
+      decisions: [],
+    };
+    const endpoints = [
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/import-json/preview`,
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/import-json/apply`,
+    ];
+
+    for (const actor of [context.users.admin, context.users.coordinator]) {
+      for (const endpoint of endpoints) {
+        const response = await request(endpoint, {
+          method: "POST",
+          token: signToken(actor),
+          body: probeBody,
+        });
+        expect(response.status).toBe(400);
+        expect(errorMessage(response.body)).toContain("dse-curriculum-v1");
+      }
+    }
+
+    for (const actor of [
+      context.users.secretary,
+      context.users.lecturer,
+      context.users.qaReviewer,
+      context.users.student,
+    ]) {
+      for (const endpoint of endpoints) {
+        const response = await request(endpoint, {
+          method: "POST",
+          token: signToken(actor),
+          body: probeBody,
+        });
+        expect(response.status).toBe(403);
+      }
+    }
+
+    const crossProgrammeCoordinator: AuthUser = {
+      ...context.users.coordinator,
+      programmeRoles: [
+        { role: "program_coordinator", programmeId: "other-programme" },
+      ],
+    };
+    for (const endpoint of endpoints) {
+      const response = await request(endpoint, {
+        method: "POST",
+        token: signToken(crossProgrammeCoordinator),
+        body: probeBody,
+      });
+      expect(response.status).toBe(403);
+      expect(errorMessage(response.body)).toContain("No curriculum import access");
+    }
+  });
+
+  test("curriculum export is server-locked for Draft and permitted for published versions", async () => {
+    const draftExport = await request(
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/artifact/export`,
+      { token: signToken(context.users.coordinator) },
+    );
+    expect(draftExport.status).toBe(409);
+    expect(errorMessage(draftExport.body)).toContain("unavailable while version status is Draft");
+
+    for (const actor of [
+      context.users.admin,
+      context.users.coordinator,
+      context.users.secretary,
+      context.users.qaReviewer,
+    ]) {
+      const response = await request(
+        `/api/programme/curricula/versions/${context.curriculum.approvedVersionId}/artifact/export`,
+        { token: signToken(actor) },
+      );
+      expect(response.status).toBe(200);
+    }
+
+    for (const actor of [context.users.lecturer, context.users.student]) {
+      const response = await request(
+        `/api/programme/curricula/versions/${context.curriculum.approvedVersionId}/artifact/export`,
+        { token: signToken(actor) },
+      );
+      expect(response.status).toBe(403);
+    }
+  });
+
   async function request(
     path: string,
     options: {
@@ -254,17 +345,27 @@ integrationDescribe("backend integration authorization boundaries", () => {
 });
 
 async function loadSeededContext(): Promise<SeededContext> {
-  const [lecturer, coLecturer, coordinator, secretary, qaReviewer, student, cs101, cs201] =
-    await Promise.all([
-      loadAuthUser("lecturer@dse.dev"),
-      loadAuthUser("hopper.lecturer@dse.dev"),
-      loadAuthUser("coordinator@dse.dev"),
-      loadAuthUser("secretary@dse.dev"),
-      loadAuthUser("qa@dse.dev"),
-      loadAuthUser("student@dse.dev"),
-      prisma.course.findUniqueOrThrow({ where: { code: "CS101" }, select: { id: true } }),
-      prisma.course.findUniqueOrThrow({ where: { code: "CS201" }, select: { id: true } }),
-    ]);
+  const [
+    admin,
+    lecturer,
+    coLecturer,
+    coordinator,
+    secretary,
+    qaReviewer,
+    student,
+    cs101,
+    cs201,
+  ] = await Promise.all([
+    loadAuthUser("admin@dse.dev"),
+    loadAuthUser("lecturer@dse.dev"),
+    loadAuthUser("hopper.lecturer@dse.dev"),
+    loadAuthUser("coordinator@dse.dev"),
+    loadAuthUser("secretary@dse.dev"),
+    loadAuthUser("qa@dse.dev"),
+    loadAuthUser("student@dse.dev"),
+    prisma.course.findUniqueOrThrow({ where: { code: "CS101" }, select: { id: true } }),
+    prisma.course.findUniqueOrThrow({ where: { code: "CS201" }, select: { id: true } }),
+  ]);
 
   const cs101Spec = await prisma.courseSpec.findFirstOrThrow({
     where: { courseId: cs101.id },
@@ -272,10 +373,51 @@ async function loadSeededContext(): Promise<SeededContext> {
     select: { id: true },
   });
 
+  const token = crypto.randomUUID().slice(0, 8);
+  const curriculum = await prisma.programmeCurriculum.create({
+    data: {
+      programmeId: "dse",
+      code: `AUTH-${token}`,
+      name: `Authorization Curriculum ${token}`,
+    },
+    select: { id: true },
+  });
+  const [draftVersion, approvedVersion] = await Promise.all([
+    prisma.programmeCurriculumVersion.create({
+      data: {
+        curriculumId: curriculum.id,
+        versionMajor: 1,
+        versionMinor: 0,
+        status: "Draft",
+        cohortLabel: "Authorization draft",
+        academicYear: "2026",
+        createdById: coordinator.id,
+      },
+      select: { id: true },
+    }),
+    prisma.programmeCurriculumVersion.create({
+      data: {
+        curriculumId: curriculum.id,
+        versionMajor: 1,
+        versionMinor: 1,
+        status: "Approved",
+        cohortLabel: "Authorization approved",
+        academicYear: "2026",
+        approvedAt: new Date(),
+        createdById: coordinator.id,
+      },
+      select: { id: true },
+    }),
+  ]);
+
   return {
-    users: { lecturer, coLecturer, coordinator, secretary, qaReviewer, student },
+    users: { admin, lecturer, coLecturer, coordinator, secretary, qaReviewer, student },
     courses: { cs101, cs201 },
     cs101SpecId: cs101Spec.id,
+    curriculum: {
+      draftVersionId: draftVersion.id,
+      approvedVersionId: approvedVersion.id,
+    },
   };
 }
 
