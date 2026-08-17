@@ -111,7 +111,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "Offering_validate_course_spec_binding"
-BEFORE INSERT OR UPDATE OF "courseSpecId" ON "Offering"
+BEFORE INSERT OR UPDATE OF "courseSpecId", "courseId" ON "Offering"
 FOR EACH ROW EXECUTE FUNCTION "validate_offering_course_spec_binding"();
 
 -- Result/deadline provenance must always agree with the Offering binding. This

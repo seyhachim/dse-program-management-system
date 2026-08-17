@@ -229,7 +229,9 @@ function toSummary(row: EnrollmentRow): PortalCourseSummary {
   const { offering } = row;
   const spec = approvedSpec(row);
   const deadlines = new Map(
-    offering.assessmentDeadlines.map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+    offering.assessmentDeadlines
+      .filter((deadline) => deadline.courseSpecId === spec?.id)
+      .map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
   );
   const nextAssessment = (spec?.assessmentItems ?? [])
     .filter((item) => item.status === "Active")
@@ -270,13 +272,14 @@ function toSummary(row: EnrollmentRow): PortalCourseSummary {
 async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCourseDetail> {
   const summary = toSummary(row);
   const spec = approvedSpec(row);
+  const exactResults = row.results.filter((result) => result.courseSpecId === spec?.id);
   const deadlines = new Map(
-    row.offering.assessmentDeadlines.map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+    row.offering.assessmentDeadlines
+      .filter((deadline) => deadline.courseSpecId === spec?.id)
+      .map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
   );
   const resultByAssessment = new Map(
-    row.results
-      .filter((result) => result.courseSpecId === spec?.id)
-      .map((result) => [result.assessmentItemId, result]),
+    exactResults.map((result) => [result.assessmentItemId, result]),
   );
   const criterionMappings = (spec?.assessmentItems ?? []).flatMap((assessment) =>
     assessment.criterionCloMappings.map((mapping) => ({
@@ -287,10 +290,10 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
     })),
   );
   const achievements = spec
-    ? calculateCloAchievements(spec.clos, spec.assessmentItems, row.results, criterionMappings)
+    ? calculateCloAchievements(spec.clos, spec.assessmentItems, exactResults, criterionMappings)
     : [];
   const grade = spec
-    ? calculateCourseGrade(spec.assessmentItems, row.results)
+    ? calculateCourseGrade(spec.assessmentItems, exactResults)
     : { totalGrade: null, complete: false, completedWeight: 0, configuredWeight: 0, contributions: [] };
   const contributionByAssessment = new Map(
     grade.contributions.map((item) => [item.assessmentItemId, item.weightedContribution]),
