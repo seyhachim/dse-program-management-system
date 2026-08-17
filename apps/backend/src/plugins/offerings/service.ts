@@ -238,6 +238,11 @@ export const offeringService = {
       include: { coLecturers: { select: { lecturerId: true } } },
     });
     if (!existing) throw new ReferenceError("Offering not found");
+    if (!existing.courseSpecId && offeringInput.courseSpecId === undefined) {
+      throw new ReferenceError(
+        "Offering must be bound to an Approved CourseSpec version before it can be updated",
+      );
+    }
     if (offeringInput.courseSpecId !== undefined) {
       await assertApprovedCourseSpec(existing.courseId, offeringInput.courseSpecId);
       if (existing.courseSpecId && offeringInput.courseSpecId !== existing.courseSpecId) {
