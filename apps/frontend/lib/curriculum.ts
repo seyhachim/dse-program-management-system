@@ -1,8 +1,12 @@
 import type {
   AddCurriculumCourseInput,
   BindCurriculumCourseSpecInput,
+  CurriculumArtifactView,
   CurriculumComparison,
   CurriculumCourseSpecBindings,
+  CurriculumImportApplyInput,
+  CurriculumImportPreview,
+  CurriculumJsonUpload,
   CurriculumVersionHistory,
   CurriculumVersionSummary,
   CurriculumWorkflowState,
@@ -24,6 +28,10 @@ export interface ProgrammeCurriculumListItem {
 
 const workflowPath = (versionId: string) =>
   `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/workflow`;
+const importPath = (versionId: string) =>
+  `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/import-json`;
+const artifactPath = (versionId: string) =>
+  `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/artifact`;
 
 export const curriculumApi = {
   list(): Promise<ProgrammeCurriculumListItem[]> {
@@ -44,6 +52,18 @@ export const curriculumApi = {
   },
   reorder(versionId: string, input: ReorderCurriculumCoursesInput): Promise<ProgrammeCurriculumRead> {
     return api.put<ProgrammeCurriculumRead>(`/api/programme/curricula/versions/${encodeURIComponent(versionId)}/reorder`, input);
+  },
+  previewJson(versionId: string, input: CurriculumJsonUpload): Promise<CurriculumImportPreview> {
+    return api.post<CurriculumImportPreview>(`${importPath(versionId)}/preview`, input);
+  },
+  applyJson(versionId: string, input: CurriculumImportApplyInput): Promise<CurriculumArtifactView> {
+    return api.post<CurriculumArtifactView>(`${importPath(versionId)}/apply`, input);
+  },
+  artifact(versionId: string): Promise<CurriculumArtifactView> {
+    return api.get<CurriculumArtifactView>(artifactPath(versionId));
+  },
+  exportArtifact(versionId: string): Promise<CurriculumArtifactView> {
+    return api.get<CurriculumArtifactView>(`${artifactPath(versionId)}/export`);
   },
   workflow(versionId: string): Promise<CurriculumWorkflowState> {
     return api.get<CurriculumWorkflowState>(workflowPath(versionId));

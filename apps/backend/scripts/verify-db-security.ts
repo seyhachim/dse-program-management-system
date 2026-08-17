@@ -17,6 +17,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "ProgramPolicy",
   "ProgrammeCurriculum",
   "ProgrammeCurriculumVersion",
+  "ProgrammeCurriculumPathway",
   "ProgrammeCurriculumCourse",
   "ProgrammeCurriculumAuditAction",
   "Course",
@@ -109,6 +110,12 @@ const EXPECTED_QA_SECURITY_TABLES = [
   "QaEvidenceExternalReference",
 ] as const;
 
+const EXPECTED_CURRICULUM_ARTIFACT_TABLES = [
+  "CourseSnapshot",
+  "DeclaredTotals",
+  "ImportSource",
+] as const;
+
 const FORBIDDEN_GRANTEES = new Set([
   "PUBLIC",
   "anon",
@@ -182,11 +189,18 @@ async function tablesForSchema(schemaName: string): Promise<TableRow[]> {
 async function main(): Promise<void> {
   const errors: string[] = [];
 
-  const [publicTables, attendanceTables, telegramSecurityTables, qaSecurityTables] = await Promise.all([
+  const [
+    publicTables,
+    attendanceTables,
+    telegramSecurityTables,
+    qaSecurityTables,
+    curriculumArtifactTables,
+  ] = await Promise.all([
     tablesForSchema("public"),
     tablesForSchema("pms_attendance"),
     tablesForSchema("telegram_security"),
     tablesForSchema("qa_security"),
+    tablesForSchema("curriculum_artifact"),
   ]);
 
   errors.push(
@@ -195,26 +209,25 @@ async function main(): Promise<void> {
       EXPECTED_PUBLIC_TABLES,
       publicTables.map((table) => table.table_name),
     ),
-  );
-  errors.push(
     ...compareInventory(
       "pms_attendance schema",
       EXPECTED_ATTENDANCE_TABLES,
       attendanceTables.map((table) => table.table_name),
     ),
-  );
-  errors.push(
     ...compareInventory(
       "telegram_security schema",
       EXPECTED_TELEGRAM_SECURITY_TABLES,
       telegramSecurityTables.map((table) => table.table_name),
     ),
-  );
-  errors.push(
     ...compareInventory(
       "qa_security schema",
       EXPECTED_QA_SECURITY_TABLES,
       qaSecurityTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "curriculum_artifact schema",
+      EXPECTED_CURRICULUM_ARTIFACT_TABLES,
+      curriculumArtifactTables.map((table) => table.table_name),
     ),
   );
 
@@ -223,6 +236,7 @@ async function main(): Promise<void> {
     ...attendanceTables,
     ...telegramSecurityTables,
     ...qaSecurityTables,
+    ...curriculumArtifactTables,
   ]) {
     if (!table.rls_enabled) {
       errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
@@ -241,7 +255,7 @@ async function main(): Promise<void> {
       COALESCE(c.relacl, acldefault('r', c.relowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
       AND c.relkind IN ('r', 'p')
       AND c.relname <> '_prisma_migrations'
       AND (
@@ -270,7 +284,7 @@ async function main(): Promise<void> {
       COALESCE(n.nspacl, acldefault('n', n.nspowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('pms_attendance', 'telegram_security', 'qa_security')
+    WHERE n.nspname IN ('pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
@@ -301,7 +315,7 @@ async function main(): Promise<void> {
     JOIN pg_namespace n ON n.oid = d.defaclnamespace
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
@@ -327,7 +341,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, and ${qaSecurityTables.length} QA security tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, and ${curriculumArtifactTables.length} curriculum artifact tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 

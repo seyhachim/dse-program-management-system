@@ -79,6 +79,18 @@ function parseEffectiveFrom(value: string | null | undefined): Date | null | und
   return value === null ? null : new Date(`${value}T00:00:00.000Z`);
 }
 
+async function defaultRoutePlacementIds(versionId: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT pc."id"
+    FROM public."ProgrammeCurriculumCourse" pc
+    LEFT JOIN public."ProgrammeCurriculumPathway" p ON p."id" = pc."pathwayId"
+    WHERE pc."curriculumVersionId" = ${versionId}
+      AND (pc."pathwayId" IS NULL OR p."isDefault" = TRUE)
+    ORDER BY pc."yearLevel", pc."semester", pc."sortOrder", pc."id"
+  `;
+  return rows.map((row) => row.id);
+}
+
 export class CurriculumNotFoundError extends Error {}
 export class CurriculumConflictError extends Error {}
 export class InvalidCurriculumRevisionError extends Error {}
@@ -333,8 +345,12 @@ export const curriculumService = {
       throw new CurriculumNotFoundError("Curriculum version not found");
     }
 
+    const visiblePlacementIds = await defaultRoutePlacementIds(selectedSummary.id);
     const placements = await prisma.programmeCurriculumCourse.findMany({
-      where: { curriculumVersionId: selectedSummary.id },
+      where: {
+        curriculumVersionId: selectedSummary.id,
+        id: { in: visiblePlacementIds },
+      },
       orderBy: [{ yearLevel: "asc" }, { semester: "asc" }, { sortOrder: "asc" }, { courseId: "asc" }],
       select: {
         id: true,

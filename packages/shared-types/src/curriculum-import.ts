@@ -1,0 +1,346 @@
+import { z } from "zod";
+import { CourseTypeSchema } from "./courses.ts";
+import { CurriculumSemesterSchema } from "./curriculum.ts";
+
+export const DSE_CURRICULUM_IMPORT_FORMAT_VERSION = "dse-curriculum-v1" as const;
+export const CURRICULUM_COMMON_SCOPE = "__COMMON__" as const;
+
+export const CurriculumHourBreakdownSchema = z
+  .object({
+    total: z.number().int().min(0),
+    lecture: z.number().int().min(0),
+    lab: z.number().int().min(0),
+    fieldVisit: z.number().int().min(0),
+  })
+  .superRefine((value, ctx) => {
+    if (value.lecture + value.lab + value.fieldVisit !== value.total) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hour breakdown must sum to total",
+      });
+    }
+  });
+
+export const CurriculumCreditBreakdownSchema = z.object({
+  total: z.number().int().min(0).max(30),
+  lecture: z.number().int().min(0).max(30),
+  lab: z.number().int().min(0).max(30),
+  fieldVisit: z.number().int().min(0).max(30),
+  breakdownProvided: z.boolean().optional(),
+});
+
+export const CurriculumImportPathwaySchema = z.object({
+  code: z.string().trim().min(1).max(40).refine((value) => value !== CURRICULUM_COMMON_SCOPE, {
+    message: `${CURRICULUM_COMMON_SCOPE} is reserved for common curriculum rows`,
+  }),
+  name: z.string().trim().min(1).max(240),
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  isDefault: z.boolean().default(false),
+  creditTarget: z.number().int().min(0).max(120).nullable().optional(),
+  sortOrder: z.number().int().min(0).default(0),
+});
+
+export const CurriculumImportCourseSchema = z.object({
+  code: z.string().trim().min(1).max(40),
+  title: z.string().trim().min(1).max(320),
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  pathwayCode: z.string().trim().min(1).max(40).nullable().default(null),
+  sortOrder: z.number().int().min(0).default(0),
+  weeklyHours: CurriculumHourBreakdownSchema.nullable().default(null),
+  credits: CurriculumCreditBreakdownSchema,
+  lecturerText: z.string().trim().max(1200).default(""),
+  courseType: CourseTypeSchema.nullable().optional(),
+});
+
+export const CurriculumImportMetadataSchema = z.object({
+  code: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(240),
+  academicYear: z.string().trim().max(40),
+  version: z.string().trim().regex(/^\d+\.\d+$/),
+  defaultPathwayCode: z.string().trim().min(1).max(40).nullable().default(null),
+});
+
+export const CurriculumDeclaredSemesterCreditSchema = z.object({
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  credits: z.number().int().min(0).max(120),
+});
+
+export const CurriculumDeclaredPathwayCreditSchema = z.object({
+  pathwayCode: z.string().trim().min(1).max(40),
+  credits: z.number().int().min(0).max(120),
+});
+
+export const CurriculumDeclaredTotalsSchema = z.object({
+  semesterCredits: z.array(CurriculumDeclaredSemesterCreditSchema).default([]),
+  pathwayCredits: z.array(CurriculumDeclaredPathwayCreditSchema).default([]),
+  programmeCourseCount: z.number().int().min(0).nullable().optional(),
+  programmeCredits: z.number().int().min(0).nullable().optional(),
+});
+export type CurriculumDeclaredTotals = z.infer<typeof CurriculumDeclaredTotalsSchema>;
+
+export const DseCurriculumImportSchema = z
+  .object({
+    formatVersion: z.literal(DSE_CURRICULUM_IMPORT_FORMAT_VERSION),
+    programmeCode: z.string().trim().min(1).max(40),
+    curriculum: CurriculumImportMetadataSchema,
+    pathways: z.array(CurriculumImportPathwaySchema),
+    courses: z.array(CurriculumImportCourseSchema).min(1),
+    declaredTotals: CurriculumDeclaredTotalsSchema.nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const pathwayCodes = new Set<string>();
+    let defaultCount = 0;
+    for (const pathway of value.pathways) {
+      if (pathwayCodes.has(pathway.code)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["pathways"],
+          message: `Duplicate pathway code: ${pathway.code}`,
+        });
+      }
+      pathwayCodes.add(pathway.code);
+      if (pathway.isDefault) defaultCount += 1;
+    }
+    if (defaultCount > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pathways"],
+        message: "Only one default pathway is allowed",
+      });
+    }
+    if (
+      value.curriculum.defaultPathwayCode &&
+      !pathwayCodes.has(value.curriculum.defaultPathwayCode)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["curriculum", "defaultPathwayCode"],
+        message: "Default pathway code does not exist",
+      });
+    }
+    if (value.curriculum.defaultPathwayCode) {
+      const declared = value.pathways.find(
+        (pathway) => pathway.code === value.curriculum.defaultPathwayCode,
+      );
+      const marked = value.pathways.find((pathway) => pathway.isDefault);
+      if (marked && declared && marked.code !== declared.code) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["curriculum", "defaultPathwayCode"],
+          message: "defaultPathwayCode conflicts with the pathway marked isDefault",
+        });
+      }
+    }
+
+    const placementKeys = new Set<string>();
+    const canonicalCourseCodes = new Set<string>();
+    for (const [index, course] of value.courses.entries()) {
+      if (course.pathwayCode && !pathwayCodes.has(course.pathwayCode)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["courses", index, "pathwayCode"],
+          message: `Unknown pathway code: ${course.pathwayCode}`,
+        });
+      }
+      const key = `${course.pathwayCode ?? CURRICULUM_COMMON_SCOPE}:${course.code}`;
+      if (placementKeys.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["courses", index, "code"],
+          message: `Duplicate curriculum course placement: ${course.code}`,
+        });
+      }
+      placementKeys.add(key);
+
+      if (canonicalCourseCodes.has(course.code)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["courses", index, "code"],
+          message: `Course code ${course.code} may appear only once in a curriculum version, even across pathways`,
+        });
+      }
+      canonicalCourseCodes.add(course.code);
+    }
+
+    const semesterTotalKeys = new Set<string>();
+    for (const [index, total] of (value.declaredTotals?.semesterCredits ?? []).entries()) {
+      const key = `${total.yearLevel}:${total.semester}`;
+      if (semesterTotalKeys.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["declaredTotals", "semesterCredits", index],
+          message: `Duplicate declared semester total: ${key}`,
+        });
+      }
+      semesterTotalKeys.add(key);
+    }
+    const declaredPathwayCodes = new Set<string>();
+    for (const [index, total] of (value.declaredTotals?.pathwayCredits ?? []).entries()) {
+      if (!pathwayCodes.has(total.pathwayCode)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["declaredTotals", "pathwayCredits", index, "pathwayCode"],
+          message: `Declared total references unknown pathway: ${total.pathwayCode}`,
+        });
+      }
+      if (declaredPathwayCodes.has(total.pathwayCode)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["declaredTotals", "pathwayCredits", index],
+          message: `Duplicate declared pathway total: ${total.pathwayCode}`,
+        });
+      }
+      declaredPathwayCodes.add(total.pathwayCode);
+    }
+  });
+
+export type DseCurriculumImport = z.infer<typeof DseCurriculumImportSchema>;
+export type CurriculumImportCourse = z.infer<typeof CurriculumImportCourseSchema>;
+export type CurriculumImportPathway = z.infer<typeof CurriculumImportPathwaySchema>;
+
+export const CurriculumJsonUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(240),
+  jsonText: z.string().min(2).max(2_000_000),
+});
+export type CurriculumJsonUpload = z.infer<typeof CurriculumJsonUploadSchema>;
+
+export const CurriculumImportDecisionActionSchema = z.enum([
+  "create-course",
+  "keep-existing-course",
+]);
+export type CurriculumImportDecisionAction = z.infer<typeof CurriculumImportDecisionActionSchema>;
+
+export const CurriculumImportDecisionSchema = z
+  .object({
+    courseCode: z.string().trim().min(1).max(40),
+    action: CurriculumImportDecisionActionSchema,
+    courseType: CourseTypeSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "create-course" && !value.courseType) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["courseType"],
+        message: "Creating a missing Course requires an explicit course type",
+      });
+    }
+  });
+export type CurriculumImportDecision = z.infer<typeof CurriculumImportDecisionSchema>;
+
+export const CurriculumImportApplyInputSchema = CurriculumJsonUploadSchema.extend({
+  decisions: z.array(CurriculumImportDecisionSchema).default([]),
+}).superRefine((value, ctx) => {
+  const codes = new Set<string>();
+  for (const [index, decision] of value.decisions.entries()) {
+    if (codes.has(decision.courseCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["decisions", index, "courseCode"],
+        message: `Duplicate decision for ${decision.courseCode}`,
+      });
+    }
+    codes.add(decision.courseCode);
+  }
+});
+export type CurriculumImportApplyInput = z.infer<typeof CurriculumImportApplyInputSchema>;
+
+export const CurriculumImportMatchStatusSchema = z.enum([
+  "matched",
+  "conflict",
+  "missing",
+  "blocked",
+]);
+export type CurriculumImportMatchStatus = z.infer<typeof CurriculumImportMatchStatusSchema>;
+
+export const CurriculumImportRequiredDecisionSchema = z.enum([
+  "create-course",
+  "keep-existing-course",
+]);
+
+export const CurriculumImportPreviewCourseSchema = CurriculumImportCourseSchema.extend({
+  matchStatus: CurriculumImportMatchStatusSchema,
+  existingCourseId: z.string().uuid().nullable(),
+  existingTitle: z.string().nullable(),
+  existingCourseType: CourseTypeSchema.nullable(),
+  requiredDecision: CurriculumImportRequiredDecisionSchema.nullable(),
+  message: z.string(),
+});
+
+export const CurriculumPathwayTotalSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+  isDefault: z.boolean(),
+  credits: z.number().int().min(0),
+  courseCount: z.number().int().min(0),
+});
+
+export const CurriculumImportTotalsSchema = z.object({
+  commonCredits: z.number().int().min(0),
+  commonCourseCount: z.number().int().min(0),
+  pathways: z.array(CurriculumPathwayTotalSchema),
+  computedSelectedRouteCredits: z.number().int().min(0),
+  selectedRouteCredits: z.number().int().min(0),
+  selectedRouteCourseCount: z.number().int().min(0),
+});
+
+export const CurriculumImportPreviewSchema = z.object({
+  source: z.object({
+    fileName: z.string(),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    formatVersion: z.literal(DSE_CURRICULUM_IMPORT_FORMAT_VERSION),
+  }),
+  target: z.object({
+    curriculumId: z.string().uuid(),
+    curriculumVersionId: z.string().uuid(),
+    programmeId: z.string(),
+    programmeCode: z.string(),
+    status: z.string(),
+  }),
+  curriculum: CurriculumImportMetadataSchema,
+  pathways: z.array(CurriculumImportPathwaySchema),
+  courses: z.array(CurriculumImportPreviewCourseSchema),
+  declaredTotals: CurriculumDeclaredTotalsSchema.nullable(),
+  totals: CurriculumImportTotalsSchema,
+  blockers: z.array(z.string()),
+  warnings: z.array(z.string()),
+  canApply: z.boolean(),
+});
+export type CurriculumImportPreview = z.infer<typeof CurriculumImportPreviewSchema>;
+
+export const CurriculumArtifactCourseSchema = CurriculumImportCourseSchema.extend({
+  courseId: z.string().uuid().nullable(),
+  placementId: z.string().uuid().nullable(),
+});
+
+export const CurriculumArtifactViewSchema = z.object({
+  curriculum: z.object({
+    id: z.string().uuid(),
+    programmeId: z.string(),
+    programmeCode: z.string(),
+    code: z.string(),
+    name: z.string(),
+    academicYear: z.string(),
+    version: z.string(),
+    status: z.string(),
+    defaultPathwayCode: z.string().nullable(),
+  }),
+  pathways: z.array(CurriculumImportPathwaySchema),
+  courses: z.array(CurriculumArtifactCourseSchema),
+  declaredTotals: CurriculumDeclaredTotalsSchema.nullable(),
+  totals: CurriculumImportTotalsSchema,
+  source: z
+    .object({
+      fileName: z.string(),
+      sha256: z.string(),
+      formatVersion: z.string(),
+      importedAt: z.string(),
+      importedById: z.string().uuid(),
+      decisions: z.array(CurriculumImportDecisionSchema),
+      warnings: z.array(z.string()),
+    })
+    .nullable(),
+});
+export type CurriculumArtifactView = z.infer<typeof CurriculumArtifactViewSchema>;
