@@ -20,6 +20,7 @@ export * from "./student-portal.ts";
 export * from "./telegram.ts";
 export * from "./qa.ts";
 export * from "./qa-knowledge.ts";
+export * from "./qa-evidence-semantics.ts";
 export * from "./qa-evidence-candidates.ts";
 export * from "./qa-evidence-library.ts";
 export * from "./qa-evidence-sharing.ts";
