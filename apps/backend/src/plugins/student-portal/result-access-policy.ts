@@ -125,7 +125,7 @@ export async function applyProvisionalResultAccessPolicy(
   );
   const hiddenAssessmentIds = new Set(
     detail.assessments.flatMap((assessment) =>
-      assessment.result && finalizedByAssessment.get(assessment.id) === false
+      assessment.result && finalizedByAssessment.get(assessment.id) !== true
         ? [assessment.id]
         : [],
     ),
