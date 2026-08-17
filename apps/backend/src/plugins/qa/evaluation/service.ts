@@ -1,6 +1,9 @@
 import {
   AUN_QA_V4_ID,
+  QaApplicabilityStateSchema,
   QaEvidenceAnalysisStateSchema,
+  QaEvidenceProvenanceSchema,
+  QaEvidenceScopeSchema,
   QaEvidenceSourceDomainSchema,
   type CreateQaEvaluationHumanRatingSchema,
   type CreateQaEvaluationRunSchema,
@@ -31,6 +34,15 @@ type SetGoldInput = z.infer<typeof SetQaEvaluationGoldSchema>;
 type CreateRunInput = z.infer<typeof CreateQaEvaluationRunSchema>;
 type CreateHumanRatingInput = z.infer<typeof CreateQaEvaluationHumanRatingSchema>;
 
+type ScenarioSemanticsRow = { id: string; goldApplicability: string | null };
+type EvidenceSemanticsRow = {
+  id: string;
+  scope: unknown;
+  provenance: unknown;
+  periodKey: string | null;
+};
+type RunSemanticsRow = { id: string; predictedApplicability: string };
+
 export class QaEvaluationResourceNotFoundError extends Error {}
 export class QaEvaluationScopeMismatchError extends Error {}
 export class QaEvaluationIntegrityError extends Error {}
@@ -44,13 +56,20 @@ function controlledAttributes(value: unknown): Record<string, string | number | 
   ) as Record<string, string | number | boolean | null>;
 }
 
-function scenarioToView(row: any): QaEvaluationScenarioView {
+function scenarioToView(
+  row: any,
+  scenarioSemantics?: ScenarioSemanticsRow,
+  evidenceSemantics: Map<string, EvidenceSemanticsRow> = new Map(),
+): QaEvaluationScenarioView {
   return {
     id: row.id,
     requirementCode: row.requirement.code,
     expectationId: row.expectationId,
     name: row.name,
     description: row.description,
+    goldApplicability: scenarioSemantics?.goldApplicability
+      ? QaApplicabilityStateSchema.parse(scenarioSemantics.goldApplicability)
+      : null,
     goldState: row.goldState
       ? QaEvidenceAnalysisStateSchema.parse(fromDbState[row.goldState as keyof typeof fromDbState])
       : null,
@@ -58,32 +77,45 @@ function scenarioToView(row: any): QaEvaluationScenarioView {
     goldReviewerName: row.goldReviewer?.name ?? null,
     goldAnnotatedAt: row.goldAnnotatedAt?.toISOString() ?? null,
     goldNote: row.goldNote,
-    evidence: row.evidence.map((item: any) => ({
-      id: item.id,
-      scenarioId: item.scenarioId,
-      order: item.order,
-      evidenceType: item.evidenceType,
-      sourceDomain: QaEvidenceSourceDomainSchema.parse(item.sourceDomain),
-      entityType: item.entityType,
-      label: item.label,
-      text: item.text,
-      referenceKey: item.referenceKey,
-      reportingDate: item.reportingDate?.toISOString() ?? null,
-      attributes: controlledAttributes(item.attributes),
-      goldRelevant: item.goldRelevant,
-    })),
+    evidence: row.evidence.map((item: any) => {
+      const semantics = evidenceSemantics.get(item.id);
+      return {
+        id: item.id,
+        scenarioId: item.scenarioId,
+        order: item.order,
+        evidenceType: item.evidenceType,
+        sourceDomain: QaEvidenceSourceDomainSchema.parse(item.sourceDomain),
+        entityType: item.entityType,
+        label: item.label,
+        text: item.text,
+        referenceKey: item.referenceKey,
+        reportingDate: item.reportingDate?.toISOString() ?? null,
+        scope: QaEvidenceScopeSchema.parse(semantics?.scope ?? {}),
+        provenance: QaEvidenceProvenanceSchema.parse(
+          semantics?.provenance ?? { authority: "unknown" },
+        ),
+        periodKey: semantics?.periodKey ?? null,
+        attributes: controlledAttributes(item.attributes),
+        goldRelevant: item.goldRelevant,
+      };
+    }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-function runToView(row: any): QaEvaluationRunView {
+function runToView(row: any, semantics?: RunSemanticsRow): QaEvaluationRunView {
   return {
     id: row.id,
     scenarioId: row.scenarioId,
-    predictedState: QaEvidenceAnalysisStateSchema.parse(
-      fromDbState[row.predictedState as keyof typeof fromDbState],
+    predictedApplicability: QaApplicabilityStateSchema.parse(
+      semantics?.predictedApplicability ?? "applicable",
     ),
+    predictedState: row.predictedState
+      ? QaEvidenceAnalysisStateSchema.parse(
+          fromDbState[row.predictedState as keyof typeof fromDbState],
+        )
+      : null,
     engine: row.engine,
     engineVersion: row.engineVersion,
     promptVersion: row.promptVersion,
@@ -109,6 +141,25 @@ function ratingToView(row: any): QaEvaluationHumanRatingView {
     traceability: row.traceability,
     comment: row.comment,
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+async function evaluationSemanticsMaps() {
+  const [scenarios, evidence, runs] = await Promise.all([
+    prisma.$queryRaw<ScenarioSemanticsRow[]>`
+      SELECT id, "goldApplicability" FROM "QaEvaluationScenario"
+    `,
+    prisma.$queryRaw<EvidenceSemanticsRow[]>`
+      SELECT id, scope, provenance, "periodKey" FROM "QaEvaluationScenarioEvidence"
+    `,
+    prisma.$queryRaw<RunSemanticsRow[]>`
+      SELECT id, "predictedApplicability" FROM "QaEvaluationRun"
+    `,
+  ]);
+  return {
+    scenarios: new Map(scenarios.map((row) => [row.id, row])),
+    evidence: new Map(evidence.map((row) => [row.id, row])),
+    runs: new Map(runs.map((row) => [row.id, row])),
   };
 }
 
@@ -149,47 +200,67 @@ export async function createQaEvaluationScenario(
     );
   }
 
-  const created = await prisma.qaEvaluationScenario.create({
-    data: {
-      requirementId: requirement.id,
-      expectationId: expectation.id,
-      name: input.name,
-      description: input.description,
-      evidence: {
-        create: input.evidence.map((item, order) => ({
-          order,
-          evidenceType: item.evidenceType,
-          sourceDomain: item.sourceDomain,
-          entityType: item.entityType,
-          label: item.label,
-          text: item.text,
-          referenceKey: item.referenceKey,
-          reportingDate: item.reportingDate,
-          attributes: item.attributes,
-        })),
+  const created = await prisma.$transaction(async (tx) => {
+    const row = await tx.qaEvaluationScenario.create({
+      data: {
+        requirementId: requirement.id,
+        expectationId: expectation.id,
+        name: input.name,
+        description: input.description,
+        evidence: {
+          create: input.evidence.map((item, order) => ({
+            order,
+            evidenceType: item.evidenceType,
+            sourceDomain: item.sourceDomain,
+            entityType: item.entityType,
+            label: item.label,
+            text: item.text,
+            referenceKey: item.referenceKey,
+            reportingDate: item.reportingDate,
+            attributes: item.attributes,
+          })),
+        },
       },
-    },
-    include: {
-      requirement: { select: { code: true } },
-      expectation: { select: { id: true } },
-      goldReviewer: { select: { name: true } },
-      evidence: { orderBy: { order: "asc" } },
-    },
+      include: {
+        requirement: { select: { code: true } },
+        expectation: { select: { id: true } },
+        goldReviewer: { select: { name: true } },
+        evidence: { orderBy: { order: "asc" } },
+      },
+    });
+
+    for (const evidenceRow of row.evidence) {
+      const source = input.evidence[evidenceRow.order];
+      if (!source) continue;
+      await tx.$executeRaw`
+        UPDATE "QaEvaluationScenarioEvidence"
+        SET scope = CAST(${JSON.stringify(source.scope)} AS jsonb),
+            provenance = CAST(${JSON.stringify(source.provenance)} AS jsonb),
+            "periodKey" = ${source.periodKey}
+        WHERE id = ${evidenceRow.id}
+      `;
+    }
+    return row;
   });
-  return scenarioToView(created);
+
+  const maps = await evaluationSemanticsMaps();
+  return scenarioToView(created, maps.scenarios.get(created.id), maps.evidence);
 }
 
 export async function listQaEvaluationScenarios(): Promise<QaEvaluationScenarioView[]> {
-  const rows = await prisma.qaEvaluationScenario.findMany({
-    orderBy: [{ requirement: { code: "asc" } }, { createdAt: "asc" }],
-    include: {
-      requirement: { select: { code: true } },
-      expectation: { select: { id: true } },
-      goldReviewer: { select: { name: true } },
-      evidence: { orderBy: { order: "asc" } },
-    },
-  });
-  return rows.map(scenarioToView);
+  const [rows, maps] = await Promise.all([
+    prisma.qaEvaluationScenario.findMany({
+      orderBy: [{ requirement: { code: "asc" } }, { createdAt: "asc" }],
+      include: {
+        requirement: { select: { code: true } },
+        expectation: { select: { id: true } },
+        goldReviewer: { select: { name: true } },
+        evidence: { orderBy: { order: "asc" } },
+      },
+    }),
+    evaluationSemanticsMaps(),
+  ]);
+  return rows.map((row) => scenarioToView(row, maps.scenarios.get(row.id), maps.evidence));
 }
 
 export async function setQaEvaluationGold(
@@ -202,7 +273,10 @@ export async function setQaEvaluationGold(
     include: { evidence: { select: { id: true } } },
   });
   if (!scenario) throw new QaEvaluationResourceNotFoundError("Evaluation scenario not found");
-  if (scenario.goldState !== null) {
+  const existingApplicability = await prisma.$queryRaw<Array<{ goldApplicability: string | null }>>`
+    SELECT "goldApplicability" FROM "QaEvaluationScenario" WHERE id = ${scenarioId}
+  `;
+  if (scenario.goldState !== null || existingApplicability[0]?.goldApplicability !== null) {
     throw new QaEvaluationIntegrityError(
       "Gold reference classification is already established; create a new controlled scenario instead of overwriting the human reference label",
     );
@@ -220,12 +294,17 @@ export async function setQaEvaluationGold(
     await tx.qaEvaluationScenario.update({
       where: { id: scenarioId },
       data: {
-        goldState: toDbState[input.goldState],
+        goldState: input.goldState ? toDbState[input.goldState] : null,
         goldReviewerId: reviewerId,
         goldAnnotatedAt: new Date(),
         goldNote: input.note,
       },
     });
+    await tx.$executeRaw`
+      UPDATE "QaEvaluationScenario"
+      SET "goldApplicability" = ${input.goldApplicability}
+      WHERE id = ${scenarioId}
+    `;
     await tx.qaEvaluationScenarioEvidence.updateMany({
       where: { scenarioId },
       data: { goldRelevant: null },
@@ -247,7 +326,8 @@ export async function setQaEvaluationGold(
       evidence: { orderBy: { order: "asc" } },
     },
   });
-  return scenarioToView(updated);
+  const maps = await evaluationSemanticsMaps();
+  return scenarioToView(updated, maps.scenarios.get(updated.id), maps.evidence);
 }
 
 /** Internal persistence for an actual prototype run. This is intentionally not
@@ -268,24 +348,47 @@ export async function createQaEvaluationRun(
     );
   }
 
-  const created = await prisma.qaEvaluationRun.create({
-    data: {
-      scenarioId: input.scenarioId,
-      predictedState: toDbState[input.predictedState],
-      engine: input.engine,
-      engineVersion: input.engineVersion,
-      promptVersion: input.promptVersion,
-      explanation: input.explanation,
-      retrieved: {
-        create: input.retrievedEvidence.map((item) => ({
-          scenarioEvidenceId: item.scenarioEvidenceId,
-          relevance: item.relevance,
-        })),
+  const created = await prisma.$transaction(async (tx) => {
+    const row = await tx.qaEvaluationRun.create({
+      data: {
+        scenarioId: input.scenarioId,
+        predictedState: toDbState[input.predictedState ?? "expertReviewRequired"],
+        engine: input.engine,
+        engineVersion: input.engineVersion,
+        promptVersion: input.promptVersion,
+        explanation: input.explanation,
+        retrieved: {
+          create: input.retrievedEvidence.map((item) => ({
+            scenarioEvidenceId: item.scenarioEvidenceId,
+            relevance: item.relevance,
+          })),
+        },
       },
-    },
-    include: { retrieved: true },
+      include: { retrieved: true },
+    });
+    if (input.predictedApplicability === "applicable") {
+      await tx.$executeRaw`
+        UPDATE "QaEvaluationRun"
+        SET "predictedApplicability" = ${input.predictedApplicability}
+        WHERE id = ${row.id}
+      `;
+    } else {
+      await tx.$executeRaw`
+        UPDATE "QaEvaluationRun"
+        SET "predictedApplicability" = ${input.predictedApplicability},
+            "predictedState" = NULL
+        WHERE id = ${row.id}
+      `;
+    }
+    return row;
   });
-  return runToView(created);
+  const semantics = await prisma.$queryRaw<RunSemanticsRow[]>`
+    SELECT id, "predictedApplicability" FROM "QaEvaluationRun" WHERE id = ${created.id}
+  `;
+  return runToView(
+    { ...created, predictedState: input.predictedState ? toDbState[input.predictedState] : null },
+    semantics[0],
+  );
 }
 
 export async function listQaEvaluationRuns(filters: {
@@ -293,16 +396,19 @@ export async function listQaEvaluationRuns(filters: {
   engineVersion?: string;
   promptVersion?: string;
 } = {}): Promise<QaEvaluationRunView[]> {
-  const rows = await prisma.qaEvaluationRun.findMany({
-    where: {
-      ...(filters.engine ? { engine: filters.engine } : {}),
-      ...(filters.engineVersion ? { engineVersion: filters.engineVersion } : {}),
-      ...(filters.promptVersion !== undefined ? { promptVersion: filters.promptVersion } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: { retrieved: true },
-  });
-  return rows.map(runToView);
+  const [rows, maps] = await Promise.all([
+    prisma.qaEvaluationRun.findMany({
+      where: {
+        ...(filters.engine ? { engine: filters.engine } : {}),
+        ...(filters.engineVersion ? { engineVersion: filters.engineVersion } : {}),
+        ...(filters.promptVersion !== undefined ? { promptVersion: filters.promptVersion } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      include: { retrieved: true },
+    }),
+    evaluationSemanticsMaps(),
+  ]);
+  return rows.map((row) => runToView(row, maps.runs.get(row.id)));
 }
 
 export async function createQaEvaluationHumanRating(
@@ -345,6 +451,7 @@ export async function getQaEvaluationMetrics(filters: {
       retrieved: { include: { scenarioEvidence: { select: { goldRelevant: true } } } },
     },
   });
+  const maps = await evaluationSemanticsMaps();
   const ratings = await prisma.qaEvaluationHumanRating.findMany({
     where: {
       run: {
@@ -362,16 +469,20 @@ export async function getQaEvaluationMetrics(filters: {
     },
   });
 
+  const applicableRuns = runs.filter((run) => {
+    const predicted = maps.runs.get(run.id)?.predictedApplicability ?? "applicable";
+    const gold = maps.scenarios.get(run.scenarioId)?.goldApplicability ?? null;
+    return predicted === "applicable" && gold === "applicable" && run.predictedState !== null && run.scenario.goldState !== null;
+  });
+
   return calculateQaEvaluationMetrics(
-    runs.map((run) => ({
+    applicableRuns.map((run) => ({
       predictedState: QaEvidenceAnalysisStateSchema.parse(
         fromDbState[run.predictedState as keyof typeof fromDbState],
       ),
-      goldState: run.scenario.goldState
-        ? QaEvidenceAnalysisStateSchema.parse(
-            fromDbState[run.scenario.goldState as keyof typeof fromDbState],
-          )
-        : null,
+      goldState: QaEvidenceAnalysisStateSchema.parse(
+        fromDbState[run.scenario.goldState as keyof typeof fromDbState],
+      ),
       retrievedEvidence: run.retrieved.map((item) => ({
         goldRelevant: item.scenarioEvidence.goldRelevant,
       })),
