@@ -19,6 +19,7 @@ import {
   matchEvidenceScope,
   matchEvidenceTime,
   meetsSourceAuthority,
+  temporalMatchSupportsEvidence,
 } from "./evidence-semantics.ts";
 import {
   QA_DETERMINISTIC_RULE_VERSION,
@@ -49,6 +50,7 @@ type AssessedCandidate = {
     | "insufficientHistory"
     | "unknown";
   authorityMatch: boolean | null;
+  temporalRule: QaTemporalRule;
 };
 
 function effectiveScopeRequirement(
@@ -69,7 +71,9 @@ function effectiveTemporalRule(
   expectation: QaQualityExpectationView,
   definition: QaExpectedEvidenceDefinitionView,
 ): QaTemporalRule {
-  if (definition.temporalRule.kind !== "withinCycle") return definition.temporalRule;
+  // pointInTime is the compatibility/default rule. A stricter evidence-specific
+  // rule wins; otherwise inherit the expectation-level rule.
+  if (definition.temporalRule.kind !== "pointInTime") return definition.temporalRule;
   return expectation.temporalRule;
 }
 
@@ -108,6 +112,7 @@ function assessCandidates(
         comparablePeriods: periodCount,
       }),
       authorityMatch: meetsSourceAuthority(definition.authorityRequirement, provenance),
+      temporalRule,
     };
   });
 
@@ -116,7 +121,7 @@ function assessCandidates(
       .filter(
         (item) =>
           item.scopeMatch === "exact" &&
-          item.temporalMatch === "current" &&
+          temporalMatchSupportsEvidence(item.temporalRule, item.temporalMatch) &&
           item.authorityMatch === true,
       )
       .map((item) => item.candidate.key),
@@ -162,7 +167,13 @@ function sourceSnapshots(assessed: AssessedCandidate[]) {
       scope: candidate.scope ?? {},
       scopeMatch: item.scopeMatch,
       temporalMatch: item.temporalMatch,
-      provenance: candidate.provenance ?? { authority: "unknown" as const },
+      provenance: candidate.provenance ?? {
+        authority: "unknown" as const,
+        ownerUnit: null,
+        version: null,
+        approvalStatus: null,
+        sourceUri: candidate.route,
+      },
       authorityMatch: item.authorityMatch,
       periodKey: candidate.periodKey ?? null,
     };
