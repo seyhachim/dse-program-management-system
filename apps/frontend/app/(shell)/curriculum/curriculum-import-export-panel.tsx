@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  CourseType,
+  CurriculumImportDecision,
   CurriculumImportPreview,
-  CurriculumVersionSummary,
   CurriculumWorkflowState,
 } from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
@@ -15,6 +16,10 @@ import {
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
 import { exportCurriculumWord } from "./curriculum-word-renderer";
+
+const COURSE_TYPES: CourseType[] = ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"];
+
+type DecisionState = Record<string, CurriculumImportDecision | undefined>;
 
 function statusBadge(status: string) {
   const classes =
@@ -30,6 +35,14 @@ function statusBadge(status: string) {
   return `rounded-full border px-2 py-1 text-xs font-medium ${classes}`;
 }
 
+function isDecisionBlocker(blocker: string) {
+  return (
+    blocker.includes("choose Create Course") ||
+    blocker.includes("title conflict requires") ||
+    blocker.includes("explicit canonical course type is required")
+  );
+}
+
 export function CurriculumImportExportPanel() {
   const { me } = useMe();
   const canWrite = me?.permissions.includes("programme:write") ?? false;
@@ -39,6 +52,7 @@ export function CurriculumImportExportPanel() {
   const [file, setFile] = useState<File | null>(null);
   const [jsonText, setJsonText] = useState("");
   const [preview, setPreview] = useState<CurriculumImportPreview | null>(null);
+  const [decisions, setDecisions] = useState<DecisionState>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -53,6 +67,17 @@ export function CurriculumImportExportPanel() {
     selected?.status === "Approved" ||
     selected?.status === "Active" ||
     selected?.status === "Superseded";
+
+  const requiredDecisionCodes = useMemo(
+    () =>
+      preview?.courses
+        .filter((course) => course.requiredDecision !== null)
+        .map((course) => course.code) ?? [],
+    [preview],
+  );
+  const decisionsResolved = requiredDecisionCodes.every((code) => Boolean(decisions[code]));
+  const hardBlockers = preview?.blockers.filter((blocker) => !isDecisionBlocker(blocker)) ?? [];
+  const canApplyPreview = Boolean(preview && decisionsResolved && hardBlockers.length === 0);
 
   const loadWorkflow = useCallback(async (id: string) => {
     if (!id) return;
@@ -79,19 +104,22 @@ export function CurriculumImportExportPanel() {
     })();
   }, [loadWorkflow]);
 
-  const chooseVersion = async (id: string) => {
-    setVersionId(id);
+  const resetImportState = () => {
     setPreview(null);
+    setDecisions({});
     setError(null);
     setSuccess(null);
+  };
+
+  const chooseVersion = async (id: string) => {
+    setVersionId(id);
+    resetImportState();
     await loadWorkflow(id);
   };
 
   const chooseFile = async (next: File | null) => {
     setFile(next);
-    setPreview(null);
-    setError(null);
-    setSuccess(null);
+    resetImportState();
     setJsonText(next ? await next.text() : "");
   };
 
@@ -100,6 +128,7 @@ export function CurriculumImportExportPanel() {
     setBusy(true);
     setError(null);
     setSuccess(null);
+    setDecisions({});
     try {
       setPreview(
         await curriculumApi.previewJson(versionId, {
@@ -115,8 +144,24 @@ export function CurriculumImportExportPanel() {
     }
   };
 
+  const chooseCreateCourse = (courseCode: string, courseType: CourseType) => {
+    setDecisions((current) => ({
+      ...current,
+      [courseCode]: { courseCode, action: "create-course", courseType },
+    }));
+  };
+
+  const chooseKeepExisting = (courseCode: string, keep: boolean) => {
+    setDecisions((current) => {
+      const next = { ...current };
+      if (keep) next[courseCode] = { courseCode, action: "keep-existing-course" };
+      else delete next[courseCode];
+      return next;
+    });
+  };
+
   const applyImport = async () => {
-    if (!versionId || !file || !jsonText || !preview?.canApply) return;
+    if (!versionId || !file || !jsonText || !canApplyPreview) return;
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -124,9 +169,10 @@ export function CurriculumImportExportPanel() {
       const artifact = await curriculumApi.applyJson(versionId, {
         fileName: file.name,
         jsonText,
+        decisions: requiredDecisionCodes.map((code) => decisions[code]!).filter(Boolean),
       });
       setSuccess(
-        `Imported ${artifact.totals.selectedRouteCourseCount} default-route courses. Reloading the canonical curriculum…`,
+        `Imported ${artifact.totals.selectedRouteCourseCount} selected-route courses and preserved ${artifact.pathways.length} canonical pathway(s). Reloading…`,
       );
       window.setTimeout(() => window.location.reload(), 500);
     } catch (err) {
@@ -142,7 +188,7 @@ export function CurriculumImportExportPanel() {
     setError(null);
     setSuccess(null);
     try {
-      const artifact = await curriculumApi.artifact(versionId);
+      const artifact = await curriculumApi.exportArtifact(versionId);
       await exportCurriculumWord(artifact);
       setSuccess(`Exported DSE curriculum v${artifact.curriculum.version} as DOCX.`);
     } catch (err) {
@@ -173,7 +219,7 @@ export function CurriculumImportExportPanel() {
             )}
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Import structured curriculum data only into an editable Draft. Exported Word files are generated from the selected canonical PMS version, including Year-IV alternative pathways.
+            Import structured curriculum data only into an editable Draft. Missing or conflicting Courses require explicit decisions. Word export is served only from a published historical version.
           </p>
         </div>
         <label className="text-sm font-medium">
@@ -216,10 +262,11 @@ export function CurriculumImportExportPanel() {
 
           {preview && (
             <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div><p className="text-xs text-muted-foreground">Rows</p><p className="font-semibold">{preview.courses.length}</p></div>
                 <div><p className="text-xs text-muted-foreground">Common credits</p><p className="font-semibold">{preview.totals.commonCredits}</p></div>
-                <div><p className="text-xs text-muted-foreground">Default route</p><p className="font-semibold">{preview.totals.selectedRouteCredits} credits</p></div>
+                <div><p className="text-xs text-muted-foreground">Row calculation</p><p className="font-semibold">{preview.totals.computedSelectedRouteCredits}</p></div>
+                <div><p className="text-xs text-muted-foreground">Official selected total</p><p className="font-semibold">{preview.totals.selectedRouteCredits} credits</p></div>
                 <div><p className="text-xs text-muted-foreground">Source hash</p><p className="truncate font-mono text-xs">{preview.source.sha256}</p></div>
               </div>
 
@@ -241,30 +288,89 @@ export function CurriculumImportExportPanel() {
               )}
 
               <div>
-                <p className="text-sm font-medium">Course matching</p>
-                <div className="mt-2 max-h-64 overflow-auto rounded-md border border-border bg-background">
+                <p className="text-sm font-medium">Course matching & decisions</p>
+                <div className="mt-2 max-h-96 overflow-auto rounded-md border border-border bg-background">
                   <table className="w-full text-left text-xs">
-                    <thead className="sticky top-0 bg-muted"><tr><th className="px-3 py-2">Code</th><th className="px-3 py-2">Course</th><th className="px-3 py-2">Pathway</th><th className="px-3 py-2">Match</th></tr></thead>
+                    <thead className="sticky top-0 bg-muted">
+                      <tr>
+                        <th className="px-3 py-2">Code</th>
+                        <th className="px-3 py-2">Course</th>
+                        <th className="px-3 py-2">Pathway</th>
+                        <th className="px-3 py-2">Match</th>
+                        <th className="px-3 py-2">Required decision</th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      {preview.courses.map((course) => (
-                        <tr key={`${course.pathwayCode ?? "common"}:${course.code}`} className="border-t border-border">
-                          <td className="px-3 py-2 font-mono">{course.code}</td>
-                          <td className="px-3 py-2">{course.title}</td>
-                          <td className="px-3 py-2">{course.pathwayCode ?? "Common"}</td>
-                          <td className="px-3 py-2"><span className={course.matchStatus === "matched" ? "text-emerald-700" : "text-destructive"}>{course.matchStatus}</span></td>
-                        </tr>
-                      ))}
+                      {preview.courses.map((course) => {
+                        const decision = decisions[course.code];
+                        return (
+                          <tr key={`${course.pathwayCode ?? "common"}:${course.code}`} className="border-t border-border align-top">
+                            <td className="px-3 py-2 font-mono">{course.code}</td>
+                            <td className="px-3 py-2">
+                              <div>{course.title}</div>
+                              <div className="mt-1 text-[11px] text-muted-foreground">{course.message}</div>
+                            </td>
+                            <td className="px-3 py-2">{course.pathwayCode ?? "Common"}</td>
+                            <td className="px-3 py-2">
+                              <span className={course.matchStatus === "matched" ? "text-emerald-700" : "text-destructive"}>
+                                {course.matchStatus}
+                              </span>
+                            </td>
+                            <td className="min-w-56 px-3 py-2">
+                              {course.requiredDecision === "create-course" ? (
+                                <label className="block">
+                                  <span className="text-[11px] text-muted-foreground">Create canonical Course as</span>
+                                  <select
+                                    value={decision?.action === "create-course" ? decision.courseType ?? "" : ""}
+                                    onChange={(event) => {
+                                      const value = event.target.value as CourseType | "";
+                                      if (value) chooseCreateCourse(course.code, value);
+                                      else setDecisions((current) => {
+                                        const next = { ...current };
+                                        delete next[course.code];
+                                        return next;
+                                      });
+                                    }}
+                                    className="mt-1 h-8 w-full rounded border border-input bg-background px-2"
+                                  >
+                                    <option value="">Select course type…</option>
+                                    {COURSE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                                  </select>
+                                </label>
+                              ) : course.requiredDecision === "keep-existing-course" ? (
+                                <label className="flex items-start gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={decision?.action === "keep-existing-course"}
+                                    onChange={(event) => chooseKeepExisting(course.code, event.target.checked)}
+                                    className="mt-0.5"
+                                  />
+                                  <span>Keep the existing PMS Course title and do not rename it.</span>
+                                </label>
+                              ) : (
+                                <span className="text-emerald-700">No decision needed</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {preview.blockers.length > 0 && (
+              {hardBlockers.length > 0 && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
                   <p className="text-sm font-medium text-destructive">Blocking issues</p>
                   <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-destructive">
-                    {preview.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                    {hardBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
                   </ul>
+                </div>
+              )}
+              {requiredDecisionCodes.length > 0 && !decisionsResolved && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900">
+                  <p className="text-sm font-medium">Decisions required</p>
+                  <p className="mt-1 text-xs">Resolve every missing/conflicting Course above before Apply to Draft is enabled.</p>
                 </div>
               )}
               {preview.warnings.length > 0 && (
@@ -278,7 +384,7 @@ export function CurriculumImportExportPanel() {
 
               <button
                 type="button"
-                disabled={busy || !preview.canApply}
+                disabled={busy || !canApplyPreview}
                 onClick={() => void applyImport()}
                 className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
@@ -311,7 +417,7 @@ export function CurriculumImportExportPanel() {
             Export DOCX
           </button>
           <p className="text-xs text-muted-foreground">
-            Word export uses the immutable selected version and the official DSE landscape curriculum layout.
+            The server permits export only from immutable published versions; the DOCX uses preserved curriculum snapshots.
           </p>
         </div>
       )}
