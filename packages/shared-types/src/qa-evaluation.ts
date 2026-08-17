@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { QaEvidenceAnalysisStateSchema } from "./qa-analysis.ts";
 import { QaEvidenceSourceDomainSchema } from "./qa-knowledge.ts";
+import {
+  QaApplicabilityStateSchema,
+  QaEvidenceProvenanceSchema,
+  QaEvidenceScopeSchema,
+} from "./qa-evidence-semantics.ts";
 
 export const QaEvaluationEvidenceAttributeValueSchema = z.union([
   z.string().max(5000),
@@ -17,6 +22,9 @@ export const QaEvaluationScenarioEvidenceInputSchema = z.object({
   text: z.string().trim().min(1).max(50_000),
   referenceKey: z.string().trim().max(500).default(""),
   reportingDate: z.coerce.date().nullable().optional().default(null),
+  scope: QaEvidenceScopeSchema.default({}),
+  provenance: QaEvidenceProvenanceSchema.default({ authority: "unknown" }),
+  periodKey: z.string().trim().max(200).nullable().optional().default(null),
   attributes: z.record(z.string(), QaEvaluationEvidenceAttributeValueSchema).default({}),
 });
 
@@ -29,7 +37,8 @@ export const CreateQaEvaluationScenarioSchema = z.object({
 });
 
 export const SetQaEvaluationGoldSchema = z.object({
-  goldState: QaEvidenceAnalysisStateSchema,
+  goldApplicability: QaApplicabilityStateSchema.default("applicable"),
+  goldState: QaEvidenceAnalysisStateSchema.nullable().optional().default(null),
   note: z.string().trim().max(5000).default(""),
   evidenceJudgments: z.array(
     z.object({
@@ -38,6 +47,20 @@ export const SetQaEvaluationGoldSchema = z.object({
     }),
   ).max(200).default([]),
 }).superRefine((value, ctx) => {
+  if (value.goldApplicability === "applicable" && value.goldState === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Applicable gold annotation requires an evidence coverage state",
+      path: ["goldState"],
+    });
+  }
+  if (value.goldApplicability !== "applicable" && value.goldState !== null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Non-applicable or uncertain gold annotation must bypass coverage classification",
+      path: ["goldState"],
+    });
+  }
   const ids = new Set<string>();
   for (const [index, item] of value.evidenceJudgments.entries()) {
     if (ids.has(item.evidenceId)) {
@@ -53,7 +76,8 @@ export const SetQaEvaluationGoldSchema = z.object({
 
 export const CreateQaEvaluationRunSchema = z.object({
   scenarioId: z.string().uuid(),
-  predictedState: QaEvidenceAnalysisStateSchema,
+  predictedApplicability: QaApplicabilityStateSchema.default("applicable"),
+  predictedState: QaEvidenceAnalysisStateSchema.nullable().optional().default(null),
   engine: z.string().trim().min(1).max(100),
   engineVersion: z.string().trim().min(1).max(100),
   promptVersion: z.string().trim().max(100).default(""),
@@ -65,6 +89,20 @@ export const CreateQaEvaluationRunSchema = z.object({
     }),
   ).max(200).default([]),
 }).superRefine((value, ctx) => {
+  if (value.predictedApplicability === "applicable" && value.predictedState === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Applicable evaluation run requires an evidence coverage state",
+      path: ["predictedState"],
+    });
+  }
+  if (value.predictedApplicability !== "applicable" && value.predictedState !== null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Non-applicable or uncertain run must bypass coverage classification",
+      path: ["predictedState"],
+    });
+  }
   const ids = new Set<string>();
   for (const [index, item] of value.retrievedEvidence.entries()) {
     if (ids.has(item.scenarioEvidenceId)) {
@@ -105,6 +143,9 @@ export interface QaEvaluationEvidenceView {
   text: string;
   referenceKey: string;
   reportingDate: string | null;
+  scope: z.infer<typeof QaEvidenceScopeSchema>;
+  provenance: z.infer<typeof QaEvidenceProvenanceSchema>;
+  periodKey: string | null;
   attributes: Record<string, z.infer<typeof QaEvaluationEvidenceAttributeValueSchema>>;
   goldRelevant: boolean | null;
 }
@@ -115,6 +156,7 @@ export interface QaEvaluationScenarioView {
   expectationId: string;
   name: string;
   description: string;
+  goldApplicability: z.infer<typeof QaApplicabilityStateSchema> | null;
   goldState: z.infer<typeof QaEvidenceAnalysisStateSchema> | null;
   goldReviewerId: string | null;
   goldReviewerName: string | null;
@@ -128,7 +170,8 @@ export interface QaEvaluationScenarioView {
 export interface QaEvaluationRunView {
   id: string;
   scenarioId: string;
-  predictedState: z.infer<typeof QaEvidenceAnalysisStateSchema>;
+  predictedApplicability: z.infer<typeof QaApplicabilityStateSchema>;
+  predictedState: z.infer<typeof QaEvidenceAnalysisStateSchema> | null;
   engine: string;
   engineVersion: string;
   promptVersion: string;
