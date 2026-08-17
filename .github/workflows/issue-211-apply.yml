@@ -13,11 +13,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: agent/issue-211-offering-course-spec-binding
-      - run: python scripts/issue-211-fix-and-apply.py
+      - run: python scripts/issue-211-fix2.py
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -- .github/workflows/ci.yml .github/workflows/issue-211-apply.yml
           git add -A
-          git commit -m "feat(offerings): bind exact approved CourseSpec versions for #211"
+          git commit -m "fix(offerings): keep student reads and seed on bound spec"
           git push
