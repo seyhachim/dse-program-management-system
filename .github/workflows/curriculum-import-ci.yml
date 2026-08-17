@@ -1,0 +1,88 @@
+name: Curriculum JSON Import
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/migrations/**curriculum_json_artifacts/**"
+      - "apps/backend/prisma/migrations/**sync_curriculum_artifact**"
+      - "apps/backend/src/plugins/programme/curriculum-import-*.ts"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "packages/shared-types/src/curriculum-import*"
+      - "apps/frontend/app/(shell)/curriculum/curriculum-*.tsx"
+      - "docs/curriculum/**"
+      - ".github/workflows/curriculum-import-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/backend/prisma/migrations/**curriculum_json_artifacts/**"
+      - "apps/backend/prisma/migrations/**sync_curriculum_artifact**"
+      - "apps/backend/src/plugins/programme/curriculum-import-*.ts"
+      - "packages/shared-types/src/curriculum-import*"
+      - "apps/frontend/app/(shell)/curriculum/curriculum-*.tsx"
+      - "docs/curriculum/**"
+
+permissions:
+  contents: read
+
+jobs:
+  curriculum-import-db:
+    name: Curriculum import DB regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_curriculum_import
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_curriculum_import"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_curriculum_import?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: bun run db:generate
+
+      - name: Simulate Supabase Data API roles and defaults
+        run: |
+          cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+          END
+          $$;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+          SQL
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+      - name: Run curriculum import DB regression
+        run: bun test apps/backend/src/plugins/programme/curriculum-import-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify database security classification
+        run: bun run --cwd apps/backend db:security:verify
