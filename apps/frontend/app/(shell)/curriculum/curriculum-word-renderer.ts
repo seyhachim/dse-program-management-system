@@ -3,6 +3,7 @@ import {
   BorderStyle,
   Document,
   Packer,
+  PageBreak,
   Paragraph,
   Table,
   TableCell,
@@ -14,12 +15,17 @@ import {
 } from "docx";
 import type { CurriculumArtifactCourse, CurriculumArtifactView } from "@dse-pms/shared-types";
 
-const PAGE_WIDTH = 15840; // 11in Letter landscape
-const PAGE_HEIGHT = 12240; // 8.5in
+// `docx` swaps width/height when landscape orientation is set. Supplying the
+// portrait Letter dimensions below produces the correct OOXML landscape size:
+// 15840 x 12240 twips. Keep the usable table width based on the final landscape
+// width so LibreOffice/Word do not clip the Semester II half.
+const DOCX_PAGE_WIDTH = 12240;
+const DOCX_PAGE_HEIGHT = 15840;
+const LANDSCAPE_PAGE_WIDTH = 15840;
 const LEFT_RIGHT_MARGIN = 432; // 0.3in — matches the supplied wide landscape table
 const TOP_MARGIN = 576; // 0.4in
 const BOTTOM_MARGIN = 432; // 0.3in
-const CONTENT_WIDTH = PAGE_WIDTH - LEFT_RIGHT_MARGIN * 2;
+const CONTENT_WIDTH = LANDSCAPE_PAGE_WIDTH - LEFT_RIGHT_MARGIN * 2;
 const FONT = "Times New Roman";
 const BODY = 18;
 const SMALL = 16;
@@ -356,6 +362,10 @@ function yearFourTable(artifact: CurriculumArtifactView) {
   });
 }
 
+function sourcePageBreak() {
+  return new Paragraph({ children: [new PageBreak()] });
+}
+
 export function buildCurriculumWordDocument(artifact: CurriculumArtifactView) {
   const children: (Paragraph | Table)[] = [
     para("ROYAL UNIVERSITY OF PHNOM PENH", { bold: true, center: true, size: 24, after: 25 }),
@@ -366,11 +376,11 @@ export function buildCurriculumWordDocument(artifact: CurriculumArtifactView) {
       after: 120,
     }),
     standardYearTable(artifact, 1),
-    para("", { after: 60 }),
+    sourcePageBreak(),
     standardYearTable(artifact, 2),
     para("", { after: 60 }),
     standardYearTable(artifact, 3),
-    para("", { after: 60 }),
+    sourcePageBreak(),
     yearFourTable(artifact),
     para("", { after: 60 }),
     para(
@@ -384,7 +394,11 @@ export function buildCurriculumWordDocument(artifact: CurriculumArtifactView) {
       {
         properties: {
           page: {
-            size: { width: PAGE_WIDTH, height: PAGE_HEIGHT, orientation: "landscape" },
+            size: {
+              width: DOCX_PAGE_WIDTH,
+              height: DOCX_PAGE_HEIGHT,
+              orientation: "landscape",
+            },
             margin: {
               top: TOP_MARGIN,
               bottom: BOTTOM_MARGIN,
