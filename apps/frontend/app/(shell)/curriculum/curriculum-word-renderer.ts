@@ -33,6 +33,9 @@ const LECTURER = 16;
 const HEADER_SHADE = "FFFFFF";
 const YEAR_SHADE = "FFFFFF";
 
+type CurriculumSemester = "First" | "Second";
+type CurriculumPathway = CurriculumArtifactView["pathways"][number];
+
 const borders = {
   top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
   bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
@@ -165,7 +168,7 @@ function sortCourses(courses: CurriculumArtifactCourse[]) {
 function scopeCourses(
   artifact: CurriculumArtifactView,
   yearLevel: number,
-  semester: "First" | "Second",
+  semester: CurriculumSemester,
   pathwayCode: string | null,
 ) {
   return sortCourses(
@@ -176,6 +179,43 @@ function scopeCourses(
         course.pathwayCode === pathwayCode,
     ),
   );
+}
+
+function pathwaysForLocation(
+  artifact: CurriculumArtifactView,
+  yearLevel: number,
+  semester: CurriculumSemester,
+) {
+  return artifact.pathways
+    .filter((pathway) => pathway.yearLevel === yearLevel && pathway.semester === semester)
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code));
+}
+
+function selectedPathway(
+  artifact: CurriculumArtifactView,
+  pathways: CurriculumPathway[],
+): CurriculumPathway | null {
+  return (
+    pathways.find((pathway) => pathway.code === artifact.curriculum.defaultPathwayCode) ??
+    pathways.find((pathway) => pathway.isDefault) ??
+    pathways[0] ??
+    null
+  );
+}
+
+function selectedRouteCourses(
+  artifact: CurriculumArtifactView,
+  yearLevel: number,
+  semester: CurriculumSemester,
+  pathway: CurriculumPathway | null,
+) {
+  const common = scopeCourses(artifact, yearLevel, semester, null);
+  if (!pathway) return common;
+  return sortCourses([
+    ...common,
+    ...scopeCourses(artifact, yearLevel, semester, pathway.code),
+  ]);
 }
 
 function scopeTotals(courses: CurriculumArtifactCourse[]) {
@@ -189,7 +229,7 @@ function scopeTotals(courses: CurriculumArtifactCourse[]) {
 function declaredSemesterCredits(
   artifact: CurriculumArtifactView,
   yearLevel: number,
-  semester: "First" | "Second",
+  semester: CurriculumSemester,
   fallback: number,
 ) {
   return (
@@ -199,27 +239,81 @@ function declaredSemesterCredits(
   );
 }
 
-function declaredPathwayCredits(
+function appendAlternativePathwayRows(
+  rows: TableRow[],
   artifact: CurriculumArtifactView,
-  pathwayCode: string | null | undefined,
-  fallback: number,
+  yearLevel: number,
+  semester: CurriculumSemester,
+  pathways: CurriculumPathway[],
+  selected: CurriculumPathway | null,
+  offset: 0 | 4,
 ) {
-  if (!pathwayCode) return fallback;
-  return (
-    artifact.declaredTotals?.pathwayCredits.find(
-      (total) => total.pathwayCode === pathwayCode,
-    )?.credits ?? fallback
-  );
+  for (const pathway of pathways.filter((item) => item.code !== selected?.code)) {
+    const courses = scopeCourses(artifact, yearLevel, semester, pathway.code);
+    if (courses.length === 0) continue;
+
+    rows.push(
+      new TableRow({
+        children:
+          offset === 0
+            ? [mergedCell(pathway.name, 0, 4), ...blankHalf()]
+            : [...blankHalf(), mergedCell(pathway.name, 4, 4)],
+      }),
+    );
+    if (courses.length > 1 || courses.some((course) => course.weeklyHours !== null)) {
+      rows.push(
+        new TableRow({
+          children:
+            offset === 0
+              ? [...headerHalf(0), ...blankHalf()]
+              : [...blankHalf(), ...headerHalf(4)],
+        }),
+      );
+    }
+    for (const course of courses) {
+      rows.push(
+        new TableRow({
+          cantSplit: true,
+          children:
+            offset === 0
+              ? [...courseHalf(course, 0), ...blankHalf()]
+              : [...blankHalf(), ...courseHalf(course, 4)],
+        }),
+      );
+    }
+  }
 }
 
-function standardYearTable(artifact: CurriculumArtifactView, yearLevel: number) {
-  const first = scopeCourses(artifact, yearLevel, "First", null);
-  const second = scopeCourses(artifact, yearLevel, "Second", null);
+function yearTable(artifact: CurriculumArtifactView, yearLevel: number) {
+  const firstPathways = pathwaysForLocation(artifact, yearLevel, "First");
+  const secondPathways = pathwaysForLocation(artifact, yearLevel, "Second");
+  const firstSelected = selectedPathway(artifact, firstPathways);
+  const secondSelected = selectedPathway(artifact, secondPathways);
+  const first = selectedRouteCourses(artifact, yearLevel, "First", firstSelected);
+  const second = selectedRouteCourses(artifact, yearLevel, "Second", secondSelected);
+
   const rows: TableRow[] = [
-    new TableRow({ children: [mergedCell(`Year ${["I", "II", "III", "IV"][yearLevel - 1]}`, 0, 8, YEAR_SHADE)] }),
+    new TableRow({
+      children: [
+        mergedCell(`Year ${["I", "II", "III", "IV"][yearLevel - 1]}`, 0, 8, YEAR_SHADE),
+      ],
+    }),
     new TableRow({ children: [mergedCell("Semester I", 0, 4), mergedCell("Semester II", 4, 4)] }),
-    new TableRow({ children: [...headerHalf(0), ...headerHalf(4)] }),
   ];
+
+  if (firstSelected || secondSelected) {
+    rows.push(
+      new TableRow({
+        children: [
+          firstSelected ? mergedCell(firstSelected.name, 0, 4) : ...blankHalf(),
+          secondSelected ? mergedCell(secondSelected.name, 4, 4) : ...blankHalf(),
+        ],
+      }),
+    );
+  }
+
+  rows.push(new TableRow({ children: [...headerHalf(0), ...headerHalf(4)] }));
+
   const length = Math.max(first.length, second.length);
   for (let index = 0; index < length; index += 1) {
     rows.push(
@@ -232,6 +326,7 @@ function standardYearTable(artifact: CurriculumArtifactView, yearLevel: number) 
       }),
     );
   }
+
   const firstTotals = scopeTotals(first);
   const secondTotals = scopeTotals(second);
   const firstCredits = declaredSemesterCredits(artifact, yearLevel, "First", firstTotals.credits);
@@ -256,102 +351,25 @@ function standardYearTable(artifact: CurriculumArtifactView, yearLevel: number) 
       ],
     }),
   );
-  return new Table({
-    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
-    columnWidths: widths,
-    layout: TableLayoutType.FIXED,
-    borders,
+
+  appendAlternativePathwayRows(
     rows,
-  });
-}
-
-function yearFourTable(artifact: CurriculumArtifactView) {
-  const first = scopeCourses(artifact, 4, "First", null);
-  const pathways = artifact.pathways
-    .filter((pathway) => pathway.yearLevel === 4 && pathway.semester === "Second")
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code));
-  const defaultPathway =
-    pathways.find((pathway) => pathway.code === artifact.curriculum.defaultPathwayCode) ??
-    pathways.find((pathway) => pathway.isDefault) ??
-    pathways[0] ??
-    null;
-  const defaultCourses = defaultPathway
-    ? scopeCourses(artifact, 4, "Second", defaultPathway.code)
-    : scopeCourses(artifact, 4, "Second", null);
-
-  const rows: TableRow[] = [
-    new TableRow({ children: [mergedCell("Year IV", 0, 8, YEAR_SHADE)] }),
-    new TableRow({ children: [mergedCell("Semester I", 0, 4), mergedCell("Semester II", 4, 4)] }),
-    new TableRow({
-      children: [
-        ...blankHalf(),
-        mergedCell(defaultPathway?.name ?? "Option 1", 4, 4),
-      ],
-    }),
-    new TableRow({ children: [...headerHalf(0), ...headerHalf(4)] }),
-  ];
-
-  const paired = Math.max(first.length, defaultCourses.length);
-  for (let index = 0; index < paired; index += 1) {
-    rows.push(
-      new TableRow({
-        cantSplit: true,
-        children: [
-          ...courseHalf(first[index] ?? null, 0),
-          ...courseHalf(defaultCourses[index] ?? null, 4),
-        ],
-      }),
-    );
-  }
-  const firstTotals = scopeTotals(first);
-  const defaultTotals = scopeTotals(defaultCourses);
-  const firstCredits = declaredSemesterCredits(artifact, 4, "First", firstTotals.credits);
-  const defaultCredits = declaredPathwayCredits(
     artifact,
-    defaultPathway?.code,
-    defaultTotals.credits,
+    yearLevel,
+    "First",
+    firstPathways,
+    firstSelected,
+    0,
   );
-  rows.push(
-    new TableRow({
-      children: [
-        simpleCell("", widths[0]!),
-        simpleCell("", widths[1]!),
-        simpleCell(firstTotals.hasHours ? `${firstTotals.hours} Hours` : "", widths[2]!, {
-          bold: true,
-          center: true,
-        }),
-        simpleCell(`${firstCredits} Credits`, widths[3]!, { bold: true, center: true }),
-        simpleCell("", widths[4]!),
-        simpleCell("", widths[5]!),
-        simpleCell(defaultTotals.hasHours ? `${defaultTotals.hours} Hours` : "", widths[6]!, {
-          bold: true,
-          center: true,
-        }),
-        simpleCell(`${defaultCredits} Credits`, widths[7]!, { bold: true, center: true }),
-      ],
-    }),
+  appendAlternativePathwayRows(
+    rows,
+    artifact,
+    yearLevel,
+    "Second",
+    secondPathways,
+    secondSelected,
+    4,
   );
-
-  for (const pathway of pathways.filter((pathway) => pathway.code !== defaultPathway?.code)) {
-    const courses = scopeCourses(artifact, 4, "Second", pathway.code);
-    rows.push(
-      new TableRow({
-        children: [...blankHalf(), mergedCell(pathway.name, 4, 4)],
-      }),
-    );
-    if (courses.length > 1 || courses.some((course) => course.weeklyHours !== null)) {
-      rows.push(new TableRow({ children: [...blankHalf(), ...headerHalf(4)] }));
-    }
-    for (const course of courses) {
-      rows.push(
-        new TableRow({
-          cantSplit: true,
-          children: [...blankHalf(), ...courseHalf(course, 4)],
-        }),
-      );
-    }
-  }
 
   return new Table({
     width: { size: CONTENT_WIDTH, type: WidthType.DXA },
@@ -375,13 +393,13 @@ export function buildCurriculumWordDocument(artifact: CurriculumArtifactView) {
       size: 21,
       after: 120,
     }),
-    standardYearTable(artifact, 1),
+    yearTable(artifact, 1),
     sourcePageBreak(),
-    standardYearTable(artifact, 2),
+    yearTable(artifact, 2),
     para("", { after: 60 }),
-    standardYearTable(artifact, 3),
+    yearTable(artifact, 3),
     sourcePageBreak(),
-    yearFourTable(artifact),
+    yearTable(artifact, 4),
     para("", { after: 60 }),
     para(
       `Total: ${artifact.totals.selectedRouteCourseCount} Courses, ${artifact.totals.selectedRouteCredits} Credits`,
