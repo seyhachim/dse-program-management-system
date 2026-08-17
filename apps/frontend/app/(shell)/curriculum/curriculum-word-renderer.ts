@@ -16,15 +16,16 @@ import type { CurriculumArtifactCourse, CurriculumArtifactView } from "@dse-pms/
 
 const PAGE_WIDTH = 15840; // 11in Letter landscape
 const PAGE_HEIGHT = 12240; // 8.5in
-const LEFT_RIGHT_MARGIN = 1440; // 1in
-const TOP_MARGIN = 720; // 0.5in
+const LEFT_RIGHT_MARGIN = 432; // 0.3in — matches the supplied wide landscape table
+const TOP_MARGIN = 576; // 0.4in
 const BOTTOM_MARGIN = 432; // 0.3in
 const CONTENT_WIDTH = PAGE_WIDTH - LEFT_RIGHT_MARGIN * 2;
-const FONT = "Arial";
+const FONT = "Times New Roman";
 const BODY = 18;
 const SMALL = 16;
-const HEADER_SHADE = "D9E2F3";
-const YEAR_SHADE = "E7E6E6";
+const LECTURER = 16;
+const HEADER_SHADE = "FFFFFF";
+const YEAR_SHADE = "FFFFFF";
 
 const borders = {
   top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
@@ -35,20 +36,21 @@ const borders = {
   insideVertical: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
 };
 
-const widths = [880, 3090, 1240, 1270, 880, 3090, 1240, 1270];
+// One semester is one half-page. The source allocates most space to Course.
+const widths = [900, 4200, 1120, 1268, 900, 4200, 1120, 1268];
 
-function text(value: string, bold = false, size = BODY) {
-  return new TextRun({ text: value, bold, font: FONT, size });
+function text(value: string, bold = false, size = BODY, color?: string) {
+  return new TextRun({ text: value, bold, font: FONT, size, color });
 }
 
 function para(
   value: string,
-  options: { bold?: boolean; size?: number; center?: boolean; after?: number } = {},
+  options: { bold?: boolean; size?: number; center?: boolean; after?: number; color?: string } = {},
 ) {
   return new Paragraph({
     alignment: options.center ? AlignmentType.CENTER : AlignmentType.LEFT,
-    spacing: { before: 0, after: options.after ?? 0, line: 200 },
-    children: [text(value, options.bold ?? false, options.size ?? BODY)],
+    spacing: { before: 0, after: options.after ?? 0, line: 190 },
+    children: [text(value, options.bold ?? false, options.size ?? BODY, options.color)],
   });
 }
 
@@ -62,7 +64,7 @@ function simpleCell(
     columnSpan: options.span,
     shading: options.shade ? { fill: options.shade } : undefined,
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 35, bottom: 35, left: 45, right: 45 },
+    margins: { top: 30, bottom: 30, left: 45, right: 45 },
     children: [
       para(value, {
         bold: options.bold,
@@ -91,12 +93,12 @@ function headerHalf(offset: 0 | 4) {
   return [
     simpleCell("Code", widths[offset]!, { bold: true, center: true, shade: HEADER_SHADE }),
     simpleCell("Course", widths[offset + 1]!, { bold: true, center: true, shade: HEADER_SHADE }),
-    simpleCell("Hour\n(Lecture–Lab–Field visit) / week", widths[offset + 2]!, {
+    simpleCell("Hour\n(Lecture–Lab–\nField visit) /\nweek", widths[offset + 2]!, {
       bold: true,
       center: true,
       shade: HEADER_SHADE,
     }),
-    simpleCell("Credit\n(Lecture–Lab–Field visit)", widths[offset + 3]!, {
+    simpleCell("Credit\n(Lecture–\nLab–Field\nvisit)", widths[offset + 3]!, {
       bold: true,
       center: true,
       shade: HEADER_SHADE,
@@ -113,10 +115,10 @@ function courseCell(course: CurriculumArtifactCourse | null, width: number) {
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 35, bottom: 35, left: 45, right: 45 },
+    margins: { top: 30, bottom: 30, left: 45, right: 45 },
     children: [
       para(course.title, { size: SMALL }),
-      ...lecturerLines.map((line) => para(line, { size: 14 })),
+      ...lecturerLines.map((line) => para(line, { size: LECTURER, color: "FF0000" })),
     ],
   });
 }
@@ -137,7 +139,7 @@ function creditText(course: CurriculumArtifactCourse | null) {
       value.lecture === 0 &&
       value.lab === 0 &&
       value.fieldVisit === 0);
-  if (breakdownUnavailable) return String(value.total);
+  if (breakdownUnavailable) return `${value.total} Credits`;
   return `${value.total}(${value.lecture}-${value.lab}-${value.fieldVisit})`;
 }
 
@@ -178,6 +180,32 @@ function scopeTotals(courses: CurriculumArtifactCourse[]) {
   };
 }
 
+function declaredSemesterCredits(
+  artifact: CurriculumArtifactView,
+  yearLevel: number,
+  semester: "First" | "Second",
+  fallback: number,
+) {
+  return (
+    artifact.declaredTotals?.semesterCredits.find(
+      (total) => total.yearLevel === yearLevel && total.semester === semester,
+    )?.credits ?? fallback
+  );
+}
+
+function declaredPathwayCredits(
+  artifact: CurriculumArtifactView,
+  pathwayCode: string | null | undefined,
+  fallback: number,
+) {
+  if (!pathwayCode) return fallback;
+  return (
+    artifact.declaredTotals?.pathwayCredits.find(
+      (total) => total.pathwayCode === pathwayCode,
+    )?.credits ?? fallback
+  );
+}
+
 function standardYearTable(artifact: CurriculumArtifactView, yearLevel: number) {
   const first = scopeCourses(artifact, yearLevel, "First", null);
   const second = scopeCourses(artifact, yearLevel, "Second", null);
@@ -200,6 +228,8 @@ function standardYearTable(artifact: CurriculumArtifactView, yearLevel: number) 
   }
   const firstTotals = scopeTotals(first);
   const secondTotals = scopeTotals(second);
+  const firstCredits = declaredSemesterCredits(artifact, yearLevel, "First", firstTotals.credits);
+  const secondCredits = declaredSemesterCredits(artifact, yearLevel, "Second", secondTotals.credits);
   rows.push(
     new TableRow({
       children: [
@@ -209,14 +239,14 @@ function standardYearTable(artifact: CurriculumArtifactView, yearLevel: number) 
           bold: true,
           center: true,
         }),
-        simpleCell(`${firstTotals.credits} Credits`, widths[3]!, { bold: true, center: true }),
+        simpleCell(`${firstCredits} Credits`, widths[3]!, { bold: true, center: true }),
         simpleCell("", widths[4]!),
         simpleCell("", widths[5]!),
         simpleCell(secondTotals.hasHours ? `${secondTotals.hours} Hours` : "", widths[6]!, {
           bold: true,
           center: true,
         }),
-        simpleCell(`${secondTotals.credits} Credits`, widths[7]!, { bold: true, center: true }),
+        simpleCell(`${secondCredits} Credits`, widths[7]!, { bold: true, center: true }),
       ],
     }),
   );
@@ -270,20 +300,29 @@ function yearFourTable(artifact: CurriculumArtifactView) {
   }
   const firstTotals = scopeTotals(first);
   const defaultTotals = scopeTotals(defaultCourses);
+  const firstCredits = declaredSemesterCredits(artifact, 4, "First", firstTotals.credits);
+  const defaultCredits = declaredPathwayCredits(
+    artifact,
+    defaultPathway?.code,
+    defaultTotals.credits,
+  );
   rows.push(
     new TableRow({
       children: [
         simpleCell("", widths[0]!),
         simpleCell("", widths[1]!),
-        simpleCell(`${firstTotals.hours} Hours`, widths[2]!, { bold: true, center: true }),
-        simpleCell(`${firstTotals.credits} Credits`, widths[3]!, { bold: true, center: true }),
+        simpleCell(firstTotals.hasHours ? `${firstTotals.hours} Hours` : "", widths[2]!, {
+          bold: true,
+          center: true,
+        }),
+        simpleCell(`${firstCredits} Credits`, widths[3]!, { bold: true, center: true }),
         simpleCell("", widths[4]!),
         simpleCell("", widths[5]!),
         simpleCell(defaultTotals.hasHours ? `${defaultTotals.hours} Hours` : "", widths[6]!, {
           bold: true,
           center: true,
         }),
-        simpleCell(`${defaultTotals.credits} Credits`, widths[7]!, { bold: true, center: true }),
+        simpleCell(`${defaultCredits} Credits`, widths[7]!, { bold: true, center: true }),
       ],
     }),
   );
@@ -317,12 +356,11 @@ function yearFourTable(artifact: CurriculumArtifactView) {
   });
 }
 
-export async function exportCurriculumWord(artifact: CurriculumArtifactView) {
+export function buildCurriculumWordDocument(artifact: CurriculumArtifactView) {
   const children: (Paragraph | Table)[] = [
     para("ROYAL UNIVERSITY OF PHNOM PENH", { bold: true, center: true, size: 24, after: 25 }),
-    para("Faculty of Engineering", { bold: true, center: true, size: 22, after: 25 }),
+    para("Faculty of Engineering", { bold: false, center: true, size: 22, after: 25 }),
     para(`Curriculum of ${artifact.curriculum.name}`, {
-      bold: true,
       center: true,
       size: 21,
       after: 120,
@@ -337,11 +375,11 @@ export async function exportCurriculumWord(artifact: CurriculumArtifactView) {
     para("", { after: 60 }),
     para(
       `Total: ${artifact.totals.selectedRouteCourseCount} Courses, ${artifact.totals.selectedRouteCredits} Credits`,
-      { bold: true, size: BODY },
+      { bold: true, size: BODY, center: true },
     ),
   ];
 
-  const doc = new Document({
+  return new Document({
     sections: [
       {
         properties: {
@@ -359,8 +397,10 @@ export async function exportCurriculumWord(artifact: CurriculumArtifactView) {
       },
     ],
   });
+}
 
-  const blob = await Packer.toBlob(doc);
+export async function exportCurriculumWord(artifact: CurriculumArtifactView) {
+  const blob = await Packer.toBlob(buildCurriculumWordDocument(artifact));
   const url = URL.createObjectURL(blob);
   const anchor = window.document.createElement("a");
   anchor.href = url;
