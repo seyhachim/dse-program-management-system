@@ -82,6 +82,30 @@ describeDb("class delivery lecturer-arrival persistence", () => {
     expect(Number(rows[0]?.count ?? 0n)).toBe(1);
   });
 
+  test("serializes concurrent same-state taps into one changed write and one idempotent retry", async () => {
+    const firstActor = await createUser("concurrent-first");
+    const secondActor = await createUser("concurrent-second");
+    const offering = await createOffering("concurrent");
+    const date = "2026-08-18";
+
+    const results = await Promise.all([
+      classDeliveryService.saveLecturerArrival(offering.id, date, "Present", firstActor.id),
+      classDeliveryService.saveLecturerArrival(offering.id, date, "Present", secondActor.id),
+    ]);
+
+    expect(results.filter((result) => result.changed)).toHaveLength(1);
+    expect(results.filter((result) => !result.changed)).toHaveLength(1);
+    expect(new Set(results.map((result) => result.confirmation.id)).size).toBe(1);
+    expect(new Set(results.map((result) => result.confirmation.recordedAt)).size).toBe(1);
+
+    const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "pms_attendance"."LecturerArrivalConfirmation"
+      WHERE "offeringId" = ${offering.id} AND "date" = ${date}::date
+    `;
+    expect(Number(rows[0]?.count ?? 0n)).toBe(1);
+  });
+
   test("rejects unknown offerings without creating orphan confirmation rows", async () => {
     const actor = await createUser("unknown-offering");
     const unknownOfferingId = crypto.randomUUID();
