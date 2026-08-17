@@ -188,6 +188,17 @@ export function createCourseRouter(): Router {
     },
   );
 
+  router.get(
+    "/:id/approved-spec-versions",
+    requirePermission("courses:read"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      if (!courseId) return;
+      if (!(await ensureCourseAccess(req, res, courseId))) return;
+      res.json(await courseService.listApprovedSpecVersions(courseId));
+    },
+  );
+
   router.get("/:id", requirePermission("courses:read"), async (req, res) => {
     const courseId = getRequiredParam(req, res, "id");
 

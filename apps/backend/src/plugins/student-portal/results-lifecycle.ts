@@ -133,19 +133,12 @@ async function resultContext(
       offering: {
         include: {
           coLecturers: true,
-          course: {
+          courseSpec: {
             include: {
-              specs: {
-                where: { reviewStatus: "Approved" },
-                orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-                take: 1,
+              assessmentItems: {
                 include: {
-                  assessmentItems: {
-                    include: {
-                      criterionCloMappings: true,
-                      rubric: { include: { levelRows: true, criterionRows: true } },
-                    },
-                  },
+                  criterionCloMappings: true,
+                  rubric: { include: { levelRows: true, criterionRows: true } },
                 },
               },
             },
@@ -165,8 +158,8 @@ async function resultContext(
     throw new PortalAccessError("You are not assigned to this offering");
   }
 
-  const spec = enrollment.offering.course.specs[0] ?? null;
-  if (!spec) throw new PortalNotFoundError("Approved course specification not found");
+  const spec = enrollment.offering.courseSpec ?? null;
+  if (!spec) throw new PortalConflictError("Offering is not bound to an Approved CourseSpec version");
   return { enrollment, spec };
 }
 
@@ -261,16 +254,7 @@ async function offeringLifecycleContext(
     include: {
       coLecturers: true,
       enrollments: { select: { id: true } },
-      course: {
-        include: {
-          specs: {
-            where: { reviewStatus: "Approved" },
-            orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-            take: 1,
-            include: { assessmentItems: true },
-          },
-        },
-      },
+      courseSpec: { include: { assessmentItems: true } },
     },
   });
   if (!offering) throw new PortalNotFoundError("Offering not found");
@@ -284,8 +268,8 @@ async function offeringLifecycleContext(
     throw new PortalAccessError("You are not assigned to this offering");
   }
 
-  const spec = offering.course.specs[0] ?? null;
-  if (!spec) throw new PortalNotFoundError("Approved course specification not found");
+  const spec = offering.courseSpec ?? null;
+  if (!spec) throw new PortalConflictError("Offering is not bound to an Approved CourseSpec version");
   const assessment = spec.assessmentItems.find(
     (item) => item.id === assessmentItemId && item.status === "Active",
   );
@@ -307,19 +291,13 @@ export const resultsLifecycleService = {
       where: { id: offeringId },
       include: {
         coLecturers: true,
-        course: {
+        course: true,
+        courseSpec: {
           include: {
-            specs: {
-              where: { reviewStatus: "Approved" },
-              orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-              take: 1,
-              include: {
-                clos: { orderBy: { order: "asc" } },
-                assessmentItems: {
-                  orderBy: { order: "asc" },
-                  include: { criterionCloMappings: true },
-                },
-              },
+            clos: { orderBy: { order: "asc" } },
+            assessmentItems: {
+              orderBy: { order: "asc" },
+              include: { criterionCloMappings: true },
             },
           },
         },
@@ -343,8 +321,8 @@ export const resultsLifecycleService = {
       throw new PortalAccessError("You are not assigned to this offering");
     }
 
-    const spec = offering.course.specs[0] ?? null;
-    if (!spec) throw new PortalNotFoundError("Approved course specification not found");
+    const spec = offering.courseSpec ?? null;
+    if (!spec) throw new PortalConflictError("Offering is not bound to an Approved CourseSpec version");
     const assessments = spec.assessmentItems.filter((item) => item.status === "Active");
 
     return {

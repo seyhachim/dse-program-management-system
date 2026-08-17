@@ -34,6 +34,13 @@ const courses = () => registry.get<CoursesServiceContract>("courses").service;
 const lecturers = () => registry.get<LecturersServiceContract>("lecturers").service;
 const students = () => registry.get<StudentsServiceContract>("students").service;
 
+async function assertApprovedCourseSpec(courseId: string, courseSpecId: string): Promise<void> {
+  const spec = await courses().getCourseSpecVersion(courseSpecId);
+  if (!spec) throw new ReferenceError("CourseSpec version does not exist");
+  if (spec.courseId !== courseId) throw new ReferenceError("CourseSpec version belongs to another course");
+  if (spec.reviewStatus !== "Approved") throw new ReferenceError("Only an Approved CourseSpec version can be assigned to an offering");
+}
+
 async function assertLecturersExist(lecturerIds: string[]): Promise<void> {
   const found = await Promise.all(lecturerIds.map((id) => lecturers().getById(id)));
   if (found.some((l) => l === null)) throw new ReferenceError("One or more co-lecturers do not exist");
@@ -74,6 +81,7 @@ async function toView(
   offering: {
     id: string;
     courseId: string;
+    courseSpecId: string | null;
     lecturerId: string | null;
     term: string;
     sectionCode: string;
@@ -98,8 +106,9 @@ async function toView(
   },
   lecturerById: Map<string, LecturerRef>,
 ): Promise<OfferingView> {
-  const [course, enrolledStudents] = await Promise.all([
+  const [course, courseSpec, enrolledStudents] = await Promise.all([
     courses().getById(offering.courseId),
+    offering.courseSpecId ? courses().getCourseSpecVersion(offering.courseSpecId) : Promise.resolve(null),
     students().findByIds(offering.enrollments.map((e) => e.studentId)),
   ]);
   const lecturer = offering.lecturerId ? (lecturerById.get(offering.lecturerId) ?? null) : null;
@@ -129,6 +138,7 @@ async function toView(
     course: course
       ? { id: course.id, code: course.code, title: course.title, programmeId: course.programmeId }
       : null,
+    courseSpec,
     // Full instructor block for the syllabus Course Details (§6–9).
     lecturer: lecturer
       ? {
@@ -179,6 +189,7 @@ export const offeringService = {
     if (!(await courses().getById(offeringInput.courseId))) {
       throw new ReferenceError("Course does not exist");
     }
+    await assertApprovedCourseSpec(offeringInput.courseId, offeringInput.courseSpecId);
     if (offeringInput.lecturerId && !(await lecturers().getById(offeringInput.lecturerId))) {
       throw new ReferenceError("Assigned lecturer does not exist");
     }
@@ -186,6 +197,7 @@ export const offeringService = {
     const offering = await prisma.offering.create({
       data: {
         courseId: offeringInput.courseId,
+        courseSpecId: offeringInput.courseSpecId,
         term: offeringInput.term,
         sectionCode: offeringInput.sectionCode,
         lecturerId: offeringInput.lecturerId ?? null,
@@ -226,6 +238,18 @@ export const offeringService = {
       include: { coLecturers: { select: { lecturerId: true } } },
     });
     if (!existing) throw new ReferenceError("Offering not found");
+    if (offeringInput.courseSpecId !== undefined) {
+      await assertApprovedCourseSpec(existing.courseId, offeringInput.courseSpecId);
+      if (existing.courseSpecId && offeringInput.courseSpecId !== existing.courseSpecId) {
+        const [deadlineCount, resultCount] = await Promise.all([
+          prisma.offeringAssessmentDeadline.count({ where: { offeringId: id } }),
+          prisma.assessmentResult.count({ where: { enrollment: { offeringId: id } } }),
+        ]);
+        if (existing.status !== "Planned" || deadlineCount > 0 || resultCount > 0) {
+          throw new ReferenceError("The bound CourseSpec version cannot change after delivery or academic data exists");
+        }
+      }
+    }
     const nextLecturerId = offeringInput.lecturerId !== undefined ? offeringInput.lecturerId : existing.lecturerId;
     const nextCoLecturerIds =
       coLecturerIds !== undefined ? coLecturerIds : existing.coLecturers.map((c) => c.lecturerId);
@@ -274,6 +298,7 @@ export const offeringService = {
       return tx.offering.update({
         where: { id },
         data: {
+          ...(offeringInput.courseSpecId !== undefined ? { courseSpecId: offeringInput.courseSpecId } : {}),
           ...(offeringInput.term !== undefined ? { term: offeringInput.term } : {}),
           ...(offeringInput.sectionCode !== undefined
             ? { sectionCode: offeringInput.sectionCode }
@@ -327,6 +352,7 @@ export const offeringService = {
       select: {
         id: true,
         courseId: true,
+        courseSpecId: true,
         lecturerId: true,
         term: true,
         sectionCode: true,
@@ -351,14 +377,15 @@ export const offeringService = {
         weeks: CourseWeeklyContactHoursRef[];
       }>
     >();
-    const courseData = (courseId: string) => {
-      let cached = courseCache.get(courseId);
+    const courseData = (courseId: string, courseSpecId: string | null) => {
+      const key = `${courseId}:${courseSpecId ?? "unbound"}`;
+      let cached = courseCache.get(key);
       if (!cached) {
         cached = Promise.all([
           courses().getById(courseId),
-          courses().weeklyContactHours(courseId),
+          courseSpecId ? courses().weeklyContactHours(courseSpecId) : Promise.resolve([]),
         ]).then(([course, weeks]) => ({ course, weeks }));
-        courseCache.set(courseId, cached);
+        courseCache.set(key, cached);
       }
       return cached;
     };
@@ -366,7 +393,7 @@ export const offeringService = {
     const enriched = (
       await Promise.all(
         assignments.map(async (assignment) => {
-          const { course, weeks } = await courseData(assignment.courseId);
+          const { course, weeks } = await courseData(assignment.courseId, assignment.courseSpecId);
           return course
             ? {
                 ...assignment,

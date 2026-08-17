@@ -7,6 +7,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CreateOfferingInput,
+  type CourseSpecVersionRef,
   type Lecturer,
   type Semester,
 } from "@dse-pms/shared-types";
@@ -30,6 +31,7 @@ const BACK_HREF = "/offerings";
 
 const emptyDefaults: OfferingFormValues = {
   courseId: "",
+  courseSpecId: "",
   term: "",
   sectionCode: "A",
   meetings: [],
@@ -45,6 +47,8 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const editing = offeringId !== null;
 
   const [courses, setCourses] = useState<CourseView[]>([]);
+  const [courseSpecVersions, setCourseSpecVersions] = useState<CourseSpecVersionRef[]>([]);
+  const [courseSpecLoading, setCourseSpecLoading] = useState(false);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,6 +72,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     resolver: zodResolver(CreateOfferingInput),
     defaultValues: emptyDefaults,
   });
+  const courseId = useWatch({ control, name: "courseId" }) ?? "";
   const lecturerId = useWatch({ control, name: "lecturerId" }) ?? null;
 
   useEffect(() => {
@@ -89,6 +94,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
         } else if (offering) {
           reset({
             courseId: offering.course?.id ?? "",
+            courseSpecId: offering.courseSpec?.id ?? "",
             term: offering.term,
             sectionCode: offering.sectionCode,
             meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, room, ...meeting }) => ({
@@ -118,6 +124,17 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
       cancelled = true;
     };
   }, [offeringId, reset]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!courseId) { setCourseSpecVersions([]); return; }
+    setCourseSpecLoading(true);
+    void coursesApi.approvedSpecVersions(courseId)
+      .then((versions) => { if (!cancelled) setCourseSpecVersions(versions); })
+      .catch(() => { if (!cancelled) setCourseSpecVersions([]); })
+      .finally(() => { if (!cancelled) setCourseSpecLoading(false); });
+    return () => { cancelled = true; };
+  }, [courseId]);
 
   const onSubmit = handleSubmit(async (values) => {
     setSaving(true);
@@ -203,6 +220,8 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 register={register}
                 errors={errors}
                 courses={courses}
+                courseSpecVersions={courseSpecVersions}
+                courseSpecLoading={courseSpecLoading}
                 lecturers={lecturers}
                 lecturerId={lecturerId}
                 courseLocked={editing}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LecturerRef } from "./contracts.ts";
+import type { CourseSpecVersionRef, LecturerRef } from "./contracts.ts";
 
 /**
  * Course Offering schemas. An offering is a course delivered in a term with an
@@ -173,6 +173,7 @@ function refineTeachingPeriod(
 
 const OfferingInputShape = z.object({
   courseId: z.string().uuid("A course is required"),
+  courseSpecId: z.string().uuid("An Approved CourseSpec version is required"),
   term: z.string().min(1, "Term is required"),
   // Default keeps older API clients compatible while the database migration
   // backfills every existing offering as Class A.
@@ -246,6 +247,8 @@ export interface OfferingView {
   // not otherwise used by the frontend today. Every Course has exactly one
   // programme (issue #150 phase C); only the whole `course` object is nullable.
   course: { id: string; code: string; title: string; programmeId: string } | null;
+  /** Exact approved CourseSpec version used for this delivery. Null only for unresolved legacy rows. */
+  courseSpec: CourseSpecVersionRef | null;
   lecturer: {
     id: string;
     name: string;
