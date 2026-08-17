@@ -8,11 +8,16 @@ import {
 } from "./qa-evidence-semantics.ts";
 
 describe("QA evidence semantics contracts", () => {
-  it("defaults legacy expectations to always-applicable, within-cycle semantics", () => {
+  it("defaults legacy expectations to always-applicable point-in-time semantics", () => {
     expect(QaQualityExpectationSemanticsSchema.parse({})).toEqual({
       applicabilityRule: { kind: "always" },
       scopeRequirement: { requiredDimensions: [] },
-      temporalRule: { kind: "withinCycle" },
+      temporalRule: { kind: "pointInTime" },
+    });
+    expect(QaExpectedEvidenceSemanticsSchema.parse({})).toEqual({
+      scopeRequirement: { requiredDimensions: [] },
+      temporalRule: { kind: "pointInTime" },
+      authorityRequirement: { minimumAuthority: "unknown" },
     });
   });
 
