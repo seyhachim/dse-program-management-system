@@ -1,6 +1,7 @@
 import type {
   CourseDeliveryOffering,
   CourseDeliveryResultReview,
+  OfferingResultAccessPolicy,
   PublishAnnouncementInput,
   PublishAssessmentResultsInput,
   SaveAssessmentResultInput,
@@ -14,6 +15,12 @@ export const courseDeliveryApi = {
     api.get<CourseDeliveryOffering[]>("/api/student-portal/manage/offerings"),
   resultReview: (offeringId: string) =>
     api.get<CourseDeliveryResultReview>(`/api/student-portal/manage/results/review/${offeringId}`),
+  resultAccessPolicy: (offeringId: string) =>
+    api.get<OfferingResultAccessPolicy>(`/api/student-portal/manage/offerings/${offeringId}/result-access`),
+  setResultAccessPolicy: (offeringId: string, requireSurveyBeforeResults: boolean) =>
+    api.put<OfferingResultAccessPolicy>(`/api/student-portal/manage/offerings/${offeringId}/result-access`, {
+      requireSurveyBeforeResults,
+    }),
   publishAnnouncement: (input: PublishAnnouncementInput) =>
     api.post("/api/student-portal/manage/announcements", input),
   setDeadline: (input: SetAssessmentDeadlineInput) =>

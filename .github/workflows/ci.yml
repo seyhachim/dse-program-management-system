@@ -193,6 +193,12 @@ jobs:
           OFFERING_COURSE_SPEC_DB_TESTS: "1"
           JWT_SECRET: issue-211-course-spec-binding-ci-secret-at-least-32-characters
 
+      - name: Verify provisional result access and finalized-result visibility
+        run: bun test apps/backend/src/plugins/student-portal/result-access-policy-db.test.ts
+        env:
+          RESULT_ACCESS_POLICY_DB_TESTS: "1"
+          JWT_SECRET: pr-289-result-access-ci-secret-at-least-32-characters
+
       - name: Verify finalized result correction integrity
         run: bun test apps/backend/src/plugins/student-portal/results-lifecycle-db.test.ts
         env:
