@@ -107,7 +107,7 @@ export function createTelegramPhase2Service(deps?: {
       try {
         return await offerings().studentAttendanceHistory.forUser(user.id, offeringId);
       } catch (error) {
-        if (error instanceof Error && /not enrolled|not linked|not active/i.test(error.message)) {
+        if (error instanceof Error && /not enrolled|not linked|not active|no active student/i.test(error.message)) {
           throw new TelegramPhase2NotFoundError("Attendance history is not available for this course");
         }
         throw error;
