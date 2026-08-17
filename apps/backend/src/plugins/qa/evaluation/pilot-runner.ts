@@ -9,9 +9,11 @@ import {
   type QaEvaluationEvidenceView,
   type QaEvaluationRunView,
   type QaPilotStatusView,
+  type QaQualityExpectationView,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import { qaService } from "../service.ts";
+import { evaluateApplicability } from "../analysis/evidence-semantics.ts";
 import {
   QaLlmProviderError,
   configuredQaLlmProvider,
@@ -46,6 +48,9 @@ function candidateFromEvidence(evidence: QaEvaluationEvidenceView): QaEvidenceCa
     entityId: evidence.id,
     route: null,
     reportingDate: evidence.reportingDate,
+    scope: evidence.scope,
+    provenance: evidence.provenance,
+    periodKey: evidence.periodKey,
     attributes: evidence.attributes,
   };
 }
@@ -59,9 +64,9 @@ async function loadPilotScenario(scenarioId: string) {
   if (!scenario.name.startsWith(`${QA_PILOT_SCENARIO_VERSION}:`)) {
     throw new QaPilotScenarioError("Only initialized AUN-QA pilot scenarios can use the pilot runner");
   }
-  if (scenario.goldState === null) {
+  if (scenario.goldApplicability === null) {
     throw new QaPilotReferenceRequiredError(
-      "Lock the independent human reference classification before running the prototype on this scenario",
+      "Lock the independent human applicability/reference classification before running the prototype on this scenario",
     );
   }
   const expectation = knowledge.expectations.find((item) => item.id === scenario.expectationId);
@@ -69,6 +74,47 @@ async function loadPilotScenario(scenarioId: string) {
     throw new QaPilotScenarioError("Pilot scenario no longer matches the active QA knowledge model");
   }
   return { scenario, expectation };
+}
+
+function parseControlledDate(value: unknown): Date | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function controlledApplicability(
+  expectation: QaQualityExpectationView,
+  evidence: QaEvaluationEvidenceView[],
+) {
+  if (expectation.applicabilityRule.kind === "always") {
+    return evaluateApplicability(expectation.applicabilityRule, {
+      asOfDate: new Date(0),
+      cohortStartDate: null,
+    });
+  }
+
+  const cohortStartDate = evidence
+    .map((item) => parseControlledDate(item.attributes.cohortStartDate))
+    .find((value): value is Date => Boolean(value));
+  const explicitAsOfDate = evidence
+    .map((item) => parseControlledDate(item.attributes.asOfDate))
+    .find((value): value is Date => Boolean(value));
+  const reportingDates = evidence
+    .map((item) => parseControlledDate(item.reportingDate))
+    .filter((value): value is Date => Boolean(value))
+    .sort((a, b) => b.getTime() - a.getTime());
+  const asOfDate = explicitAsOfDate ?? reportingDates[0] ?? null;
+
+  if (!asOfDate) {
+    return {
+      state: "uncertain" as const,
+      reason: "Controlled scenario has no reproducible as-of/reporting date for cohort applicability.",
+    };
+  }
+  return evaluateApplicability(expectation.applicabilityRule, {
+    cohortStartDate: cohortStartDate ?? null,
+    asOfDate,
+  });
 }
 
 function controlledResult(
@@ -93,6 +139,20 @@ export async function runDeterministicQaPilotScenario(
   scenarioId: string,
 ): Promise<QaEvaluationRunView> {
   const { scenario, expectation } = await loadPilotScenario(scenarioId);
+  const applicability = controlledApplicability(expectation, scenario.evidence);
+  if (applicability.state !== "applicable") {
+    return createQaEvaluationRun({
+      scenarioId: scenario.id,
+      predictedApplicability: applicability.state,
+      predictedState: null,
+      engine: "deterministic-rules",
+      engineVersion: QA_DETERMINISTIC_RULE_VERSION,
+      promptVersion: "",
+      explanation: applicability.reason,
+      retrievedEvidence: [],
+    });
+  }
+
   const findings = applyExpectationCrossChecks(
     scenario.requirementCode,
     expectation.expectedEvidence.map((definition) =>
@@ -110,6 +170,7 @@ export async function runDeterministicQaPilotScenario(
 
   return createQaEvaluationRun({
     scenarioId: scenario.id,
+    predictedApplicability: "applicable",
     predictedState: state,
     engine: "deterministic-rules",
     engineVersion: QA_DETERMINISTIC_RULE_VERSION,
@@ -161,6 +222,9 @@ function pilotPrompt(options: {
             title: candidate.title,
             summary: candidate.summary,
             reportingDate: candidate.reportingDate,
+            scope: candidate.scope,
+            provenance: candidate.provenance,
+            periodKey: candidate.periodKey,
             attributes: candidate.attributes,
           })),
         },
@@ -175,12 +239,26 @@ export async function runLlmQaPilotScenario(
   scenarioId: string,
   provider: QaLlmProvider | null = configuredQaLlmProvider(),
 ): Promise<QaEvaluationRunView> {
+  const { scenario, expectation } = await loadPilotScenario(scenarioId);
+  const applicability = controlledApplicability(expectation, scenario.evidence);
+  if (applicability.state !== "applicable") {
+    return createQaEvaluationRun({
+      scenarioId: scenario.id,
+      predictedApplicability: applicability.state,
+      predictedState: null,
+      engine: "llm-assisted",
+      engineVersion: provider?.model ?? "not-invoked",
+      promptVersion: QA_LLM_PROMPT_VERSION,
+      explanation: `${applicability.reason} LLM evidence classification was not invoked.`,
+      retrievedEvidence: [],
+    });
+  }
   if (!provider) {
     throw new QaPilotLlmUnavailableError(
       "QA LLM provider is not configured. Set QA_LLM_API_URL and QA_LLM_MODEL before running LLM pilot analysis.",
     );
   }
-  const { scenario, expectation } = await loadPilotScenario(scenarioId);
+
   const candidates = scenario.evidence.map(candidateFromEvidence);
   if (candidates.length === 0) {
     throw new QaPilotScenarioError(
@@ -230,6 +308,7 @@ export async function runLlmQaPilotScenario(
 
   return createQaEvaluationRun({
     scenarioId: scenario.id,
+    predictedApplicability: "applicable",
     predictedState: parsed.data.state,
     engine: "llm-assisted",
     engineVersion: provider.model,
@@ -247,31 +326,39 @@ export async function runLlmQaPilotScenario(
 }
 
 export async function getQaPilotStatus(): Promise<QaPilotStatusView> {
-  const scenarios = await prisma.qaEvaluationScenario.findMany({
-    where: { name: { startsWith: `${QA_PILOT_SCENARIO_VERSION}:` } },
-    include: {
-      requirement: { select: { code: true } },
-      runs: {
-        select: {
-          engine: true,
-          humanRatings: { select: { id: true } },
+  const [scenarios, applicabilityRows] = await Promise.all([
+    prisma.qaEvaluationScenario.findMany({
+      where: { name: { startsWith: `${QA_PILOT_SCENARIO_VERSION}:` } },
+      include: {
+        requirement: { select: { code: true } },
+        runs: {
+          select: {
+            engine: true,
+            humanRatings: { select: { id: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.$queryRaw<Array<{ id: string; goldApplicability: string | null }>>`
+      SELECT id, "goldApplicability"
+      FROM "QaEvaluationScenario"
+      WHERE name LIKE ${`${QA_PILOT_SCENARIO_VERSION}:%`}
+    `,
+  ]);
+  const goldById = new Map(applicabilityRows.map((row) => [row.id, row.goldApplicability]));
 
   const requirements = QA_PILOT_REQUIREMENT_CODES.map((requirementCode) => {
     const matching = scenarios.filter((scenario) => scenario.requirement.code === requirementCode);
     return {
       requirementCode,
       scenarioCount: matching.length,
-      goldAnnotatedCount: matching.filter((scenario) => scenario.goldState !== null).length,
+      goldAnnotatedCount: matching.filter((scenario) => goldById.get(scenario.id) !== null).length,
       deterministicRunCount: matching.flatMap((scenario) => scenario.runs).filter((run) => run.engine === "deterministic-rules").length,
       llmRunCount: matching.flatMap((scenario) => scenario.runs).filter((run) => run.engine === "llm-assisted").length,
     };
   });
   const allRuns = scenarios.flatMap((scenario) => scenario.runs);
-  const goldAnnotatedCount = scenarios.filter((scenario) => scenario.goldState !== null).length;
+  const goldAnnotatedCount = scenarios.filter((scenario) => goldById.get(scenario.id) !== null).length;
   const allRequirementsCovered = requirements.every((item) => item.scenarioCount >= 2);
   const allGoldAnnotated =
     scenarios.length === QA_PILOT_EXPECTED_SCENARIO_COUNT &&
