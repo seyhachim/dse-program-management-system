@@ -74,7 +74,7 @@ export default function TelegramLinkPage() {
       } catch (error) {
         if (!cancelled) {
           setState("error");
-          setMessage(error instanceof Error ? error.message : "Could not confirm your DSE PMS account.");
+          setMessage(linkErrorMessage(error));
         }
       }
     }
@@ -96,13 +96,16 @@ export default function TelegramLinkPage() {
     }
   }
 
-  async function useDifferentAccount() {
+  async function chooseDifferentAccount() {
     if (!verificationId) return;
     if (AUTH_MODE === "supabase") {
       await getSupabase().auth.signOut();
+      const returnPath = `/telegram/link?verificationId=${encodeURIComponent(verificationId)}`;
+      window.location.replace(`/login?next=${encodeURIComponent(returnPath)}`);
+      return;
     }
-    const returnPath = `/telegram/link?verificationId=${encodeURIComponent(verificationId)}`;
-    window.location.replace(`/login?next=${encodeURIComponent(returnPath)}`);
+    setState("error");
+    setMessage("Account switching is only available with normal PMS authentication. Reopen the Mini App using the intended PMS account.");
   }
 
   function returnToTelegram() {
@@ -182,7 +185,7 @@ export default function TelegramLinkPage() {
             </button>
             <button
               type="button"
-              onClick={() => void useDifferentAccount()}
+              onClick={() => void chooseDifferentAccount()}
               className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800"
             >
               This is not my account
@@ -213,7 +216,7 @@ export default function TelegramLinkPage() {
             {verificationId ? (
               <button
                 type="button"
-                onClick={() => void useDifferentAccount()}
+                onClick={() => void chooseDifferentAccount()}
                 className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800"
               >
                 Sign in with another PMS account
