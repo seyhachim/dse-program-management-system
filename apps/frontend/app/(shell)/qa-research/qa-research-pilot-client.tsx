@@ -352,7 +352,11 @@ export function QaResearchPilotClient() {
                         {scenarioRuns.length === 0 ? <p className="text-xs text-muted-foreground">Reference is locked. No prototype run has been executed yet.</p> : scenarioRuns.map((run) => (
                           <div key={run.id} className="rounded-lg border border-border p-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <StateBadge state={run.predictedState} prefix={run.engine === "deterministic-rules" ? "Rules" : `LLM · ${run.engineVersion}`} />
+                              {run.predictedState ? (
+                                <StateBadge state={run.predictedState} prefix={run.engine === "deterministic-rules" ? "Rules" : `LLM · ${run.engineVersion}`} />
+                              ) : (
+                                <ApplicabilityBadge applicability={run.predictedApplicability} prefix={run.engine === "deterministic-rules" ? "Rules" : `LLM · ${run.engineVersion}`} />
+                              )}
                               {canWrite ? <Button size="sm" variant="outline" onClick={() => { setRatingRunId(ratingRunId === run.id ? null : run.id); setRatingDraft(defaultRating); }}>Rate this run</Button> : null}
                             </div>
                             <p className="mt-2 text-sm text-muted-foreground">{run.explanation}</p>
@@ -389,6 +393,18 @@ function StateBadge({ state, prefix }: { state: QaEvidenceAnalysisState; prefix:
       ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
       : "bg-amber-500/10 text-amber-800 dark:text-amber-300";
   return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${style}`}>{prefix}: {stateLabel[state]}</span>;
+}
+
+function ApplicabilityBadge({ applicability, prefix }: { applicability: QaEvaluationRunView["predictedApplicability"]; prefix: string }) {
+  const label = applicability === "notApplicable"
+    ? "Not applicable"
+    : applicability === "uncertain"
+      ? "Applicability uncertain"
+      : "Applicable · no evidence state";
+  const style = applicability === "notApplicable"
+    ? "bg-slate-500/10 text-slate-700 dark:text-slate-300"
+    : "bg-amber-500/10 text-amber-800 dark:text-amber-300";
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${style}`}>{prefix}: {label}</span>;
 }
 
 function RatingForm({ draft, setDraft, busy, onSave }: { draft: RatingDraft; setDraft: (next: RatingDraft) => void; busy: boolean; onSave: () => void }) {
