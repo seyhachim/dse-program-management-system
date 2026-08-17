@@ -3,6 +3,8 @@ name: Patch issue 301 cohort progression
 on:
   push:
     branches: [agent/issue-301-cohort-progression]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
