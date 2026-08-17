@@ -1552,6 +1552,7 @@ model Offering {
   assessmentDeadlines            OfferingAssessmentDeadline[]
   announcements                  CourseAnnouncement[]
   feedbackResponses              CourseFeedback[]
+  resultAccessPolicy             OfferingResultAccessPolicy?
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
 
@@ -1559,6 +1560,13 @@ model Offering {
   @@index([status])
   @@index([lecturerId])
   @@index([courseSpecId])
+}
+
+model OfferingResultAccessPolicy {
+  offeringId                 String   @id
+  offering                   Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  requireSurveyBeforeResults Boolean  @default(false)
+  updatedAt                  DateTime @default(now()) @updatedAt
 }
 
 /// A recurring weekly class session. Duration is derived from startTime/endTime
