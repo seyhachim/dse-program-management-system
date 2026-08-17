@@ -97,7 +97,10 @@ export const RunQaDeterministicAnalysisSchema = z.object({
   programmeId: z.string().trim().min(1),
 });
 
-export type CreateQaEvidenceAnalysisInput = z.infer<typeof CreateQaEvidenceAnalysisSchema>;
+// Use the schema input type so callers remain source-compatible with defaulted
+// #296-#299 fields. createQaEvidenceAnalysis parses this into the fully normalized
+// output shape before persistence.
+export type CreateQaEvidenceAnalysisInput = z.input<typeof CreateQaEvidenceAnalysisSchema>;
 export type RunQaDeterministicAnalysisInput = z.infer<typeof RunQaDeterministicAnalysisSchema>;
 
 export interface QaEvidenceAnalysisSourceView {
