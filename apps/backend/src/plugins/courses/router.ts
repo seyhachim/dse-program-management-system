@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import {
   CreateCourseInput,
+  CreateCourseSpecRevisionRequestSchema,
   ListCoursesQuery,
   SPEC_SECTION_SCHEMAS,
   UpdateCourseInput,
@@ -12,6 +13,8 @@ import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
 import { overlayCourseSpecTeachingAssignment } from "./teaching-assignment.ts";
 import { CourseSpecLockedError } from "./spec-lock.ts";
+import { canCreateCourseSpecRevision } from "./revision-authorization.ts";
+import { courseSpecRevisionRequestService } from "./revision-request-service.ts";
 
 /**
  * Get a required route parameter.
@@ -196,6 +199,58 @@ export function createCourseRouter(): Router {
       if (!courseId) return;
       if (!(await ensureCourseAccess(req, res, courseId))) return;
       res.json(await courseService.listApprovedSpecVersions(courseId));
+    },
+  );
+
+
+  router.post(
+    "/:id/spec/revisions",
+    requirePermission("courses:review"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      if (!courseId) return;
+      const requestedById = getRequiredUserId(req, res);
+      if (!requestedById) return;
+
+      const course = await courseService.getById(courseId);
+      if (!course) {
+        res.status(404).json({ error: "Course not found" });
+        return;
+      }
+      if (!canCreateCourseSpecRevision(req.user!, course.programmeId)) {
+        res.status(403).json({
+          error: "Only programme academic leadership may create a course specification revision",
+        });
+        return;
+      }
+
+      const parsed = CreateCourseSpecRevisionRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid revision request",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      try {
+        res.status(201).json(
+          await courseSpecRevisionRequestService.create(
+            courseId,
+            requestedById,
+            parsed.data,
+          ),
+        );
+      } catch (err) {
+        const code = (err as { code?: string }).code;
+        const status =
+          code === "COURSE_NOT_FOUND" ? 404 :
+          code === "INVALID_OVERRIDE" ? 400 :
+          code === "SOURCE_NOT_APPROVED" || code === "OPEN_REVISION_EXISTS" ? 409 : 409;
+        res.status(status).json({
+          error: err instanceof Error ? err.message : "Could not create course specification revision",
+        });
+      }
     },
   );
 

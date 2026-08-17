@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -187,10 +188,21 @@ export function ReviewSubmitSection({
             Prepare and submit your course specification for review by the Head of Program.
           </p>
         </div>
-        <Button variant="outline" onClick={onPreview}>
-          <Eye className="mr-2 h-4 w-4" />
-          Preview Document
-        </Button>
+        <div className="flex gap-2">
+          {canReview && review.status === "approved" ? (
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={<Link href={`/courses/${course.id}/spec/revision`} />}
+            >
+              Create Revision
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={onPreview}>
+            <Eye className="mr-2 h-4 w-4" />
+            Preview Document
+          </Button>
+        </div>
       </div>
 
       {/* Compact horizontal workflow */}
