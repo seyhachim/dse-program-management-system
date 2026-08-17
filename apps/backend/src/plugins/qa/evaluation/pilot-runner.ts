@@ -180,8 +180,8 @@ function assessControlledDefinition(
   evidence: QaEvaluationEvidenceView[],
 ): { finding: QaEvidenceRuleFinding; assessments: ControlledCandidateAssessment[] } {
   const matchingEvidence = evidence.filter((item) => item.evidenceType === definition.evidenceType);
-  const evidenceByKey = new Map(
-    matchingEvidence.map((item) => [`pilot-evidence:${item.id}`, item] as const),
+  const evidenceByKey = new Map<string, QaEvaluationEvidenceView>(
+    matchingEvidence.map((item) => [`pilot-evidence:${item.id}`, item]),
   );
   const result: QaEvidenceCandidateResultView = {
     programmeId: "controlled-evaluation",
