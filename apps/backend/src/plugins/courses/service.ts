@@ -4,6 +4,7 @@ import {
   type AssessmentPlanSection,
   type ClosSection,
   type CourseInfoInput,
+  type CourseSpecVersionRef,
   type CourseInfoSection,
   type CourseSpecProgress,
   type CoursesServiceContract,
@@ -173,6 +174,27 @@ const CURRENT_SPEC_ORDER = [
   { versionMinor: "desc" as const },
 ];
 
+function toCourseSpecVersionRef(spec: {
+  id: string;
+  courseId: string;
+  versionMajor: number;
+  versionMinor: number;
+  reviewStatus: string;
+  approvedAt: Date | null;
+  effectiveFrom: Date | null;
+}): CourseSpecVersionRef {
+  return {
+    id: spec.id,
+    courseId: spec.courseId,
+    versionMajor: spec.versionMajor,
+    versionMinor: spec.versionMinor,
+    version: `${spec.versionMajor}.${spec.versionMinor}`,
+    reviewStatus: spec.reviewStatus,
+    approvedAt: spec.approvedAt?.toISOString() ?? null,
+    effectiveFrom: spec.effectiveFrom?.toISOString().slice(0, 10) ?? null,
+  };
+}
+
 export const courseService = {
   /**
    * List courses. When `lecturerScope` is given, results are scoped to that
@@ -276,12 +298,29 @@ export const courseService = {
     return prisma.course.findUnique({ where: { id } });
   },
 
-  // Part of CoursesServiceContract — workload consumers need only scheduled
-  // contact hours, never CourseSpec's storage details or self-study time.
-  async weeklyContactHours(courseId: string) {
-    const spec = await prisma.courseSpec.findFirst({
-      where: { courseId },
+  // Cross-plugin exact-version lookup used by Offerings.
+  async getCourseSpecVersion(id: string): Promise<CourseSpecVersionRef | null> {
+    const spec = await prisma.courseSpec.findUnique({
+      where: { id },
+      select: { id: true, courseId: true, versionMajor: true, versionMinor: true, reviewStatus: true, approvedAt: true, effectiveFrom: true },
+    });
+    return spec ? toCourseSpecVersionRef(spec) : null;
+  },
+
+  async listApprovedSpecVersions(courseId: string): Promise<CourseSpecVersionRef[]> {
+    const specs = await prisma.courseSpec.findMany({
+      where: { courseId, reviewStatus: "Approved" },
       orderBy: CURRENT_SPEC_ORDER,
+      select: { id: true, courseId: true, versionMajor: true, versionMinor: true, reviewStatus: true, approvedAt: true, effectiveFrom: true },
+    });
+    return specs.map(toCourseSpecVersionRef);
+  },
+
+  // Part of CoursesServiceContract — workload must use the Offering's exact
+  // bound CourseSpec, never whichever course version is newest today.
+  async weeklyContactHours(courseSpecId: string) {
+    const spec = await prisma.courseSpec.findUnique({
+      where: { id: courseSpecId },
       select: {
         weeks: {
           orderBy: { order: "asc" },

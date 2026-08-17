@@ -41,6 +41,7 @@ dbDescribe("finalized result correction database integrity", () => {
     const offering = await prisma.offering.create({
       data: {
         courseId: spec.courseId,
+        courseSpecId: spec.id,
         lecturerId: actor.id,
         term: `issue333-${suffix}`,
         sectionCode: `I333-${suffix.slice(0, 8)}`,

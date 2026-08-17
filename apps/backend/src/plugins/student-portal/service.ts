@@ -37,27 +37,21 @@ const enrollmentInclude = {
         where: { publishedAt: { not: null } },
         include: { author: { select: { name: true } } },
       },
-      course: {
+      course: true,
+      courseSpec: {
         include: {
-          specs: {
-            where: { reviewStatus: "Approved" },
-            orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-            take: 1,
+          clos: { orderBy: { order: "asc" as const } },
+          weeks: { orderBy: { order: "asc" as const } },
+          assessmentItems: {
+            orderBy: { order: "asc" as const },
             include: {
-              clos: { orderBy: { order: "asc" as const } },
-              weeks: { orderBy: { order: "asc" as const } },
-              assessmentItems: {
-                orderBy: { order: "asc" as const },
-                include: {
-                  criterionCloMappings: true,
-                  rubric: {
-                    include: { levelRows: { orderBy: { order: "asc" } }, criterionRows: { orderBy: { order: "asc" } } },
-                  },
-                },
+              criterionCloMappings: true,
+              rubric: {
+                include: { levelRows: { orderBy: { order: "asc" } }, criterionRows: { orderBy: { order: "asc" } } },
               },
-              resources: { orderBy: { order: "asc" as const } },
             },
           },
+          resources: { orderBy: { order: "asc" as const } },
         },
       },
     },
@@ -228,14 +222,16 @@ export function deliveryOfferingScope(userId: string, programmeWide: boolean) {
 }
 
 function approvedSpec(row: EnrollmentRow) {
-  return row.offering.course.specs[0] ?? null;
+  return row.offering.courseSpec ?? null;
 }
 
 function toSummary(row: EnrollmentRow): PortalCourseSummary {
   const { offering } = row;
   const spec = approvedSpec(row);
   const deadlines = new Map(
-    offering.assessmentDeadlines.map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+    offering.assessmentDeadlines
+      .filter((deadline) => deadline.courseSpecId === spec?.id)
+      .map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
   );
   const nextAssessment = (spec?.assessmentItems ?? [])
     .filter((item) => item.status === "Active")
@@ -276,11 +272,14 @@ function toSummary(row: EnrollmentRow): PortalCourseSummary {
 async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCourseDetail> {
   const summary = toSummary(row);
   const spec = approvedSpec(row);
+  const exactResults = row.results.filter((result) => result.courseSpecId === spec?.id);
   const deadlines = new Map(
-    row.offering.assessmentDeadlines.map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+    row.offering.assessmentDeadlines
+      .filter((deadline) => deadline.courseSpecId === spec?.id)
+      .map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
   );
   const resultByAssessment = new Map(
-    row.results.map((result) => [result.assessmentItemId, result]),
+    exactResults.map((result) => [result.assessmentItemId, result]),
   );
   const criterionMappings = (spec?.assessmentItems ?? []).flatMap((assessment) =>
     assessment.criterionCloMappings.map((mapping) => ({
@@ -291,10 +290,10 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
     })),
   );
   const achievements = spec
-    ? calculateCloAchievements(spec.clos, spec.assessmentItems, row.results, criterionMappings)
+    ? calculateCloAchievements(spec.clos, spec.assessmentItems, exactResults, criterionMappings)
     : [];
   const grade = spec
-    ? calculateCourseGrade(spec.assessmentItems, row.results)
+    ? calculateCourseGrade(spec.assessmentItems, exactResults)
     : { totalGrade: null, complete: false, completedWeight: 0, configuredWeight: 0, contributions: [] };
   const contributionByAssessment = new Map(
     grade.contributions.map((item) => [item.assessmentItemId, item.weightedContribution]),
@@ -413,18 +412,8 @@ async function assertOfferingEditor(offeringId: string, userId: string, programm
     where: { id: offeringId },
     include: {
       coLecturers: true,
-      course: {
-        select: {
-          specs: {
-            where: { reviewStatus: "Approved" },
-            orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-            take: 1,
-            select: {
-              id: true,
-              assessmentItems: { select: { id: true } },
-            },
-          },
-        },
+      courseSpec: {
+        select: { id: true, reviewStatus: true, assessmentItems: { select: { id: true } } },
       },
     },
   });
@@ -439,20 +428,14 @@ export const studentPortalService = {
     const offerings = await prisma.offering.findMany({
       where: deliveryOfferingScope(userId, programmeWide),
       include: {
-        course: {
+        course: true,
+        courseSpec: {
           include: {
-            specs: {
-              where: { reviewStatus: "Approved" },
-              orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-              take: 1,
+            assessmentItems: {
+              orderBy: { order: "asc" },
               include: {
-                assessmentItems: {
-                  orderBy: { order: "asc" },
-                  include: {
-                    criterionCloMappings: true,
-                    rubric: { include: { levelRows: { orderBy: { order: "asc" } }, criterionRows: { orderBy: { order: "asc" } } } },
-                  },
-                },
+                criterionCloMappings: true,
+                rubric: { include: { levelRows: { orderBy: { order: "asc" } }, criterionRows: { orderBy: { order: "asc" } } } },
               },
             },
           },
@@ -475,9 +458,11 @@ export const studentPortalService = {
     });
 
     return offerings.map((offering) => {
-      const spec = offering.course.specs[0] ?? null;
+      const spec = offering.courseSpec ?? null;
       const deadlines = new Map(
-        offering.assessmentDeadlines.map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+        offering.assessmentDeadlines
+          .filter((deadline) => deadline.courseSpecId === spec?.id)
+          .map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
       );
       return {
         offeringId: offering.id,
@@ -630,23 +615,14 @@ export const studentPortalService = {
       include: {
         offering: {
           include: {
-            course: {
-              include: {
-                specs: {
-                  where: { reviewStatus: "Approved" },
-                  orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
-                  take: 1,
-                  include: { assessmentItems: true },
-                },
-              },
-            },
+            courseSpec: { include: { assessmentItems: true } },
           },
         },
       },
     });
     if (!enrollment) throw new PortalNotFoundError("Enrollment not found");
     await assertOfferingEditor(enrollment.offeringId, authorId, programmeWide);
-    const spec = enrollment.offering.course.specs[0] ?? null;
+    const spec = enrollment.offering.courseSpec ?? null;
     if (!spec || !spec.assessmentItems.some((item) => item.id === input.assessmentItemId)) {
       throw new PortalNotFoundError("Assessment not found");
     }
@@ -673,7 +649,7 @@ export const studentPortalService = {
 
   async setDeadline(authorId: string, programmeWide: boolean, input: SetAssessmentDeadlineInput) {
     const offering = await assertOfferingEditor(input.offeringId, authorId, programmeWide);
-    const spec = offering.course.specs[0] ?? null;
+    const spec = offering.courseSpec ?? null;
     if (!spec?.id) throw new PortalNotFoundError("Course specification not found");
     if (!spec.assessmentItems.some((assessment) => assessment.id === input.assessmentItemId)) {
       throw new PortalNotFoundError("Assessment not found");
