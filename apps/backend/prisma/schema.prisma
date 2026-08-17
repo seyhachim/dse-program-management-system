@@ -325,6 +325,7 @@ model Programme {
   qaSarSubmissions         QaSarSubmission[]
   qaSarReleases            QaSarRelease[]
   studentCohorts            StudentCohort[]
+  qaCloAttainmentSnapshots  QaCloAttainmentSnapshot[]
 }
 
 /// Canonical curriculum identity for one programme. Versions are immutable
@@ -1125,6 +1126,48 @@ model StudentProgressionRecord {
   @@index([academicYear, term, status])
 }
 
+/// Issue #303: immutable, reproducible CLO-attainment calculation artifact.
+/// Each row snapshots exact source inputs and calculation metadata; recalculation
+/// creates a new row and links it to the prior snapshot instead of rewriting history.
+model QaCloAttainmentSnapshot {
+  id                      String                    @id @default(uuid())
+  programmeId             String
+  programme               Programme                 @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  courseId                String
+  course                  Course                    @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  courseSpecId            String
+  cloId                   String
+  clo                     CourseSpecClo             @relation(fields: [courseSpecId, cloId], references: [courseSpecId, id], onDelete: Restrict)
+  offeringId              String
+  offering                Offering                  @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  cloCode                 String
+  periodKey               String
+  calculationVersion      String
+  thresholdPercentage     Float
+  thresholdRule           Json
+  populationSize          Int
+  studentCount            Int
+  achievedCount           Int
+  achievedRate            Float?
+  sourceAssessmentItemIds String[]                  @default([])
+  sourceAssessmentResultIds String[]                @default([])
+  sourceCriterionScoreIds String[]                  @default([])
+  sourceMappingKeys       String[]                  @default([])
+  sourceEvidence          Json
+  calculationHash         String
+  supersedesSnapshotId    String?
+  supersedesSnapshot      QaCloAttainmentSnapshot?  @relation("QaCloAttainmentHistory", fields: [supersedesSnapshotId], references: [id], onDelete: Restrict)
+  supersededBy            QaCloAttainmentSnapshot[] @relation("QaCloAttainmentHistory")
+  generatedAt             DateTime                  @default(now())
+
+  @@unique([offeringId, courseSpecId, cloId, calculationVersion, calculationHash])
+  @@index([programmeId, periodKey])
+  @@index([courseId, courseSpecId])
+  @@index([offeringId, cloCode, generatedAt])
+  @@index([courseSpecId, cloId])
+  @@index([supersedesSnapshotId])
+}
+
 /// Programme-level learning outcomes for the single DSE programme.
 ///
 /// `code` is the stable academic identifier (for example "PLO1") and must
@@ -1240,6 +1283,7 @@ model Course {
   offerings            Offering[]
   specs                CourseSpec[]
   curriculumPlacements ProgrammeCurriculumCourse[]
+  qaCloAttainmentSnapshots QaCloAttainmentSnapshot[]
 
   @@index([lecturerId])
   @@index([programmeId])
@@ -1482,6 +1526,7 @@ model CourseSpecClo {
   teachingMethods           CourseSpecCloTeachingMethod[]
   activeLearningStrategyIds String[]                        @default([])
   assessmentMethods         CourseSpecCloAssessmentMethod[]
+  attainmentSnapshots       QaCloAttainmentSnapshot[]
 
   @@id([courseSpecId, id])
 }
@@ -1726,6 +1771,7 @@ model Offering {
   resultAccessPolicy             OfferingResultAccessPolicy?
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
+  qaCloAttainmentSnapshots      QaCloAttainmentSnapshot[]
 
   @@unique([courseId, term, sectionCode])
   @@index([status])
