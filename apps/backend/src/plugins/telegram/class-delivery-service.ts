@@ -56,11 +56,14 @@ function productionOfferings(): OfferingsContract {
 }
 
 export function createTelegramClassDeliveryService(
-  offerings: OfferingsContract = productionOfferings(),
+  injectedOfferings?: OfferingsContract,
   audit: (input: AuditInput) => Promise<void> = telegramIdentityStore.audit,
 ) {
+  const offerings = () => injectedOfferings ?? productionOfferings();
+
   async function authorize(user: TelegramSessionUser, offeringId: string) {
-    const offering = await offerings.getById(offeringId);
+    const service = offerings();
+    const offering = await service.getById(offeringId);
     if (!offering) throw new TelegramClassDeliveryNotFoundError("Offering not found");
 
     const programmeId = offering.course?.programmeId ?? null;
@@ -77,7 +80,7 @@ export function createTelegramClassDeliveryService(
     }
 
     try {
-      const responsibility = await offerings.classResponsibilities.assertActiveForUser(user.id, offeringId);
+      const responsibility = await service.classResponsibilities.assertActiveForUser(user.id, offeringId);
       return {
         actorKind: responsibility.role,
         responsibilityAssignmentId: responsibility.id,
@@ -92,7 +95,7 @@ export function createTelegramClassDeliveryService(
   return {
     async get(user: TelegramSessionUser, offeringId: string, date: string) {
       const access = await authorize(user, offeringId);
-      const confirmation = await offerings.classDelivery.getLecturerArrival(offeringId, date);
+      const confirmation = await offerings().classDelivery.getLecturerArrival(offeringId, date);
       return {
         access: {
           actorKind: access.actorKind,
@@ -109,7 +112,7 @@ export function createTelegramClassDeliveryService(
       status: LecturerArrivalStatus,
     ) {
       const access = await authorize(user, offeringId);
-      const result = await offerings.classDelivery.saveLecturerArrival(
+      const result = await offerings().classDelivery.saveLecturerArrival(
         offeringId,
         date,
         status,
