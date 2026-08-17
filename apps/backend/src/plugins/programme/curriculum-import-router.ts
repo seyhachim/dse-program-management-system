@@ -1,5 +1,8 @@
 import { Router, type Response } from "express";
-import { CurriculumJsonUploadSchema } from "@dse-pms/shared-types";
+import {
+  CurriculumImportApplyInputSchema,
+  CurriculumJsonUploadSchema,
+} from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
@@ -89,10 +92,10 @@ export function createCurriculumImportRouter(): Router {
         res.status(400).json({ error: "Curriculum version id is required" });
         return;
       }
-      const parsed = CurriculumJsonUploadSchema.safeParse(req.body);
+      const parsed = CurriculumImportApplyInputSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({
-          error: "Invalid curriculum JSON upload",
+          error: "Invalid curriculum import decisions",
           details: parsed.error.flatten(),
         });
         return;
@@ -128,6 +131,28 @@ export function createCurriculumImportRouter(): Router {
           return;
         }
         res.json(await curriculumImportService.artifact(versionId));
+      } catch (error) {
+        sendImportError(res, error);
+      }
+    },
+  );
+
+  router.get(
+    "/curricula/versions/:versionId/artifact/export",
+    requirePermission("programme:read"),
+    async (req, res) => {
+      const versionId = req.params.versionId;
+      if (!versionId || !req.user) {
+        res.status(400).json({ error: "Curriculum version id is required" });
+        return;
+      }
+      try {
+        const scope = await scopeForVersion(versionId, req.user, READ_ROLES);
+        if (!scope.allowed) {
+          res.status(403).json({ error: "No curriculum export access for this programme" });
+          return;
+        }
+        res.json(await curriculumImportService.artifactForExport(versionId));
       } catch (error) {
         sendImportError(res, error);
       }
