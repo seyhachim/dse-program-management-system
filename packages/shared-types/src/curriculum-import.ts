@@ -3,6 +3,7 @@ import { CourseTypeSchema } from "./courses.ts";
 import { CurriculumSemesterSchema } from "./curriculum.ts";
 
 export const DSE_CURRICULUM_IMPORT_FORMAT_VERSION = "dse-curriculum-v1" as const;
+export const CURRICULUM_COMMON_SCOPE = "__COMMON__" as const;
 
 export const CurriculumHourBreakdownSchema = z
   .object({
@@ -20,15 +21,18 @@ export const CurriculumHourBreakdownSchema = z
     }
   });
 
+const NullableCreditPartSchema = z.number().int().min(0).max(30).nullable().default(null);
 export const CurriculumCreditBreakdownSchema = z.object({
   total: z.number().int().min(0).max(30),
-  lecture: z.number().int().min(0).max(30),
-  lab: z.number().int().min(0).max(30),
-  fieldVisit: z.number().int().min(0).max(30),
+  lecture: NullableCreditPartSchema,
+  lab: NullableCreditPartSchema,
+  fieldVisit: NullableCreditPartSchema,
 });
 
 export const CurriculumImportPathwaySchema = z.object({
-  code: z.string().trim().min(1).max(40),
+  code: z.string().trim().min(1).max(40).refine((value) => value !== CURRICULUM_COMMON_SCOPE, {
+    message: `${CURRICULUM_COMMON_SCOPE} is reserved for common curriculum rows`,
+  }),
   name: z.string().trim().min(1).max(240),
   yearLevel: z.number().int().min(1).max(4),
   semester: CurriculumSemesterSchema,
@@ -95,6 +99,19 @@ export const DseCurriculumImportSchema = z
         message: "Default pathway code does not exist",
       });
     }
+    if (value.curriculum.defaultPathwayCode) {
+      const declared = value.pathways.find(
+        (pathway) => pathway.code === value.curriculum.defaultPathwayCode,
+      );
+      const marked = value.pathways.find((pathway) => pathway.isDefault);
+      if (marked && declared && marked.code !== declared.code) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["curriculum", "defaultPathwayCode"],
+          message: "defaultPathwayCode conflicts with the pathway marked isDefault",
+        });
+      }
+    }
 
     const placementKeys = new Set<string>();
     for (const [index, course] of value.courses.entries()) {
@@ -105,7 +122,7 @@ export const DseCurriculumImportSchema = z
           message: `Unknown pathway code: ${course.pathwayCode}`,
         });
       }
-      const key = `${course.pathwayCode ?? "COMMON"}:${course.code}`;
+      const key = `${course.pathwayCode ?? CURRICULUM_COMMON_SCOPE}:${course.code}`;
       if (placementKeys.has(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
