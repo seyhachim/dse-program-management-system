@@ -1,12 +1,17 @@
 import {
   AttendanceDateSchema,
   CourseFeedbackInput,
+  LecturerArrivalStatusSchema,
   SaveAttendanceInput,
   TelegramInitDataVerifyRequestSchema,
   TelegramLinkRequestSchema,
 } from "@dse-pms/shared-types";
 import { Router, type Response } from "express";
 import { requireAuth } from "../../core/auth/middleware.ts";
+import {
+  telegramClassDeliveryErrorStatus,
+  telegramClassDeliveryService,
+} from "./class-delivery-service.ts";
 import { resolveTelegramDeepLink } from "./deep-link.ts";
 import { TelegramInitDataError } from "./init-data.ts";
 import { TelegramLinkError, telegramIdentityStore } from "./identity-store.ts";
@@ -51,6 +56,8 @@ function sendMiniAppError(res: Response, error: unknown) {
     const status = error.code === "TELEGRAM_LINK_CONFLICT" ? 409 : error.code === "INIT_DATA_EXPIRED" ? 401 : 400;
     return res.status(status).json({ error: { code: error.code, message: error.message } });
   }
+  const deliveryStatus = telegramClassDeliveryErrorStatus(error);
+  if (deliveryStatus) return res.status(deliveryStatus).json({ error: error instanceof Error ? error.message : "Request denied" });
   const miniStatus = telegramMiniErrorStatus(error);
   if (miniStatus) return res.status(miniStatus).json({ error: error instanceof Error ? error.message : "Request denied" });
   const name = error instanceof Error ? error.constructor.name : "";
@@ -135,6 +142,21 @@ export function createTelegramRouter(service: TelegramService = telegramService)
   });
   router.get("/mini/classes/:offeringId", async (req, res) => {
     try { res.json(await telegramMiniAppService.course(req.telegramUser!, req.params.offeringId!)); } catch (error) { sendMiniAppError(res, error); }
+  });
+  router.get("/mini/classes/:offeringId/lecturer-arrival/:date", async (req, res) => {
+    const date = AttendanceDateSchema.safeParse(req.params.date);
+    if (!date.success) return void res.status(400).json({ error: "Invalid class-delivery date" });
+    try {
+      res.json(await telegramClassDeliveryService.get(req.telegramUser!, req.params.offeringId!, date.data));
+    } catch (error) { sendMiniAppError(res, error); }
+  });
+  router.put("/mini/classes/:offeringId/lecturer-arrival/:date", async (req, res) => {
+    const date = AttendanceDateSchema.safeParse(req.params.date);
+    const status = LecturerArrivalStatusSchema.safeParse(req.body?.status);
+    if (!date.success || !status.success) return void res.status(400).json({ error: "Invalid lecturer-arrival confirmation" });
+    try {
+      res.json(await telegramClassDeliveryService.save(req.telegramUser!, req.params.offeringId!, date.data, status.data));
+    } catch (error) { sendMiniAppError(res, error); }
   });
   router.get("/mini/announcements", async (req, res) => {
     try { res.json(await telegramMiniAppService.announcements(req.telegramUser!)); } catch (error) { sendMiniAppError(res, error); }
