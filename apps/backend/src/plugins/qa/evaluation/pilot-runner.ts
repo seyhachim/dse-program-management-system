@@ -6,14 +6,23 @@ import {
   QaLlmEvidenceMatchOutputSchema,
   type QaEvidenceCandidateResultView,
   type QaEvidenceCandidateView,
+  type QaEvidenceScopeRequirement,
   type QaEvaluationEvidenceView,
   type QaEvaluationRunView,
+  type QaExpectedEvidenceDefinitionView,
   type QaPilotStatusView,
   type QaQualityExpectationView,
+  type QaTemporalRule,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import { qaService } from "../service.ts";
-import { evaluateApplicability } from "../analysis/evidence-semantics.ts";
+import {
+  evaluateApplicability,
+  matchEvidenceScope,
+  matchEvidenceTime,
+  meetsSourceAuthority,
+  temporalMatchSupportsEvidence,
+} from "../analysis/evidence-semantics.ts";
 import {
   QaLlmProviderError,
   configuredQaLlmProvider,
@@ -25,6 +34,7 @@ import {
   buildDeterministicExplanation,
   determineExpectationState,
   evaluateExpectedEvidence,
+  type QaEvidenceRuleFinding,
 } from "../analysis/rules.ts";
 import {
   QaEvaluationResourceNotFoundError,
@@ -36,6 +46,22 @@ export class QaPilotReferenceRequiredError extends Error {}
 export class QaPilotScenarioError extends Error {}
 export class QaPilotLlmUnavailableError extends Error {}
 export class QaPilotLlmOutputValidationError extends Error {}
+
+interface ControlledCandidateAssessment {
+  evidence: QaEvaluationEvidenceView;
+  candidate: QaEvidenceCandidateView;
+  definition: QaExpectedEvidenceDefinitionView;
+  scopeMatch: "exact" | "partial" | "mismatch" | "unknown";
+  temporalMatch:
+    | "current"
+    | "historicalRelevant"
+    | "stale"
+    | "future"
+    | "insufficientHistory"
+    | "unknown";
+  authorityMatch: boolean | null;
+  temporalRule: QaTemporalRule;
+}
 
 function candidateFromEvidence(evidence: QaEvaluationEvidenceView): QaEvidenceCandidateView {
   return {
@@ -82,13 +108,35 @@ function parseControlledDate(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function controlledCycle(evidence: QaEvaluationEvidenceView[]) {
+  const explicitStart = evidence
+    .map((item) => parseControlledDate(item.attributes.cycleStartDate))
+    .find((value): value is Date => Boolean(value));
+  const explicitEnd = evidence
+    .map((item) => parseControlledDate(item.attributes.cycleEndDate))
+    .find((value): value is Date => Boolean(value));
+  if (explicitStart && explicitEnd) {
+    return { reportingStart: explicitStart, reportingEnd: explicitEnd };
+  }
+
+  const dates = evidence
+    .map((item) => parseControlledDate(item.reportingDate))
+    .filter((value): value is Date => Boolean(value))
+    .sort((a, b) => b.getTime() - a.getTime());
+  const year = dates[0]?.getUTCFullYear() ?? 2026;
+  return {
+    reportingStart: new Date(Date.UTC(year, 0, 1)),
+    reportingEnd: new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
+  };
+}
+
 function controlledApplicability(
   expectation: QaQualityExpectationView,
   evidence: QaEvaluationEvidenceView[],
 ) {
   if (expectation.applicabilityRule.kind === "always") {
     return evaluateApplicability(expectation.applicabilityRule, {
-      asOfDate: new Date(0),
+      asOfDate: controlledCycle(evidence).reportingEnd,
       cohortStartDate: null,
     });
   }
@@ -99,40 +147,125 @@ function controlledApplicability(
   const explicitAsOfDate = evidence
     .map((item) => parseControlledDate(item.attributes.asOfDate))
     .find((value): value is Date => Boolean(value));
-  const reportingDates = evidence
-    .map((item) => parseControlledDate(item.reportingDate))
-    .filter((value): value is Date => Boolean(value))
-    .sort((a, b) => b.getTime() - a.getTime());
-  const asOfDate = explicitAsOfDate ?? reportingDates[0] ?? null;
+  const asOfDate = explicitAsOfDate ?? controlledCycle(evidence).reportingEnd;
 
-  if (!asOfDate) {
-    return {
-      state: "uncertain" as const,
-      reason: "Controlled scenario has no reproducible as-of/reporting date for cohort applicability.",
-    };
-  }
   return evaluateApplicability(expectation.applicabilityRule, {
     cohortStartDate: cohortStartDate ?? null,
     asOfDate,
   });
 }
 
-function controlledResult(
-  scenarioId: string,
-  definition: Awaited<ReturnType<typeof qaService.getKnowledge>>["expectations"][number]["expectedEvidence"][number],
-  evidence: QaEvaluationEvidenceView[],
-): QaEvidenceCandidateResultView {
+function effectiveScopeRequirement(
+  expectation: QaQualityExpectationView,
+  definition: QaExpectedEvidenceDefinitionView,
+): QaEvidenceScopeRequirement {
   return {
-    programmeId: `controlled-evaluation:${scenarioId}`,
+    requiredDimensions: [
+      ...new Set([
+        ...expectation.scopeRequirement.requiredDimensions,
+        ...definition.scopeRequirement.requiredDimensions,
+      ]),
+    ],
+  };
+}
+
+function effectiveTemporalRule(
+  expectation: QaQualityExpectationView,
+  definition: QaExpectedEvidenceDefinitionView,
+): QaTemporalRule {
+  return definition.temporalRule.kind === "pointInTime"
+    ? expectation.temporalRule
+    : definition.temporalRule;
+}
+
+function assessControlledDefinition(
+  expectation: QaQualityExpectationView,
+  definition: QaExpectedEvidenceDefinitionView,
+  evidence: QaEvaluationEvidenceView[],
+): { finding: QaEvidenceRuleFinding; assessments: ControlledCandidateAssessment[] } {
+  const matchingEvidence = evidence.filter((item) => item.evidenceType === definition.evidenceType);
+  const periodCount = new Set(
+    matchingEvidence.map((item) => item.periodKey).filter((value): value is string => Boolean(value)),
+  ).size;
+  const temporalRule = effectiveTemporalRule(expectation, definition);
+  const cycle = controlledCycle(evidence);
+
+  const assessments = matchingEvidence.map((item): ControlledCandidateAssessment => {
+    const candidate = candidateFromEvidence(item);
+    return {
+      evidence: item,
+      candidate,
+      definition,
+      scopeMatch: matchEvidenceScope(
+        effectiveScopeRequirement(expectation, definition),
+        { programmeId: "controlled-evaluation" },
+        candidate.scope ?? {},
+      ),
+      temporalMatch: matchEvidenceTime(temporalRule, {
+        cycleStart: cycle.reportingStart,
+        cycleEnd: cycle.reportingEnd,
+        candidateDate: candidate.reportingDate ? new Date(candidate.reportingDate) : null,
+        comparablePeriods: periodCount,
+      }),
+      authorityMatch: meetsSourceAuthority(
+        definition.authorityRequirement,
+        candidate.provenance ?? { authority: "unknown" },
+      ),
+      temporalRule,
+    };
+  });
+
+  const acceptedKeys = new Set(
+    assessments
+      .filter(
+        (item) =>
+          item.scopeMatch === "exact" &&
+          temporalMatchSupportsEvidence(item.temporalRule, item.temporalMatch) &&
+          item.authorityMatch === true,
+      )
+      .map((item) => item.candidate.key),
+  );
+
+  const result: QaEvidenceCandidateResultView = {
+    programmeId: "controlled-evaluation",
     expectedEvidenceId: definition.id,
     evidenceType: definition.evidenceType,
     sourceDomain: definition.sourceDomain,
     status: "supported",
-    reason: "Controlled scenario evidence container searched for the registered evidence type.",
-    candidates: evidence
-      .filter((item) => item.evidenceType === definition.evidenceType)
-      .map(candidateFromEvidence),
+    reason: "Controlled evidence was evaluated against declared scope, temporal, and authority semantics.",
+    candidates: assessments
+      .filter((item) => acceptedKeys.has(item.candidate.key))
+      .map((item) => item.candidate),
   };
+
+  if (result.candidates.length === 0 && assessments.length > 0) {
+    const ambiguous = assessments.some(
+      (item) =>
+        item.scopeMatch === "partial" ||
+        item.scopeMatch === "unknown" ||
+        item.temporalMatch === "unknown" ||
+        item.authorityMatch === null,
+    );
+    if (ambiguous) {
+      result.status = "unsupported";
+      result.reason =
+        "Controlled candidates have unresolved scope, temporal, or provenance semantics and require expert review.";
+    }
+  }
+
+  return {
+    finding: evaluateExpectedEvidence(definition, result),
+    assessments,
+  };
+}
+
+function controlledGroups(
+  expectation: QaQualityExpectationView,
+  evidence: QaEvaluationEvidenceView[],
+) {
+  return expectation.expectedEvidence.map((definition) =>
+    assessControlledDefinition(expectation, definition, evidence),
+  );
 }
 
 export async function runDeterministicQaPilotScenario(
@@ -153,14 +286,10 @@ export async function runDeterministicQaPilotScenario(
     });
   }
 
+  const groups = controlledGroups(expectation, scenario.evidence);
   const findings = applyExpectationCrossChecks(
     scenario.requirementCode,
-    expectation.expectedEvidence.map((definition) =>
-      evaluateExpectedEvidence(
-        definition,
-        controlledResult(scenario.id, definition, scenario.evidence),
-      ),
-    ),
+    groups.map((group) => group.finding),
   );
   const { state } = determineExpectationState(scenario.requirementCode, findings);
   const explanation = buildDeterministicExplanation(scenario.requirementCode, findings, state);
@@ -199,13 +328,19 @@ function pilotPrompt(options: {
     role: string;
     candidateKeys: string[];
   }>;
-  candidates: QaEvidenceCandidateView[];
+  assessments: ControlledCandidateAssessment[];
 }) {
+  const accepted = options.assessments.filter(
+    (item) =>
+      item.scopeMatch === "exact" &&
+      temporalMatchSupportsEvidence(item.temporalRule, item.temporalMatch) &&
+      item.authorityMatch === true,
+  );
   return [
     {
       role: "system" as const,
       content:
-        "You are an evidence-matching assistant for higher-education quality assurance. Your task is only to determine whether the supplied controlled evidence context supports the stated quality expectation. Do not assign, predict, recommend, or imply any official AUN-QA rating, score, pass/fail, accreditation decision, or institutional quality judgment. A missing evidence record is an evidence gap, not proof of poor quality. Use only candidate keys supplied by the user. If evidence is partial, conflicting, stale, or interpretation depends on academic/QA expertise, use expertReviewRequired. Return JSON only with exactly these fields: state, explanation, confidence, uncertaintyNote, usedCandidateKeys. state must be evidenceIdentified, potentialEvidenceGap, or expertReviewRequired. confidence is 0..1 or null. usedCandidateKeys must be a subset of the supplied candidate keys.",
+        "You are an evidence-matching assistant for higher-education quality assurance. Your task is only to determine whether the supplied controlled evidence context supports the stated quality expectation. Do not assign, predict, recommend, or imply any official AUN-QA rating, score, pass/fail, accreditation decision, or institutional quality judgment. A missing evidence record is an evidence gap, not proof of poor quality. Use only candidate keys supplied by the user. Candidates rejected by deterministic scope/time/authority semantics are not supplied. If the remaining evidence is partial, conflicting, or interpretation depends on academic/QA expertise, use expertReviewRequired. Return JSON only with exactly these fields: state, explanation, confidence, uncertaintyNote, usedCandidateKeys. state must be evidenceIdentified, potentialEvidenceGap, or expertReviewRequired. confidence is 0..1 or null. usedCandidateKeys must be a subset of the supplied candidate keys.",
     },
     {
       role: "user" as const,
@@ -215,17 +350,20 @@ function pilotPrompt(options: {
           requirementCode: options.requirementCode,
           qualityExpectation: options.expectation,
           expectedEvidence: options.expectedEvidence,
-          candidates: options.candidates.map((candidate) => ({
-            key: candidate.key,
-            evidenceType: candidate.evidenceType,
-            sourceDomain: candidate.sourceDomain,
-            title: candidate.title,
-            summary: candidate.summary,
-            reportingDate: candidate.reportingDate,
-            scope: candidate.scope,
-            provenance: candidate.provenance,
-            periodKey: candidate.periodKey,
-            attributes: candidate.attributes,
+          candidates: accepted.map((item) => ({
+            key: item.candidate.key,
+            evidenceType: item.candidate.evidenceType,
+            sourceDomain: item.candidate.sourceDomain,
+            title: item.candidate.title,
+            summary: item.candidate.summary,
+            reportingDate: item.candidate.reportingDate,
+            scope: item.candidate.scope,
+            scopeMatch: item.scopeMatch,
+            temporalMatch: item.temporalMatch,
+            provenance: item.candidate.provenance,
+            authorityMatch: item.authorityMatch,
+            periodKey: item.candidate.periodKey,
+            attributes: item.candidate.attributes,
           })),
         },
         null,
@@ -259,17 +397,37 @@ export async function runLlmQaPilotScenario(
     );
   }
 
-  const candidates = scenario.evidence.map(candidateFromEvidence);
-  if (candidates.length === 0) {
-    throw new QaPilotScenarioError(
-      "The controlled scenario has no evidence context; use deterministic gap analysis instead of asking an LLM to infer from nothing",
-    );
-  }
-  const candidateByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]));
-  const evidenceByCandidateKey = new Map(
-    scenario.evidence.map((evidence) => [`pilot-evidence:${evidence.id}`, evidence]),
+  const groups = controlledGroups(expectation, scenario.evidence);
+  const assessments = groups.flatMap((group) => group.assessments);
+  const accepted = assessments.filter(
+    (item) =>
+      item.scopeMatch === "exact" &&
+      temporalMatchSupportsEvidence(item.temporalRule, item.temporalMatch) &&
+      item.authorityMatch === true,
   );
+  if (accepted.length === 0) {
+    const ambiguous = assessments.some(
+      (item) =>
+        item.scopeMatch === "partial" ||
+        item.scopeMatch === "unknown" ||
+        item.temporalMatch === "unknown" ||
+        item.authorityMatch === null,
+    );
+    return createQaEvaluationRun({
+      scenarioId: scenario.id,
+      predictedApplicability: "applicable",
+      predictedState: ambiguous ? "expertReviewRequired" : "potentialEvidenceGap",
+      engine: "llm-assisted",
+      engineVersion: provider.model,
+      promptVersion: QA_LLM_PROMPT_VERSION,
+      explanation: ambiguous
+        ? "Controlled evidence semantics are unresolved; LLM content classification was bypassed."
+        : "No controlled evidence candidate satisfied declared scope, temporal, and authority requirements; LLM content classification was bypassed.",
+      retrievedEvidence: [],
+    });
+  }
 
+  const candidateByKey = new Map(accepted.map((item) => [item.candidate.key, item]));
   let raw: unknown;
   try {
     raw = await provider.completeJson(
@@ -280,11 +438,11 @@ export async function runLlmQaPilotScenario(
           evidenceType: definition.evidenceType,
           description: definition.description,
           role: definition.role,
-          candidateKeys: candidates
-            .filter((candidate) => candidate.evidenceType === definition.evidenceType)
-            .map((candidate) => candidate.key),
+          candidateKeys: accepted
+            .filter((item) => item.definition.id === definition.id)
+            .map((item) => item.candidate.key),
         })),
-        candidates,
+        assessments,
       }),
     );
   } catch (error) {
@@ -315,7 +473,7 @@ export async function runLlmQaPilotScenario(
     promptVersion: QA_LLM_PROMPT_VERSION,
     explanation: parsed.data.explanation,
     retrievedEvidence: parsed.data.usedCandidateKeys.map((key) => {
-      const evidence = evidenceByCandidateKey.get(key)!;
+      const evidence = candidateByKey.get(key)!.evidence;
       const similarity = evidence.attributes.similarity;
       return {
         scenarioEvidenceId: evidence.id,
