@@ -17,6 +17,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "ProgramPolicy",
   "ProgrammeCurriculum",
   "ProgrammeCurriculumVersion",
+  "ProgrammeCurriculumPathway",
   "ProgrammeCurriculumCourse",
   "ProgrammeCurriculumAuditAction",
   "Course",
@@ -105,8 +106,8 @@ const EXPECTED_QA_SECURITY_TABLES = [
 ] as const;
 
 const EXPECTED_CURRICULUM_ARTIFACT_TABLES = [
-  "Pathway",
   "CourseSnapshot",
+  "DeclaredTotals",
   "ImportSource",
 ] as const;
 
