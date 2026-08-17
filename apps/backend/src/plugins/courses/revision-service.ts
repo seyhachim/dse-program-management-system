@@ -43,7 +43,10 @@ const SOURCE_INCLUDE = {
     orderBy: { order: "asc" as const },
   },
   weeks: { orderBy: { order: "asc" as const } },
-  assessmentItems: { orderBy: { order: "asc" as const } },
+  assessmentItems: {
+    orderBy: { order: "asc" as const },
+    include: { criterionCloMappings: true },
+  },
   mappingCells: true,
   resources: { orderBy: { order: "asc" as const } },
   studentResponsibilities: { orderBy: { order: "asc" as const } },
@@ -276,6 +279,21 @@ async function cloneNormalizedContent(
         notes: row.notes,
       })),
     });
+  }
+
+  const criterionMappings = source.assessmentItems.flatMap((assessment) =>
+    assessment.criterionCloMappings.map((mapping) => ({
+      courseSpecId: targetCourseSpecId,
+      assessmentItemId: assessmentIdMap.get(assessment.id)!,
+      rubricId: mapping.rubricId,
+      criterionId: mapping.criterionId,
+      criterionName: mapping.criterionName,
+      rubricContentHash: mapping.rubricContentHash,
+      cloCode: mapping.cloCode,
+    })),
+  );
+  if (criterionMappings.length > 0) {
+    await tx.courseSpecCriterionCloMapping.createMany({ data: criterionMappings });
   }
 
   if (source.mappingCells.length > 0) {

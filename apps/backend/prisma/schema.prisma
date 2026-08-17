@@ -22,6 +22,17 @@ enum OfferingStatus {
   Completed
 }
 
+enum ClassResponsibilityRole {
+  ClassMonitor
+  SubClassMonitor
+}
+
+enum ClassResponsibilityAuditAction {
+  Assigned
+  Revoked
+  Reassigned
+}
+
 /// Syllabus §12 "Course Availability" — which semester the course is delivered in.
 enum Semester {
   First
@@ -85,6 +96,43 @@ enum CourseSpecRevisionTrigger {
   QaFinding
   RegulatoryChange
   Other
+}
+
+enum ProgrammeCurriculumStatus {
+  Draft
+  Approved
+  Active
+  Superseded
+}
+
+enum ProgrammeCurriculumRevisionType {
+  Initial
+  Minor
+  Major
+}
+
+enum ProgrammeCurriculumRevisionTrigger {
+  ScheduledReview
+  StudentFeedback
+  AlumniFeedback
+  EmployerFeedback
+  LecturerReflection
+  ProgrammeCoordinator
+  ExternalExaminer
+  QaFinding
+  RegulatoryChange
+  Other
+}
+
+enum ProgrammeCurriculumAuditActionType {
+  Created
+  MetadataUpdated
+  CourseAdded
+  CourseUpdated
+  CourseRemoved
+  Approved
+  Activated
+  Superseded
 }
 
 /// Mirrors the shared-types `CloStatus` zod enum ("active"|"inactive") for a
@@ -175,26 +223,36 @@ model User {
   phone         String?
   createdAt     DateTime @default(now())
 
-  coursesLed               Course[]                   @relation("CourseLecturer")
-  offeringsLed             Offering[]                 @relation("OfferingLecturer")
-  rubricsOwned             Rubric[]                   @relation("RubricOwner")
-  coLecturerOf             OfferingCoLecturer[]       @relation("OfferingCoLecturer")
-  roleAssignments          UserRoleAssignment[]
-  courseSpecSubmissions    CourseSpec[]               @relation("CourseSpecSubmittedBy")
-  courseSpecReviewActions  CourseSpecReviewAction[]   @relation("CourseSpecReviewActor")
-  studentProfile           Student?
-  announcementsAuthored    CourseAnnouncement[]       @relation("AnnouncementAuthor")
-  qaCyclesCreated          QaAssessmentCycle[]        @relation("QaCycleCreator")
-  qaEvidenceCreated        QaEvidence[]               @relation("QaEvidenceCreator")
-  qaEvidenceMappings       QaEvidenceMapping[]        @relation("QaEvidenceMapper")
-  qaAssessmentsReviewed    QaRequirementAssessment[]  @relation("QaAssessmentReviewer")
-  qaAnalysisReviews        QaEvidenceAnalysisReview[] @relation("QaAnalysisReviewer")
-  qaRequirementAssignments QaRequirementAssignment[]  @relation("QaRequirementAssignee")
-  qaAssignmentsCreated     QaRequirementAssignment[]  @relation("QaRequirementAssignedBy")
-  qaSarSectionsUpdated     QaSarSection[]             @relation("QaSarSectionUpdatedBy")
-  qaSarSubmissions         QaSarSubmission[]          @relation("QaSarSubmittedBy")
-  qaSarReviews             QaSarReview[]              @relation("QaSarReviewer")
-  qaSarReleasesFinalized   QaSarRelease[]             @relation("QaSarReleaseFinalizedBy")
+  coursesLed                       Course[]                         @relation("CourseLecturer")
+  offeringsLed                     Offering[]                       @relation("OfferingLecturer")
+  rubricsOwned                     Rubric[]                         @relation("RubricOwner")
+  coLecturerOf                     OfferingCoLecturer[]             @relation("OfferingCoLecturer")
+  roleAssignments                  UserRoleAssignment[]
+  courseSpecSubmissions            CourseSpec[]                     @relation("CourseSpecSubmittedBy")
+  courseSpecReviewActions          CourseSpecReviewAction[]         @relation("CourseSpecReviewActor")
+  curriculumVersionsCreated        ProgrammeCurriculumVersion[]     @relation("ProgrammeCurriculumVersionCreatedBy")
+  curriculumAuditActions           ProgrammeCurriculumAuditAction[] @relation("ProgrammeCurriculumAuditActor")
+  studentProfile                   Student?
+  announcementsAuthored            CourseAnnouncement[]             @relation("AnnouncementAuthor")
+  assessmentResultsPublished       AssessmentResult[]               @relation("AssessmentResultPublishedBy")
+  assessmentResultsFinalized       AssessmentResult[]               @relation("AssessmentResultFinalizedBy")
+  assessmentResultCorrections      AssessmentResultCorrection[]     @relation("AssessmentResultCorrectionActor")
+  classResponsibilitiesAssigned    ClassResponsibilityAssignment[]  @relation("ClassResponsibilityAssignedBy")
+  classResponsibilitiesRevoked     ClassResponsibilityAssignment[]  @relation("ClassResponsibilityRevokedBy")
+  classResponsibilityAuditEvents   ClassResponsibilityAuditEvent[]  @relation("ClassResponsibilityAuditActor")
+  qaCyclesCreated                  QaAssessmentCycle[]               @relation("QaCycleCreator")
+  qaEvidenceCreated                QaEvidence[]                      @relation("QaEvidenceCreator")
+  qaEvidenceMappings               QaEvidenceMapping[]               @relation("QaEvidenceMapper")
+  qaAssessmentsReviewed            QaRequirementAssessment[]         @relation("QaAssessmentReviewer")
+  qaAnalysisReviews                QaEvidenceAnalysisReview[]        @relation("QaAnalysisReviewer")
+  qaRequirementAssignments         QaRequirementAssignment[]         @relation("QaRequirementAssignee")
+  qaAssignmentsCreated             QaRequirementAssignment[]         @relation("QaRequirementAssignedBy")
+  qaSarSectionsUpdated             QaSarSection[]                    @relation("QaSarSectionUpdatedBy")
+  qaSarSubmissions                 QaSarSubmission[]                 @relation("QaSarSubmittedBy")
+  qaSarReviews                     QaSarReview[]                     @relation("QaSarReviewer")
+  qaSarReleasesFinalized           QaSarRelease[]                    @relation("QaSarReleaseFinalizedBy")
+  qaEvaluationGoldReviews          QaEvaluationScenario[]            @relation("QaEvaluationGoldReviewer")
+  qaEvaluationRatings              QaEvaluationHumanRating[]         @relation("QaEvaluationHumanReviewer")
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
@@ -230,6 +288,7 @@ model Programme {
 
   roleAssignments          UserRoleAssignment[]
   courses                  Course[]
+  curricula                ProgrammeCurriculum[]
   qaCycles                 QaAssessmentCycle[]
   qaEvidence               QaEvidence[]
   qaEvidenceMappings       QaEvidenceMapping[]
@@ -241,6 +300,101 @@ model Programme {
   qaSarSections            QaSarSection[]
   qaSarSubmissions         QaSarSubmission[]
   qaSarReleases            QaSarRelease[]
+}
+
+/// Canonical curriculum identity for one programme. Versions are immutable
+/// academic snapshots once approved; the root remains stable across revisions.
+model ProgrammeCurriculum {
+  id          String     @id @default(uuid())
+  programmeId String
+  programme   Programme  @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  code        String
+  name        String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  versions ProgrammeCurriculumVersion[]
+
+  @@unique([programmeId, code])
+  @@index([programmeId])
+}
+
+/// One academic version of a programme curriculum. `versionMajor` and
+/// `versionMinor` form the authoritative version identity; API/domain code
+/// renders them as `major.minor`. Approved/Active/Superseded rows are immutable.
+model ProgrammeCurriculumVersion {
+  id               String                             @id @default(uuid())
+  curriculumId     String
+  curriculum       ProgrammeCurriculum                @relation(fields: [curriculumId], references: [id], onDelete: Restrict)
+  versionMajor     Int                                @default(1)
+  versionMinor     Int                                @default(0)
+  status           ProgrammeCurriculumStatus          @default(Draft)
+  revisionType     ProgrammeCurriculumRevisionType    @default(Initial)
+  revisionTriggers ProgrammeCurriculumRevisionTrigger[] @default([])
+  revisionReason   String                             @default("")
+  changeSummary    String                             @default("")
+  basedOnVersionId String?
+  basedOnVersion   ProgrammeCurriculumVersion?        @relation("ProgrammeCurriculumVersionHistory", fields: [basedOnVersionId], references: [id], onDelete: Restrict)
+  derivedVersions  ProgrammeCurriculumVersion[]       @relation("ProgrammeCurriculumVersionHistory")
+  cohortLabel      String                             @default("")
+  intakeYear       Int?
+  academicYear     String                             @default("")
+  effectiveFrom    DateTime?                          @db.Date
+  approvedAt       DateTime?
+  createdById      String
+  createdBy        User                               @relation("ProgrammeCurriculumVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt        DateTime                           @default(now())
+  updatedAt        DateTime                           @updatedAt
+
+  courses      ProgrammeCurriculumCourse[]
+  auditActions ProgrammeCurriculumAuditAction[]
+
+  @@unique([curriculumId, versionMajor, versionMinor])
+  @@index([curriculumId, status])
+  @@index([basedOnVersionId])
+  @@index([createdById])
+}
+
+/// A course's placement in one exact curriculum version. Credits and course type
+/// are copied when the placement is created so later edits to Course cannot
+/// rewrite historical curriculum evidence.
+model ProgrammeCurriculumCourse {
+  id                  String                     @id @default(uuid())
+  curriculumVersionId String
+  curriculumVersion   ProgrammeCurriculumVersion @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
+  courseId            String
+  course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  courseSpecVersionId String?
+  courseSpecVersion   CourseSpec?                 @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)
+  yearLevel           Int
+  semester            Semester
+  creditsSnapshot     Int
+  courseTypeSnapshot  CourseType
+  sortOrder           Int                        @default(0)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@unique([curriculumVersionId, courseId])
+  @@index([courseId])
+  @@index([courseSpecVersionId])
+  @@index([curriculumVersionId, yearLevel, semester, sortOrder])
+}
+
+/// Append-only workflow/revision history for curriculum versions. Database
+/// triggers reject UPDATE/DELETE so corrections are represented by new actions.
+model ProgrammeCurriculumAuditAction {
+  id                  String                             @id @default(uuid())
+  curriculumVersionId String
+  curriculumVersion   ProgrammeCurriculumVersion         @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
+  actorId             String
+  actor               User                               @relation("ProgrammeCurriculumAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action              ProgrammeCurriculumAuditActionType
+  note                String                             @default("")
+  details             Json?
+  createdAt           DateTime                           @default(now())
+
+  @@index([curriculumVersionId, createdAt])
+  @@index([actorId])
 }
 
 /// Versioned quality-assurance catalogue. Framework content is seeded from the
@@ -284,13 +438,14 @@ model QaRequirement {
   title       String
   order       Int
 
-  evidenceMappings QaEvidenceMapping[]
-  assessments      QaRequirementAssessment[]
-  expectations     QaQualityExpectation[]
-  analyses         QaEvidenceAnalysis[]
-  assignments      QaRequirementAssignment[]
-  sarSections      QaSarSection[]
-  sarSubmissions   QaSarSubmission[]
+  evidenceMappings    QaEvidenceMapping[]
+  assessments         QaRequirementAssessment[]
+  expectations        QaQualityExpectation[]
+  analyses            QaEvidenceAnalysis[]
+  assignments         QaRequirementAssignment[]
+  sarSections         QaSarSection[]
+  sarSubmissions      QaSarSubmission[]
+  evaluationScenarios QaEvaluationScenario[]
 
   @@unique([criterionId, code])
   @@unique([criterionId, order])
@@ -310,9 +465,10 @@ model QaQualityExpectation {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now())
 
-  expectedEvidence QaExpectedEvidence[]
-  analyses         QaEvidenceAnalysis[]
-  evidenceMappings QaEvidenceMapping[]
+  expectedEvidence    QaExpectedEvidence[]
+  analyses            QaEvidenceAnalysis[]
+  evidenceMappings    QaEvidenceMapping[]
+  evaluationScenarios QaEvaluationScenario[]
 
   @@unique([requirementId, order])
   @@index([requirementId, active])
@@ -682,6 +838,102 @@ model QaDocumentChunk {
   @@index([embeddingModel])
 }
 
+/// Controlled/synthetic research scenario. Intentionally has no Programme FK so
+/// evaluation data remains isolated from operational institutional QA records.
+model QaEvaluationScenario {
+  id              String                     @id @default(uuid())
+  requirementId   String
+  requirement     QaRequirement              @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  expectationId   String
+  expectation     QaQualityExpectation       @relation(fields: [expectationId], references: [id], onDelete: Restrict)
+  name            String
+  description     String
+  goldState       QaEvidenceAnalysisState?
+  goldReviewerId  String?
+  goldReviewer    User?                      @relation("QaEvaluationGoldReviewer", fields: [goldReviewerId], references: [id], onDelete: SetNull)
+  goldAnnotatedAt DateTime?
+  goldNote        String                     @default("")
+  evidence        QaEvaluationScenarioEvidence[]
+  runs            QaEvaluationRun[]
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([requirementId])
+  @@index([expectationId])
+  @@index([goldState])
+}
+
+model QaEvaluationScenarioEvidence {
+  id            String               @id @default(uuid())
+  scenarioId    String
+  scenario      QaEvaluationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  order         Int
+  evidenceType  String               @default("")
+  sourceDomain  String
+  entityType    String
+  label         String
+  text          String
+  referenceKey  String               @default("")
+  reportingDate DateTime?
+  attributes    Json                 @default("{}")
+  goldRelevant  Boolean?
+  runLinks      QaEvaluationRunEvidence[]
+
+  @@unique([scenarioId, order])
+  @@index([scenarioId, goldRelevant])
+  @@index([scenarioId, evidenceType])
+}
+
+/// Immutable prototype output for one controlled scenario. Gold labels are read
+/// from the separate human annotation fields and are never generated here.
+model QaEvaluationRun {
+  id             String                     @id @default(uuid())
+  scenarioId     String
+  scenario       QaEvaluationScenario       @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  predictedState QaEvidenceAnalysisState
+  engine         String
+  engineVersion  String
+  promptVersion  String                     @default("")
+  explanation    String
+  createdAt      DateTime                   @default(now())
+  retrieved      QaEvaluationRunEvidence[]
+  humanRatings   QaEvaluationHumanRating[]
+
+  @@index([scenarioId, createdAt])
+  @@index([engine, engineVersion, promptVersion])
+}
+
+model QaEvaluationRunEvidence {
+  runId              String
+  run                QaEvaluationRun              @relation(fields: [runId], references: [id], onDelete: Cascade)
+  scenarioEvidenceId String
+  scenarioEvidence   QaEvaluationScenarioEvidence @relation(fields: [scenarioEvidenceId], references: [id], onDelete: Cascade)
+  relevance          Float?
+
+  @@id([runId, scenarioEvidenceId])
+  @@index([scenarioEvidenceId])
+}
+
+/// Human assessment of evidence relevance and explanation usefulness for one
+/// exact prototype run. One reviewer contributes at most one immutable rating.
+model QaEvaluationHumanRating {
+  id                 String          @id @default(uuid())
+  runId              String
+  run                QaEvaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  reviewerId         String
+  reviewer           User            @relation("QaEvaluationHumanReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  evidenceRelevance  Int
+  explanationClarity Int
+  understandability  Int
+  usefulness         Int
+  traceability       Int
+  comment            String          @default("")
+  createdAt          DateTime        @default(now())
+
+  @@unique([runId, reviewerId])
+  @@index([reviewerId])
+}
+
 model Permission {
   id          String   @id @default(uuid())
   slug        String   @unique
@@ -751,7 +1003,9 @@ model Student {
   userId    String?       @unique
   user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  enrollments Enrollment[]
+  enrollments                    Enrollment[]
+  classResponsibilityAssignments ClassResponsibilityAssignment[]
+  classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
 
   @@index([status])
 }
@@ -868,8 +1122,9 @@ model Course {
   programme     Programme   @relation(fields: [programmeId], references: [id], onDelete: Restrict)
   createdAt     DateTime    @default(now())
 
-  offerings Offering[]
-  specs     CourseSpec[]
+  offerings            Offering[]
+  specs                CourseSpec[]
+  curriculumPlacements ProgrammeCurriculumCourse[]
 
   @@index([lecturerId])
   @@index([programmeId])
@@ -915,6 +1170,7 @@ model CourseSpec {
   submissionNote          String                            @default("")
   submittedBy             User?                             @relation("CourseSpecSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewActions           CourseSpecReviewAction[]
+  curriculumPlacements    ProgrammeCurriculumCourse[]       @relation("ProgrammeCurriculumCourseSpecVersion")
 
   approvedAt      DateTime?
   effectiveFrom   DateTime?
@@ -1157,11 +1413,32 @@ model CourseSpecAssessmentItem {
   instructions        String               @default("")
   rubricId            String?
   rubric              Rubric?              @relation(fields: [rubricId], references: [id], onDelete: SetNull)
+  criterionCloMappings CourseSpecCriterionCloMapping[]
   mappedPlos          String[]             @default([])
   notes               String               @default("")
 
   @@id([courseSpecId, id])
   @@index([rubricId])
+}
+
+/// Issue #282: explicit rubric-criterion -> CLO evidence mapping scoped to one exact
+/// CourseSpec assessment. Criterion/rubric identity is snapshotted rather than
+/// FK'd to the mutable rubric library so historical approved-spec evidence cannot
+/// disappear or be reinterpreted by a later rubric edit.
+model CourseSpecCriterionCloMapping {
+  courseSpecId       String
+  assessmentItemId  String
+  assessmentItem     CourseSpecAssessmentItem @relation(fields: [courseSpecId, assessmentItemId], references: [courseSpecId, id], onDelete: Cascade)
+  rubricId           String
+  criterionId        String
+  criterionName      String
+  rubricContentHash  String
+  cloCode            String
+  createdAt          DateTime                 @default(now())
+
+  @@id([courseSpecId, assessmentItemId, rubricId, criterionId, cloCode])
+  @@index([courseSpecId, assessmentItemId, cloCode])
+  @@index([rubricId, criterionId])
 }
 
 /// Issue #103: normalized CLO Alignment Mapping cells (previously the `mapping`
@@ -1266,12 +1543,14 @@ model Offering {
   otherLecturers String?
   createdAt      DateTime       @default(now())
 
-  enrollments         Enrollment[]
-  coLecturers         OfferingCoLecturer[]
-  meetings            OfferingMeeting[]
-  assessmentDeadlines OfferingAssessmentDeadline[]
-  announcements       CourseAnnouncement[]
-  feedbackResponses   CourseFeedback[]
+  enrollments                    Enrollment[]
+  coLecturers                    OfferingCoLecturer[]
+  meetings                       OfferingMeeting[]
+  assessmentDeadlines            OfferingAssessmentDeadline[]
+  announcements                  CourseAnnouncement[]
+  feedbackResponses              CourseFeedback[]
+  classResponsibilityAssignments ClassResponsibilityAssignment[]
+  classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
 
   @@unique([courseId, term, sectionCode])
   @@index([status])
@@ -1324,6 +1603,61 @@ model Enrollment {
   @@index([studentId])
 }
 
+/// Offering-scoped Class Monitor/Sub-class Monitor responsibility. Runtime
+/// authorization is revalidated from Student + Enrollment + this active row.
+model ClassResponsibilityAssignment {
+  id           String                  @id @default(uuid())
+  offeringId   String
+  studentId    String
+  role         ClassResponsibilityRole
+  assignedById String
+  assignedAt   DateTime                @default(now())
+  revokedById  String?
+  revokedAt    DateTime?
+  revokeReason String                  @default("")
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @default(now()) @updatedAt
+
+  offering    Offering                       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student     Student                        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  assignedBy  User                           @relation("ClassResponsibilityAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+  revokedBy   User?                          @relation("ClassResponsibilityRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  auditEvents ClassResponsibilityAuditEvent[]
+
+  @@index([offeringId])
+  @@index([studentId, offeringId])
+  @@index([offeringId, role])
+  @@index([offeringId, revokedAt])
+  @@index([assignedById])
+  @@index([revokedById])
+}
+
+/// Append-only lifecycle evidence for class-responsibility assignment,
+/// reassignment and revocation.
+model ClassResponsibilityAuditEvent {
+  id           String                          @id @default(uuid())
+  assignmentId String?
+  offeringId   String
+  studentId    String
+  actorId      String
+  action       ClassResponsibilityAuditAction
+  previousRole ClassResponsibilityRole?
+  newRole      ClassResponsibilityRole?
+  reason       String                          @default("")
+  details      Json?
+  createdAt    DateTime                        @default(now())
+
+  assignment ClassResponsibilityAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  offering   Offering                       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student    Student                        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  actor      User                           @relation("ClassResponsibilityAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([offeringId, createdAt])
+  @@index([studentId])
+  @@index([actorId])
+  @@index([assignmentId])
+}
+
 /// An exact, section-specific deadline that overrides the course specification's
 /// week-level due date. Assessment ids remain stable inside one CourseSpec.
 model OfferingAssessmentDeadline {
@@ -1352,11 +1686,65 @@ model AssessmentResult {
   maxScore         Float
   feedback         String     @default("")
   publishedAt      DateTime?
+  publishedById    String?
+  publishedBy      User?      @relation("AssessmentResultPublishedBy", fields: [publishedById], references: [id], onDelete: Restrict)
+  finalizedAt      DateTime?
+  finalizedById    String?
+  finalizedBy      User?      @relation("AssessmentResultFinalizedBy", fields: [finalizedById], references: [id], onDelete: Restrict)
+  criterionScores  AssessmentCriterionScore[]
+  corrections      AssessmentResultCorrection[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
   @@unique([enrollmentId, courseSpecId, assessmentItemId])
   @@index([enrollmentId, publishedAt])
+  @@index([publishedById])
+  @@index([finalizedAt])
+  @@index([finalizedById])
+}
+
+/// Append-only, reasoned history for controlled changes to an official finalized result.
+/// Database triggers reject UPDATE/DELETE so every correction remains auditable.
+model AssessmentResultCorrection {
+  id                 String           @id @default(uuid())
+  assessmentResultId String
+  assessmentResult   AssessmentResult @relation(fields: [assessmentResultId], references: [id], onDelete: Restrict)
+  beforeScore        Float
+  beforeMaxScore     Float
+  beforeFeedback     String
+  afterScore         Float
+  afterMaxScore      Float
+  afterFeedback      String
+  reason             String
+  correctedById      String
+  correctedBy        User             @relation("AssessmentResultCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
+  createdAt          DateTime         @default(now())
+
+  @@index([assessmentResultId, createdAt])
+  @@index([correctedById])
+}
+
+/// Issue #282: per-student rubric criterion score evidence. Whole-assessment
+/// AssessmentResult remains authoritative for local course grading; these rows
+/// are independent criterion-level evidence and snapshot the rubric context used.
+model AssessmentCriterionScore {
+  id                 String           @id @default(uuid())
+  assessmentResultId String
+  assessmentResult   AssessmentResult @relation(fields: [assessmentResultId], references: [id], onDelete: Cascade)
+  rubricId           String
+  criterionId        String
+  criterionName      String
+  rubricContentHash  String
+  score              Float
+  maxScore           Float
+  rubricLevelId      String?
+  rubricLevelLabel   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([assessmentResultId, rubricId, criterionId])
+  @@index([assessmentResultId])
+  @@index([rubricId, criterionId])
 }
 
 /// Section-level notices. Draft notices have a null `publishedAt` and never
@@ -1436,11 +1824,11 @@ model ActiveLearningCluster {
 /// Programme-managed active-learning vocabulary. `id` is the stable slug already
 /// stored by CourseSpecTeachingLearning and CourseSpecClo, so existing specs need no rewrite.
 model ActiveLearningStrategy {
-  id        String                @id
+  id        String                 @id
   name      String
   clusterId String
   cluster   ActiveLearningCluster @relation(fields: [clusterId], references: [id], onDelete: Restrict)
-  sortOrder Int                   @default(0)
+  sortOrder Int                    @default(0)
   active    Boolean               @default(true)
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt

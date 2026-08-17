@@ -1,26 +1,36 @@
 import { Router } from "express";
 import {
+  CorrectFinalizedAssessmentResultInput,
   CourseFeedbackInput,
+  FinalizeAssessmentResultsInput,
   PublishAnnouncementInput,
   PublishAssessmentResultsInput,
+  SaveAssessmentCriterionScoresInput,
   SaveAssessmentResultInput,
   SetAssessmentDeadlineInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import { registry } from "../../core/plugins/registry.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
-import {
-  applyProvisionalResultAccessPolicy,
-  getOfferingResultAccessPolicy,
-  setOfferingResultAccessPolicy,
-} from "./result-access-policy.ts";
 import {
   PortalAccessError,
   PortalConflictError,
   PortalNotFoundError,
   studentPortalService,
 } from "./service.ts";
+
+interface TelegramNotificationsContract {
+  notifications: {
+    deliverAnnouncement(input: {
+      announcementId: string;
+      offeringId: string;
+      title: string;
+      body: string;
+    }): Promise<void>;
+  };
+}
 
 function programmeWide(roles: Role[]): boolean {
   return roles.some((role) => PROGRAMME_WIDE_ROLES.includes(role));
@@ -45,11 +55,7 @@ export function createStudentPortalRouter(): Router {
     try { res.json(await studentPortalService.courses(req.user!.id)); } catch (error) { handleError(error, res); }
   });
   router.get("/courses/:offeringId", requirePermission("student-portal:read"), async (req, res) => {
-    try {
-      const offeringId = req.params.offeringId!;
-      const detail = await studentPortalService.course(req.user!.id, offeringId);
-      res.json(await applyProvisionalResultAccessPolicy(offeringId, detail));
-    } catch (error) { handleError(error, res); }
+    try { res.json(await studentPortalService.course(req.user!.id, req.params.offeringId!)); } catch (error) { handleError(error, res); }
   });
   router.get("/announcements", requirePermission("student-portal:read"), async (req, res) => {
     try { res.json(await studentPortalService.announcements(req.user!.id)); } catch (error) { handleError(error, res); }
@@ -63,36 +69,67 @@ export function createStudentPortalRouter(): Router {
   router.get("/manage/offerings", requirePermission("courses:write"), async (req, res) => {
     try { res.json(await studentPortalService.deliveryOfferings(req.user!.id, programmeWide(req.user!.roles))); } catch (error) { handleError(error, res); }
   });
-  router.get("/manage/offerings/:offeringId/result-access", requirePermission("courses:write"), async (req, res) => {
-    try { res.json(await getOfferingResultAccessPolicy(req.params.offeringId!)); } catch (error) { handleError(error, res); }
-  });
-  router.put("/manage/offerings/:offeringId/result-access", requirePermission("courses:write"), async (req, res) => {
-    if (typeof req.body?.requireSurveyBeforeResults !== "boolean") {
-      return void res.status(400).json({ error: "requireSurveyBeforeResults must be a boolean" });
-    }
-    try {
-      res.json(await setOfferingResultAccessPolicy(
-        req.params.offeringId!,
-        req.user!.id,
-        programmeWide(req.user!.roles),
-        req.body.requireSurveyBeforeResults,
-      ));
-    } catch (error) { handleError(error, res); }
+  router.get("/manage/results/review/:offeringId", requirePermission("courses:write"), async (req, res) => {
+    try { res.json(await resultsLifecycleService.review(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!)); } catch (error) { handleError(error, res); }
   });
   router.post("/manage/announcements", requirePermission("courses:write"), async (req, res) => {
     const parsed = PublishAnnouncementInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid announcement", details: parsed.error.flatten() });
-    try { res.status(201).json(await studentPortalService.publishAnnouncement(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
+    try {
+      const announcement = await studentPortalService.publishAnnouncement(
+        req.user!.id,
+        programmeWide(req.user!.roles),
+        parsed.data,
+      );
+      res.status(201).json(announcement);
+      if (registry.has("telegram")) {
+        const telegram = registry.get<TelegramNotificationsContract>("telegram").service;
+        void telegram.notifications.deliverAnnouncement({
+          announcementId: announcement.id,
+          offeringId: parsed.data.offeringId,
+          title: parsed.data.title,
+          body: parsed.data.body,
+        }).catch((error) => console.error("Telegram announcement delivery failed", error));
+      }
+    } catch (error) { handleError(error, res); }
   });
   router.put("/manage/results", requirePermission("courses:write"), async (req, res) => {
     const parsed = SaveAssessmentResultInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid result", details: parsed.error.flatten() });
     try { res.json(await resultsLifecycleService.saveDraft(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
   });
+  router.put("/manage/results/criteria", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SaveAssessmentCriterionScoresInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid criterion scores", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await resultsLifecycleService.saveCriterionScores(req.user!.id, programmeWide(req.user!.roles), parsed.data));
+    } catch (error) { handleError(error, res); }
+  });
   router.post("/manage/results/publish", requirePermission("courses:write"), async (req, res) => {
     const parsed = PublishAssessmentResultsInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid publication request", details: parsed.error.flatten() });
     try { res.json(await resultsLifecycleService.publishAssessment(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.post("/manage/results/finalize", requirePermission("courses:write"), async (req, res) => {
+    const parsed = FinalizeAssessmentResultsInput.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid finalization request", details: parsed.error.flatten() });
+    try { res.json(await resultsLifecycleService.finalizeAssessment(req.user!.id, programmeWide(req.user!.roles), parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.post("/manage/results/correct", requirePermission("courses:write"), async (req, res) => {
+    const parsed = CorrectFinalizedAssessmentResultInput.safeParse(req.body);
+    if (!parsed.success) {
+      return void res.status(400).json({ error: "Invalid correction request", details: parsed.error.flatten() });
+    }
+    try {
+      res.json(await resultsLifecycleService.correctFinalized(
+        req.user!.id,
+        programmeWide(req.user!.roles),
+        parsed.data,
+      ));
+    } catch (error) { handleError(error, res); }
   });
   router.put("/manage/deadlines", requirePermission("courses:write"), async (req, res) => {
     const parsed = SetAssessmentDeadlineInput.safeParse(req.body);

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import {
   communityManifest,
+  curriculumWorkspaceManifest,
   navForRole,
   navFromManifests,
   navGroupsForRole,
@@ -36,10 +37,15 @@ import {
 } from "@dse-pms/shared-types";
 
 /**
- * Sidebar nav is generated from the shared plugin manifests. Community of Practice
- * is kept in its own additive manifest while the legacy registry is gradually split.
+ * Sidebar nav is generated from shared feature manifests. Community of Practice
+ * and Programme Curriculum are additive manifests while the legacy registry is
+ * gradually split into feature-owned manifests.
  */
-const frontendManifests = [...pluginManifests, communityManifest];
+const frontendManifests = [
+  ...pluginManifests,
+  curriculumWorkspaceManifest,
+  communityManifest,
+];
 
 export const iconMap: Record<string, LucideIcon> = {
   users: Users,

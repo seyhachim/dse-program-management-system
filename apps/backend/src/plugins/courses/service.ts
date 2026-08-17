@@ -26,6 +26,7 @@ import {
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { assertCourseSpecEditable } from "./spec-lock.ts";
@@ -52,6 +53,40 @@ export function validateAssessmentCloEvidence(
       throw new ReferenceError(
         `Assessment "${item.name}" references ${invalidCode}, which does not belong to this course specification`,
       );
+    }
+  }
+}
+
+export function validateCriterionCloMappings(
+  item: {
+    name: string;
+    rubricId: string | null;
+    cloCodes: string[];
+    criterionCloMappings: Array<{ criterionId: string; cloCodes: string[] }>;
+  },
+  validCloCodes: ReadonlySet<string>,
+  validCriterionIds: ReadonlySet<string>,
+) {
+  if (item.criterionCloMappings.length === 0) return;
+  if (!item.rubricId) {
+    throw new ReferenceError(`Assessment "${item.name}" needs a linked rubric before criterion CLO evidence can be mapped`);
+  }
+  const assessmentCloCodes = new Set(item.cloCodes);
+  const keys = new Set<string>();
+  for (const mapping of item.criterionCloMappings) {
+    if (!validCriterionIds.has(mapping.criterionId)) {
+      throw new ReferenceError(`Assessment "${item.name}" references a rubric criterion that does not belong to its linked rubric`);
+    }
+    for (const cloCode of mapping.cloCodes) {
+      if (!validCloCodes.has(cloCode)) {
+        throw new ReferenceError(`Assessment "${item.name}" criterion evidence references ${cloCode}, which does not belong to this course specification`);
+      }
+      if (!assessmentCloCodes.has(cloCode)) {
+        throw new ReferenceError(`Assessment "${item.name}" criterion evidence references ${cloCode}, which is not mapped at assessment level`);
+      }
+      const key = `${mapping.criterionId}:${cloCode}`;
+      if (keys.has(key)) throw new ReferenceError(`Assessment "${item.name}" contains a duplicate criterion CLO mapping`);
+      keys.add(key);
     }
   }
 }
@@ -656,7 +691,10 @@ const SPEC_INCLUDE = {
     orderBy: { order: "asc" as const },
   },
   weeks: { orderBy: { order: "asc" as const } },
-  assessmentItems: { orderBy: { order: "asc" as const } },
+  assessmentItems: {
+    orderBy: { order: "asc" as const },
+    include: { criterionCloMappings: true },
+  },
   mappingCells: true,
   resources: { orderBy: { order: "asc" as const } },
   reviewActions: {
@@ -755,6 +793,14 @@ function reassembleSpec(spec: SpecRow | null): {
         submissionMethod: item.submissionMethod,
         instructions: item.instructions,
         rubricId: item.rubricId,
+        criterionCloMappings: Object.values(
+          item.criterionCloMappings.reduce<Record<string, { criterionId: string; cloCodes: string[] }>>((acc, mapping) => {
+            const row = acc[mapping.criterionId] ?? { criterionId: mapping.criterionId, cloCodes: [] };
+            row.cloCodes.push(mapping.cloCode);
+            acc[mapping.criterionId] = row;
+            return acc;
+          }, {}),
+        ),
         feedbackMethod: item.feedbackMethod,
         feedbackTimeline: item.feedbackTimeline,
         mappedPlos: item.mappedPlos,
@@ -973,17 +1019,28 @@ async function syncAssessmentPlan(
   validateAssessmentCloEvidence(items, validCloCodes);
 
   const rubricIds = [...new Set(items.flatMap((item) => item.rubricId ? [item.rubricId] : []))];
-  const validRubricIds = rubricIds.length
-    ? new Set(
-        (
-          await tx.rubric.findMany({
-            where: { id: { in: rubricIds } },
-            select: { id: true },
-          })
-        ).map((r) => r.id),
-      )
-    : new Set<string>();
+  const rubrics = rubricIds.length
+    ? await tx.rubric.findMany({
+        where: { id: { in: rubricIds } },
+        select: {
+          id: true,
+          levelRows: { select: { id: true, label: true, points: true, order: true } },
+          criterionRows: { select: { id: true, name: true, order: true } },
+        },
+      })
+    : [];
+  const rubricById = new Map(rubrics.map((rubric) => [rubric.id, rubric]));
+  const validRubricIds = new Set(rubrics.map((rubric) => rubric.id));
+  for (const item of items) {
+    const rubric = item.rubricId ? rubricById.get(item.rubricId) : undefined;
+    validateCriterionCloMappings(
+      item,
+      validCloCodes,
+      new Set(rubric?.criterionRows.map((criterion) => criterion.id) ?? []),
+    );
+  }
 
+  await tx.courseSpecCriterionCloMapping.deleteMany({ where: { courseSpecId } });
   await tx.courseSpecAssessmentItem.deleteMany({ where: { courseSpecId } });
   await tx.courseSpecAssessmentItem.createMany({
     data: items.map((item, order) => ({
@@ -1016,6 +1073,30 @@ async function syncAssessmentPlan(
       notes: item.notes,
     })),
   });
+
+  const mappingRows = items.flatMap((item) => {
+    if (!item.rubricId) return [];
+    const rubric = rubricById.get(item.rubricId);
+    if (!rubric) return [];
+    const criterionById = new Map(rubric.criterionRows.map((criterion) => [criterion.id, criterion]));
+    const contentHash = rubricContentHash(rubric);
+    return item.criterionCloMappings.flatMap((mapping) => {
+      const criterion = criterionById.get(mapping.criterionId);
+      if (!criterion) return [];
+      return mapping.cloCodes.map((cloCode) => ({
+        courseSpecId,
+        assessmentItemId: item.id,
+        rubricId: item.rubricId!,
+        criterionId: mapping.criterionId,
+        criterionName: criterion.name,
+        rubricContentHash: contentHash,
+        cloCode,
+      }));
+    });
+  });
+  if (mappingRows.length > 0) {
+    await tx.courseSpecCriterionCloMapping.createMany({ data: mappingRows });
+  }
 }
 
 /**

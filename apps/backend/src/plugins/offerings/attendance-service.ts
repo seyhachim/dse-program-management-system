@@ -158,31 +158,63 @@ export const attendanceService = {
   get: getAttendance,
 
   async save(offeringId: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
-    const enrollments = await roster(offeringId);
-    const currentStudentIds = new Set(enrollments.map((row) => row.studentId));
-    for (const record of input.records) {
-      if (!currentStudentIds.has(record.studentId)) {
-        throw new ReferenceError("Attendance can only be recorded for students enrolled in this class section");
-      }
-    }
-
-    const studentRows = await students().findByIds(input.records.map((record) => record.studentId));
+    // Current roster rows use the canonical Students service identity. Historical-only
+    // rows deliberately do not depend on the current Student record; their exact saved
+    // identity snapshot is resolved inside the transaction below.
+    const requestedStudentIds = [...new Set(input.records.map((record) => record.studentId))];
+    const studentRows = await students().findByIds(requestedStudentIds);
     const studentById = new Map(studentRows.map((student) => [student.id, student]));
-    if (studentRows.length !== input.records.length) {
-      throw new ReferenceError("One or more attendance students no longer exist");
-    }
 
     await prisma.$transaction(async (tx) => {
+      // Lock current Enrollment rows for the duration of replacement so a concurrent
+      // unenrollment cannot invalidate roster eligibility after validation succeeds.
+      const enrollments = await tx.$queryRaw<EnrollmentRow[]>`
+        SELECT "studentId"
+        FROM "Enrollment"
+        WHERE "offeringId" = ${offeringId}
+        FOR SHARE
+      `;
+      const currentStudentIds = new Set(enrollments.map((row) => row.studentId));
+
+      // Lock the exact historical session while correcting it. Eligibility for a
+      // historical-only student is scoped to records already stored in this session,
+      // never to another date or another offering.
       const existing = await tx.$queryRaw<SessionRow[]>`
         SELECT "id", "offeringId", "sessionDate", "updatedAt"
         FROM "pms_attendance"."AttendanceSession"
         WHERE "offeringId" = ${offeringId}
           AND "sessionDate" = ${dateValue(date)}
         LIMIT 1
+        FOR UPDATE
       `;
-      const sessionId = existing[0]?.id ?? crypto.randomUUID();
+      const existingSession = existing[0] ?? null;
+      const historicalRows = existingSession
+        ? await tx.$queryRaw<RecordRow[]>`
+            SELECT "studentId", "studentNumber", "studentName", "status", "note"
+            FROM "pms_attendance"."AttendanceRecord"
+            WHERE "sessionId" = ${existingSession.id}
+          `
+        : [];
+      const historicalByStudent = new Map(historicalRows.map((record) => [record.studentId, record]));
 
-      if (existing.length === 0) {
+      // Validate the complete replacement before mutating anything. New registers stay
+      // current-roster-only; existing registers additionally accept only students that
+      // already belong to this exact saved session.
+      for (const record of input.records) {
+        const isCurrent = currentStudentIds.has(record.studentId);
+        const historical = historicalByStudent.get(record.studentId);
+        if (!isCurrent && !historical) {
+          throw new ReferenceError(
+            "Attendance can only be recorded for current students or students already present in this saved register",
+          );
+        }
+        if (isCurrent && !studentById.has(record.studentId)) {
+          throw new ReferenceError("One or more attendance students no longer exist");
+        }
+      }
+
+      const sessionId = existingSession?.id ?? crypto.randomUUID();
+      if (!existingSession) {
         await tx.$executeRaw`
           INSERT INTO "pms_attendance"."AttendanceSession" ("id", "offeringId", "sessionDate")
           VALUES (${sessionId}, ${offeringId}, ${dateValue(date)})
@@ -201,12 +233,18 @@ export const attendanceService = {
       `;
 
       for (const record of input.records) {
-        const student = studentById.get(record.studentId)!;
+        const currentStudent = currentStudentIds.has(record.studentId)
+          ? studentById.get(record.studentId)
+          : null;
+        const historical = historicalByStudent.get(record.studentId);
+        const studentNumber = currentStudent?.studentId ?? historical!.studentNumber;
+        const studentName = currentStudent?.name ?? historical!.studentName;
+
         await tx.$executeRaw`
           INSERT INTO "pms_attendance"."AttendanceRecord"
             ("sessionId", "studentId", "studentNumber", "studentName", "status", "note")
           VALUES
-            (${sessionId}, ${record.studentId}, ${student.studentId}, ${student.name}, ${record.status}, ${record.note})
+            (${sessionId}, ${record.studentId}, ${studentNumber}, ${studentName}, ${record.status}, ${record.note})
         `;
       }
     });
