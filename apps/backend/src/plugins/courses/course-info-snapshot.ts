@@ -1,10 +1,8 @@
 import {
   PROGRAMME_TITLE,
   type CourseInfoSection,
-  type LecturersServiceContract,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
-import { registry } from "../../core/plugins/registry.ts";
 
 type CourseSnapshotSource = {
   id: string;
@@ -18,21 +16,40 @@ type CourseSnapshotSource = {
   lecturerId: string | null;
 };
 
-function lecturers(): LecturersServiceContract {
-  return registry.get<LecturersServiceContract>("lecturers").service;
-}
-
-/** Capture current administrative values once for one academic CourseSpec version. */
+/**
+ * Capture current administrative values once for one academic CourseSpec version.
+ *
+ * Lecturer profile fields live on the core User row referenced directly by Course,
+ * so snapshotting them does not require the Lecturers plugin registry to be booted.
+ * This keeps revision/domain services usable in DB jobs while avoiding a direct
+ * cross-plugin import.
+ */
 export async function buildCourseInfoSnapshot(
   course: CourseSnapshotSource,
 ): Promise<CourseInfoSection> {
-  const lecturer = course.lecturerId
-    ? await lecturers().getById(course.lecturerId)
-    : null;
-  const offering = await prisma.offering.findFirst({
-    where: { courseId: course.id },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-  });
+  const [lecturer, offering] = await Promise.all([
+    course.lecturerId
+      ? prisma.user.findUnique({
+          where: { id: course.lecturerId },
+          select: {
+            name: true,
+            title: true,
+            qualification: true,
+            email: true,
+            phone: true,
+          },
+        })
+      : Promise.resolve(null),
+    prisma.offering.findFirst({
+      where: { courseId: course.id },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: {
+        otherLecturers: true,
+        semester: true,
+        programmeYear: true,
+      },
+    }),
+  ]);
 
   return {
     programmeTitle: PROGRAMME_TITLE,
