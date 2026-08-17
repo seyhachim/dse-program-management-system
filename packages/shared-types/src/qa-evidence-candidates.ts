@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { QaEvidenceSourceDomainSchema } from "./qa-knowledge.ts";
+import type { QaEvidenceProvenance, QaEvidenceScope } from "./qa-evidence-semantics.ts";
 
 export const QaEvidenceRetrievalStatusSchema = z.enum(["supported", "unsupported"]);
 export type QaEvidenceRetrievalStatus = z.infer<typeof QaEvidenceRetrievalStatusSchema>;
@@ -16,6 +17,12 @@ export interface QaEvidenceCandidateView {
   entityId: string;
   route: string | null;
   reportingDate: string | null;
+  /** Normalized machine-readable scope. Optional while legacy adapters migrate. */
+  scope?: QaEvidenceScope;
+  /** Source authority/provenance is distinct from the evidence source domain. */
+  provenance?: QaEvidenceProvenance;
+  /** Comparable reporting period key, e.g. academic year/cohort period. */
+  periodKey?: string | null;
   attributes: Record<string, QaEvidenceAttributeValue>;
 }
 
