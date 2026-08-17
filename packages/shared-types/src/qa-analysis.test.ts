@@ -42,7 +42,14 @@ test("QA analysis supports exactly the three research-defined evidence states", 
 });
 
 test("QA analysis validates confidence, relevance, and source provenance", () => {
-  expect(CreateQaEvidenceAnalysisSchema.safeParse(baseInput).success).toBe(true);
+  const parsed = CreateQaEvidenceAnalysisSchema.safeParse(baseInput);
+  expect(parsed.success).toBe(true);
+  if (parsed.success) {
+    expect(parsed.data.applicability).toBe("applicable");
+    expect(parsed.data.sources[0]?.scopeMatch).toBe("unknown");
+    expect(parsed.data.sources[0]?.temporalMatch).toBe("unknown");
+    expect(parsed.data.sources[0]?.provenance.authority).toBe("unknown");
+  }
   expect(
     CreateQaEvidenceAnalysisSchema.safeParse({ ...baseInput, confidence: 1.1 }).success,
   ).toBe(false);
@@ -50,6 +57,41 @@ test("QA analysis validates confidence, relevance, and source provenance", () =>
     CreateQaEvidenceAnalysisSchema.safeParse({
       ...baseInput,
       sources: [{ ...baseInput.sources[0], relevance: -0.1 }],
+    }).success,
+  ).toBe(false);
+});
+
+test("not-applicable and uncertain expectations bypass evidence coverage classification", () => {
+  expect(
+    CreateQaEvidenceAnalysisSchema.safeParse({
+      ...baseInput,
+      applicability: "notApplicable",
+      applicabilityReason: "Cohort has not reached the maturity threshold.",
+      state: null,
+      sources: [],
+    }).success,
+  ).toBe(true);
+  expect(
+    CreateQaEvidenceAnalysisSchema.safeParse({
+      ...baseInput,
+      applicability: "uncertain",
+      applicabilityReason: "Cohort start date is unavailable.",
+      state: null,
+      sources: [],
+    }).success,
+  ).toBe(true);
+  expect(
+    CreateQaEvidenceAnalysisSchema.safeParse({
+      ...baseInput,
+      applicability: "notApplicable",
+      state: "potentialEvidenceGap",
+    }).success,
+  ).toBe(false);
+  expect(
+    CreateQaEvidenceAnalysisSchema.safeParse({
+      ...baseInput,
+      applicability: "applicable",
+      state: null,
     }).success,
   ).toBe(false);
 });

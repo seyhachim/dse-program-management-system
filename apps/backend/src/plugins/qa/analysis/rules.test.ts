@@ -21,6 +21,9 @@ function definition(
     role,
     sourceDomain: "courseSpec",
     order: 1,
+    scopeRequirement: { requiredDimensions: [] },
+    temporalRule: { kind: "withinCycle" },
+    authorityRequirement: { minimumAuthority: "unknown" },
   };
 }
 

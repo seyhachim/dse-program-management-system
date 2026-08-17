@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { QaEvidenceSourceDomainSchema } from "./qa-knowledge.ts";
+import type { QaEvidenceProvenance, QaEvidenceScope } from "./qa-evidence-semantics.ts";
 
 export const QaEvidenceRetrievalStatusSchema = z.enum(["supported", "unsupported"]);
 export type QaEvidenceRetrievalStatus = z.infer<typeof QaEvidenceRetrievalStatusSchema>;
@@ -16,6 +17,12 @@ export interface QaEvidenceCandidateView {
   entityId: string;
   route: string | null;
   reportingDate: string | null;
+  /** Normalized machine-readable scope. Optional while legacy adapters migrate. */
+  scope?: QaEvidenceScope;
+  /** Source authority/provenance is distinct from the evidence source domain. */
+  provenance?: QaEvidenceProvenance;
+  /** Comparable reporting period key, e.g. academic year/cohort period. */
+  periodKey?: string | null;
   attributes: Record<string, QaEvidenceAttributeValue>;
 }
 
@@ -26,6 +33,13 @@ export interface QaEvidenceCandidateResultView {
   sourceDomain: z.infer<typeof QaEvidenceSourceDomainSchema>;
   status: QaEvidenceRetrievalStatus;
   reason: string;
+  /**
+   * Concrete target scope when the caller is evaluating one known course,
+   * course-spec version, offering, cohort, assessment, term, or population.
+   * Programme-wide retrievals may omit it; required dimensions are then checked
+   * for presence without inventing a target value.
+   */
+  expectedScope?: QaEvidenceScope;
   candidates: QaEvidenceCandidateView[];
 }
 

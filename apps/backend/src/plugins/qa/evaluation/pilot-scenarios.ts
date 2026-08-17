@@ -4,6 +4,7 @@ import {
   type QaEvaluationScenarioEvidenceInputSchema,
   type QaPilotInitializeResult,
   type QaQualityExpectationView,
+  type QaSourceAuthority,
 } from "@dse-pms/shared-types";
 import type { z } from "zod";
 import { prisma } from "../../../core/db/prisma.ts";
@@ -12,6 +13,7 @@ import { createQaEvaluationScenario } from "./service.ts";
 
 type EvidenceInput = z.infer<typeof QaEvaluationScenarioEvidenceInputSchema>;
 type PrimitiveAttributes = Record<string, string | number | boolean | null>;
+type EvidenceDefinition = QaQualityExpectationView["expectedEvidence"][number];
 type ChallengeMode = "omit" | "incomplete" | "stale" | "ambiguous" | "conflicting" | "partialCoverage";
 
 interface Challenge {
@@ -74,67 +76,71 @@ const completeText: Record<string, string> = {
 
 function completeAttributes(evidenceType: string): PrimitiveAttributes {
   switch (evidenceType) {
-    case "educational-philosophy":
-      return { items: 1 };
+    case "educational-philosophy": return { items: 1 };
     case "clo-plo-mappings":
-    case "course-clo-plo-coverage":
-      return { activeClos: 4, mappedClos: 4 };
-    case "clo-teaching-alignment":
-      return { activeClos: 4, supportedClos: 4 };
+    case "course-clo-plo-coverage": return { activeClos: 4, mappedClos: 4 };
+    case "clo-teaching-alignment": return { activeClos: 4, supportedClos: 4 };
     case "clo-assessment-alignment":
-    case "clo-assessment-methods":
-      return { assessmentMethodCount: 2 };
-    case "weekly-alignment":
-      return { cloCount: 2, teachingMethodCount: 2 };
-    case "course-teaching-philosophy":
-      return { teachingMethodCount: 3, philosophyTags: "learner-centred,active-learning" };
-    case "active-learning-strategies":
-      return { activeLearningCount: 2 };
-    case "weekly-student-activities":
-      return { activityCount: 2, studentLearningActivities: '["case analysis","group problem solving"]' };
-    case "assessment-plan":
-      return { cloCount: 2, weight: 30 };
-    case "feedback-plan":
-      return { feedbackMethod: "Written comments and consultation", feedbackTimeline: "Within 7 days" };
-    case "published-feedback":
-      return { feedbackCount: 12 };
+    case "clo-assessment-methods": return { assessmentMethodCount: 2 };
+    case "weekly-alignment": return { cloCount: 2, teachingMethodCount: 2 };
+    case "course-teaching-philosophy": return { teachingMethodCount: 3, philosophyTags: "learner-centred,active-learning" };
+    case "active-learning-strategies": return { activeLearningCount: 2 };
+    case "weekly-student-activities": return { activityCount: 2, studentLearningActivities: '["case analysis","group problem solving"]' };
+    case "assessment-plan": return { cloCount: 2, weight: 30 };
+    case "feedback-plan": return { feedbackMethod: "Written comments and consultation", feedbackTimeline: "Within 7 days" };
+    case "published-feedback": return { feedbackCount: 12 };
     case "lecturer-assignments":
-    case "teaching-assignments":
-      return { primaryLecturer: "Dr Pilot Lecturer" };
-    case "staff-profile":
-      return { qualification: "PhD in Data Science" };
-    default:
-      return {};
+    case "teaching-assignments": return { primaryLecturer: "Dr Pilot Lecturer" };
+    case "staff-profile": return { qualification: "PhD in Data Science" };
+    default: return {};
   }
 }
 
 function incompleteAttributes(evidenceType: string): PrimitiveAttributes {
   switch (evidenceType) {
     case "clo-plo-mappings":
-    case "course-clo-plo-coverage":
-      return { activeClos: 4, mappedClos: 3 };
-    case "clo-teaching-alignment":
-      return { activeClos: 4, supportedClos: 3 };
+    case "course-clo-plo-coverage": return { activeClos: 4, mappedClos: 3 };
+    case "clo-teaching-alignment": return { activeClos: 4, supportedClos: 3 };
     case "clo-assessment-alignment":
-    case "clo-assessment-methods":
-      return { assessmentMethodCount: 0 };
-    case "active-learning-strategies":
-      return { activeLearningCount: 0 };
-    case "assessment-plan":
-      return { cloCount: 2, weight: 0 };
-    case "feedback-plan":
-      return { feedbackMethod: "Written comments", feedbackTimeline: "" };
+    case "clo-assessment-methods": return { assessmentMethodCount: 0 };
+    case "active-learning-strategies": return { activeLearningCount: 0 };
+    case "assessment-plan": return { cloCount: 2, weight: 0 };
+    case "feedback-plan": return { feedbackMethod: "Written comments", feedbackTimeline: "" };
     case "lecturer-assignments":
-    case "teaching-assignments":
-      return { primaryLecturer: "" };
-    case "staff-profile":
-      return { qualification: "" };
-    default:
-      return { complete: false };
+    case "teaching-assignments": return { primaryLecturer: "" };
+    case "staff-profile": return { qualification: "" };
+    default: return { complete: false };
   }
 }
 
-function evidenceCount(
+function requiredScope(definition: EvidenceDefinition): EvidenceInput["scope"] {
+  const scope: EvidenceInput["scope"] = {};
+  for (const dimension of definition.scopeRequirement.requiredDimensions) {
+    switch (dimension) {
+      case "programme": scope.programmeId = "controlled-evaluation"; break;
+      case "academicYear": scope.academicYear = "2025-2026"; break;
+      case "term": scope.term = "2026-S1"; break;
+      case "course": scope.courseId = "controlled-course-1"; break;
+      case "courseSpecVersion": scope.courseSpecVersionId = "controlled-spec-v2"; break;
+      case "offering": scope.offeringId = "controlled-offering-1"; break;
+      case "cohort": scope.cohortId = "controlled-cohort-2024"; break;
+      case "assessment": scope.assessmentId = "controlled-assessment-1"; break;
+      case "population": scope.population = "enrolled-students"; break;
+    }
+  }
+  if (!scope.programmeId) scope.programmeId = "controlled-evaluation";
+  return scope;
+}
+
+function fixtureAuthority(definition: EvidenceDefinition): QaSourceAuthority {
+  if (definition.authorityRequirement.acceptableAuthorities?.length) {
+    return definition.authorityRequirement.acceptableAuthorities[0]!;
+  }
+  const minimum = definition.authorityRequirement.minimumAuthority;
+  return minimum === "unknown" ? "controlledInternalRecord" : minimum;
+}
+
+function baseEvidenceCount(
   requirementCode: string,
   evidenceType: string,
   variant: "A" | "B",
@@ -149,27 +155,57 @@ function evidenceCount(
   return 1;
 }
 
+function evidenceCount(
+  requirementCode: string,
+  definition: EvidenceDefinition,
+  variant: "A" | "B",
+  challenge: Challenge,
+): number {
+  const base = baseEvidenceCount(requirementCode, definition.evidenceType, variant, challenge);
+  if (base === 0) return 0;
+  if (definition.temporalRule.kind === "longitudinal" || definition.temporalRule.kind === "multiPeriod") {
+    return Math.max(base, definition.temporalRule.minimumPeriods);
+  }
+  return base;
+}
+
+function evidenceReportingDate(
+  definition: EvidenceDefinition,
+  index: number,
+  challenged: boolean,
+  challenge: Challenge,
+): Date {
+  if (challenged && challenge.mode === "stale") return new Date("2020-06-30T00:00:00Z");
+  if (definition.temporalRule.kind === "longitudinal" || definition.temporalRule.kind === "multiPeriod") {
+    return new Date(Date.UTC(2026 - index, 5, 30));
+  }
+  return new Date("2026-06-30T00:00:00Z");
+}
+
 function buildEvidenceForDefinition(options: {
   requirementCode: string;
   expectation: QaQualityExpectationView;
-  definition: QaQualityExpectationView["expectedEvidence"][number];
+  definition: EvidenceDefinition;
   variant: "A" | "B";
   challenge: Challenge;
 }): EvidenceInput[] {
   const { requirementCode, definition, variant, challenge } = options;
-  const count = evidenceCount(requirementCode, definition.evidenceType, variant, challenge);
+  const count = evidenceCount(requirementCode, definition, variant, challenge);
   const challenged = variant === "B" && challenge.evidenceType === definition.evidenceType;
-  const reportingDate = challenged && challenge.mode === "stale"
-    ? new Date("2020-06-30T00:00:00Z")
-    : new Date("2026-06-30T00:00:00Z");
 
   return Array.from({ length: count }, (_, index) => {
+    const reportingDate = evidenceReportingDate(definition, index, challenged, challenge);
     let text = completeText[definition.evidenceType] ?? `Controlled evidence record for ${definition.description}`;
-    let attributes: PrimitiveAttributes = completeAttributes(definition.evidenceType);
+    let attributes: PrimitiveAttributes = {
+      ...completeAttributes(definition.evidenceType),
+      asOfDate: "2026-12-31T23:59:59.999Z",
+      cycleStartDate: "2026-01-01T00:00:00.000Z",
+      cycleEndDate: "2026-12-31T23:59:59.999Z",
+    };
 
     if (challenged && challenge.mode === "incomplete") {
       text = `The controlled record is present, but one or more required fields or mappings are incomplete for ${definition.description}`;
-      attributes = incompleteAttributes(definition.evidenceType);
+      attributes = { ...attributes, ...incompleteAttributes(definition.evidenceType) };
     } else if (challenged && challenge.mode === "stale") {
       text = `This record contains potentially relevant evidence for ${definition.description}, but it relates to an earlier review period and has not been confirmed as current.`;
     } else if (challenged && challenge.mode === "ambiguous") {
@@ -190,6 +226,15 @@ function buildEvidenceForDefinition(options: {
       text,
       referenceKey: `${QA_PILOT_SCENARIO_VERSION}:${requirementCode}:${variant}:${definition.evidenceType}:${index + 1}`,
       reportingDate,
+      scope: requiredScope(definition),
+      provenance: {
+        authority: fixtureAuthority(definition),
+        ownerUnit: "Controlled research fixture",
+        version: QA_PILOT_SCENARIO_VERSION,
+        approvalStatus: fixtureAuthority(definition) === "approvedDocument" ? "approved" : "controlled",
+        sourceUri: null,
+      },
+      periodKey: String(reportingDate.getUTCFullYear()),
       attributes,
     };
   });
@@ -211,7 +256,7 @@ export function buildQaPilotScenarioInput(
     name: `${QA_PILOT_SCENARIO_VERSION}:${requirementCode}:${variant}`,
     description:
       `Controlled pilot scenario ${variant} for AUN-QA requirement ${requirementCode}. ` +
-      "Classify the evidence independently using only the supplied records. Prototype predictions remain unavailable until the human reference classification is locked.",
+      "Classify applicability and evidence independently using only the supplied records. Scope, reporting period, and provenance are controlled research factors.",
     evidence,
   };
 }
