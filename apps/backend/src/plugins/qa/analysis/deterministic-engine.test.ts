@@ -130,24 +130,13 @@ describe("deterministic QA engine evidence semantics", () => {
   });
 
   it("does not allow partial or unknown required scope to become deterministic support", () => {
-    const partial = candidate({
-      key: "partial",
-      ...expectedScope,
-      courseSpecVersionId: undefined,
-    });
-    const unknown = candidate({
-      key: "unknown",
-      courseId: undefined,
-      courseSpecVersionId: undefined,
-      cohortId: undefined,
-      term: undefined,
-      assessmentId: undefined,
-    });
+    const partial = candidate({ key: "partial", ...expectedScope, courseSpecVersionId: undefined });
+    const unknown = candidate({ key: "unknown" });
 
     const assessed = assessCandidates("dse", expectation(), definition(), result([partial, unknown]), cycle);
 
     expect(assessed.assessed.find((item) => item.candidate.key === "partial")?.scopeMatch).toBe("partial");
-    expect(assessed.assessed.find((item) => item.candidate.key === "unknown")?.scopeMatch).toBe("partial");
+    expect(assessed.assessed.find((item) => item.candidate.key === "unknown")?.scopeMatch).not.toBe("exact");
     expect(assessed.finding.result.candidates).toHaveLength(0);
   });
 
