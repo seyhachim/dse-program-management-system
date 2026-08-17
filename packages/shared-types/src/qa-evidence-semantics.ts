@@ -110,14 +110,17 @@ export type QaSourceAuthorityRequirement = z.infer<typeof QaSourceAuthorityRequi
 export const QaQualityExpectationSemanticsSchema = z.object({
   applicabilityRule: QaApplicabilityRuleSchema.default({ kind: "always" }),
   scopeRequirement: QaEvidenceScopeRequirementSchema.default({ requiredDimensions: [] }),
-  temporalRule: QaTemporalRuleSchema.default({ kind: "withinCycle" }),
+  // pointInTime is the compatibility default: existing records may pre-date the
+  // reporting cycle but remain the current approved/controlled record. Stricter
+  // current-cycle expectations opt into withinCycle or recent explicitly.
+  temporalRule: QaTemporalRuleSchema.default({ kind: "pointInTime" }),
 });
 export type QaQualityExpectationSemantics = z.infer<typeof QaQualityExpectationSemanticsSchema>;
 
 /** Machine-operable evidence semantics introduced by #297-#299. */
 export const QaExpectedEvidenceSemanticsSchema = z.object({
   scopeRequirement: QaEvidenceScopeRequirementSchema.default({ requiredDimensions: [] }),
-  temporalRule: QaTemporalRuleSchema.default({ kind: "withinCycle" }),
+  temporalRule: QaTemporalRuleSchema.default({ kind: "pointInTime" }),
   authorityRequirement: QaSourceAuthorityRequirementSchema.default({ minimumAuthority: "unknown" }),
 });
 export type QaExpectedEvidenceSemantics = z.infer<typeof QaExpectedEvidenceSemanticsSchema>;
