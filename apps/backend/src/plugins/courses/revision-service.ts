@@ -68,6 +68,24 @@ export type CreateCourseSpecRevisionInput = {
   reason: string;
   changeSummary: string;
   initiatedById: string;
+  revisionRequest?: {
+    requestedById: string;
+    triggers: CourseSpecRevisionTrigger[];
+    evidenceSummary: string;
+    changeSummary: string;
+    proposedRevisionType: RevisionKind;
+    recommendedRevisionType: RevisionKind;
+    overrideJustification: string;
+    effectiveAcademicTerm: string;
+    impactCourseCodeOrTitle: boolean;
+    impactCreditsOrSlt: boolean;
+    impactPrerequisites: boolean;
+    impactMaterialCloChanges: boolean;
+    impactBloomOrCapLevels: boolean;
+    impactCloPloAlignment: boolean;
+    impactAssessmentStructureOrWeighting: boolean;
+    impactCurriculumOrRegulatoryAlignment: boolean;
+  };
 };
 
 export const courseSpecRevisionService = {
@@ -142,6 +160,15 @@ export const courseSpecRevisionService = {
       });
 
       await cloneNormalizedContent(tx, source, target.id);
+
+      if (input.revisionRequest) {
+        await tx.courseSpecRevisionRequest.create({
+          data: {
+            courseSpecId: target.id,
+            ...input.revisionRequest,
+          },
+        });
+      }
 
       return {
         id: target.id,

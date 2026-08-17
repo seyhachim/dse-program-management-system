@@ -6,7 +6,9 @@ CREATE TABLE "CourseSpecRevisionRequest" (
   "id" TEXT NOT NULL,
   "courseSpecId" TEXT NOT NULL,
   "requestedById" TEXT NOT NULL,
+  "triggers" "CourseSpecRevisionTrigger"[] NOT NULL,
   "evidenceSummary" TEXT NOT NULL,
+  "changeSummary" TEXT NOT NULL,
   "proposedRevisionType" "CourseSpecRevisionType" NOT NULL,
   "recommendedRevisionType" "CourseSpecRevisionType" NOT NULL,
   "overrideJustification" TEXT NOT NULL DEFAULT '',
@@ -62,12 +64,25 @@ FOR EACH ROW EXECUTE FUNCTION "prevent_course_spec_revision_request_mutation"();
 
 ALTER TABLE "CourseSpecRevisionRequest" ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE "CourseSpecRevisionRequest" FROM PUBLIC;
-REVOKE ALL ON TABLE "CourseSpecRevisionRequest" FROM anon;
-REVOKE ALL ON TABLE "CourseSpecRevisionRequest" FROM authenticated;
-REVOKE ALL ON TABLE "CourseSpecRevisionRequest" FROM service_role;
+REVOKE ALL PRIVILEGES ON TABLE "CourseSpecRevisionRequest" FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION "prevent_course_spec_revision_request_mutation"() FROM PUBLIC;
 
-REVOKE ALL ON FUNCTION "prevent_course_spec_revision_request_mutation"() FROM PUBLIC;
-REVOKE ALL ON FUNCTION "prevent_course_spec_revision_request_mutation"() FROM anon;
-REVOKE ALL ON FUNCTION "prevent_course_spec_revision_request_mutation"() FROM authenticated;
-REVOKE ALL ON FUNCTION "prevent_course_spec_revision_request_mutation"() FROM service_role;
+DO $$
+DECLARE
+  api_role text;
+BEGIN
+  FOR api_role IN
+    SELECT rolname FROM pg_roles
+    WHERE rolname = ANY (ARRAY['anon', 'authenticated', 'service_role'])
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON TABLE %I.%I FROM %I',
+      'public', 'CourseSpecRevisionRequest', api_role
+    );
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON FUNCTION %I.%I() FROM %I',
+      'public', 'prevent_course_spec_revision_request_mutation', api_role
+    );
+  END LOOP;
+END
+$$;

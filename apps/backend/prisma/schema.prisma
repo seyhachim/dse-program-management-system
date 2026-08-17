@@ -230,6 +230,7 @@ model User {
   roleAssignments                  UserRoleAssignment[]
   courseSpecSubmissions            CourseSpec[]                     @relation("CourseSpecSubmittedBy")
   courseSpecReviewActions          CourseSpecReviewAction[]         @relation("CourseSpecReviewActor")
+  courseSpecRevisionRequests        CourseSpecRevisionRequest[]       @relation("CourseSpecRevisionRequestedBy")
   curriculumVersionsCreated        ProgrammeCurriculumVersion[]     @relation("ProgrammeCurriculumVersionCreatedBy")
   curriculumAuditActions           ProgrammeCurriculumAuditAction[] @relation("ProgrammeCurriculumAuditActor")
   studentProfile                   Student?
@@ -1160,6 +1161,7 @@ model CourseSpec {
   resources               CourseSpecResource[]
   studentResponsibilities CourseSpecStudentResponsibility[]
   courseInfo              CourseSpecCourseInfo?
+  revisionRequest         CourseSpecRevisionRequest?
   policy                  CourseSpecPolicy?
   teachingLearning        CourseSpecTeachingLearning?
   weekProjectProgress     CourseSpecWeekProjectProgress[]
@@ -1216,6 +1218,35 @@ model CourseSpecCourseInfo {
   programmeYear    Int?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+}
+
+/// Immutable governance record that explains why one CourseSpec academic revision
+/// was created. It is one-to-one with the resulting draft revision and stores the
+/// original impact assessment independently from later edits to that draft.
+model CourseSpecRevisionRequest {
+  id                                      String                    @id @default(uuid())
+  courseSpecId                            String                    @unique
+  courseSpec                              CourseSpec                @relation(fields: [courseSpecId], references: [id], onDelete: Restrict)
+  requestedById                           String
+  requestedBy                             User                      @relation("CourseSpecRevisionRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  triggers                                CourseSpecRevisionTrigger[]
+  evidenceSummary                         String
+  changeSummary                           String
+  proposedRevisionType                    CourseSpecRevisionType
+  recommendedRevisionType                 CourseSpecRevisionType
+  overrideJustification                   String                    @default("")
+  effectiveAcademicTerm                   String
+  impactCourseCodeOrTitle                 Boolean                   @default(false)
+  impactCreditsOrSlt                      Boolean                   @default(false)
+  impactPrerequisites                     Boolean                   @default(false)
+  impactMaterialCloChanges                Boolean                   @default(false)
+  impactBloomOrCapLevels                  Boolean                   @default(false)
+  impactCloPloAlignment                   Boolean                   @default(false)
+  impactAssessmentStructureOrWeighting    Boolean                   @default(false)
+  impactCurriculumOrRegulatoryAlignment   Boolean                   @default(false)
+  createdAt                               DateTime                  @default(now())
+
+  @@index([requestedById, createdAt])
 }
 
 /// Immutable workflow events for Course Specification submission/review actions.

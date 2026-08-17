@@ -140,7 +140,7 @@ export function RevisionRequestClient({ courseId }: { courseId: string }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Only the programme coordinator / Head of Programme or an administrator may create an academic revision.
         </p>
-        <Button className="mt-4" variant="outline" render={<Link href={`/courses/${courseId}/spec`} />}>
+        <Button className="mt-4" variant="outline" nativeButton={false} render={<Link href={`/courses/${courseId}/spec`} />}>
           Back to Course Specification
         </Button>
       </div>
@@ -154,7 +154,7 @@ export function RevisionRequestClient({ courseId }: { courseId: string }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Complete the current Course Specification review workflow before creating another academic revision.
         </p>
-        <Button className="mt-4" variant="outline" render={<Link href={`/courses/${courseId}/spec`} />}>
+        <Button className="mt-4" variant="outline" nativeButton={false} render={<Link href={`/courses/${courseId}/spec`} />}>
           Back to Course Specification
         </Button>
       </div>
@@ -171,7 +171,7 @@ export function RevisionRequestClient({ courseId }: { courseId: string }) {
             Record why this revision is needed and assess its academic impact before a draft is created.
           </p>
         </div>
-        <Button variant="outline" render={<Link href={`/courses/${courseId}/spec`} />}>
+        <Button variant="outline" nativeButton={false} render={<Link href={`/courses/${courseId}/spec`} />}>
           Cancel
         </Button>
       </div>
@@ -294,7 +294,7 @@ export function RevisionRequestClient({ courseId }: { courseId: string }) {
       </section>
 
       <div className="flex justify-end gap-3">
-        <Button variant="outline" render={<Link href={`/courses/${courseId}/spec`} />}>
+        <Button variant="outline" nativeButton={false} render={<Link href={`/courses/${courseId}/spec`} />}>
           Cancel
         </Button>
         <Button onClick={submit} disabled={submitting}>

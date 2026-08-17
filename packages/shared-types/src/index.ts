@@ -14,6 +14,7 @@ export * from "./offerings.ts";
 export * from "./attendance.ts";
 export * from "./class-responsibilities.ts";
 export * from "./course-spec.ts";
+export * from "./course-spec-revision.ts";
 export * from "./methods.ts";
 export * from "./rubrics.ts";
 export * from "./student-portal.ts";
