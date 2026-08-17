@@ -59,22 +59,48 @@ export function TelegramStatus() {
     return () => { cancelled = true; };
   }, []);
 
-  if (state.status === "loading") return <p className="text-sm text-slate-500">Securely connecting to PMS…</p>;
+  if (state.status === "loading") return <p className="text-sm text-slate-500">Securely connecting to DSE PMS…</p>;
   if (state.status === "outside") {
-    return <p className="text-sm text-slate-600">Open this page from the official DSE Telegram Mini App to sign in.</p>;
+    return (
+      <div className="space-y-2">
+        <p className="font-medium text-slate-900">Open DSE PMS from Telegram</p>
+        <p className="text-sm leading-6 text-slate-600">
+          This page only signs in when it is opened from the official DSE Telegram Mini App. A normal browser cannot create a Telegram session.
+        </p>
+      </div>
+    );
   }
   if (state.status === "error") return <p className="text-sm text-red-700">{state.message}</p>;
   if (state.status === "unlinked") {
     return (
-      <div className="space-y-3">
-        <p className="font-medium">Link your PMS account</p>
-        <p className="text-sm text-slate-600">Telegram has been verified. Sign in to PMS once to confirm which account this Telegram identity belongs to.</p>
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <p className="text-lg font-semibold text-slate-950">Connect your DSE PMS account</p>
+          <p className="text-sm leading-6 text-slate-600">
+            Use your existing DSE PMS account to connect Telegram. You only need to do this once.
+          </p>
+          <p className="text-sm leading-6 text-slate-600">
+            Telegram confirms your Telegram identity. DSE PMS determines your student or lecturer account, courses, roles, and permissions.
+          </p>
+        </div>
+
         <Link
           href={`/telegram/link?verificationId=${encodeURIComponent(state.verificationId)}`}
-          className="inline-flex min-h-11 items-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white"
         >
-          Link PMS account
+          Connect DSE PMS Account
         </Link>
+
+        <div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+          <p className="font-medium text-slate-700">Why do I need to connect?</p>
+          <p className="mt-1">
+            Connecting tells DSE PMS which PMS account belongs to this verified Telegram account. Telegram does not decide whether you are a student, lecturer, monitor, or administrator.
+          </p>
+        </div>
+
+        <p className="text-xs leading-5 text-slate-500">
+          Your Telegram account does not replace your PMS account. Your PMS password and academic data are not stored by Telegram.
+        </p>
       </div>
     );
   }
