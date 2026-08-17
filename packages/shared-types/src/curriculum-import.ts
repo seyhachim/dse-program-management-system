@@ -21,12 +21,12 @@ export const CurriculumHourBreakdownSchema = z
     }
   });
 
-const NullableCreditPartSchema = z.number().int().min(0).max(30).nullable().default(null);
 export const CurriculumCreditBreakdownSchema = z.object({
   total: z.number().int().min(0).max(30),
-  lecture: NullableCreditPartSchema,
-  lab: NullableCreditPartSchema,
-  fieldVisit: NullableCreditPartSchema,
+  lecture: z.number().int().min(0).max(30),
+  lab: z.number().int().min(0).max(30),
+  fieldVisit: z.number().int().min(0).max(30),
+  breakdownProvided: z.boolean().optional(),
 });
 
 export const CurriculumImportPathwaySchema = z.object({
