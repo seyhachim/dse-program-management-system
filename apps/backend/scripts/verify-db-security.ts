@@ -93,6 +93,7 @@ const EXPECTED_PUBLIC_TABLES = [
 const EXPECTED_ATTENDANCE_TABLES = [
   "AttendanceSession",
   "AttendanceRecord",
+  "LecturerArrivalConfirmation",
 ] as const;
 
 const EXPECTED_TELEGRAM_SECURITY_TABLES = [
