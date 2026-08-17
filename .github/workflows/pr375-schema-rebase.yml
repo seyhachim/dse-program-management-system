@@ -1,4 +1,4 @@
-name: PR375 schema patch and rebase
+name: PR375 rebase conflict probe
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  patch-and-rebase:
+  probe-rebase:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,53 +20,32 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Represent canonical curriculum pathways in Prisma
+      - name: Probe rebase and publish conflicts
         shell: bash
         run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const path = 'apps/backend/prisma/schema.prisma';
-          let text = fs.readFileSync(path, 'utf8');
-
-          if (!text.includes('model ProgrammeCurriculumPathway {')) {
-            const versionRelations = '  courses      ProgrammeCurriculumCourse[]\n  auditActions ProgrammeCurriculumAuditAction[]';
-            if (!text.includes(versionRelations)) {
-              throw new Error('ProgrammeCurriculumVersion relation anchor not found');
-            }
-            text = text.replace(
-              versionRelations,
-              '  courses      ProgrammeCurriculumCourse[]\n  pathways    ProgrammeCurriculumPathway[]\n  auditActions ProgrammeCurriculumAuditAction[]',
-            );
-
-            const sectionStart = text.indexOf("/// A course's placement in one exact curriculum version.");
-            const sectionEnd = text.indexOf('/// Append-only workflow/revision history', sectionStart);
-            if (sectionStart < 0 || sectionEnd < 0) {
-              throw new Error('ProgrammeCurriculumCourse schema section not found');
-            }
-
-            const replacement = `/// A version-scoped mutually exclusive curriculum route. Pathway identity is\n/// canonical public curriculum data; import/export artifacts only snapshot it.\nmodel ProgrammeCurriculumPathway {\n  id                  String                     @id @default(uuid())\n  curriculumVersionId String\n  curriculumVersion   ProgrammeCurriculumVersion @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)\n  code                String\n  name                String\n  yearLevel           Int\n  semester            Semester\n  isDefault           Boolean                    @default(false)\n  creditTarget        Int?\n  sortOrder           Int                        @default(0)\n  createdAt           DateTime                   @default(now())\n  updatedAt           DateTime                   @default(now())\n\n  courses ProgrammeCurriculumCourse[]\n\n  @@unique([curriculumVersionId, code])\n  @@index([curriculumVersionId, yearLevel, semester, sortOrder])\n}\n\n/// A course's placement in one exact curriculum version. Credits and course type\n/// are copied when the placement is created so later edits to Course cannot\n/// rewrite historical curriculum evidence. A nullable pathway keeps common rows\n/// distinct from mutually exclusive route rows while preserving one canonical\n/// Course placement per curriculum version.\nmodel ProgrammeCurriculumCourse {\n  id                  String                      @id @default(uuid())\n  curriculumVersionId String\n  curriculumVersion   ProgrammeCurriculumVersion  @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)\n  courseId            String\n  course              Course                      @relation(fields: [courseId], references: [id], onDelete: Restrict)\n  courseSpecVersionId String?\n  courseSpecVersion   CourseSpec?                  @relation(\"ProgrammeCurriculumCourseSpecVersion\", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)\n  pathwayId           String?\n  pathway             ProgrammeCurriculumPathway? @relation(fields: [pathwayId], references: [id], onDelete: Restrict)\n  yearLevel           Int\n  semester            Semester\n  creditsSnapshot     Int\n  courseTypeSnapshot  CourseType\n  sortOrder           Int                         @default(0)\n  createdAt           DateTime                    @default(now())\n  updatedAt           DateTime                    @updatedAt\n\n  @@unique([curriculumVersionId, courseId])\n  @@index([courseId])\n  @@index([courseSpecVersionId])\n  @@index([pathwayId])\n  @@index([curriculumVersionId, yearLevel, semester, sortOrder])\n}\n\n`;
-
-            text = text.slice(0, sectionStart) + replacement + text.slice(sectionEnd);
-            fs.writeFileSync(path, text);
-          }
-          NODE
-
-      - name: Commit schema fix before rebase
-        shell: bash
-        run: |
-          if git diff --quiet -- apps/backend/prisma/schema.prisma; then
-            echo "Schema already patched"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add apps/backend/prisma/schema.prisma
-            git commit -m "fix(curriculum): model canonical pathways in Prisma"
-            git push origin HEAD:agent/issue-371-curriculum-import
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          set +e
+          GIT_EDITOR=true git rebase origin/main
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            git push --force-with-lease origin HEAD:agent/issue-371-curriculum-import
+            exit 0
           fi
 
-      - name: Rebase onto current main
-        shell: bash
-        run: |
-          git fetch origin main
-          git rebase origin/main
-          git push --force-with-lease origin HEAD:agent/issue-371-curriculum-import
+          git diff --name-only --diff-filter=U | sort -u > /tmp/conflicts.txt
+          git rebase --abort
+          mkdir -p docs
+          {
+            echo "PR #375 rebase conflict probe"
+            echo "main: $(git rev-parse origin/main)"
+            echo "branch-before-rebase: $(git rev-parse HEAD)"
+            echo "conflicts:"
+            cat /tmp/conflicts.txt
+          } > docs/pr375-rebase-conflicts.txt
+          git add docs/pr375-rebase-conflicts.txt
+          git commit -m "chore(curriculum): record rebase conflicts"
+          git push origin HEAD:agent/issue-371-curriculum-import
+          exit 1
