@@ -245,12 +245,14 @@ describeDb("curriculum JSON import and artifact persistence", () => {
     });
 
     await expect(
-      prisma.$executeRaw`
-        UPDATE curriculum_artifact."Pathway"
-        SET "name" = 'Mutated history'
-        WHERE "curriculumVersionId" = ${f.version.id}
-          AND "code" = 'COURSEWORK'
-      `,
+      Promise.resolve(
+        prisma.$executeRaw`
+          UPDATE curriculum_artifact."Pathway"
+          SET "name" = 'Mutated history'
+          WHERE "curriculumVersionId" = ${f.version.id}
+            AND "code" = 'COURSEWORK'
+        `,
+      ),
     ).rejects.toThrow("immutable");
 
     const preview = await curriculumImportService.preview(f.version.id, uploadFor(f));
