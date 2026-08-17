@@ -6,7 +6,7 @@ import {
   QaLlmEvidenceMatchOutputSchema,
   type QaEvidenceCandidateResultView,
   type QaEvidenceCandidateView,
-  type QaEvidenceScopeRequirement,
+  type QaEvidenceScope,
   type QaEvaluationEvidenceView,
   type QaEvaluationRunView,
   type QaExpectedEvidenceDefinitionView,
@@ -16,11 +16,9 @@ import {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import { qaService } from "../service.ts";
+import { assessCandidates } from "../analysis/deterministic-engine.ts";
 import {
   evaluateApplicability,
-  matchEvidenceScope,
-  matchEvidenceTime,
-  meetsSourceAuthority,
   temporalMatchSupportsEvidence,
 } from "../analysis/evidence-semantics.ts";
 import {
@@ -33,7 +31,6 @@ import {
   applyExpectationCrossChecks,
   buildDeterministicExplanation,
   determineExpectationState,
-  evaluateExpectedEvidence,
   type QaEvidenceRuleFinding,
 } from "../analysis/rules.ts";
 import {
@@ -155,27 +152,26 @@ function controlledApplicability(
   });
 }
 
-function effectiveScopeRequirement(
-  expectation: QaQualityExpectationView,
-  definition: QaExpectedEvidenceDefinitionView,
-): QaEvidenceScopeRequirement {
-  return {
-    requiredDimensions: [
-      ...new Set([
-        ...expectation.scopeRequirement.requiredDimensions,
-        ...definition.scopeRequirement.requiredDimensions,
-      ]),
-    ],
-  };
-}
+function controlledExpectedScope(evidence: QaEvaluationEvidenceView[]): QaEvidenceScope {
+  const scope: QaEvidenceScope = { programmeId: "controlled-evaluation" };
+  const mappings: Array<[keyof QaEvidenceScope, string]> = [
+    ["academicYear", "expectedAcademicYear"],
+    ["term", "expectedTerm"],
+    ["courseId", "expectedCourseId"],
+    ["courseSpecVersionId", "expectedCourseSpecVersionId"],
+    ["offeringId", "expectedOfferingId"],
+    ["cohortId", "expectedCohortId"],
+    ["assessmentId", "expectedAssessmentId"],
+    ["population", "expectedPopulation"],
+  ];
 
-function effectiveTemporalRule(
-  expectation: QaQualityExpectationView,
-  definition: QaExpectedEvidenceDefinitionView,
-): QaTemporalRule {
-  return definition.temporalRule.kind === "pointInTime"
-    ? expectation.temporalRule
-    : definition.temporalRule;
+  for (const [scopeKey, attributeKey] of mappings) {
+    const value = evidence
+      .map((item) => item.attributes[attributeKey])
+      .find((candidate): candidate is string => typeof candidate === "string" && Boolean(candidate.trim()));
+    if (value) scope[scopeKey] = value.trim();
+  }
+  return scope;
 }
 
 function assessControlledDefinition(
@@ -184,48 +180,9 @@ function assessControlledDefinition(
   evidence: QaEvaluationEvidenceView[],
 ): { finding: QaEvidenceRuleFinding; assessments: ControlledCandidateAssessment[] } {
   const matchingEvidence = evidence.filter((item) => item.evidenceType === definition.evidenceType);
-  const periodCount = new Set(
-    matchingEvidence.map((item) => item.periodKey).filter((value): value is string => Boolean(value)),
-  ).size;
-  const temporalRule = effectiveTemporalRule(expectation, definition);
-  const cycle = controlledCycle(evidence);
-
-  const assessments = matchingEvidence.map((item): ControlledCandidateAssessment => {
-    const candidate = candidateFromEvidence(item);
-    return {
-      evidence: item,
-      candidate,
-      definition,
-      scopeMatch: matchEvidenceScope(
-        effectiveScopeRequirement(expectation, definition),
-        { programmeId: "controlled-evaluation" },
-        candidate.scope ?? {},
-      ),
-      temporalMatch: matchEvidenceTime(temporalRule, {
-        cycleStart: cycle.reportingStart,
-        cycleEnd: cycle.reportingEnd,
-        candidateDate: candidate.reportingDate ? new Date(candidate.reportingDate) : null,
-        comparablePeriods: periodCount,
-      }),
-      authorityMatch: meetsSourceAuthority(
-        definition.authorityRequirement,
-        candidate.provenance ?? { authority: "unknown" },
-      ),
-      temporalRule,
-    };
-  });
-
-  const acceptedKeys = new Set(
-    assessments
-      .filter(
-        (item) =>
-          item.scopeMatch === "exact" &&
-          temporalMatchSupportsEvidence(item.temporalRule, item.temporalMatch) &&
-          item.authorityMatch === true,
-      )
-      .map((item) => item.candidate.key),
+  const evidenceByKey = new Map(
+    matchingEvidence.map((item) => [`pilot-evidence:${item.id}`, item] as const),
   );
-
   const result: QaEvidenceCandidateResultView = {
     programmeId: "controlled-evaluation",
     expectedEvidenceId: definition.id,
@@ -233,29 +190,23 @@ function assessControlledDefinition(
     sourceDomain: definition.sourceDomain,
     status: "supported",
     reason: "Controlled evidence was evaluated against declared scope, temporal, and authority semantics.",
-    candidates: assessments
-      .filter((item) => acceptedKeys.has(item.candidate.key))
-      .map((item) => item.candidate),
+    expectedScope: controlledExpectedScope(evidence),
+    candidates: matchingEvidence.map(candidateFromEvidence),
   };
-
-  if (result.candidates.length === 0 && assessments.length > 0) {
-    const ambiguous = assessments.some(
-      (item) =>
-        item.scopeMatch === "partial" ||
-        item.scopeMatch === "unknown" ||
-        item.temporalMatch === "unknown" ||
-        item.authorityMatch === null,
-    );
-    if (ambiguous) {
-      result.status = "unsupported";
-      result.reason =
-        "Controlled candidates have unresolved scope, temporal, or provenance semantics and require expert review.";
-    }
-  }
+  const semantic = assessCandidates(
+    "controlled-evaluation",
+    expectation,
+    definition,
+    result,
+    controlledCycle(evidence),
+  );
 
   return {
-    finding: evaluateExpectedEvidence(definition, result),
-    assessments,
+    finding: semantic.finding,
+    assessments: semantic.assessed.map((item) => ({
+      ...item,
+      evidence: evidenceByKey.get(item.candidate.key)!,
+    })),
   };
 }
 
