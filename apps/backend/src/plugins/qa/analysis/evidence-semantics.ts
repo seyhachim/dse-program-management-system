@@ -122,6 +122,12 @@ export function meetsSourceAuthority(
   requirement: QaSourceAuthorityRequirement,
   provenance: QaEvidenceProvenance,
 ): boolean | null {
+  if (
+    requirement.minimumAuthority === "unknown" &&
+    (!requirement.acceptableAuthorities || requirement.acceptableAuthorities.length === 0)
+  ) {
+    return true;
+  }
   if (provenance.authority === "unknown") return null;
   if (
     requirement.acceptableAuthorities &&
