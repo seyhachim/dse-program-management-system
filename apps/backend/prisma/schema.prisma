@@ -348,6 +348,7 @@ model ProgrammeCurriculumVersion {
   updatedAt        DateTime                           @updatedAt
 
   courses      ProgrammeCurriculumCourse[]
+  pathways    ProgrammeCurriculumPathway[]
   auditActions ProgrammeCurriculumAuditAction[]
 
   @@unique([curriculumId, versionMajor, versionMinor])
@@ -356,28 +357,55 @@ model ProgrammeCurriculumVersion {
   @@index([createdById])
 }
 
-/// A course's placement in one exact curriculum version. Credits and course type
-/// are copied when the placement is created so later edits to Course cannot
-/// rewrite historical curriculum evidence.
-model ProgrammeCurriculumCourse {
+/// A version-scoped mutually exclusive curriculum route. Pathway identity is
+/// canonical public curriculum data; import/export artifacts only snapshot it.
+model ProgrammeCurriculumPathway {
   id                  String                     @id @default(uuid())
   curriculumVersionId String
   curriculumVersion   ProgrammeCurriculumVersion @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
+  code                String
+  name                String
+  yearLevel           Int
+  semester            Semester
+  isDefault           Boolean                    @default(false)
+  creditTarget        Int?
+  sortOrder           Int                        @default(0)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @default(now())
+
+  courses ProgrammeCurriculumCourse[]
+
+  @@unique([curriculumVersionId, code])
+  @@index([curriculumVersionId, yearLevel, semester, sortOrder])
+}
+
+/// A course's placement in one exact curriculum version. Credits and course type
+/// are copied when the placement is created so later edits to Course cannot
+/// rewrite historical curriculum evidence. A nullable pathway keeps common rows
+/// distinct from mutually exclusive route rows while preserving one canonical
+/// Course placement per curriculum version.
+model ProgrammeCurriculumCourse {
+  id                  String                      @id @default(uuid())
+  curriculumVersionId String
+  curriculumVersion   ProgrammeCurriculumVersion  @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
   courseId            String
-  course              Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  course              Course                      @relation(fields: [courseId], references: [id], onDelete: Restrict)
   courseSpecVersionId String?
-  courseSpecVersion   CourseSpec?                 @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)
+  courseSpecVersion   CourseSpec?                  @relation("ProgrammeCurriculumCourseSpecVersion", fields: [courseSpecVersionId], references: [id], onDelete: Restrict)
+  pathwayId           String?
+  pathway             ProgrammeCurriculumPathway? @relation(fields: [pathwayId], references: [id], onDelete: Restrict)
   yearLevel           Int
   semester            Semester
   creditsSnapshot     Int
   courseTypeSnapshot  CourseType
-  sortOrder           Int                        @default(0)
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
+  sortOrder           Int                         @default(0)
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
 
   @@unique([curriculumVersionId, courseId])
   @@index([courseId])
   @@index([courseSpecVersionId])
+  @@index([pathwayId])
   @@index([curriculumVersionId, yearLevel, semester, sortOrder])
 }
 
