@@ -1,11 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import {
+  CurriculumImportDecisionSchema,
   DseCurriculumImportSchema,
   type CurriculumArtifactView,
+  type CurriculumDeclaredTotals,
+  type CurriculumImportApplyInput,
   type CurriculumImportCourse,
-  type CurriculumImportPreview,
+  type CurriculumImportDecision,
   type CurriculumImportPathway,
+  type CurriculumImportPreview,
   type CurriculumJsonUpload,
   type CourseType,
 } from "@dse-pms/shared-types";
@@ -27,7 +31,8 @@ type TargetVersion = {
   academicYear: string;
 };
 
-type ArtifactPathwayRow = {
+type CanonicalPathwayRow = {
+  id: string;
   curriculumVersionId: string;
   code: string;
   name: string;
@@ -66,6 +71,21 @@ type ImportSourceRow = {
   formatVersion: string;
   importedAt: Date;
   importedById: string;
+  decisions: Prisma.JsonValue;
+  warnings: Prisma.JsonValue;
+};
+
+type DeclaredTotalsRow = {
+  semesterCredits: Prisma.JsonValue;
+  pathwayCredits: Prisma.JsonValue;
+  programmeCourseCount: number | null;
+  programmeCredits: number | null;
+};
+
+type CanonicalCourseResolution = {
+  courseId: string;
+  title: string;
+  courseType: CourseType;
 };
 
 export class CurriculumImportNotFoundError extends Error {}
@@ -102,6 +122,18 @@ function parseUpload(upload: CurriculumJsonUpload) {
     data: parsed.data,
     sha256: sourceHash(upload.jsonText),
   };
+}
+
+function parseStoredDecisions(value: Prisma.JsonValue): CurriculumImportDecision[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const parsed = CurriculumImportDecisionSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+function parseStoredWarnings(value: Prisma.JsonValue): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 async function loadTarget(versionId: string): Promise<TargetVersion> {
@@ -151,8 +183,10 @@ function calculateTotals(
   pathways: CurriculumImportPathway[],
   courses: Array<Pick<CurriculumImportCourse, "pathwayCode" | "credits">>,
   defaultPathwayCode: string | null,
+  declaredTotals: CurriculumDeclaredTotals | null,
 ) {
   const common = courses.filter((course) => course.pathwayCode === null);
+  const commonCredits = common.reduce((total, course) => total + course.credits.total, 0);
   const pathwayTotals = pathways
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code))
@@ -169,14 +203,15 @@ function calculateTotals(
   const selected = defaultPathwayCode
     ? pathwayTotals.find((pathway) => pathway.code === defaultPathwayCode) ?? null
     : pathwayTotals.find((pathway) => pathway.isDefault) ?? null;
+  const computedSelectedRouteCredits = commonCredits + (selected?.credits ?? 0);
+  const computedCourseCount = common.length + (selected?.courseCount ?? 0);
   return {
-    commonCredits: common.reduce((total, course) => total + course.credits.total, 0),
+    commonCredits,
     commonCourseCount: common.length,
     pathways: pathwayTotals,
-    selectedRouteCredits:
-      common.reduce((total, course) => total + course.credits.total, 0) +
-      (selected?.credits ?? 0),
-    selectedRouteCourseCount: common.length + (selected?.courseCount ?? 0),
+    computedSelectedRouteCredits,
+    selectedRouteCredits: declaredTotals?.programmeCredits ?? computedSelectedRouteCredits,
+    selectedRouteCourseCount: declaredTotals?.programmeCourseCount ?? computedCourseCount,
   };
 }
 
@@ -187,14 +222,70 @@ function creditBreakdownWarning(course: CurriculumImportCourse): string | null {
     : `${course.code}: credit breakdown (${sum}) differs from total credits (${course.credits.total}); source values will be preserved`;
 }
 
+function appendDeclaredTotalWarnings(
+  warnings: string[],
+  pathways: CurriculumImportPathway[],
+  courses: CurriculumImportCourse[],
+  defaultPathwayCode: string | null,
+  declared: CurriculumDeclaredTotals | null,
+) {
+  if (!declared) return;
+  const isSelected = (course: CurriculumImportCourse) =>
+    course.pathwayCode === null || course.pathwayCode === defaultPathwayCode;
+
+  for (const total of declared.semesterCredits) {
+    const computed = courses
+      .filter(
+        (course) =>
+          isSelected(course) &&
+          course.yearLevel === total.yearLevel &&
+          course.semester === total.semester,
+      )
+      .reduce((sum, course) => sum + course.credits.total, 0);
+    if (computed !== total.credits) {
+      warnings.push(
+        `Year ${total.yearLevel} ${total.semester} semester rows total ${computed} credits while the source declares ${total.credits}; both values are preserved`,
+      );
+    }
+  }
+
+  for (const total of declared.pathwayCredits) {
+    const computed = courses
+      .filter((course) => course.pathwayCode === total.pathwayCode)
+      .reduce((sum, course) => sum + course.credits.total, 0);
+    if (computed !== total.credits) {
+      warnings.push(
+        `${total.pathwayCode} pathway rows total ${computed} credits while the source declares ${total.credits}`,
+      );
+    }
+  }
+
+  const rowTotals = calculateTotals(pathways, courses, defaultPathwayCode, null);
+  if (
+    declared.programmeCredits !== null &&
+    declared.programmeCredits !== undefined &&
+    declared.programmeCredits !== rowTotals.computedSelectedRouteCredits
+  ) {
+    warnings.push(
+      `Selected/default route rows total ${rowTotals.computedSelectedRouteCredits} credits while the official source declares ${declared.programmeCredits}; the official declared total is used for document totals without changing row credits`,
+    );
+  }
+}
+
+function decisionsByCode(decisions: CurriculumImportDecision[]) {
+  return new Map(decisions.map((decision) => [decision.courseCode, decision]));
+}
+
 async function buildPreview(
   target: TargetVersion,
   upload: CurriculumJsonUpload,
+  decisions: CurriculumImportDecision[] = [],
 ): Promise<CurriculumImportPreview> {
   const { data, sha256 } = parseUpload(upload);
   const workflow = await getCurriculumWorkflowState(target.id);
   const blockers: string[] = [];
   const warnings: string[] = [];
+  const decisionMap = decisionsByCode(decisions);
 
   if (data.programmeCode.toUpperCase() !== target.programmeCode.toUpperCase()) {
     blockers.push(
@@ -227,7 +318,21 @@ async function buildPreview(
     blockers.push("A default pathway must be selected when alternative pathways are present");
   }
 
-  const codes = [...new Set(data.courses.map((course) => course.code))];
+  const distinctByCode = new Map<string, CurriculumImportCourse>();
+  for (const course of data.courses) {
+    const first = distinctByCode.get(course.code);
+    if (
+      first &&
+      (normalizeTitle(first.title) !== normalizeTitle(course.title) ||
+        first.credits.total !== course.credits.total)
+    ) {
+      blockers.push(`${course.code}: repeated pathway rows disagree on title or credits`);
+    } else if (!first) {
+      distinctByCode.set(course.code, course);
+    }
+  }
+
+  const codes = [...distinctByCode.keys()];
   const existing = await prisma.course.findMany({
     where: { programmeId: target.programmeId, code: { in: codes } },
     select: { id: true, code: true, title: true, courseType: true, credits: true },
@@ -236,26 +341,47 @@ async function buildPreview(
 
   const courses = data.courses.map((course) => {
     const current = byCode.get(course.code) ?? null;
-    const isPublicPlacement =
-      course.pathwayCode === null || course.pathwayCode === defaultPathway?.code;
+    const decision = decisionMap.get(course.code) ?? null;
     let matchStatus: "matched" | "conflict" | "missing" | "blocked" = "matched";
+    let requiredDecision: "create-course" | "keep-existing-course" | null = null;
     let message = "Exact canonical course match";
 
     if (!current) {
       matchStatus = "missing";
-      message = "No canonical Course exists with this code";
-      blockers.push(`${course.code}: canonical course is missing`);
+      requiredDecision = "create-course";
+      if (decision?.action === "create-course" && decision.courseType) {
+        message = `Will create canonical Course with explicit type ${decision.courseType}`;
+      } else {
+        message = "No canonical Course exists with this code";
+        blockers.push(`${course.code}: choose Create Course and an explicit course type before apply`);
+      }
     } else if (normalizeTitle(current.title) !== normalizeTitle(course.title)) {
       matchStatus = "conflict";
-      message = `PMS title is “${current.title}”`;
-      blockers.push(`${course.code}: JSON title conflicts with the canonical Course title`);
-    } else if (isPublicPlacement && !current.courseType) {
-      matchStatus = "blocked";
-      message = "Canonical Course has no course type; curriculum placement cannot snapshot a null type";
-      blockers.push(`${course.code}: canonical Course needs a course type before import`);
+      requiredDecision = "keep-existing-course";
+      if (decision?.action === "keep-existing-course") {
+        message = `Will keep canonical PMS title “${current.title}”`;
+      } else {
+        message = `PMS title is “${current.title}”`;
+        blockers.push(`${course.code}: title conflict requires an explicit keep-existing-course decision`);
+      }
+    } else if (decision) {
+      blockers.push(`${course.code}: an import decision was supplied for a course that already matches exactly`);
     }
 
-    if (current?.credits !== null && current?.credits !== undefined && current.credits !== course.credits.total) {
+    const effectiveType =
+      current?.courseType ??
+      (decision?.action === "create-course" ? decision.courseType ?? null : null);
+    if (!effectiveType) {
+      matchStatus = "blocked";
+      message = "A canonical course type is required for the immutable curriculum placement snapshot";
+      blockers.push(`${course.code}: an explicit canonical course type is required`);
+    }
+
+    if (
+      current?.credits !== null &&
+      current?.credits !== undefined &&
+      current.credits !== course.credits.total
+    ) {
       warnings.push(
         `${course.code}: source curriculum credits ${course.credits.total} differ from current Course credits ${current.credits}; curriculum snapshot will preserve the source total`,
       );
@@ -269,19 +395,15 @@ async function buildPreview(
       existingCourseId: current?.id ?? null,
       existingTitle: current?.title ?? null,
       existingCourseType: current?.courseType ?? null,
+      requiredDecision,
       message,
     };
   });
 
   const defaultCode = defaultPathway?.code ?? null;
-  const totals = calculateTotals(data.pathways, data.courses, defaultCode);
-  if (data.programmeCode.toUpperCase() === "DSE" && data.curriculum.academicYear === "2026") {
-    if (totals.selectedRouteCredits !== 143) {
-      warnings.push(
-        `DSE 2026 selected/default route totals ${totals.selectedRouteCredits} credits; the supplied reference states 143`,
-      );
-    }
-  }
+  const declaredTotals = data.declaredTotals ?? null;
+  appendDeclaredTotalWarnings(warnings, data.pathways, data.courses, defaultCode, declaredTotals);
+  const totals = calculateTotals(data.pathways, data.courses, defaultCode, declaredTotals);
 
   return {
     source: {
@@ -299,6 +421,7 @@ async function buildPreview(
     curriculum: data.curriculum,
     pathways: data.pathways,
     courses,
+    declaredTotals,
     totals,
     blockers: [...new Set(blockers)],
     warnings: [...new Set(warnings)],
@@ -349,11 +472,11 @@ async function assertTransactionDraft(tx: Prisma.TransactionClient, versionId: s
 }
 
 async function artifactRows(versionId: string) {
-  const [pathways, courses, sources] = await Promise.all([
-    prisma.$queryRaw<ArtifactPathwayRow[]>`
-      SELECT "curriculumVersionId", "code", "name", "yearLevel", "semester"::text AS semester,
+  const [pathways, courses, sources, declared] = await Promise.all([
+    prisma.$queryRaw<CanonicalPathwayRow[]>`
+      SELECT "id", "curriculumVersionId", "code", "name", "yearLevel", "semester"::text AS semester,
              "isDefault", "creditTarget", "sortOrder"
-      FROM curriculum_artifact."Pathway"
+      FROM public."ProgrammeCurriculumPathway"
       WHERE "curriculumVersionId" = ${versionId}
       ORDER BY "sortOrder", "code"
     `,
@@ -368,13 +491,85 @@ async function artifactRows(versionId: string) {
       ORDER BY "yearLevel", "semester", "scopeCode", "sortOrder", "courseCodeSnapshot"
     `,
     prisma.$queryRaw<ImportSourceRow[]>`
-      SELECT "fileName", "sha256", "formatVersion", "importedAt", "importedById"
+      SELECT "fileName", "sha256", "formatVersion", "importedAt", "importedById", "decisions", "warnings"
       FROM curriculum_artifact."ImportSource"
       WHERE "curriculumVersionId" = ${versionId}
       LIMIT 1
     `,
+    prisma.$queryRaw<DeclaredTotalsRow[]>`
+      SELECT "semesterCredits", "pathwayCredits", "programmeCourseCount", "programmeCredits"
+      FROM curriculum_artifact."DeclaredTotals"
+      WHERE "curriculumVersionId" = ${versionId}
+      LIMIT 1
+    `,
   ]);
-  return { pathways, courses, source: sources[0] ?? null };
+  return {
+    pathways,
+    courses,
+    source: sources[0] ?? null,
+    declared: declared[0] ?? null,
+  };
+}
+
+async function resolveCanonicalCourses(
+  tx: Prisma.TransactionClient,
+  programmeId: string,
+  courses: CurriculumImportCourse[],
+  decisions: CurriculumImportDecision[],
+): Promise<Map<string, CanonicalCourseResolution>> {
+  const sourceByCode = new Map<string, CurriculumImportCourse>();
+  for (const course of courses) if (!sourceByCode.has(course.code)) sourceByCode.set(course.code, course);
+  const codes = [...sourceByCode.keys()];
+  const current = await tx.course.findMany({
+    where: { programmeId, code: { in: codes } },
+    select: { id: true, code: true, title: true, courseType: true },
+  });
+  const currentByCode = new Map(current.map((course) => [course.code, course]));
+  const decisionMap = decisionsByCode(decisions);
+  const resolved = new Map<string, CanonicalCourseResolution>();
+
+  for (const [code, source] of sourceByCode) {
+    const existing = currentByCode.get(code);
+    const decision = decisionMap.get(code);
+    if (!existing) {
+      if (decision?.action !== "create-course" || !decision.courseType) {
+        throw new CurriculumImportConflictError(`${code} no longer has a valid explicit create decision`);
+      }
+      const created = await tx.course.create({
+        data: {
+          programmeId,
+          code,
+          title: source.title,
+          credits: source.credits.total,
+          courseType: decision.courseType,
+        },
+        select: { id: true, title: true, courseType: true },
+      });
+      resolved.set(code, {
+        courseId: created.id,
+        title: created.title,
+        courseType: created.courseType,
+      });
+      continue;
+    }
+
+    if (normalizeTitle(existing.title) !== normalizeTitle(source.title)) {
+      if (decision?.action !== "keep-existing-course") {
+        throw new CurriculumImportConflictError(`${code} canonical title changed; re-preview the import`);
+      }
+    } else if (decision) {
+      throw new CurriculumImportConflictError(`${code} no longer requires an import decision`);
+    }
+    if (!existing.courseType) {
+      throw new CurriculumImportConflictError(`${code} canonical Course has no course type`);
+    }
+    resolved.set(code, {
+      courseId: existing.id,
+      title: existing.title,
+      courseType: existing.courseType,
+    });
+  }
+  return resolved;
 }
 
 export const curriculumImportService = {
@@ -385,9 +580,10 @@ export const curriculumImportService = {
     return buildPreview(target, upload);
   },
 
-  async apply(versionId: string, actorId: string, upload: CurriculumJsonUpload) {
+  async apply(versionId: string, actorId: string, input: CurriculumImportApplyInput) {
     const target = await loadTarget(versionId);
-    const preview = await buildPreview(target, upload);
+    const upload = { fileName: input.fileName, jsonText: input.jsonText };
+    const preview = await buildPreview(target, upload, input.decisions);
     if (!preview.canApply) {
       throw new CurriculumImportValidationError("Curriculum import has blocking issues", {
         blockers: preview.blockers,
@@ -398,22 +594,17 @@ export const curriculumImportService = {
       data.pathways,
       data.curriculum.defaultPathwayCode,
     );
-    const matchedByCode = new Map(
-      preview.courses.map((course) => [
-        course.code,
-        {
-          courseId: course.existingCourseId!,
-          courseType: course.existingCourseType as CourseType | null,
-        },
-      ]),
-    );
 
     await prisma.$transaction(
       async (tx) => {
         await assertTransactionDraft(tx, versionId);
+        const resolvedCourses = await resolveCanonicalCourses(
+          tx,
+          target.programmeId,
+          data.courses,
+          input.decisions,
+        );
 
-        // Replace the Draft snapshot atomically. Deleting canonical placements
-        // cascades their artifact snapshots; alternatives are removed explicitly.
         await tx.programmeCurriculumCourse.deleteMany({
           where: { curriculumVersionId: versionId },
         });
@@ -422,90 +613,95 @@ export const curriculumImportService = {
           WHERE "curriculumVersionId" = ${versionId}
         `;
         await tx.$executeRaw`
-          DELETE FROM curriculum_artifact."Pathway"
+          DELETE FROM curriculum_artifact."DeclaredTotals"
           WHERE "curriculumVersionId" = ${versionId}
         `;
         await tx.$executeRaw`
           DELETE FROM curriculum_artifact."ImportSource"
           WHERE "curriculumVersionId" = ${versionId}
         `;
+        await tx.$executeRaw`
+          DELETE FROM public."ProgrammeCurriculumPathway"
+          WHERE "curriculumVersionId" = ${versionId}
+        `;
 
+        const pathwayIds = new Map<string, string>();
         for (const pathway of data.pathways) {
+          const pathwayId = randomUUID();
+          pathwayIds.set(pathway.code, pathwayId);
           await tx.$executeRaw`
-            INSERT INTO curriculum_artifact."Pathway"
-              ("curriculumVersionId", "code", "name", "yearLevel", "semester", "isDefault", "creditTarget", "sortOrder")
+            INSERT INTO public."ProgrammeCurriculumPathway"
+              ("id", "curriculumVersionId", "code", "name", "yearLevel", "semester",
+               "isDefault", "creditTarget", "sortOrder", "updatedAt")
             VALUES
-              (${versionId}, ${pathway.code}, ${pathway.name}, ${pathway.yearLevel},
+              (${pathwayId}, ${versionId}, ${pathway.code}, ${pathway.name}, ${pathway.yearLevel},
                ${sqlSemester(pathway.semester)}::"Semester", ${pathway.code === defaultPathway?.code},
-               ${pathway.creditTarget ?? null}, ${pathway.sortOrder})
+               ${pathway.creditTarget ?? null}, ${pathway.sortOrder}, CURRENT_TIMESTAMP)
           `;
         }
 
         for (const course of data.courses) {
-          const match = matchedByCode.get(course.code)!;
-          const isPublicPlacement =
-            course.pathwayCode === null || course.pathwayCode === defaultPathway?.code;
+          const canonical = resolvedCourses.get(course.code);
+          if (!canonical) throw new CurriculumImportConflictError(`${course.code} could not be resolved`);
+          const pathwayId = course.pathwayCode ? pathwayIds.get(course.pathwayCode) ?? null : null;
+          if (course.pathwayCode && !pathwayId) {
+            throw new CurriculumImportConflictError(`${course.code} references a pathway that no longer exists`);
+          }
+          const placementId = randomUUID();
           const hours = importSnapshotValues(course);
 
-          if (isPublicPlacement) {
-            if (!match.courseType) {
-              throw new CurriculumImportValidationError(
-                `${course.code} has no canonical course type`,
-              );
-            }
-            const placement = await tx.programmeCurriculumCourse.create({
-              data: {
-                curriculumVersionId: versionId,
-                courseId: match.courseId,
-                yearLevel: course.yearLevel,
-                semester: course.semester,
-                creditsSnapshot: course.credits.total,
-                courseTypeSnapshot: match.courseType,
-                sortOrder: course.sortOrder,
-              },
-              select: { id: true },
-            });
-            await tx.$executeRaw`
-              UPDATE curriculum_artifact."CourseSnapshot"
-              SET "scopeCode" = ${course.pathwayCode ?? COMMON_SCOPE},
-                  "courseCodeSnapshot" = ${course.code},
-                  "courseTitleSnapshot" = ${course.title},
-                  "yearLevel" = ${course.yearLevel},
-                  "semester" = ${sqlSemester(course.semester)}::"Semester",
-                  "sortOrder" = ${course.sortOrder},
-                  "weeklyHoursTotal" = ${hours.weeklyTotal},
-                  "weeklyLectureHours" = ${hours.weeklyLecture},
-                  "weeklyLabHours" = ${hours.weeklyLab},
-                  "weeklyFieldVisitHours" = ${hours.weeklyField},
-                  "creditsTotal" = ${course.credits.total},
-                  "creditLecture" = ${course.credits.lecture},
-                  "creditLab" = ${course.credits.lab},
-                  "creditFieldVisit" = ${course.credits.fieldVisit},
-                  "lecturerText" = ${course.lecturerText},
-                  "updatedAt" = CURRENT_TIMESTAMP
-              WHERE "placementId" = ${placement.id}
-            `;
-          } else {
-            await tx.$executeRaw`
-              INSERT INTO curriculum_artifact."CourseSnapshot" (
-                "id", "curriculumVersionId", "scopeCode", "placementId", "courseId",
-                "courseCodeSnapshot", "courseTitleSnapshot", "yearLevel", "semester", "sortOrder",
-                "weeklyHoursTotal", "weeklyLectureHours", "weeklyLabHours", "weeklyFieldVisitHours",
-                "creditsTotal", "creditLecture", "creditLab", "creditFieldVisit", "lecturerText"
-              ) VALUES (
-                ${randomUUID()}, ${versionId}, ${course.pathwayCode!}, NULL, ${match.courseId},
-                ${course.code}, ${course.title}, ${course.yearLevel}, ${sqlSemester(course.semester)}::"Semester", ${course.sortOrder},
-                ${hours.weeklyTotal}, ${hours.weeklyLecture}, ${hours.weeklyLab}, ${hours.weeklyField},
-                ${course.credits.total}, ${course.credits.lecture}, ${course.credits.lab}, ${course.credits.fieldVisit}, ${course.lecturerText}
-              )
-            `;
-          }
+          await tx.$executeRaw`
+            INSERT INTO public."ProgrammeCurriculumCourse" (
+              "id", "curriculumVersionId", "courseId", "pathwayId", "yearLevel", "semester",
+              "creditsSnapshot", "courseTypeSnapshot", "sortOrder", "createdAt", "updatedAt"
+            ) VALUES (
+              ${placementId}, ${versionId}, ${canonical.courseId}, ${pathwayId}, ${course.yearLevel},
+              ${sqlSemester(course.semester)}::"Semester", ${course.credits.total},
+              ${canonical.courseType}::"CourseType", ${course.sortOrder}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+          `;
+
+          await tx.$executeRaw`
+            UPDATE curriculum_artifact."CourseSnapshot"
+            SET "scopeCode" = ${course.pathwayCode ?? COMMON_SCOPE},
+                "courseCodeSnapshot" = ${course.code},
+                "courseTitleSnapshot" = ${canonical.title},
+                "yearLevel" = ${course.yearLevel},
+                "semester" = ${sqlSemester(course.semester)}::"Semester",
+                "sortOrder" = ${course.sortOrder},
+                "weeklyHoursTotal" = ${hours.weeklyTotal},
+                "weeklyLectureHours" = ${hours.weeklyLecture},
+                "weeklyLabHours" = ${hours.weeklyLab},
+                "weeklyFieldVisitHours" = ${hours.weeklyField},
+                "creditsTotal" = ${course.credits.total},
+                "creditLecture" = ${course.credits.lecture},
+                "creditLab" = ${course.credits.lab},
+                "creditFieldVisit" = ${course.credits.fieldVisit},
+                "lecturerText" = ${course.lecturerText},
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "placementId" = ${placementId}
+          `;
+        }
+
+        if (data.declaredTotals) {
+          await tx.$executeRaw`
+            INSERT INTO curriculum_artifact."DeclaredTotals"
+              ("curriculumVersionId", "semesterCredits", "pathwayCredits", "programmeCourseCount", "programmeCredits")
+            VALUES (
+              ${versionId}, ${JSON.stringify(data.declaredTotals.semesterCredits)}::jsonb,
+              ${JSON.stringify(data.declaredTotals.pathwayCredits)}::jsonb,
+              ${data.declaredTotals.programmeCourseCount ?? null}, ${data.declaredTotals.programmeCredits ?? null}
+            )
+          `;
         }
 
         await tx.$executeRaw`
           INSERT INTO curriculum_artifact."ImportSource"
-            ("curriculumVersionId", "fileName", "sha256", "formatVersion", "importedById")
-          VALUES (${versionId}, ${upload.fileName}, ${sha256}, ${data.formatVersion}, ${actorId})
+            ("curriculumVersionId", "fileName", "sha256", "formatVersion", "importedById", "decisions", "warnings")
+          VALUES (
+            ${versionId}, ${upload.fileName}, ${sha256}, ${data.formatVersion}, ${actorId},
+            ${JSON.stringify(input.decisions)}::jsonb, ${JSON.stringify(preview.warnings)}::jsonb
+          )
         `;
 
         await tx.programmeCurriculumAuditAction.create({
@@ -524,7 +720,10 @@ export const curriculumImportService = {
                 name: pathway.name,
                 isDefault: pathway.code === defaultPathway?.code,
               })),
+              computedSelectedRouteCredits: preview.totals.computedSelectedRouteCredits,
               selectedRouteCredits: preview.totals.selectedRouteCredits,
+              declaredTotals: data.declaredTotals ?? null,
+              decisions: input.decisions,
               warnings: preview.warnings,
             },
           },
@@ -575,7 +774,19 @@ export const curriculumImportService = {
       courseId: course.courseId,
       placementId: course.placementId,
     }));
-    const totals = calculateTotals(pathways, courses, defaultPathway?.code ?? null);
+    const declaredTotals: CurriculumDeclaredTotals | null = rows.declared
+      ? {
+          semesterCredits: Array.isArray(rows.declared.semesterCredits)
+            ? (rows.declared.semesterCredits as CurriculumDeclaredTotals["semesterCredits"])
+            : [],
+          pathwayCredits: Array.isArray(rows.declared.pathwayCredits)
+            ? (rows.declared.pathwayCredits as CurriculumDeclaredTotals["pathwayCredits"])
+            : [],
+          programmeCourseCount: rows.declared.programmeCourseCount,
+          programmeCredits: rows.declared.programmeCredits,
+        }
+      : null;
+    const totals = calculateTotals(pathways, courses, defaultPathway?.code ?? null, declaredTotals);
     return {
       curriculum: {
         id: target.curriculumId,
@@ -590,6 +801,7 @@ export const curriculumImportService = {
       },
       pathways,
       courses,
+      declaredTotals,
       totals,
       source: rows.source
         ? {
@@ -598,9 +810,25 @@ export const curriculumImportService = {
             formatVersion: rows.source.formatVersion,
             importedAt: rows.source.importedAt.toISOString(),
             importedById: rows.source.importedById,
+            decisions: parseStoredDecisions(rows.source.decisions),
+            warnings: parseStoredWarnings(rows.source.warnings),
           }
         : null,
     };
+  },
+
+  async artifactForExport(versionId: string): Promise<CurriculumArtifactView> {
+    const workflow = await getCurriculumWorkflowState(versionId);
+    if (![
+      "Approved",
+      "Active",
+      "Superseded",
+    ].includes(workflow.status)) {
+      throw new CurriculumImportConflictError(
+        `Curriculum export is unavailable while version status is ${workflow.status}`,
+      );
+    }
+    return this.artifact(versionId);
   },
 };
 
