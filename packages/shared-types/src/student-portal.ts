@@ -89,6 +89,18 @@ export interface PortalCourseSummary {
   } | null;
 }
 
+export interface OfferingResultAccessPolicy {
+  offeringId: string;
+  requireSurveyBeforeResults: boolean;
+}
+
+export interface ProvisionalResultAccess {
+  requireSurveyBeforeResults: boolean;
+  surveyCompleted: boolean;
+  canViewProvisionalResults: boolean;
+  hiddenProvisionalAssessmentCount: number;
+}
+
 export interface PortalCourseDetail extends PortalCourseSummary {
   clos: Array<{
     code: string;
@@ -136,6 +148,7 @@ export interface PortalCourseDetail extends PortalCourseSummary {
   achievements: PortalCloAchievement[];
   overallAchievement: number | null;
   feedbackSubmitted: boolean;
+  provisionalResultAccess?: ProvisionalResultAccess;
 }
 
 export interface PortalAnnouncement {
@@ -184,6 +197,11 @@ export const PublishAnnouncementInput = z.object({
   pinned: z.boolean().default(false),
 });
 export type PublishAnnouncementInput = z.infer<typeof PublishAnnouncementInput>;
+
+export const SetOfferingResultAccessPolicyInput = z.object({
+  requireSurveyBeforeResults: z.boolean(),
+});
+export type SetOfferingResultAccessPolicyInput = z.infer<typeof SetOfferingResultAccessPolicyInput>;
 
 /** Save one lecturer-entered assessment result without making it student-visible. */
 export const SaveAssessmentResultInput = z.object({
