@@ -18,6 +18,7 @@ import {
   matchEvidenceScope,
   matchEvidenceTime,
   meetsSourceAuthority,
+  temporalMatchSupportsEvidence,
 } from "./evidence-semantics.ts";
 import { createQaEvidenceAnalysis, QaAnalysisResourceNotFoundError } from "./service.ts";
 import {
@@ -37,6 +38,7 @@ interface CandidateWithKind {
   definition?: QaExpectedEvidenceDefinitionView;
   scopeMatch?: "exact" | "partial" | "mismatch" | "unknown";
   temporalMatch?: "current" | "historicalRelevant" | "stale" | "future" | "insufficientHistory" | "unknown";
+  temporalRule?: QaTemporalRule;
   authorityMatch?: boolean | null;
 }
 
@@ -214,7 +216,7 @@ function effectiveTemporalRule(
   expectation: QaQualityExpectationView,
   definition: QaExpectedEvidenceDefinitionView,
 ): QaTemporalRule {
-  return definition.temporalRule.kind === "withinCycle"
+  return definition.temporalRule.kind === "pointInTime"
     ? expectation.temporalRule
     : definition.temporalRule;
 }
@@ -235,6 +237,7 @@ function assessCandidate(options: {
     approvalStatus: null,
     sourceUri: item.candidate.route,
   };
+  const temporalRule = effectiveTemporalRule(expectation, definition);
   return {
     ...item,
     definition,
@@ -243,12 +246,13 @@ function assessCandidate(options: {
       { programmeId },
       item.candidate.scope ?? { programmeId },
     ),
-    temporalMatch: matchEvidenceTime(effectiveTemporalRule(expectation, definition), {
+    temporalMatch: matchEvidenceTime(temporalRule, {
       cycleStart: cycle.reportingStart,
       cycleEnd: cycle.reportingEnd,
       candidateDate: item.candidate.reportingDate ? new Date(item.candidate.reportingDate) : null,
       comparablePeriods,
     }),
+    temporalRule,
     authorityMatch: meetsSourceAuthority(definition.authorityRequirement, provenance),
   };
 }
@@ -256,7 +260,7 @@ function assessCandidate(options: {
 function usableForLlm(item: CandidateWithKind): boolean {
   return (
     item.scopeMatch === "exact" &&
-    item.temporalMatch === "current" &&
+    Boolean(item.temporalRule && item.temporalMatch && temporalMatchSupportsEvidence(item.temporalRule, item.temporalMatch)) &&
     item.authorityMatch === true
   );
 }
@@ -381,12 +385,11 @@ export async function runLlmAssistedQaAnalysis(
     const allByKey = new Map<string, CandidateWithKind>();
     for (const item of assessedRetrieved) allByKey.set(item.candidate.key, item);
     for (const item of manual) {
-      // Manually mapped QA evidence is valid contextual input but has no specific
-      // expected-evidence definition, so retain explicit unknown match factors.
       allByKey.set(item.candidate.key, {
         ...item,
         scopeMatch: "exact",
         temporalMatch: "current",
+        temporalRule: { kind: "pointInTime" },
         authorityMatch: true,
       });
     }
