@@ -124,11 +124,11 @@ describe("Telegram phase 2 services", () => {
 
   test("attendance history is scoped to the authenticated PMS user and exact offering", async () => {
     const student = user("student");
-    let seen: [string, string] | null = null;
+    const capture: { seen?: [string, string] } = {};
     const offerings = offeringsFixture({
       studentAttendanceHistory: {
         async forUser(userId, offeringId) {
-          seen = [userId, offeringId];
+          capture.seen = [userId, offeringId];
           return {
             offeringId,
             studentId: "student-record",
@@ -144,7 +144,7 @@ describe("Telegram phase 2 services", () => {
     });
     const service = createTelegramPhase2Service({ portal: portalFixture(), offerings });
     await service.attendanceHistory(student, offeringB);
-    expect(seen).toEqual([student.id, offeringB]);
+    expect(capture.seen).toEqual([student.id, offeringB]);
   });
 
   test("removed enrollment or inactive student maps to a non-leaking not-found response", async () => {
@@ -157,16 +157,16 @@ describe("Telegram phase 2 services", () => {
 
   test("workload uses the authenticated lecturer id and optional term", async () => {
     const lecturer = user("lecturer");
-    let seen: [string, string | undefined] | null = null;
+    const capture: { seen?: [string, string | undefined] } = {};
     const offerings = offeringsFixture({
       async workloadForLecturer(lecturerId, query) {
-        seen = [lecturerId, query.term];
+        capture.seen = [lecturerId, query.term];
         return offeringsFixture().workloadForLecturer(lecturerId, query);
       },
     });
     const service = createTelegramPhase2Service({ portal: portalFixture(), offerings });
     await service.lecturerWorkload(lecturer, "2026-S1");
-    expect(seen).toEqual([lecturer.id, "2026-S1"]);
+    expect(capture.seen).toEqual([lecturer.id, "2026-S1"]);
   });
 
   test("student cannot open lecturer workload", async () => {
