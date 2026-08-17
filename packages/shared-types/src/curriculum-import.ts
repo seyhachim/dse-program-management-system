@@ -62,6 +62,25 @@ export const CurriculumImportMetadataSchema = z.object({
   defaultPathwayCode: z.string().trim().min(1).max(40).nullable().default(null),
 });
 
+export const CurriculumDeclaredSemesterCreditSchema = z.object({
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  credits: z.number().int().min(0).max(120),
+});
+
+export const CurriculumDeclaredPathwayCreditSchema = z.object({
+  pathwayCode: z.string().trim().min(1).max(40),
+  credits: z.number().int().min(0).max(120),
+});
+
+export const CurriculumDeclaredTotalsSchema = z.object({
+  semesterCredits: z.array(CurriculumDeclaredSemesterCreditSchema).default([]),
+  pathwayCredits: z.array(CurriculumDeclaredPathwayCreditSchema).default([]),
+  programmeCourseCount: z.number().int().min(0).nullable().optional(),
+  programmeCredits: z.number().int().min(0).nullable().optional(),
+});
+export type CurriculumDeclaredTotals = z.infer<typeof CurriculumDeclaredTotalsSchema>;
+
 export const DseCurriculumImportSchema = z
   .object({
     formatVersion: z.literal(DSE_CURRICULUM_IMPORT_FORMAT_VERSION),
@@ -69,6 +88,7 @@ export const DseCurriculumImportSchema = z
     curriculum: CurriculumImportMetadataSchema,
     pathways: z.array(CurriculumImportPathwaySchema),
     courses: z.array(CurriculumImportCourseSchema).min(1),
+    declaredTotals: CurriculumDeclaredTotalsSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     const pathwayCodes = new Set<string>();
@@ -134,6 +154,37 @@ export const DseCurriculumImportSchema = z
       }
       placementKeys.add(key);
     }
+
+    const semesterTotalKeys = new Set<string>();
+    for (const [index, total] of (value.declaredTotals?.semesterCredits ?? []).entries()) {
+      const key = `${total.yearLevel}:${total.semester}`;
+      if (semesterTotalKeys.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["declaredTotals", "semesterCredits", index],
+          message: `Duplicate declared semester total: ${key}`,
+        });
+      }
+      semesterTotalKeys.add(key);
+    }
+    const declaredPathwayCodes = new Set<string>();
+    for (const [index, total] of (value.declaredTotals?.pathwayCredits ?? []).entries()) {
+      if (!pathwayCodes.has(total.pathwayCode)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["declaredTotals", "pathwayCredits", index, "pathwayCode"],
+          message: `Declared total references unknown pathway: ${total.pathwayCode}`,
+        });
+      }
+      if (declaredPathwayCodes.has(total.pathwayCode)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["declaredTotals", "pathwayCredits", index],
+          message: `Duplicate declared pathway total: ${total.pathwayCode}`,
+        });
+      }
+      declaredPathwayCodes.add(total.pathwayCode);
+    }
   });
 
 export type DseCurriculumImport = z.infer<typeof DseCurriculumImportSchema>;
@@ -146,21 +197,65 @@ export const CurriculumJsonUploadSchema = z.object({
 });
 export type CurriculumJsonUpload = z.infer<typeof CurriculumJsonUploadSchema>;
 
+export const CurriculumImportDecisionActionSchema = z.enum([
+  "create-course",
+  "keep-existing-course",
+]);
+export type CurriculumImportDecisionAction = z.infer<typeof CurriculumImportDecisionActionSchema>;
+
+export const CurriculumImportDecisionSchema = z
+  .object({
+    courseCode: z.string().trim().min(1).max(40),
+    action: CurriculumImportDecisionActionSchema,
+    courseType: CourseTypeSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "create-course" && !value.courseType) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["courseType"],
+        message: "Creating a missing Course requires an explicit course type",
+      });
+    }
+  });
+export type CurriculumImportDecision = z.infer<typeof CurriculumImportDecisionSchema>;
+
+export const CurriculumImportApplyInputSchema = CurriculumJsonUploadSchema.extend({
+  decisions: z.array(CurriculumImportDecisionSchema).default([]),
+}).superRefine((value, ctx) => {
+  const codes = new Set<string>();
+  for (const [index, decision] of value.decisions.entries()) {
+    if (codes.has(decision.courseCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["decisions", index, "courseCode"],
+        message: `Duplicate decision for ${decision.courseCode}`,
+      });
+    }
+    codes.add(decision.courseCode);
+  }
+});
+export type CurriculumImportApplyInput = z.infer<typeof CurriculumImportApplyInputSchema>;
+
 export const CurriculumImportMatchStatusSchema = z.enum([
   "matched",
   "conflict",
   "missing",
   "blocked",
 ]);
-export type CurriculumImportMatchStatus = z.infer<
-  typeof CurriculumImportMatchStatusSchema
->;
+export type CurriculumImportMatchStatus = z.infer<typeof CurriculumImportMatchStatusSchema>;
+
+export const CurriculumImportRequiredDecisionSchema = z.enum([
+  "create-course",
+  "keep-existing-course",
+]);
 
 export const CurriculumImportPreviewCourseSchema = CurriculumImportCourseSchema.extend({
   matchStatus: CurriculumImportMatchStatusSchema,
   existingCourseId: z.string().uuid().nullable(),
   existingTitle: z.string().nullable(),
   existingCourseType: CourseTypeSchema.nullable(),
+  requiredDecision: CurriculumImportRequiredDecisionSchema.nullable(),
   message: z.string(),
 });
 
@@ -170,6 +265,15 @@ export const CurriculumPathwayTotalSchema = z.object({
   isDefault: z.boolean(),
   credits: z.number().int().min(0),
   courseCount: z.number().int().min(0),
+});
+
+export const CurriculumImportTotalsSchema = z.object({
+  commonCredits: z.number().int().min(0),
+  commonCourseCount: z.number().int().min(0),
+  pathways: z.array(CurriculumPathwayTotalSchema),
+  computedSelectedRouteCredits: z.number().int().min(0),
+  selectedRouteCredits: z.number().int().min(0),
+  selectedRouteCourseCount: z.number().int().min(0),
 });
 
 export const CurriculumImportPreviewSchema = z.object({
@@ -188,13 +292,8 @@ export const CurriculumImportPreviewSchema = z.object({
   curriculum: CurriculumImportMetadataSchema,
   pathways: z.array(CurriculumImportPathwaySchema),
   courses: z.array(CurriculumImportPreviewCourseSchema),
-  totals: z.object({
-    commonCredits: z.number().int().min(0),
-    commonCourseCount: z.number().int().min(0),
-    pathways: z.array(CurriculumPathwayTotalSchema),
-    selectedRouteCredits: z.number().int().min(0),
-    selectedRouteCourseCount: z.number().int().min(0),
-  }),
+  declaredTotals: CurriculumDeclaredTotalsSchema.nullable(),
+  totals: CurriculumImportTotalsSchema,
   blockers: z.array(z.string()),
   warnings: z.array(z.string()),
   canApply: z.boolean(),
@@ -220,13 +319,8 @@ export const CurriculumArtifactViewSchema = z.object({
   }),
   pathways: z.array(CurriculumImportPathwaySchema),
   courses: z.array(CurriculumArtifactCourseSchema),
-  totals: z.object({
-    commonCredits: z.number().int().min(0),
-    commonCourseCount: z.number().int().min(0),
-    pathways: z.array(CurriculumPathwayTotalSchema),
-    selectedRouteCredits: z.number().int().min(0),
-    selectedRouteCourseCount: z.number().int().min(0),
-  }),
+  declaredTotals: CurriculumDeclaredTotalsSchema.nullable(),
+  totals: CurriculumImportTotalsSchema,
   source: z
     .object({
       fileName: z.string(),
@@ -234,6 +328,8 @@ export const CurriculumArtifactViewSchema = z.object({
       formatVersion: z.string(),
       importedAt: z.string(),
       importedById: z.string().uuid(),
+      decisions: z.array(CurriculumImportDecisionSchema),
+      warnings: z.array(z.string()),
     })
     .nullable(),
 });
