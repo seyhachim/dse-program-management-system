@@ -67,7 +67,7 @@ function baseImport() {
         lecturerText: "",
       },
     ],
-  } as const;
+  };
 }
 
 describe("dse curriculum JSON import contract", () => {

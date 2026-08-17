@@ -54,17 +54,19 @@ export const CurriculumImportCourseSchema = z.object({
   courseType: CourseTypeSchema.nullable().optional(),
 });
 
+export const CurriculumImportMetadataSchema = z.object({
+  code: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(240),
+  academicYear: z.string().trim().max(40),
+  version: z.string().trim().regex(/^\d+\.\d+$/),
+  defaultPathwayCode: z.string().trim().min(1).max(40).nullable().default(null),
+});
+
 export const DseCurriculumImportSchema = z
   .object({
     formatVersion: z.literal(DSE_CURRICULUM_IMPORT_FORMAT_VERSION),
     programmeCode: z.string().trim().min(1).max(40),
-    curriculum: z.object({
-      code: z.string().trim().min(1).max(64),
-      name: z.string().trim().min(1).max(240),
-      academicYear: z.string().trim().max(40),
-      version: z.string().trim().regex(/^\d+\.\d+$/),
-      defaultPathwayCode: z.string().trim().min(1).max(40).nullable().default(null),
-    }),
+    curriculum: CurriculumImportMetadataSchema,
     pathways: z.array(CurriculumImportPathwaySchema),
     courses: z.array(CurriculumImportCourseSchema).min(1),
   })
@@ -183,7 +185,7 @@ export const CurriculumImportPreviewSchema = z.object({
     programmeCode: z.string(),
     status: z.string(),
   }),
-  curriculum: DseCurriculumImportSchema.shape.curriculum,
+  curriculum: CurriculumImportMetadataSchema,
   pathways: z.array(CurriculumImportPathwaySchema),
   courses: z.array(CurriculumImportPreviewCourseSchema),
   totals: z.object({
