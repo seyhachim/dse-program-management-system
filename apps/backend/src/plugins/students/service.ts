@@ -36,6 +36,10 @@ export const studentService = {
     return prisma.student.findUnique({ where: { id } });
   },
 
+  async getByUserId(userId: string) {
+    return prisma.student.findUnique({ where: { userId } });
+  },
+
   async findByIds(ids: string[]) {
     return prisma.student.findMany({ where: { id: { in: ids } } });
   },
