@@ -106,6 +106,22 @@ export const QaSourceAuthorityRequirementSchema = z.object({
 });
 export type QaSourceAuthorityRequirement = z.infer<typeof QaSourceAuthorityRequirementSchema>;
 
+/** Machine-operable expectation semantics introduced by #296-#298. */
+export const QaQualityExpectationSemanticsSchema = z.object({
+  applicabilityRule: QaApplicabilityRuleSchema.default({ kind: "always" }),
+  scopeRequirement: QaEvidenceScopeRequirementSchema.default({ requiredDimensions: [] }),
+  temporalRule: QaTemporalRuleSchema.default({ kind: "withinCycle" }),
+});
+export type QaQualityExpectationSemantics = z.infer<typeof QaQualityExpectationSemanticsSchema>;
+
+/** Machine-operable evidence semantics introduced by #297-#299. */
+export const QaExpectedEvidenceSemanticsSchema = z.object({
+  scopeRequirement: QaEvidenceScopeRequirementSchema.default({ requiredDimensions: [] }),
+  temporalRule: QaTemporalRuleSchema.default({ kind: "withinCycle" }),
+  authorityRequirement: QaSourceAuthorityRequirementSchema.default({ minimumAuthority: "unknown" }),
+});
+export type QaExpectedEvidenceSemantics = z.infer<typeof QaExpectedEvidenceSemanticsSchema>;
+
 export const QaEvidenceSemanticsSnapshotSchema = z.object({
   applicability: QaApplicabilityStateSchema,
   applicabilityReason: z.string().trim().max(2000).default(""),
