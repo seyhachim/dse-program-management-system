@@ -98,6 +98,10 @@ function blankHalf() {
   ];
 }
 
+function pathwayLabelHalf(pathway: CurriculumPathway | null, offset: 0 | 4) {
+  return pathway ? [mergedCell(pathway.name, offset, 4)] : blankHalf();
+}
+
 function headerHalf(offset: 0 | 4) {
   return [
     simpleCell("Code", widths[offset]!, { bold: true, center: true, shade: HEADER_SHADE }),
@@ -305,8 +309,8 @@ function yearTable(artifact: CurriculumArtifactView, yearLevel: number) {
     rows.push(
       new TableRow({
         children: [
-          firstSelected ? mergedCell(firstSelected.name, 0, 4) : ...blankHalf(),
-          secondSelected ? mergedCell(secondSelected.name, 4, 4) : ...blankHalf(),
+          ...pathwayLabelHalf(firstSelected, 0),
+          ...pathwayLabelHalf(secondSelected, 4),
         ],
       }),
     );
