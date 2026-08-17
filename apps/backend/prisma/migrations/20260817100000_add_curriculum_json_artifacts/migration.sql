@@ -108,14 +108,20 @@ CREATE TABLE curriculum_artifact."ImportSource" (
 );
 
 -- Artifact rows may only be edited while their curriculum version is Draft.
--- The existing workflow service separately locks Draft rows while Under Review.
+-- A migration-only session flag permits the one-time legacy snapshot backfill;
+-- it is cleared immediately after that statement.
 CREATE OR REPLACE FUNCTION curriculum_artifact."assert_draft_version"()
 RETURNS TRIGGER AS $$
 DECLARE
   version_id TEXT;
   version_status "ProgrammeCurriculumStatus";
 BEGIN
-  version_id := COALESCE(NEW."curriculumVersionId", OLD."curriculumVersionId");
+  IF TG_OP = 'DELETE' THEN
+    version_id := OLD."curriculumVersionId";
+  ELSE
+    version_id := NEW."curriculumVersionId";
+  END IF;
+
   SELECT "status" INTO version_status
   FROM public."ProgrammeCurriculumVersion"
   WHERE "id" = version_id;
@@ -123,10 +129,15 @@ BEGIN
   IF version_status IS NULL THEN
     RAISE EXCEPTION 'Curriculum version not found for artifact row';
   END IF;
-  IF version_status <> 'Draft' THEN
+  IF version_status <> 'Draft'
+     AND current_setting('dse.curriculum_artifact_backfill', true) IS DISTINCT FROM 'on' THEN
     RAISE EXCEPTION 'Curriculum artifact is immutable while version status is %', version_status;
   END IF;
-  RETURN COALESCE(NEW, OLD);
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -171,8 +182,9 @@ BEFORE INSERT OR UPDATE ON curriculum_artifact."CourseSnapshot"
 FOR EACH ROW EXECUTE FUNCTION curriculum_artifact."validate_course_scope"();
 
 -- Best-available artifact snapshot for curriculum placements that predate #371.
--- Hour and lecturer source fields intentionally stay unknown rather than being
--- inferred from mutable Offerings.
+-- We intentionally do not invent lecture/lab/field credit composition or
+-- lecturer/hour source data for historical rows that never stored it.
+SELECT set_config('dse.curriculum_artifact_backfill', 'on', false);
 INSERT INTO curriculum_artifact."CourseSnapshot" (
   "id", "curriculumVersionId", "scopeCode", "placementId", "courseId",
   "courseCodeSnapshot", "courseTitleSnapshot", "yearLevel", "semester", "sortOrder",
@@ -181,9 +193,10 @@ INSERT INTO curriculum_artifact."CourseSnapshot" (
 SELECT
   pc."id", pc."curriculumVersionId", '__COMMON__', pc."id", pc."courseId",
   c."code", c."title", pc."yearLevel", pc."semester", pc."sortOrder",
-  pc."creditsSnapshot", pc."creditsSnapshot", 0, 0, ''
+  pc."creditsSnapshot", 0, 0, 0, ''
 FROM public."ProgrammeCurriculumCourse" pc
 JOIN public."Course" c ON c."id" = pc."courseId";
+SELECT set_config('dse.curriculum_artifact_backfill', 'off', false);
 
 -- New manually-added Draft placements receive a stable fallback snapshot. JSON
 -- import later replaces the fallback values with exact source metadata.
@@ -234,7 +247,7 @@ BEGIN
     ) VALUES (
       NEW."id", NEW."curriculumVersionId", '__COMMON__', NEW."id", NEW."courseId",
       course_code, course_title, NEW."yearLevel", NEW."semester", NEW."sortOrder",
-      NEW."creditsSnapshot", NEW."creditsSnapshot", 0, 0, ''
+      NEW."creditsSnapshot", 0, 0, 0, ''
     ) ON CONFLICT ("placementId") WHERE "placementId" IS NOT NULL DO NOTHING;
   END IF;
   RETURN NEW;
@@ -304,6 +317,9 @@ BEGIN
     EXECUTE format('REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA curriculum_artifact FROM %I', api_role);
     EXECUTE format('REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA curriculum_artifact FROM %I', api_role);
     EXECUTE format('REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA curriculum_artifact FROM %I', api_role);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA curriculum_artifact REVOKE ALL ON TABLES FROM %I', api_role);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA curriculum_artifact REVOKE ALL ON SEQUENCES FROM %I', api_role);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA curriculum_artifact REVOKE ALL ON FUNCTIONS FROM %I', api_role);
   END LOOP;
 END $$;
 
