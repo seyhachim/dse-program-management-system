@@ -1,0 +1,28 @@
+name: Apply issue 208 integration patch
+
+on:
+  push:
+    branches:
+      - agent/issue-208-revision-impact-assessment
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-208-revision-impact-assessment
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: python .github/scripts/issue208_apply.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(course-spec): integrate revision impact assessment (#208)"
+          git push origin HEAD:agent/issue-208-revision-impact-assessment
