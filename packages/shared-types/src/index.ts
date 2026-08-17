@@ -4,6 +4,7 @@ export * from "./auth.ts";
 export * from "./programme.ts";
 export * from "./curriculum.ts";
 export * from "./curriculum-import.ts";
+export * from "./curriculum-artifact-types.ts";
 export * from "./curriculum-workflow.ts";
 export * from "./curriculum-history.ts";
 export * from "./curriculum-course-spec-binding.ts";
