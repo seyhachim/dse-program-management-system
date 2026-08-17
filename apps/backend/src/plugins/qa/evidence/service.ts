@@ -16,6 +16,7 @@ import {
   retrieveEvidenceCandidates,
   type ExpectedEvidenceDefinition,
 } from "./registry.ts";
+import { retrieveRubricEvidenceCandidates } from "./rubric-evidence.ts";
 
 type DefinitionRow = {
   id: string;
@@ -156,6 +157,17 @@ export async function getQaEvidenceCandidates(
   const sourceDomain = QaEvidenceSourceDomainSchema.safeParse(row.sourceDomain);
   if (!sourceDomain.success) {
     throw new Error(`Unsupported QA evidence source domain: ${row.sourceDomain}`);
+  }
+
+  if (row.evidenceType === "rubrics") {
+    return normalizeCandidateSemantics(
+      programmeId,
+      await retrieveRubricEvidenceCandidates(programmeId, {
+        id: row.id,
+        evidenceType: row.evidenceType,
+        sourceDomain: sourceDomain.data,
+      }),
+    );
   }
 
   if (semanticDomains.has(sourceDomain.data)) {

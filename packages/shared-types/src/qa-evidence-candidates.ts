@@ -50,7 +50,8 @@ export const QaEvidenceCandidatesQuerySchema = z.object({
 });
 
 /**
- * Evidence types #186 can retrieve deterministically from current DSE-PMS tables.
+ * Evidence types #186 and follow-up domain issues can retrieve deterministically
+ * from current DSE-PMS tables.
  */
 export const QA_STRUCTURED_EVIDENCE_TYPES = [
   "programme-outcomes",
@@ -71,6 +72,7 @@ export const QA_STRUCTURED_EVIDENCE_TYPES = [
   "course-spec-review-history",
   "assessment-plan",
   "clo-assessment-methods",
+  "rubrics",
   "published-results",
   "feedback-plan",
   "published-feedback",
@@ -90,8 +92,7 @@ export const QA_SEMANTIC_EVIDENCE_TYPES = [
   "supporting-cv",
 ] as const;
 
-/** Evidence types whose source model is still not safe/available after #189. */
+/** Evidence types whose source model is still not safe/available after #305. */
 export const QA_EXPLICITLY_UNSUPPORTED_EVIDENCE_TYPES = [
   "clo-achievement",
-  "rubrics",
 ] as const;
