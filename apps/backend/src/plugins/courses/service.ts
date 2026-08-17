@@ -31,6 +31,10 @@ import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { assertCourseSpecEditable } from "./spec-lock.ts";
+import {
+  buildCourseInfoSnapshot,
+  courseInfoSnapshotData,
+} from "./course-info-snapshot.ts";
 
 /**
  * Courses business logic. The lecturer relationship is validated through the
@@ -376,11 +380,10 @@ export const courseService = {
   /* ---------------------------------------------------- Course Specification */
 
   /**
-   * Return the full spec document for a course. Course Information (§1–13) is
-   * always recomputed live from the current course + assigned lecturer + latest
-   * offering — never read back from storage — so reassigning a lecturer or
-   * editing the course elsewhere is reflected immediately instead of showing a
-   * stale snapshot from whenever the section was last saved.
+   * Return the current academic CourseSpec version for a course. Once a version
+   * exists, Course Information (§1–13) is read only from that version's snapshot
+   * so later Course, lecturer, or Offering edits cannot rewrite historical output.
+   * A course with no CourseSpec yet receives live values only as first-save prefill.
    */
   async getSpec(courseId: string) {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
@@ -392,7 +395,9 @@ export const courseService = {
       include: SPEC_INCLUDE,
     });
     const { data, status } = reassembleSpec(spec);
-    data.courseInfo = await buildCourseInfoPrefill(course);
+    if (!spec) data.courseInfo = await buildCourseInfoSnapshot(course);
+    else if (!spec.courseInfo)
+      throw new Error("Course specification Course Information snapshot is missing");
     return { courseId, data, status, review: reviewEnvelope(spec) };
   },
 
@@ -474,7 +479,6 @@ export const courseService = {
       include: SPEC_INCLUDE,
     });
     const { data, status } = reassembleSpec(updated);
-    data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status, review: reviewEnvelope(updated) };
   },
 
@@ -515,7 +519,6 @@ export const courseService = {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
     const { data, status } = reassembleSpec(updated);
-    data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status, review: reviewEnvelope(updated) };
   },
 
@@ -550,21 +553,17 @@ export const courseService = {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
     const { data, status } = reassembleSpec(updated);
-    data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status, review: reviewEnvelope(updated) };
   },
 
   /**
-   * Upsert one section of the spec, marking it complete. For the Course
-   * Information section, `values` is already restricted by `CourseInfoInput` to
-   * Pre-requisites/Description — every other §1–13 field is admin/assignment-
-   * derived (see `getSpec`) and isn't accepted here, so it's mirrored onto the
-   * Course row rather than stored as a section snapshot; nothing is written to
-   * `data.courseInfo`, since `getSpec` recomputes it fresh on every read. `clos`
-   * additionally rebuilds the normalized CourseSpecClo rows (issue #81) instead
-   * of storing its content as section JSON — every other section is a plain
-   * upsert of its own CourseSpecSection row, isolated from every other section's
-   * `updatedAt`/content.
+   * Upsert one section of the spec, marking it complete. For Course Information,
+   * `CourseInfoInput` intentionally permits only prerequisites/description. The
+   * initial save captures all administrative §1–13 values into CourseSpecCourseInfo;
+   * later draft edits update only those two permitted fields in both Course and
+   * the active version snapshot. Other snapshot fields change only by creating a
+   * new academic revision. `clos` additionally rebuilds normalized CourseSpecClo
+   * rows; other sections keep their existing normalized storage behavior.
    */
   async saveSection(
     courseId: string,
@@ -573,10 +572,12 @@ export const courseService = {
   ) {
     let course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new ReferenceError("Course not found");
+    const initialCourseInfoSnapshot = await buildCourseInfoSnapshot(course);
 
     await prisma.$transaction(async (tx) => {
       const existingSpec = await tx.courseSpec.findFirst({
         where: { courseId },
+        orderBy: CURRENT_SPEC_ORDER,
         select: { id: true, reviewStatus: true },
       });
       if (existingSpec) assertCourseSpecEditable(existingSpec.reviewStatus);
@@ -584,7 +585,10 @@ export const courseService = {
       const spec =
         existingSpec ??
         (await tx.courseSpec.create({
-          data: { courseId },
+          data: {
+            courseId,
+            courseInfo: { create: courseInfoSnapshotData(initialCourseInfoSnapshot) },
+          },
           select: { id: true, reviewStatus: true },
         }));
 
@@ -595,6 +599,13 @@ export const courseService = {
           data: {
             prerequisites: info.prerequisites || null,
             description: info.description || null,
+          },
+        });
+        await tx.courseSpecCourseInfo.update({
+          where: { courseSpecId: spec.id },
+          data: {
+            prerequisites: info.prerequisites ?? "",
+            description: info.description ?? "",
           },
         });
       }
@@ -664,7 +675,6 @@ export const courseService = {
       include: SPEC_INCLUDE,
     });
     const { data, status } = reassembleSpec(spec);
-    data.courseInfo = await buildCourseInfoPrefill(course);
     return { courseId, data, status, review: reviewEnvelope(spec) };
   },
 } satisfies CoursesServiceContract & Record<string, unknown>;
@@ -725,6 +735,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
 /** Shared `include` shape for reading a CourseSpec back out via `reassembleSpec`. */
 const SPEC_INCLUDE = {
   sections: true,
+  courseInfo: true,
   clos: {
     include: { teachingMethods: true, assessmentMethods: true },
     orderBy: { order: "asc" as const },
@@ -770,6 +781,27 @@ function reassembleSpec(spec: SpecRow | null): {
   }
   const hasSection = (key: SpecSectionId) =>
     spec.sections.some((s) => s.sectionKey === key);
+
+  if (spec.courseInfo) {
+    data.courseInfo = {
+      programmeTitle: spec.courseInfo.programmeTitle,
+      courseTitle: spec.courseInfo.courseTitle,
+      courseCode: spec.courseInfo.courseCode,
+      credits: spec.courseInfo.credits,
+      prerequisites: spec.courseInfo.prerequisites,
+      courseType: spec.courseInfo.courseType,
+      description: spec.courseInfo.description,
+      totalSltHours: spec.courseInfo.totalSltHours,
+      instructorName: spec.courseInfo.instructorName,
+      instructorTitle: spec.courseInfo.instructorTitle,
+      qualification: spec.courseInfo.qualification,
+      email: spec.courseInfo.email,
+      telephone: spec.courseInfo.telephone,
+      otherLecturers: spec.courseInfo.otherLecturers,
+      semester: spec.courseInfo.semester,
+      programmeYear: spec.courseInfo.programmeYear,
+    } satisfies CourseInfoSection;
+  }
 
   if (hasSection("clos")) {
     // `code` isn't stored — re-derived from `order` so it can't drift from the
@@ -1290,42 +1322,6 @@ async function syncMappingCells(
       strength: cell.strength,
     })),
   });
-}
-
-/** Assemble a Course Information (§1–13) snapshot from existing course-related data. */
-async function buildCourseInfoPrefill(course: {
-  id: string;
-  title: string;
-  code: string;
-  description: string | null;
-  credits: number | null;
-  prerequisites: string | null;
-  courseType: string | null;
-  lecturerId: string | null;
-}): Promise<CourseInfoSection> {
-  const lecturer = course.lecturerId
-    ? await lecturers().getById(course.lecturerId)
-    : null;
-  const offering = await prisma.offering.findFirst({
-    where: { courseId: course.id },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return {
-    courseTitle: course.title,
-    courseCode: course.code,
-    credits: course.credits,
-    prerequisites: course.prerequisites ?? "",
-    courseType: (course.courseType as CourseInfoSection["courseType"]) ?? null,
-    description: course.description ?? "",
-    instructorName: lecturer?.name ?? "",
-    qualification: lecturer?.qualification ?? "",
-    email: lecturer?.email ?? "",
-    telephone: lecturer?.phone ?? "",
-    otherLecturers: offering?.otherLecturers ?? "",
-    semester: offering?.semester ?? null,
-    programmeYear: offering?.programmeYear ?? null,
-  };
 }
 
 export type CourseService = typeof courseService;

@@ -193,6 +193,11 @@ jobs:
           OFFERING_COURSE_SPEC_DB_TESTS: "1"
           JWT_SECRET: issue-211-course-spec-binding-ci-secret-at-least-32-characters
 
+      - name: Verify CourseSpec Course Information snapshot stability
+        run: bun test apps/backend/src/plugins/courses/course-info-snapshot-db.test.ts
+        env:
+          COURSE_INFO_SNAPSHOT_DB_TESTS: "1"
+
       - name: Verify provisional result access and finalized-result visibility
         run: bun test apps/backend/src/plugins/student-portal/result-access-policy-db.test.ts
         env:

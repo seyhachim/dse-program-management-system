@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type CourseSpecRevisionTrigger, type CourseSpecRevisionType } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import {
+  buildCourseInfoSnapshotByCourseId,
+  courseInfoSnapshotData,
+} from "./course-info-snapshot.ts";
 
 export type AcademicVersion = { major: number; minor: number };
 export type RevisionKind = Exclude<CourseSpecRevisionType, "Initial">;
@@ -68,6 +72,10 @@ export type CreateCourseSpecRevisionInput = {
 
 export const courseSpecRevisionService = {
   async createCourseSpecRevision(input: CreateCourseSpecRevisionInput) {
+    const courseInfoSnapshot = await buildCourseInfoSnapshotByCourseId(input.courseId);
+    if (!courseInfoSnapshot) {
+      throw new CourseSpecRevisionError("Course not found", "COURSE_NOT_FOUND");
+    }
     return prisma.$transaction(async (tx) => {
       const [course, initiator, openRevision, source] = await Promise.all([
         tx.course.findUnique({ where: { id: input.courseId }, select: { id: true } }),
@@ -129,6 +137,7 @@ export const courseSpecRevisionService = {
           effectiveFrom: null,
           nextReviewDueAt: null,
           contentHash: null,
+          courseInfo: { create: courseInfoSnapshotData(courseInfoSnapshot) },
         },
       });
 

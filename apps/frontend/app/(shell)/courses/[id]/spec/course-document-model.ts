@@ -462,9 +462,13 @@ export function buildCourseDocument({
     });
 
   const documentMapping = activeClos.map((clo) => {
+    const snapshotTotalSlt =
+      courseInfo.totalSltHours === undefined
+        ? courseTotalSlt
+        : courseInfo.totalSltHours;
     const focusPercent = cloFocusPercent(
       clo.sltHours ? Number(clo.sltHours) : null,
-      courseTotalSlt,
+      snapshotTotalSlt,
     );
     return {
       cloCode: clo.code,
@@ -511,7 +515,8 @@ export function buildCourseDocument({
     specDate: specDate?.date ?? null,
     plos: programme?.plos ?? [],
     courseInformation: {
-      programmeTitle: programme?.title ?? PROGRAMME_TITLE,
+      programmeTitle:
+        courseInfo.programmeTitle || programme?.title || PROGRAMME_TITLE,
       courseTitle: courseInfo.courseTitle,
       courseCode: courseInfo.courseCode,
       credits: courseInfo.credits,
