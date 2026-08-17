@@ -136,6 +136,7 @@ export const DseCurriculumImportSchema = z
     }
 
     const placementKeys = new Set<string>();
+    const canonicalCourseCodes = new Set<string>();
     for (const [index, course] of value.courses.entries()) {
       if (course.pathwayCode && !pathwayCodes.has(course.pathwayCode)) {
         ctx.addIssue({
@@ -153,6 +154,15 @@ export const DseCurriculumImportSchema = z
         });
       }
       placementKeys.add(key);
+
+      if (canonicalCourseCodes.has(course.code)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["courses", index, "code"],
+          message: `Course code ${course.code} may appear only once in a curriculum version, even across pathways`,
+        });
+      }
+      canonicalCourseCodes.add(course.code);
     }
 
     const semesterTotalKeys = new Set<string>();
