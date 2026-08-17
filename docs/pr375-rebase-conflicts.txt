@@ -1,0 +1,5 @@
+PR #375 rebase conflict probe
+main: a88780a13101c85d238b026f13952ffc0ea9263d
+branch-before-rebase: a1a4abb410f01d1c395837ff65e05aeee2e4e7f7
+conflicts:
+apps/backend/scripts/verify-db-security.ts
