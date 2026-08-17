@@ -12,6 +12,7 @@ import {
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
 const COURSE = "33333333-3333-3333-3333-333333333333";
+const COURSE_SPEC = "44444444-4444-4444-4444-444444444444";
 
 test("coLecturerViolation is null when unset or empty", () => {
   expect(coLecturerViolation({})).toBeNull();
@@ -32,9 +33,18 @@ test("coLecturerViolation flags the primary lecturer also listed as a co-lecture
   expect(coLecturerViolation({ lecturerId: A, coLecturerIds: [A, B] })).toBe("primaryIsCoLecturer");
 });
 
+test("CreateOfferingInput requires an exact CourseSpec version", () => {
+  const result = CreateOfferingInput.safeParse({
+    courseId: COURSE,
+    term: "2025-Fall",
+  });
+  expect(result.success).toBe(false);
+});
+
 test("CreateOfferingInput rejects duplicate co-lecturers", () => {
   const result = CreateOfferingInput.safeParse({
     courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
     term: "2025-Fall",
     coLecturerIds: [A, A],
   });
@@ -44,6 +54,7 @@ test("CreateOfferingInput rejects duplicate co-lecturers", () => {
 test("CreateOfferingInput rejects the primary lecturer listed as a co-lecturer", () => {
   const result = CreateOfferingInput.safeParse({
     courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
     term: "2025-Fall",
     lecturerId: A,
     coLecturerIds: [A],
@@ -54,6 +65,7 @@ test("CreateOfferingInput rejects the primary lecturer listed as a co-lecturer",
 test("CreateOfferingInput accepts a valid co-lecturer assignment", () => {
   const result = CreateOfferingInput.safeParse({
     courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
     term: "2025-Fall",
     lecturerId: A,
     coLecturerIds: [B],
@@ -67,8 +79,12 @@ test("UpdateOfferingInput applies the same invariant on a partial patch", () => 
   expect(UpdateOfferingInput.safeParse({}).success).toBe(true);
 });
 
-test("class section defaults to A for backward-compatible create requests", () => {
-  const parsed = CreateOfferingInput.parse({ courseId: COURSE, term: "2026-Fall" });
+test("class section defaults to A when an exact CourseSpec version is supplied", () => {
+  const parsed = CreateOfferingInput.parse({
+    courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
+    term: "2026-Fall",
+  });
   expect(parsed.sectionCode).toBe("A");
 });
 
@@ -123,15 +139,21 @@ test("teaching-period invariant requires a complete ordered range", () => {
 });
 
 test("CreateOfferingInput accepts either no dates or a complete teaching period", () => {
-  expect(CreateOfferingInput.safeParse({ courseId: COURSE, term: "2026-Fall" }).success).toBe(true);
   expect(CreateOfferingInput.safeParse({
     courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
+    term: "2026-Fall",
+  }).success).toBe(true);
+  expect(CreateOfferingInput.safeParse({
+    courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
     term: "2026-Fall",
     startDate: "2026-08-10",
     endDate: "2026-11-28",
   }).success).toBe(true);
   expect(CreateOfferingInput.safeParse({
     courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
     term: "2026-Fall",
     startDate: "2026-08-10",
   }).success).toBe(false);
