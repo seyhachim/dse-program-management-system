@@ -40,13 +40,14 @@ export async function generateCloAttainmentSnapshots(
           id: true,
           studentId: true,
           results: {
-            where: { finalizedAt: { not: null } },
+            where: { publishedAt: { not: null }, finalizedAt: { not: null } },
             select: {
               id: true,
               courseSpecId: true,
               assessmentItemId: true,
               score: true,
               maxScore: true,
+              publishedAt: true,
               finalizedAt: true,
               updatedAt: true,
               criterionScores: {
@@ -120,8 +121,10 @@ export async function generateCloAttainmentSnapshots(
             sources.push({
               source: "criterion", assessmentItemId: assessment.id, resultId: result.id, criterionScoreId: score.id,
               rubricId: score.rubricId, criterionId: score.criterionId, rubricContentHash: score.rubricContentHash,
-              score: score.score, maxScore: score.maxScore, percentage, resultUpdatedAt: result.updatedAt.toISOString(),
-              criterionUpdatedAt: score.updatedAt.toISOString(),
+              score: score.score, maxScore: score.maxScore, percentage,
+              publishedAt: result.publishedAt?.toISOString() ?? null,
+              finalizedAt: result.finalizedAt?.toISOString() ?? null,
+              resultUpdatedAt: result.updatedAt.toISOString(), criterionUpdatedAt: score.updatedAt.toISOString(),
             });
           }
         } else if (assessment.cloCodes.includes(cloCode) && result.maxScore > 0) {
@@ -130,7 +133,10 @@ export async function generateCloAttainmentSnapshots(
           usedResultIds.push(result.id);
           sources.push({
             source: "assessment", assessmentItemId: assessment.id, resultId: result.id, score: result.score,
-            maxScore: result.maxScore, percentage, resultUpdatedAt: result.updatedAt.toISOString(),
+            maxScore: result.maxScore, percentage,
+            publishedAt: result.publishedAt?.toISOString() ?? null,
+            finalizedAt: result.finalizedAt?.toISOString() ?? null,
+            resultUpdatedAt: result.updatedAt.toISOString(),
           });
         }
       }
@@ -151,7 +157,7 @@ export async function generateCloAttainmentSnapshots(
     const achievedCount = students.filter((student) => student.achieved).length;
     const achievedRate = studentCount === 0 ? null : round2((achievedCount / studentCount) * 100);
     const thresholdRule = {
-      kind: "studentMeanMappedEvidenceGte", thresholdPercentage, finalizedResultsOnly: true,
+      kind: "studentMeanMappedEvidenceGte", thresholdPercentage, publishedAndFinalizedResultsOnly: true,
       criterionEvidencePreferred: true, emptyPopulationRate: null,
     };
     const sourceEvidence = {
