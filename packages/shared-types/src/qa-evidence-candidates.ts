@@ -78,6 +78,8 @@ export const QA_STRUCTURED_EVIDENCE_TYPES = [
   "weekly-workload",
   "staff-profile",
   "teaching-assignments",
+  "cohort-membership",
+  "student-progression-records",
 ] as const;
 
 /** Evidence types #189 can retrieve semantically from programme QA documents. */

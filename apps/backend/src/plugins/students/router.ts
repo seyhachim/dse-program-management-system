@@ -8,6 +8,7 @@ import {
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { studentService } from "./service.ts";
+import { createStudentCohortRouter } from "./cohort-router.ts";
 
 /**
  * Students REST router. Every route requires authentication; writes require the
@@ -18,6 +19,8 @@ export function createStudentRouter(): Router {
   const router = Router();
 
   router.use(requireAuth);
+
+  router.use("/cohorts", createStudentCohortRouter());
 
   // GET /api/students?search=&activeOnly=
   router.get("/", requirePermission("students:read"), async (req, res) => {

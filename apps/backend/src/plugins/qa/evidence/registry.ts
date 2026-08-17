@@ -89,6 +89,59 @@ async function queryRows(
   evidenceType: string,
 ): Promise<CandidateRow[]> {
   switch (evidenceType) {
+    case "cohort-membership":
+      return prisma.$queryRaw<CandidateRow[]>`
+        SELECT
+          m.id AS "entityId",
+          'StudentCohortMembership' AS "entityType",
+          s."studentId" || ' — ' || c.code || ' cohort membership' AS title,
+          'Joined ' || m."joinedAt"::text || CASE WHEN m."exitedAt" IS NULL THEN '; active membership.' ELSE '; exited ' || m."exitedAt"::text || '.' END AS summary,
+          '/students' AS route,
+          m."joinedAt" AS "reportingDate",
+          jsonb_build_object(
+            'cohortId', c.id,
+            'cohortCode', c.code,
+            'studentId', s.id,
+            'population', 'student',
+            'joinedAt', m."joinedAt"::text,
+            'exitedAt', m."exitedAt"::text,
+            'exitReason', m."exitReason"::text,
+            'finalized', true
+          ) AS attributes
+        FROM "StudentCohortMembership" m
+        JOIN "StudentCohort" c ON c.id = m."cohortId"
+        JOIN "Student" s ON s.id = m."studentId"
+        WHERE c."programmeId" = ${programmeId}
+        ORDER BY c."intakeYear", c.code, s."studentId", m."joinedAt"
+      `;
+
+    case "student-progression-records":
+      return prisma.$queryRaw<CandidateRow[]>`
+        SELECT
+          p.id AS "entityId",
+          'StudentProgressionRecord' AS "entityType",
+          s."studentId" || ' — ' || p."academicYear" || ' ' || p.term AS title,
+          p.status::text || CASE WHEN p.note = '' THEN '.' ELSE ': ' || p.note END AS summary,
+          '/students' AS route,
+          p."periodEnd" AS "reportingDate",
+          jsonb_build_object(
+            'cohortId', c.id,
+            'cohortCode', c.code,
+            'studentId', s.id,
+            'academicYear', p."academicYear",
+            'term', p.term,
+            'periodKey', p."academicYear" || ':' || p.term,
+            'population', 'student',
+            'status', p.status::text,
+            'finalized', true
+          ) AS attributes
+        FROM "StudentProgressionRecord" p
+        JOIN "StudentCohortMembership" m ON m.id = p."membershipId"
+        JOIN "StudentCohort" c ON c.id = m."cohortId"
+        JOIN "Student" s ON s.id = m."studentId"
+        WHERE c."programmeId" = ${programmeId}
+        ORDER BY p."periodStart", c.code, s."studentId"
+      `;
     case "programme-outcomes":
       return prisma.$queryRaw<CandidateRow[]>`
         SELECT

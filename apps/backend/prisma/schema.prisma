@@ -16,6 +16,29 @@ enum StudentStatus {
   Pending
 }
 
+enum StudentCohortStatus {
+  Planned
+  Active
+  Completed
+  Archived
+}
+
+enum StudentCohortMembershipExitReason {
+  Withdrawn
+  Transferred
+  Graduated
+  Other
+}
+
+enum StudentProgressionStatus {
+  Progressed
+  Retained
+  Withdrawn
+  Inactive
+  Graduated
+  Transferred
+}
+
 enum OfferingStatus {
   Planned
   Active
@@ -301,6 +324,7 @@ model Programme {
   qaSarSections            QaSarSection[]
   qaSarSubmissions         QaSarSubmission[]
   qaSarReleases            QaSarRelease[]
+  studentCohorts            StudentCohort[]
 }
 
 /// Canonical curriculum identity for one programme. Versions are immutable
@@ -1036,8 +1060,69 @@ model Student {
   enrollments                    Enrollment[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
+  cohortMemberships                 StudentCohortMembership[]
 
   @@index([status])
+}
+
+/// Authoritative programme cohort identity. Cohort membership and progression
+/// history are explicit records and are never inferred from attendance or enrolment.
+model StudentCohort {
+  id                     String              @id @default(uuid())
+  programmeId            String
+  programme              Programme           @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  code                   String
+  name                   String
+  intakeYear             Int
+  expectedGraduationYear Int
+  status                 StudentCohortStatus @default(Active)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  memberships StudentCohortMembership[]
+
+  @@unique([programmeId, code])
+  @@index([programmeId, intakeYear, status])
+}
+
+/// Dated student membership in one programme cohort. Membership history is kept
+/// even after withdrawal, transfer, or graduation.
+model StudentCohortMembership {
+  id         String                             @id @default(uuid())
+  cohortId   String
+  cohort     StudentCohort                      @relation(fields: [cohortId], references: [id], onDelete: Restrict)
+  studentId  String
+  student    Student                            @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  joinedAt   DateTime                           @db.Date
+  exitedAt   DateTime?                          @db.Date
+  exitReason StudentCohortMembershipExitReason?
+  note       String                             @default("")
+  createdAt  DateTime                           @default(now())
+
+  progressionRecords StudentProgressionRecord[]
+
+  @@unique([cohortId, studentId, joinedAt])
+  @@index([studentId, joinedAt])
+  @@index([cohortId, joinedAt, exitedAt])
+}
+
+/// Append-only academic-period status for one exact cohort membership. Corrections
+/// are represented by a later period record rather than rewriting prior evidence.
+model StudentProgressionRecord {
+  id             String                   @id @default(uuid())
+  membershipId   String
+  membership     StudentCohortMembership  @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  academicYear   String
+  term           String
+  periodStart    DateTime                 @db.Date
+  periodEnd      DateTime                 @db.Date
+  status         StudentProgressionStatus
+  note           String                   @default("")
+  recordedAt     DateTime                 @default(now())
+
+  @@unique([membershipId, academicYear, term])
+  @@index([membershipId, periodStart])
+  @@index([academicYear, term, status])
 }
 
 /// Programme-level learning outcomes for the single DSE programme.
