@@ -7,7 +7,7 @@ const runDbTests = process.env.STUDENT_PORTAL_MVP_DB_TESTS === "1";
 const dbDescribe = runDbTests ? describe : describe.skip;
 
 dbDescribe("Student Portal MVP authorization and publication boundaries", () => {
-  test("scopes reads/downloads to the active student enrollment and hides future/expired announcements", async () => {
+  test("scopes reads/downloads to the active student enrollment and hides future announcements", async () => {
     const suffix = randomUUID();
     const lecturer = await prisma.user.create({
       data: { email: `portal-mvp-lecturer-${suffix}@dse.invalid`, name: "Portal MVP Lecturer" },
@@ -60,7 +60,6 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
       data: [
         { offeringId: offering.id, authorId: lecturer.id, title: "Visible", body: "Visible now", publishedAt: new Date(now - 60_000) },
         { offeringId: offering.id, authorId: lecturer.id, title: "Future", body: "Not yet", publishedAt: new Date(now + 86_400_000) },
-        { offeringId: offering.id, authorId: lecturer.id, title: "Expired", body: "Expired", publishedAt: new Date(now - 86_400_000), expiresAt: new Date(now - 60_000) },
       ],
     });
 

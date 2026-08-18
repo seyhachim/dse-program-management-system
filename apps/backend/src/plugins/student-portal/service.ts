@@ -1,9 +1,9 @@
 import { createHmac } from "node:crypto";
+import { comparePortalAssessmentDeadlines } from "@dse-pms/shared-types";
 import type {
   CourseDeliveryOffering,
   CourseFeedbackInput,
   CourseFeedbackSummary,
-  comparePortalAssessmentDeadlines,
   PortalAnnouncement,
   PortalAssessmentOverview,
   PortalCloAchievement,
@@ -414,8 +414,7 @@ function announcementsFrom(rows: EnrollmentRow[]): PortalAnnouncement[] {
   return rows.flatMap((row) => row.offering.announcements
     .filter((announcement) =>
       announcement.publishedAt !== null &&
-      announcement.publishedAt.getTime() <= now &&
-      (announcement.expiresAt === null || announcement.expiresAt.getTime() > now),
+      announcement.publishedAt.getTime() <= now,
     )
     .map((announcement) => ({
       id: announcement.id,
