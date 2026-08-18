@@ -94,6 +94,22 @@ async function latestReview(courseSpecId: string): Promise<LatestReviewRow | nul
   return rows[0] ?? null;
 }
 
+async function reviewById(id: string): Promise<CourseSpecPeriodicReviewView> {
+  const rows = await prisma.$queryRaw<ReviewRow[]>`
+    SELECT
+      "id", "courseSpecId", "reviewerId", "scheduledDueAt", "reviewedAt",
+      "evidenceSummary", "decisionReason", "outcome", "createdRevisionId",
+      "nextReviewDueAt", "createdAt"
+    FROM "course_spec_governance"."CourseSpecPeriodicReview"
+    WHERE "id" = ${id}
+  `;
+  const row = rows[0];
+  if (!row) {
+    throw new Error("Periodic review was not persisted");
+  }
+  return toView(row);
+}
+
 async function insertReview(input: {
   id: string;
   courseSpecId: string;
@@ -208,28 +224,28 @@ export const courseSpecPeriodicReviewService = {
       });
     }
 
+    const reviewId = randomUUID();
     const revisionType = input.outcome === "MajorRevision" ? "Major" : "Minor";
-    const revision = await courseSpecRevisionService.createCourseSpecRevision({
+    await courseSpecRevisionService.createCourseSpecRevision({
       courseId,
       revisionType,
       triggers: ["ScheduledReview"],
       reason: input.decisionReason,
       changeSummary: input.changeSummary,
       initiatedById: reviewerId,
+      periodicReview: {
+        id: reviewId,
+        sourceCourseSpecId: source.id,
+        reviewerId,
+        scheduledDueAt,
+        reviewedAt,
+        evidenceSummary: input.evidenceSummary,
+        decisionReason: input.decisionReason,
+        outcome: input.outcome,
+      },
     });
 
-    return insertReview({
-      id: randomUUID(),
-      courseSpecId: source.id,
-      reviewerId,
-      scheduledDueAt,
-      reviewedAt,
-      evidenceSummary: input.evidenceSummary,
-      decisionReason: input.decisionReason,
-      outcome: input.outcome,
-      createdRevisionId: revision.id,
-      nextReviewDueAt: null,
-    });
+    return reviewById(reviewId);
   },
 
   async list(courseId: string): Promise<CourseSpecPeriodicReviewView[]> {
