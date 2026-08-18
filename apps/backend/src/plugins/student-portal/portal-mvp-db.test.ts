@@ -7,7 +7,7 @@ const runDbTests = process.env.STUDENT_PORTAL_MVP_DB_TESTS === "1";
 const dbDescribe = runDbTests ? describe : describe.skip;
 
 dbDescribe("Student Portal MVP authorization and publication boundaries", () => {
-  test("scopes reads/downloads to the active student enrollment and hides future announcements", async () => {
+  test("scopes reads/downloads to the active student enrollment and preserves historical offerings", async () => {
     const suffix = randomUUID();
     const lecturer = await prisma.user.create({
       data: { email: `portal-mvp-lecturer-${suffix}@dse.invalid`, name: "Portal MVP Lecturer" },
@@ -35,6 +35,17 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
         status: "Active",
       },
     });
+    const historicalOffering = await prisma.offering.create({
+      data: {
+        courseId: spec.courseId,
+        courseSpecId: spec.id,
+        lecturerId: lecturer.id,
+        term: `portal-mvp-history-${suffix}`,
+        sectionCode: `H-${suffix.slice(0, 8)}`,
+        capacity: 10,
+        status: "Completed",
+      },
+    });
     const student = await prisma.student.create({
       data: {
         userId: studentUser.id,
@@ -53,7 +64,12 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
         status: "Active",
       },
     });
-    await prisma.enrollment.create({ data: { offeringId: offering.id, studentId: student.id } });
+    await prisma.enrollment.createMany({
+      data: [
+        { offeringId: offering.id, studentId: student.id },
+        { offeringId: historicalOffering.id, studentId: student.id },
+      ],
+    });
 
     const now = Date.now();
     await prisma.courseAnnouncement.createMany({
@@ -65,17 +81,27 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
 
     try {
       const courses = await studentPortalService.courses(studentUser.id);
-      expect(courses.map((course) => course.offeringId)).toEqual([offering.id]);
+      expect(courses.find((course) => course.offeringId === offering.id)?.lifecycle).toBe("current");
+      expect(courses.find((course) => course.offeringId === historicalOffering.id)?.lifecycle).toBe("historical");
 
       const detail = await studentPortalService.course(studentUser.id, offering.id);
       expect(detail.specAvailable).toBe(true);
+      expect(detail.lifecycle).toBe("current");
 
       const document = await studentPortalService.courseDocument(studentUser.id, offering.id);
       expect(document.fileName).toContain("approved-course-specification.html");
       expect(document.contentType).toBe("text/html; charset=utf-8");
 
+      const historicalDetail = await studentPortalService.course(studentUser.id, historicalOffering.id);
+      expect(historicalDetail.specAvailable).toBe(true);
+      expect(historicalDetail.lifecycle).toBe("historical");
+
+      const historicalDocument = await studentPortalService.courseDocument(studentUser.id, historicalOffering.id);
+      expect(historicalDocument.fileName).toContain("approved-course-specification.html");
+
       await expect(studentPortalService.course(otherUser.id, offering.id)).rejects.toBeInstanceOf(PortalNotFoundError);
       await expect(studentPortalService.courseDocument(otherUser.id, offering.id)).rejects.toBeInstanceOf(PortalNotFoundError);
+      await expect(studentPortalService.course(otherUser.id, historicalOffering.id)).rejects.toBeInstanceOf(PortalNotFoundError);
 
       const announcements = await studentPortalService.announcements(studentUser.id);
       expect(announcements.map((announcement) => announcement.title)).toEqual(["Visible"]);
@@ -83,7 +109,7 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
       await prisma.student.update({ where: { id: student.id }, data: { status: "Inactive" } });
       await expect(studentPortalService.courses(studentUser.id)).rejects.toBeInstanceOf(PortalAccessError);
     } finally {
-      await prisma.offering.delete({ where: { id: offering.id } }).catch(() => undefined);
+      await prisma.offering.deleteMany({ where: { id: { in: [offering.id, historicalOffering.id] } } }).catch(() => undefined);
       await prisma.student.deleteMany({ where: { id: { in: [student.id, otherStudent.id] } } });
       await prisma.user.deleteMany({ where: { id: { in: [lecturer.id, studentUser.id, otherUser.id] } } });
     }

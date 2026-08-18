@@ -262,6 +262,7 @@ function toSummary(row: EnrollmentRow): PortalCourseSummary {
     credits: offering.course.credits,
     term: offering.term,
     sectionCode: offering.sectionCode,
+    lifecycle: offering.status === "Completed" ? "historical" : offering.status === "Planned" ? "planned" : "current",
     lecturer: offering.lecturer,
     coLecturers: offering.coLecturers.map((item) => item.lecturer),
     meetings: offering.meetings.map((meeting) => ({

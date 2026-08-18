@@ -74,6 +74,8 @@ export interface PortalCloAchievement {
   }>;
 }
 
+export type PortalCourseLifecycle = "planned" | "current" | "historical";
+
 export interface PortalCourseSummary {
   offeringId: string;
   enrollmentId: string;
@@ -84,6 +86,7 @@ export interface PortalCourseSummary {
   credits: number | null;
   term: string;
   sectionCode: string;
+  lifecycle: PortalCourseLifecycle;
   lecturer: PortalLecturer | null;
   coLecturers: PortalLecturer[];
   meetings: PortalMeeting[];
@@ -217,7 +220,6 @@ export interface PortalCourseDocumentDownload {
   contentType: "text/html; charset=utf-8";
   content: string;
 }
-
 export type PortalAssessmentDeadlineState = "overdue" | "upcoming" | "week-only" | "unscheduled";
 
 export function portalAssessmentDeadlineState(
