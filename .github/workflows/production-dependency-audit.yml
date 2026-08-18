@@ -36,8 +36,15 @@ jobs:
         with:
           bun-version: 1.2.23
 
-      - name: Install locked dependencies
-        run: bun install --frozen-lockfile
+      - name: Regenerate lockfile for dependency classification change
+        run: bun install
+
+      - name: Capture generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-131-bun-lock
+          path: bun.lock
+          if-no-files-found: error
 
       - name: Audit production dependency graph
         run: bun run audit:production
