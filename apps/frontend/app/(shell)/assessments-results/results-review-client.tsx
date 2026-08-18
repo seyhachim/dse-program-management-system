@@ -23,6 +23,8 @@ import { courseDeliveryApi } from "@/lib/course-delivery";
 import { Topbar } from "../topbar";
 import { FinalizedResultCorrections } from "./finalized-result-corrections";
 
+const UNAPPROVED_SPEC_ERROR = "Offering is not bound to an Approved CourseSpec version";
+
 export function ResultsReviewClient() {
   const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -75,6 +77,8 @@ export function ResultsReviewClient() {
   );
 
   const selected = offerings.find((item) => item.offeringId === selectedId) ?? null;
+  const requiresApprovedSpecification = selected?.specificationStatus !== "Approved";
+  const isExpectedSpecificationError = error === UNAPPROVED_SPEC_ERROR;
   const configuredWeight = review?.rows[0]?.configuredGradeWeight ?? 0;
   const completeCount = review?.rows.filter((row) => row.courseGradeComplete).length ?? 0;
   const incompleteCount = (review?.rows.length ?? 0) - completeCount;
@@ -135,15 +139,13 @@ export function ResultsReviewClient() {
             </div>
           </section>
 
-          {error ? <ErrorBanner message={error} /> : null}
+          {error && !isExpectedSpecificationError ? <ErrorBanner message={error} /> : null}
           {loadingOfferings ? <LoadingCard message="Loading assigned course sections…" /> : null}
           {!loadingOfferings && !offerings.length ? (
             <EmptyCard message="No assigned course sections are available for result review." />
           ) : null}
-          {selected && selected.specificationStatus !== "Approved" ? (
-            <WarningBanner>
-              This section does not currently have an approved course specification. Grade and CLO review requires an approved specification.
-            </WarningBanner>
+          {selected && requiresApprovedSpecification ? (
+            <CourseSpecificationRequiredCard offering={selected} />
           ) : null}
           {loadingReview ? <LoadingCard message="Calculating weighted grades and CLO evidence…" /> : null}
 
@@ -339,6 +341,35 @@ function Metric({ icon: Icon, label, value }: { icon: typeof ClipboardCheck; lab
       <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4 text-primary" />{label}</div>
       <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
     </div>
+  );
+}
+
+function CourseSpecificationRequiredCard({ offering }: { offering: CourseDeliveryOffering }) {
+  return (
+    <section className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm dark:border-amber-900 dark:bg-amber-950/30 md:p-6">
+      <div className="flex gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold text-amber-950 dark:text-amber-100">Course specification required</h3>
+          <p className="mt-1 max-w-3xl text-sm text-amber-900/90 dark:text-amber-200">
+            {offering.code} · Section {offering.sectionCode} · {offering.term} has not yet been linked to an approved Course Specification. Results cannot be calculated until an approved version is assigned.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-amber-200 bg-background/70 px-4 py-3 dark:border-amber-900">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current specification status</p>
+              <p className="mt-1 font-semibold">{offering.specificationStatus || "Not linked"}</p>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-background/70 px-4 py-3 dark:border-amber-900">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Required status</p>
+              <p className="mt-1 font-semibold">Approved</p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-amber-900/80 dark:text-amber-200/80">
+            Ask the Head of Programme or an authorized administrator to approve and bind the correct Course Specification version before entering or reviewing official results.
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
