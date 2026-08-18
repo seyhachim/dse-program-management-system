@@ -1,0 +1,31 @@
+name: Patch issue 307 unified evidence candidates
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-307-unified-evidence-candidates
+      - run: python .github/patch-issue-307.py
+      - name: Commit generated feature files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/shared-types/src/qa-evidence-candidates.ts \
+            apps/backend/src/plugins/qa/documents/semantic.ts \
+            apps/backend/src/plugins/qa/evidence/service.ts \
+            apps/backend/src/plugins/qa/analysis/deterministic-engine.ts \
+            apps/backend/src/plugins/qa/evidence/unified-candidates.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "feat(qa): unify structured and document evidence candidates (#307)"
+          git pull --rebase origin agent/issue-307-unified-evidence-candidates
+          git push origin HEAD:agent/issue-307-unified-evidence-candidates
