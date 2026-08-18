@@ -213,7 +213,7 @@ export function RollCallDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className="h-[min(92vh,860px)] max-h-[92vh] w-[min(1120px,94vw)] max-w-none gap-0 overflow-hidden p-0 text-sm shadow-2xl"
+        className="h-[min(92vh,860px)] max-h-[92vh] w-[min(1120px,94vw)] max-w-none gap-0 overflow-hidden p-0 text-sm shadow-2xl sm:max-w-none"
       >
         <DialogTitle className="sr-only">Roll Call Mode</DialogTitle>
         <DialogDescription className="sr-only">
