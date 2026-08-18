@@ -29,6 +29,7 @@ import {
   evaluateExpectedEvidence,
   type QaEvidenceRuleFinding,
 } from "./rules.ts";
+import { evaluateRelationship } from "./relationships.ts";
 
 function relevanceFor(definition: QaExpectedEvidenceDefinitionView): number {
   if (definition.role === "required") return 1;
@@ -321,6 +322,7 @@ export async function runDeterministicQaAnalysis(
           engine: "deterministic-rules",
           engineVersion: QA_DETERMINISTIC_RULE_VERSION,
           promptVersion: "",
+          reasoningFactors: { evidence: [], relationships: [] },
           sources: [],
         }),
       );
@@ -337,10 +339,31 @@ export async function runDeterministicQaAnalysis(
       requirementCode,
       assessedGroups.map((group) => group.finding),
     );
+    const acceptedByType = new Map(assessedGroups.map((group) => [group.finding.definition.evidenceType, group.finding.result.candidates]));
+    const relationshipFindings = (expectation.relationshipRequirement?.requiredLinks ?? []).map((link) =>
+      evaluateRelationship(link, acceptedByType.get(link.fromEvidenceType) ?? [], acceptedByType.get(link.toEvidenceType) ?? []),
+    );
     const { state, uncertaintyNote } = determineExpectationState(
       requirementCode,
       findings,
+      relationshipFindings,
     );
+    const reasoningFactors = {
+      evidence: assessedGroups.map((group) => ({
+        expectedEvidenceId: group.finding.definition.id,
+        evidenceType: group.finding.definition.evidenceType,
+        role: group.finding.definition.role,
+        findingState: group.finding.state,
+        acceptedCandidateKeys: group.finding.result.candidates.map((candidate) => candidate.key),
+        rejectedScopeCount: group.assessed.filter((item) => item.scopeMatch !== "exact").length,
+        rejectedTemporalCount: group.assessed.filter((item) => !temporalMatchSupportsEvidence(item.temporalRule, item.temporalMatch)).length,
+        rejectedAuthorityCount: group.assessed.filter((item) => item.authorityMatch !== true).length,
+      })),
+      relationships: relationshipFindings.map((finding) => ({
+        fromEvidenceType: finding.link.fromEvidenceType, toEvidenceType: finding.link.toEvidenceType, relation: finding.link.relation,
+        state: finding.state, matchedPairs: finding.matchedPairs, explanation: finding.explanation,
+      })),
+    };
 
     analyses.push(
       await createQaEvidenceAnalysis({
@@ -351,12 +374,13 @@ export async function runDeterministicQaAnalysis(
         applicability: "applicable",
         applicabilityReason: applicability.reason,
         state,
-        explanation: buildDeterministicExplanation(requirementCode, findings, state),
+        explanation: buildDeterministicExplanation(requirementCode, findings, state, relationshipFindings),
         confidence: null,
         uncertaintyNote,
         engine: "deterministic-rules",
         engineVersion: QA_DETERMINISTIC_RULE_VERSION,
         promptVersion: "",
+        reasoningFactors,
         sources: sourceSnapshots(assessedGroups.flatMap((group) => group.assessed)),
       }),
     );

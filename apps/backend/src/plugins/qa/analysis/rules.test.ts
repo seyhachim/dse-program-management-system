@@ -63,7 +63,7 @@ function candidate(
 }
 
 test("deterministic rule engine is explicitly versioned", () => {
-  expect(QA_DETERMINISTIC_RULE_VERSION).toBe("1.0.0");
+  expect(QA_DETERMINISTIC_RULE_VERSION).toBe("2.0.0");
 });
 
 test("supported required source with no candidates produces a potential evidence gap", () => {
