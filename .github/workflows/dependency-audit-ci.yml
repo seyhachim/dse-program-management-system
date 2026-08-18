@@ -21,39 +21,11 @@ on:
     - cron: "17 1 * * 1"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  refresh-safe-transitives:
-    if: github.event_name == 'pull_request' && github.head_ref == 'agent/issue-131-dependency-audit'
-    name: Refresh patched transitive versions
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.23
-      - run: bun install --frozen-lockfile
-      - name: Update only advisory-bearing packages within existing ranges
-        run: bun update @hono/node-server brace-expansion hono ip-address js-yaml nanoid postcss undici --lockfile-only
-      - name: Commit lockfile refresh when needed
-        shell: bash
-        run: |
-          if git diff --quiet -- bun.lock; then
-            echo "No transitive lockfile updates available"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bun.lock
-          git commit -m "chore(deps): refresh patched transitive versions"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-
   production-audit:
-    name: Production dependency advisory inventory
+    name: Production dependency advisory gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -62,14 +34,25 @@ jobs:
         with:
           bun-version: 1.2.23
       - run: bun install --frozen-lockfile
-      - name: Capture production audit
+      - name: Audit production dependency graph
         shell: bash
         run: |
           set +e
           bun audit --production --json > dependency-audit.json 2>dependency-audit.stderr
           status=$?
           set -e
+
           cat dependency-audit.stderr || true
-          cat dependency-audit.json || true
-          echo "audit_exit_code=$status" >> "$GITHUB_STEP_SUMMARY"
-          exit 0
+          cat dependency-audit.json
+
+          bun -e '
+            const report = JSON.parse(await Bun.file("dependency-audit.json").text());
+            const packageCount = Object.keys(report).length;
+            const advisoryCount = Object.values(report).reduce((count, advisories) => count + advisories.length, 0);
+            console.log(`Production audit: ${advisoryCount} advisories across ${packageCount} packages`);
+            if (packageCount > 0 || advisoryCount > 0) process.exit(1);
+          '
+
+          if [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
