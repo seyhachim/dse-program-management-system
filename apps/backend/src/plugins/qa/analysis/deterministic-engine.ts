@@ -340,7 +340,7 @@ export async function runDeterministicQaAnalysis(
       assessedGroups.map((group) => group.finding),
     );
     const acceptedByType = new Map(assessedGroups.map((group) => [group.finding.definition.evidenceType, group.finding.result.candidates]));
-    const relationshipFindings = expectation.relationshipRequirement.requiredLinks.map((link) =>
+    const relationshipFindings = (expectation.relationshipRequirement?.requiredLinks ?? []).map((link) =>
       evaluateRelationship(link, acceptedByType.get(link.fromEvidenceType) ?? [], acceptedByType.get(link.toEvidenceType) ?? []),
     );
     const { state, uncertaintyNote } = determineExpectationState(
