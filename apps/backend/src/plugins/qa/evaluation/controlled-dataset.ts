@@ -15,7 +15,7 @@ import { createQaEvaluationScenario, listQaEvaluationScenarios } from "./service
 type EvidenceInput = z.infer<typeof QaEvaluationScenarioEvidenceInputSchema>;
 type EvidenceDefinition = QaQualityExpectationView["expectedEvidence"][number];
 
-export const QA_CRITERIA_1_4_8_REQUIREMENTS = ["1.2", "4.1", "8.3"] as const;
+export const QA_CRITERIA_1_4_8_REQUIREMENTS = ["1.2", "4.1", "8.5"] as const;
 export const QA_CONTROLLED_SCENARIO_TYPES = QaEvaluationScenarioTypeSchema.options;
 export const QA_CONTROLLED_DATASET_EXPECTED_SCENARIOS =
   QA_CRITERIA_1_4_8_REQUIREMENTS.length * QA_CONTROLLED_SCENARIO_TYPES.length;
