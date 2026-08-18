@@ -17,6 +17,10 @@ import {
   retrieveEvidenceCandidates,
   type ExpectedEvidenceDefinition,
 } from "./registry.ts";
+import {
+  retrieveRubricEvidenceCandidates,
+  type RubricEvidenceViewer,
+} from "./rubric-evidence.ts";
 
 type DefinitionRow = {
   id: string;
@@ -123,8 +127,6 @@ export function normalizeCandidateSemantics(
     provenance: candidate.provenance ?? inferProvenance(candidate),
     periodKey: candidate.periodKey ?? inferPeriodKey(candidate),
   }));
-  // Candidate keys are the stable identity across adapters. Preserve the first
-  // ranked occurrence and drop later duplicates deterministically.
   const byKey = new Map<string, (typeof normalized)[number]>();
   for (const candidate of normalized) {
     if (!byKey.has(candidate.key)) byKey.set(candidate.key, candidate);
@@ -135,7 +137,12 @@ export function normalizeCandidateSemantics(
 export async function getQaEvidenceCandidates(
   programmeId: string,
   expectedEvidenceId: string,
-  options: { topK?: number; embeddingProvider?: QaEmbeddingProvider | null; cohortIds?: string[] } = {},
+  options: {
+    topK?: number;
+    embeddingProvider?: QaEmbeddingProvider | null;
+    cohortIds?: string[];
+    viewer?: RubricEvidenceViewer;
+  } = {},
 ): Promise<QaEvidenceCandidateResultView> {
   const [programme, definitions] = await Promise.all([
     prisma.programme.findUnique({ where: { id: programmeId }, select: { id: true } }),
@@ -168,6 +175,21 @@ export async function getQaEvidenceCandidates(
   const sourceDomain = QaEvidenceSourceDomainSchema.safeParse(row.sourceDomain);
   if (!sourceDomain.success) {
     throw new Error(`Unsupported QA evidence source domain: ${row.sourceDomain}`);
+  }
+
+  if (row.evidenceType === "rubrics") {
+    return normalizeCandidateSemantics(
+      programmeId,
+      await retrieveRubricEvidenceCandidates(
+        programmeId,
+        {
+          id: row.id,
+          evidenceType: row.evidenceType,
+          sourceDomain: sourceDomain.data,
+        },
+        options.viewer,
+      ),
+    );
   }
 
   if (semanticDomains.has(sourceDomain.data)) {
