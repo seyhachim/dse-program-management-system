@@ -345,19 +345,21 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           format: item.format,
           submissionMethod: item.submissionMethod,
           instructions: item.instructions,
-          rubricName: item.rubric?.name ?? "",
-          rubricCriteria: (item.rubric?.criterionRows ?? []).map((criterion) => ({
-            id: criterion.id,
-            name: criterion.name,
-            cloCodes: item.criterionCloMappings
-              .filter((mapping) => mapping.rubricId === item.rubricId && mapping.criterionId === criterion.id)
-              .map((mapping) => mapping.cloCode),
-            levels: (item.rubric?.levelRows ?? []).map((level) => ({
-              id: level.id,
-              label: level.label,
-              points: level.points,
-            })),
-          })),
+          rubricName: item.rubric && item.rubric.status !== "Draft" ? item.rubric.name : "",
+          rubricCriteria: item.rubric && item.rubric.status !== "Draft"
+            ? item.rubric.criterionRows.map((criterion) => ({
+                id: criterion.id,
+                name: criterion.name,
+                cloCodes: item.criterionCloMappings
+                  .filter((mapping) => mapping.rubricId === item.rubricId && mapping.criterionId === criterion.id)
+                  .map((mapping) => mapping.cloCode),
+                levels: item.rubric!.levelRows.map((level) => ({
+                  id: level.id,
+                  label: level.label,
+                  points: level.points,
+                })),
+              }))
+            : [],
           result: result && result.publishedAt
             ? {
                 assessmentItemId: item.id,
