@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { ClassResponsibilityRole, LecturerArrivalStatus } from "@dse-pms/shared-types";
+import type {
+  ClassResponsibilityRole,
+  ClassSessionStatus,
+  LecturerArrivalStatus,
+} from "@dse-pms/shared-types";
 import type { TelegramSessionUser } from "./session.ts";
 import {
   createTelegramClassDeliveryService,
@@ -8,9 +12,12 @@ import {
 
 const offeringId = "550e8400-e29b-41d4-a716-446655440001";
 const confirmationId = "550e8400-e29b-41d4-a716-446655440002";
+const sessionId = "550e8400-e29b-41d4-a716-446655440003";
 const programmeId = "dse";
 
-function user(role: "student" | "lecturer" = "student", id = crypto.randomUUID()): TelegramSessionUser {
+type TestRole = "student" | "lecturer" | "admin" | "program_coordinator" | "program_secretary";
+
+function user(role: TestRole = "student", id = crypto.randomUUID()): TelegramSessionUser {
   return {
     id,
     name: `Test ${role}`,
@@ -52,8 +59,12 @@ function harness(options: {
   lecturerId?: string;
   monitorRole?: ClassResponsibilityRole;
   monitorAllowed?: boolean;
-  existingStatus?: LecturerArrivalStatus | null;
-  saveChanged?: boolean;
+  existingArrivalStatus?: LecturerArrivalStatus | null;
+  existingNote?: string;
+  existingSessionStatus?: ClassSessionStatus | null;
+  existingReason?: string;
+  saveArrivalChanged?: boolean;
+  saveSessionChanged?: boolean;
 } = {}) {
   const audits: any[] = [];
   let responsibilityChecks = 0;
@@ -78,28 +89,70 @@ function harness(options: {
     },
     classDelivery: {
       async getLecturerArrival(id: string, date: string) {
-        if (!options.existingStatus) return null;
+        if (!options.existingArrivalStatus) return null;
         return {
           id: confirmationId,
           offeringId: id,
           date,
-          status: options.existingStatus,
+          status: options.existingArrivalStatus,
+          note: options.existingNote ?? "",
           recordedBy: { id: crypto.randomUUID(), name: "Recorder" },
           recordedAt: "2026-08-17T01:00:00.000Z",
           updatedAt: "2026-08-17T01:00:00.000Z",
         };
       },
-      async saveLecturerArrival(id: string, date: string, status: LecturerArrivalStatus, actorId: string) {
+      async getClassSessionStatus(id: string, date: string) {
+        if (!options.existingSessionStatus) return null;
         return {
-          changed: options.saveChanged ?? true,
+          id: sessionId,
+          offeringId: id,
+          date,
+          status: options.existingSessionStatus,
+          reason: options.existingReason ?? "",
+          recordedBy: { id: crypto.randomUUID(), name: "Manager" },
+          recordedAt: "2026-08-17T00:30:00.000Z",
+          updatedAt: "2026-08-17T00:30:00.000Z",
+        };
+      },
+      async saveLecturerArrival(
+        id: string,
+        date: string,
+        status: LecturerArrivalStatus,
+        note: string,
+        actorId: string,
+      ) {
+        return {
+          changed: options.saveArrivalChanged ?? true,
           confirmation: {
             id: confirmationId,
             offeringId: id,
             date,
             status,
+            note,
             recordedBy: { id: actorId, name: "Recorder" },
             recordedAt: "2026-08-17T01:00:00.000Z",
             updatedAt: "2026-08-17T01:00:00.000Z",
+          },
+        };
+      },
+      async saveClassSessionStatus(
+        id: string,
+        date: string,
+        status: ClassSessionStatus,
+        reason: string,
+        actorId: string,
+      ) {
+        return {
+          changed: options.saveSessionChanged ?? true,
+          session: {
+            id: sessionId,
+            offeringId: id,
+            date,
+            status,
+            reason,
+            recordedBy: { id: actorId, name: "Manager" },
+            recordedAt: "2026-08-17T00:30:00.000Z",
+            updatedAt: "2026-08-17T00:30:00.000Z",
           },
         };
       },
@@ -110,20 +163,40 @@ function harness(options: {
 }
 
 describe("Telegram class delivery authorization", () => {
-  test("assigned lecturer can confirm without monitor authority", async () => {
+  test("assigned lecturer can record arrival and optional note without monitor authority", async () => {
     const lecturer = user("lecturer");
-    const { service, responsibilityChecks } = harness({ lecturerId: lecturer.id });
-    const result = await service.save(lecturer, offeringId, "2026-08-17", "Present");
-    expect(result.access.actorKind).toBe("Lecturer");
+    const { service, responsibilityChecks, audits } = harness({ lecturerId: lecturer.id });
+    const result = await service.save(
+      lecturer,
+      offeringId,
+      "2026-08-17",
+      "Present",
+      "Arrived before the lecture started",
+    );
+    expect(result.access).toMatchObject({
+      actorKind: "Lecturer",
+      canRecordArrival: true,
+      canManageSession: false,
+    });
+    expect(result.confirmation.note).toBe("Arrived before the lecture started");
     expect(responsibilityChecks()).toBe(0);
+    expect(audits[0]?.metadata).toMatchObject({
+      resultingState: "Present",
+      note: "Arrived before the lecture started",
+      actorKind: "Lecturer",
+    });
   });
 
   for (const role of ["ClassMonitor", "SubClassMonitor"] as const) {
-    test(`${role} can confirm only through canonical active responsibility`, async () => {
+    test(`${role} can record arrival only through canonical active responsibility`, async () => {
       const monitor = user("student");
       const { service, audits } = harness({ monitorRole: role, monitorAllowed: true });
-      const result = await service.save(monitor, offeringId, "2026-08-17", "NotYet");
-      expect(result.access.actorKind).toBe(role);
+      const result = await service.save(monitor, offeringId, "2026-08-17", "NotYet", "On the way");
+      expect(result.access).toMatchObject({
+        actorKind: role,
+        canRecordArrival: true,
+        canManageSession: false,
+      });
       expect(audits).toHaveLength(1);
       expect(audits[0]).toMatchObject({
         userId: monitor.id,
@@ -131,10 +204,73 @@ describe("Telegram class delivery authorization", () => {
         action: "lecturer_arrival_confirmed",
         resourceType: "Offering",
         resourceId: offeringId,
-        metadata: { resultingState: "NotYet", actorKind: role, changed: true },
+        metadata: { resultingState: "NotYet", note: "On the way", actorKind: role, changed: true },
       });
     });
   }
+
+  test("programme manager can manage session status but cannot record lecturer arrival", async () => {
+    const manager = user("program_coordinator");
+    const { service, audits, responsibilityChecks } = harness();
+
+    const session = await service.saveSession(
+      manager,
+      offeringId,
+      "2026-08-17",
+      "Holiday",
+      "National holiday",
+    );
+    expect(session.access).toMatchObject({
+      actorKind: "ProgrammeManager",
+      canRecordArrival: false,
+      canManageSession: true,
+    });
+    expect(session.session).toMatchObject({ status: "Holiday", reason: "National holiday" });
+    expect(audits[0]?.action).toBe("class_session_status_recorded");
+    expect(audits[0]?.metadata).toMatchObject({
+      resultingState: "Holiday",
+      reason: "National holiday",
+      actorKind: "ProgrammeManager",
+      changed: true,
+    });
+    expect(responsibilityChecks()).toBe(0);
+
+    await expect(
+      service.save(manager, offeringId, "2026-08-17", "Present", ""),
+    ).rejects.toBeInstanceOf(TelegramClassDeliveryAccessError);
+  });
+
+  test("monitor cannot change official session status", async () => {
+    const monitor = user("student");
+    const { service } = harness({ monitorRole: "ClassMonitor", monitorAllowed: true });
+    await expect(
+      service.saveSession(monitor, offeringId, "2026-08-17", "Cancelled", "Lecturer unavailable"),
+    ).rejects.toBeInstanceOf(TelegramClassDeliveryAccessError);
+  });
+
+  test("session exception blocks lecturer-arrival mutation", async () => {
+    const monitor = user("student");
+    const { service } = harness({
+      monitorRole: "ClassMonitor",
+      monitorAllowed: true,
+      existingSessionStatus: "Holiday",
+      existingReason: "National holiday",
+    });
+    await expect(
+      service.save(monitor, offeringId, "2026-08-17", "Present", ""),
+    ).rejects.toThrow("not applicable");
+  });
+
+  test("assigned lecturer who also has a programme-wide role can manage both paths", async () => {
+    const lecturerManager = user("program_coordinator");
+    const { service } = harness({ lecturerId: lecturerManager.id });
+    const access = await service.get(lecturerManager, offeringId, "2026-08-17");
+    expect(access.access).toMatchObject({
+      actorKind: "Lecturer",
+      canRecordArrival: true,
+      canManageSession: true,
+    });
+  });
 
   test("unrelated student fails closed", async () => {
     const student = user("student");
@@ -147,9 +283,9 @@ describe("Telegram class delivery authorization", () => {
   test("removed enrollment or revoked responsibility fails closed on the next request", async () => {
     const monitor = user("student");
     const { service } = harness({ monitorRole: "ClassMonitor", monitorAllowed: false });
-    await expect(service.save(monitor, offeringId, "2026-08-17", "Present")).rejects.toBeInstanceOf(
-      TelegramClassDeliveryAccessError,
-    );
+    await expect(
+      service.save(monitor, offeringId, "2026-08-17", "Present", ""),
+    ).rejects.toBeInstanceOf(TelegramClassDeliveryAccessError);
   });
 
   test("cross-offering ids fail without leaking authority", async () => {
@@ -160,17 +296,33 @@ describe("Telegram class delivery authorization", () => {
     ).rejects.toThrow("Offering not found");
   });
 
-  test("duplicate same-state submissions stay idempotent and remain auditable", async () => {
+  test("duplicate same-state and same-note submissions stay idempotent and auditable", async () => {
     const monitor = user("student");
     const { service, audits } = harness({
       monitorRole: "ClassMonitor",
       monitorAllowed: true,
-      existingStatus: "Present",
-      saveChanged: false,
+      existingArrivalStatus: "Present",
+      existingNote: "Already here",
+      saveArrivalChanged: false,
     });
-    const result = await service.save(monitor, offeringId, "2026-08-17", "Present");
+    const result = await service.save(monitor, offeringId, "2026-08-17", "Present", "Already here");
     expect(result.changed).toBe(false);
-    expect(result.confirmation.status).toBe("Present");
+    expect(result.confirmation).toMatchObject({ status: "Present", note: "Already here" });
     expect(audits[0]?.metadata).toMatchObject({ resultingState: "Present", changed: false });
+  });
+
+  test("duplicate session state and reason stay idempotent and auditable", async () => {
+    const manager = user("admin");
+    const { service, audits } = harness({ saveSessionChanged: false });
+    const result = await service.saveSession(
+      manager,
+      offeringId,
+      "2026-08-17",
+      "Rescheduled",
+      "Moved to Friday",
+    );
+    expect(result.changed).toBe(false);
+    expect(result.session).toMatchObject({ status: "Rescheduled", reason: "Moved to Friday" });
+    expect(audits[0]?.metadata).toMatchObject({ resultingState: "Rescheduled", changed: false });
   });
 });
