@@ -1,11 +1,6 @@
 name: Bootstrap issue 169 Student Portal MVP
 
 on:
-  push:
-    branches:
-      - agent/issue-169-student-portal-mvp
-    paths:
-      - .github/workflows/issue-169-bootstrap.yml
   pull_request:
     branches:
       - main
@@ -15,7 +10,6 @@ permissions:
 
 jobs:
   apply:
-    if: github.event_name == 'pull_request' || github.event.head_commit.message == 'chore: bootstrap issue 169 implementation'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout implementation branch
@@ -28,7 +22,7 @@ jobs:
         run: python tools/issue-169-student-portal-mvp.py
 
       - name: Remove bootstrap-only files
-        run: git rm tools/issue-169-student-portal-mvp.py .github/workflows/issue-169-bootstrap.yml
+        run: git rm tools/issue-169-student-portal-mvp.py tools/issue-169-trigger.txt .github/workflows/issue-169-bootstrap.yml
 
       - name: Commit implementation
         run: |
