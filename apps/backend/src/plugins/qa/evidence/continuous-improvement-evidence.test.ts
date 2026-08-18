@@ -13,7 +13,9 @@ describe("Criterion 8 continuous-improvement evidence contract", () => {
     expect(source).toContain("'analysisId', v.\"analysisId\"");
     expect(source).toContain("'reviewId', x.\"reviewId\"");
     expect(source).toContain("'actionId', f.\"actionId\"");
-    expect(source).toContain("JOIN \"QaImprovementActionFollowUp\" f");
+    expect(source).toContain("FROM \"QaImprovementActionFollowUp\" f");
+    expect(source).toContain("JOIN \"QaImprovementAction\" x ON x.id = f.\"actionId\"");
+    expect(source).toContain("JOIN \"QaEvidence\" e ON e.id = f.\"evidenceId\"");
     expect(source).not.toContain("similarity");
     expect(source).not.toContain("ILIKE");
   });
