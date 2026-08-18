@@ -6,13 +6,16 @@ on:
       - agent/issue-169-student-portal-mvp
     paths:
       - .github/workflows/issue-169-bootstrap.yml
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.event.head_commit.message == 'chore: bootstrap issue 169 implementation'
+    if: github.event_name == 'pull_request' || github.event.head_commit.message == 'chore: bootstrap issue 169 implementation'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout implementation branch
