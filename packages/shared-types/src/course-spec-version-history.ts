@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CourseSpecReview, CourseSpecView, TeachingLearningProfile } from "./course-spec.ts";
 import { SpecSectionIdSchema } from "./course-spec.ts";
 
 export const CourseSpecAcademicReviewStatusSchema = z.enum([
@@ -53,10 +54,20 @@ export type CourseSpecVersionHistoryView = {
   versions: CourseSpecVersionHistoryItem[];
 };
 
+export type CourseSpecExactVersionView = {
+  courseId: string;
+  version: CourseSpecVersionHistoryItem;
+  data: CourseSpecView["data"];
+  status: CourseSpecView["status"];
+  review: CourseSpecReview;
+  teachingLearning: TeachingLearningProfile;
+};
+
 export type CourseSpecSectionComparison = {
   sectionId: z.infer<typeof SpecSectionIdSchema>;
   label: string;
   changed: boolean;
+  changedPaths: string[];
 };
 
 export type CourseSpecVersionComparisonView = {
