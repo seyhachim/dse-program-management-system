@@ -1,8 +1,9 @@
 import {
   AttendanceDateSchema,
   CourseFeedbackInput,
-  LecturerArrivalStatusSchema,
   SaveAttendanceInput,
+  SaveClassSessionStatusInputSchema,
+  SaveLecturerArrivalConfirmationInputSchema,
   TelegramInitDataVerifyRequestSchema,
   TelegramLinkRequestSchema,
 } from "@dse-pms/shared-types";
@@ -155,10 +156,30 @@ export function createTelegramRouter(service: TelegramService = telegramService)
   });
   router.put("/mini/classes/:offeringId/lecturer-arrival/:date", async (req, res) => {
     const date = AttendanceDateSchema.safeParse(req.params.date);
-    const status = LecturerArrivalStatusSchema.safeParse(req.body?.status);
-    if (!date.success || !status.success) return void res.status(400).json({ error: "Invalid lecturer-arrival confirmation" });
+    const body = SaveLecturerArrivalConfirmationInputSchema.safeParse(req.body);
+    if (!date.success || !body.success) return void res.status(400).json({ error: "Invalid lecturer-arrival confirmation" });
     try {
-      res.json(await telegramClassDeliveryService.save(req.telegramUser!, req.params.offeringId!, date.data, status.data));
+      res.json(await telegramClassDeliveryService.save(
+        req.telegramUser!,
+        req.params.offeringId!,
+        date.data,
+        body.data.status,
+        body.data.note,
+      ));
+    } catch (error) { sendMiniAppError(res, error); }
+  });
+  router.put("/mini/classes/:offeringId/session-status/:date", async (req, res) => {
+    const date = AttendanceDateSchema.safeParse(req.params.date);
+    const body = SaveClassSessionStatusInputSchema.safeParse(req.body);
+    if (!date.success || !body.success) return void res.status(400).json({ error: "Invalid class-session status" });
+    try {
+      res.json(await telegramClassDeliveryService.saveSession(
+        req.telegramUser!,
+        req.params.offeringId!,
+        date.data,
+        body.data.status,
+        body.data.reason,
+      ));
     } catch (error) { sendMiniAppError(res, error); }
   });
   router.get("/mini/announcements", async (req, res) => {
