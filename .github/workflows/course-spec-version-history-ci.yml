@@ -6,6 +6,8 @@ on:
       - "apps/backend/src/plugins/courses/version-history-*.ts"
       - "apps/frontend/app/(shell)/courses/[id]/spec/**"
       - "apps/frontend/lib/course-spec-history*"
+      - "apps/frontend/lib/course-spec-governance-actions*"
+      - "apps/frontend/lib/course-spec-periodic-review.ts"
       - "packages/shared-types/src/course-spec-version-history.ts"
       - ".github/workflows/course-spec-version-history-ci.yml"
   push:
@@ -15,6 +17,8 @@ on:
       - "apps/backend/src/plugins/courses/version-history-*.ts"
       - "apps/frontend/app/(shell)/courses/[id]/spec/**"
       - "apps/frontend/lib/course-spec-history*"
+      - "apps/frontend/lib/course-spec-governance-actions*"
+      - "apps/frontend/lib/course-spec-periodic-review.ts"
       - "packages/shared-types/src/course-spec-version-history.ts"
       - ".github/workflows/course-spec-version-history-ci.yml"
 
@@ -52,4 +56,4 @@ jobs:
       - run: bun run db:generate
       - run: bun run db:migrate:deploy
       - run: bun run seed
-      - run: bun test apps/backend/src/plugins/courses/version-history-service.test.ts apps/backend/src/plugins/courses/version-history-db.test.ts apps/frontend/lib/course-spec-history.test.ts
+      - run: bun test apps/backend/src/plugins/courses/version-history-service.test.ts apps/backend/src/plugins/courses/version-history-db.test.ts apps/frontend/lib/course-spec-history.test.ts apps/frontend/lib/course-spec-governance-actions.test.ts
