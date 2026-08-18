@@ -5,6 +5,7 @@ import { buildPortalCourseDocument } from "./course-document.ts";
 const fixture = {
   offeringId: "offering", enrollmentId: "enrollment", courseId: "course", code: "PAN202",
   title: "Predictive <Analytics>", description: "Approved & safe", credits: 3, term: "2026-S2", sectionCode: "A",
+  lifecycle: "current",
   lecturer: null, coLecturers: [], meetings: [], specAvailable: true, nextAssessment: null,
   clos: [{ code: "CLO1", description: "Build models", level: "C3", mappedPlos: ["PLO1"] }],
   weeks: [{ id: "week", week: 1, topic: "Introduction", cloCodes: ["CLO1"], learningOutcomes: [], activities: [] }],
