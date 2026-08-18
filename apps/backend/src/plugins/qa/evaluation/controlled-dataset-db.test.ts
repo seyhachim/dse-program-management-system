@@ -53,7 +53,7 @@ describeDb("Criteria 1/4/8 controlled QA dataset", () => {
       }
     }
 
-    expect([...byRequirement.keys()].sort()).toEqual(["1.2", "4.1", "8.3"]);
+    expect([...byRequirement.keys()].sort()).toEqual(["1.2", "4.1", "8.5"]);
     for (const types of byRequirement.values()) {
       expect([...types].sort()).toEqual([...QA_CONTROLLED_SCENARIO_TYPES].sort());
     }
