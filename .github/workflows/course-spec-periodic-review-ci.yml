@@ -1,0 +1,53 @@
+name: CourseSpec Periodic Review Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/backend/src/plugins/courses/periodic-review-*.ts"
+      - "apps/backend/src/plugins/courses/revision-service.ts"
+      - "apps/backend/src/plugins/courses/index.ts"
+      - "packages/shared-types/src/course-spec-periodic-review.ts"
+      - "packages/shared-types/src/index.ts"
+      - ".github/workflows/course-spec-periodic-review-ci.yml"
+
+jobs:
+  periodic-review-integrity:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dse_periodic_review
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dse_periodic_review"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dse_periodic_review?schema=public
+      COURSE_SPEC_PERIODIC_REVIEW_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+      - name: Generate Prisma Client
+        run: bun run --cwd apps/backend db:generate
+      - name: Validate Prisma schema
+        run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
+      - name: Apply migrations
+        run: bun run --cwd apps/backend db:migrate:deploy
+      - name: Seed database
+        run: bun run --cwd apps/backend seed
+      - name: Verify periodic review governance
+        run: bun test apps/backend/src/plugins/courses/periodic-review-db.test.ts
+      - name: Verify database security
+        run: bun run --cwd apps/backend db:security:verify

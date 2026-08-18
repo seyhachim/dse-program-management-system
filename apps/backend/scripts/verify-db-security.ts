@@ -124,6 +124,10 @@ const EXPECTED_CURRICULUM_ARTIFACT_TABLES = [
   "ImportSource",
 ] as const;
 
+const EXPECTED_COURSE_SPEC_GOVERNANCE_TABLES = [
+  "CourseSpecPeriodicReview",
+] as const;
+
 const FORBIDDEN_GRANTEES = new Set([
   "PUBLIC",
   "anon",
@@ -203,12 +207,14 @@ async function main(): Promise<void> {
     telegramSecurityTables,
     qaSecurityTables,
     curriculumArtifactTables,
+    courseSpecGovernanceTables,
   ] = await Promise.all([
     tablesForSchema("public"),
     tablesForSchema("pms_attendance"),
     tablesForSchema("telegram_security"),
     tablesForSchema("qa_security"),
     tablesForSchema("curriculum_artifact"),
+    tablesForSchema("course_spec_governance"),
   ]);
 
   errors.push(
@@ -237,6 +243,11 @@ async function main(): Promise<void> {
       EXPECTED_CURRICULUM_ARTIFACT_TABLES,
       curriculumArtifactTables.map((table) => table.table_name),
     ),
+    ...compareInventory(
+      "course_spec_governance schema",
+      EXPECTED_COURSE_SPEC_GOVERNANCE_TABLES,
+      courseSpecGovernanceTables.map((table) => table.table_name),
+    ),
   );
 
   for (const table of [
@@ -245,6 +256,7 @@ async function main(): Promise<void> {
     ...telegramSecurityTables,
     ...qaSecurityTables,
     ...curriculumArtifactTables,
+    ...courseSpecGovernanceTables,
   ]) {
     if (!table.rls_enabled) {
       errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
@@ -263,7 +275,7 @@ async function main(): Promise<void> {
       COALESCE(c.relacl, acldefault('r', c.relowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact', 'course_spec_governance')
       AND c.relkind IN ('r', 'p')
       AND c.relname <> '_prisma_migrations'
       AND (
@@ -292,7 +304,7 @@ async function main(): Promise<void> {
       COALESCE(n.nspacl, acldefault('n', n.nspowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
+    WHERE n.nspname IN ('pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact', 'course_spec_governance')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
@@ -323,7 +335,7 @@ async function main(): Promise<void> {
     JOIN pg_namespace n ON n.oid = d.defaclnamespace
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact')
+    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact', 'course_spec_governance')
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
@@ -349,7 +361,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, and ${curriculumArtifactTables.length} curriculum artifact tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, and ${courseSpecGovernanceTables.length} course-spec governance tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 
