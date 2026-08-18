@@ -26,11 +26,11 @@ describe("unified QA evidence candidates", () => {
     expect(normalized.candidates[1]?.attributes.endOffset).toBe(420);
   });
 
-  test("deduplicates stable candidate keys deterministically", () => {
+  test("deduplicates stable candidate keys by keeping the first-ranked occurrence", () => {
     const duplicate = { key: "same", evidenceType: "policy", sourceDomain: "outcomes" as const, title: "first", summary: "", entityType: "Course", entityId: "course-1", route: null, reportingDate: null, attributes: {} };
     const normalized = normalizeCandidateSemantics("dse", result([duplicate, { ...duplicate, title: "second" }]));
     expect(normalized.candidates).toHaveLength(1);
-    expect(normalized.candidates[0]?.title).toBe("second");
+    expect(normalized.candidates[0]?.title).toBe("first");
   });
 
   test("lexical fallback ranks relevant document text without embeddings", () => {
