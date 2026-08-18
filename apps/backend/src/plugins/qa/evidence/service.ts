@@ -111,19 +111,24 @@ function inferPeriodKey(candidate: QaEvidenceCandidateView): string | null {
   return Number.isNaN(date.getTime()) ? null : String(date.getUTCFullYear());
 }
 
-function normalizeCandidateSemantics(
+export function normalizeCandidateSemantics(
   programmeId: string,
   result: QaEvidenceCandidateResultView,
 ): QaEvidenceCandidateResultView {
-  return {
-    ...result,
-    candidates: result.candidates.map((candidate) => ({
-      ...candidate,
-      scope: candidate.scope ?? inferScope(programmeId, candidate),
-      provenance: candidate.provenance ?? inferProvenance(candidate),
-      periodKey: candidate.periodKey ?? inferPeriodKey(candidate),
-    })),
-  };
+  const normalized = result.candidates.map((candidate) => ({
+    ...candidate,
+    sourceKind: candidate.sourceKind ?? (candidate.entityType === "QaDocumentChunk" ? "documentChunk" as const : "structuredCandidate" as const),
+    scope: candidate.scope ?? inferScope(programmeId, candidate),
+    provenance: candidate.provenance ?? inferProvenance(candidate),
+    periodKey: candidate.periodKey ?? inferPeriodKey(candidate),
+  }));
+  // Candidate keys are the stable identity across adapters. Preserve the first
+  // ranked occurrence and drop later duplicates deterministically.
+  const byKey = new Map<string, (typeof normalized)[number]>();
+  for (const candidate of normalized) {
+    if (!byKey.has(candidate.key)) byKey.set(candidate.key, candidate);
+  }
+  return { ...result, candidates: [...byKey.values()] };
 }
 
 export async function getQaEvidenceCandidates(
