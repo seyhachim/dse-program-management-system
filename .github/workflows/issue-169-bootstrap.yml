@@ -1,0 +1,36 @@
+name: Bootstrap issue 169 Student Portal MVP
+
+on:
+  push:
+    branches:
+      - agent/issue-169-student-portal-mvp
+    paths:
+      - .github/workflows/issue-169-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'chore: bootstrap issue 169 implementation'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/issue-169-student-portal-mvp
+          fetch-depth: 0
+
+      - name: Apply scoped Student Portal patch
+        run: python tools/issue-169-student-portal-mvp.py
+
+      - name: Remove bootstrap-only files
+        run: git rm tools/issue-169-student-portal-mvp.py .github/workflows/issue-169-bootstrap.yml
+
+      - name: Commit implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(student-portal): complete MVP (#169)'
+          git push origin HEAD:agent/issue-169-student-portal-mvp
