@@ -15,6 +15,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: agent/issue-306-improvement-followup-traceability
+      - name: Align structured evidence anchor after issue 307
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/patch-issue-306.py')
+          text = p.read_text()
+          old = '''    '  "indicator-definition-history",\\n] as const;',
+              '  "indicator-definition-history",\\n  "outcome-concerns",\\n  "qa-review-records",\\n  "improvement-actions",\\n  "follow-up-evidence",\\n] as const;',
+          )'''
+          new = '''    '  "clo-attainment-snapshots",\\n] as const;',
+              '  "clo-attainment-snapshots",\\n  "outcome-concerns",\\n  "qa-review-records",\\n  "improvement-actions",\\n  "follow-up-evidence",\\n] as const;',
+          )'''
+          if old not in text:
+              raise SystemExit('issue 306 structured evidence patch anchor not found')
+          p.write_text(text.replace(old, new, 1))
+          PY
       - run: python .github/patch-issue-306.py
       - name: Commit generated feature files
         run: |
@@ -31,5 +47,6 @@ jobs:
             apps/backend/src/plugins/qa/evidence/service.ts
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "feat(qa): add explicit improvement follow-up traceability (#306)"
+          git restore .github/patch-issue-306.py
           git pull --rebase origin agent/issue-306-improvement-followup-traceability
           git push origin HEAD:agent/issue-306-improvement-followup-traceability
