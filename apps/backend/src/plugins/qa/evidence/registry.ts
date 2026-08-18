@@ -89,6 +89,34 @@ async function queryRows(
   evidenceType: string,
 ): Promise<CandidateRow[]> {
   switch (evidenceType) {
+    case "completion-records":
+    case "graduation-outcomes": {
+      const outcomeType = evidenceType === "completion-records" ? "ProgrammeCompleted" : "GraduationAwarded";
+      return prisma.$queryRaw<CandidateRow[]>`
+        SELECT
+          o.id AS "entityId",
+          'StudentCompletionOutcome' AS "entityType",
+          s."studentId" || ' — ' || c.code || ' — ' || o."outcomeType"::text AS title,
+          CASE WHEN o."awardName" = '' THEN o."outcomeType"::text || ' on ' || o."outcomeDate"::text
+               ELSE o."outcomeType"::text || ': ' || o."awardName" || ' on ' || o."outcomeDate"::text END AS summary,
+          '/students' AS route,
+          o."outcomeDate" AS "reportingDate",
+          jsonb_build_object(
+            'cohortId', c.id, 'cohortCode', c.code, 'studentId', s.id,
+            'academicYear', o."academicYear", 'periodKey', o."academicYear",
+            'population', 'cohort-membership', 'outcomeType', o."outcomeType"::text,
+            'outcomeDate', o."outcomeDate"::text, 'awardName', o."awardName", 'finalized', true
+          ) AS attributes
+        FROM "StudentCompletionOutcome" o
+        JOIN "StudentCohortMembership" m ON m.id = o."membershipId"
+        JOIN "StudentCohort" c ON c.id = m."cohortId"
+        JOIN "Student" s ON s.id = m."studentId"
+        WHERE c."programmeId" = ${programmeId}
+          AND o."outcomeType"::text = ${outcomeType}
+        ORDER BY o."outcomeDate", c.code, s."studentId"
+      `;
+    }
+
     case "clo-attainment-snapshots":
       return prisma.$queryRaw<CandidateRow[]>`
         SELECT
@@ -579,6 +607,7 @@ async function queryRows(
 export async function retrieveEvidenceCandidates(
   programmeId: string,
   definition: ExpectedEvidenceDefinition,
+  options: { cohortIds?: string[] } = {},
 ): Promise<QaEvidenceCandidateResultView> {
   if (!supportedTypes.has(definition.evidenceType)) {
     return {
@@ -593,6 +622,13 @@ export async function retrieveEvidenceCandidates(
   }
 
   const rows = await queryRows(programmeId, definition.evidenceType);
+  const candidates = toCandidates(definition, rows);
+  const filteredCandidates = options.cohortIds === undefined
+    ? candidates
+    : candidates.filter((candidate) => {
+        const cohortId = candidate.attributes.cohortId;
+        return typeof cohortId === "string" && options.cohortIds!.includes(cohortId);
+      });
   return {
     programmeId,
     expectedEvidenceId: definition.id,
@@ -600,6 +636,6 @@ export async function retrieveEvidenceCandidates(
     sourceDomain: definition.sourceDomain,
     status: "supported",
     reason: evidenceTypeSupportReason(definition),
-    candidates: toCandidates(definition, rows),
+    candidates: filteredCandidates,
   };
 }

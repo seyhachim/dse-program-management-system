@@ -14,6 +14,7 @@ import { QA_SOURCE_AUTHORITY_ORDER } from "@dse-pms/shared-types";
 
 export interface QaApplicabilityContext {
   cohortStartDate?: Date | null;
+  cohortStartDates?: Date[];
   asOfDate: Date;
 }
 
@@ -30,25 +31,34 @@ export function evaluateApplicability(
     return { state: "applicable", reason: "Expectation is always applicable." };
   }
 
-  if (!context.cohortStartDate) {
+  const cohortStartDates = context.cohortStartDates?.length
+    ? context.cohortStartDates
+    : context.cohortStartDate
+      ? [context.cohortStartDate]
+      : [];
+  if (cohortStartDates.length === 0) {
     return {
       state: "uncertain",
-      reason: "Cohort maturity cannot be established because the cohort start date is unavailable.",
+      reason: "Cohort maturity cannot be established because authoritative cohort start data is unavailable.",
     };
   }
 
-  const maturityDate = new Date(context.cohortStartDate);
-  maturityDate.setUTCFullYear(maturityDate.getUTCFullYear() + rule.minimumElapsedYears);
+  const matureCount = cohortStartDates.filter((start) => {
+    const maturityDate = new Date(start);
+    maturityDate.setUTCFullYear(maturityDate.getUTCFullYear() + rule.minimumElapsedYears);
+    return context.asOfDate >= maturityDate;
+  }).length;
 
-  return context.asOfDate >= maturityDate
-    ? {
-        state: "applicable",
-        reason: `Cohort has reached the required ${rule.minimumElapsedYears}-year maturity threshold.`,
-      }
-    : {
-        state: "notApplicable",
-        reason: `Cohort has not yet reached the required ${rule.minimumElapsedYears}-year maturity threshold.`,
-      };
+  if (matureCount > 0) {
+    return {
+      state: "applicable",
+      reason: `${matureCount} of ${cohortStartDates.length} authoritative cohort(s) have reached the required ${rule.minimumElapsedYears}-year maturity threshold.`,
+    };
+  }
+  return {
+    state: "notApplicable",
+    reason: `No authoritative cohort has yet reached the required ${rule.minimumElapsedYears}-year maturity threshold.`,
+  };
 }
 
 const SCOPE_KEYS: Record<QaEvidenceScopeDimension, keyof QaEvidenceScope> = {

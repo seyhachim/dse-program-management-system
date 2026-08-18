@@ -216,57 +216,33 @@ function sourceSnapshots(assessed: AssessedCandidate[]) {
   return [...byKey.values()];
 }
 
-type CohortStartRow = {
-  effectiveFrom: Date | null;
-  intakeYear: number | null;
-  academicYear: string;
+type StudentCohortMaturityRow = {
+  id: string;
+  intakeYear: number;
 };
 
-function rowStartDate(row: CohortStartRow): Date | null {
-  if (row.effectiveFrom) return row.effectiveFrom;
-  return row.intakeYear ? new Date(Date.UTC(row.intakeYear, 0, 1)) : null;
+export function cohortStartDateFromIntakeYear(intakeYear: number): Date {
+  return new Date(Date.UTC(intakeYear, 0, 1));
 }
 
-function academicYearMatchesCycle(
-  academicYear: string,
-  cycle: { reportingStart: Date; reportingEnd: Date },
-): boolean {
-  const normalized = academicYear.trim();
-  if (!normalized) return false;
-  const startYear = String(cycle.reportingStart.getUTCFullYear());
-  const endYear = String(cycle.reportingEnd.getUTCFullYear());
-  return normalized.includes(startYear) && normalized.includes(endYear);
+export function matureStudentCohortIds(
+  rows: StudentCohortMaturityRow[],
+  asOfDate: Date,
+  minimumElapsedYears: number,
+): string[] {
+  return rows.filter((row) => {
+    const maturityDate = cohortStartDateFromIntakeYear(row.intakeYear);
+    maturityDate.setUTCFullYear(maturityDate.getUTCFullYear() + minimumElapsedYears);
+    return asOfDate >= maturityDate;
+  }).map((row) => row.id);
 }
 
-/**
- * Select a cohort only when the cycle makes that choice unambiguous. Multiple
- * active curriculum cohorts without one cycle match deliberately resolve to
- * null so applicability becomes `uncertain` instead of borrowing another
- * cohort's maturity date.
- */
-export function selectCohortStartDate(
-  rows: CohortStartRow[],
-  cycle: { reportingStart: Date; reportingEnd: Date },
-): Date | null {
-  const cycleMatches = rows.filter((row) => academicYearMatchesCycle(row.academicYear, cycle));
-  const candidates = cycleMatches.length > 0 ? cycleMatches : rows;
-  if (candidates.length !== 1) return null;
-  return rowStartDate(candidates[0]!);
-}
-
-async function resolveCohortStartDate(
-  programmeId: string,
-  cycle: { reportingStart: Date; reportingEnd: Date },
-): Promise<Date | null> {
-  const rows = await prisma.$queryRaw<CohortStartRow[]>`
-    SELECT v."effectiveFrom", v."intakeYear", v."academicYear"
-    FROM "ProgrammeCurriculumVersion" v
-    JOIN "ProgrammeCurriculum" c ON c.id = v."curriculumId"
-    WHERE c."programmeId" = ${programmeId}
-      AND v.status = 'Active'
-    ORDER BY v."effectiveFrom" DESC NULLS LAST, v."createdAt" DESC
-  `;
-  return selectCohortStartDate(rows, cycle);
+async function resolveStudentCohorts(programmeId: string): Promise<StudentCohortMaturityRow[]> {
+  return prisma.studentCohort.findMany({
+    where: { programmeId, status: { in: ["Active", "Completed", "Archived"] } },
+    select: { id: true, intakeYear: true },
+    orderBy: [{ intakeYear: "asc" }, { code: "asc" }],
+  });
 }
 
 export async function runDeterministicQaAnalysis(
@@ -284,7 +260,8 @@ export async function runDeterministicQaAnalysis(
   if (!cycle || cycle.programmeId !== programmeId) {
     throw new QaAnalysisResourceNotFoundError("QA assessment cycle not found for programme");
   }
-  const cohortStartDate = await resolveCohortStartDate(programmeId, cycle);
+  const studentCohorts = await resolveStudentCohorts(programmeId);
+  const cohortStartDates = studentCohorts.map((cohort) => cohortStartDateFromIntakeYear(cohort.intakeYear));
 
   const expectations = knowledge.expectations.filter(
     (expectation) => expectation.requirementCode === requirementCode,
@@ -298,9 +275,12 @@ export async function runDeterministicQaAnalysis(
   const analyses: QaEvidenceAnalysisView[] = [];
   for (const expectation of expectations) {
     const applicability = evaluateApplicability(expectation.applicabilityRule, {
-      cohortStartDate,
+      cohortStartDates,
       asOfDate: cycle.reportingEnd,
     });
+    const matureCohortIds = expectation.applicabilityRule.kind === "cohortMaturity"
+      ? matureStudentCohortIds(studentCohorts, cycle.reportingEnd, expectation.applicabilityRule.minimumElapsedYears)
+      : undefined;
 
     if (applicability.state !== "applicable") {
       analyses.push(
@@ -332,7 +312,7 @@ export async function runDeterministicQaAnalysis(
 
     const assessedGroups = await Promise.all(
       expectation.expectedEvidence.map(async (definition) => {
-        const result = await getQaEvidenceCandidates(programmeId, definition.id);
+        const result = await getQaEvidenceCandidates(programmeId, definition.id, { cohortIds: matureCohortIds });
         return assessCandidates(programmeId, expectation, definition, result, cycle);
       }),
     );

@@ -6,6 +6,8 @@ import {
   ExitStudentCohortMembershipInput,
   ListStudentCohortsQuery,
   ListStudentProgressionQuery,
+  ListStudentCompletionOutcomesQuery,
+  RecordStudentCompletionOutcomeInput,
 } from "@dse-pms/shared-types";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { studentCohortService } from "./cohort-service.ts";
@@ -60,6 +62,28 @@ export function createStudentCohortRouter(): Router {
     if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
     try { res.status(201).json(await studentCohortService.appendProgression(req.params.cohortId!, parsed.data)); }
     catch (err) { res.status(notFound(err) ? 404 : conflict(err) ? 409 : 400).json({ error: notFound(err) ? "Cohort membership not found" : conflict(err) ? "Progression already recorded for this academic period" : "Could not append progression record" }); }
+  });
+
+  router.get("/:cohortId/completion-outcomes", requirePermission("students:read"), async (req, res) => {
+    const parsed = ListStudentCompletionOutcomesQuery.safeParse(req.query);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+    res.json(await studentCohortService.listCompletionOutcomes(req.params.cohortId!, parsed.data));
+  });
+
+  router.post("/:cohortId/completion-outcomes", requirePermission("students:write"), async (req, res) => {
+    const parsed = RecordStudentCompletionOutcomeInput.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+    try { res.status(201).json(await studentCohortService.recordCompletionOutcome(req.params.cohortId!, parsed.data)); }
+    catch (err) {
+      res.status(notFound(err) ? 404 : conflict(err) ? 409 : 400).json({
+        error: notFound(err) ? "Cohort membership not found" : conflict(err) ? "Completion outcome already recorded for this membership" : (err instanceof Error ? err.message : "Could not record completion outcome"),
+      });
+    }
+  });
+
+  router.get("/:cohortId/completion-summary", requirePermission("students:read"), async (req, res) => {
+    try { res.json(await studentCohortService.completionSummary(req.params.cohortId!)); }
+    catch (err) { res.status(notFound(err) ? 404 : 400).json({ error: notFound(err) ? "Cohort not found" : "Could not calculate completion summary" }); }
   });
 
   router.get("/:cohortId/students/:studentId/history", requirePermission("students:read"), async (req, res) => {

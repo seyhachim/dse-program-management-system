@@ -5,7 +5,11 @@ import type {
   QaExpectedEvidenceDefinitionView,
   QaQualityExpectationView,
 } from "@dse-pms/shared-types";
-import { assessCandidates, selectCohortStartDate } from "./deterministic-engine.ts";
+import {
+  assessCandidates,
+  cohortStartDateFromIntakeYear,
+  matureStudentCohortIds,
+} from "./deterministic-engine.ts";
 
 const cycle = {
   reportingStart: new Date("2025-01-01T00:00:00.000Z"),
@@ -186,37 +190,32 @@ describe("deterministic QA engine evidence semantics", () => {
   });
 });
 
-describe("deterministic QA cohort applicability context", () => {
-  it("uses the single curriculum cohort that matches the reporting cycle", () => {
-    expect(
-      selectCohortStartDate(
-        [
-          { effectiveFrom: new Date("2020-09-01T00:00:00.000Z"), intakeYear: 2020, academicYear: "2020-2021" },
-          { effectiveFrom: new Date("2024-09-01T00:00:00.000Z"), intakeYear: 2024, academicYear: "2025-2025" },
-        ],
-        cycle,
-      )?.toISOString(),
-    ).toBe("2024-09-01T00:00:00.000Z");
+describe("deterministic QA authoritative student cohort maturity", () => {
+  it("derives the stable cohort start boundary from intake year", () => {
+    expect(cohortStartDateFromIntakeYear(2024).toISOString()).toBe("2024-01-01T00:00:00.000Z");
   });
 
-  it("returns null for ambiguous cohort context instead of borrowing the latest active cohort", () => {
+  it("selects every student cohort that has reached the configured maturity threshold", () => {
     expect(
-      selectCohortStartDate(
+      matureStudentCohortIds(
         [
-          { effectiveFrom: new Date("2020-09-01T00:00:00.000Z"), intakeYear: 2020, academicYear: "" },
-          { effectiveFrom: new Date("2024-09-01T00:00:00.000Z"), intakeYear: 2024, academicYear: "" },
+          { id: "cohort-2020", intakeYear: 2020 },
+          { id: "cohort-2022", intakeYear: 2022 },
+          { id: "cohort-2024", intakeYear: 2024 },
         ],
-        cycle,
+        new Date("2026-12-31T23:59:59.999Z"),
+        4,
       ),
-    ).toBeNull();
+    ).toEqual(["cohort-2020", "cohort-2022"]);
   });
 
-  it("returns the only active cohort start date and falls back to intake year when needed", () => {
+  it("returns no mature cohort instead of borrowing curriculum-version dates", () => {
     expect(
-      selectCohortStartDate(
-        [{ effectiveFrom: null, intakeYear: 2024, academicYear: "" }],
-        cycle,
-      )?.toISOString(),
-    ).toBe("2024-01-01T00:00:00.000Z");
+      matureStudentCohortIds(
+        [{ id: "cohort-2025", intakeYear: 2025 }],
+        new Date("2026-12-31T23:59:59.999Z"),
+        4,
+      ),
+    ).toEqual([]);
   });
 });
