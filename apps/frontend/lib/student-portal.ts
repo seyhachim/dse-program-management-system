@@ -1,3 +1,4 @@
+import { STUDENT_PORTAL_TIME_ZONE } from "@dse-pms/shared-types";
 import type {
   CourseFeedbackInput,
   PortalAnnouncement,
@@ -5,7 +6,6 @@ import type {
   PortalCourseDetail,
   PortalCourseDocumentDownload,
   PortalCourseSummary,
-  STUDENT_PORTAL_TIME_ZONE,
   StudentPortalHome,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
