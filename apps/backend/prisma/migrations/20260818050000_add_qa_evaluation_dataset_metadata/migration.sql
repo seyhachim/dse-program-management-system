@@ -8,5 +8,9 @@ ALTER TABLE "QaEvaluationScenario"
 CREATE INDEX "QaEvaluationScenario_datasetVersion_scenarioType_idx"
   ON "QaEvaluationScenario" ("datasetVersion", "scenarioType");
 
+-- Existing pilot history predates explicit dataset metadata and may legitimately
+-- contain multiple scenarios for one expectation. Enforce stable identity only
+-- for explicitly versioned datasets introduced by #310.
 CREATE UNIQUE INDEX "QaEvaluationScenario_dataset_identity_key"
-  ON "QaEvaluationScenario" ("datasetVersion", "requirementId", "expectationId", "scenarioType", "scenarioVersion");
+  ON "QaEvaluationScenario" ("datasetVersion", "requirementId", "expectationId", "scenarioType", "scenarioVersion")
+  WHERE "datasetVersion" <> 'legacy';
