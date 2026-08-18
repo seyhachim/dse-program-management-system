@@ -1,7 +1,10 @@
+import { STUDENT_PORTAL_TIME_ZONE } from "@dse-pms/shared-types";
 import type {
   CourseFeedbackInput,
   PortalAnnouncement,
+  PortalAssessmentOverview,
   PortalCourseDetail,
+  PortalCourseDocumentDownload,
   PortalCourseSummary,
   StudentPortalHome,
 } from "@dse-pms/shared-types";
@@ -12,6 +15,10 @@ export const studentPortalApi = {
   courses: () => api.get<PortalCourseSummary[]>("/api/student-portal/courses"),
   course: (offeringId: string) =>
     api.get<PortalCourseDetail>(`/api/student-portal/courses/${offeringId}`),
+  assessments: () =>
+    api.get<PortalAssessmentOverview[]>("/api/student-portal/assessments"),
+  courseDocument: (offeringId: string) =>
+    api.get<PortalCourseDocumentDownload>(`/api/student-portal/courses/${offeringId}/document`),
   announcements: () =>
     api.get<PortalAnnouncement[]>("/api/student-portal/announcements"),
   submitFeedback: (offeringId: string, input: CourseFeedbackInput) =>
@@ -20,14 +27,29 @@ export const studentPortalApi = {
 
 export function assessmentDeadline(dueAt: string | null, dueWeek: number | null): string {
   if (dueAt) {
-    return new Intl.DateTimeFormat(undefined, {
+    return `${new Intl.DateTimeFormat(undefined, {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(new Date(dueAt));
+      timeZone: STUDENT_PORTAL_TIME_ZONE,
+    }).format(new Date(dueAt))} (Cambodia time)`;
   }
   return dueWeek ? `Due in Week ${dueWeek}` : "Deadline to be announced";
 }
 
 export function meetingLabel(meeting: PortalCourseSummary["meetings"][number]): string {
   return `${meeting.dayOfWeek} · ${meeting.startTime}–${meeting.endTime}`;
+}
+
+export async function downloadApprovedCourseDocument(offeringId: string): Promise<void> {
+  const document = await studentPortalApi.courseDocument(offeringId);
+  const blob = new Blob([document.content], { type: document.contentType });
+  const url = URL.createObjectURL(blob);
+  try {
+    const anchor = window.document.createElement("a");
+    anchor.href = url;
+    anchor.download = document.fileName;
+    anchor.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

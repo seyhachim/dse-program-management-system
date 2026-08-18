@@ -250,12 +250,13 @@ export const dashboardManifest: PluginManifest = {
 export const studentPortalManifest: PluginManifest = {
   id: "student-portal",
   name: "Student Portal",
-  version: "0.1.0",
-  description: "Enrolled courses, schedule, approved learning information, results, and feedback.",
+  version: "0.2.0",
+  description: "Enrolled courses, schedule, approved learning information, assessments, results, and feedback.",
   routes: [
     { label: "Home", path: "/portal", icon: "home", roles: ["student"] },
     { label: "My Courses", path: "/portal/courses", icon: "book", roles: ["student"], group: "Learning" },
     { label: "Schedule", path: "/portal/schedule", icon: "calendar", roles: ["student"], group: "Learning" },
+    { label: "Assessments", path: "/portal/assessments", icon: "file-check", roles: ["student"], group: "Learning" },
     { label: "Results", path: "/portal/results", icon: "chart", roles: ["student"], group: "Progress" },
     { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },
   ],
@@ -345,9 +346,9 @@ export const qaManifest: PluginManifest = {
  * explicitly excluded from academic-decision entries (§8), and QA's own
  * "QA Dashboard" is its landing page distinct from the general `/dashboard`.
  * `Users`/`Settings`/`Audit Trail` are system administration and stay
- * admin-only, matching the role-comparison table (§18). `student` isn't
- * listed anywhere here — there's no student portal built yet, so it (like
- * every other unlisted role) only ever sees the unrestricted footer entry.
+ * admin-only, matching the role-comparison table (§18). Student navigation is
+ * provided separately by `studentPortalManifest`; these placeholders remain
+ * restricted to the programme roles listed below.
  */
 export const placeholdersManifest: PluginManifest = {
   id: "placeholders",

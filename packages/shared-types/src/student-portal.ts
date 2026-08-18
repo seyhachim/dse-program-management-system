@@ -30,6 +30,13 @@ export interface PortalCriterionEvidence {
   cloCodes: string[];
 }
 
+export interface PortalRubricCriterion {
+  id: string;
+  name: string;
+  cloCodes: string[];
+  levels: Array<{ id: string; label: string; points: number }>;
+}
+
 export interface PortalAssessmentResult {
   assessmentItemId: string;
   score: number;
@@ -132,6 +139,7 @@ export interface PortalCourseDetail extends PortalCourseSummary {
     submissionMethod: string;
     instructions: string;
     rubricName: string;
+    rubricCriteria?: PortalRubricCriterion[];
     result: PortalAssessmentResult | null;
   }>;
   resources: Array<{
@@ -178,6 +186,72 @@ export interface StudentPortalHome {
   }>;
   announcements: PortalAnnouncement[];
   overallAchievement: number | null;
+}
+
+export const STUDENT_PORTAL_TIME_ZONE = "Asia/Phnom_Penh" as const;
+
+export interface PortalAssessmentOverview {
+  offeringId: string;
+  courseCode: string;
+  courseTitle: string;
+  sectionCode: string;
+  term: string;
+  assessmentId: string;
+  name: string;
+  type: string;
+  description: string;
+  mode: "individual" | "group";
+  cloCodes: string[];
+  weight: number | null;
+  dueAt: string | null;
+  dueWeek: number | null;
+  format: string;
+  submissionMethod: string;
+  instructions: string;
+  rubricName: string;
+  rubricCriteria: PortalRubricCriterion[];
+}
+
+export interface PortalCourseDocumentDownload {
+  fileName: string;
+  contentType: "text/html; charset=utf-8";
+  content: string;
+}
+
+export type PortalAssessmentDeadlineState = "overdue" | "upcoming" | "week-only" | "unscheduled";
+
+export function portalAssessmentDeadlineState(
+  assessment: Pick<PortalAssessmentOverview, "dueAt" | "dueWeek">,
+  now = new Date(),
+): PortalAssessmentDeadlineState {
+  if (assessment.dueAt) {
+    return new Date(assessment.dueAt).getTime() < now.getTime() ? "overdue" : "upcoming";
+  }
+  return assessment.dueWeek !== null ? "week-only" : "unscheduled";
+}
+
+export function comparePortalAssessmentDeadlines(
+  left: Pick<PortalAssessmentOverview, "dueAt" | "dueWeek" | "courseCode" | "name">,
+  right: Pick<PortalAssessmentOverview, "dueAt" | "dueWeek" | "courseCode" | "name">,
+): number {
+  if (left.dueAt && right.dueAt) {
+    const exact = left.dueAt.localeCompare(right.dueAt);
+    if (exact !== 0) return exact;
+  } else if (left.dueAt) {
+    return -1;
+  } else if (right.dueAt) {
+    return 1;
+  } else if (left.dueWeek !== null && right.dueWeek !== null) {
+    const week = left.dueWeek - right.dueWeek;
+    if (week !== 0) return week;
+  } else if (left.dueWeek !== null) {
+    return -1;
+  } else if (right.dueWeek !== null) {
+    return 1;
+  }
+
+  const course = left.courseCode.localeCompare(right.courseCode);
+  return course !== 0 ? course : left.name.localeCompare(right.name);
 }
 
 export const CourseFeedbackInput = z.object({
