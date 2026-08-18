@@ -43,3 +43,20 @@ jobs:
           cat dependency-audit.json || true
           echo "audit_exit_code=$status" >> "$GITHUB_STEP_SUMMARY"
           exit 0
+      - name: Trace vulnerable dependency paths
+        shell: bash
+        run: |
+          for package in \
+            @hono/node-server \
+            brace-expansion \
+            hono \
+            ip-address \
+            js-yaml \
+            nanoid \
+            postcss \
+            sharp \
+            undici
+          do
+            echo "===== $package ====="
+            bun pm why "$package" || true
+          done
