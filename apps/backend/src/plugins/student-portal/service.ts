@@ -3,9 +3,12 @@ import type {
   CourseDeliveryOffering,
   CourseFeedbackInput,
   CourseFeedbackSummary,
+  comparePortalAssessmentDeadlines,
   PortalAnnouncement,
+  PortalAssessmentOverview,
   PortalCloAchievement,
   PortalCourseDetail,
+  PortalCourseDocumentDownload,
   PortalCourseSummary,
   PublishAnnouncementInput,
   PublishAssessmentResultInput,
@@ -16,6 +19,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
+import { buildPortalCourseDocument } from "./course-document.ts";
 
 export class PortalNotFoundError extends Error {}
 export class PortalConflictError extends Error {}
@@ -222,7 +226,8 @@ export function deliveryOfferingScope(userId: string, programmeWide: boolean) {
 }
 
 function approvedSpec(row: EnrollmentRow) {
-  return row.offering.courseSpec ?? null;
+  const spec = row.offering.courseSpec;
+  return spec?.reviewStatus === "Approved" ? spec : null;
 }
 
 function toSummary(row: EnrollmentRow): PortalCourseSummary {
@@ -341,6 +346,18 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           submissionMethod: item.submissionMethod,
           instructions: item.instructions,
           rubricName: item.rubric?.name ?? "",
+          rubricCriteria: (item.rubric?.criterionRows ?? []).map((criterion) => ({
+            id: criterion.id,
+            name: criterion.name,
+            cloCodes: item.criterionCloMappings
+              .filter((mapping) => mapping.rubricId === item.rubricId && mapping.criterionId === criterion.id)
+              .map((mapping) => mapping.cloCode),
+            levels: (item.rubric?.levelRows ?? []).map((level) => ({
+              id: level.id,
+              label: level.label,
+              points: level.points,
+            })),
+          })),
           result: result && result.publishedAt
             ? {
                 assessmentItemId: item.id,
@@ -393,18 +410,32 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
 }
 
 function announcementsFrom(rows: EnrollmentRow[]): PortalAnnouncement[] {
-  return rows.flatMap((row) => row.offering.announcements.map((announcement) => ({
-    id: announcement.id,
-    offeringId: row.offeringId,
-    courseCode: row.offering.course.code,
-    courseTitle: row.offering.course.title,
-    sectionCode: row.offering.sectionCode,
-    title: announcement.title,
-    body: announcement.body,
-    pinned: announcement.pinned,
-    authorName: announcement.author.name,
-    publishedAt: announcement.publishedAt!.toISOString(),
-  }))).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.publishedAt.localeCompare(a.publishedAt));
+  const now = Date.now();
+  return rows.flatMap((row) => row.offering.announcements
+    .filter((announcement) =>
+      announcement.publishedAt !== null &&
+      announcement.publishedAt.getTime() <= now &&
+      (announcement.expiresAt === null || announcement.expiresAt.getTime() > now),
+    )
+    .map((announcement) => ({
+      id: announcement.id,
+      offeringId: row.offeringId,
+      courseCode: row.offering.course.code,
+      courseTitle: row.offering.course.title,
+      sectionCode: row.offering.sectionCode,
+      title: announcement.title,
+      body: announcement.body,
+      pinned: announcement.pinned,
+      authorName: announcement.author.name,
+      publishedAt: announcement.publishedAt!.toISOString(),
+    }))).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.publishedAt.localeCompare(a.publishedAt));
+}
+
+async function detailForStudent(userId: string, offeringId: string): Promise<PortalCourseDetail> {
+  const rows = await enrolledRows(userId);
+  const row = rows.find((item) => item.offeringId === offeringId);
+  if (!row) throw new PortalNotFoundError("Enrolled course not found");
+  return toDetail(row, userId);
 }
 
 async function assertOfferingEditor(offeringId: string, userId: string, programmeWide: boolean) {
@@ -540,11 +571,40 @@ export const studentPortalService = {
     return (await enrolledRows(userId)).map(toSummary);
   },
 
-  async course(userId: string, offeringId: string): Promise<PortalCourseDetail> {
+  async assessments(userId: string): Promise<PortalAssessmentOverview[]> {
     const rows = await enrolledRows(userId);
-    const row = rows.find((item) => item.offeringId === offeringId);
-    if (!row) throw new PortalNotFoundError("Enrolled course not found");
-    return toDetail(row, userId);
+    const details = await Promise.all(rows.map((row) => toDetail(row, userId)));
+    return details.flatMap((course) => course.assessments.map((assessment) => ({
+      offeringId: course.offeringId,
+      courseCode: course.code,
+      courseTitle: course.title,
+      sectionCode: course.sectionCode,
+      term: course.term,
+      assessmentId: assessment.id,
+      name: assessment.name,
+      type: assessment.type,
+      description: assessment.description,
+      mode: assessment.mode,
+      cloCodes: assessment.cloCodes,
+      weight: assessment.weight,
+      dueAt: assessment.dueAt,
+      dueWeek: assessment.dueWeek,
+      format: assessment.format,
+      submissionMethod: assessment.submissionMethod,
+      instructions: assessment.instructions,
+      rubricName: assessment.rubricName,
+      rubricCriteria: assessment.rubricCriteria ?? [],
+    }))).sort(comparePortalAssessmentDeadlines);
+  },
+
+  async course(userId: string, offeringId: string): Promise<PortalCourseDetail> {
+    return detailForStudent(userId, offeringId);
+  },
+
+  async courseDocument(userId: string, offeringId: string): Promise<PortalCourseDocumentDownload> {
+    const detail = await detailForStudent(userId, offeringId);
+    if (!detail.specAvailable) throw new PortalNotFoundError("Approved course specification not found");
+    return buildPortalCourseDocument(detail);
   },
 
   async announcements(userId: string): Promise<PortalAnnouncement[]> {

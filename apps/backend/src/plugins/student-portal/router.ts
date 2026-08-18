@@ -61,6 +61,9 @@ export function createStudentPortalRouter(): Router {
   router.get("/courses", requirePermission("student-portal:read"), async (req, res) => {
     try { res.json(await studentPortalService.courses(req.user!.id)); } catch (error) { handleError(error, res); }
   });
+  router.get("/assessments", requirePermission("student-portal:read"), async (req, res) => {
+    try { res.json(await studentPortalService.assessments(req.user!.id)); } catch (error) { handleError(error, res); }
+  });
   router.get("/courses/:offeringId", requirePermission("student-portal:read"), async (req, res) => {
     try {
       const offeringId = req.params.offeringId!;
@@ -70,6 +73,9 @@ export function createStudentPortalRouter(): Router {
   });
   router.get("/announcements", requirePermission("student-portal:read"), async (req, res) => {
     try { res.json(await studentPortalService.announcements(req.user!.id)); } catch (error) { handleError(error, res); }
+  });
+  router.get("/courses/:offeringId/document", requirePermission("student-portal:read"), async (req, res) => {
+    try { res.json(await studentPortalService.courseDocument(req.user!.id, req.params.offeringId!)); } catch (error) { handleError(error, res); }
   });
   router.post("/courses/:offeringId/feedback", requirePermission("student-portal:feedback"), async (req, res) => {
     const parsed = CourseFeedbackInput.safeParse(req.body);

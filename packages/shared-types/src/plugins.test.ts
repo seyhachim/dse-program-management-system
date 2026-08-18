@@ -141,3 +141,33 @@ test("Program Secretary is excluded from academic-decision entries reserved for 
   expect(routes).toContain("/programme-management");
   expect(routes).toContain("/teaching-management");
 });
+
+test("Student Portal navigation contains the complete MVP and excludes staff workspaces", () => {
+  const paths = navForRole(pluginManifests, ["student"]).map((route) => route.path);
+
+  for (const path of [
+    "/portal",
+    "/portal/courses",
+    "/portal/schedule",
+    "/portal/assessments",
+    "/portal/results",
+    "/portal/announcements",
+  ]) {
+    expect(paths).toContain(path);
+  }
+
+  for (const path of [
+    "/dashboard",
+    "/courses",
+    "/offerings",
+    "/students",
+    "/lecturer-overview",
+    "/course-delivery",
+    "/assessment-management",
+    "/programme-management",
+    "/users",
+    "/settings",
+  ]) {
+    expect(paths).not.toContain(path);
+  }
+});
