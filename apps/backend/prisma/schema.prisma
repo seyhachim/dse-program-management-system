@@ -44,6 +44,15 @@ enum StudentCompletionOutcomeType {
   GraduationAwarded
 }
 
+enum ProgrammeOutcomeIndicatorType {
+  ProgressionRate
+  RetentionRate
+  CompletionRate
+  DropoutRate
+  CloAttainmentRate
+  PloAttainmentRate
+}
+
 enum OfferingStatus {
   Planned
   Active
@@ -331,6 +340,7 @@ model Programme {
   qaSarReleases            QaSarRelease[]
   studentCohorts            StudentCohort[]
   qaCloAttainmentSnapshots  QaCloAttainmentSnapshot[]
+  outcomeIndicators          ProgrammeOutcomeIndicator[]
 }
 
 /// Canonical curriculum identity for one programme. Versions are immutable
@@ -1086,6 +1096,7 @@ model StudentCohort {
   updatedAt              DateTime            @updatedAt
 
   memberships StudentCohortMembership[]
+  outcomeIndicators ProgrammeOutcomeIndicator[]
 
   @@unique([programmeId, code])
   @@index([programmeId, intakeYear, status])
@@ -1149,6 +1160,37 @@ model StudentCompletionOutcome {
   @@unique([membershipId, outcomeType])
   @@index([membershipId, outcomeDate])
   @@index([outcomeType, academicYear, outcomeDate])
+}
+
+/// Issue #304: immutable, versioned programme-level outcome indicator snapshot.
+/// Definition and calculation hashes make longitudinal comparability explicit.
+model ProgrammeOutcomeIndicator {
+  id                    String                        @id @default(uuid())
+  programmeId           String
+  programme             Programme                     @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  cohortId              String
+  cohort                StudentCohort                 @relation(fields: [cohortId], references: [id], onDelete: Restrict)
+  indicatorType         ProgrammeOutcomeIndicatorType
+  academicYear          String
+  periodKey             String
+  numerator             Int
+  denominator           Int
+  value                 Float?
+  definitionVersion     String
+  definition            Json
+  definitionHash        String
+  calculationVersion    String
+  sourceRefs            String[]                      @default([])
+  calculationHash       String                        @unique
+  supersedesIndicatorId String?
+  supersedesIndicator   ProgrammeOutcomeIndicator?    @relation("ProgrammeOutcomeIndicatorHistory", fields: [supersedesIndicatorId], references: [id], onDelete: Restrict)
+  supersededBy          ProgrammeOutcomeIndicator[]   @relation("ProgrammeOutcomeIndicatorHistory")
+  generatedAt           DateTime                      @default(now())
+
+  @@index([programmeId, indicatorType, academicYear])
+  @@index([cohortId, indicatorType, periodKey])
+  @@index([definitionHash, periodKey])
+  @@index([supersedesIndicatorId])
 }
 
 /// Issue #303: immutable, reproducible CLO-attainment calculation artifact.

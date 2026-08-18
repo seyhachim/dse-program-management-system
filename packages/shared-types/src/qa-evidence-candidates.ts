@@ -82,6 +82,8 @@ export const QA_STRUCTURED_EVIDENCE_TYPES = [
   "student-progression-records",
   "completion-records",
   "graduation-outcomes",
+  "programme-outcome-indicators",
+  "indicator-definition-history",
   "clo-attainment-snapshots",
 ] as const;
 

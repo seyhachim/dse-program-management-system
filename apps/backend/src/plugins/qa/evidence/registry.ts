@@ -89,6 +89,50 @@ async function queryRows(
   evidenceType: string,
 ): Promise<CandidateRow[]> {
   switch (evidenceType) {
+    case "programme-outcome-indicators":
+      return prisma.$queryRaw<CandidateRow[]>`
+        SELECT
+          i.id AS "entityId",
+          'ProgrammeOutcomeIndicator' AS "entityType",
+          i."indicatorType"::text || ' — ' || c.code || ' — ' || i."periodKey" AS title,
+          CASE WHEN i.value IS NULL THEN i.numerator::text || '/' || i.denominator::text || ' (no rate for zero denominator).'
+               ELSE i.numerator::text || '/' || i.denominator::text || ' = ' || i.value::text || '%.' END AS summary,
+          NULL::text AS route,
+          i."generatedAt" AS "reportingDate",
+          jsonb_build_object(
+            'cohortId', i."cohortId", 'cohortCode', c.code, 'academicYear', i."academicYear",
+            'periodKey', i."periodKey", 'population', 'cohort-membership', 'indicatorType', i."indicatorType"::text,
+            'numerator', i.numerator, 'denominator', i.denominator, 'value', i.value,
+            'definitionVersion', i."definitionVersion", 'definitionHash', i."definitionHash",
+            'calculationVersion', i."calculationVersion", 'calculationHash', i."calculationHash",
+            'sourceRefs', array_to_string(i."sourceRefs", ',')
+          ) AS attributes
+        FROM "ProgrammeOutcomeIndicator" i
+        JOIN "StudentCohort" c ON c.id = i."cohortId"
+        WHERE i."programmeId" = ${programmeId}
+        ORDER BY i."indicatorType", c.code, i."periodKey", i."generatedAt"
+      `;
+
+    case "indicator-definition-history":
+      return prisma.$queryRaw<CandidateRow[]>`
+        SELECT
+          i."indicatorType"::text || ':' || i."definitionHash" AS "entityId",
+          'ProgrammeOutcomeIndicatorDefinition' AS "entityType",
+          i."indicatorType"::text || ' — definition ' || i."definitionVersion" AS title,
+          COUNT(*)::text || ' indicator snapshot(s), ' || COUNT(DISTINCT i."periodKey")::text || ' period(s).' AS summary,
+          NULL::text AS route,
+          MAX(i."generatedAt") AS "reportingDate",
+          jsonb_build_object(
+            'indicatorType', i."indicatorType"::text, 'definitionVersion', i."definitionVersion",
+            'definitionHash', i."definitionHash", 'calculationVersion', i."calculationVersion",
+            'periodCount', COUNT(DISTINCT i."periodKey"), 'firstPeriod', MIN(i."periodKey"), 'lastPeriod', MAX(i."periodKey")
+          ) AS attributes
+        FROM "ProgrammeOutcomeIndicator" i
+        WHERE i."programmeId" = ${programmeId}
+        GROUP BY i."indicatorType", i."definitionVersion", i."definitionHash", i."calculationVersion"
+        ORDER BY i."indicatorType", MAX(i."generatedAt") DESC
+      `;
+
     case "completion-records":
     case "graduation-outcomes": {
       const outcomeType = evidenceType === "completion-records" ? "ProgrammeCompleted" : "GraduationAwarded";
