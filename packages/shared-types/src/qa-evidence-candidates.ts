@@ -6,9 +6,12 @@ export const QaEvidenceRetrievalStatusSchema = z.enum(["supported", "unsupported
 export type QaEvidenceRetrievalStatus = z.infer<typeof QaEvidenceRetrievalStatusSchema>;
 
 export type QaEvidenceAttributeValue = string | number | boolean | null;
+export type QaEvidenceCandidateSourceKind = "structuredCandidate" | "documentChunk";
 
 export interface QaEvidenceCandidateView {
   key: string;
+  /** Normalized source kind. Service normalization fills legacy structured adapters. */
+  sourceKind?: QaEvidenceCandidateSourceKind;
   evidenceType: string;
   sourceDomain: z.infer<typeof QaEvidenceSourceDomainSchema>;
   title: string;

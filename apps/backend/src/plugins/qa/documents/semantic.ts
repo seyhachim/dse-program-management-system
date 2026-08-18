@@ -24,43 +24,28 @@ function documentTypeForDomain(sourceDomain: QaEvidenceSourceDomain): string | n
   return null;
 }
 
+function lexicalTerms(value: string): string[] {
+  return [...new Set(value.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [])];
+}
+
+export function lexicalEvidenceScore(query: string, text: string): number {
+  const terms = lexicalTerms(query);
+  if (terms.length === 0) return 0;
+  const haystack = text.toLowerCase();
+  const matched = terms.filter((term) => haystack.includes(term)).length;
+  return matched / terms.length;
+}
+
 export async function retrieveSemanticDocumentEvidence(
   programmeId: string,
   definition: QaSemanticEvidenceDefinition,
   topK = 10,
   provider: QaEmbeddingProvider | null = configuredQaEmbeddingProvider(),
 ): Promise<QaEvidenceCandidateResultView> {
-  if (!provider) {
-    return {
-      programmeId,
-      expectedEvidenceId: definition.id,
-      evidenceType: definition.evidenceType,
-      sourceDomain: definition.sourceDomain,
-      status: "unsupported",
-      reason:
-        "QA semantic retrieval is unavailable because no embedding provider is configured. Set QA_EMBEDDING_API_URL and QA_EMBEDDING_MODEL, then embed the programme documents.",
-      candidates: [],
-    };
-  }
-
   const query = `${definition.expectationStatement}\nExpected evidence: ${definition.description}`;
-  const queryVector = (await provider.embed([query]))[0];
-  if (!queryVector) {
-    return {
-      programmeId,
-      expectedEvidenceId: definition.id,
-      evidenceType: definition.evidenceType,
-      sourceDomain: definition.sourceDomain,
-      status: "unsupported",
-      reason: "Embedding provider did not return a query vector.",
-      candidates: [],
-    };
-  }
-
   const requiredDocumentType = documentTypeForDomain(definition.sourceDomain);
   const chunks = await prisma.qaDocumentChunk.findMany({
     where: {
-      embeddingModel: provider.model,
       document: {
         programmeId,
         ...(requiredDocumentType ? { documentType: requiredDocumentType } : {}),
@@ -69,25 +54,51 @@ export async function retrieveSemanticDocumentEvidence(
     include: { document: true },
   });
 
+  let queryVector: number[] | null = null;
+  if (provider) {
+    try {
+      queryVector = (await provider.embed([query]))[0] ?? null;
+    } catch {
+      // Fail soft to lexical retrieval. The pilot must remain usable without
+      // pgvector or a live embedding service; provenance remains unchanged.
+      queryVector = null;
+    }
+  }
+
   const ranked = chunks
-    .filter((chunk) => chunk.embedding.length > 0)
-    .map((chunk) => ({
-      chunk,
-      similarity: cosineSimilarity(queryVector, chunk.embedding),
-    }))
-    .filter((item) => Number.isFinite(item.similarity) && item.similarity > -1)
-    .sort((a, b) => b.similarity - a.similarity)
+    .map((chunk) => {
+      const lexical = lexicalEvidenceScore(query, chunk.text);
+      const semantic =
+        provider && queryVector && chunk.embeddingModel === provider.model && chunk.embedding.length > 0
+          ? cosineSimilarity(queryVector, chunk.embedding)
+          : null;
+      const semanticNormalized = semantic === null || !Number.isFinite(semantic)
+        ? null
+        : Math.max(0, Math.min(1, (semantic + 1) / 2));
+      const score = semanticNormalized === null ? lexical : (semanticNormalized * 0.75) + (lexical * 0.25);
+      return { chunk, score, lexical, semantic: semanticNormalized };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) =>
+      b.score - a.score ||
+      a.chunk.documentId.localeCompare(b.chunk.documentId) ||
+      a.chunk.chunkIndex - b.chunk.chunkIndex
+    )
     .slice(0, topK);
 
+  const retrievalMode = queryVector ? "hybrid" : "lexical";
   return {
     programmeId,
     expectedEvidenceId: definition.id,
     evidenceType: definition.evidenceType,
     sourceDomain: definition.sourceDomain,
     status: "supported",
-    reason: `Semantic retrieval ranked programme document chunks with embedding model ${provider.model}.`,
-    candidates: ranked.map(({ chunk, similarity }) => ({
+    reason: queryVector
+      ? `Hybrid document retrieval ranked programme chunks using lexical relevance and embedding model ${provider?.model}.`
+      : "Lexical document retrieval ranked programme chunks without requiring pgvector or an embedding provider.",
+    candidates: ranked.map(({ chunk, score, lexical, semantic }) => ({
       key: `${definition.evidenceType}:QaDocumentChunk:${chunk.id}`,
+      sourceKind: "documentChunk",
       evidenceType: definition.evidenceType,
       sourceDomain: definition.sourceDomain,
       title: `${chunk.document.title} · chunk ${chunk.chunkIndex + 1}`,
@@ -97,13 +108,30 @@ export async function retrieveSemanticDocumentEvidence(
       route: null,
       reportingDate:
         chunk.document.reportingEnd?.toISOString() ?? chunk.document.updatedAt.toISOString(),
+      scope: { programmeId },
+      provenance: {
+        authority: "uploadedExternalDocument",
+        ownerUnit: "DSE",
+        version: chunk.document.version,
+        approvalStatus: null,
+        sourceUri: `qa-document:${chunk.documentId}#chunk=${chunk.id}`,
+      },
+      periodKey: chunk.document.reportingEnd
+        ? String(chunk.document.reportingEnd.getUTCFullYear())
+        : String(chunk.document.updatedAt.getUTCFullYear()),
       attributes: {
         documentId: chunk.documentId,
         documentType: chunk.document.documentType,
         documentVersion: chunk.document.version,
+        chunkIndex: chunk.chunkIndex,
         pageNumber: chunk.pageNumber,
         sectionLabel: chunk.sectionLabel,
-        similarity: Number(similarity.toFixed(6)),
+        startOffset: chunk.startOffset,
+        endOffset: chunk.endOffset,
+        relevance: Number(score.toFixed(6)),
+        lexicalScore: Number(lexical.toFixed(6)),
+        semanticScore: semantic === null ? null : Number(semantic.toFixed(6)),
+        retrievalMode,
         embeddingModel: chunk.embeddingModel,
         contentHash: chunk.document.contentHash,
       },

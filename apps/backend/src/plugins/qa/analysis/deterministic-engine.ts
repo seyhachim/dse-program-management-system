@@ -202,7 +202,7 @@ function sourceSnapshots(assessed: AssessedCandidate[]) {
   const snapshots = assessed.map((item) => {
     const candidate = item.candidate;
     return {
-      sourceKind: "structuredCandidate" as const,
+      sourceKind: candidate.sourceKind ?? "structuredCandidate",
       candidateKey: candidate.key,
       sourceDomain: candidate.sourceDomain as QaEvidenceAnalysisSourceView["sourceDomain"],
       entityType: candidate.entityType,
