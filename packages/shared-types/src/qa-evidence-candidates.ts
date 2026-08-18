@@ -88,6 +88,10 @@ export const QA_STRUCTURED_EVIDENCE_TYPES = [
   "programme-outcome-indicators",
   "indicator-definition-history",
   "clo-attainment-snapshots",
+  "outcome-concerns",
+  "qa-review-records",
+  "improvement-actions",
+  "follow-up-evidence",
 ] as const;
 
 /** Evidence types #189 can retrieve semantically from programme QA documents. */

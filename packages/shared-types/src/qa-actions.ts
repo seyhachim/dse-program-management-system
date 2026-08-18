@@ -87,3 +87,27 @@ export interface QaImprovementActionView {
   createdAt: string;
   updatedAt: string;
 }
+
+
+export const CreateQaImprovementActionFollowUpSchema = z.object({
+  programmeId: z.string().trim().min(1),
+  evidenceId: z.string().uuid(),
+  note: z.string().trim().max(2000).default(""),
+});
+export type CreateQaImprovementActionFollowUpInput = z.infer<typeof CreateQaImprovementActionFollowUpSchema>;
+
+export const QaImprovementActionFollowUpListQuerySchema = z.object({
+  programmeId: z.string().trim().min(1),
+});
+
+export interface QaImprovementActionFollowUpView {
+  id: string;
+  programmeId: string;
+  actionId: string;
+  evidenceId: string;
+  evidenceTitle: string;
+  evidenceStatus: "draft" | "ready" | "reviewed";
+  note: string;
+  linkedById: string;
+  linkedAt: string;
+}

@@ -81,6 +81,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "QaDocument",
   "QaDocumentChunk",
   "QaImprovementAction",
+  "QaImprovementActionFollowUp",
   "QaSarSection",
   "QaSarSubmission",
   "QaSarReview",

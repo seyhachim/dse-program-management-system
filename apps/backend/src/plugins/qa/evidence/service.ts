@@ -12,6 +12,7 @@ import {
   type QaSemanticEvidenceDefinition,
 } from "../documents/semantic.ts";
 import type { QaEmbeddingProvider } from "../documents/embedding.ts";
+import { retrieveContinuousImprovementEvidence } from "./continuous-improvement-evidence.ts";
 import {
   retrieveEvidenceCandidates,
   type ExpectedEvidenceDefinition,
@@ -191,6 +192,9 @@ export async function getQaEvidenceCandidates(
     evidenceType: row.evidenceType,
     sourceDomain: sourceDomain.data,
   };
+  if (["outcome-concerns", "qa-review-records", "improvement-actions", "follow-up-evidence"].includes(row.evidenceType)) {
+    return normalizeCandidateSemantics(programmeId, await retrieveContinuousImprovementEvidence(programmeId, definition));
+  }
   return normalizeCandidateSemantics(
     programmeId,
     await retrieveEvidenceCandidates(programmeId, definition, { cohortIds: options.cohortIds }),

@@ -4,6 +4,8 @@ import {
   CreateQaImprovementActionSchema,
   QaImprovementActionListQuerySchema,
   UpdateQaImprovementActionSchema,
+  CreateQaImprovementActionFollowUpSchema,
+  QaImprovementActionFollowUpListQuerySchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { requirePermission } from "../../../core/permissions/index.ts";
@@ -18,6 +20,7 @@ import {
   listQaImprovementActions,
   updateQaImprovementAction,
 } from "./service.ts";
+import { createQaImprovementActionFollowUp, listQaImprovementActionFollowUps } from "./follow-up-service.ts";
 
 function sendActionError(res: Response, error: unknown) {
   if (error instanceof QaImprovementActionResourceNotFoundError) {
@@ -126,6 +129,24 @@ export function createQaActionRouter(): Router {
       }
     },
   );
+
+  router.get("/actions/:actionId/follow-ups", requirePermission("qa:read"), async (req, res) => {
+    const actionId = req.params.actionId;
+    const parsed = QaImprovementActionFollowUpListQuerySchema.safeParse(req.query);
+    if (!actionId || !parsed.success) { res.status(400).json({ error: "Invalid follow-up query" }); return; }
+    if (!req.user || !canAccessQaProgramme(req.user, parsed.data.programmeId)) { res.status(403).json({ error: "You do not have QA access to this programme" }); return; }
+    try { res.json(await listQaImprovementActionFollowUps(actionId, parsed.data.programmeId)); }
+    catch (error) { sendActionError(res, error); }
+  });
+
+  router.post("/actions/:actionId/follow-ups", requirePermission("qa:write"), async (req, res) => {
+    const actionId = req.params.actionId;
+    const parsed = CreateQaImprovementActionFollowUpSchema.safeParse(req.body);
+    if (!actionId || !parsed.success) { res.status(400).json({ error: "Invalid follow-up evidence link", details: parsed.success ? undefined : parsed.error.flatten() }); return; }
+    if (!req.user || !canAccessQaProgramme(req.user, parsed.data.programmeId)) { res.status(403).json({ error: "You do not have QA access to this programme" }); return; }
+    try { res.status(201).json(await createQaImprovementActionFollowUp(actionId, parsed.data, req.user.id)); }
+    catch (error) { sendActionError(res, error); }
+  });
 
   return router;
 }
