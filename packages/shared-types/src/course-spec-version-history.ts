@@ -1,6 +1,10 @@
 import { z } from "zod";
-import type { CourseSpecReview, CourseSpecView, TeachingLearningProfile } from "./course-spec.ts";
-import { SpecSectionIdSchema } from "./course-spec.ts";
+import type {
+  CourseSpecReview,
+  CourseSpecView,
+  SpecSectionId,
+  TeachingLearningProfile,
+} from "./course-spec.ts";
 
 export const CourseSpecAcademicReviewStatusSchema = z.enum([
   "Draft",
@@ -64,7 +68,7 @@ export type CourseSpecExactVersionView = {
 };
 
 export type CourseSpecSectionComparison = {
-  sectionId: z.infer<typeof SpecSectionIdSchema>;
+  sectionId: SpecSectionId;
   label: string;
   changed: boolean;
   changedPaths: string[];
