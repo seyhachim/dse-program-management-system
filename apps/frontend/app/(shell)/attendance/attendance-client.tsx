@@ -196,6 +196,14 @@ export function AttendanceClient() {
     setRollCallSnapshot(null);
   }
 
+  function openHistoryRegister(sessionDate: string) {
+    setSearch("");
+    setDate(sessionDate);
+    window.requestAnimationFrame(() => {
+      document.getElementById("attendance-register")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   const sessionContext = selectedOffering
     ? `${selectedOffering.course?.title ?? selectedOffering.course?.code ?? "Course"} · Class ${selectedOffering.sectionCode} · ${
         teachingWeek ? `Week ${teachingWeek}` : "Week not scheduled"
@@ -292,7 +300,7 @@ export function AttendanceClient() {
             <SummaryCard icon={<UsersRound className="h-4 w-4" />} label="Unmarked" value={counts.Unmarked} />
           </section>
 
-          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <section id="attendance-register" className="scroll-mt-4 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
@@ -427,7 +435,7 @@ export function AttendanceClient() {
                         <td className="px-4 py-3">
                           <button
                             type="button"
-                            onClick={() => setDate(item.date)}
+                            onClick={() => openHistoryRegister(item.date)}
                             className="text-sm font-medium text-primary hover:underline"
                           >
                             Open register
