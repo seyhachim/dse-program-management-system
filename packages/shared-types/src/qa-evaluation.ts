@@ -7,6 +7,23 @@ import {
   QaEvidenceScopeSchema,
 } from "./qa-evidence-semantics.ts";
 
+export const QA_CRITERIA_1_4_8_DATASET_VERSION = "aun-qa-v4-criteria-1-4-8-v1";
+
+export const QaEvaluationScenarioTypeSchema = z.enum([
+  "positiveEvidence",
+  "missingEvidence",
+  "partialEvidence",
+  "ambiguousRelationship",
+  "wrongScope",
+  "staleEvidence",
+  "conflictingEvidence",
+  "notApplicable",
+]);
+export type QaEvaluationScenarioType = z.infer<typeof QaEvaluationScenarioTypeSchema>;
+
+export const QaEvaluationDifficultySchema = z.enum(["easy", "medium", "hard"]);
+export type QaEvaluationDifficulty = z.infer<typeof QaEvaluationDifficultySchema>;
+
 export const QaEvaluationEvidenceAttributeValueSchema = z.union([
   z.string().max(5000),
   z.number(),
@@ -165,6 +182,21 @@ export interface QaEvaluationScenarioView {
   evidence: QaEvaluationEvidenceView[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface QaEvaluationDatasetScenarioView extends QaEvaluationScenarioView {
+  scenarioType: QaEvaluationScenarioType;
+  difficulty: QaEvaluationDifficulty;
+  datasetVersion: string;
+  scenarioVersion: number;
+}
+
+export interface QaEvaluationDatasetExportView {
+  schemaVersion: "qa-controlled-dataset-v1";
+  frameworkId: string;
+  datasetVersion: string;
+  scenarioCount: number;
+  scenarios: QaEvaluationDatasetScenarioView[];
 }
 
 export interface QaEvaluationRunView {
