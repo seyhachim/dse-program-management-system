@@ -1,6 +1,11 @@
-import type {
-  CreateQaAnalysisReviewInput,
-  QaAnalysisReviewView,
+import {
+  QaAnalysisCorrectedRelationshipSchema,
+  QaAnalysisCorrectionReasonCategorySchema,
+  QaAnalysisCorrectionReasonCodeSchema,
+  QaEvidenceAnalysisStateSchema,
+  qaAnalysisCorrectionReasonCategory,
+  type CreateQaAnalysisReviewInput,
+  type QaAnalysisReviewView,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 
@@ -16,10 +21,31 @@ const fromDbDecision = {
   NeedsMoreEvidence: "needsMoreEvidence",
 } as const;
 
+const toDbState = {
+  evidenceIdentified: "EvidenceIdentified",
+  potentialEvidenceGap: "PotentialEvidenceGap",
+  expertReviewRequired: "ExpertReviewRequired",
+} as const;
+
+const fromDbState = {
+  EvidenceIdentified: "evidenceIdentified",
+  PotentialEvidenceGap: "potentialEvidenceGap",
+  ExpertReviewRequired: "expertReviewRequired",
+} as const;
+
 export class QaAnalysisReviewResourceNotFoundError extends Error {}
 export class QaAnalysisReviewScopeMismatchError extends Error {}
 
-function toView(review: {
+type CorrectionRow = {
+  id: string;
+  correctedState: keyof typeof fromDbState | null;
+  reasonCategory: string;
+  reasonCode: string;
+  correctedEvidenceCandidateKeys: string[];
+  correctedRelationships: unknown;
+};
+
+type ReviewRow = {
   id: string;
   programmeId: string;
   analysisId: string;
@@ -28,7 +54,9 @@ function toView(review: {
   comment: string;
   createdAt: Date;
   reviewer: { name: string };
-}): QaAnalysisReviewView {
+};
+
+function toView(review: ReviewRow, correction?: CorrectionRow): QaAnalysisReviewView {
   return {
     id: review.id,
     programmeId: review.programmeId,
@@ -37,8 +65,32 @@ function toView(review: {
     reviewerName: review.reviewer.name,
     decision: fromDbDecision[review.decision],
     comment: review.comment,
+    correctedState: correction?.correctedState
+      ? QaEvidenceAnalysisStateSchema.parse(fromDbState[correction.correctedState])
+      : null,
+    reasonCategory: QaAnalysisCorrectionReasonCategorySchema.parse(
+      correction?.reasonCategory ?? "confirmation",
+    ),
+    reasonCode: QaAnalysisCorrectionReasonCodeSchema.parse(
+      correction?.reasonCode ?? "confirmed",
+    ),
+    correctedEvidenceCandidateKeys: correction?.correctedEvidenceCandidateKeys ?? [],
+    correctedRelationships: QaAnalysisCorrectedRelationshipSchema.array().parse(
+      correction?.correctedRelationships ?? [],
+    ),
     createdAt: review.createdAt.toISOString(),
   };
+}
+
+async function loadCorrectionRows(ids: string[]): Promise<Map<string, CorrectionRow>> {
+  if (ids.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<CorrectionRow[]>`
+    SELECT id, "correctedState", "reasonCategory", "reasonCode",
+           "correctedEvidenceCandidateKeys", "correctedRelationships"
+    FROM "QaEvidenceAnalysisReview"
+    WHERE id = ANY(${ids}::text[])
+  `;
+  return new Map(rows.map((row) => [row.id, row]));
 }
 
 export async function createQaAnalysisReview(
@@ -59,17 +111,36 @@ export async function createQaAnalysisReview(
     );
   }
 
-  const created = await prisma.qaEvidenceAnalysisReview.create({
-    data: {
-      programmeId: input.programmeId,
-      analysisId,
-      reviewerId,
-      decision: toDbDecision[input.decision],
-      comment: input.comment,
-    },
+  const id = crypto.randomUUID();
+  const reasonCode = input.reasonCode ?? "confirmed";
+  const reasonCategory = qaAnalysisCorrectionReasonCategory(reasonCode);
+  const correctedState = input.correctedState
+    ? toDbState[input.correctedState]
+    : null;
+
+  await prisma.$executeRaw`
+    INSERT INTO "QaEvidenceAnalysisReview" (
+      id, "programmeId", "analysisId", "reviewerId", decision, comment,
+      "correctedState", "reasonCategory", "reasonCode",
+      "correctedEvidenceCandidateKeys", "correctedRelationships", "createdAt"
+    ) VALUES (
+      ${id}, ${input.programmeId}, ${analysisId}, ${reviewerId},
+      ${toDbDecision[input.decision]}::"QaAnalysisReviewDecision", ${input.comment},
+      ${correctedState}::"QaEvidenceAnalysisState", ${reasonCategory}, ${reasonCode},
+      ${input.correctedEvidenceCandidateKeys}::text[],
+      CAST(${JSON.stringify(input.correctedRelationships)} AS jsonb), NOW()
+    )
+  `;
+
+  const created = await prisma.qaEvidenceAnalysisReview.findUnique({
+    where: { id },
     include: { reviewer: { select: { name: true } } },
   });
-  return toView(created);
+  if (!created) {
+    throw new QaAnalysisReviewResourceNotFoundError("Created QA analysis review could not be reloaded");
+  }
+  const corrections = await loadCorrectionRows([id]);
+  return toView(created, corrections.get(id));
 }
 
 export async function listQaAnalysisReviews(
@@ -97,5 +168,6 @@ export async function listQaAnalysisReviews(
     orderBy: { createdAt: "desc" },
     include: { reviewer: { select: { name: true } } },
   });
-  return reviews.map(toView);
+  const corrections = await loadCorrectionRows(reviews.map((review) => review.id));
+  return reviews.map((review) => toView(review, corrections.get(review.id)));
 }
