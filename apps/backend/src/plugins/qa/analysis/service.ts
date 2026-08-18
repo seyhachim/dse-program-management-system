@@ -2,6 +2,7 @@ import {
   AUN_QA_V4_ID,
   CreateQaEvidenceAnalysisSchema,
   QaApplicabilityStateSchema,
+  QaAnalysisReasoningFactorsSchema,
   QaEvidenceAnalysisSourceKindSchema,
   QaEvidenceAnalysisStateSchema,
   QaEvidenceProvenanceSchema,
@@ -34,6 +35,7 @@ type AnalysisSemanticsRow = {
   id: string;
   applicability: string;
   applicabilityReason: string;
+  reasoningFactors: unknown;
 };
 
 type SourceSemanticsRow = {
@@ -131,6 +133,7 @@ function analysisToView(
     engine: analysis.engine,
     engineVersion: analysis.engineVersion,
     promptVersion: analysis.promptVersion,
+    reasoningFactors: QaAnalysisReasoningFactorsSchema.parse(semantics?.reasoningFactors ?? { evidence: [], relationships: [] }),
     createdAt: analysis.createdAt.toISOString(),
     sources: analysis.sources.map((source) => sourceToView(source, sourceSemantics.get(source.id))),
   };
@@ -242,7 +245,8 @@ export async function createQaEvidenceAnalysis(
       await tx.$executeRaw`
         UPDATE "QaEvidenceAnalysis"
         SET "applicability" = ${input.applicability},
-            "applicabilityReason" = ${input.applicabilityReason}
+            "applicabilityReason" = ${input.applicabilityReason},
+            "reasoningFactors" = CAST(${JSON.stringify(input.reasoningFactors)} AS jsonb)
         WHERE id = ${created.id}
       `;
     } else {
@@ -250,6 +254,7 @@ export async function createQaEvidenceAnalysis(
         UPDATE "QaEvidenceAnalysis"
         SET "applicability" = ${input.applicability},
             "applicabilityReason" = ${input.applicabilityReason},
+            "reasoningFactors" = CAST(${JSON.stringify(input.reasoningFactors)} AS jsonb),
             state = NULL
         WHERE id = ${created.id}
       `;
@@ -320,7 +325,7 @@ export async function listQaEvidenceAnalyses(
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const analysisSemantics = await prisma.$queryRaw<AnalysisSemanticsRow[]>`
-    SELECT id, applicability, "applicabilityReason"
+    SELECT id, applicability, "applicabilityReason", "reasoningFactors"
     FROM "QaEvidenceAnalysis"
     WHERE id = ANY(${ids}::text[])
   `;

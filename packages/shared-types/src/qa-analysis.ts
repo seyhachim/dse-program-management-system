@@ -44,6 +44,31 @@ export const CreateQaEvidenceAnalysisSourceSchema = z.object({
   periodKey: z.string().trim().max(200).nullable().optional().default(null),
 });
 
+export const QaEvidenceRelationshipReasoningStateSchema = z.enum(["satisfied", "gap", "ambiguous"]);
+export const QaEvidenceReasoningFactorSchema = z.object({
+  expectedEvidenceId: z.string().trim().min(1).max(300),
+  evidenceType: z.string().trim().min(1).max(120),
+  role: z.enum(["required", "supportive", "context"]),
+  findingState: z.enum(["satisfied", "gap", "ambiguous"]),
+  acceptedCandidateKeys: z.array(z.string().max(500)).max(500).default([]),
+  rejectedScopeCount: z.number().int().min(0).default(0),
+  rejectedTemporalCount: z.number().int().min(0).default(0),
+  rejectedAuthorityCount: z.number().int().min(0).default(0),
+});
+export const QaRelationshipReasoningFactorSchema = z.object({
+  fromEvidenceType: z.string().trim().min(1).max(120),
+  toEvidenceType: z.string().trim().min(1).max(120),
+  relation: z.enum(["supports", "derivedFrom", "reviewedBy", "resultsIn", "followedUpBy"]),
+  state: QaEvidenceRelationshipReasoningStateSchema,
+  matchedPairs: z.array(z.object({ fromCandidateKey: z.string().max(500), toCandidateKey: z.string().max(500) })).max(500).default([]),
+  explanation: z.string().trim().max(5000),
+});
+export const QaAnalysisReasoningFactorsSchema = z.object({
+  evidence: z.array(QaEvidenceReasoningFactorSchema).max(100).default([]),
+  relationships: z.array(QaRelationshipReasoningFactorSchema).max(50).default([]),
+});
+export type QaAnalysisReasoningFactors = z.infer<typeof QaAnalysisReasoningFactorsSchema>;
+
 export const CreateQaEvidenceAnalysisSchema = z.object({
   programmeId: z.string().trim().min(1),
   cycleId: z.string().uuid(),
@@ -58,6 +83,7 @@ export const CreateQaEvidenceAnalysisSchema = z.object({
   engine: z.string().trim().min(1).max(100),
   engineVersion: z.string().trim().min(1).max(100),
   promptVersion: z.string().trim().max(100).default(""),
+  reasoningFactors: QaAnalysisReasoningFactorsSchema.default({ evidence: [], relationships: [] }),
   sources: z.array(CreateQaEvidenceAnalysisSourceSchema).max(500).default([]),
 }).superRefine((value, ctx) => {
   if (value.applicability === "applicable" && value.state === null) {
@@ -141,6 +167,7 @@ export interface QaEvidenceAnalysisView {
   engine: string;
   engineVersion: string;
   promptVersion: string;
+  reasoningFactors: QaAnalysisReasoningFactors;
   createdAt: string;
   sources: QaEvidenceAnalysisSourceView[];
 }

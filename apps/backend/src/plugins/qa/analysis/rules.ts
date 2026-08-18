@@ -3,8 +3,9 @@ import type {
   QaExpectedEvidenceDefinitionView,
   QaEvidenceAnalysisState,
 } from "@dse-pms/shared-types";
+import type { QaRelationshipFinding } from "./relationships.ts";
 
-export const QA_DETERMINISTIC_RULE_VERSION = "1.0.0";
+export const QA_DETERMINISTIC_RULE_VERSION = "2.0.0";
 
 export type QaRuleFindingState = "satisfied" | "gap" | "ambiguous";
 
@@ -278,10 +279,11 @@ const semanticExpertReviewRequirements = new Set(["1.1", "3.6", "5.4"]);
 export function determineExpectationState(
   requirementCode: string,
   findings: QaEvidenceRuleFinding[],
+  relationships: QaRelationshipFinding[] = [],
 ): { state: QaEvidenceAnalysisState; uncertaintyNote: string } {
   const required = findings.filter((finding) => finding.definition.role === "required");
 
-  if (required.some((finding) => finding.state === "gap")) {
+  if (required.some((finding) => finding.state === "gap") || relationships.some((finding) => finding.state === "gap")) {
     return {
       state: "potentialEvidenceGap",
       uncertaintyNote: "At least one required structured evidence source was available to the rule engine but was absent or incomplete. This is an evidence-gap signal, not a quality judgment.",
@@ -291,6 +293,7 @@ export function determineExpectationState(
   if (
     required.length === 0 ||
     required.some((finding) => finding.state === "ambiguous") ||
+    relationships.some((finding) => finding.state === "ambiguous") ||
     semanticExpertReviewRequirements.has(requirementCode)
   ) {
     return {
@@ -309,6 +312,7 @@ export function buildDeterministicExplanation(
   requirementCode: string,
   findings: QaEvidenceRuleFinding[],
   state: QaEvidenceAnalysisState,
+  relationships: QaRelationshipFinding[] = [],
 ): string {
   const headline =
     state === "evidenceIdentified"
@@ -324,5 +328,6 @@ export function buildDeterministicExplanation(
     })
     .join(" ");
 
-  return `${headline} ${details}`.trim();
+  const relationshipDetails = relationships.map((finding) => `[relationship ${finding.link.relation}; ${finding.state}] ${finding.explanation}`).join(" ");
+  return `${headline} ${details} ${relationshipDetails}`.trim();
 }
