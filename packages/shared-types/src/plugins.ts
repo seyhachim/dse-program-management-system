@@ -85,19 +85,10 @@ export const coursesManifest: PluginManifest = {
   name: "Courses",
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
-  // Two route entries at the same path, split by role (issue #104): a lecturer
-  // gets a teaching-focused "My Courses" label/page, everyone else keeps the
-  // curriculum-management label. Safe to split like this because the role sets
-  // are disjoint in practice — a caller holding both would see both sidebar
-  // entries, an accepted edge case (no seeded user holds both today).
+  // Programme-wide roles keep the curriculum-management course entry. The
+  // lecturer-facing /courses entry lives in lecturerWorkspaceManifest so its
+  // label and grouping can follow the lecturer-specific information architecture.
   routes: [
-    {
-      label: "My Courses",
-      path: "/courses",
-      icon: "book",
-      roles: ["lecturer"],
-      group: "Academic",
-    },
     {
       label: "Course Management",
       path: "/courses",
@@ -116,6 +107,80 @@ export const coursesManifest: PluginManifest = {
     },
   ],
   permissions: ["courses:read", "courses:write", "courses:manage", "courses:review"],
+};
+
+/** Lecturer-focused cross-course workspace navigation. */
+export const lecturerWorkspaceManifest: PluginManifest = {
+  id: "lecturer-workspace",
+  name: "Lecturer Workspace",
+  version: "0.2.0",
+  description:
+    "Lecturer navigation organized around teaching, curriculum, delivery, and personal work.",
+  routes: [
+    {
+      label: "Overview",
+      path: "/lecturer-overview",
+      icon: "dashboard",
+      roles: ["lecturer"],
+      group: "Teaching",
+    },
+    {
+      label: "Course Delivery",
+      path: "/course-delivery",
+      icon: "megaphone",
+      roles: ["lecturer"],
+      group: "Academic",
+    },
+    {
+      label: "Teaching Schedule",
+      path: "/teaching-schedule",
+      icon: "calendar",
+      roles: ["lecturer"],
+      group: "Teaching",
+    },
+    {
+      label: "Course Specifications",
+      path: "/courses",
+      icon: "book",
+      roles: ["lecturer"],
+      group: "Curriculum",
+    },
+    {
+      label: "Attendance",
+      path: "/attendance",
+      icon: "check-square",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Assessments / Results",
+      path: "/assessments-results",
+      icon: "file-check",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Announcements",
+      path: "/announcements",
+      icon: "bell",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Feedback",
+      path: "/feedback",
+      icon: "chart",
+      roles: ["lecturer"],
+      group: "Delivery",
+    },
+    {
+      label: "Account Settings",
+      path: "/account-settings",
+      icon: "settings",
+      roles: ["lecturer"],
+      group: "Personal",
+    },
+  ],
 };
 
 export const offeringsManifest: PluginManifest = {
@@ -179,6 +244,25 @@ export const dashboardManifest: PluginManifest = {
   ],
 };
 
+/** Student-only learning-information portal. All backend reads are scoped to
+ * the authenticated student's enrollments; this manifest controls navigation,
+ * not the authorization boundary. */
+export const studentPortalManifest: PluginManifest = {
+  id: "student-portal",
+  name: "Student Portal",
+  version: "0.2.0",
+  description: "Enrolled courses, schedule, approved learning information, assessments, results, and feedback.",
+  routes: [
+    { label: "Home", path: "/portal", icon: "home", roles: ["student"] },
+    { label: "My Courses", path: "/portal/courses", icon: "book", roles: ["student"], group: "Learning" },
+    { label: "Schedule", path: "/portal/schedule", icon: "calendar", roles: ["student"], group: "Learning" },
+    { label: "Assessments", path: "/portal/assessments", icon: "file-check", roles: ["student"], group: "Learning" },
+    { label: "Results", path: "/portal/results", icon: "chart", roles: ["student"], group: "Progress" },
+    { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },
+  ],
+  permissions: ["student-portal:read", "student-portal:feedback"],
+};
+
 export const programmeManifest: PluginManifest = {
   id: "programme",
   name: "Programme Management",
@@ -197,6 +281,58 @@ export const programmeManifest: PluginManifest = {
   permissions: ["programme:read", "programme:write"],
 };
 
+export const qaManifest: PluginManifest = {
+  id: "qa",
+  name: "Quality Assurance",
+  version: "0.2.0",
+  description:
+    "Programme-scoped AUN-QA evidence, contributor work, self-assessment, review, and readiness workflow.",
+  routes: [
+    {
+      label: "AUN-QA Workspace",
+      path: "/aun-qa",
+      icon: "shield-check",
+      roles: ["admin", "program_coordinator", "qa_contributor"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Evidence Library",
+      path: "/aun-qa/evidence",
+      icon: "library",
+      roles: ["admin", "program_coordinator", "qa_contributor", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "SAR Review",
+      path: "/aun-qa/review",
+      icon: "clipboard-check",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "SAR Preview",
+      path: "/aun-qa/sar-preview",
+      icon: "file-text",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "QA Evidence Analysis",
+      path: "/qa-dashboard",
+      icon: "file-check",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+  ],
+  permissions: [
+    "qa:read",
+    "qa:write",
+    "qa:contribute",
+    "qa:review",
+    "qa:manage",
+  ],
+};
+
 /**
  * Sidebar-only placeholder pages for sections not built yet (issue #49). Each
  * route renders a generic "coming soon" page — no backend plugin/router, since
@@ -210,9 +346,9 @@ export const programmeManifest: PluginManifest = {
  * explicitly excluded from academic-decision entries (§8), and QA's own
  * "QA Dashboard" is its landing page distinct from the general `/dashboard`.
  * `Users`/`Settings`/`Audit Trail` are system administration and stay
- * admin-only, matching the role-comparison table (§18). `student` isn't
- * listed anywhere here — there's no student portal built yet, so it (like
- * every other unlisted role) only ever sees the unrestricted footer entry.
+ * admin-only, matching the role-comparison table (§18). Student navigation is
+ * provided separately by `studentPortalManifest`; these placeholders remain
+ * restricted to the programme roles listed below.
  */
 export const placeholdersManifest: PluginManifest = {
   id: "placeholders",
@@ -234,13 +370,6 @@ export const placeholdersManifest: PluginManifest = {
       icon: "graduation-cap",
       roles: ["admin", "program_coordinator", "program_secretary"],
       group: "Academic",
-    },
-    {
-      label: "QA Dashboard",
-      path: "/qa-dashboard",
-      icon: "shield-check",
-      roles: ["admin", "program_coordinator", "qa_reviewer"],
-      group: "Quality Assurance",
     },
     {
       label: "Reports",
@@ -334,12 +463,15 @@ export const authManifest: PluginManifest = {
 };
 
 export const pluginManifests: PluginManifest[] = [
+  studentPortalManifest,
   dashboardManifest,
   studentsManifest,
   coursesManifest,
+  lecturerWorkspaceManifest,
   offeringsManifest,
   lecturersManifest,
   programmeManifest,
+  qaManifest,
   placeholdersManifest,
   methodsManifest,
   rubricsManifest,

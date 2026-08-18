@@ -16,6 +16,7 @@ export type CloForm = {
   mappedPlos: string[];
   sltHours: string;
   teachingMethodIds: string[];
+  activeLearningStrategyIds: string[];
   assessmentMethodIds: string[];
   status: "active" | "inactive";
   notes: string;
@@ -33,6 +34,7 @@ export function emptyClo(): CloForm {
     mappedPlos: [],
     sltHours: "",
     teachingMethodIds: [],
+    activeLearningStrategyIds: [],
     assessmentMethodIds: [],
     status: "active",
     notes: "",
@@ -89,6 +91,7 @@ export function toClosForm(data: unknown, legacyMapping?: unknown): CloForm[] {
         teachingMethodIds: teachingMethodIds.length
           ? teachingMethodIds
           : asStrArray(legacy?.teachingMethodIds),
+        activeLearningStrategyIds: asStrArray(d.activeLearningStrategyIds),
         assessmentMethodIds: asStrArray(d.assessmentMethodIds),
         status: d.status === "inactive" ? "inactive" : "active",
         notes: asStr(d.notes),
@@ -108,6 +111,7 @@ export function toClosPayload(items: CloForm[]) {
       mappedPlos: f.mappedPlos,
       sltHours: f.sltHours ? Number(f.sltHours) : null,
       teachingMethodIds: f.teachingMethodIds,
+      activeLearningStrategyIds: f.activeLearningStrategyIds,
       assessmentMethodIds: f.assessmentMethodIds,
       status: f.status,
       notes: f.notes.trim(),
@@ -137,6 +141,60 @@ export type BloomStyle = {
   bar: string;
   chip: string;
 };
+
+export type CapDomainStyle = {
+  code: "C" | "A" | "P";
+  name: "Cognitive" | "Affective" | "Psychomotor";
+  dot: string;
+  bar: string;
+  chip: string;
+};
+
+/** Domain-level palette used by the C/A/P overview and compact level-code badges. */
+export const CAP_DOMAINS: readonly CapDomainStyle[] = [
+  {
+    code: "C",
+    name: "Cognitive",
+    dot: "#6366f1",
+    bar: "#6366f1",
+    chip: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300",
+  },
+  {
+    code: "A",
+    name: "Affective",
+    dot: "#10b981",
+    bar: "#10b981",
+    chip: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+  },
+  {
+    code: "P",
+    name: "Psychomotor",
+    dot: "#f59e0b",
+    bar: "#f59e0b",
+    chip: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+  },
+] as const;
+
+/** Resolve a validated C/A/P level such as C5 or A3 to its learning domain. */
+export function capDomainStyle(level: string): CapDomainStyle | null {
+  if (!CAP_LEVELS.some((entry) => entry.code === level)) return null;
+  return CAP_DOMAINS.find((domain) => level.startsWith(domain.code)) ?? null;
+}
+
+export type CapDomainCounts = Record<"C" | "A" | "P" | "unclassified", number>;
+
+/** Count CLO level codes by their primary learning domain. */
+export function capDomainCounts(levels: readonly string[]): CapDomainCounts {
+  return levels.reduce<CapDomainCounts>(
+    (counts, level) => {
+      const domain = capDomainStyle(level);
+      if (domain) counts[domain.code] += 1;
+      else counts.unclassified += 1;
+      return counts;
+    },
+    { C: 0, A: 0, P: 0, unclassified: 0 },
+  );
+}
 
 /** Cognitive levels (C1–C6) carry the reference colour scheme. */
 const COGNITIVE_STYLE: Record<string, Omit<BloomStyle, "name">> = {

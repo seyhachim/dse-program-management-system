@@ -1,0 +1,59 @@
+name: CourseSpec Version History Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/src/plugins/courses/version-history-*.ts"
+      - "apps/frontend/app/(shell)/courses/[id]/spec/**"
+      - "apps/frontend/lib/course-spec-history*"
+      - "apps/frontend/lib/course-spec-governance-actions*"
+      - "apps/frontend/lib/course-spec-periodic-review.ts"
+      - "packages/shared-types/src/course-spec-version-history.ts"
+      - ".github/workflows/course-spec-version-history-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/backend/src/plugins/courses/version-history-*.ts"
+      - "apps/frontend/app/(shell)/courses/[id]/spec/**"
+      - "apps/frontend/lib/course-spec-history*"
+      - "apps/frontend/lib/course-spec-governance-actions*"
+      - "apps/frontend/lib/course-spec-periodic-review.ts"
+      - "packages/shared-types/src/course-spec-version-history.ts"
+      - ".github/workflows/course-spec-version-history-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-version-integrity:
+    name: Exact version read and comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_version_history_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_version_history_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_version_history_ci?schema=public
+      COURSE_SPEC_VERSION_HISTORY_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - run: bun test apps/backend/src/plugins/courses/version-history-service.test.ts apps/backend/src/plugins/courses/version-history-db.test.ts apps/frontend/lib/course-spec-history.test.ts apps/frontend/lib/course-spec-governance-actions.test.ts

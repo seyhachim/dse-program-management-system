@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CourseTypeSchema } from "./courses.ts";
-import { SemesterSchema } from "./offerings.ts";
+import { DateOnlySchema, SemesterSchema } from "./offerings.ts";
 
 /**
  * Course Specification wizard contract. The full RUPP syllabus (Part 2 §1–25) is
@@ -85,7 +85,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
     title: "References / Textbooks",
     ref: "§20",
     part: "Part 2",
-    state: "soon",
+    state: "ready",
   },
   {
     id: "responsibility",
@@ -115,7 +115,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
     part: "Part 2",
     state: "soon",
   },
-  { id: "date", title: "Date", ref: "§25", part: "Part 2", state: "soon" },
+  { id: "date", title: "Date", ref: "§25", part: "Part 2", state: "ready" },
 ] as const;
 
 export type SpecSectionId = (typeof SPEC_SECTIONS)[number]["id"];
@@ -438,26 +438,23 @@ export type FocusCode = z.infer<typeof FocusCode>;
 /* -------------------------------------------- §1–13 Course Information */
 
 /**
- * Course Information (§1–13) as returned by `GET /:id/spec` — a read model, not
- * stored verbatim. Programme Title (§1) is fixed config; the administrative
- * scalars (§2–4, §11) come live from the Course row, the instructor block (§6–9)
- * from the assigned lecturer's profile, and availability/other-lecturers (§10,
- * §12) from the course's latest Offering — all recomputed on every read so
- * reassigning a lecturer or editing the course is reflected immediately. Only
- * Pre-requisites (§5) and Course Description (§14) are actually editable; see
- * `CourseInfoInput`, which is what `PUT /:id/spec/courseInfo` accepts.
+ * Course Information (§1–13) as returned by `GET /:id/spec`. Once a CourseSpec
+ * version exists, these values come from that version's normalized snapshot so
+ * later Course, lecturer, Offering, or programme-title edits cannot rewrite
+ * historical approved output. `CourseInfoInput` remains deliberately narrow:
+ * lecturers can edit only prerequisites/description through this workspace.
  */
 export const CourseInfoSection = z.object({
-  // §2 / §3 / §4 / §11 — read live from Course; edited via the Course entity.
+  programmeTitle: z.string().optional(),
   courseTitle: z.string().min(1, "Course title is required"),
   courseCode: z.string().min(1, "Course code is required"),
   credits: z.coerce.number().int().min(1).max(30).nullable().optional(),
   courseType: CourseTypeSchema.nullable().optional(),
-  // §5 / §14 — the only fields a save actually persists.
   prerequisites: z.string().optional(),
   description: z.string().optional(),
-  // §6–9 — read live from the assigned lecturer's profile.
+  totalSltHours: z.coerce.number().int().min(0).nullable().optional(),
   instructorName: z.string().optional(),
+  instructorTitle: z.string().optional(),
   qualification: z.string().optional(),
   email: z
     .string()
@@ -465,9 +462,7 @@ export const CourseInfoSection = z.object({
     .or(z.literal(""))
     .optional(),
   telephone: z.string().optional(),
-  // §10 — read live from the latest Offering; edited via the Offering entity.
   otherLecturers: z.string().optional(),
-  // §12 — read live from the latest Offering; edited via the Offering entity.
   semester: SemesterSchema.nullable().optional(),
   programmeYear: z.coerce.number().int().min(1).max(10).nullable().optional(),
 });
@@ -482,6 +477,12 @@ export const PolicySection = z.object({
 });
 
 export type PolicySection = z.infer<typeof PolicySection>;
+
+/** §25 Date — spec last revised/approved date. A single value, stored directly on CourseSpec. */
+export const DateSection = z.object({
+  date: DateOnlySchema.nullable(),
+});
+export type DateSection = z.infer<typeof DateSection>;
 /**
  * What `PUT /:id/spec/courseInfo` actually accepts. Every other Course
  * Information field is admin/assignment-derived (see `CourseInfoSection`) and
@@ -520,11 +521,46 @@ export const CloItem = z.object({
   mappedPlos: z.array(PloId).default([]),
   sltHours: z.coerce.number().int().min(0).max(1000).nullable().optional(),
   teachingMethodIds: z.array(z.string()).default([]),
+  activeLearningStrategyIds: z.array(z.string()).default([]),
   assessmentMethodIds: z.array(z.string()).default([]),
   status: CloStatus.default("active"),
   notes: z.string().default(""),
 });
 export type CloItem = z.infer<typeof CloItem>;
+
+export const TeachingLearningProfile = z.object({
+  philosophyTags: z.array(z.string()).default([]),
+  philosophyStatement: z.string().default(""),
+  teachingMethodIds: z.array(z.string()).default([]),
+  activeLearningStrategyIds: z.array(z.string()).default([]),
+  independentLearningTypes: z.array(z.string()).default([]),
+  resourceTypes: z.array(z.string()).default([]),
+  technologyTypes: z.array(z.string()).default([]),
+});
+export type TeachingLearningProfile = z.infer<typeof TeachingLearningProfile>;
+
+export type TeachingLearningCloSupport = Pick<
+  CloItem,
+  "status" | "teachingMethodIds"
+>;
+
+export function teachingLearningIsReady(
+  profile: TeachingLearningProfile,
+  clos: TeachingLearningCloSupport[],
+): boolean {
+  const activeClos = clos.filter((clo) => clo.status === "active");
+  const hasPhilosophy =
+    profile.philosophyTags.length > 0 ||
+    profile.philosophyStatement.trim().length > 0;
+
+  return (
+    hasPhilosophy &&
+    profile.teachingMethodIds.length > 0 &&
+    profile.activeLearningStrategyIds.length > 0 &&
+    activeClos.length > 0 &&
+    activeClos.every((clo) => clo.teachingMethodIds.length > 0)
+  );
+}
 
 export const ClosSection = z.object({
   items: z.array(CloItem),
@@ -680,6 +716,55 @@ export const ResourcesSection = z.object({
 
 export type ResourcesSection = z.infer<typeof ResourcesSection>;
 
+/* --------------------------------------- §20 References / Textbooks */
+
+/**
+ * A reference's citation kind — matches the values already live in
+ * `CourseSpecResource.kind` for rows carried forward from the abandoned
+ * `CourseSpecReference` table (see the `unify_course_spec_resources` and
+ * `preserve_legacy_course_spec_references` migrations).
+ */
+export const REFERENCE_KINDS = ["REQUIRED", "RECOMMENDED", "OTHER"] as const;
+export const ReferenceKind = z.enum(REFERENCE_KINDS);
+export type ReferenceKind = z.infer<typeof ReferenceKind>;
+
+/** Human label for a reference kind. */
+export function referenceKindLabel(kind: string): string {
+  switch (kind) {
+    case "REQUIRED":
+      return "Required";
+    case "RECOMMENDED":
+      return "Recommended";
+    case "OTHER":
+      return "Other";
+    default:
+      return kind;
+  }
+}
+
+export const CourseReferenceItem = z.object({
+  id: z.string().min(1),
+  kind: ReferenceKind.default("REQUIRED"),
+  title: z.string().trim().min(1, "A title is required"),
+  authors: z.string().default(""),
+  publisher: z.string().default(""),
+  year: z.string().default(""),
+  isbn: z.string().default(""),
+  url: z
+    .union([z.literal(""), z.string().url("Enter a valid URL")])
+    .default(""),
+  basedOn: z.string().default(""),
+  notes: z.string().default(""),
+});
+
+export type CourseReferenceItem = z.infer<typeof CourseReferenceItem>;
+
+export const ReferencesSection = z.object({
+  items: z.array(CourseReferenceItem).default([]),
+});
+
+export type ReferencesSection = z.infer<typeof ReferencesSection>;
+
 /* --------------------------------------- §21 Student Responsibility */
 
 export const StudentResponsibilityItem = z.object({
@@ -733,7 +818,13 @@ export const AssessmentItem = z.object({
   format: z.string().default(""),
   submissionMethod: z.string().default(""),
   instructions: z.string().default(""),
-  rubric: z.string().default(""),
+  // A Rubric Library `Rubric.id`, or null when no rubric is linked (issue #123).
+  rubricId: z.string().nullable().default(null),
+  // Issue #282: explicit criterion -> CLO evidence, independent from local grade weight.
+  criterionCloMappings: z.array(z.object({
+    criterionId: z.string().min(1),
+    cloCodes: z.array(z.string().min(1)).default([]),
+  })).default([]),
   feedbackMethod: z.string().default(""),
   feedbackTimeline: z.string().default(""),
   // PLO mapping & notes.
@@ -872,8 +963,10 @@ export const SPEC_SECTION_SCHEMAS: Partial<
   assessmentPlan: AssessmentPlanSection,
   mapping: MappingSection,
   resources: ResourcesSection,
+  references: ReferencesSection,
   responsibility: StudentResponsibilitySection,
   policy: PolicySection,
+  date: DateSection,
 };
 
 /**

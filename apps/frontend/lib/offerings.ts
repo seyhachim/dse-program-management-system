@@ -1,7 +1,11 @@
 import type {
+  AttendanceSessionSummary,
+  AttendanceSessionView,
   CreateOfferingInput,
+  LecturerWorkloadSummary,
   OfferingStatus,
   OfferingView,
+  SaveAttendanceInput,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
@@ -9,6 +13,10 @@ import { api } from "./api";
 export const offeringsApi = {
   list(): Promise<OfferingView[]> {
     return api.get<OfferingView[]>("/api/offerings");
+  },
+  workload(term?: string): Promise<LecturerWorkloadSummary> {
+    const query = term ? `?term=${encodeURIComponent(term)}` : "";
+    return api.get<LecturerWorkloadSummary>(`/api/offerings/workload/me${query}`);
   },
   get(id: string): Promise<OfferingView> {
     return api.get<OfferingView>(`/api/offerings/${id}`);
@@ -28,7 +36,40 @@ export const offeringsApi = {
   unenroll(id: string, studentId: string): Promise<OfferingView> {
     return api.delete<OfferingView>(`/api/offerings/${id}/enrollments/${studentId}`);
   },
+  attendanceSessions(id: string): Promise<AttendanceSessionSummary[]> {
+    return api.get<AttendanceSessionSummary[]>(`/api/offerings/${id}/attendance`);
+  },
+  attendance(id: string, date: string): Promise<AttendanceSessionView> {
+    return api.get<AttendanceSessionView>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}`);
+  },
+  saveAttendance(id: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
+    return api.put<AttendanceSessionView>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}`, input);
+  },
 };
+
+/** Apply the My Courses term selection to a server-provided workload summary. */
+export function workloadForTerm(
+  summary: LecturerWorkloadSummary,
+  term: string | null,
+): LecturerWorkloadSummary {
+  const scheduleRows = term
+    ? summary.scheduleRows.filter((row) => row.term === term)
+    : summary.scheduleRows;
+  const rows = term ? summary.rows.filter((row) => row.term === term) : summary.rows;
+  const weeklyTotals = term
+    ? summary.weeklyTotals.filter((week) => week.term === term)
+    : summary.weeklyTotals;
+  return {
+    scheduleRows,
+    scheduledWeeklyHours:
+      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
+    rows,
+    weeklyTotals,
+    peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
+    totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
+    coLecturerAssumption: summary.coLecturerAssumption,
+  };
+}
 
 /** Map an offering status to a StatusBadge tone. */
 export function offeringTone(status: OfferingStatus): "live" | "upcoming" | "neutral" {

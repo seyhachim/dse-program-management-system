@@ -84,9 +84,9 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {group.routes.map((route) => {
                     const Icon = route.icon ? iconMap[route.icon] : undefined;
-                    // Course Management gets an expandable list of courses; each course
-                    // jumps straight to its spec page instead of routing through the table.
-                    if (route.path === "/courses") {
+                    // Programme-wide Course Management keeps the expandable course list.
+                    // Lecturer Course Specifications is intentionally a normal link.
+                    if (route.path === "/courses" && route.label === "Course Management") {
                       return (
                         <CourseNavItem
                           key={route.path}

@@ -24,6 +24,20 @@ export interface CourseRef {
   code: string;
   title: string;
   lecturerId: string | null;
+  // Backs programme-scope access checks in offerings/router.ts (issue #147).
+  // Every Course has exactly one programme (issue #150 phase C).
+  programmeId: string;
+}
+
+export interface CourseSpecVersionRef {
+  id: string;
+  courseId: string;
+  versionMajor: number;
+  versionMinor: number;
+  version: string;
+  reviewStatus: string;
+  approvedAt: string | null;
+  effectiveFrom: string | null;
 }
 
 export interface LecturerRef {
@@ -43,6 +57,18 @@ export interface StudentsServiceContract {
 
 export interface CoursesServiceContract {
   getById(id: string): Promise<CourseRef | null>;
+  getCourseSpecVersion(id: string): Promise<CourseSpecVersionRef | null>;
+  listApprovedSpecVersions(courseId: string): Promise<CourseSpecVersionRef[]>;
+  weeklyContactHours(courseSpecId: string): Promise<CourseWeeklyContactHoursRef[]>;
+}
+
+export interface CourseWeeklyContactHoursRef {
+  week: number;
+  lectureHours: number;
+  tutorialHours: number;
+  practiceHours: number;
+  otherHours: number;
+  totalContactHours: number;
 }
 
 export interface LecturersServiceContract {

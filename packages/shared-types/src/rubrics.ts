@@ -54,14 +54,14 @@ export const DEFAULT_RUBRIC_LEVELS: readonly RubricLevel[] = [
   { label: "Poor", points: 1 },
 ] as const;
 
-/** The rubric owner as embedded in API responses (never the full User row). */
+/** The rubric owner as embedded in authenticated API responses. */
 export const RubricOwner = z.object({
   id: z.string(),
   name: z.string(),
 });
 export type RubricOwner = z.infer<typeof RubricOwner>;
 
-/** Full rubric as returned by the API. */
+/** Full rubric as returned by authenticated management/read APIs. */
 export const RubricSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
@@ -71,10 +71,28 @@ export const RubricSchema = z.object({
   criteria: z.array(RubricCriterion),
   status: RubricStatusSchema,
   owner: RubricOwner.nullable(),
+  /** Number of course-spec assessment rows currently referencing this rubric. */
+  assessmentUsageCount: z.number().int().nonnegative().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type Rubric = z.infer<typeof RubricSchema>;
+
+/**
+ * Deliberately small public contract. Only published (`Active`) rubric content
+ * is exposed; ownership, usage counts, and internal lifecycle timestamps never
+ * leave the public endpoint.
+ */
+export const PublicRubricSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  type: RubricTypeSchema,
+  description: z.string(),
+  levels: z.array(RubricLevel).min(1),
+  criteria: z.array(RubricCriterion),
+  status: z.literal("Active"),
+});
+export type PublicRubric = z.infer<typeof PublicRubricSchema>;
 
 /** Body for POST /api/rubrics. Owner is taken from the caller, never the body. */
 export const CreateRubricInput = z.object({

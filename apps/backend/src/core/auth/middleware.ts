@@ -77,5 +77,10 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
 
   // UserRoleAssignment is the authorization source of truth (issue #77).
   const roles = user.roleAssignments.map((a) => a.role.slug as Role);
-  return { id: user.id, email: user.email, roles };
+  // programmeId is already a scalar column on the loaded join row (issue #147).
+  const programmeRoles = user.roleAssignments.map((a) => ({
+    role: a.role.slug as Role,
+    programmeId: a.programmeId,
+  }));
+  return { id: user.id, email: user.email, roles, programmeRoles };
 }

@@ -1,0 +1,61 @@
+name: Cohort Progression Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/students/**"
+      - "apps/backend/src/plugins/qa/evidence/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "packages/shared-types/src/student-progression*"
+      - "packages/shared-types/src/qa-evidence-candidates.ts"
+      - ".github/workflows/cohort-progression-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/students/**"
+      - "apps/backend/src/plugins/qa/evidence/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "packages/shared-types/src/student-progression*"
+      - "packages/shared-types/src/qa-evidence-candidates.ts"
+      - ".github/workflows/cohort-progression-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    name: Cohort/progression DB invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_cohort_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_cohort_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_cohort_ci?schema=public
+      COHORT_PROGRESSION_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - name: Verify cohort membership, progression history, and QA retrieval
+        run: bun test apps/backend/src/plugins/students/cohort-progression-db.test.ts

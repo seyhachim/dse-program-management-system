@@ -7,6 +7,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CreateOfferingInput,
+  type CourseSpecVersionRef,
   type Lecturer,
   type Semester,
 } from "@dse-pms/shared-types";
@@ -30,7 +31,10 @@ const BACK_HREF = "/offerings";
 
 const emptyDefaults: OfferingFormValues = {
   courseId: "",
+  courseSpecId: "",
   term: "",
+  sectionCode: "A",
+  meetings: [],
   lecturerId: null,
   coLecturerIds: [],
   capacity: 30,
@@ -43,6 +47,8 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const editing = offeringId !== null;
 
   const [courses, setCourses] = useState<CourseView[]>([]);
+  const [courseSpecVersions, setCourseSpecVersions] = useState<CourseSpecVersionRef[]>([]);
+  const [courseSpecLoading, setCourseSpecLoading] = useState(false);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,6 +58,9 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   // §12 Course Availability — plain local state so an empty choice submits as null.
   const [semester, setSemester] = useState<string>("");
   const [programmeYear, setProgrammeYear] = useState<string>("");
+  // Delivery calendar dates are optional as a pair; empty strings map to null.
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const {
     control,
@@ -63,6 +72,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     resolver: zodResolver(CreateOfferingInput),
     defaultValues: emptyDefaults,
   });
+  const courseId = useWatch({ control, name: "courseId" }) ?? "";
   const lecturerId = useWatch({ control, name: "lecturerId" }) ?? null;
 
   useEffect(() => {
@@ -84,7 +94,13 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
         } else if (offering) {
           reset({
             courseId: offering.course?.id ?? "",
+            courseSpecId: offering.courseSpec?.id ?? "",
             term: offering.term,
+            sectionCode: offering.sectionCode,
+            meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, room, ...meeting }) => ({
+              ...meeting,
+              room: room ?? "",
+            })),
             lecturerId: offering.lecturer?.id ?? null,
             coLecturerIds: offering.coLecturers.map((l) => l.id),
             capacity: offering.capacity,
@@ -93,6 +109,8 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
           });
           setSemester(offering.semester ?? "");
           setProgrammeYear(offering.programmeYear != null ? String(offering.programmeYear) : "");
+          setStartDate(offering.startDate ?? "");
+          setEndDate(offering.endDate ?? "");
         }
       } catch (err) {
         if (!cancelled) {
@@ -107,6 +125,17 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     };
   }, [offeringId, reset]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!courseId) { setCourseSpecVersions([]); return; }
+    setCourseSpecLoading(true);
+    void coursesApi.approvedSpecVersions(courseId)
+      .then((versions) => { if (!cancelled) setCourseSpecVersions(versions); })
+      .catch(() => { if (!cancelled) setCourseSpecVersions([]); })
+      .finally(() => { if (!cancelled) setCourseSpecLoading(false); });
+    return () => { cancelled = true; };
+  }, [courseId]);
+
   const onSubmit = handleSubmit(async (values) => {
     setSaving(true);
     setError(null);
@@ -116,14 +145,25 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
       coLecturerIds: values.coLecturerIds ?? [],
       semester: (semester || null) as Semester | null,
       programmeYear: programmeYear ? Number(programmeYear) : null,
+      startDate: startDate || null,
+      endDate: endDate || null,
       otherLecturers: values.otherLecturers?.trim() || undefined,
     };
+    const parsed = CreateOfferingInput.safeParse(payload);
+    if (!parsed.success) {
+      const dateIssue = parsed.error.issues.find(
+        (issue) => issue.path[0] === "startDate" || issue.path[0] === "endDate",
+      );
+      setError(dateIssue?.message ?? "Check the offering details and try again");
+      setSaving(false);
+      return;
+    }
     try {
       if (offeringId) {
-        const { courseId: _courseId, ...rest } = payload;
+        const { courseId: _courseId, ...rest } = parsed.data;
         await offeringsApi.update(offeringId, rest);
       } else {
-        await offeringsApi.create(payload);
+        await offeringsApi.create(parsed.data);
       }
       router.push(BACK_HREF);
     } catch (err) {
@@ -139,7 +179,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     <>
       <Topbar
         title={pageTitle}
-        subtitle="A course delivered in a term, with a lecturer and seat capacity."
+        subtitle="A course delivered in a term, with teaching dates, lecturer, timetable, and seat capacity."
       />
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-3xl space-y-4">
@@ -180,6 +220,8 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 register={register}
                 errors={errors}
                 courses={courses}
+                courseSpecVersions={courseSpecVersions}
+                courseSpecLoading={courseSpecLoading}
                 lecturers={lecturers}
                 lecturerId={lecturerId}
                 courseLocked={editing}
@@ -187,6 +229,10 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 onSemesterChange={setSemester}
                 programmeYear={programmeYear}
                 onProgrammeYearChange={setProgrammeYear}
+                startDate={startDate}
+                onStartDateChange={setStartDate}
+                endDate={endDate}
+                onEndDateChange={setEndDate}
               />
 
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">

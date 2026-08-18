@@ -1,0 +1,61 @@
+name: Programme Outcome Indicator Integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/qa/analysis/**"
+      - "apps/backend/src/plugins/qa/evidence/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "packages/shared-types/src/programme-outcome-indicators.ts"
+      - "packages/shared-types/src/qa-evidence-candidates.ts"
+      - ".github/workflows/programme-outcome-indicators-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/qa/analysis/**"
+      - "apps/backend/src/plugins/qa/evidence/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "packages/shared-types/src/programme-outcome-indicators.ts"
+      - "packages/shared-types/src/qa-evidence-candidates.ts"
+      - ".github/workflows/programme-outcome-indicators-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  programme-indicator-db-integrity:
+    name: Programme indicator DB invariants
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_indicator_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_indicator_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_indicator_ci?schema=public
+      PROGRAMME_INDICATOR_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - name: Verify versioned comparable programme indicators
+        run: bun test apps/backend/src/plugins/qa/evidence/programme-outcome-indicators-db.test.ts

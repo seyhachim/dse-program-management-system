@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { navForRole, pluginManifests, routeAllowsRole, type PluginRoute } from "./plugins.ts";
+import { navForRole, navGroupsForRole, pluginManifests, routeAllowsRole, type PluginRoute } from "./plugins.ts";
 import { Role } from "./auth.ts";
 
 const ALL_ROLES = Role.options;
@@ -27,17 +27,93 @@ test("Program Coordinator/Secretary see Course Offerings; Lecturer and Student d
 
 test("a caller with multiple roles sees the union of both roles' routes", () => {
   const routes = navForRole(pluginManifests, ["lecturer", "program_secretary"]).map((r) => r.path);
-  expect(routes).toContain("/courses"); // lecturer route
-  expect(routes).toContain("/students"); // program_secretary route
+  expect(routes).toContain("/courses");
+  expect(routes).toContain("/students");
 });
 
-test("QA Reviewer lands on its own QA Dashboard, not the general Dashboard, and has no admin-only routes", () => {
+test("Lecturer gets the focused workspace routes in the intended sidebar clusters", () => {
+  const lecturerRoutes = navForRole(pluginManifests, ["lecturer"]);
+  const paths = lecturerRoutes.map((r) => r.path);
+
+  expect(paths).toContain("/lecturer-overview");
+  expect(paths).toContain("/course-delivery");
+  expect(paths).toContain("/teaching-schedule");
+  expect(paths).toContain("/courses");
+  expect(paths).toContain("/attendance");
+  expect(paths).toContain("/assessments-results");
+  expect(paths).toContain("/announcements");
+  expect(paths).toContain("/feedback");
+  expect(paths).toContain("/account-settings");
+
+  expect(lecturerRoutes.find((r) => r.path === "/lecturer-overview")?.group).toBe("Teaching");
+  expect(lecturerRoutes.find((r) => r.path === "/course-delivery")?.group).toBe("Academic");
+  expect(lecturerRoutes.find((r) => r.path === "/teaching-schedule")?.group).toBe("Teaching");
+  expect(lecturerRoutes.find((r) => r.path === "/courses")?.group).toBe("Curriculum");
+  expect(lecturerRoutes.find((r) => r.path === "/attendance")?.group).toBe("Delivery");
+  expect(lecturerRoutes.find((r) => r.path === "/assessments-results")?.group).toBe("Delivery");
+  expect(lecturerRoutes.find((r) => r.path === "/announcements")?.group).toBe("Delivery");
+  expect(lecturerRoutes.find((r) => r.path === "/feedback")?.group).toBe("Delivery");
+  expect(lecturerRoutes.find((r) => r.path === "/account-settings")?.group).toBe("Personal");
+
+  const groups = navGroupsForRole(pluginManifests, ["lecturer"])
+    .filter((group) => group.label !== "footer")
+    .map((group) => group.label);
+  expect(groups).toEqual(["Teaching", "Academic", "Curriculum", "Delivery", "Personal"]);
+
+  const coursesRoute = lecturerRoutes.find((r) => r.path === "/courses");
+  expect(coursesRoute?.label).toBe("Course Specifications");
+
+  expect(paths).not.toContain("/my-tasks");
+  expect(paths).not.toContain("/templates-guides");
+
+  for (const role of ["admin", "program_coordinator", "program_secretary", "qa_reviewer", "student"] as const) {
+    const rolePaths = navForRole(pluginManifests, [role]).map((r) => r.path);
+    expect(rolePaths).not.toContain("/lecturer-overview");
+    expect(rolePaths).not.toContain("/course-delivery");
+    expect(rolePaths).not.toContain("/teaching-schedule");
+    expect(rolePaths).not.toContain("/attendance");
+    expect(rolePaths).not.toContain("/assessments-results");
+    expect(rolePaths).not.toContain("/announcements");
+    expect(rolePaths).not.toContain("/feedback");
+    expect(rolePaths).not.toContain("/account-settings");
+  }
+});
+
+test("QA Reviewer lands on evidence analysis, not contributor work or the general Dashboard", () => {
   const routes = navForRole(pluginManifests, ["qa_reviewer"]);
   expect(routes.some((r) => r.path === "/students")).toBe(false);
   expect(routes.some((r) => r.path === "/dashboard")).toBe(false);
   expect(routes.some((r) => r.path === "/users")).toBe(false);
   expect(routes.some((r) => r.path === "/settings")).toBe(false);
   expect(routes.some((r) => r.path === "/qa-dashboard")).toBe(true);
+  expect(routes.some((r) => r.path === "/aun-qa")).toBe(false);
+});
+
+test("QA Contributor sees the AUN-QA workspace without receiving reviewer navigation", () => {
+  const contributorRoutes = navForRole(pluginManifests, ["qa_contributor"]).map((r) => r.path);
+  expect(contributorRoutes).toContain("/aun-qa");
+  expect(contributorRoutes).not.toContain("/qa-dashboard");
+
+  const lecturerOnlyRoutes = navForRole(pluginManifests, ["lecturer"]).map((r) => r.path);
+  expect(lecturerOnlyRoutes).not.toContain("/aun-qa");
+
+  const combined = navForRole(pluginManifests, ["lecturer", "qa_contributor"]).map((r) => r.path);
+  expect(combined).toContain("/courses");
+  expect(combined).toContain("/aun-qa");
+});
+
+test("Quality Assurance plugin exposes workspace, evidence analysis, and granular permissions", () => {
+  const qa = pluginManifests.find((manifest) => manifest.id === "qa");
+  expect(qa).toBeDefined();
+  expect(qa?.routes?.some((route) => route.path === "/aun-qa")).toBe(true);
+  expect(qa?.routes?.some((route) => route.path === "/qa-dashboard")).toBe(true);
+  expect(qa?.permissions).toEqual([
+    "qa:read",
+    "qa:write",
+    "qa:contribute",
+    "qa:review",
+    "qa:manage",
+  ]);
 });
 
 test("QA Reviewer can reach Course Specification content for review, and its own QA sections", () => {
@@ -64,4 +140,34 @@ test("Program Secretary is excluded from academic-decision entries reserved for 
   expect(routes).not.toContain("/cqi");
   expect(routes).toContain("/programme-management");
   expect(routes).toContain("/teaching-management");
+});
+
+test("Student Portal navigation contains the complete MVP and excludes staff workspaces", () => {
+  const paths = navForRole(pluginManifests, ["student"]).map((route) => route.path);
+
+  for (const path of [
+    "/portal",
+    "/portal/courses",
+    "/portal/schedule",
+    "/portal/assessments",
+    "/portal/results",
+    "/portal/announcements",
+  ]) {
+    expect(paths).toContain(path);
+  }
+
+  for (const path of [
+    "/dashboard",
+    "/courses",
+    "/offerings",
+    "/students",
+    "/lecturer-overview",
+    "/course-delivery",
+    "/assessment-management",
+    "/programme-management",
+    "/users",
+    "/settings",
+  ]) {
+    expect(paths).not.toContain(path);
+  }
 });

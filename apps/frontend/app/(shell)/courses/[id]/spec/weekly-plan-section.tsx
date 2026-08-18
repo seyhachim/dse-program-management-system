@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Copy,
   Info,
   Pencil,
   Plus,
@@ -25,6 +26,7 @@ import {
   weeklyPlanFormTotals,
   type WeeklyPlanForm,
 } from "./weekly-plan-model";
+import { duplicateWeeklyPlanWeek } from "./weekly-plan-duplicate";
 import { teachingResourceLabel } from "./weekly-plan/week-form-fields";
 import { WeekFormModal } from "./weekly-plan/week-form-modal";
 
@@ -70,6 +72,7 @@ export function WeeklyPlanSectionForm({
     open: false,
     weekId: null,
   });
+  const [notice, setNotice] = useState<string | null>(null);
 
   const openAdd = () =>
     setModal({
@@ -90,6 +93,21 @@ export function WeeklyPlanSectionForm({
     totals.tutorialHours +
     totals.practiceHours +
     totals.otherHours;
+
+  const duplicate = async (id: string) => {
+    const source = value.find((item) => item.id === id);
+    if (!source) return;
+
+    const next = duplicateWeeklyPlanWeek(value, id);
+    const duplicated = next.at(-1);
+    const ok = await onPersist(next);
+
+    setNotice(
+      ok
+        ? `Week ${duplicated?.week ?? ""} was created from week ${source.week}.`
+        : `Could not duplicate week ${source.week}.`,
+    );
+  };
 
   const remove = async (id: string) => {
     const week = value.find((item) => item.id === id);
@@ -122,6 +140,19 @@ export function WeeklyPlanSectionForm({
           Add Week
         </Button>
       </div>
+
+      {notice ? (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          {notice}
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="text-xs font-medium hover:text-foreground"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {/* Dashboard */}
       <WeeklyPlanDashboard plan={value} cloCodes={cloCodes} />
@@ -178,7 +209,7 @@ export function WeeklyPlanSectionForm({
 
                   <th className="w-32 px-3 py-2.5">Attention</th>
 
-                  <th className="w-20 px-3 py-2.5 text-right">Actions</th>
+                  <th className="w-28 px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
 
@@ -370,6 +401,13 @@ export function WeeklyPlanSectionForm({
                             onClick={() => openEdit(week.id)}
                           >
                             <Pencil className="h-4 w-4" />
+                          </IconButton>
+
+                          <IconButton
+                            label={`Duplicate week ${week.week}`}
+                            onClick={() => duplicate(week.id)}
+                          >
+                            <Copy className="h-4 w-4" />
                           </IconButton>
 
                           <IconButton

@@ -1,15 +1,20 @@
 import { Router, type Request, type Response } from "express";
 import {
   CreateCourseInput,
+  CreateCourseSpecRevisionRequestSchema,
   ListCoursesQuery,
   SPEC_SECTION_SCHEMAS,
   UpdateCourseInput,
   type SpecSectionId,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
-import { PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
+import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
+import { overlayCourseSpecTeachingAssignment } from "./teaching-assignment.ts";
+import { CourseSpecLockedError } from "./spec-lock.ts";
+import { canCreateCourseSpecRevision } from "./revision-authorization.ts";
+import { courseSpecRevisionRequestService } from "./revision-request-service.ts";
 
 /**
  * Get a required route parameter.
@@ -66,18 +71,15 @@ function getOwnerScope(req: Request, res: Response): string | undefined | null {
 }
 
 /**
- * A lecturer may only see/edit courses they're assigned to;
- * programme-wide roles may access any course.
+ * A lecturer may only see/edit courses they're assigned to; a caller holding
+ * a programme-wide role for the course's own programme (globally, or scoped
+ * to that specific programme — issue #147) may access any course in it.
  */
 async function ensureCourseAccess(
   req: Request,
   res: Response,
   courseId: string,
 ): Promise<boolean> {
-  if (req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r))) {
-    return true;
-  }
-
   const course = await courseService.getById(courseId);
 
   if (!course) {
@@ -85,6 +87,10 @@ async function ensureCourseAccess(
       error: "Course not found",
     });
     return false;
+  }
+
+  if (hasAnyRoleInProgramme(req.user!, PROGRAMME_WIDE_ROLES, course.programmeId)) {
+    return true;
   }
 
   const userId = req.user?.id;
@@ -107,22 +113,15 @@ async function ensureCourseAccess(
 }
 
 /**
- * Lecturers may edit a course specification only while it is in
- * Draft or Changes Requested.
- *
- * Programme-wide roles retain edit access for administration
- * and review workflows.
+ * Course-specification content is editable only while the workflow is Draft
+ * or Changes Requested. Programme-wide roles retain broad course access, but
+ * they do not bypass content immutability once a specification enters review.
  */
-
 async function ensureSpecEditable(
   req: Request,
   res: Response,
   courseId: string,
 ): Promise<boolean> {
-  if (req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r))) {
-    return true;
-  }
-
   const spec = await courseService.getSpec(courseId);
 
   if (!spec) {
@@ -192,6 +191,69 @@ export function createCourseRouter(): Router {
     },
   );
 
+  router.get(
+    "/:id/approved-spec-versions",
+    requirePermission("courses:read"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      if (!courseId) return;
+      if (!(await ensureCourseAccess(req, res, courseId))) return;
+      res.json(await courseService.listApprovedSpecVersions(courseId));
+    },
+  );
+
+
+  router.post(
+    "/:id/spec/revisions",
+    requirePermission("courses:review"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      if (!courseId) return;
+      const requestedById = getRequiredUserId(req, res);
+      if (!requestedById) return;
+
+      const course = await courseService.getById(courseId);
+      if (!course) {
+        res.status(404).json({ error: "Course not found" });
+        return;
+      }
+      if (!canCreateCourseSpecRevision(req.user!, course.programmeId)) {
+        res.status(403).json({
+          error: "Only programme academic leadership may create a course specification revision",
+        });
+        return;
+      }
+
+      const parsed = CreateCourseSpecRevisionRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid revision request",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      try {
+        res.status(201).json(
+          await courseSpecRevisionRequestService.create(
+            courseId,
+            requestedById,
+            parsed.data,
+          ),
+        );
+      } catch (err) {
+        const code = (err as { code?: string }).code;
+        const status =
+          code === "COURSE_NOT_FOUND" ? 404 :
+          code === "INVALID_OVERRIDE" ? 400 :
+          code === "SOURCE_NOT_APPROVED" || code === "OPEN_REVISION_EXISTS" ? 409 : 409;
+        res.status(status).json({
+          error: err instanceof Error ? err.message : "Could not create course specification revision",
+        });
+      }
+    },
+  );
+
   router.get("/:id", requirePermission("courses:read"), async (req, res) => {
     const courseId = getRequiredParam(req, res, "id");
 
@@ -249,6 +311,10 @@ export function createCourseRouter(): Router {
         return;
       }
 
+      if (!(await ensureCourseAccess(req, res, courseId))) {
+        return;
+      }
+
       const parsed = UpdateCourseInput.safeParse(req.body);
 
       if (!parsed.success) {
@@ -276,6 +342,10 @@ export function createCourseRouter(): Router {
       const courseId = getRequiredParam(req, res, "id");
 
       if (!courseId) {
+        return;
+      }
+
+      if (!(await ensureCourseAccess(req, res, courseId))) {
         return;
       }
 
@@ -316,6 +386,22 @@ export function createCourseRouter(): Router {
         });
         return;
       }
+
+      // Not a security boundary (ensureCourseAccess already gated this
+      // course) — just which Offering's teaching-assignment data to overlay.
+      const course = await courseService.getById(courseId);
+      const lecturerScope = hasAnyRoleInProgramme(
+        req.user!,
+        PROGRAMME_WIDE_ROLES,
+        course?.programmeId ?? null,
+      )
+        ? undefined
+        : req.user!.id;
+      await overlayCourseSpecTeachingAssignment(
+        spec,
+        courseId,
+        lecturerScope,
+      );
 
       res.json(spec);
     },
@@ -478,6 +564,10 @@ export function createCourseRouter(): Router {
  * Map service/Prisma errors to HTTP status.
  */
 function errStatus(err: unknown): number {
+  if (err instanceof CourseSpecLockedError) {
+    return 409;
+  }
+
   if (err instanceof ReferenceError) {
     return 400;
   }
@@ -496,6 +586,10 @@ function errStatus(err: unknown): number {
 }
 
 function errMessage(err: unknown, uniqueField: string): string | null {
+  if (err instanceof CourseSpecLockedError) {
+    return err.message;
+  }
+
   if (err instanceof ReferenceError) {
     return err.message;
   }

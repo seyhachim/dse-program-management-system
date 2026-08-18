@@ -180,6 +180,9 @@ export function AssessmentFormPage({
         ...current,
         cloCodes,
         mappedPlos: deriveMappedPlos(cloCodes, clos),
+        criterionCloMappings: current.criterionCloMappings
+          .map((mapping) => ({ ...mapping, cloCodes: mapping.cloCodes.filter((mapped) => cloCodes.includes(mapped)) }))
+          .filter((mapping) => mapping.cloCodes.length > 0),
       };
     });
   };
@@ -331,7 +334,7 @@ export function AssessmentFormPage({
   );
 }
 function AssessmentSummary({ draft, rubrics, items, assessmentId }: { draft: AssessmentForm; rubrics: Rubric[]; items: AssessmentForm[]; assessmentId: string | null }) {
-  const rubric = rubrics.find((r) => r.id === draft.rubric);
+  const rubric = rubrics.find((r) => r.id === draft.rubricId);
   const numberWeight = (value: string) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -346,7 +349,7 @@ function AssessmentSummary({ draft, rubrics, items, assessmentId }: { draft: Ass
     ["Has assessment name", draft.name.trim() !== ""],
     ["Has weight (%)", draft.weight !== ""],
     ["Mapped to at least one CLO", draft.cloCodes.length > 0],
-    ["Rubric selected", draft.rubric !== ""],
+    ["Rubric selected", draft.rubricId !== ""],
     ["Feedback method selected", draft.feedbackMethod.trim() !== ""],
   ] as const;
 
@@ -361,7 +364,7 @@ function AssessmentSummary({ draft, rubrics, items, assessmentId }: { draft: Ass
         <SummaryRow label="Duration" value={draft.durationWeeks ? `${draft.durationWeeks} weeks` : "Optional"} />
         <SummaryRow label="Mode" value={draft.mode === "group" ? "Group" : "Individual"} />
         <SummaryRow label="CLOs" value={draft.cloCodes.length ? draft.cloCodes.join(", ") : "—"} />
-        <SummaryRow label="Rubric" value={rubric?.name ?? (draft.rubric ? "Unavailable rubric" : "—")} />
+        <SummaryRow label="Rubric" value={rubric?.name ?? (draft.rubricId ? "Unavailable rubric" : "—")} />
         <SummaryRow label="Feedback" value={draft.feedbackMethod || "—"} />
         <SummaryRow label="Feedback Timeline" value={draft.feedbackTimeline || "Optional"} />
       </dl>

@@ -7,6 +7,7 @@ import {
   cloFocusPercent,
   WeeklyPlanSection,
   ResourcesSection,
+  ReferencesSection,
   StudentResponsibilitySection,
   SPEC_SECTION_SCHEMAS,
   weekContactHours,
@@ -25,6 +26,8 @@ import {
   specAttention,
   specCompletionLabel,
   specCompletionPercent,
+  TeachingLearningProfile,
+  teachingLearningIsReady,
 } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
@@ -35,7 +38,43 @@ test("CloItem defaults method id arrays to []", () => {
     description: "Do the thing",
   });
   expect(parsed.teachingMethodIds).toEqual([]);
+  expect(parsed.activeLearningStrategyIds).toEqual([]);
   expect(parsed.assessmentMethodIds).toEqual([]);
+});
+
+test("CloItem preserves active-learning strategy ids", () => {
+  const parsed = CloItem.parse({
+    id: "clo-1",
+    code: "CLO1",
+    description: "Do the thing",
+    activeLearningStrategyIds: ["peer-review"],
+  });
+  expect(parsed.activeLearningStrategyIds).toEqual(["peer-review"]);
+});
+
+test("Teaching & Learning readiness applies every required rule to active CLOs", () => {
+  const readyProfile = TeachingLearningProfile.parse({
+    philosophyTags: ["applied"],
+    teachingMethodIds: ["lab"],
+    activeLearningStrategyIds: ["coding-exercise"],
+  });
+  const supportedClos = [
+    { status: "active" as const, teachingMethodIds: ["lab"] },
+    { status: "inactive" as const, teachingMethodIds: [] },
+  ];
+
+  expect(teachingLearningIsReady(readyProfile, supportedClos)).toBe(true);
+  expect(
+    teachingLearningIsReady(
+      { ...readyProfile, activeLearningStrategyIds: [] },
+      supportedClos,
+    ),
+  ).toBe(false);
+  expect(
+    teachingLearningIsReady(readyProfile, [
+      { status: "active", teachingMethodIds: [] },
+    ]),
+  ).toBe(false);
 });
 
 test("CloItem preserves provided SLT hours and method ids", () => {
@@ -435,8 +474,10 @@ test("COMPLETABLE_SPEC_SECTIONS is the save-able sections, in SPEC_SECTIONS orde
     "slt",
     "mapping",
     "resources",
+    "references",
     "responsibility",
     "policy",
+    "date",
   ]);
 });
 
@@ -507,6 +548,21 @@ test("resources are registered as a completable §19 section and support evidenc
   expect(COMPLETABLE_SPEC_SECTIONS.some((section) => section.id === "resources")).toBe(true);
 });
 
+
+test("references are registered as a completable §20 section and default kind to REQUIRED", () => {
+  expect(SPEC_SECTION_SCHEMAS.references).toBe(ReferencesSection);
+  const parsed = ReferencesSection.parse({
+    items: [{ id: "reference-1", title: "Introduction to Algorithms" }],
+  });
+  expect(parsed.items[0]?.kind).toBe("REQUIRED");
+  expect(COMPLETABLE_SPEC_SECTIONS.some((section) => section.id === "references")).toBe(true);
+});
+
+test("ReferencesSection rejects an item with no title", () => {
+  expect(() =>
+    ReferencesSection.parse({ items: [{ id: "reference-1", kind: "RECOMMENDED", title: "  " }] }),
+  ).toThrow();
+});
 
 test("StudentResponsibilitySection accepts ordered responsibility statements", () => {
   const parsed = StudentResponsibilitySection.parse({

@@ -1,5 +1,7 @@
 import type {
   CreateRubricInput,
+  MeResponse,
+  PublicRubric,
   Rubric,
   RubricStatus,
   RubricType,
@@ -8,7 +10,7 @@ import type {
 import type { StatusTone } from "@dse-pms/ui";
 import { api } from "./api";
 
-/** Frontend-side Rubric Library API — mirrors the backend router. */
+/** Frontend-side Rubric Library API — mirrors the authenticated backend router. */
 export const rubricsApi = {
   list(params: { search?: string; status?: RubricStatus } = {}): Promise<Rubric[]> {
     const qs = new URLSearchParams();
@@ -26,10 +28,52 @@ export const rubricsApi = {
   update(id: string, input: UpdateRubricInput): Promise<Rubric> {
     return api.patch<Rubric>(`/api/rubrics/${id}`, input);
   },
+  archive(id: string): Promise<Rubric> {
+    return api.patch<Rubric>(`/api/rubrics/${id}`, { status: "Archived" });
+  },
   remove(id: string): Promise<void> {
     return api.delete<void>(`/api/rubrics/${id}`);
   },
 };
+
+/** Active rubric content that is safe to load without a login. */
+export const publicRubricsApi = {
+  get(id: string): Promise<PublicRubric> {
+    return api.get<PublicRubric>(`/api/rubrics/public/${id}`);
+  },
+};
+
+type RubricViewer = Pick<MeResponse, "id" | "roles" | "permissions"> | null | undefined;
+
+/** UI-only convenience; the backend service remains the authoritative authorization boundary. */
+export function canManageRubric(me: RubricViewer, rubric: Rubric): boolean {
+  if (!me?.permissions.includes("rubrics:write")) return false;
+  const elevated = me.roles.some((role) => role === "admin" || role === "program_coordinator");
+  return elevated || rubric.owner?.id === me.id;
+}
+
+export function canEditRubric(me: RubricViewer, rubric: Rubric): boolean {
+  return canManageRubric(me, rubric)
+    && rubric.status === "Draft"
+    && (rubric.assessmentUsageCount ?? 0) === 0;
+}
+
+export function canDeleteRubric(me: RubricViewer, rubric: Rubric): boolean {
+  return canEditRubric(me, rubric);
+}
+
+export function canArchiveRubric(me: RubricViewer, rubric: Rubric): boolean {
+  return canManageRubric(me, rubric) && rubric.status === "Active";
+}
+
+/** Explain why a manageable rubric is read-only. */
+export function rubricLockLabel(rubric: Rubric): string | null {
+  if (rubric.status === "Active") return "Published content is locked";
+  if (rubric.status === "Archived") return "Archived content is locked";
+  const usage = rubric.assessmentUsageCount ?? 0;
+  if (usage > 0) return `Linked to ${usage} assessment${usage === 1 ? "" : "s"}`;
+  return null;
+}
 
 /** Map a rubric status to a StatusBadge tone. */
 export function rubricStatusTone(status: RubricStatus): StatusTone {

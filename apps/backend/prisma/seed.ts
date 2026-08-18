@@ -1,6 +1,15 @@
 import { PrismaClient } from "@prisma/client";
-import { PLOS, pluginManifests } from "@dse-pms/shared-types";
+import {
+  AUN_QA_V4_CATALOG,
+  AUN_QA_V4_ID,
+  AUN_QA_V4_SOURCE_URL,
+  PLOS,
+  PROGRAMME_TITLE,
+  pluginManifests,
+} from "@dse-pms/shared-types";
 import { syncNormalizedRubricTables } from "../src/plugins/rubrics/service.ts";
+import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
+import { defaultProgrammeIdForRole } from "../src/core/auth/token.ts";
 
 /**
  * Seeds dev users (incl. several lecturers), students, courses, offerings and a
@@ -332,6 +341,10 @@ const permissionTitles: Record<string, string> = {
 
   "programme:read": "View programme academic configuration",
   "programme:write": "Manage programme academic configuration",
+  "student-portal:read": "View own student portal information",
+  "student-portal:feedback": "Submit anonymous course feedback",
+  "qa:read": "View programme quality-assurance evidence and reviews",
+  "qa:write": "Manage programme quality-assurance evidence and self-assessments",
 };
 
 const permissionSlugs = [
@@ -374,6 +387,9 @@ const roleDefs: {
 
       "programme:read",
       "programme:write",
+
+      "qa:read",
+      "qa:write",
     ],
   },
 
@@ -409,6 +425,9 @@ const roleDefs: {
 
       "programme:read",
       "programme:write",
+
+      "qa:read",
+      "qa:write",
     ],
   },
 
@@ -477,9 +496,10 @@ const roleDefs: {
     slug: "qa_reviewer",
     title: "QA Reviewer",
 
-    // QA requires read-only access to programme-level academic evidence.
+    // QA reviewers maintain evidence assessments while underlying academic
+    // programme and course records remain read-only to them.
     description:
-      "Reviews programme evidence and findings for quality assurance. Read-only.",
+      "Reviews programme evidence and findings for quality assurance.",
 
     permissions: [
       "students:read",
@@ -490,23 +510,19 @@ const roleDefs: {
       "rubrics:read",
 
       "programme:read",
+
+      "qa:read",
+      "qa:write",
     ],
   },
 
   {
     slug: "student",
     title: "Student",
-    description: "Read-only access to the catalog.",
-
-    // No programme permissions yet. There is currently no student programme
-    // management/portal workflow requiring this API.
+    description: "Enrollment-scoped access to the student learning portal.",
     permissions: [
-      "students:read",
-      "courses:read",
-      "offerings:read",
-      "lecturers:read",
-      "methods:read",
-      "rubrics:read",
+      "student-portal:read",
+      "student-portal:feedback",
     ],
   },
 ];
@@ -800,6 +816,7 @@ async function main() {
       create: {
         userId: user.id,
         roleId: role.id,
+        programmeId: defaultProgrammeIdForRole(roleSlug),
       },
     });
 
@@ -825,6 +842,17 @@ async function main() {
       },
       update: s,
       create: s,
+    });
+  }
+
+  // The seeded student login represents Ada's portal account. Production
+  // accounts are linked during the Supabase invite workflow.
+  const seededStudentUser = await prisma.user.findUnique({ where: { email: "student@dse.dev" } });
+  const seededStudentProfile = await prisma.student.findUnique({ where: { email: "ada@dse.dev" } });
+  if (seededStudentUser && seededStudentProfile) {
+    await prisma.student.update({
+      where: { id: seededStudentProfile.id },
+      data: { userId: seededStudentUser.id },
     });
   }
 
@@ -925,6 +953,63 @@ async function main() {
   });
 
   // ---------------------------------------------------------------------------
+  // AUN-QA Programme Assessment v4 catalogue
+  // ---------------------------------------------------------------------------
+
+  await prisma.qaFramework.upsert({
+    where: { id: AUN_QA_V4_ID },
+    update: {
+      code: "AUN-QA-PA",
+      name: "AUN-QA Assessment at Programme Level",
+      version: "4.0",
+      sourceUrl: AUN_QA_V4_SOURCE_URL,
+      active: true,
+    },
+    create: {
+      id: AUN_QA_V4_ID,
+      code: "AUN-QA-PA",
+      name: "AUN-QA Assessment at Programme Level",
+      version: "4.0",
+      sourceUrl: AUN_QA_V4_SOURCE_URL,
+      active: true,
+    },
+  });
+
+  for (const [criterionIndex, criterion] of AUN_QA_V4_CATALOG.entries()) {
+    const criterionId = `${AUN_QA_V4_ID}:${criterion.code}`;
+    await prisma.qaCriterion.upsert({
+      where: { id: criterionId },
+      update: {
+        title: criterion.title,
+        summary: criterion.summary,
+        order: criterionIndex + 1,
+      },
+      create: {
+        id: criterionId,
+        frameworkId: AUN_QA_V4_ID,
+        code: criterion.code,
+        title: criterion.title,
+        summary: criterion.summary,
+        order: criterionIndex + 1,
+      },
+    });
+
+    for (const [requirementIndex, [code, title]] of criterion.requirements.entries()) {
+      await prisma.qaRequirement.upsert({
+        where: { id: `${AUN_QA_V4_ID}:${code}` },
+        update: { title, order: requirementIndex + 1 },
+        create: {
+          id: `${AUN_QA_V4_ID}:${code}`,
+          criterionId,
+          code,
+          title,
+          order: requirementIndex + 1,
+        },
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Teaching / Assessment Methods
   // ---------------------------------------------------------------------------
 
@@ -962,6 +1047,7 @@ async function main() {
       credits: c.credits,
       prerequisites: c.prerequisites,
       courseType: c.courseType,
+      programmeId: DEFAULT_PROGRAMME_ID,
     };
 
     await prisma.course.upsert({
@@ -986,6 +1072,7 @@ async function main() {
     },
   });
 
+  const rubricIdByName = new Map<string, string>();
   for (const r of rubrics) {
     const { levels, criteria, ...rubricData } = r;
 
@@ -1014,6 +1101,7 @@ async function main() {
           })
         ).id;
 
+    rubricIdByName.set(r.name, rubricId);
     await syncNormalizedRubricTables(prisma, rubricId, levels, criteria);
   }
 
@@ -1032,9 +1120,10 @@ async function main() {
   if (cs101) {
     const offering = await prisma.offering.upsert({
       where: {
-        courseId_term: {
+        courseId_term_sectionCode: {
           courseId: cs101.id,
           term: "2025-Fall",
+          sectionCode: "A",
         },
       },
       update: {
@@ -1045,6 +1134,7 @@ async function main() {
       create: {
         courseId: cs101.id,
         term: "2025-Fall",
+        sectionCode: "A",
         capacity: 30,
         status: "Active",
         lecturerId: cs101.lecturerId,
@@ -1094,6 +1184,166 @@ async function main() {
         create: {
           offeringId: offering.id,
           lecturerId: coLecturer.id,
+        },
+      });
+    }
+
+    // Small approved specification + portal evidence so a fresh development
+    // database demonstrates every student MVP state without manual setup.
+    const spec = await prisma.courseSpec.upsert({
+      where: {
+        courseId_versionMajor_versionMinor: {
+          courseId: cs101.id,
+          versionMajor: 1,
+          versionMinor: 0,
+        },
+      },
+      update: {},
+      create: {
+        courseId: cs101.id,
+        versionMajor: 1,
+        versionMinor: 0,
+        reviewStatus: "Approved",
+        submissionVersion: 1,
+      },
+    });
+    const seededSpecSnapshot = await prisma.courseSpecCourseInfo.findUnique({
+      where: { courseSpecId: spec.id },
+      select: { courseSpecId: true },
+    });
+    if (!seededSpecSnapshot) {
+      const specLecturer = cs101.lecturerId
+        ? await prisma.user.findUnique({ where: { id: cs101.lecturerId } })
+        : null;
+      await prisma.courseSpecCourseInfo.create({
+        data: {
+          courseSpecId: spec.id,
+          programmeTitle: PROGRAMME_TITLE,
+          courseTitle: cs101.title,
+          courseCode: cs101.code,
+          credits: cs101.credits,
+          prerequisites: cs101.prerequisites ?? "",
+          courseType: cs101.courseType,
+          description: cs101.description ?? "",
+          totalSltHours: cs101.totalSltHours,
+          instructorName: specLecturer?.name ?? "",
+          instructorTitle: specLecturer?.title ?? "",
+          qualification: specLecturer?.qualification ?? "",
+          email: specLecturer?.email ?? "",
+          telephone: specLecturer?.phone ?? "",
+          otherLecturers: offering.otherLecturers ?? "",
+          semester: offering.semester,
+          programmeYear: offering.programmeYear,
+        },
+      });
+    }
+
+    // Direct seed writes bypass the Offering API, so explicitly establish the
+    // same exact Approved CourseSpec binding required for real new offerings.
+    await prisma.offering.update({
+      where: { id: offering.id },
+      data: { courseSpecId: spec.id },
+    });
+    for (const sectionKey of ["clos", "slt", "assessmentPlan", "resources"] as const) {
+      await prisma.courseSpecSection.upsert({
+        where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey } },
+        update: { status: "Complete" },
+        create: { courseSpecId: spec.id, sectionKey, status: "Complete" },
+      });
+    }
+    await prisma.courseSpecClo.upsert({
+      where: { courseSpecId_id: { courseSpecId: spec.id, id: "seed-clo-1" } },
+      update: {},
+      create: {
+        id: "seed-clo-1",
+        courseSpecId: spec.id,
+        order: 0,
+        description: "Develop small programs using variables, control flow, functions, and structured problem solving.",
+        level: "C3",
+        mappedPlos: ["PLO1", "PLO3"],
+      },
+    });
+    await prisma.courseSpecWeek.upsert({
+      where: { courseSpecId_id: { courseSpecId: spec.id, id: "seed-week-1" } },
+      update: {},
+      create: {
+        id: "seed-week-1",
+        courseSpecId: spec.id,
+        order: 0,
+        week: 1,
+        topic: "Programming foundations and problem-solving workflow",
+        cloCodes: ["CLO1"],
+        lloItems: ["Explain how a program executes", "Write a small Python program"],
+        activities: ["Lecture", "Guided Hands-on Lab"],
+      },
+    });
+    await prisma.courseSpecAssessmentItem.upsert({
+      where: { courseSpecId_id: { courseSpecId: spec.id, id: "seed-assessment-1" } },
+      update: {},
+      create: {
+        id: "seed-assessment-1",
+        courseSpecId: spec.id,
+        order: 0,
+        name: "Programming Fundamentals Assignment",
+        type: "Assignment",
+        description: "Build and explain a small console application.",
+        cloCodes: ["CLO1"],
+        weight: 20,
+        dueWeek: 4,
+        format: "Source Code and Written Report",
+        submissionMethod: "LMS (Upload)",
+        rubricId: rubricIdByName.get("Assignment Rubric – Written Report") ?? null,
+      },
+    });
+    await prisma.courseSpecResource.upsert({
+      where: { courseSpecId_id: { courseSpecId: spec.id, id: "seed-resource-1" } },
+      update: {},
+      create: {
+        id: "seed-resource-1",
+        courseSpecId: spec.id,
+        order: 0,
+        resourceType: "Online Tutorial",
+        title: "Python Official Tutorial",
+        url: "https://docs.python.org/3/tutorial/",
+      },
+    });
+
+    const ada = enrolees.find((student) => student.email === "ada@dse.dev");
+    const lecturer = await prisma.user.findUnique({ where: { email: "lecturer@dse.dev" } });
+    if (ada && lecturer) {
+      const enrollment = await prisma.enrollment.findUniqueOrThrow({
+        where: { offeringId_studentId: { offeringId: offering.id, studentId: ada.id } },
+      });
+      await prisma.courseAnnouncement.upsert({
+        where: { id: "seed-announcement-1" },
+        update: {},
+        create: {
+          id: "seed-announcement-1",
+          offeringId: offering.id,
+          authorId: lecturer.id,
+          title: "Welcome to Introduction to Programming",
+          body: "Please review Week 1 learning outcomes and bring your laptop to the first lab session.",
+          pinned: true,
+          publishedAt: new Date(),
+        },
+      });
+      await prisma.assessmentResult.upsert({
+        where: {
+          enrollmentId_courseSpecId_assessmentItemId: {
+            enrollmentId: enrollment.id,
+            courseSpecId: spec.id,
+            assessmentItemId: "seed-assessment-1",
+          },
+        },
+        update: {},
+        create: {
+          enrollmentId: enrollment.id,
+          courseSpecId: spec.id,
+          assessmentItemId: "seed-assessment-1",
+          score: 16,
+          maxScore: 20,
+          feedback: "Good structure and clear explanation.",
+          publishedAt: new Date(),
         },
       });
     }
