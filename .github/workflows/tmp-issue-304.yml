@@ -15,6 +15,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: agent/issue-304-programme-outcome-indicators
+      - name: Align patch anchor to current Programme relation names
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/patch-issue-304.py')
+          text = p.read_text()
+          old = '    "  cohorts            StudentCohort[]",\n    "  cohorts            StudentCohort[]\\n  outcomeIndicators  ProgrammeOutcomeIndicator[]",'
+          new = '    "  qaCloAttainmentSnapshots  QaCloAttainmentSnapshot[]",\n    "  qaCloAttainmentSnapshots  QaCloAttainmentSnapshot[]\\n  outcomeIndicators          ProgrammeOutcomeIndicator[]",'
+          if old not in text:
+              raise SystemExit('expected Programme relation patch anchor not found')
+          p.write_text(text.replace(old, new, 1))
+          PY
       - run: python .github/patch-issue-304.py
       - name: Commit generated feature files
         run: |
