@@ -1,0 +1,63 @@
+name: CourseSpec Periodic Review Integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/backend/src/plugins/courses/periodic-review-*.ts"
+      - "apps/backend/src/plugins/courses/index.ts"
+      - "packages/shared-types/src/course-spec-periodic-review.ts"
+      - "packages/shared-types/src/course-spec-periodic-review.test.ts"
+      - "packages/shared-types/src/index.ts"
+      - ".github/workflows/course-spec-periodic-review-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/backend/src/plugins/courses/periodic-review-*.ts"
+      - "apps/backend/src/plugins/courses/index.ts"
+      - "packages/shared-types/src/course-spec-periodic-review.ts"
+      - "packages/shared-types/src/course-spec-periodic-review.test.ts"
+      - "packages/shared-types/src/index.ts"
+      - ".github/workflows/course-spec-periodic-review-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  periodic-review-db-integrity:
+    name: Periodic reviews preserve version history
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_course_spec_periodic_review_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_course_spec_periodic_review_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_course_spec_periodic_review_ci?schema=public
+      COURSE_SPEC_PERIODIC_REVIEW_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - name: Verify periodic review persistence, revision linkage, due scheduling and append-only history
+        run: bun test apps/backend/src/plugins/courses/periodic-review-db.test.ts
+      - name: Verify database security inventory
+        run: bun run --cwd apps/backend db:verify-security
