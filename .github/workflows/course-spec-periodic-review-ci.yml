@@ -8,6 +8,9 @@ on:
       - "apps/backend/src/plugins/courses/periodic-review-*.ts"
       - "apps/backend/src/plugins/courses/revision-service.ts"
       - "apps/backend/src/plugins/courses/index.ts"
+      - "apps/frontend/app/(shell)/courses/[id]/spec/version-history-bar.tsx"
+      - "apps/frontend/lib/course-spec-governance-actions*"
+      - "apps/frontend/lib/course-spec-periodic-review.ts"
       - "packages/shared-types/src/course-spec-periodic-review.ts"
       - "packages/shared-types/src/index.ts"
       - ".github/workflows/course-spec-periodic-review-ci.yml"
@@ -48,6 +51,6 @@ jobs:
       - name: Seed database
         run: bun run --cwd apps/backend seed
       - name: Verify periodic review governance
-        run: bun test apps/backend/src/plugins/courses/periodic-review-db.test.ts
+        run: bun test apps/backend/src/plugins/courses/periodic-review-db.test.ts apps/frontend/lib/course-spec-governance-actions.test.ts
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
