@@ -1,0 +1,37 @@
+name: Patch issue 304 programme outcome indicators
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-304-programme-outcome-indicators
+      - run: python .github/patch-issue-304.py
+      - name: Commit generated feature files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backend/prisma/schema.prisma \
+            apps/backend/prisma/migrations/20260818040000_add_programme_outcome_indicators/migration.sql \
+            apps/backend/scripts/verify-db-security.ts \
+            apps/backend/src/plugins/qa/analysis/deterministic-engine.ts \
+            apps/backend/src/plugins/qa/analysis/deterministic-engine.test.ts \
+            apps/backend/src/plugins/qa/evidence/registry.ts \
+            apps/backend/src/plugins/qa/evidence/programme-outcome-indicators.ts \
+            apps/backend/src/plugins/qa/evidence/programme-outcome-indicators-db.test.ts \
+            packages/shared-types/src/index.ts \
+            packages/shared-types/src/programme-outcome-indicators.ts \
+            packages/shared-types/src/qa-evidence-candidates.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "feat(qa): add versioned programme outcome indicators (#304)"
+          git pull --rebase origin agent/issue-304-programme-outcome-indicators
+          git push origin HEAD:agent/issue-304-programme-outcome-indicators
