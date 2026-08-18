@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   apply:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout implementation branch
@@ -21,8 +22,11 @@ jobs:
       - name: Apply scoped Student Portal patch
         run: python tools/issue-169-student-portal-mvp.py
 
-      - name: Remove bootstrap-only files
-        run: git rm tools/issue-169-student-portal-mvp.py tools/issue-169-trigger.txt .github/workflows/issue-169-bootstrap.yml
+      - name: Keep the repository CI workflow unchanged in the bot commit
+        run: git checkout origin/main -- .github/workflows/ci.yml
+
+      - name: Remove bootstrap-only normal files
+        run: git rm tools/issue-169-student-portal-mvp.py tools/issue-169-trigger.txt
 
       - name: Commit implementation
         run: |
