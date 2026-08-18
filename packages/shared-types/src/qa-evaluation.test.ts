@@ -3,6 +3,9 @@ import {
   CreateQaEvaluationHumanRatingSchema,
   CreateQaEvaluationRunSchema,
   CreateQaEvaluationScenarioSchema,
+  QA_CRITERIA_1_4_8_DATASET_VERSION,
+  QaEvaluationDifficultySchema,
+  QaEvaluationScenarioTypeSchema,
   SetQaEvaluationGoldSchema,
 } from "./index.ts";
 
@@ -37,6 +40,22 @@ test("controlled QA scenario requires a real AUN-QA requirement/expectation refe
       evidence: [],
     }).success,
   ).toBe(false);
+});
+
+test("controlled dataset taxonomy is closed and versioned for reproducible experiments", () => {
+  expect(QA_CRITERIA_1_4_8_DATASET_VERSION).toBe("aun-qa-v4-criteria-1-4-8-v1");
+  expect(QaEvaluationScenarioTypeSchema.options).toEqual([
+    "positiveEvidence",
+    "missingEvidence",
+    "partialEvidence",
+    "ambiguousRelationship",
+    "wrongScope",
+    "staleEvidence",
+    "conflictingEvidence",
+    "notApplicable",
+  ]);
+  expect(QaEvaluationDifficultySchema.options).toEqual(["easy", "medium", "hard"]);
+  expect(QaEvaluationScenarioTypeSchema.safeParse("modelInventedCase").success).toBe(false);
 });
 
 test("human gold annotation rejects duplicate evidence judgments", () => {
