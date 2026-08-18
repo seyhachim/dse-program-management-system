@@ -169,6 +169,18 @@ describe("deterministic QA engine evidence semantics", () => {
     expect(assessed.finding.result.candidates).toHaveLength(0);
   });
 
+  it("does not combine periods across changed indicator definitions", () => {
+    const longitudinalDefinition = definition({ kind: "longitudinal", minimumPeriods: 3 });
+    const candidates = [
+      { ...candidate({ key: "v1-p1", ...expectedScope, reportingDate: "2023-06-01T00:00:00.000Z", periodKey: "2023" }), attributes: { definitionHash: "hash-v1" } },
+      { ...candidate({ key: "v1-p2", ...expectedScope, reportingDate: "2024-06-01T00:00:00.000Z", periodKey: "2024" }), attributes: { definitionHash: "hash-v1" } },
+      { ...candidate({ key: "v2-p3", ...expectedScope, reportingDate: "2025-06-01T00:00:00.000Z", periodKey: "2025" }), attributes: { definitionHash: "hash-v2" } },
+    ];
+    const assessed = assessCandidates("dse", expectation({ kind: "longitudinal", minimumPeriods: 3 }), longitudinalDefinition, result(candidates), cycle);
+    expect(assessed.assessed.every((item) => item.temporalMatch === "insufficientHistory")).toBe(true);
+    expect(assessed.finding.result.candidates).toHaveLength(0);
+  });
+
   it("accepts longitudinal evidence once three eligible distinct periods exist", () => {
     const longitudinalDefinition = definition({ kind: "longitudinal", minimumPeriods: 3 });
     const candidates = [

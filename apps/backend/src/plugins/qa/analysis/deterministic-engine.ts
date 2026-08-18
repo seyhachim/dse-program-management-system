@@ -55,6 +55,7 @@ export type AssessedCandidate = {
 
 type BaseCandidateAssessment = Omit<AssessedCandidate, "temporalMatch"> & {
   candidateDate: Date | null;
+  comparisonKey: string;
 };
 
 function effectiveScopeRequirement(
@@ -85,6 +86,14 @@ function candidateDate(candidate: Candidate): Date | null {
   if (!candidate.reportingDate) return null;
   const parsed = new Date(candidate.reportingDate);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function candidateComparisonKey(candidate: Candidate): string {
+  for (const key of ["definitionHash", "definitionVersion", "calculationVersion"] as const) {
+    const value = candidate.attributes[key];
+    if (typeof value === "string" && value.trim()) return `${key}:${value.trim()}`;
+  }
+  return "legacy-compatible-definition";
 }
 
 /**
@@ -118,33 +127,32 @@ export function assessCandidates(
       authorityMatch: meetsSourceAuthority(definition.authorityRequirement, provenance),
       temporalRule,
       candidateDate: candidateDate(candidate),
+      comparisonKey: candidateComparisonKey(candidate),
     };
   });
 
   // Longitudinal/multi-period history must be made only from candidates that
   // could otherwise support the expectation. Wrong-scope, weak-authority,
   // future, invalid-date, and missing-period candidates cannot inflate history.
-  const comparablePeriods = new Set(
-    baseAssessments
-      .filter(
-        (item) =>
-          item.scopeMatch === "exact" &&
-          item.authorityMatch === true &&
-          Boolean(item.candidate.periodKey) &&
-          Boolean(item.candidateDate) &&
-          item.candidateDate! <= cycle.reportingEnd,
-      )
-      .map((item) => item.candidate.periodKey as string),
-  ).size;
+  const periodsByDefinition = new Map<string, Set<string>>();
+  for (const item of baseAssessments) {
+    if (
+      item.scopeMatch !== "exact" || item.authorityMatch !== true || !item.candidate.periodKey ||
+      !item.candidateDate || item.candidateDate > cycle.reportingEnd
+    ) continue;
+    const periods = periodsByDefinition.get(item.comparisonKey) ?? new Set<string>();
+    periods.add(item.candidate.periodKey);
+    periodsByDefinition.set(item.comparisonKey, periods);
+  }
 
   const assessed = baseAssessments.map(
-    ({ candidateDate: parsedCandidateDate, ...item }): AssessedCandidate => ({
+    ({ candidateDate: parsedCandidateDate, comparisonKey, ...item }): AssessedCandidate => ({
       ...item,
       temporalMatch: matchEvidenceTime(temporalRule, {
         cycleStart: cycle.reportingStart,
         cycleEnd: cycle.reportingEnd,
         candidateDate: parsedCandidateDate,
-        comparablePeriods,
+        comparablePeriods: periodsByDefinition.get(comparisonKey)?.size ?? 0,
       }),
     }),
   );
