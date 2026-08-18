@@ -89,11 +89,20 @@ function candidateDate(candidate: Candidate): Date | null {
 }
 
 function candidateComparisonKey(candidate: Candidate): string {
-  for (const key of ["definitionHash", "definitionVersion", "calculationVersion"] as const) {
-    const value = candidate.attributes[key];
-    if (typeof value === "string" && value.trim()) return `${key}:${value.trim()}`;
-  }
-  return "legacy-compatible-definition";
+  const definitionHash = candidate.attributes.definitionHash;
+  const definitionVersion = candidate.attributes.definitionVersion;
+  const calculationVersion = candidate.attributes.calculationVersion;
+  const definitionFingerprint =
+    typeof definitionHash === "string" && definitionHash.trim()
+      ? `hash:${definitionHash.trim()}`
+      : typeof definitionVersion === "string" && definitionVersion.trim()
+        ? `version:${definitionVersion.trim()}`
+        : "legacy-definition";
+  const calculationFingerprint =
+    typeof calculationVersion === "string" && calculationVersion.trim()
+      ? calculationVersion.trim()
+      : "legacy-calculation";
+  return `${definitionFingerprint}|calculation:${calculationFingerprint}`;
 }
 
 /**
