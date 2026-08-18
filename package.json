@@ -23,7 +23,12 @@
     "seed": "bun run --cwd apps/backend seed",
     "gen-token": "bun run --cwd apps/backend gen-token"
   },
+  "overrides": {
+    "postcss": "8.5.26",
+    "js-yaml": "4.3.1"
+  },
   "devDependencies": {
+    "minimatch": "10.2.6",
     "turbo": "^2.5.0",
     "typescript": "^5.6.3"
   }
