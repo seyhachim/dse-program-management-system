@@ -34,25 +34,46 @@ jobs:
         with:
           bun-version: 1.2.23
       - run: bun install --frozen-lockfile
-      - name: Audit production dependency graph
+      - name: Capture audit inventory
         shell: bash
         run: |
           set +e
           bun audit --production --json > dependency-audit.json 2>dependency-audit.stderr
           status=$?
           set -e
-
+          echo "AUDIT_STATUS=$status" >> "$GITHUB_ENV"
           cat dependency-audit.stderr || true
           cat dependency-audit.json
-
           bun -e '
             const report = JSON.parse(await Bun.file("dependency-audit.json").text());
             const packageCount = Object.keys(report).length;
             const advisoryCount = Object.values(report).reduce((count, advisories) => count + advisories.length, 0);
-            console.log(`Production audit: ${advisoryCount} advisories across ${packageCount} packages`);
-            if (packageCount > 0 || advisoryCount > 0) process.exit(1);
+            console.log(`Audit inventory: ${advisoryCount} advisories across ${packageCount} packages`);
           '
-
-          if [ "$status" -ne 0 ]; then
-            exit "$status"
+      - name: Trace residual advisory paths
+        shell: bash
+        run: |
+          for package in \
+            @hono/node-server \
+            brace-expansion \
+            hono \
+            ip-address \
+            js-yaml \
+            nanoid \
+            postcss \
+            undici
+          do
+            echo "===== $package ====="
+            bun pm why "$package" || true
+          done
+      - name: Fail while residual findings are unclassified
+        shell: bash
+        run: |
+          bun -e '
+            const report = JSON.parse(await Bun.file("dependency-audit.json").text());
+            const advisoryCount = Object.values(report).reduce((count, advisories) => count + advisories.length, 0);
+            if (advisoryCount > 0) process.exit(1);
+          '
+          if [ "$AUDIT_STATUS" -ne 0 ]; then
+            exit "$AUDIT_STATUS"
           fi
