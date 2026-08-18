@@ -16,6 +16,7 @@ export interface AttendanceRegisterAnchor {
 export interface OpenAttendanceHistoryRegisterDependencies {
   clearSearch: () => void;
   selectDate: (date: string) => void;
+  reloadSelectedDate: () => void;
   schedule: (callback: () => void) => void;
   getRegisterAnchor: () => AttendanceRegisterAnchor | null;
 }
@@ -65,6 +66,7 @@ export function openAttendanceHistoryRegister(
 ): void {
   dependencies.clearSearch();
   dependencies.selectDate(sessionDate);
+  dependencies.reloadSelectedDate();
   dependencies.schedule(() => {
     dependencies.getRegisterAnchor()?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
