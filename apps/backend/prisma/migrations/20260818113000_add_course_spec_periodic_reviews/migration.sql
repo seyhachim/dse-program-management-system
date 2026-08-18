@@ -39,6 +39,21 @@ CREATE INDEX "CourseSpecPeriodicReview_nextReviewDueAt_idx"
 CREATE INDEX "CourseSpecPeriodicReview_reviewerId_idx"
   ON "CourseSpecPeriodicReview" ("reviewerId");
 
+ALTER TABLE "CourseSpecPeriodicReview" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "CourseSpecPeriodicReview" FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    EXECUTE 'REVOKE ALL ON TABLE "CourseSpecPeriodicReview" FROM anon';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    EXECUTE 'REVOKE ALL ON TABLE "CourseSpecPeriodicReview" FROM authenticated';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    EXECUTE 'REVOKE ALL ON TABLE "CourseSpecPeriodicReview" FROM service_role';
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION reject_course_spec_periodic_review_mutation()
 RETURNS trigger AS $$
 BEGIN
