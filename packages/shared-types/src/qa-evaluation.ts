@@ -50,10 +50,6 @@ export const CreateQaEvaluationScenarioSchema = z.object({
   expectationId: z.string().trim().min(1).max(200),
   name: z.string().trim().min(3).max(300),
   description: z.string().trim().min(10).max(5000),
-  scenarioType: QaEvaluationScenarioTypeSchema.default("positiveEvidence"),
-  difficulty: QaEvaluationDifficultySchema.default("medium"),
-  datasetVersion: z.string().trim().min(1).max(120).default("legacy"),
-  scenarioVersion: z.number().int().min(1).max(10_000).default(1),
   evidence: z.array(QaEvaluationScenarioEvidenceInputSchema).max(200).default([]),
 });
 
@@ -177,10 +173,6 @@ export interface QaEvaluationScenarioView {
   expectationId: string;
   name: string;
   description: string;
-  scenarioType: QaEvaluationScenarioType;
-  difficulty: QaEvaluationDifficulty;
-  datasetVersion: string;
-  scenarioVersion: number;
   goldApplicability: z.infer<typeof QaApplicabilityStateSchema> | null;
   goldState: z.infer<typeof QaEvidenceAnalysisStateSchema> | null;
   goldReviewerId: string | null;
@@ -190,6 +182,21 @@ export interface QaEvaluationScenarioView {
   evidence: QaEvaluationEvidenceView[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface QaEvaluationDatasetScenarioView extends QaEvaluationScenarioView {
+  scenarioType: QaEvaluationScenarioType;
+  difficulty: QaEvaluationDifficulty;
+  datasetVersion: string;
+  scenarioVersion: number;
+}
+
+export interface QaEvaluationDatasetExportView {
+  schemaVersion: "qa-controlled-dataset-v1";
+  frameworkId: string;
+  datasetVersion: string;
+  scenarioCount: number;
+  scenarios: QaEvaluationDatasetScenarioView[];
 }
 
 export interface QaEvaluationRunView {
