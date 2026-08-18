@@ -7,6 +7,7 @@ on:
       - "bun.lock"
       - "apps/*/package.json"
       - "packages/*/package.json"
+      - "scripts/verify-production-dependency-audit.ts"
       - ".github/workflows/dependency-audit-ci.yml"
   push:
     branches:
@@ -16,42 +17,17 @@ on:
       - "bun.lock"
       - "apps/*/package.json"
       - "packages/*/package.json"
+      - "scripts/verify-production-dependency-audit.ts"
       - ".github/workflows/dependency-audit-ci.yml"
   schedule:
     - cron: "17 1 * * 1"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  normalize-lockfile:
-    if: github.event_name == 'pull_request' && github.head_ref == 'agent/issue-131-dependency-audit'
-    name: Normalize Bun lockfile
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.23
-      - run: bun install --lockfile-only
-      - name: Commit normalized lockfile when needed
-        shell: bash
-        run: |
-          if git diff --quiet -- bun.lock; then
-            echo "bun.lock is already canonical"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bun.lock
-          git commit -m "chore(deps): normalize bun lockfile"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-
   production-audit:
-    name: Production dependency advisory inventory
+    name: Production dependency advisory gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -59,7 +35,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.23
-      - run: bun install --lockfile-only
+      - run: bun install --frozen-lockfile
       - name: Capture production audit
         shell: bash
         run: |
@@ -68,6 +44,7 @@ jobs:
           status=$?
           set -e
           cat dependency-audit.stderr || true
-          cat dependency-audit.json || true
-          echo "audit_exit_code=$status" >> "$GITHUB_STEP_SUMMARY"
-          exit 0
+          cat dependency-audit.json
+          echo "raw_bun_audit_exit_code=$status" >> "$GITHUB_STEP_SUMMARY"
+      - name: Enforce advisory classification policy
+        run: bun scripts/verify-production-dependency-audit.ts dependency-audit.json
