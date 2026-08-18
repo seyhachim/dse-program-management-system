@@ -7,6 +7,23 @@ import {
   QaEvidenceScopeSchema,
 } from "./qa-evidence-semantics.ts";
 
+export const QA_CRITERIA_1_4_8_DATASET_VERSION = "aun-qa-v4-criteria-1-4-8-v1";
+
+export const QaEvaluationScenarioTypeSchema = z.enum([
+  "positiveEvidence",
+  "missingEvidence",
+  "partialEvidence",
+  "ambiguousRelationship",
+  "wrongScope",
+  "staleEvidence",
+  "conflictingEvidence",
+  "notApplicable",
+]);
+export type QaEvaluationScenarioType = z.infer<typeof QaEvaluationScenarioTypeSchema>;
+
+export const QaEvaluationDifficultySchema = z.enum(["easy", "medium", "hard"]);
+export type QaEvaluationDifficulty = z.infer<typeof QaEvaluationDifficultySchema>;
+
 export const QaEvaluationEvidenceAttributeValueSchema = z.union([
   z.string().max(5000),
   z.number(),
@@ -33,6 +50,10 @@ export const CreateQaEvaluationScenarioSchema = z.object({
   expectationId: z.string().trim().min(1).max(200),
   name: z.string().trim().min(3).max(300),
   description: z.string().trim().min(10).max(5000),
+  scenarioType: QaEvaluationScenarioTypeSchema.default("positiveEvidence"),
+  difficulty: QaEvaluationDifficultySchema.default("medium"),
+  datasetVersion: z.string().trim().min(1).max(120).default("legacy"),
+  scenarioVersion: z.number().int().min(1).max(10_000).default(1),
   evidence: z.array(QaEvaluationScenarioEvidenceInputSchema).max(200).default([]),
 });
 
@@ -156,6 +177,10 @@ export interface QaEvaluationScenarioView {
   expectationId: string;
   name: string;
   description: string;
+  scenarioType: QaEvaluationScenarioType;
+  difficulty: QaEvaluationDifficulty;
+  datasetVersion: string;
+  scenarioVersion: number;
   goldApplicability: z.infer<typeof QaApplicabilityStateSchema> | null;
   goldState: z.infer<typeof QaEvidenceAnalysisStateSchema> | null;
   goldReviewerId: string | null;
