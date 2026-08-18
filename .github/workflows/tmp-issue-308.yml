@@ -1,0 +1,33 @@
+name: Patch issue 308 research grade matcher
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-308-research-grade-evidence-matcher
+      - run: python .github/patch-issue-308.py
+      - name: Commit generated feature files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backend/prisma/migrations/20260818060000_add_qa_analysis_reasoning_factors/migration.sql \
+            packages/shared-types/src/qa-analysis.ts \
+            apps/backend/src/plugins/qa/analysis/service.ts \
+            apps/backend/src/plugins/qa/analysis/relationships.ts \
+            apps/backend/src/plugins/qa/analysis/relationships.test.ts \
+            apps/backend/src/plugins/qa/analysis/rules.ts \
+            apps/backend/src/plugins/qa/analysis/deterministic-engine.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "feat(qa): add research-grade relationship matcher (#308)"
+          git pull --rebase origin agent/issue-308-research-grade-evidence-matcher
+          git push origin HEAD:agent/issue-308-research-grade-evidence-matcher
