@@ -111,38 +111,36 @@ export async function createQaAnalysisReview(
     );
   }
 
-  const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.qaEvidenceAnalysisReview.create({
-      data: {
-        programmeId: input.programmeId,
-        analysisId,
-        reviewerId,
-        decision: toDbDecision[input.decision],
-        comment: input.comment,
-      },
-      include: { reviewer: { select: { name: true } } },
-    });
+  const id = crypto.randomUUID();
+  const reasonCode = input.reasonCode ?? "confirmed";
+  const reasonCategory = qaAnalysisCorrectionReasonCategory(reasonCode);
+  const correctedState = input.correctedState
+    ? toDbState[input.correctedState]
+    : null;
 
-    const reasonCode = input.reasonCode ?? "confirmed";
-    const reasonCategory = qaAnalysisCorrectionReasonCategory(reasonCode);
-    const correctedState = input.correctedState
-      ? toDbState[input.correctedState]
-      : null;
+  await prisma.$executeRaw`
+    INSERT INTO "QaEvidenceAnalysisReview" (
+      id, "programmeId", "analysisId", "reviewerId", decision, comment,
+      "correctedState", "reasonCategory", "reasonCode",
+      "correctedEvidenceCandidateKeys", "correctedRelationships", "createdAt"
+    ) VALUES (
+      ${id}, ${input.programmeId}, ${analysisId}, ${reviewerId},
+      ${toDbDecision[input.decision]}::"QaAnalysisReviewDecision", ${input.comment},
+      ${correctedState}::"QaEvidenceAnalysisState", ${reasonCategory}, ${reasonCode},
+      ${input.correctedEvidenceCandidateKeys}::text[],
+      CAST(${JSON.stringify(input.correctedRelationships)} AS jsonb), NOW()
+    )
+  `;
 
-    await tx.$executeRaw`
-      UPDATE "QaEvidenceAnalysisReview"
-      SET "correctedState" = ${correctedState}::"QaEvidenceAnalysisState",
-          "reasonCategory" = ${reasonCategory},
-          "reasonCode" = ${reasonCode},
-          "correctedEvidenceCandidateKeys" = ${input.correctedEvidenceCandidateKeys}::text[],
-          "correctedRelationships" = CAST(${JSON.stringify(input.correctedRelationships)} AS jsonb)
-      WHERE id = ${row.id}
-    `;
-    return row;
+  const created = await prisma.qaEvidenceAnalysisReview.findUnique({
+    where: { id },
+    include: { reviewer: { select: { name: true } } },
   });
-
-  const corrections = await loadCorrectionRows([created.id]);
-  return toView(created, corrections.get(created.id));
+  if (!created) {
+    throw new QaAnalysisReviewResourceNotFoundError("Created QA analysis review could not be reloaded");
+  }
+  const corrections = await loadCorrectionRows([id]);
+  return toView(created, corrections.get(id));
 }
 
 export async function listQaAnalysisReviews(
