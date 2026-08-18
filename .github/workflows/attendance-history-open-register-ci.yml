@@ -1,0 +1,34 @@
+name: Attendance History Open Register
+
+on:
+  push:
+    branches: [seyhadev]
+    paths:
+      - "apps/frontend/app/(shell)/attendance/attendance-client.tsx"
+      - "apps/frontend/app/(shell)/attendance/roll-call-state.ts"
+      - "apps/frontend/app/(shell)/attendance/roll-call-state.test.ts"
+      - ".github/workflows/attendance-history-open-register-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/frontend/app/(shell)/attendance/attendance-client.tsx"
+      - "apps/frontend/app/(shell)/attendance/roll-call-state.ts"
+      - "apps/frontend/app/(shell)/attendance/roll-call-state.test.ts"
+      - ".github/workflows/attendance-history-open-register-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  focused-attendance-history-test:
+    name: Attendance history Open register
+    if: github.event_name == 'push' || github.head_ref == 'seyhadev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - name: Run focused Attendance history Open register tests
+        run: bun test 'apps/frontend/app/(shell)/attendance/roll-call-state.test.ts'
