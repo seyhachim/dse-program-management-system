@@ -129,6 +129,7 @@ dbDescribe("provisional result access policy", () => {
       credits: 3,
       term: offering.term,
       sectionCode: offering.sectionCode,
+      lifecycle: "current",
       lecturer: null,
       coLecturers: [],
       meetings: [],
