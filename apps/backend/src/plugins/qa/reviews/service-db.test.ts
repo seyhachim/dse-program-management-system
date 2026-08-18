@@ -121,11 +121,15 @@ describe.skipIf(!enabled)("structured QA expert corrections", () => {
     });
 
     await expect(
-      db.$executeRaw`UPDATE "QaEvidenceAnalysisReview" SET comment = 'mutated' WHERE id = ${review.id}`,
+      Promise.resolve(
+        db.$executeRaw`UPDATE "QaEvidenceAnalysisReview" SET comment = 'mutated' WHERE id = ${review.id}`,
+      ),
     ).rejects.toThrow(/append-only/i);
 
     await expect(
-      db.$executeRaw`DELETE FROM "QaEvidenceAnalysisReview" WHERE id = ${review.id}`,
+      Promise.resolve(
+        db.$executeRaw`DELETE FROM "QaEvidenceAnalysisReview" WHERE id = ${review.id}`,
+      ),
     ).rejects.toThrow(/append-only/i);
   });
 });
