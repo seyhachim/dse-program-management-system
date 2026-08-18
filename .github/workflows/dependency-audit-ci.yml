@@ -1,0 +1,50 @@
+name: Production Dependency Audit
+
+on:
+  pull_request:
+    paths:
+      - "package.json"
+      - "bun.lock"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - "scripts/verify-production-dependency-audit.ts"
+      - ".github/workflows/dependency-audit-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "package.json"
+      - "bun.lock"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - "scripts/verify-production-dependency-audit.ts"
+      - ".github/workflows/dependency-audit-ci.yml"
+  schedule:
+    - cron: "17 1 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  production-audit:
+    name: Production dependency advisory gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - name: Capture production audit
+        shell: bash
+        run: |
+          set +e
+          bun audit --production --json > dependency-audit.json 2>dependency-audit.stderr
+          status=$?
+          set -e
+          cat dependency-audit.stderr || true
+          cat dependency-audit.json
+          echo "raw_bun_audit_exit_code=$status" >> "$GITHUB_STEP_SUMMARY"
+      - name: Enforce advisory classification policy
+        run: bun scripts/verify-production-dependency-audit.ts dependency-audit.json
