@@ -1,71 +1,3 @@
-<<<<<<< HEAD
-# AGENTS.md
-
-## Project Overview
-
-This repository contains the DSE Program Management System.
-
-Before changing code:
-
-- Inspect the relevant implementation and tests.
-- Explain the proposed plan before making large changes.
-- Keep each change limited to the current GitHub Issue.
-- Do not modify unrelated files.
-
-## Development Commands
-
-Run the following checks after making changes:
-
-- `bun run typecheck`
-- `bun run lint`
-- `bun test`
-- `bun run build`
-
-## Coding Rules
-
-- Follow the existing architecture and naming conventions.
-- Reuse existing components and utilities where practical.
-- Do not introduce new dependencies without explaining why.
-- Preserve authentication, authorization, and validation.
-- Never expose secrets or commit environment files.
-- Add or update tests when behavior changes.
-
-## Database Changes
-
-- Do not delete or rename database fields without approval.
-- Make migrations backward-compatible where practical.
-- Review authorization and ownership checks for every mutation.
-
-## Git Workflow
-
-- One GitHub Issue per branch.
-- Use branch names such as:
-  - `fix/issue-12-description`
-  - `feature/issue-18-description`
-- Do not commit directly to `main`.
-- Use focused conventional commit messages.
-
-## Definition of Done
-
-A task is complete when:
-
-- Acceptance criteria are satisfied.
-- Relevant tests have been added or updated.
-- Type checking, linting, tests, and build pass.
-- No unrelated files were changed.
-- Remaining risks or limitations are reported.
-
-## Code Review Rules
-
-During review, prioritize:
-
-- Authentication and authorization gaps
-- Missing input validation
-- Unsafe database operations
-- Business-logic regressions
-- Missing tests
-- Incorrect error handling
-=======
 # DSE-PMS Agent Guide
 
 Use this file as the repository-level execution checklist for automated coding agents and contributors.
@@ -131,4 +63,3 @@ CI performs a fresh PostgreSQL migration/seed plus curriculum-integrity and fail
 Before creating or updating a PR, read the root `pull_request_template.md` and preserve its required inspection, implementation, database, contract, authorization, edge-case, test, and reviewer evidence.
 
 Before merge, compare the finished PR with both the issue acceptance criteria and the root PR template. Any failing typecheck, lint, test, build, migration, security, permission, or API-contract gate is merge-blocking unless it is explicitly outside the issue and documented as a pre-existing repository limitation.
->>>>>>> 635fd92079d4dd0b47a572746a03d6a3a1d458ab
