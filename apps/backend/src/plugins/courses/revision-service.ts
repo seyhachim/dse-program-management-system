@@ -16,7 +16,8 @@ export class CourseSpecRevisionError extends Error {
       | "COURSE_NOT_FOUND"
       | "SOURCE_NOT_APPROVED"
       | "OPEN_REVISION_EXISTS"
-      | "INITIATOR_NOT_FOUND",
+      | "INITIATOR_NOT_FOUND"
+      | "PERIODIC_REVIEW_SOURCE_MISMATCH",
   ) {
     super(message);
     this.name = "CourseSpecRevisionError";
@@ -86,6 +87,16 @@ export type CreateCourseSpecRevisionInput = {
     impactAssessmentStructureOrWeighting: boolean;
     impactCurriculumOrRegulatoryAlignment: boolean;
   };
+  periodicReview?: {
+    id: string;
+    sourceCourseSpecId: string;
+    reviewerId: string;
+    scheduledDueAt: Date | null;
+    reviewedAt: Date;
+    evidenceSummary: string;
+    decisionReason: string;
+    outcome: "MinorRevision" | "MajorRevision";
+  };
 };
 
 export const courseSpecRevisionService = {
@@ -130,6 +141,15 @@ export const courseSpecRevisionService = {
           "SOURCE_NOT_APPROVED",
         );
       }
+      if (
+        input.periodicReview &&
+        input.periodicReview.sourceCourseSpecId !== source.id
+      ) {
+        throw new CourseSpecRevisionError(
+          "Periodic review must target the current approved source version",
+          "PERIODIC_REVIEW_SOURCE_MISMATCH",
+        );
+      }
 
       const next = nextAcademicVersion(
         { major: source.versionMajor, minor: source.versionMinor },
@@ -168,6 +188,22 @@ export const courseSpecRevisionService = {
             ...input.revisionRequest,
           },
         });
+      }
+
+      if (input.periodicReview) {
+        await tx.$executeRaw`
+          INSERT INTO "course_spec_governance"."CourseSpecPeriodicReview" (
+            "id", "courseSpecId", "reviewerId", "scheduledDueAt", "reviewedAt",
+            "evidenceSummary", "decisionReason", "outcome", "createdRevisionId",
+            "nextReviewDueAt"
+          ) VALUES (
+            ${input.periodicReview.id}, ${source.id}, ${input.periodicReview.reviewerId},
+            ${input.periodicReview.scheduledDueAt}, ${input.periodicReview.reviewedAt},
+            ${input.periodicReview.evidenceSummary.trim()},
+            ${input.periodicReview.decisionReason.trim()},
+            ${input.periodicReview.outcome}, ${target.id}, NULL
+          )
+        `;
       }
 
       return {
