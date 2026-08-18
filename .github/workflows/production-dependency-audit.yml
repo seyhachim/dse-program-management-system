@@ -1,0 +1,43 @@
+name: Production Dependency Audit
+
+on:
+  pull_request:
+    paths:
+      - "package.json"
+      - "bun.lock"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - ".github/workflows/production-dependency-audit.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "package.json"
+      - "bun.lock"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - ".github/workflows/production-dependency-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit-production:
+    name: Audit production dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Audit production dependency graph
+        run: bun run audit:production
