@@ -8,6 +8,10 @@ import {
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { requirePermission } from "../../../core/permissions/index.ts";
 import {
+  exportQaCriteria148Dataset,
+  initializeQaCriteria148Dataset,
+} from "./controlled-dataset.ts";
+import {
   QaEvaluationIntegrityError,
   QaEvaluationResourceNotFoundError,
   QaEvaluationScopeMismatchError,
@@ -76,6 +80,34 @@ export function createQaEvaluationRouter(): Router {
       }
       try {
         res.json(await setQaEvaluationGold(scenarioId, parsed.data, req.user!.id));
+      } catch (error) {
+        sendEvaluationError(res, error);
+      }
+    },
+  );
+
+  router.post(
+    "/evaluation/controlled-dataset/initialize",
+    requirePermission("qa:write"),
+    async (_req, res) => {
+      try {
+        res.json(await initializeQaCriteria148Dataset());
+      } catch (error) {
+        sendEvaluationError(res, error);
+      }
+    },
+  );
+
+  router.get(
+    "/evaluation/controlled-dataset/export",
+    requirePermission("qa:read"),
+    async (_req, res) => {
+      try {
+        res.setHeader(
+          "Content-Disposition",
+          'attachment; filename="qa-criteria-1-4-8-controlled-dataset.json"',
+        );
+        res.json(await exportQaCriteria148Dataset());
       } catch (error) {
         sendEvaluationError(res, error);
       }
