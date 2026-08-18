@@ -10,6 +10,7 @@ import {
   getTeachingWeek,
   getUnmarkedStudentIds,
   markAttendanceStatus,
+  openAttendanceHistoryRegister,
   toSaveAttendanceRecords,
 } from "./roll-call-state";
 
@@ -81,6 +82,57 @@ describe("roll call navigation", () => {
 
   test("unmarked review includes only skipped or untouched students", () => {
     expect(getUnmarkedStudentIds(records)).toEqual([records[1]!.studentId]);
+  });
+});
+
+describe("attendance history open register", () => {
+  test("same-date click still reloads, clears search, and scrolls to the register", () => {
+    let selectedDate = "2026-08-18";
+    let search = "Ada";
+    let reloads = 0;
+    let scheduled: (() => void) | null = null;
+    let scrollOptions: { behavior: "smooth"; block: "start" } | null = null;
+
+    openAttendanceHistoryRegister("2026-08-18", {
+      clearSearch: () => { search = ""; },
+      selectDate: (value) => { selectedDate = value; },
+      reloadSelectedDate: () => { reloads += 1; },
+      schedule: (callback) => { scheduled = callback; },
+      getRegisterAnchor: () => ({
+        scrollIntoView: (options) => { scrollOptions = options; },
+      }),
+    });
+
+    expect(search).toBe("");
+    expect(selectedDate).toBe("2026-08-18");
+    expect(reloads).toBe(1);
+    expect(scheduled).not.toBeNull();
+    scheduled?.();
+    expect(scrollOptions).toEqual({ behavior: "smooth", block: "start" });
+  });
+
+  test("selects a different history date before reloading and scrolling", () => {
+    let selectedDate = "2026-08-18";
+    const order: string[] = [];
+
+    openAttendanceHistoryRegister("2026-08-11", {
+      clearSearch: () => { order.push("clear-search"); },
+      selectDate: (value) => { selectedDate = value; order.push(`select:${value}`); },
+      reloadSelectedDate: () => { order.push("reload"); },
+      schedule: (callback) => { order.push("schedule"); callback(); },
+      getRegisterAnchor: () => ({
+        scrollIntoView: () => { order.push("scroll"); },
+      }),
+    });
+
+    expect(selectedDate).toBe("2026-08-11");
+    expect(order).toEqual([
+      "clear-search",
+      "select:2026-08-11",
+      "reload",
+      "schedule",
+      "scroll",
+    ]);
   });
 });
 
