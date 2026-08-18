@@ -53,7 +53,7 @@ const reviewStatusMap: Record<string, CourseSpecReviewStatus> = {
 
 function reviewEnvelope(spec: SpecRow): CourseSpecReview {
   return {
-    status: reviewStatusMap[spec.reviewStatus],
+    status: reviewStatusMap[spec.reviewStatus]!,
     submissionVersion: spec.submissionVersion,
     submittedAt: spec.submittedAt?.toISOString() ?? null,
     submittedById: spec.submittedById,
