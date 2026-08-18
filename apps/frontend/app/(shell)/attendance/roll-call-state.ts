@@ -9,6 +9,17 @@ export interface AttendanceCounts {
   Total: number;
 }
 
+export interface AttendanceRegisterAnchor {
+  scrollIntoView: (options: { behavior: "smooth"; block: "start" }) => void;
+}
+
+export interface OpenAttendanceHistoryRegisterDependencies {
+  clearSearch: () => void;
+  selectDate: (date: string) => void;
+  schedule: (callback: () => void) => void;
+  getRegisterAnchor: () => AttendanceRegisterAnchor | null;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function dateValue(value: string): number | null {
@@ -46,6 +57,17 @@ export function getTeachingWeek(
   if (start === null || selected === null || selected < start) return null;
   if (end !== null && selected > end) return null;
   return Math.floor((selected - start) / (7 * DAY_MS)) + 1;
+}
+
+export function openAttendanceHistoryRegister(
+  sessionDate: string,
+  dependencies: OpenAttendanceHistoryRegisterDependencies,
+): void {
+  dependencies.clearSearch();
+  dependencies.selectDate(sessionDate);
+  dependencies.schedule(() => {
+    dependencies.getRegisterAnchor()?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 export function getNextIndex(currentIndex: number, length: number): number {
