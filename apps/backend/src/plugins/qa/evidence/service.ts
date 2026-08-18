@@ -124,7 +124,10 @@ export function normalizeCandidateSemantics(
   }));
   // Candidate keys are the stable identity across adapters. Preserve the first
   // ranked occurrence and drop later duplicates deterministically.
-  const byKey = new Map(normalized.map((candidate) => [candidate.key, candidate]));
+  const byKey = new Map<string, (typeof normalized)[number]>();
+  for (const candidate of normalized) {
+    if (!byKey.has(candidate.key)) byKey.set(candidate.key, candidate);
+  }
   return { ...result, candidates: [...byKey.values()] };
 }
 
