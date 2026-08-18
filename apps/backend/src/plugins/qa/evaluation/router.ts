@@ -3,6 +3,7 @@ import {
   CreateQaEvaluationHumanRatingSchema,
   CreateQaEvaluationScenarioSchema,
   QaEvaluationRunQuerySchema,
+  QaResearchMetricsQuerySchema,
   SetQaEvaluationGoldSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
@@ -11,6 +12,7 @@ import {
   exportQaCriteria148Dataset,
   initializeQaCriteria148Dataset,
 } from "./controlled-dataset.ts";
+import { getQaResearchMetricsReport } from "./research-metrics-service.ts";
 import {
   QaEvaluationIntegrityError,
   QaEvaluationResourceNotFoundError,
@@ -162,6 +164,37 @@ export function createQaEvaluationRouter(): Router {
       sendEvaluationError(res, error);
     }
   });
+
+  router.get("/evaluation/research-metrics", requirePermission("qa:read"), async (req, res) => {
+    const parsed = QaResearchMetricsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid QA research metrics query", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await getQaResearchMetricsReport(parsed.data));
+    } catch (error) {
+      sendEvaluationError(res, error);
+    }
+  });
+
+  router.get(
+    "/evaluation/research-metrics/export",
+    requirePermission("qa:read"),
+    async (req, res) => {
+      const parsed = QaResearchMetricsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid QA research metrics query", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.setHeader("Content-Disposition", 'attachment; filename="qa-research-metrics.json"');
+        res.json(await getQaResearchMetricsReport(parsed.data));
+      } catch (error) {
+        sendEvaluationError(res, error);
+      }
+    },
+  );
 
   router.get("/evaluation/export", requirePermission("qa:read"), async (_req, res) => {
     try {

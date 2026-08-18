@@ -1,0 +1,53 @@
+name: QA Research Metrics Integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/backend/src/plugins/qa/evaluation/**"
+      - "packages/shared-types/src/qa-research-metrics.ts"
+      - "packages/shared-types/src/index.ts"
+      - ".github/workflows/qa-research-metrics-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/src/plugins/qa/evaluation/**"
+      - "packages/shared-types/src/qa-research-metrics.ts"
+      - "packages/shared-types/src/index.ts"
+      - ".github/workflows/qa-research-metrics-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qa-research-metrics-db-integrity:
+    name: Stored runs produce reproducible PII-safe metrics
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_qa_research_metrics_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_qa_research_metrics_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_qa_research_metrics_ci?schema=public
+      QA_RESEARCH_METRICS_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - name: Verify reproducibility, grouped filters, false gaps and PII-safe export
+        run: bun test apps/backend/src/plugins/qa/evaluation/research-metrics-db.test.ts
