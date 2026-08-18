@@ -43,7 +43,10 @@ type DeliveryResponse = {
   session: Session | null;
 };
 
-type SaveArrivalResponse = DeliveryResponse & { changed: boolean };
+type SaveArrivalResponse = Omit<DeliveryResponse, "confirmation"> & {
+  confirmation: Confirmation;
+  changed: boolean;
+};
 type SaveSessionResponse = {
   access: Access;
   confirmation: Confirmation | null;
