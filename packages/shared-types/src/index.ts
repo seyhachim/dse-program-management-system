@@ -21,6 +21,7 @@ export * from "./class-delivery.ts";
 export * from "./course-spec.ts";
 export * from "./course-spec-revision.ts";
 export * from "./course-spec-periodic-review.ts";
+export * from "./course-spec-version-history.ts";
 export * from "./methods.ts";
 export * from "./rubrics.ts";
 export * from "./student-portal.ts";
