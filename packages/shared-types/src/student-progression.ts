@@ -68,3 +68,23 @@ export const ListStudentProgressionQuery = z.object({
   status: StudentProgressionStatusSchema.optional(),
 });
 export type ListStudentProgressionQuery = z.infer<typeof ListStudentProgressionQuery>;
+
+
+export const STUDENT_COMPLETION_OUTCOME_TYPES = ["ProgrammeCompleted", "GraduationAwarded"] as const;
+export const StudentCompletionOutcomeTypeSchema = z.enum(STUDENT_COMPLETION_OUTCOME_TYPES);
+
+export const RecordStudentCompletionOutcomeInput = z.object({
+  membershipId: z.string().uuid(),
+  outcomeType: StudentCompletionOutcomeTypeSchema,
+  outcomeDate: DateOnlySchema,
+  academicYear: z.string().trim().min(4).max(20),
+  awardName: z.string().trim().max(300).default(""),
+  note: z.string().trim().max(2000).default(""),
+});
+export type RecordStudentCompletionOutcomeInput = z.infer<typeof RecordStudentCompletionOutcomeInput>;
+
+export const ListStudentCompletionOutcomesQuery = z.object({
+  outcomeType: StudentCompletionOutcomeTypeSchema.optional(),
+  academicYear: z.string().trim().min(4).max(20).optional(),
+});
+export type ListStudentCompletionOutcomesQuery = z.infer<typeof ListStudentCompletionOutcomesQuery>;

@@ -14,6 +14,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "StudentCohortMembership",
   "StudentProgressionRecord",
   "QaCloAttainmentSnapshot",
+  "StudentCompletionOutcome",
   "ProgramLearningOutcome",
   "ProgramCompetency",
   "ProgramCompetencyPlo",

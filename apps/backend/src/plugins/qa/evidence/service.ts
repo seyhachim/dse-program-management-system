@@ -129,7 +129,7 @@ function normalizeCandidateSemantics(
 export async function getQaEvidenceCandidates(
   programmeId: string,
   expectedEvidenceId: string,
-  options: { topK?: number; embeddingProvider?: QaEmbeddingProvider | null } = {},
+  options: { topK?: number; embeddingProvider?: QaEmbeddingProvider | null; cohortIds?: string[] } = {},
 ): Promise<QaEvidenceCandidateResultView> {
   const [programme, definitions] = await Promise.all([
     prisma.programme.findUnique({ where: { id: programmeId }, select: { id: true } }),
@@ -188,6 +188,6 @@ export async function getQaEvidenceCandidates(
   };
   return normalizeCandidateSemantics(
     programmeId,
-    await retrieveEvidenceCandidates(programmeId, definition),
+    await retrieveEvidenceCandidates(programmeId, definition, { cohortIds: options.cohortIds }),
   );
 }

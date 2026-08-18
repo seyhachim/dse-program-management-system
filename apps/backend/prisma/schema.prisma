@@ -39,6 +39,11 @@ enum StudentProgressionStatus {
   Transferred
 }
 
+enum StudentCompletionOutcomeType {
+  ProgrammeCompleted
+  GraduationAwarded
+}
+
 enum OfferingStatus {
   Planned
   Active
@@ -1101,6 +1106,7 @@ model StudentCohortMembership {
   createdAt  DateTime                           @default(now())
 
   progressionRecords StudentProgressionRecord[]
+  completionOutcomes StudentCompletionOutcome[]
 
   @@unique([cohortId, studentId, joinedAt])
   @@index([studentId, joinedAt])
@@ -1124,6 +1130,25 @@ model StudentProgressionRecord {
   @@unique([membershipId, academicYear, term])
   @@index([membershipId, periodStart])
   @@index([academicYear, term, status])
+}
+
+/// Issue #302: append-only authoritative completion/graduation evidence for one
+/// exact student cohort membership. Completion and award are separate events so
+/// later graduation does not rewrite the earlier programme-completion record.
+model StudentCompletionOutcome {
+  id            String                       @id @default(uuid())
+  membershipId  String
+  membership    StudentCohortMembership      @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  outcomeType   StudentCompletionOutcomeType
+  outcomeDate   DateTime                     @db.Date
+  academicYear  String
+  awardName     String                       @default("")
+  note          String                       @default("")
+  recordedAt    DateTime                     @default(now())
+
+  @@unique([membershipId, outcomeType])
+  @@index([membershipId, outcomeDate])
+  @@index([outcomeType, academicYear, outcomeDate])
 }
 
 /// Issue #303: immutable, reproducible CLO-attainment calculation artifact.
