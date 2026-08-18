@@ -6,6 +6,7 @@ on:
       - "apps/backend/prisma/migrations/**"
       - "apps/backend/scripts/verify-db-security.ts"
       - "apps/backend/src/plugins/courses/periodic-review-*.ts"
+      - "apps/backend/src/plugins/courses/revision-service.ts"
       - "apps/backend/src/plugins/courses/index.ts"
       - "packages/shared-types/src/course-spec-periodic-review.ts"
       - "packages/shared-types/src/index.ts"
@@ -45,7 +46,7 @@ jobs:
       - name: Apply migrations
         run: bun run --cwd apps/backend db:migrate:deploy
       - name: Seed database
-        run: bun run --cwd apps/backend db:seed
+        run: bun run --cwd apps/backend seed
       - name: Verify periodic review governance
         run: bun test apps/backend/src/plugins/courses/periodic-review-db.test.ts
       - name: Verify database security
