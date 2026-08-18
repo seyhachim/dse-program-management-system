@@ -63,7 +63,8 @@ describe.skipIf(!enabled)("structured QA expert corrections", () => {
   });
 
   afterAll(async () => {
-    await db.qaAssessmentCycle.delete({ where: { id: cycleId } });
+    // The CI database is disposable. Deliberately do not delete the review/cycle:
+    // deleting would contradict the append-only audit invariant under test.
     await db.$disconnect();
   });
 
