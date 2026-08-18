@@ -29,12 +29,12 @@ test("registry does not pretend CLO achievement is already a persisted source", 
   ).toContain("does not yet persist");
 });
 
-test("registry refuses unsafe programme-scoped rubric retrieval", () => {
+test("registry recognizes assessment-linked rubrics as structured evidence", () => {
   expect(
     evidenceTypeSupportReason({
       id: "e4",
       evidenceType: "rubrics",
       sourceDomain: "assessment",
     }),
-  ).toContain("no stable programme/course/assessment foreign key");
+  ).toContain("Deterministic retrieval");
 });
