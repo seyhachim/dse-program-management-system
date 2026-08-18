@@ -48,7 +48,7 @@ export const QaEvidenceRelationshipReasoningStateSchema = z.enum(["satisfied", "
 export const QaEvidenceReasoningFactorSchema = z.object({
   expectedEvidenceId: z.string().trim().min(1).max(300),
   evidenceType: z.string().trim().min(1).max(120),
-  role: z.enum(["required", "supportive", "context"]),
+  role: z.enum(["required", "supportive", "contextual"]),
   findingState: z.enum(["satisfied", "gap", "ambiguous"]),
   acceptedCandidateKeys: z.array(z.string().max(500)).max(500).default([]),
   rejectedScopeCount: z.number().int().min(0).default(0),
