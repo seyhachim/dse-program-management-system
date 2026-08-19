@@ -4,6 +4,7 @@ import type {
   ListCoursesQuery,
   SetCourseSpecResponsibleLecturersInput,
 } from "@dse-pms/shared-types";
+import type { CourseSpecReviewStatus } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import {
@@ -17,7 +18,7 @@ type CurrentSpecRow = {
   courseId: string;
   versionMajor: number;
   versionMinor: number;
-  reviewStatus: string;
+  reviewStatus: CourseSpecReviewStatus;
 };
 
 type ResponsibleLecturerRow = {
@@ -127,12 +128,9 @@ export async function setCourseSpecResponsibleLecturers(
         reviewStatus: true,
       },
     });
-    spec = {
-      ...created,
-      reviewStatus: created.reviewStatus,
-    };
+    spec = created;
   } else {
-    assertCourseSpecEditable(spec.reviewStatus as never);
+    assertCourseSpecEditable(spec.reviewStatus);
   }
 
   await prisma.$transaction(async (tx) => {
