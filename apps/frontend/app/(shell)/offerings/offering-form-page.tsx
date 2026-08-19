@@ -9,7 +9,6 @@ import {
   CreateOfferingInput,
   type CourseSpecVersionRef,
   type Lecturer,
-  type Semester,
 } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
@@ -39,7 +38,6 @@ const emptyDefaults: OfferingFormValues = {
   coLecturerIds: [],
   capacity: 30,
   status: "Planned",
-  otherLecturers: "",
 };
 
 export function OfferingFormPage({ offeringId }: { offeringId: string | null }) {
@@ -55,9 +53,6 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  // §12 Course Availability — plain local state so an empty choice submits as null.
-  const [semester, setSemester] = useState<string>("");
-  const [programmeYear, setProgrammeYear] = useState<string>("");
   // Delivery calendar dates are optional as a pair; empty strings map to null.
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -105,10 +100,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
             coLecturerIds: offering.coLecturers.map((l) => l.id),
             capacity: offering.capacity,
             status: offering.status,
-            otherLecturers: offering.otherLecturers ?? "",
           });
-          setSemester(offering.semester ?? "");
-          setProgrammeYear(offering.programmeYear != null ? String(offering.programmeYear) : "");
           setStartDate(offering.startDate ?? "");
           setEndDate(offering.endDate ?? "");
         }
@@ -143,18 +135,15 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
       ...values,
       lecturerId: values.lecturerId || null,
       coLecturerIds: values.coLecturerIds ?? [],
-      semester: (semester || null) as Semester | null,
-      programmeYear: programmeYear ? Number(programmeYear) : null,
       startDate: startDate || null,
       endDate: endDate || null,
-      otherLecturers: values.otherLecturers?.trim() || undefined,
     };
     const parsed = CreateOfferingInput.safeParse(payload);
     if (!parsed.success) {
       const dateIssue = parsed.error.issues.find(
         (issue) => issue.path[0] === "startDate" || issue.path[0] === "endDate",
       );
-      setError(dateIssue?.message ?? "Check the offering details and try again");
+      setError(dateIssue?.message ?? "Check the required offering details and try again");
       setSaving(false);
       return;
     }
@@ -179,7 +168,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     <>
       <Topbar
         title={pageTitle}
-        subtitle="A course delivered in a term, with teaching dates, lecturer, timetable, and seat capacity."
+        subtitle="A course delivered in a term, with teaching dates, lecturers, timetable, and seat capacity."
       />
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-3xl space-y-4">
@@ -225,10 +214,6 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 lecturers={lecturers}
                 lecturerId={lecturerId}
                 courseLocked={editing}
-                semester={semester}
-                onSemesterChange={setSemester}
-                programmeYear={programmeYear}
-                onProgrammeYearChange={setProgrammeYear}
                 startDate={startDate}
                 onStartDateChange={setStartDate}
                 endDate={endDate}
