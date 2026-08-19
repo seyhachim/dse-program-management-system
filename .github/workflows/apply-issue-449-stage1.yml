@@ -1,6 +1,6 @@
 name: Apply Issue 449 Stage 1
 
-# Temporary same-repo patch runner; the patch deletes this workflow after applying.
+# Temporary same-repo patch runner; workflow/script cleanup is performed separately.
 on:
   push:
     branches:
@@ -113,8 +113,11 @@ jobs:
           PY
       - name: Apply guarded backend patch
         run: python .github/scripts/apply_issue_449_stage1.py
-      - name: Commit implementation
+      - name: Commit product implementation only
         run: |
+          # The runner token may push source code but cannot mutate workflow files.
+          # Restore temporary staging files and ci.yml; they are cleaned up/updated separately.
+          git restore --source=HEAD -- .github/scripts/apply_issue_449_stage1.py .github/workflows/apply-issue-449-stage1.yml .github/workflows/ci.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
