@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText } from "lucide-react";
+import { FileText, Users } from "lucide-react";
 import { courseTypeLabel } from "@dse-pms/shared-types";
 import { DataTable, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
@@ -136,6 +136,15 @@ export function CoursesClient() {
             icon: <FileText className="mr-1 h-3.5 w-3.5" />,
             onClick: (c) => router.push(canReview ? `/courses/${c.id}/spec?tab=reviewSubmit` : `/courses/${c.id}/spec`),
           },
+          ...(canManage
+            ? [{
+                key: "responsible-lecturers",
+                label: "Responsible Lecturers",
+                icon: <Users className="mr-1 h-3.5 w-3.5" />,
+                onClick: (c: CourseView) =>
+                  router.push(`/courses/${c.id}/spec/responsible-lecturers`),
+              }]
+            : []),
         ]}
         onEdit={canManage ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}
         onDelete={canManage ? handleDelete : undefined}
