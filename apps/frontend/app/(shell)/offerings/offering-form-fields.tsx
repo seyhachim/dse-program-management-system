@@ -1,6 +1,6 @@
 "use client";
 
-import { Controller, useFieldArray, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
+import { Controller, useFieldArray, useWatch, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
 import {
   MEETING_ACTIVITY_TYPES,
   MEETING_DAYS,
@@ -71,11 +71,13 @@ export function OfferingFormFields({
     control,
     name: "meetings",
   });
+  const startDate = useWatch({ control, name: "startDate" }) ?? "";
+  const endDate = useWatch({ control, name: "endDate" }) ?? "";
   const dayItems = Object.fromEntries(MEETING_DAYS.map((day) => [day, day]));
   const activityItems = Object.fromEntries(
     MEETING_ACTIVITY_TYPES.map((activity) => [activity, activity]),
   );
-  const meetingsError = errors.meetings?.message;
+  const meetingsError = (errors.meetings as { message?: string } | undefined)?.message;
 
   return (
     <div className="space-y-4">
@@ -233,7 +235,7 @@ export function OfferingFormFields({
                 <Input
                   type="date"
                   value={field.value ?? ""}
-                  max={control._formValues.endDate || undefined}
+                  max={endDate || undefined}
                   onChange={(event) => field.onChange(event.target.value || null)}
                 />
               )}
@@ -247,7 +249,7 @@ export function OfferingFormFields({
                 <Input
                   type="date"
                   value={field.value ?? ""}
-                  min={control._formValues.startDate || undefined}
+                  min={startDate || undefined}
                   onChange={(event) => field.onChange(event.target.value || null)}
                 />
               )}
