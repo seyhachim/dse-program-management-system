@@ -188,7 +188,7 @@ const OfferingInputShape = z.object({
   // §12 Course Availability — optional. Year is the programme/study year (1–6).
   semester: SemesterSchema.nullable().optional(),
   programmeYear: z.coerce.number().int().min(1).max(6).nullable().optional(),
-  // Calendar dates for this delivered offering. Both are null when not scheduled.
+  // Historical/PATCH compatibility keeps these nullable; CreateOfferingInput below requires both.
   startDate: DateOnlySchema.nullable().optional(),
   endDate: DateOnlySchema.nullable().optional(),
   // §10 Other Course Lecturer(s) — optional free text, co-teachers this term.
@@ -197,6 +197,35 @@ const OfferingInputShape = z.object({
 
 export const CreateOfferingInput = OfferingInputShape.superRefine((data, ctx) => {
   refineCoLecturers(data, ctx);
+
+  if (!data.lecturerId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "A primary lecturer is required",
+      path: ["lecturerId"],
+    });
+  }
+  if (!data.meetings || data.meetings.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Add at least one weekly class session",
+      path: ["meetings"],
+    });
+  }
+  if (!data.startDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Teaching start date is required",
+      path: ["startDate"],
+    });
+  }
+  if (!data.endDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Teaching end date is required",
+      path: ["endDate"],
+    });
+  }
   refineTeachingPeriod(data, ctx, true);
 });
 export type CreateOfferingInput = z.infer<typeof CreateOfferingInput>;

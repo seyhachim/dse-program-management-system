@@ -14,6 +14,27 @@ const B = "22222222-2222-2222-2222-222222222222";
 const COURSE = "33333333-3333-3333-3333-333333333333";
 const COURSE_SPEC = "44444444-4444-4444-4444-444444444444";
 
+const VALID_MEETING = {
+  dayOfWeek: "Monday" as const,
+  startTime: "08:00",
+  endTime: "10:00",
+  room: "A203",
+  activityType: "Lecture" as const,
+};
+
+function validCreate(overrides: Record<string, unknown> = {}) {
+  return {
+    courseId: COURSE,
+    courseSpecId: COURSE_SPEC,
+    term: "2026-Fall",
+    lecturerId: A,
+    meetings: [VALID_MEETING],
+    startDate: "2026-08-10",
+    endDate: "2026-11-28",
+    ...overrides,
+  };
+}
+
 test("coLecturerViolation is null when unset or empty", () => {
   expect(coLecturerViolation({})).toBeNull();
   expect(coLecturerViolation({ coLecturerIds: [] })).toBeNull();
@@ -34,57 +55,51 @@ test("coLecturerViolation flags the primary lecturer also listed as a co-lecture
 });
 
 test("CreateOfferingInput requires an exact CourseSpec version", () => {
-  const result = CreateOfferingInput.safeParse({
-    courseId: COURSE,
-    term: "2025-Fall",
-  });
+  const result = CreateOfferingInput.safeParse(validCreate({ courseSpecId: undefined }));
   expect(result.success).toBe(false);
 });
 
+test("CreateOfferingInput requires a primary lecturer", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({ lecturerId: null })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ lecturerId: undefined })).success).toBe(false);
+});
+
+test("CreateOfferingInput requires at least one weekly class session", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({ meetings: [] })).success).toBe(false);
+});
+
+test("CreateOfferingInput requires both teaching-period dates", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({ startDate: null })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ endDate: null })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ startDate: undefined, endDate: undefined })).success).toBe(false);
+});
+
 test("CreateOfferingInput rejects duplicate co-lecturers", () => {
-  const result = CreateOfferingInput.safeParse({
-    courseId: COURSE,
-    courseSpecId: COURSE_SPEC,
-    term: "2025-Fall",
-    coLecturerIds: [A, A],
-  });
+  const result = CreateOfferingInput.safeParse(validCreate({ coLecturerIds: [B, B] }));
   expect(result.success).toBe(false);
 });
 
 test("CreateOfferingInput rejects the primary lecturer listed as a co-lecturer", () => {
-  const result = CreateOfferingInput.safeParse({
-    courseId: COURSE,
-    courseSpecId: COURSE_SPEC,
-    term: "2025-Fall",
-    lecturerId: A,
-    coLecturerIds: [A],
-  });
+  const result = CreateOfferingInput.safeParse(validCreate({ coLecturerIds: [A] }));
   expect(result.success).toBe(false);
 });
 
-test("CreateOfferingInput accepts a valid co-lecturer assignment", () => {
-  const result = CreateOfferingInput.safeParse({
-    courseId: COURSE,
-    courseSpecId: COURSE_SPEC,
-    term: "2025-Fall",
-    lecturerId: A,
-    coLecturerIds: [B],
-  });
+test("CreateOfferingInput accepts a complete delivery with a valid co-lecturer assignment", () => {
+  const result = CreateOfferingInput.safeParse(validCreate({ coLecturerIds: [B] }));
   expect(result.success).toBe(true);
 });
 
-test("UpdateOfferingInput applies the same invariant on a partial patch", () => {
+test("UpdateOfferingInput remains backward-compatible for partial historical patches", () => {
   expect(UpdateOfferingInput.safeParse({ lecturerId: A, coLecturerIds: [A] }).success).toBe(false);
   expect(UpdateOfferingInput.safeParse({ coLecturerIds: [B] }).success).toBe(true);
+  expect(UpdateOfferingInput.safeParse({ lecturerId: null }).success).toBe(true);
+  expect(UpdateOfferingInput.safeParse({ meetings: [] }).success).toBe(true);
+  expect(UpdateOfferingInput.safeParse({ startDate: null, endDate: null }).success).toBe(true);
   expect(UpdateOfferingInput.safeParse({}).success).toBe(true);
 });
 
-test("class section defaults to A when an exact CourseSpec version is supplied", () => {
-  const parsed = CreateOfferingInput.parse({
-    courseId: COURSE,
-    courseSpecId: COURSE_SPEC,
-    term: "2026-Fall",
-  });
+test("class section defaults to A for a complete new offering", () => {
+  const parsed = CreateOfferingInput.parse(validCreate({ sectionCode: undefined }));
   expect(parsed.sectionCode).toBe("A");
 });
 
@@ -98,13 +113,7 @@ test("class section rejects spaces and punctuation", () => {
 });
 
 test("meeting validation accepts room/time and derives no user-entered duration", () => {
-  const meeting = OfferingMeetingInput.parse({
-    dayOfWeek: "Monday",
-    startTime: "08:00",
-    endTime: "10:30",
-    room: "A203",
-    activityType: "Lecture",
-  });
+  const meeting = OfferingMeetingInput.parse(VALID_MEETING);
   expect(meeting.room).toBe("A203");
   expect("duration" in meeting).toBe(false);
 });
@@ -138,25 +147,11 @@ test("teaching-period invariant requires a complete ordered range", () => {
   expect(teachingPeriodViolation({ startDate: "2026-08-10", endDate: "2026-11-28" })).toBeNull();
 });
 
-test("CreateOfferingInput accepts either no dates or a complete teaching period", () => {
-  expect(CreateOfferingInput.safeParse({
-    courseId: COURSE,
-    courseSpecId: COURSE_SPEC,
-    term: "2026-Fall",
-  }).success).toBe(true);
-  expect(CreateOfferingInput.safeParse({
-    courseId: COURSE,
-    courseSpecId: COURSE_SPEC,
-    term: "2026-Fall",
-    startDate: "2026-08-10",
-    endDate: "2026-11-28",
-  }).success).toBe(true);
-  expect(CreateOfferingInput.safeParse({
-    courseId: COURSE,
-    courseSpecId: COURSE_SPEC,
-    term: "2026-Fall",
-    startDate: "2026-08-10",
-  }).success).toBe(false);
+test("CreateOfferingInput rejects a reversed teaching period", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({
+    startDate: "2026-11-28",
+    endDate: "2026-08-10",
+  })).success).toBe(false);
 });
 
 test("UpdateOfferingInput validates ordering when both teaching-period dates are supplied", () => {
