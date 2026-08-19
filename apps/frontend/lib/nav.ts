@@ -56,7 +56,7 @@ const rubricBankManifest: PluginManifest = {
   routes: [
     {
       label: "Rubric Bank",
-      path: "/rubrics",
+      path: "/rubric-bank",
       icon: "library",
       roles: ["admin", "program_coordinator"],
       group: "Academic",
