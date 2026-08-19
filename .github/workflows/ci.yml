@@ -2,31 +2,356 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: issue-449-typefix-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-typefix:
-    if: github.event.pull_request.head.ref == 'agent/issue-449-group-assessment-results' && github.actor != 'github-actions[bot]'
+  quality:
+    name: Typecheck, lint, test, build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          ref: agent/issue-449-group-assessment-results
-          fetch-depth: 0
-      - name: Apply guarded frontend type fixes
-        run: python .github/scripts/apply_issue_449_typefix.py
-      - name: Commit product fixes only
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client explicitly
+        run: bun run db:generate
+
+      - name: Validate Prisma schema
+        run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_ci?schema=public
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test all suites
+        run: bun run test
+
+      - name: Verify backend test discovery
+        run: bun run test:backend
+
+      - name: Build
+        run: bun run build
+        env:
+          NEXT_PUBLIC_AUTH_MODE: supabase
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
+
+  database:
+    name: Fresh database migration, seed, and security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_ci?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client explicitly
+        run: bun run db:generate
+
+      - name: Simulate Supabase Data API roles and defaults
         run: |
-          git restore --source=HEAD -- .github/scripts/apply_issue_449_typefix.py .github/workflows/ci.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit -m "fix(results): repair group assessment frontend types"
-          git push origin HEAD:agent/issue-449-group-assessment-results
+          cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+              CREATE ROLE service_role NOLOGIN;
+            END IF;
+          END
+          $$;
+
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+
+          CREATE SCHEMA IF NOT EXISTS telegram_security;
+          GRANT USAGE, CREATE ON SCHEMA telegram_security TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA telegram_security
+            GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+          SQL
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+      - name: Seed clean database
+        run: bun run seed
+
+      - name: Verify curriculum database invariants
+        run: bun test apps/backend/src/plugins/programme/curriculum-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify curriculum revision and read service
+        run: bun test apps/backend/src/plugins/programme/curriculum-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify curriculum draft mutations
+        run: bun test apps/backend/src/plugins/programme/curriculum-draft-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify curriculum lifecycle workflow
+        run: bun test apps/backend/src/plugins/programme/curriculum-workflow-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify curriculum history ordering
+        run: bun test apps/backend/src/plugins/programme/curriculum-history-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify curriculum CourseSpec bindings
+        run: bun test apps/backend/src/plugins/programme/curriculum-course-spec-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify Telegram identity and revocation security
+        run: bun test apps/backend/src/plugins/telegram/telegram-security-db.test.ts
+        env:
+          TELEGRAM_DB_TESTS: "1"
+          JWT_SECRET: telegram-ci-security-secret-at-least-32-characters
+
+      - name: Verify criterion evidence database invariants and revision provenance
+        run: bun test apps/backend/src/plugins/student-portal/criterion-evidence-db.test.ts
+        env:
+          CRITERION_EVIDENCE_DB_TESTS: "1"
+
+      - name: Verify class responsibility integrity and revocation
+        run: bun test apps/backend/src/plugins/offerings/class-responsibility-db.test.ts
+        env:
+          CLASS_RESPONSIBILITY_DB_TESTS: "1"
+
+      - name: Verify lecturer arrival confirmation persistence and idempotence
+        run: bun test apps/backend/src/plugins/offerings/class-delivery-db.test.ts
+        env:
+          CLASS_DELIVERY_DB_TESTS: "1"
+
+      - name: Verify historical attendance correction
+        run: bun test apps/backend/src/plugins/offerings/attendance-service-db.test.ts
+        env:
+          ATTENDANCE_DB_TESTS: "1"
+
+      - name: Verify Offering CourseSpec binding and historical result stability
+        run: bun test apps/backend/src/plugins/offerings/course-spec-binding-db.test.ts
+        env:
+          OFFERING_COURSE_SPEC_DB_TESTS: "1"
+          JWT_SECRET: issue-211-course-spec-binding-ci-secret-at-least-32-characters
+
+      - name: Verify CourseSpec Course Information snapshot stability
+        run: bun test apps/backend/src/plugins/courses/course-info-snapshot-db.test.ts
+        env:
+          COURSE_INFO_SNAPSHOT_DB_TESTS: "1"
+
+      - name: Verify immutable CourseSpec revision request metadata
+        run: bun test apps/backend/src/plugins/courses/revision-request-db.test.ts
+        env:
+          COURSE_SPEC_REVISION_REQUEST_DB_TESTS: "1"
+
+      - name: Verify provisional result access and finalized-result visibility
+        run: bun test apps/backend/src/plugins/student-portal/result-access-policy-db.test.ts
+        env:
+          RESULT_ACCESS_POLICY_DB_TESTS: "1"
+          JWT_SECRET: pr-289-result-access-ci-secret-at-least-32-characters
+
+      - name: Verify finalized result correction integrity
+        run: bun test apps/backend/src/plugins/student-portal/results-lifecycle-db.test.ts
+        env:
+          RESULT_CORRECTION_DB_TESTS: "1"
+
+      - name: Verify group assessment provenance and audit integrity
+        run: bun test apps/backend/src/plugins/student-portal/group-assessment-db.test.ts
+        env:
+          GROUP_ASSESSMENT_DB_TESTS: "1"
+
+      - name: Verify database security
+        run: bun run --cwd apps/backend db:security:verify
+
+      - name: Prove verifier ignores managed-role default grants
+        run: |
+          cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+          CREATE ROLE supabase_managed_probe NOLOGIN;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+          SQL
+
+          bun run --cwd apps/backend db:security:verify
+
+          cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            REVOKE ALL PRIVILEGES ON SEQUENCES FROM anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            REVOKE ALL PRIVILEGES ON FUNCTIONS FROM anon, authenticated, service_role;
+          DROP ROLE supabase_managed_probe;
+          SQL
+
+      - name: Prove verifier rejects an unclassified public table
+        run: |
+          echo 'CREATE TABLE public."SecurityVerifierProbe" ("id" text PRIMARY KEY);' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted an unclassified public table."
+            exit 1
+          fi
+
+          echo 'DROP TABLE public."SecurityVerifierProbe";' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects an unclassified Telegram security table
+        run: |
+          echo 'CREATE TABLE telegram_security."SecurityVerifierProbe" ("id" text PRIMARY KEY);' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted an unclassified Telegram security table."
+            exit 1
+          fi
+
+          echo 'DROP TABLE telegram_security."SecurityVerifierProbe";' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects a forbidden Data API grant
+        run: |
+          echo 'GRANT SELECT ON TABLE public."User" TO authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted a forbidden authenticated grant."
+            exit 1
+          fi
+
+          echo 'REVOKE SELECT ON TABLE public."User" FROM authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Prove verifier rejects a forbidden protected-schema grant
+        run: |
+          echo 'GRANT USAGE ON SCHEMA telegram_security TO authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+          if bun run --cwd apps/backend db:security:verify; then
+            echo "Verifier unexpectedly accepted a forbidden Telegram schema grant."
+            exit 1
+          fi
+
+          echo 'REVOKE USAGE ON SCHEMA telegram_security FROM authenticated;' \
+            | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+
+      - name: Verify database security after fail-closed probes
+        run: bun run --cwd apps/backend db:security:verify
+
+  backend-integration:
+    name: Backend integration authorization
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_integration
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_integration"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_integration?schema=public
+      AUTH_MODE: dev
+      JWT_SECRET: issue-130-ci-integration-secret-at-least-32-characters
+      BACKEND_INTEGRATION_TESTS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client explicitly
+        run: bun run db:generate
+
+      - name: Apply migrations to isolated integration database
+        run: bun run db:migrate:deploy
+
+      - name: Seed isolated integration database
+        run: bun run seed
+
+      - name: Run backend route/database authorization integration suite
+        run: bun run test:backend:integration
