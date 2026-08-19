@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@dse-pms/ui";
+import { CoursePicker } from "./course-picker";
 import { LecturerChecklist } from "./lecturer-checklist";
 
 export type OfferingFormValues = {
@@ -31,9 +32,9 @@ export type OfferingFormValues = {
   coLecturerIds?: string[];
   capacity: number;
   status: (typeof OFFERING_STATUSES)[number];
+  startDate?: string | null;
+  endDate?: string | null;
 };
-
-const UNASSIGNED_SENTINEL = "__unassigned__";
 
 interface OfferingFormFieldsProps {
   control: Control<OfferingFormValues>;
@@ -46,10 +47,6 @@ interface OfferingFormFieldsProps {
   lecturerId: string | null;
   /** Course is fixed once an offering exists — an offering can't change its course. */
   courseLocked?: boolean;
-  startDate: string;
-  onStartDateChange: (v: string) => void;
-  endDate: string;
-  onEndDateChange: (v: string) => void;
 }
 
 export function OfferingFormFields({
@@ -62,23 +59,14 @@ export function OfferingFormFields({
   lecturers,
   lecturerId,
   courseLocked,
-  startDate,
-  onStartDateChange,
-  endDate,
-  onEndDateChange,
 }: OfferingFormFieldsProps) {
-  const courseItems: Record<string, string> = Object.fromEntries(
-    courses.map((c) => [c.id, `${c.code} — ${c.title}`]),
-  );
   const courseSpecItems: Record<string, string> = Object.fromEntries(
     courseSpecVersions.map((spec) => [spec.id, `Version ${spec.version}`]),
   );
-  const lecturerItems: Record<string, string> = {
-    [UNASSIGNED_SENTINEL]: "— Unassigned —",
-    ...Object.fromEntries(lecturers.map((l) => [l.id, l.name])),
-  };
-  // The primary lecturer can't also be picked as a co-lecturer.
-  const coLecturerOptions = lecturers.filter((l) => l.id !== lecturerId);
+  const lecturerItems: Record<string, string> = Object.fromEntries(
+    lecturers.map((lecturer) => [lecturer.id, lecturer.name]),
+  );
+  const coLecturerOptions = lecturers.filter((lecturer) => lecturer.id !== lecturerId);
   const { fields: meetingFields, append: appendMeeting, remove: removeMeeting } = useFieldArray({
     control,
     name: "meetings",
@@ -87,37 +75,21 @@ export function OfferingFormFields({
   const activityItems = Object.fromEntries(
     MEETING_ACTIVITY_TYPES.map((activity) => [activity, activity]),
   );
+  const meetingsError = errors.meetings?.message;
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">Required before saving:</span>{" "}
-        Course, Approved CourseSpec version, Term, and Class / Section. Fields marked{" "}
-        <span className="font-semibold text-status-live">*</span> need a value. Capacity and Status already have defaults.
-      </div>
-
       <Field label="Course" error={errors.courseId?.message} required>
         <Controller
           control={control}
           name="courseId"
           render={({ field }) => (
-            <Select
-              items={courseItems}
-              value={field.value || null}
-              onValueChange={(v) => field.onChange(v ?? "")}
+            <CoursePicker
+              courses={courses}
+              selectedId={field.value ?? ""}
+              onChange={field.onChange}
               disabled={courseLocked}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="— Select course —" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.code} — {c.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           )}
         />
       </Field>
@@ -130,7 +102,7 @@ export function OfferingFormFields({
             <Select
               items={courseSpecItems}
               value={field.value || null}
-              onValueChange={(v) => field.onChange(v ?? "")}
+              onValueChange={(value) => field.onChange(value ?? "")}
               disabled={!courseSpecVersions.length || courseSpecLoading}
             >
               <SelectTrigger className="w-full">
@@ -164,10 +136,10 @@ export function OfferingFormFields({
         <div className="flex items-start justify-between gap-3">
           <div>
             <legend className="text-sm font-semibold text-foreground">
-              Weekly Class Schedule <span className="font-normal text-muted-foreground">(Optional)</span>
+              Weekly Class Schedule <span className="ml-1 text-status-live" aria-label="required">*</span>
             </legend>
             <p className="text-xs text-muted-foreground">
-              Add recurring sessions only when the timetable is known. Duration is calculated from start and end time.
+              Add at least one recurring class session. Duration is calculated from start and end time.
             </p>
           </div>
           <Button
@@ -187,9 +159,10 @@ export function OfferingFormFields({
         </div>
         {meetingFields.length === 0 ? (
           <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-            No timetable added yet. Planned workload will still come from the course specification.
+            Add at least one weekly session before saving this offering.
           </p>
         ) : null}
+        {meetingsError ? <p className="text-xs text-status-live">{meetingsError}</p> : null}
         {meetingFields.map((meeting, index) => (
           <div key={meeting.id} className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -245,27 +218,39 @@ export function OfferingFormFields({
       <fieldset className="space-y-3 rounded-lg border border-border p-4">
         <div>
           <legend className="text-sm font-semibold text-foreground">
-            Teaching Period <span className="font-normal text-muted-foreground">(Optional)</span>
+            Teaching Period <span className="ml-1 text-status-live" aria-label="required">*</span>
           </legend>
           <p className="text-xs text-muted-foreground">
-            If you set a delivery period, set both dates. Otherwise leave both empty.
+            Set the actual delivery start and end dates.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Start date" optional>
-            <Input
-              type="date"
-              value={startDate}
-              max={endDate || undefined}
-              onChange={(event) => onStartDateChange(event.target.value)}
+          <Field label="Start date" error={errors.startDate?.message} required>
+            <Controller
+              control={control}
+              name="startDate"
+              render={({ field }) => (
+                <Input
+                  type="date"
+                  value={field.value ?? ""}
+                  max={control._formValues.endDate || undefined}
+                  onChange={(event) => field.onChange(event.target.value || null)}
+                />
+              )}
             />
           </Field>
-          <Field label="End date" optional>
-            <Input
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(event) => onEndDateChange(event.target.value)}
+          <Field label="End date" error={errors.endDate?.message} required>
+            <Controller
+              control={control}
+              name="endDate"
+              render={({ field }) => (
+                <Input
+                  type="date"
+                  value={field.value ?? ""}
+                  min={control._formValues.startDate || undefined}
+                  onChange={(event) => field.onChange(event.target.value || null)}
+                />
+              )}
             />
           </Field>
         </div>
@@ -285,9 +270,9 @@ export function OfferingFormFields({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {OFFERING_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
+                  {OFFERING_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -297,24 +282,23 @@ export function OfferingFormFields({
         </Field>
       </div>
 
-      <Field label="Primary Lecturer" error={errors.lecturerId?.message} optional>
+      <Field label="Primary Lecturer" error={errors.lecturerId?.message} required>
         <Controller
           control={control}
           name="lecturerId"
           render={({ field }) => (
             <Select
               items={lecturerItems}
-              value={field.value || UNASSIGNED_SENTINEL}
-              onValueChange={(v) => field.onChange(v === UNASSIGNED_SENTINEL ? null : v)}
+              value={field.value || null}
+              onValueChange={(value) => field.onChange(value ?? null)}
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="— Select primary lecturer —" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNASSIGNED_SENTINEL}>— Unassigned —</SelectItem>
-                {lecturers.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.name}
+                {lecturers.map((lecturer) => (
+                  <SelectItem key={lecturer.id} value={lecturer.id}>
+                    {lecturer.name}
                   </SelectItem>
                 ))}
               </SelectContent>
