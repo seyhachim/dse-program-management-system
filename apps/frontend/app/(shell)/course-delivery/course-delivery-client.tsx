@@ -21,6 +21,7 @@ import { Button, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@dse-pm
 import { ApiError } from "@/lib/api";
 import { courseDeliveryApi, toDateTimeLocal } from "@/lib/course-delivery";
 import { Topbar } from "../topbar";
+import { GroupAssessmentPanel } from "./group-assessment-panel";
 
 export function CourseDeliveryClient() {
   const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
@@ -274,25 +275,31 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
                 {offering.assessments.map((item) => <option key={item.id} value={item.id}>{item.name} {item.weight === null ? "" : `(${item.weight}%)`}</option>)}
               </select>
             </label>
-            {assessment ? (
+            {assessment?.mode === "individual" ? (
               <Button type="button" onClick={publishAssessment} disabled={publishing || !readyToPublish}>
                 <CheckCircle2 />{publishing ? "Publishing…" : allPublished ? "Published & locked" : "Publish assessment"}
               </Button>
             ) : null}
           </div>
         ) : <Muted>Add active assessments to the course specification first.</Muted>}
-        {assessment ? (
-          <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-            <span className="rounded-full bg-muted px-3 py-1">{draftCount} draft</span>
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{publishedCount} published</span>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">{missingCount} missing</span>
-          </div>
+        {assessment?.mode === "individual" ? (
+          <>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-muted px-3 py-1">{draftCount} draft</span>
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{publishedCount} published</span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">{missingCount} missing</span>
+            </div>
+            {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
+            {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
+          </>
+        ) : assessment ? (
+          <p className="mt-3 text-sm text-muted-foreground">This assessment uses {assessment.mode === "group" ? "Group" : "Group + Individual"} scoring. Configure membership and source evidence in the group workspace below.</p>
         ) : null}
-        {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
-        {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
-      {assessment ? (
+      {assessment?.mode !== "individual" ? (
+        <GroupAssessmentPanel offeringId={offering.offeringId} assessment={assessment} onChanged={onChanged} />
+      ) : assessment ? (
         <Panel title={assessment.name} description={allPublished ? "Published results are locked against ordinary edits." : `${draftCount} of ${assessment.results.length} student marks saved as drafts.`}>
           <div className="space-y-3">
             {assessment.results.map((row) => <ResultRow key={row.enrollmentId} assessment={assessment} row={row} onChanged={onChanged} />)}

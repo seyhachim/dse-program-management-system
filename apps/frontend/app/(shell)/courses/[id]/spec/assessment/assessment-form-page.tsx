@@ -194,7 +194,8 @@ export function AssessmentFormPage({
 
     setTouched(true);
 
-    if (assessmentFormErrors(draft).name) {
+    const validation = assessmentFormErrors(draft);
+    if (Object.values(validation).some(Boolean)) {
       return;
     }
 
