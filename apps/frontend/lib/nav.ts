@@ -32,6 +32,7 @@ import {
   navGroupsForRole,
   pluginManifests,
   type NavGroup,
+  type PluginManifest,
   type PluginRoute,
   type Role,
 } from "@dse-pms/shared-types";
@@ -40,9 +41,32 @@ import {
  * Sidebar nav is generated from shared feature manifests. Community of Practice
  * and Programme Curriculum are additive manifests while the legacy registry is
  * gradually split into feature-owned manifests.
+ *
+ * The rubric backend manifest intentionally has no route because lecturers reach
+ * rubrics from Course Specification. The authenticated Rubric Bank is an admin /
+ * programme-coordinator management surface, so the frontend adds that route to
+ * the existing rubric manifest without introducing a second rubric domain.
  */
+const rubricBankManifest: PluginManifest = {
+  ...(pluginManifests.find((manifest) => manifest.id === "rubrics") ?? {
+    id: "rubrics",
+    name: "Rubric Library",
+    version: "0.1.0",
+  }),
+  routes: [
+    {
+      label: "Rubric Bank",
+      path: "/rubrics",
+      icon: "library",
+      roles: ["admin", "program_coordinator"],
+      group: "Academic",
+    },
+  ],
+};
+
 const frontendManifests = [
-  ...pluginManifests,
+  ...pluginManifests.filter((manifest) => manifest.id !== "rubrics"),
+  rubricBankManifest,
   curriculumWorkspaceManifest,
   communityManifest,
 ];
