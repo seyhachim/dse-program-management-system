@@ -64,3 +64,29 @@ export const ListCoursesQuery = z.object({
   search: z.string().trim().optional(),
 });
 export type ListCoursesQuery = z.infer<typeof ListCoursesQuery>;
+
+export const SetCourseSpecResponsibleLecturersInputSchema = z.object({
+  lecturerIds: z
+    .array(z.string().uuid())
+    .max(20, "A Course Specification can have at most 20 responsible lecturers")
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: "Responsible lecturers must be unique",
+    }),
+});
+export type SetCourseSpecResponsibleLecturersInput = z.infer<
+  typeof SetCourseSpecResponsibleLecturersInputSchema
+>;
+
+export type CourseSpecResponsibleLecturerRef = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export type CourseSpecResponsibleLecturersView = {
+  courseId: string;
+  courseSpecId: string | null;
+  academicVersion: string;
+  reviewStatus: string;
+  lecturers: CourseSpecResponsibleLecturerRef[];
+};
