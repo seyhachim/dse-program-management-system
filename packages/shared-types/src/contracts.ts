@@ -1,4 +1,5 @@
 import type { StudentStatus } from "./students.ts";
+import type { UserHonorific } from "./lecturers.ts";
 
 /**
  * Cross-plugin service contracts. A plugin that needs another plugin's data
@@ -44,7 +45,9 @@ export interface LecturerRef {
   id: string;
   name: string;
   email: string;
+  honorific: UserHonorific | null;
   // Syllabus "Course Details" instructor block (§7 qualification, §9 phone).
+  // `title` remains the academic position; honorific is only a form of address.
   title: string | null;
   qualification: string | null;
   phone: string | null;
