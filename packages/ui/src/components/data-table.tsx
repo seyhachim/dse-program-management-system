@@ -52,7 +52,7 @@ const alignClass = {
   center: "text-center",
 } as const;
 
-/** Generic data table matching the Noviq moodboard rows. */
+/** Generic data table matching the shared DSE PMS theme. */
 export function DataTable<T>({
   columns,
   rows,
@@ -163,12 +163,12 @@ export function DataTable<T>({
                   ? [
                       <tr
                         key={`group-${group}`}
-                        className="border-b border-blue-200 bg-blue-50"
+                        className="border-b border-border bg-surface-secondary"
                       >
                         <th
                           scope="rowgroup"
                           colSpan={totalCols}
-                          className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-blue-700"
+                          className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary"
                         >
                           {renderGroupHeader
                             ? renderGroupHeader(group, groupRows)
@@ -183,7 +183,7 @@ export function DataTable<T>({
                   return [
                     <tr
                       key={id}
-                      className="border-b border-border/60 last:border-0 hover:bg-muted/50"
+                      className="border-b border-border/60 last:border-0 hover:bg-surface-hover"
                     >
                       {expandable ? (
                         <td className="px-3 py-3 align-top">
@@ -242,7 +242,7 @@ export function DataTable<T>({
                                 className={cn(
                                   "inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium hover:bg-muted",
                                   action.tone === "danger"
-                                    ? "text-status-live"
+                                    ? "text-error hover:bg-error-bg"
                                     : "text-foreground",
                                 )}
                               >
@@ -263,7 +263,7 @@ export function DataTable<T>({
                               <button
                                 onClick={() => onDelete(row)}
                                 aria-label="Delete"
-                                className="rounded-md p-1.5 text-muted-foreground hover:bg-status-live-bg hover:text-status-live"
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-error-bg hover:text-error"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -276,7 +276,7 @@ export function DataTable<T>({
                       ? [
                           <tr
                             key={`${id}-expanded`}
-                            className="border-b border-border/60 bg-muted/20"
+                            className="border-b border-border/60 bg-surface-secondary/60"
                           >
                             <td colSpan={totalCols} className="px-4 py-4">
                               {renderExpandedRow!(row)}
