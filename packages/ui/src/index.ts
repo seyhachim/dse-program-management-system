@@ -103,6 +103,7 @@ export {
   StatusBadge,
   statusToneClass,
   type StatusTone,
+  type StatusBadgeTone,
   type SemanticStatusTone,
   type LegacyStatusTone,
   type StatusBadgeProps,
