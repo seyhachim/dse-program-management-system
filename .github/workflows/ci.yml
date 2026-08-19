@@ -222,6 +222,30 @@ jobs:
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
+      - name: Prove verifier ignores managed-role default grants
+        run: |
+          cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+          CREATE ROLE supabase_managed_probe NOLOGIN;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            GRANT ALL PRIVILEGES ON FUNCTIONS TO anon, authenticated, service_role;
+          SQL
+
+          bun run --cwd apps/backend db:security:verify
+
+          cat <<'SQL' | bunx prisma db execute --schema apps/backend/prisma/schema.prisma --stdin
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            REVOKE ALL PRIVILEGES ON SEQUENCES FROM anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES FOR ROLE supabase_managed_probe IN SCHEMA public
+            REVOKE ALL PRIVILEGES ON FUNCTIONS FROM anon, authenticated, service_role;
+          DROP ROLE supabase_managed_probe;
+          SQL
+
       - name: Prove verifier rejects an unclassified public table
         run: |
           echo 'CREATE TABLE public."SecurityVerifierProbe" ("id" text PRIMARY KEY);' \
