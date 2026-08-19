@@ -5,6 +5,7 @@ import type { CurriculumCourse, ProgrammeCurriculumRead } from "@dse-pms/shared-
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { coursesApi, type CourseView } from "@/lib/courses";
+import { INITIAL_DSE_CURRICULUM_INPUT } from "@/lib/curriculum-bootstrap";
 import {
   curriculumApi,
   curriculumStatusLabel,
@@ -94,11 +95,20 @@ export function CurriculumPageClient() {
   const enterEdit=async()=>{setMutationError(null);try{setCourses(await coursesApi.list());setEditMode(true);}catch(err){setMutationError(err instanceof ApiError?err.message:"Could not load programme courses");}};
   const mutate=async(action:()=>Promise<ProgrammeCurriculumRead>)=>{setMutating(true);setMutationError(null);try{applyData(await action());setEditingPlacementId(null);}catch(err){setMutationError(err instanceof ApiError?err.message:"Could not save curriculum change");}finally{setMutating(false);}};
   const reorder=async(yearLevel:number,semester:"First"|"Second",ids:string[])=>{if(!data||ids.length<1)return;await mutate(()=>curriculumApi.reorder(data.selectedVersion.id,{yearLevel,semester,placementIds:ids}));};
+  const createInitialCurriculum=async()=>{
+    setMutating(true);setMutationError(null);
+    try { await curriculumApi.createInitial(INITIAL_DSE_CURRICULUM_INPUT); window.location.reload(); }
+    catch(err){
+      if(err instanceof ApiError&&err.status===409){window.location.reload();return;}
+      setMutationError(err instanceof ApiError?err.message:"Could not create the initial curriculum");
+    }
+    finally{setMutating(false);}
+  };
 
   if(meLoading||loading)return <CurriculumSkeleton/>;
   if(permissionDenied)return <div className="rounded-xl border border-destructive/30 p-6"><h2 className="font-semibold">Curriculum access denied</h2><p className="mt-2 text-sm text-muted-foreground">Your account is not assigned curriculum access for this programme.</p></div>;
   if(error)return <div className="rounded-xl border border-destructive/30 p-6"><h2 className="font-semibold">Could not load curriculum</h2><p className="mt-2 text-sm text-muted-foreground">{error}</p><button onClick={()=>void load()} className="mt-4 h-9 rounded-md border px-3 text-sm">Try again</button></div>;
-  if(!data||!curricula.length)return <div className="rounded-xl border border-dashed p-10 text-center"><h2 className="text-lg font-semibold">No programme curriculum yet</h2><p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">The workflow is ready for a canonical curriculum. We will import the current approved curriculum separately after implementation is complete.</p></div>;
+  if(!data||!curricula.length)return <div className="rounded-xl border border-dashed p-10 text-center"><h2 className="text-lg font-semibold">Set up programme curriculum</h2><p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">Create the canonical DSE curriculum as an empty v1.0 Draft. No approved course or Course Specification records will be changed; you can review and import the historical curriculum after setup.</p>{canWrite?<button type="button" disabled={mutating} onClick={()=>void createInitialCurriculum()} className="mt-5 h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50">{mutating?"Creating v1.0…":"Create Initial Curriculum"}</button>:<p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground">You need programme write access to create the initial curriculum.</p>}{mutationError&&<p className="mt-3 text-sm text-destructive">{mutationError}</p>}</div>;
 
   const current=data.selectedVersion;
   const isHistorical=current.status!=="Draft";

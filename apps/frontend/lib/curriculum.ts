@@ -1,6 +1,7 @@
 import type {
   AddCurriculumCourseInput,
   BindCurriculumCourseSpecInput,
+  CreateInitialCurriculumInput,
   CurriculumArtifactView,
   CurriculumComparison,
   CurriculumCourseSpecBindings,
@@ -36,6 +37,9 @@ const artifactPath = (versionId: string) =>
 export const curriculumApi = {
   list(): Promise<ProgrammeCurriculumListItem[]> {
     return api.get<ProgrammeCurriculumListItem[]>(`/api/programme/curricula/programmes/${CURRENT_PROGRAMME_ID}`);
+  },
+  createInitial(input: CreateInitialCurriculumInput): Promise<ProgrammeCurriculumRead> {
+    return api.post<ProgrammeCurriculumRead>(`/api/programme/curricula/programmes/${CURRENT_PROGRAMME_ID}`, input);
   },
   get(curriculumId: string, versionId?: string): Promise<ProgrammeCurriculumRead> {
     const query = versionId ? `?versionId=${encodeURIComponent(versionId)}` : "";

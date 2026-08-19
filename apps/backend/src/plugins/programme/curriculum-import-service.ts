@@ -96,6 +96,12 @@ export class CurriculumImportValidationError extends Error {
 }
 export class CurriculumImportConflictError extends Error {}
 
+export const CURRICULUM_IMPORT_TRANSACTION_OPTIONS = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 10_000,
+  timeout: 60_000,
+} as const;
+
 function sourceHash(jsonText: string): string {
   return createHash("sha256").update(jsonText, "utf8").digest("hex");
 }
@@ -216,6 +222,7 @@ function calculateTotals(
 }
 
 function creditBreakdownWarning(course: CurriculumImportCourse): string | null {
+  if (!course.credits.breakdownProvided) return null;
   const sum = course.credits.lecture + course.credits.lab + course.credits.fieldVisit;
   return sum === course.credits.total
     ? null
@@ -274,6 +281,16 @@ function appendDeclaredTotalWarnings(
 
 function decisionsByCode(decisions: CurriculumImportDecision[]) {
   return new Map(decisions.map((decision) => [decision.courseCode, decision]));
+}
+
+function typedCreateCourseType(
+  course: CurriculumImportCourse,
+  decision: CurriculumImportDecision | null,
+): CourseType | null {
+  if (decision?.action === "create-course" && decision.courseType) {
+    return decision.courseType;
+  }
+  return course.courseType ?? null;
 }
 
 async function buildPreview(
@@ -348,10 +365,18 @@ async function buildPreview(
 
     if (!current) {
       matchStatus = "missing";
-      requiredDecision = "create-course";
-      if (decision?.action === "create-course" && decision.courseType) {
-        message = `Will create canonical Course with explicit type ${decision.courseType}`;
+      const createType = typedCreateCourseType(course, decision);
+      if (course.courseType && decision?.action === "create-course" && decision.courseType !== course.courseType) {
+        blockers.push(
+          `${course.code}: create decision type ${decision.courseType} conflicts with source course type ${course.courseType}`,
+        );
+      }
+      if (createType) {
+        message = course.courseType
+          ? `Will create canonical Course with source type ${createType}`
+          : `Will create canonical Course with explicit type ${createType}`;
       } else {
+        requiredDecision = "create-course";
         message = "No canonical Course exists with this code";
         blockers.push(`${course.code}: choose Create Course and an explicit course type before apply`);
       }
@@ -368,9 +393,7 @@ async function buildPreview(
       blockers.push(`${course.code}: an import decision was supplied for a course that already matches exactly`);
     }
 
-    const effectiveType =
-      current?.courseType ??
-      (decision?.action === "create-course" ? decision.courseType ?? null : null);
+    const effectiveType = current?.courseType ?? typedCreateCourseType(course, decision);
     if (!effectiveType) {
       matchStatus = "blocked";
       message = "A canonical course type is required for the immutable curriculum placement snapshot";
@@ -532,8 +555,12 @@ async function resolveCanonicalCourses(
     const existing = currentByCode.get(code);
     const decision = decisionMap.get(code);
     if (!existing) {
-      if (decision?.action !== "create-course" || !decision.courseType) {
-        throw new CurriculumImportConflictError(`${code} no longer has a valid explicit create decision`);
+      const createType = typedCreateCourseType(source, decision ?? null);
+      if (!createType) {
+        throw new CurriculumImportConflictError(`${code} no longer has a valid explicit create course type`);
+      }
+      if (source.courseType && decision?.action === "create-course" && decision.courseType !== source.courseType) {
+        throw new CurriculumImportConflictError(`${code} create decision conflicts with the source course type`);
       }
       const created = await tx.course.create({
         data: {
@@ -541,7 +568,7 @@ async function resolveCanonicalCourses(
           code,
           title: source.title,
           credits: source.credits.total,
-          courseType: decision.courseType,
+          courseType: createType,
         },
         select: { id: true, title: true, courseType: true },
       });
@@ -729,7 +756,7 @@ export const curriculumImportService = {
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      CURRICULUM_IMPORT_TRANSACTION_OPTIONS,
     );
 
     return this.artifact(versionId);

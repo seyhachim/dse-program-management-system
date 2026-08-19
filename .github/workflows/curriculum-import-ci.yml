@@ -90,7 +90,10 @@ jobs:
         run: bun run db:migrate:deploy
 
       - name: Run curriculum import DB regression
-        run: bun test apps/backend/src/plugins/programme/curriculum-import-db.test.ts
+        run: >-
+          bun test
+          apps/backend/src/plugins/programme/curriculum-import-db.test.ts
+          apps/backend/src/plugins/programme/curriculum-import-typed-course-type-db.test.ts
         env:
           CURRICULUM_DB_TESTS: "1"
 

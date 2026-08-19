@@ -16,6 +16,10 @@ import {
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
 import { exportCurriculumWord } from "./curriculum-word-renderer";
+import {
+  curriculumOperationCopy,
+  type CurriculumOperation,
+} from "./curriculum-operation-state";
 
 const COURSE_TYPES: CourseType[] = ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"];
 
@@ -53,7 +57,8 @@ export function CurriculumImportExportPanel() {
   const [jsonText, setJsonText] = useState("");
   const [preview, setPreview] = useState<CurriculumImportPreview | null>(null);
   const [decisions, setDecisions] = useState<DecisionState>({});
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<CurriculumOperation>(null);
+  const busy = operation !== null;
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -112,20 +117,39 @@ export function CurriculumImportExportPanel() {
   };
 
   const chooseVersion = async (id: string) => {
+    if (busy) return;
+    setOperation("loading-version");
     setVersionId(id);
     resetImportState();
-    await loadWorkflow(id);
+    try {
+      await loadWorkflow(id);
+    } finally {
+      setOperation(null);
+    }
   };
 
   const chooseFile = async (next: File | null) => {
+    if (busy) return;
     setFile(next);
     resetImportState();
-    setJsonText(next ? await next.text() : "");
+    if (!next) {
+      setJsonText("");
+      return;
+    }
+    setOperation("reading-file");
+    try {
+      setJsonText(await next.text());
+    } catch {
+      setJsonText("");
+      setError("Could not read the selected curriculum JSON file");
+    } finally {
+      setOperation(null);
+    }
   };
 
   const previewImport = async () => {
     if (!versionId || !file || !jsonText) return;
-    setBusy(true);
+    setOperation("previewing");
     setError(null);
     setSuccess(null);
     setDecisions({});
@@ -140,7 +164,7 @@ export function CurriculumImportExportPanel() {
       setPreview(null);
       setError(err instanceof ApiError ? err.message : "Could not preview curriculum JSON");
     } finally {
-      setBusy(false);
+      setOperation(null);
     }
   };
 
@@ -162,7 +186,7 @@ export function CurriculumImportExportPanel() {
 
   const applyImport = async () => {
     if (!versionId || !file || !jsonText || !canApplyPreview) return;
-    setBusy(true);
+    setOperation("applying");
     setError(null);
     setSuccess(null);
     try {
@@ -178,13 +202,13 @@ export function CurriculumImportExportPanel() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not apply curriculum JSON");
     } finally {
-      setBusy(false);
+      setOperation(null);
     }
   };
 
   const exportWord = async () => {
     if (!versionId || !exportable) return;
-    setBusy(true);
+    setOperation("exporting");
     setError(null);
     setSuccess(null);
     try {
@@ -194,9 +218,11 @@ export function CurriculumImportExportPanel() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not export curriculum DOCX");
     } finally {
-      setBusy(false);
+      setOperation(null);
     }
   };
+
+  const operationCopy = curriculumOperationCopy(operation);
 
   if (!versions.length) return null;
 
@@ -226,6 +252,7 @@ export function CurriculumImportExportPanel() {
           Version
           <select
             value={versionId}
+            disabled={busy}
             onChange={(event) => void chooseVersion(event.target.value)}
             className="mt-1 block h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
@@ -238,6 +265,23 @@ export function CurriculumImportExportPanel() {
         </label>
       </div>
 
+      {operationCopy && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-4 flex items-start gap-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-blue-900"
+        >
+          <span
+            className="mt-0.5 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+            aria-hidden="true"
+          />
+          <div>
+            <p className="text-sm font-medium">{operationCopy.title}</p>
+            <p className="mt-0.5 text-xs">{operationCopy.description}</p>
+          </div>
+        </div>
+      )}
+
       {editable && (
         <div className="mt-5 space-y-4 border-t border-border pt-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -246,6 +290,7 @@ export function CurriculumImportExportPanel() {
               <input
                 type="file"
                 accept="application/json,.json"
+                disabled={busy}
                 onChange={(event) => void chooseFile(event.target.files?.[0] ?? null)}
                 className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
@@ -256,7 +301,17 @@ export function CurriculumImportExportPanel() {
               onClick={() => void previewImport()}
               className="h-10 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent disabled:opacity-50"
             >
-              Preview import
+              {operation === "previewing" ? (
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                    aria-hidden="true"
+                  />
+                  Previewing…
+                </span>
+              ) : (
+                "Preview import"
+              )}
             </button>
           </div>
 
@@ -321,6 +376,7 @@ export function CurriculumImportExportPanel() {
                                 <label className="block">
                                   <span className="text-[11px] text-muted-foreground">Create canonical Course as</span>
                                   <select
+                                    disabled={busy}
                                     value={decision?.action === "create-course" ? decision.courseType ?? "" : ""}
                                     onChange={(event) => {
                                       const value = event.target.value as CourseType | "";
@@ -341,6 +397,7 @@ export function CurriculumImportExportPanel() {
                                 <label className="flex items-start gap-2">
                                   <input
                                     type="checkbox"
+                                    disabled={busy}
                                     checked={decision?.action === "keep-existing-course"}
                                     onChange={(event) => chooseKeepExisting(course.code, event.target.checked)}
                                     className="mt-0.5"
@@ -388,7 +445,17 @@ export function CurriculumImportExportPanel() {
                 onClick={() => void applyImport()}
                 className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
-                Apply to Draft
+                {operation === "applying" ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                      aria-hidden="true"
+                    />
+                    Applying curriculum…
+                  </span>
+                ) : (
+                  "Apply to Draft"
+                )}
               </button>
             </div>
           )}
@@ -414,7 +481,17 @@ export function CurriculumImportExportPanel() {
             onClick={() => void exportWord()}
             className="h-10 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent disabled:opacity-50"
           >
-            Export DOCX
+            {operation === "exporting" ? (
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  aria-hidden="true"
+                />
+                Exporting…
+              </span>
+            ) : (
+              "Export DOCX"
+            )}
           </button>
           <p className="text-xs text-muted-foreground">
             The server permits export only from immutable published versions; the DOCX uses preserved curriculum snapshots.
