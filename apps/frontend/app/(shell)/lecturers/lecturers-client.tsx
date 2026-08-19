@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Lecturer } from "@dse-pms/shared-types";
+import { formatLecturerDisplayName, type Lecturer } from "@dse-pms/shared-types";
 import { Button, DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { lecturersApi } from "@/lib/lecturers";
 import { authApi, useMe } from "@/lib/auth";
@@ -109,11 +109,13 @@ export function LecturersClient() {
       key: "name",
       header: "Name",
       render: (l) => (
-        <span className="font-medium">
-          {l.title ? `${l.title} ` : ""}
-          {l.name}
-        </span>
+        <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
       ),
+    },
+    {
+      key: "title",
+      header: "Academic position",
+      render: (l) => (l.title ? l.title : <span className="text-muted-foreground">—</span>),
     },
     { key: "email", header: "Email", render: (l) => l.email },
     {
