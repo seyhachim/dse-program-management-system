@@ -219,6 +219,11 @@ jobs:
         env:
           RESULT_CORRECTION_DB_TESTS: "1"
 
+      - name: Verify group assessment provenance and audit integrity
+        run: bun test apps/backend/src/plugins/student-portal/group-assessment-db.test.ts
+        env:
+          GROUP_ASSESSMENT_DB_TESTS: "1"
+
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
