@@ -62,7 +62,7 @@ export type UpdateLecturerInput = z.infer<typeof UpdateLecturerInput>;
 export const UpdateMyLecturerProfileInput = z
   .object({
     name: z.string().trim().min(1, "Name is required").max(200),
-    honorific: UserHonorificSchema.nullable(),
+    honorific: UserHonorificSchema.nullable().optional(),
     title: z.string().trim().max(100).nullable(),
     qualification: z.string().trim().max(500).nullable(),
     phone: z.string().trim().max(50).nullable(),
