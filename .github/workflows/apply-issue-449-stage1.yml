@@ -1,5 +1,6 @@
 name: Apply Issue 449 Stage 1
 
+# Temporary same-repo patch runner; the patch deletes this workflow after applying.
 on:
   push:
     branches:
