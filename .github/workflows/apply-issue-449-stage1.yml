@@ -7,9 +7,16 @@ on:
     paths:
       - ".github/scripts/apply_issue_449_stage1.py"
       - ".github/workflows/apply-issue-449-stage1.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/scripts/apply_issue_449_stage1.py"
+      - ".github/workflows/apply-issue-449-stage1.yml"
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   apply:
