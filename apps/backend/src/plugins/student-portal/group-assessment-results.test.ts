@@ -12,6 +12,18 @@ describe("group assessment result calculation", () => {
     expect(result.maxScore).toBe(100);
     expect(result.feedback).toContain("Adjustment +1");
   });
+
+  test("rejects invalid combined weights instead of materializing an ambiguous result", () => {
+    expect(() => calculateDerivedGroupResult({
+      mode: "GroupIndividual",
+      groupScore: 16,
+      groupMaxScore: 20,
+      groupWeight: 70,
+      individualScore: 8,
+      individualMaxScore: 10,
+      individualWeight: 20,
+    })).toThrow(/weights must total 100/i);
+  });
 });
 
 describe("group assessment publication readiness", () => {
