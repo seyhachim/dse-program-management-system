@@ -24,7 +24,7 @@ courseService.list = async (query, lecturerScope) => {
     rows,
     lecturerScope,
     query,
-    (courseId) => courseService.getById(courseId),
+    (courseId) => courseService.getDetailed(courseId),
   );
 };
 
