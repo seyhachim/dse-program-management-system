@@ -21,7 +21,7 @@
     "@dse-pms/shared-types": "workspace:*",
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.110.8",
-    "cors": "^4.21.1",
+    "cors": "^2.8.5",
     "express": "^4.21.1",
     "jose": "^6.2.4",
     "jsonwebtoken": "^9.0.2",
