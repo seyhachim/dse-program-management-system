@@ -334,9 +334,11 @@ async function main(): Promise<void> {
       acl.privilege_type::text AS privilege_type
     FROM pg_default_acl d
     JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
     WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact', 'course_spec_governance')
+      AND owner_role.rolname = current_user
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
