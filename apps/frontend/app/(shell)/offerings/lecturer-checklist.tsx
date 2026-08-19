@@ -4,6 +4,18 @@ import { useMemo, useState } from "react";
 import { formatLecturerDisplayName, type Lecturer } from "@dse-pms/shared-types";
 import { Input } from "@dse-pms/ui";
 
+export function filterLecturerOptions(options: Lecturer[], query: string): Lecturer[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return options;
+  return options.filter((lecturer) =>
+    [lecturer.name, lecturer.email, lecturer.title, lecturer.qualification]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(normalized),
+  );
+}
+
 /** Searchable multi-select checkbox list for offering co-lecturers. */
 export function LecturerChecklist({
   label,
@@ -19,17 +31,7 @@ export function LecturerChecklist({
   const [query, setQuery] = useState("");
   const selected = new Set(selectedIds);
   const selectedLecturers = options.filter((lecturer) => selected.has(lecturer.id));
-  const filteredOptions = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return options;
-    return options.filter((lecturer) =>
-      [lecturer.name, lecturer.email, lecturer.title, lecturer.qualification]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized),
-    );
-  }, [options, query]);
+  const filteredOptions = useMemo(() => filterLecturerOptions(options, query), [options, query]);
 
   const toggle = (id: string) => {
     const next = new Set(selected);
