@@ -99,7 +99,14 @@ export {
 } from "./components/ui/sidebar.tsx";
 
 // Composed components
-export { StatusBadge, type StatusTone, type StatusBadgeProps } from "./components/status-badge.tsx";
+export {
+  StatusBadge,
+  statusToneClass,
+  type StatusTone,
+  type SemanticStatusTone,
+  type LegacyStatusTone,
+  type StatusBadgeProps,
+} from "./components/status-badge.tsx";
 export { CompletionRing, type CompletionRingProps } from "./components/completion-ring.tsx";
 export { TableToolbar, type TableToolbarProps } from "./components/table-toolbar.tsx";
 export {
