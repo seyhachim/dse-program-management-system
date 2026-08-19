@@ -28,6 +28,27 @@ jobs:
         with:
           ref: agent/issue-449-group-assessment-results
           fetch-depth: 0
+      - name: Fix guarded two-location portal mode assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/apply_issue_449_stage1.py')
+          text = path.read_text()
+          old = '''replace_once(portal, 'mode: "individual" | "group";', 'mode: "individual" | "group" | "group_individual";')
+          # The same declaration appears twice (detail and overview). Replace the second too.
+          text = read(portal)
+          text = text.replace('mode: "individual" | "group";', 'mode: "individual" | "group" | "group_individual";')
+          write(portal, text)'''
+          new = '''text = read(portal)
+          mode_old = 'mode: "individual" | "group";'
+          if text.count(mode_old) != 2:
+              raise RuntimeError(f"{portal}: expected two assessment mode declarations, found {text.count(mode_old)}")
+          text = text.replace(mode_old, 'mode: "individual" | "group" | "group_individual";')
+          write(portal, text)'''
+          if old not in text:
+              raise SystemExit('Expected portal mode patch block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Apply guarded backend patch
         run: python .github/scripts/apply_issue_449_stage1.py
       - name: Commit implementation
