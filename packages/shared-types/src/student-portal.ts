@@ -514,15 +514,42 @@ export const SaveAssessmentIndividualComponentInput = z.object({
 });
 export type SaveAssessmentIndividualComponentInput = z.infer<typeof SaveAssessmentIndividualComponentInput>;
 
-export const CorrectAssessmentGroupScoreInput = SaveAssessmentGroupScoreInput.extend({
+export const CorrectAssessmentGroupScoreInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
   reason: z.string().trim().min(1).max(2000),
   expectedUpdatedAt: z.string().datetime(),
+}).refine((value) => value.score <= value.maxScore, {
+  message: "Score cannot exceed maximum score",
+  path: ["score"],
 });
 export type CorrectAssessmentGroupScoreInput = z.infer<typeof CorrectAssessmentGroupScoreInput>;
 
-export const CorrectAssessmentIndividualComponentInput = SaveAssessmentIndividualComponentInput.extend({
+export const CorrectAssessmentIndividualComponentInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+  adjustmentPoints: z.coerce.number().default(0),
+  adjustmentReason: z.string().trim().max(2000).default(""),
   reason: z.string().trim().min(1).max(2000),
   expectedUpdatedAt: z.string().datetime(),
+}).superRefine((value, ctx) => {
+  const adjusted = value.score + value.adjustmentPoints;
+  if (adjusted < 0 || adjusted > value.maxScore) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["adjustmentPoints"],
+      message: "Adjusted score must remain between 0 and the maximum score",
+    });
+  }
+  if (value.adjustmentPoints !== 0 && !value.adjustmentReason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["adjustmentReason"],
+      message: "An adjustment reason is required",
+    });
+  }
 });
 export type CorrectAssessmentIndividualComponentInput = z.infer<typeof CorrectAssessmentIndividualComponentInput>;
 
