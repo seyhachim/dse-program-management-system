@@ -1,15 +1,16 @@
 name: Apply Issue 449 Fix 1
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/issue-449-group-assessment-results
+      - main
     paths:
       - ".github/scripts/apply_issue_449_fix1.py"
       - ".github/workflows/apply-issue-449-fix1.yml"
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   apply:
