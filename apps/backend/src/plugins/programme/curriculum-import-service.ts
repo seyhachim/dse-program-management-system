@@ -216,6 +216,7 @@ function calculateTotals(
 }
 
 function creditBreakdownWarning(course: CurriculumImportCourse): string | null {
+  if (!course.credits.breakdownProvided) return null;
   const sum = course.credits.lecture + course.credits.lab + course.credits.fieldVisit;
   return sum === course.credits.total
     ? null
