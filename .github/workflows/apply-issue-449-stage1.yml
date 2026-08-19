@@ -28,37 +28,38 @@ jobs:
         with:
           ref: agent/issue-449-group-assessment-results
           fetch-depth: 0
-      - name: Fix guarded assertions for current main formatting
+      - name: Align guarded patch with current main formatting
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('.github/scripts/apply_issue_449_stage1.py')
           text = path.read_text()
 
-          old = '''replace_once(portal, 'mode: "individual" | "group";', 'mode: "individual" | "group" | "group_individual";')
+          def swap(old: str, new: str, label: str) -> None:
+              global text
+              if old not in text:
+                  raise SystemExit(f'Expected {label} patch block not found')
+              text = text.replace(old, new, 1)
+
+          swap('''replace_once(portal, 'mode: "individual" | "group";', 'mode: "individual" | "group" | "group_individual";')
           # The same declaration appears twice (detail and overview). Replace the second too.
           text = read(portal)
           text = text.replace('mode: "individual" | "group";', 'mode: "individual" | "group" | "group_individual";')
-          write(portal, text)'''
-          new = '''text = read(portal)
+          write(portal, text)''', '''text = read(portal)
           mode_old = 'mode: "individual" | "group";'
           if text.count(mode_old) != 2:
               raise RuntimeError(f"{portal}: expected two assessment mode declarations, found {text.count(mode_old)}")
           text = text.replace(mode_old, 'mode: "individual" | "group" | "group_individual";')
-          write(portal, text)'''
-          if old not in text:
-              raise SystemExit('Expected portal mode patch block not found')
-          text = text.replace(old, new, 1)
+          write(portal, text)''', 'portal mode')
 
-          old_service = '''replace_once(
+          swap('''replace_once(
               courses_service,
               '        mode: item.mode === "group" ? ("Group" as const) : ("Individual" as const),\\n',
               '        mode: item.mode === "group" ? ("Group" as const) : item.mode === "group_individual" ? ("GroupIndividual" as const) : ("Individual" as const),\\n'
               '        groupWeight: item.mode === "group_individual" ? item.groupWeight : null,\\n'
               '        individualWeight: item.mode === "group_individual" ? item.individualWeight : null,\\n'
               '        individualCriterionIds: item.mode === "group_individual" ? item.individualCriterionIds : [],\\n',
-          )'''
-          new_service = '''replace_once(
+          )''', '''replace_once(
               courses_service,
               '      mode:\\n        item.mode === "group" ? ("Group" as const) : ("Individual" as const),\\n',
               '      mode:\\n'
@@ -70,10 +71,45 @@ jobs:
               '      groupWeight: item.mode === "group_individual" ? item.groupWeight : null,\\n'
               '      individualWeight: item.mode === "group_individual" ? item.individualWeight : null,\\n'
               '      individualCriterionIds: item.mode === "group_individual" ? item.individualCriterionIds : [],\\n',
-          )'''
-          if old_service not in text:
-              raise SystemExit('Expected CourseSpec persistence patch block not found')
-          path.write_text(text.replace(old_service, new_service, 1))
+          )''', 'CourseSpec persistence')
+
+          swap('''replace_once(
+              lifecycle,
+              '  async publishAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: PublishAssessmentResultsInput,\\n  ): Promise<PublishAssessmentResultsResponse> {\\n    return prisma.$transaction(async (tx) => {\\n',
+              '  async publishAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: PublishAssessmentResultsInput,\\n  ): Promise<PublishAssessmentResultsResponse> {\\n'
+              '    if (await groupAssessmentService.modeFor(authorId, programmeWide, input) !== "Individual") {\\n'
+              '      return groupAssessmentService.publishAssessment(authorId, programmeWide, input);\\n'
+              '    }\\n'
+              '    return prisma.$transaction(async (tx) => {\\n',
+          )''', '''replace_once(
+              lifecycle,
+              '  async publishAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: PublishAssessmentResultsInput,\\n  ): Promise<PublishAssessmentResultsResponse> {\\n    const { offering, spec, assessment } = await offeringLifecycleContext(\\n',
+              '  async publishAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: PublishAssessmentResultsInput,\\n  ): Promise<PublishAssessmentResultsResponse> {\\n'
+              '    if (await groupAssessmentService.modeFor(authorId, programmeWide, input) !== "Individual") {\\n'
+              '      return groupAssessmentService.publishAssessment(authorId, programmeWide, input);\\n'
+              '    }\\n'
+              '    const { offering, spec, assessment } = await offeringLifecycleContext(\\n',
+          )''', 'publish lifecycle')
+
+          swap('''replace_once(
+              lifecycle,
+              '  async finalizeAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: FinalizeAssessmentResultsInput,\\n  ): Promise<FinalizeAssessmentResultsResponse> {\\n    return prisma.$transaction(async (tx) => {\\n',
+              '  async finalizeAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: FinalizeAssessmentResultsInput,\\n  ): Promise<FinalizeAssessmentResultsResponse> {\\n'
+              '    if (await groupAssessmentService.modeFor(authorId, programmeWide, input) !== "Individual") {\\n'
+              '      return groupAssessmentService.finalizeAssessment(authorId, programmeWide, input);\\n'
+              '    }\\n'
+              '    return prisma.$transaction(async (tx) => {\\n',
+          )''', '''replace_once(
+              lifecycle,
+              '  async finalizeAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: FinalizeAssessmentResultsInput,\\n  ): Promise<FinalizeAssessmentResultsResponse> {\\n    const { offering, spec, assessment } = await offeringLifecycleContext(\\n',
+              '  async finalizeAssessment(\\n    authorId: string,\\n    programmeWide: boolean,\\n    input: FinalizeAssessmentResultsInput,\\n  ): Promise<FinalizeAssessmentResultsResponse> {\\n'
+              '    if (await groupAssessmentService.modeFor(authorId, programmeWide, input) !== "Individual") {\\n'
+              '      return groupAssessmentService.finalizeAssessment(authorId, programmeWide, input);\\n'
+              '    }\\n'
+              '    const { offering, spec, assessment } = await offeringLifecycleContext(\\n',
+          )''', 'finalize lifecycle')
+
+          path.write_text(text)
           PY
       - name: Apply guarded backend patch
         run: python .github/scripts/apply_issue_449_stage1.py
