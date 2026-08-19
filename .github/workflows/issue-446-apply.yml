@@ -1,18 +1,16 @@
 name: Apply issue 446 feature patch
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/issue-446-course-spec-responsible-lecturers
-    paths:
-      - .github/workflows/issue-446-apply.yml
-      - .github/patch-issue-446.py
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply:
+    if: github.head_ref == 'agent/issue-446-course-spec-responsible-lecturers'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
