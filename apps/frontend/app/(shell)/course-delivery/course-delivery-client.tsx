@@ -297,7 +297,7 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
         ) : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
-      {assessment?.mode !== "individual" ? (
+      {assessment && assessment.mode !== "individual" ? (
         <GroupAssessmentPanel offeringId={offering.offeringId} assessment={assessment} onChanged={onChanged} />
       ) : assessment ? (
         <Panel title={assessment.name} description={allPublished ? "Published results are locked against ordinary edits." : `${draftCount} of ${assessment.results.length} student marks saved as drafts.`}>
