@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateLecturerInput, type Lecturer } from "@dse-pms/shared-types";
+import {
+  CreateLecturerInput,
+  USER_HONORIFIC_LABELS,
+  UserHonorificSchema,
+  type Lecturer,
+  type UserHonorific,
+} from "@dse-pms/shared-types";
 import {
   Button,
   Dialog,
@@ -19,6 +25,7 @@ import {
 export type LecturerFormValues = {
   name: string;
   email: string;
+  honorific?: UserHonorific;
   title?: string;
   qualification?: string;
   phone?: string;
@@ -33,7 +40,14 @@ interface LecturerFormProps {
   canGrantAccess?: boolean;
 }
 
-const empty: LecturerFormValues = { name: "", email: "", title: "", qualification: "", phone: "" };
+const empty: LecturerFormValues = {
+  name: "",
+  email: "",
+  honorific: undefined,
+  title: "",
+  qualification: "",
+  phone: "",
+};
 
 export function LecturerForm({
   open,
@@ -62,6 +76,7 @@ export function LecturerForm({
           ? {
               name: editing.name,
               email: editing.email,
+              honorific: editing.honorific ?? undefined,
               title: editing.title ?? "",
               qualification: editing.qualification ?? "",
               phone: editing.phone ?? "",
@@ -78,17 +93,18 @@ export function LecturerForm({
           <DialogTitle>{editing ? "Edit lecturer" : "Add lecturer"}</DialogTitle>
           <DialogDescription>
             {editing
-              ? "Update the lecturer's details. Qualification and phone appear on course syllabi."
+              ? "Update the lecturer's details. Honorific is optional and is never inferred from gender."
               : "Add the lecturer's academic profile and, if needed, invite them to access DSE."}
           </DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={handleSubmit(async (values) => {
-            // Send undefined for blank optionals so they store as null, not "".
+            // Send undefined for blank optionals so they store as null/defaults, not "".
             await onSubmit(
               {
                 ...values,
+                honorific: values.honorific || undefined,
                 title: values.title || undefined,
                 qualification: values.qualification || undefined,
                 phone: values.phone || undefined,
@@ -104,8 +120,23 @@ export function LecturerForm({
           <Field label="Email" error={errors.email?.message}>
             <Input placeholder="chim.seyha@rupp.edu.kh" {...register("email")} />
           </Field>
-          <Field label="Title" error={errors.title?.message}>
-            <Input placeholder="Mr. / Ms. / Dr. / Assoc. Prof. (optional)" {...register("title")} />
+          <Field label="Honorific" error={errors.honorific?.message}>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              {...register("honorific", {
+                setValueAs: (value: string) => (value === "" ? undefined : value),
+              })}
+            >
+              <option value="">No honorific</option>
+              {UserHonorificSchema.options.map((honorific) => (
+                <option key={honorific} value={honorific}>
+                  {USER_HONORIFIC_LABELS[honorific]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Academic position" error={errors.title?.message}>
+            <Input placeholder="Lecturer / Assistant Professor (optional)" {...register("title")} />
           </Field>
           <Field label="Qualification" error={errors.qualification?.message}>
             <Input placeholder="Master's degree in computer science (optional)" {...register("qualification")} />

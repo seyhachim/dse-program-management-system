@@ -246,19 +246,31 @@ enum QaSarReviewDecision {
   MoreEvidenceRequested
 }
 
+/// Optional form of address for a user. This is explicitly selected and never
+/// inferred from gender; academic position remains in User.title.
+enum UserHonorific {
+  Mr
+  Ms
+  Mrs
+  Mx
+  Dr
+  Prof
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
 /// "Course Details" instructor block.
 model User {
-  id            String   @id @default(uuid())
-  authId        String?  @unique
-  email         String   @unique
+  id            String         @id @default(uuid())
+  authId        String?        @unique
+  email         String         @unique
   name          String
+  honorific     UserHonorific?
   title         String?
   qualification String?
   phone         String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
 
   coursesLed                       Course[]                         @relation("CourseLecturer")
   offeringsLed                     Offering[]                       @relation("OfferingLecturer")
@@ -287,9 +299,9 @@ model User {
   qaRequirementAssignments         QaRequirementAssignment[]         @relation("QaRequirementAssignee")
   qaAssignmentsCreated             QaRequirementAssignment[]         @relation("QaRequirementAssignedBy")
   qaSarSectionsUpdated             QaSarSection[]                    @relation("QaSarSectionUpdatedBy")
-  qaSarSubmissions                 QaSarSubmission[]                 @relation("QaSarSubmittedBy")
-  qaSarReviews                     QaSarReview[]                     @relation("QaSarReviewer")
-  qaSarReleasesFinalized           QaSarRelease[]                    @relation("QaSarReleaseFinalizedBy")
+  qaSarSubmissions                 QaSarSubmission[]                  @relation("QaSarSubmittedBy")
+  qaSarReviews                     QaSarReview[]                      @relation("QaSarReviewer")
+  qaSarReleasesFinalized           QaSarRelease[]                     @relation("QaSarReleaseFinalizedBy")
   qaEvaluationGoldReviews          QaEvaluationScenario[]            @relation("QaEvaluationGoldReviewer")
   qaEvaluationRatings              QaEvaluationHumanRating[]         @relation("QaEvaluationHumanReviewer")
 }
@@ -1809,7 +1821,11 @@ enum CourseSpecResourceSection {
   Reference
 }
 
-/// §21 Student Responsibility. One ordered statement per course specification.
+/// §21 Student Responsibility. Each row supplies the actual material/link for a
+/// resource type planned in one §18 Weekly Plan week. `weekId` is intentionally
+/// a loose reference, matching CourseSpecMappingCell.ref: CourseSpecWeek uses a
+/// composite key and weekly-plan sync rebuilds rows, so a hard FK would cascade
+/// resource evidence during an otherwise harmless weekly-plan save.
 model CourseSpecStudentResponsibility {
   id           String     @default(uuid())
   courseSpecId String
@@ -2142,7 +2158,7 @@ model ActiveLearningStrategy {
   clusterId String
   cluster   ActiveLearningCluster @relation(fields: [clusterId], references: [id], onDelete: Restrict)
   sortOrder Int                    @default(0)
-  active    Boolean               @default(true)
+  active    Boolean                @default(true)
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
 

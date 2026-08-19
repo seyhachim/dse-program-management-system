@@ -23,6 +23,7 @@ const lecturerSelect = {
   authId: true,
   name: true,
   email: true,
+  honorific: true,
   title: true,
   qualification: true,
   phone: true,
