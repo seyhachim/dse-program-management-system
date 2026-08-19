@@ -14,14 +14,14 @@ import { cn } from "../lib/cn.ts";
 /**
  * Theme-driven application status badge.
  *
- * Prefer semantic tones (`success`, `warning`, `info`, `danger`, `neutral`)
- * for new application workflow states. The legacy `live`, `upcoming`, and
- * `tournament` tones remain supported so existing callers can migrate without
- * a breaking design-system change.
+ * `StatusTone` intentionally keeps the original public union so existing
+ * callers that use it for exhaustive maps do not break. New workflow UI can
+ * use the additive semantic tones through `StatusBadgeTone`.
  */
+export type StatusTone = "live" | "upcoming" | "tournament" | "neutral";
+export type LegacyStatusTone = StatusTone;
 export type SemanticStatusTone = "success" | "warning" | "info" | "danger" | "neutral";
-export type LegacyStatusTone = "live" | "upcoming" | "tournament";
-export type StatusTone = SemanticStatusTone | LegacyStatusTone;
+export type StatusBadgeTone = StatusTone | SemanticStatusTone;
 
 const semanticToneStyles: Record<SemanticStatusTone, string> = {
   success: "bg-success-bg text-success",
@@ -31,20 +31,20 @@ const semanticToneStyles: Record<SemanticStatusTone, string> = {
   neutral: "bg-inactive-bg text-inactive",
 };
 
-const legacyToneStyles: Record<LegacyStatusTone, string> = {
+const legacyToneStyles: Record<Exclude<StatusTone, "neutral">, string> = {
   live: "bg-status-live-bg text-status-live",
   upcoming: "bg-status-upcoming-bg text-status-upcoming",
   tournament: "bg-status-tournament-bg text-status-tournament",
 };
 
-export function statusToneClass(tone: StatusTone): string {
+export function statusToneClass(tone: StatusBadgeTone): string {
   if (tone === "live" || tone === "upcoming" || tone === "tournament") {
     return legacyToneStyles[tone];
   }
   return semanticToneStyles[tone];
 }
 
-const toneIcons: Record<StatusTone, React.ComponentType<{ className?: string }>> = {
+const toneIcons: Record<StatusBadgeTone, React.ComponentType<{ className?: string }>> = {
   success: CheckCircle2,
   warning: AlertTriangle,
   info: Info,
@@ -56,7 +56,7 @@ const toneIcons: Record<StatusTone, React.ComponentType<{ className?: string }>>
 };
 
 export interface StatusBadgeProps {
-  tone: StatusTone;
+  tone: StatusBadgeTone;
   label: string;
   icon?: boolean;
   className?: string;
