@@ -1,12 +1,23 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { CourseType, PrismaClient } from "@prisma/client";
-import { curriculumImportService } from "./curriculum-import-service.ts";
+import { CourseType, Prisma, PrismaClient } from "@prisma/client";
+import {
+  CURRICULUM_IMPORT_TRANSACTION_OPTIONS,
+  curriculumImportService,
+} from "./curriculum-import-service.ts";
 
 const dbTestsEnabled = process.env.CURRICULUM_DB_TESTS === "1";
 const describeDb = dbTestsEnabled ? describe : describe.skip;
 const prisma = new PrismaClient();
 
 const suffix = () => crypto.randomUUID().slice(0, 8);
+
+test("curriculum import reserves enough time for remote bulk apply", () => {
+  expect(CURRICULUM_IMPORT_TRANSACTION_OPTIONS).toEqual({
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 10_000,
+    timeout: 60_000,
+  });
+});
 
 describeDb("typed curriculum JSON course creation", () => {
   test("preview and apply use a validated source courseType without a redundant create decision", async () => {

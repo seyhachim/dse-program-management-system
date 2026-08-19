@@ -96,6 +96,12 @@ export class CurriculumImportValidationError extends Error {
 }
 export class CurriculumImportConflictError extends Error {}
 
+export const CURRICULUM_IMPORT_TRANSACTION_OPTIONS = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 10_000,
+  timeout: 60_000,
+} as const;
+
 function sourceHash(jsonText: string): string {
   return createHash("sha256").update(jsonText, "utf8").digest("hex");
 }
@@ -750,7 +756,7 @@ export const curriculumImportService = {
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      CURRICULUM_IMPORT_TRANSACTION_OPTIONS,
     );
 
     return this.artifact(versionId);
