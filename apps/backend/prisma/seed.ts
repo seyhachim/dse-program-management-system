@@ -93,19 +93,74 @@ const programmeProfile = {
     "Cultivate leadership, adaptability, and lifelong learning.",
   ],
   educationalPhilosophy: [
-    { code: "EP1", title: "Critical Thinking and Data-Driven Decision Making", description: "Develop graduates who apply critical thinking, logical reasoning, and data-driven approaches to solve complex real-world problems and support informed decision-making." },
-    { code: "EP2", title: "Research, Innovation, and Computational Intelligence", description: "Foster strong capacity in research, innovation, and the use of computational methods, AI, and data science techniques to generate new knowledge and solutions." },
-    { code: "EP3", title: "Professional Practice and Industry Readiness", description: "Prepare graduates with strong technical competence, digital literacy, and professional skills to meet evolving industry and employability demands." },
-    { code: "EP4", title: "Societal and Regional Responsiveness", description: "Equip graduates to design data-driven solutions that address societal challenges and respond to regional development needs in Cambodia and ASEAN." },
-    { code: "EP5", title: "Intercultural Competence and Responsible Citizenship", description: "Promote intercultural understanding, teamwork, and responsible citizenship." },
-    { code: "EP6", title: "National Development, Sustainability, and Digital Transformation", description: "Encourage graduates to contribute to national development, cultural and environmental sustainability, and digital transformation through innovative data science and engineering solutions." },
+    {
+      code: "EP1",
+      title: "Critical Thinking and Data-Driven Decision Making",
+      description:
+        "Develop graduates who apply critical thinking, logical reasoning, and data-driven approaches to solve complex real-world problems and support informed decision-making.",
+    },
+    {
+      code: "EP2",
+      title: "Research, Innovation, and Computational Intelligence",
+      description:
+        "Foster strong capacity in research, innovation, and the use of computational methods, AI, and data science techniques to generate new knowledge and solutions.",
+    },
+    {
+      code: "EP3",
+      title: "Professional Practice and Industry Readiness",
+      description:
+        "Prepare graduates with strong technical competence, digital literacy, and professional skills to meet evolving industry and employability demands.",
+    },
+    {
+      code: "EP4",
+      title: "Societal and Regional Responsiveness",
+      description:
+        "Equip graduates to design data-driven solutions that address societal challenges and respond to regional development needs in Cambodia and ASEAN.",
+    },
+    {
+      code: "EP5",
+      title: "Intercultural Competence and Responsible Citizenship",
+      description:
+        "Promote intercultural understanding, teamwork, and responsible citizenship.",
+    },
+    {
+      code: "EP6",
+      title: "National Development, Sustainability, and Digital Transformation",
+      description:
+        "Encourage graduates to contribute to national development, cultural and environmental sustainability, and digital transformation through innovative data science and engineering solutions.",
+    },
   ],
   peos: [
-    { code: "PEO1", title: "Professional Practice", description: "Graduates will become competent professionals in data science and engineering, applying digital and analytical skills in diverse industries." },
-    { code: "PEO2", title: "Innovation & Problem Solving", description: "Graduates will demonstrate innovation, critical thinking, and problem-solving skills to design and implement data-driven solutions to real-world challenges." },
-    { code: "PEO3", title: "Communication & Collaboration", description: "Graduates will effectively collaborate and communicate with interdisciplinary teams and stakeholders in both local and international contexts." },
-    { code: "PEO4", title: "Ethics & Social Responsibility", description: "Graduates will practice with professionalism, ethics, and a commitment to social and environmental responsibility." },
-    { code: "PEO5", title: "Lifelong Learning & Leadership", description: "Graduates will pursue continuous learning, certifications, or advanced degrees and assume leadership roles in the digital economy." },
+    {
+      code: "PEO1",
+      title: "Professional Practice",
+      description:
+        "Graduates will become competent professionals in data science and engineering, applying digital and analytical skills in diverse industries.",
+    },
+    {
+      code: "PEO2",
+      title: "Innovation & Problem Solving",
+      description:
+        "Graduates will demonstrate innovation, critical thinking, and problem-solving skills to design and implement data-driven solutions to real-world challenges.",
+    },
+    {
+      code: "PEO3",
+      title: "Communication & Collaboration",
+      description:
+        "Graduates will effectively collaborate and communicate with interdisciplinary teams and stakeholders in both local and international contexts.",
+    },
+    {
+      code: "PEO4",
+      title: "Ethics & Social Responsibility",
+      description:
+        "Graduates will practice with professionalism, ethics, and a commitment to social and environmental responsibility.",
+    },
+    {
+      code: "PEO5",
+      title: "Lifelong Learning & Leadership",
+      description:
+        "Graduates will pursue continuous learning, certifications, or advanced degrees and assume leadership roles in the digital economy.",
+    },
   ],
 };
 
@@ -344,7 +399,8 @@ const permissionTitles: Record<string, string> = {
   "student-portal:read": "View own student portal information",
   "student-portal:feedback": "Submit anonymous course feedback",
   "qa:read": "View programme quality-assurance evidence and reviews",
-  "qa:write": "Manage programme quality-assurance evidence and self-assessments",
+  "qa:write":
+    "Manage programme quality-assurance evidence and self-assessments",
 };
 
 const permissionSlugs = [
@@ -520,10 +576,7 @@ const roleDefs: {
     slug: "student",
     title: "Student",
     description: "Enrollment-scoped access to the student learning portal.",
-    permissions: [
-      "student-portal:read",
-      "student-portal:feedback",
-    ],
+    permissions: ["student-portal:read", "student-portal:feedback"],
   },
 ];
 
@@ -847,8 +900,12 @@ async function main() {
 
   // The seeded student login represents Ada's portal account. Production
   // accounts are linked during the Supabase invite workflow.
-  const seededStudentUser = await prisma.user.findUnique({ where: { email: "student@dse.dev" } });
-  const seededStudentProfile = await prisma.student.findUnique({ where: { email: "ada@dse.dev" } });
+  const seededStudentUser = await prisma.user.findUnique({
+    where: { email: "student@dse.dev" },
+  });
+  const seededStudentProfile = await prisma.student.findUnique({
+    where: { email: "ada@dse.dev" },
+  });
   if (seededStudentUser && seededStudentProfile) {
     await prisma.student.update({
       where: { id: seededStudentProfile.id },
@@ -994,7 +1051,10 @@ async function main() {
       },
     });
 
-    for (const [requirementIndex, [code, title]] of criterion.requirements.entries()) {
+    for (const [
+      requirementIndex,
+      [code, title],
+    ] of criterion.requirements.entries()) {
       await prisma.qaRequirement.upsert({
         where: { id: `${AUN_QA_V4_ID}:${code}` },
         update: { title, order: requirementIndex + 1 },
@@ -1198,7 +1258,10 @@ async function main() {
           versionMinor: 0,
         },
       },
-      update: {},
+      update: {
+        reviewStatus: "Approved",
+        submissionVersion: 1,
+      },
       create: {
         courseId: cs101.id,
         versionMajor: 1,
@@ -1244,9 +1307,16 @@ async function main() {
       where: { id: offering.id },
       data: { courseSpecId: spec.id },
     });
-    for (const sectionKey of ["clos", "slt", "assessmentPlan", "resources"] as const) {
+    for (const sectionKey of [
+      "clos",
+      "slt",
+      "assessmentPlan",
+      "resources",
+    ] as const) {
       await prisma.courseSpecSection.upsert({
-        where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey } },
+        where: {
+          courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey },
+        },
         update: { status: "Complete" },
         create: { courseSpecId: spec.id, sectionKey, status: "Complete" },
       });
@@ -1258,7 +1328,8 @@ async function main() {
         id: "seed-clo-1",
         courseSpecId: spec.id,
         order: 0,
-        description: "Develop small programs using variables, control flow, functions, and structured problem solving.",
+        description:
+          "Develop small programs using variables, control flow, functions, and structured problem solving.",
         level: "C3",
         mappedPlos: ["PLO1", "PLO3"],
       },
@@ -1273,12 +1344,17 @@ async function main() {
         week: 1,
         topic: "Programming foundations and problem-solving workflow",
         cloCodes: ["CLO1"],
-        lloItems: ["Explain how a program executes", "Write a small Python program"],
+        lloItems: [
+          "Explain how a program executes",
+          "Write a small Python program",
+        ],
         activities: ["Lecture", "Guided Hands-on Lab"],
       },
     });
     await prisma.courseSpecAssessmentItem.upsert({
-      where: { courseSpecId_id: { courseSpecId: spec.id, id: "seed-assessment-1" } },
+      where: {
+        courseSpecId_id: { courseSpecId: spec.id, id: "seed-assessment-1" },
+      },
       update: {},
       create: {
         id: "seed-assessment-1",
@@ -1292,11 +1368,14 @@ async function main() {
         dueWeek: 4,
         format: "Source Code and Written Report",
         submissionMethod: "LMS (Upload)",
-        rubricId: rubricIdByName.get("Assignment Rubric – Written Report") ?? null,
+        rubricId:
+          rubricIdByName.get("Assignment Rubric – Written Report") ?? null,
       },
     });
     await prisma.courseSpecResource.upsert({
-      where: { courseSpecId_id: { courseSpecId: spec.id, id: "seed-resource-1" } },
+      where: {
+        courseSpecId_id: { courseSpecId: spec.id, id: "seed-resource-1" },
+      },
       update: {},
       create: {
         id: "seed-resource-1",
@@ -1309,10 +1388,14 @@ async function main() {
     });
 
     const ada = enrolees.find((student) => student.email === "ada@dse.dev");
-    const lecturer = await prisma.user.findUnique({ where: { email: "lecturer@dse.dev" } });
+    const lecturer = await prisma.user.findUnique({
+      where: { email: "lecturer@dse.dev" },
+    });
     if (ada && lecturer) {
       const enrollment = await prisma.enrollment.findUniqueOrThrow({
-        where: { offeringId_studentId: { offeringId: offering.id, studentId: ada.id } },
+        where: {
+          offeringId_studentId: { offeringId: offering.id, studentId: ada.id },
+        },
       });
       await prisma.courseAnnouncement.upsert({
         where: { id: "seed-announcement-1" },
