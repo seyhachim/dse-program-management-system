@@ -28,12 +28,13 @@ jobs:
         with:
           ref: agent/issue-449-group-assessment-results
           fetch-depth: 0
-      - name: Fix guarded two-location portal mode assertion
+      - name: Fix guarded assertions for current main formatting
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('.github/scripts/apply_issue_449_stage1.py')
           text = path.read_text()
+
           old = '''replace_once(portal, 'mode: "individual" | "group";', 'mode: "individual" | "group" | "group_individual";')
           # The same declaration appears twice (detail and overview). Replace the second too.
           text = read(portal)
@@ -47,7 +48,32 @@ jobs:
           write(portal, text)'''
           if old not in text:
               raise SystemExit('Expected portal mode patch block not found')
-          path.write_text(text.replace(old, new, 1))
+          text = text.replace(old, new, 1)
+
+          old_service = '''replace_once(
+              courses_service,
+              '        mode: item.mode === "group" ? ("Group" as const) : ("Individual" as const),\\n',
+              '        mode: item.mode === "group" ? ("Group" as const) : item.mode === "group_individual" ? ("GroupIndividual" as const) : ("Individual" as const),\\n'
+              '        groupWeight: item.mode === "group_individual" ? item.groupWeight : null,\\n'
+              '        individualWeight: item.mode === "group_individual" ? item.individualWeight : null,\\n'
+              '        individualCriterionIds: item.mode === "group_individual" ? item.individualCriterionIds : [],\\n',
+          )'''
+          new_service = '''replace_once(
+              courses_service,
+              '      mode:\\n        item.mode === "group" ? ("Group" as const) : ("Individual" as const),\\n',
+              '      mode:\\n'
+              '        item.mode === "group"\\n'
+              '          ? ("Group" as const)\\n'
+              '          : item.mode === "group_individual"\\n'
+              '            ? ("GroupIndividual" as const)\\n'
+              '            : ("Individual" as const),\\n'
+              '      groupWeight: item.mode === "group_individual" ? item.groupWeight : null,\\n'
+              '      individualWeight: item.mode === "group_individual" ? item.individualWeight : null,\\n'
+              '      individualCriterionIds: item.mode === "group_individual" ? item.individualCriterionIds : [],\\n',
+          )'''
+          if old_service not in text:
+              raise SystemExit('Expected CourseSpec persistence patch block not found')
+          path.write_text(text.replace(old_service, new_service, 1))
           PY
       - name: Apply guarded backend patch
         run: python .github/scripts/apply_issue_449_stage1.py
