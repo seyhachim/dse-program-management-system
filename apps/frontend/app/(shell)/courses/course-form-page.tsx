@@ -95,9 +95,13 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
       totalSltHours: totalSltHours ? Number(totalSltHours) : null,
     };
     try {
-      if (courseId) await coursesApi.update(courseId, payload);
-      else await coursesApi.create(payload);
-      router.push(BACK_HREF);
+      if (courseId) {
+        await coursesApi.update(courseId, payload);
+        router.push(BACK_HREF);
+      } else {
+        const created = await coursesApi.create(payload);
+        router.push(`/courses/${created.id}/spec/responsible-lecturers`);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save the course");
     } finally {
