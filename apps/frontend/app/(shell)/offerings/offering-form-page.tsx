@@ -236,7 +236,12 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
               />
 
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
-                <Button type="button" variant="outline" render={<Link href={BACK_HREF}>Cancel</Link>} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href={BACK_HREF}>Cancel</Link>}
+                />
                 <Button type="submit" disabled={saving}>
                   {saving ? "Saving…" : editing ? "Save changes" : "Add offering"}
                 </Button>
