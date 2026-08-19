@@ -8,7 +8,6 @@ import {
   type CourseSpecVersionRef,
   type Lecturer,
   type OfferingMeetingInput,
-  type Semester,
 } from "@dse-pms/shared-types";
 import type { CourseView } from "@/lib/courses";
 import {
@@ -29,35 +28,12 @@ export type OfferingFormValues = {
   sectionCode: string;
   meetings: OfferingMeetingInput[];
   lecturerId?: string | null;
-  // Existing lecturer users assigned alongside the primary lecturer (issue #79).
   coLecturerIds?: string[];
   capacity: number;
   status: (typeof OFFERING_STATUSES)[number];
-  // §12 Course Availability — optional.
-  semester?: Semester | null;
-  programmeYear?: number | null;
-  // §10 Other Course Lecturer(s) — optional free text.
-  otherLecturers?: string;
 };
 
-const YEAR_OPTIONS = [1, 2, 3, 4] as const;
-
-// The Select item value can't be "" (that's reserved for "nothing selected"),
-// so optional/clearable fields use these sentinels and map back at the edges.
-const NOT_SET = "__not_set__";
 const UNASSIGNED_SENTINEL = "__unassigned__";
-
-// base-ui's <Select.Value> renders the raw value unless the Root gets an `items`
-// map (value -> label); without it the trigger would show the course/lecturer id.
-const SEMESTER_ITEMS: Record<string, string> = {
-  [NOT_SET]: "— Not set —",
-  First: "1st Semester",
-  Second: "2nd Semester",
-};
-const YEAR_ITEMS: Record<string, string> = {
-  [NOT_SET]: "— Not set —",
-  ...Object.fromEntries(YEAR_OPTIONS.map((y) => [String(y), `Year ${y}`])),
-};
 
 interface OfferingFormFieldsProps {
   control: Control<OfferingFormValues>;
@@ -70,10 +46,6 @@ interface OfferingFormFieldsProps {
   lecturerId: string | null;
   /** Course is fixed once an offering exists — an offering can't change its course. */
   courseLocked?: boolean;
-  semester: string;
-  onSemesterChange: (v: string) => void;
-  programmeYear: string;
-  onProgrammeYearChange: (v: string) => void;
   startDate: string;
   onStartDateChange: (v: string) => void;
   endDate: string;
@@ -90,10 +62,6 @@ export function OfferingFormFields({
   lecturers,
   lecturerId,
   courseLocked,
-  semester,
-  onSemesterChange,
-  programmeYear,
-  onProgrammeYearChange,
   startDate,
   onStartDateChange,
   endDate,
@@ -122,7 +90,13 @@ export function OfferingFormFields({
 
   return (
     <div className="space-y-4">
-      <Field label="Course" error={errors.courseId?.message}>
+      <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">Required before saving:</span>{" "}
+        Course, Approved CourseSpec version, Term, and Class / Section. Fields marked{" "}
+        <span className="font-semibold text-status-live">*</span> need a value. Capacity and Status already have defaults.
+      </div>
+
+      <Field label="Course" error={errors.courseId?.message} required>
         <Controller
           control={control}
           name="courseId"
@@ -147,7 +121,8 @@ export function OfferingFormFields({
           )}
         />
       </Field>
-      <Field label="Approved CourseSpec version" error={errors.courseSpecId?.message}>
+
+      <Field label="Approved CourseSpec version" error={errors.courseSpecId?.message} required>
         <Controller
           control={control}
           name="courseSpecId"
@@ -175,20 +150,24 @@ export function OfferingFormFields({
           <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">This course has no Approved CourseSpec version yet.</p>
         ) : null}
       </Field>
+
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Term" error={errors.term?.message}>
+        <Field label="Term" error={errors.term?.message} required>
           <Input placeholder="2025-Fall" {...register("term")} />
         </Field>
-        <Field label="Class / Section" error={errors.sectionCode?.message}>
+        <Field label="Class / Section" error={errors.sectionCode?.message} required>
           <Input placeholder="A" maxLength={12} {...register("sectionCode")} />
         </Field>
       </div>
+
       <fieldset className="space-y-3 rounded-lg border border-border p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <legend className="text-sm font-semibold text-foreground">Weekly Class Schedule</legend>
+            <legend className="text-sm font-semibold text-foreground">
+              Weekly Class Schedule <span className="font-normal text-muted-foreground">(Optional)</span>
+            </legend>
             <p className="text-xs text-muted-foreground">
-              Add each recurring session. Duration is calculated from its start and end time.
+              Add recurring sessions only when the timetable is known. Duration is calculated from start and end time.
             </p>
           </div>
           <Button
@@ -214,7 +193,7 @@ export function OfferingFormFields({
         {meetingFields.map((meeting, index) => (
           <div key={meeting.id} className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <Field label="Day" error={errors.meetings?.[index]?.dayOfWeek?.message}>
+              <Field label="Day" error={errors.meetings?.[index]?.dayOfWeek?.message} required>
                 <Controller
                   control={control}
                   name={`meetings.${index}.dayOfWeek`}
@@ -228,13 +207,13 @@ export function OfferingFormFields({
                   )}
                 />
               </Field>
-              <Field label="Start" error={errors.meetings?.[index]?.startTime?.message}>
+              <Field label="Start" error={errors.meetings?.[index]?.startTime?.message} required>
                 <Input type="time" {...register(`meetings.${index}.startTime`)} />
               </Field>
-              <Field label="End" error={errors.meetings?.[index]?.endTime?.message}>
+              <Field label="End" error={errors.meetings?.[index]?.endTime?.message} required>
                 <Input type="time" {...register(`meetings.${index}.endTime`)} />
               </Field>
-              <Field label="Room" error={errors.meetings?.[index]?.room?.message}>
+              <Field label="Room" error={errors.meetings?.[index]?.room?.message} optional>
                 <Input placeholder="A203" maxLength={80} {...register(`meetings.${index}.room`)} />
               </Field>
               <Field label="Activity" error={errors.meetings?.[index]?.activityType?.message}>
@@ -262,52 +241,18 @@ export function OfferingFormFields({
           </div>
         ))}
       </fieldset>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Semester (§12)">
-          <Select
-            items={SEMESTER_ITEMS}
-            value={semester === "" ? NOT_SET : semester}
-            onValueChange={(v) => onSemesterChange(v && v !== NOT_SET ? v : "")}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NOT_SET}>— Not set —</SelectItem>
-              <SelectItem value="First">1st Semester</SelectItem>
-              <SelectItem value="Second">2nd Semester</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Year (§12)">
-          <Select
-            items={YEAR_ITEMS}
-            value={programmeYear === "" ? NOT_SET : programmeYear}
-            onValueChange={(v) => onProgrammeYearChange(v && v !== NOT_SET ? v : "")}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NOT_SET}>— Not set —</SelectItem>
-              {YEAR_OPTIONS.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  Year {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
+
       <fieldset className="space-y-3 rounded-lg border border-border p-4">
         <div>
-          <legend className="text-sm font-semibold text-foreground">Teaching Period</legend>
+          <legend className="text-sm font-semibold text-foreground">
+            Teaching Period <span className="font-normal text-muted-foreground">(Optional)</span>
+          </legend>
           <p className="text-xs text-muted-foreground">
-            Optional calendar range for the actual delivery period. Set both dates or leave both empty.
+            If you set a delivery period, set both dates. Otherwise leave both empty.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Start date">
+          <Field label="Start date" optional>
             <Input
               type="date"
               value={startDate}
@@ -315,7 +260,7 @@ export function OfferingFormFields({
               onChange={(event) => onStartDateChange(event.target.value)}
             />
           </Field>
-          <Field label="End date">
+          <Field label="End date" optional>
             <Input
               type="date"
               value={endDate}
@@ -325,6 +270,7 @@ export function OfferingFormFields({
           </Field>
         </div>
       </fieldset>
+
       <div className="grid grid-cols-2 gap-3">
         <Field label="Capacity" error={errors.capacity?.message}>
           <Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} />
@@ -350,7 +296,8 @@ export function OfferingFormFields({
           />
         </Field>
       </div>
-      <Field label="Lecturer" error={errors.lecturerId?.message}>
+
+      <Field label="Primary Lecturer" error={errors.lecturerId?.message} optional>
         <Controller
           control={control}
           name="lecturerId"
@@ -375,6 +322,7 @@ export function OfferingFormFields({
           )}
         />
       </Field>
+
       <Controller
         control={control}
         name="coLecturerIds"
@@ -390,9 +338,6 @@ export function OfferingFormFields({
       {errors.coLecturerIds?.message ? (
         <p className="text-xs text-status-live">{errors.coLecturerIds.message}</p>
       ) : null}
-      <Field label="Other lecturer(s) (§10)" error={errors.otherLecturers?.message}>
-        <Input placeholder="Co-teachers this term (optional)" {...register("otherLecturers")} />
-      </Field>
     </div>
   );
 }
@@ -400,15 +345,23 @@ export function OfferingFormFields({
 function Field({
   label,
   error,
+  required = false,
+  optional = false,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
+  optional?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground">
+        {label}
+        {required ? <span className="ml-1 text-status-live" aria-label="required">*</span> : null}
+        {optional ? <span className="ml-1 font-normal text-muted-foreground">(Optional)</span> : null}
+      </span>
       {children}
       {error ? <span className="block text-xs text-status-live">{error}</span> : null}
     </label>
