@@ -12,7 +12,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:security:verify": "bun scripts/verify-db-security.ts",
-    "seed": "bun prisma/seed.ts",
+    "seed": "bun prisma/seed.ts && bun prisma/sync-qa-permissions.ts",
     "course-spec:import": "bun scripts/course-spec-import.ts",
     "gen-token": "bun scripts/gen-token.ts",
     "test": "bun test"
@@ -21,7 +21,7 @@
     "@dse-pms/shared-types": "workspace:*",
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.110.8",
-    "cors": "^2.8.5",
+    "cors": "^4.21.1",
     "express": "^4.21.1",
     "jose": "^6.2.4",
     "jsonwebtoken": "^9.0.2",
