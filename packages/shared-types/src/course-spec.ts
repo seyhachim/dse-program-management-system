@@ -290,6 +290,7 @@ export const LEARNING_ACTIVITIES: readonly string[] = [
 export const GROUP_INDIVIDUAL: readonly { code: string; name: string }[] = [
   { code: "I", name: "Individual" },
   { code: "G", name: "Group" },
+  { code: "GI", name: "Group + Individual" },
 ] as const;
 
 /** §17 assessment types — the vocabulary for the "Type" column and picker. */
@@ -787,7 +788,7 @@ export const AssessmentType = z.enum(ASSESSMENT_TYPES);
 export type AssessmentType = z.infer<typeof AssessmentType>;
 
 /** Whether an assessment is done individually or as a group. */
-export const AssessmentMode = z.enum(["individual", "group"]);
+export const AssessmentMode = z.enum(["individual", "group", "group_individual"]);
 export type AssessmentMode = z.infer<typeof AssessmentMode>;
 
 /** Whether an assessment counts toward the plan's weighting and reports. */
@@ -807,6 +808,9 @@ export const AssessmentItem = z.object({
   type: AssessmentType,
   description: z.string().default(""),
   mode: AssessmentMode.default("individual"),
+  groupWeight: z.coerce.number().gt(0).max(100).nullable().default(null),
+  individualWeight: z.coerce.number().gt(0).max(100).nullable().default(null),
+  individualCriterionIds: z.array(z.string().min(1)).default([]),
   status: AssessmentStatus.default("active"),
   // Linking.
   cloCodes: z.array(z.string()).default([]),
@@ -830,6 +834,17 @@ export const AssessmentItem = z.object({
   // PLO mapping & notes.
   mappedPlos: z.array(PloId).default([]),
   notes: z.string().default(""),
+}).superRefine((value, ctx) => {
+  if (value.mode !== "group_individual") return;
+  if (value.groupWeight === null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["groupWeight"], message: "Group weight is required" });
+  }
+  if (value.individualWeight === null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["individualWeight"], message: "Individual weight is required" });
+  }
+  if (value.groupWeight !== null && value.individualWeight !== null && Math.abs(value.groupWeight + value.individualWeight - 100) > 0.000001) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["individualWeight"], message: "Group and individual weights must total 100%" });
+  }
 });
 export type AssessmentItem = z.infer<typeof AssessmentItem>;
 

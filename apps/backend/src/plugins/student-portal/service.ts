@@ -513,6 +513,9 @@ export const studentPortalService = {
             id: assessment.id,
             name: assessment.name,
             type: assessment.type,
+            mode: assessment.mode === "Group" ? "group" : assessment.mode === "GroupIndividual" ? "group_individual" : "individual",
+            groupWeight: assessment.groupWeight,
+            individualWeight: assessment.individualWeight,
             weight: assessment.weight,
             countsTowardGrade: assessment.weight !== null && assessment.weight > 0,
             courseGradeWeight: assessment.weight,
@@ -525,6 +528,7 @@ export const studentPortalService = {
             rubricCriteria: (assessment.rubric?.criterionRows ?? []).map((criterion) => ({
               id: criterion.id,
               name: criterion.name,
+              scoringScope: assessment.mode === "Group" ? "group" : assessment.mode === "Individual" ? "individual" : assessment.individualCriterionIds.includes(criterion.id) ? "individual" : "group",
               cloCodes: assessment.criterionCloMappings
                 .filter((mapping) => mapping.rubricId === assessment.rubricId && mapping.criterionId === criterion.id)
                 .map((mapping) => mapping.cloCode),

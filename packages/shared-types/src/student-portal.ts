@@ -34,6 +34,7 @@ export interface PortalRubricCriterion {
   id: string;
   name: string;
   cloCodes: string[];
+  scoringScope?: "group" | "individual";
   levels: Array<{ id: string; label: string; points: number }>;
 }
 
@@ -131,7 +132,7 @@ export interface PortalCourseDetail extends PortalCourseSummary {
     name: string;
     type: string;
     description: string;
-    mode: "individual" | "group";
+    mode: "individual" | "group" | "group_individual";
     cloCodes: string[];
     weight: number | null;
     countsTowardGrade: boolean;
@@ -203,7 +204,7 @@ export interface PortalAssessmentOverview {
   name: string;
   type: string;
   description: string;
-  mode: "individual" | "group";
+  mode: "individual" | "group" | "group_individual";
   cloCodes: string[];
   weight: number | null;
   dueAt: string | null;
@@ -375,6 +376,7 @@ export interface CourseDeliveryRubricCriterion {
   id: string;
   name: string;
   cloCodes: string[];
+  scoringScope: "group" | "individual";
   levels: Array<{ id: string; label: string; points: number }>;
 }
 
@@ -403,6 +405,9 @@ export interface CourseDeliveryAssessment {
   id: string;
   name: string;
   type: string;
+  mode: "individual" | "group" | "group_individual";
+  groupWeight: number | null;
+  individualWeight: number | null;
   weight: number | null;
   countsTowardGrade: boolean;
   courseGradeWeight: number | null;
@@ -456,6 +461,123 @@ export interface CourseDeliveryOffering {
   assessments: CourseDeliveryAssessment[];
   announcements: CourseDeliveryAnnouncement[];
   feedback: CourseFeedbackSummary;
+}
+
+
+export const SaveAssessmentGroupsInput = z.object({
+  groups: z.array(z.object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(1).max(120),
+    enrollmentIds: z.array(z.string().uuid()),
+  })).min(1),
+}).superRefine((value, ctx) => {
+  const names = new Set<string>();
+  const members = new Set<string>();
+  value.groups.forEach((group, groupIndex) => {
+    const name = group.name.toLocaleLowerCase();
+    if (names.has(name)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["groups", groupIndex, "name"], message: "Group names must be unique" });
+    names.add(name);
+    group.enrollmentIds.forEach((id, memberIndex) => {
+      if (members.has(id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["groups", groupIndex, "enrollmentIds", memberIndex], message: "A student can belong to only one group" });
+      members.add(id);
+    });
+  });
+});
+export type SaveAssessmentGroupsInput = z.infer<typeof SaveAssessmentGroupsInput>;
+
+export const SaveAssessmentGroupScoreInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+}).refine((value) => value.score <= value.maxScore, { message: "Score cannot exceed maximum score", path: ["score"] });
+export type SaveAssessmentGroupScoreInput = z.infer<typeof SaveAssessmentGroupScoreInput>;
+
+export const SaveAssessmentSourceCriterionScoresInput = z.object({
+  scores: z.array(z.object({
+    criterionId: z.string().min(1),
+    score: z.coerce.number().min(0),
+    rubricLevelId: z.string().nullable().optional(),
+  })),
+});
+export type SaveAssessmentSourceCriterionScoresInput = z.infer<typeof SaveAssessmentSourceCriterionScoresInput>;
+
+export const SaveAssessmentIndividualComponentInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+  adjustmentPoints: z.coerce.number().default(0),
+  adjustmentReason: z.string().trim().max(2000).default(""),
+}).superRefine((value, ctx) => {
+  const adjusted = value.score + value.adjustmentPoints;
+  if (adjusted < 0 || adjusted > value.maxScore) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["adjustmentPoints"], message: "Adjusted score must remain between 0 and the maximum score" });
+  if (value.adjustmentPoints !== 0 && !value.adjustmentReason) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["adjustmentReason"], message: "An adjustment reason is required" });
+});
+export type SaveAssessmentIndividualComponentInput = z.infer<typeof SaveAssessmentIndividualComponentInput>;
+
+export const CorrectAssessmentGroupScoreInput = SaveAssessmentGroupScoreInput.extend({
+  reason: z.string().trim().min(1).max(2000),
+  expectedUpdatedAt: z.string().datetime(),
+});
+export type CorrectAssessmentGroupScoreInput = z.infer<typeof CorrectAssessmentGroupScoreInput>;
+
+export const CorrectAssessmentIndividualComponentInput = SaveAssessmentIndividualComponentInput.extend({
+  reason: z.string().trim().min(1).max(2000),
+  expectedUpdatedAt: z.string().datetime(),
+});
+export type CorrectAssessmentIndividualComponentInput = z.infer<typeof CorrectAssessmentIndividualComponentInput>;
+
+export interface GroupAssessmentWorkspace {
+  offeringId: string;
+  courseSpecId: string;
+  assessmentItemId: string;
+  assessmentName: string;
+  mode: "group" | "group_individual";
+  groupWeight: number | null;
+  individualWeight: number | null;
+  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string; studentName: string }>;
+  rubricId: string | null;
+  rubricName: string;
+  rubricContentHash: string | null;
+  rubricCriteria: CourseDeliveryRubricCriterion[];
+  groups: Array<{
+    id: string;
+    name: string;
+    sortOrder: number;
+    membershipLockedAt: string | null;
+    publishedAt: string | null;
+    finalizedAt: string | null;
+    members: Array<{ enrollmentId: string; studentId: string; studentCode: string; studentName: string }>;
+    score: null | {
+      id: string;
+      score: number;
+      maxScore: number;
+      feedback: string;
+      updatedAt: string;
+      criterionScores: CourseDeliveryCriterionScore[];
+    };
+    individualComponents: Array<{
+      id: string;
+      enrollmentId: string;
+      score: number;
+      maxScore: number;
+      feedback: string;
+      adjustmentPoints: number;
+      adjustmentReason: string;
+      updatedAt: string;
+      criterionScores: CourseDeliveryCriterionScore[];
+    }>;
+  }>;
+  readiness: {
+    readyToPublish: boolean;
+    unassignedEnrollmentIds: string[];
+    emptyGroupIds: string[];
+    missingGroupScoreIds: string[];
+    missingGroupCriterionGroupIds: string[];
+    missingIndividualEnrollmentIds: string[];
+    missingIndividualCriterionEnrollmentIds: string[];
+    invalidWeightConfiguration: boolean;
+  };
+  audit: Array<{ id: string; action: string; groupId: string | null; enrollmentId: string | null; actorName: string; reason: string; createdAt: string }>;
 }
 
 /** Lecturer-only calculation preview. Draft marks are included and must never be sent to student endpoints. */

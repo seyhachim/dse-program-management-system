@@ -854,7 +854,10 @@ function reassembleSpec(spec: SpecRow | null): {
         name: item.name,
         type: item.type,
         description: item.description,
-        mode: item.mode === "Group" ? "group" : "individual",
+        mode: item.mode === "Group" ? "group" : item.mode === "GroupIndividual" ? "group_individual" : "individual",
+        groupWeight: item.groupWeight,
+        individualWeight: item.individualWeight,
+        individualCriterionIds: item.individualCriterionIds,
         status: item.status === "Inactive" ? "inactive" : "active",
         cloCodes: item.cloCodes,
         weight: item.weight,
@@ -1122,7 +1125,14 @@ async function syncAssessmentPlan(
       type: item.type,
       description: item.description,
       mode:
-        item.mode === "group" ? ("Group" as const) : ("Individual" as const),
+        item.mode === "group"
+          ? ("Group" as const)
+          : item.mode === "group_individual"
+            ? ("GroupIndividual" as const)
+            : ("Individual" as const),
+      groupWeight: item.mode === "group_individual" ? item.groupWeight : null,
+      individualWeight: item.mode === "group_individual" ? item.individualWeight : null,
+      individualCriterionIds: item.mode === "group_individual" ? item.individualCriterionIds : [],
       status:
         item.status === "inactive"
           ? ("Inactive" as const)
