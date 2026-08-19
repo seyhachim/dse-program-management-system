@@ -87,6 +87,7 @@ describeDb("typed curriculum JSON course creation", () => {
 
     expect(preview.canApply).toBe(true);
     expect(preview.blockers).toEqual([]);
+    expect(preview.warnings.some((warning) => warning.includes("credit breakdown"))).toBe(false);
     expect(preview.courses[0]?.matchStatus).toBe("missing");
     expect(preview.courses[0]?.requiredDecision).toBeNull();
     expect(preview.courses[0]?.courseType).toBe("Specialization");
@@ -104,6 +105,7 @@ describeDb("typed curriculum JSON course creation", () => {
     expect(created.courseType).toBe(CourseType.Specialization);
     expect(created.credits).toBe(3);
     expect(artifact.source?.decisions).toEqual([]);
+    expect(artifact.source?.warnings.some((warning) => warning.includes("credit breakdown"))).toBe(false);
     expect(artifact.totals.selectedRouteCourseCount).toBe(1);
     expect(artifact.totals.selectedRouteCredits).toBe(3);
 
