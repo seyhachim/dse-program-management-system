@@ -38,6 +38,8 @@ const emptyDefaults: OfferingFormValues = {
   coLecturerIds: [],
   capacity: 30,
   status: "Planned",
+  startDate: null,
+  endDate: null,
 };
 
 export function OfferingFormPage({ offeringId }: { offeringId: string | null }) {
@@ -52,10 +54,6 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
-
-  // Delivery calendar dates are optional as a pair; empty strings map to null.
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
 
   const {
     control,
@@ -97,12 +95,12 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
               room: room ?? "",
             })),
             lecturerId: offering.lecturer?.id ?? null,
-            coLecturerIds: offering.coLecturers.map((l) => l.id),
+            coLecturerIds: offering.coLecturers.map((lecturer) => lecturer.id),
             capacity: offering.capacity,
             status: offering.status,
+            startDate: offering.startDate,
+            endDate: offering.endDate,
           });
-          setStartDate(offering.startDate ?? "");
-          setEndDate(offering.endDate ?? "");
         }
       } catch (err) {
         if (!cancelled) {
@@ -119,13 +117,24 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
 
   useEffect(() => {
     let cancelled = false;
-    if (!courseId) { setCourseSpecVersions([]); return; }
+    if (!courseId) {
+      setCourseSpecVersions([]);
+      return;
+    }
     setCourseSpecLoading(true);
     void coursesApi.approvedSpecVersions(courseId)
-      .then((versions) => { if (!cancelled) setCourseSpecVersions(versions); })
-      .catch(() => { if (!cancelled) setCourseSpecVersions([]); })
-      .finally(() => { if (!cancelled) setCourseSpecLoading(false); });
-    return () => { cancelled = true; };
+      .then((versions) => {
+        if (!cancelled) setCourseSpecVersions(versions);
+      })
+      .catch(() => {
+        if (!cancelled) setCourseSpecVersions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCourseSpecLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [courseId]);
 
   const onSubmit = handleSubmit(async (values) => {
@@ -135,15 +144,10 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
       ...values,
       lecturerId: values.lecturerId || null,
       coLecturerIds: values.coLecturerIds ?? [],
-      startDate: startDate || null,
-      endDate: endDate || null,
     };
     const parsed = CreateOfferingInput.safeParse(payload);
     if (!parsed.success) {
-      const dateIssue = parsed.error.issues.find(
-        (issue) => issue.path[0] === "startDate" || issue.path[0] === "endDate",
-      );
-      setError(dateIssue?.message ?? "Check the required offering details and try again");
+      setError("Check the required offering details and try again");
       setSaving(false);
       return;
     }
@@ -214,10 +218,6 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 lecturers={lecturers}
                 lecturerId={lecturerId}
                 courseLocked={editing}
-                startDate={startDate}
-                onStartDateChange={setStartDate}
-                endDate={endDate}
-                onEndDateChange={setEndDate}
               />
 
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
