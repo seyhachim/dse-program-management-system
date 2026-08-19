@@ -97,9 +97,9 @@ export function CurriculumPageClient() {
   const reorder=async(yearLevel:number,semester:"First"|"Second",ids:string[])=>{if(!data||ids.length<1)return;await mutate(()=>curriculumApi.reorder(data.selectedVersion.id,{yearLevel,semester,placementIds:ids}));};
   const createInitialCurriculum=async()=>{
     setMutating(true);setMutationError(null);
-    try { await curriculumApi.createInitial(INITIAL_DSE_CURRICULUM_INPUT); await load(); }
+    try { await curriculumApi.createInitial(INITIAL_DSE_CURRICULUM_INPUT); window.location.reload(); }
     catch(err){
-      if(err instanceof ApiError&&err.status===409){await load();return;}
+      if(err instanceof ApiError&&err.status===409){window.location.reload();return;}
       setMutationError(err instanceof ApiError?err.message:"Could not create the initial curriculum");
     }
     finally{setMutating(false);}
