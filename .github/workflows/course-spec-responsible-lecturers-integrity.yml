@@ -1,0 +1,78 @@
+name: CourseSpec Responsible Lecturer Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/courses/**"
+      - "apps/backend/src/integration/responsible-lecturers.integration.test.ts"
+      - "packages/shared-types/src/courses.ts"
+      - "apps/frontend/app/(shell)/courses/**"
+      - ".github/workflows/course-spec-responsible-lecturers-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/courses/**"
+      - "apps/backend/src/integration/responsible-lecturers.integration.test.ts"
+      - "packages/shared-types/src/courses.ts"
+      - "apps/frontend/app/(shell)/courses/**"
+      - ".github/workflows/course-spec-responsible-lecturers-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  responsible-lecturer-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_responsible_lecturers
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_responsible_lecturers"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_responsible_lecturers?schema=public
+      AUTH_MODE: dev
+      JWT_SECRET: issue-446-responsible-lecturer-ci-secret-at-least-32-characters
+      BACKEND_INTEGRATION_TESTS: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client explicitly
+        run: bun run db:generate
+
+      - name: Validate Prisma schema
+        run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+      - name: Seed isolated integration database
+        run: bun run seed
+
+      - name: Run Responsible Lecturer focused integration suite
+        run: bun test apps/backend/src/integration/responsible-lecturers.integration.test.ts
+
+      - name: Verify database security
+        run: bun run --cwd apps/backend db:security:verify
