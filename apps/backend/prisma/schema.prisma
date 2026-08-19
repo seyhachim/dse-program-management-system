@@ -271,6 +271,7 @@ model User {
   curriculumVersionsCreated        ProgrammeCurriculumVersion[]     @relation("ProgrammeCurriculumVersionCreatedBy")
   curriculumAuditActions           ProgrammeCurriculumAuditAction[] @relation("ProgrammeCurriculumAuditActor")
   studentProfile                   Student?
+  lecturerProfile                  LecturerProfile?
   announcementsAuthored            CourseAnnouncement[]             @relation("AnnouncementAuthor")
   assessmentResultsPublished       AssessmentResult[]               @relation("AssessmentResultPublishedBy")
   assessmentResultsFinalized       AssessmentResult[]               @relation("AssessmentResultFinalizedBy")
@@ -291,6 +292,22 @@ model User {
   qaSarReleasesFinalized           QaSarRelease[]                    @relation("QaSarReleaseFinalizedBy")
   qaEvaluationGoldReviews          QaEvaluationScenario[]            @relation("QaEvaluationGoldReviewer")
   qaEvaluationRatings              QaEvaluationHumanRating[]         @relation("QaEvaluationHumanReviewer")
+}
+
+/// Lecturer-specific professional metadata used for AUN-QA staff evidence.
+/// User remains the source of truth for identity/contact/authentication, while
+/// current teaching assignments remain Course/Offering relations.
+model LecturerProfile {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gender                String?
+  employmentType        String?
+  fieldOfSpecialization String?
+  yearsOfExperience     Int?
+  legacyCoursesTaught   String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 /// Normalized role/permission model (issue #65). Phase 1 (#66) added these tables
