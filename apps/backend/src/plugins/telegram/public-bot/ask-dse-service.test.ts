@@ -27,6 +27,51 @@ const course = {
   provenance,
 };
 
+const careerFaq = {
+  slug: "careers-data-science",
+  category: "Careers" as const,
+  question: "What careers can DSE graduates pursue?",
+  answer: "Graduates can work in data science and engineering roles.",
+  shortAnswer: null,
+  isFeatured: false,
+  sourceLabel: "DSE",
+  sourceUrl: "https://example.edu/dse/careers",
+};
+
+const programmingFaq = {
+  slug: "programming-experience",
+  category: "Admission" as const,
+  question: "Do I need programming experience before joining?",
+  answer: "Prior programming experience is helpful but not required.",
+  shortAnswer: null,
+  isFeatured: false,
+  sourceLabel: "DSE",
+  sourceUrl: null,
+};
+
+const scholarshipFaqs = [
+  {
+    slug: "scholarship-eligibility",
+    category: "FeesScholarships" as const,
+    question: "Who is eligible for DSE scholarships?",
+    answer: "Published scholarship eligibility guidance.",
+    shortAnswer: null,
+    isFeatured: false,
+    sourceLabel: "DSE",
+    sourceUrl: null,
+  },
+  {
+    slug: "scholarship-application",
+    category: "FeesScholarships" as const,
+    question: "How do I apply for a DSE scholarship?",
+    answer: "Published scholarship application guidance.",
+    shortAnswer: null,
+    isFeatured: false,
+    sourceLabel: "DSE",
+    sourceUrl: null,
+  },
+];
+
 function deps(options: { conflict?: boolean } = {}) {
   return {
     publicRead: {
@@ -44,18 +89,7 @@ function deps(options: { conflict?: boolean } = {}) {
           applicationUrl: "https://example.edu/apply",
         };
       },
-      async listFaqs() {
-        return [{
-          slug: "careers-data-science",
-          category: "Careers" as const,
-          question: "What careers can DSE graduates pursue?",
-          answer: "Graduates can work in data science and engineering roles.",
-          shortAnswer: null,
-          isFeatured: false,
-          sourceLabel: "DSE",
-          sourceUrl: "https://example.edu/dse/careers",
-        }];
-      },
+      async listFaqs() { return [careerFaq, programmingFaq]; },
       async getAdmission() {
         return {
           applicationUrl: "https://example.edu/apply",
@@ -70,10 +104,10 @@ function deps(options: { conflict?: boolean } = {}) {
             isFeatured: true,
             sourceLabel: "DSE",
             sourceUrl: null,
-          }],
+          }, programmingFaq],
         };
       },
-      async getFeesScholarships() { return { faqs: [] }; },
+      async getFeesScholarships() { return { faqs: scholarshipFaqs }; },
       async listImportantDates() { return []; },
       async getContact() {
         return {
@@ -143,10 +177,26 @@ describe("deterministic Ask DSE", () => {
     expect(contact.text).toContain("admission@example.edu");
   });
 
-  test("uses deterministic FAQ overlap for supported free-form questions", async () => {
-    const answer = await createAskDseService(deps()).answer("dse", "What careers can graduates pursue?");
+  test("returns the approved answer for an exact/strong FAQ match", async () => {
+    const answer = await createAskDseService(deps()).answer("dse", "What careers can DSE graduates pursue?");
     expect(answer.intent).toBe("faq");
+    expect(answer.matched).toBe(true);
     expect(answer.text).toContain("data science and engineering roles");
+  });
+
+  test("expands deterministic synonyms without generating a new claim", async () => {
+    const answer = await createAskDseService(deps()).answer("dse", "need python before study?");
+    expect(answer.intent).toBe("faq");
+    expect(answer.text).toContain("programming experience");
+    expect(answer.text).not.toContain("Python is required");
+  });
+
+  test("ambiguous scholarship query returns ranked published suggestions", async () => {
+    const answer = await createAskDseService(deps()).answer("dse", "scholarship");
+    expect(answer.intent).toBe("faq");
+    expect(answer.matched).toBe(false);
+    expect(answer.text).toContain("Who is eligible for DSE scholarships?");
+    expect(answer.text).toContain("How do I apply for a DSE scholarship?");
   });
 
   test("returns safe unknown fallback rather than synthesizing facts", async () => {
