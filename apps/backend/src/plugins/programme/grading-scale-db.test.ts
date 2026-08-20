@@ -168,6 +168,26 @@ describeDb("programme grading-scale database integrity", () => {
     expect(v1After.status).toBe("Superseded");
     expect(v1After.effectiveTo?.toISOString().slice(0, 10)).toBe("2027-01-01");
 
+    const currentDraft = await prisma.courseSpec.create({
+      data: {
+        courseId: f.course.id,
+        versionMajor: 1,
+        versionMinor: 1,
+        effectiveFrom: new Date("2026-10-01T00:00:00.000Z"),
+      },
+    });
+    expect(currentDraft.gradingScaleVersionId).toBe(f.v1.id);
+
+    const futureDraft = await prisma.courseSpec.create({
+      data: {
+        courseId: f.course.id,
+        versionMajor: 1,
+        versionMinor: 2,
+        effectiveFrom: new Date("2027-02-01T00:00:00.000Z"),
+      },
+    });
+    expect(futureDraft.gradingScaleVersionId).toBe(v2.id);
+
     const historical = await prisma.courseSpec.findUniqueOrThrow({
       where: { id: spec.id },
     });
