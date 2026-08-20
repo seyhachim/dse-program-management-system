@@ -5,6 +5,7 @@ import { createCourseRouter } from "./router.ts";
 import { createCourseSpecPeriodicReviewRouter } from "./periodic-review-router.ts";
 import { createResponsibleLecturersRouter } from "./responsible-lecturers-router.ts";
 import {
+  courseIdsForResponsibleLecturer,
   mergeResponsibleCourses,
   responsibleLecturerCanAccess,
 } from "./responsible-lecturers.ts";
@@ -15,6 +16,7 @@ import { courseService, type CourseService } from "./service.ts";
 // second Course Spec authorization path. Teaching & Learning already consumes
 // lecturerCanAccess through the Courses registry, so it inherits this rule too.
 const offeringScopedList = courseService.list.bind(courseService);
+const offeringScopedSpecProgress = courseService.listSpecProgress.bind(courseService);
 const offeringScopedAccess = courseService.lecturerCanAccess.bind(courseService);
 
 courseService.list = async (query, lecturerScope) => {
@@ -25,6 +27,31 @@ courseService.list = async (query, lecturerScope) => {
     lecturerScope,
     query,
     (courseId) => courseService.getDetailed(courseId),
+  );
+};
+
+courseService.listSpecProgress = async (lecturerScope) => {
+  const rows = await offeringScopedSpecProgress(lecturerScope);
+  if (!lecturerScope) return rows;
+
+  const existingCourseIds = new Set(rows.map((row) => row.courseId));
+  const missingResponsibleCourseIds = (
+    await courseIdsForResponsibleLecturer(lecturerScope)
+  ).filter((courseId) => !existingCourseIds.has(courseId));
+
+  if (missingResponsibleCourseIds.length === 0) return rows;
+
+  // Reuse the canonical progress calculation instead of duplicating section
+  // completeness logic. The unscoped result stays server-side and is filtered
+  // to the current lecturer's Responsible Lecturer memberships before return.
+  const missingIds = new Set(missingResponsibleCourseIds);
+  const allProgress = await offeringScopedSpecProgress();
+  const responsibleOnlyRows = allProgress.filter((row) =>
+    missingIds.has(row.courseId),
+  );
+
+  return [...rows, ...responsibleOnlyRows].sort((a, b) =>
+    a.code.localeCompare(b.code),
   );
 };
 
