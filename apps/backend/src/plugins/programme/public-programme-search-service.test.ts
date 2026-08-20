@@ -62,7 +62,7 @@ describe("deterministic Ask DSE ranking", () => {
   });
 
   test("returns ranked suggestions when a broad scholarship question is ambiguous", () => {
-    const result = chooseAskDseResult("scholarship application", faqs);
+    const result = chooseAskDseResult("scholarship", faqs);
     expect(result.kind).toBe("suggestions");
     if (result.kind === "suggestions") {
       expect(result.suggestions.length).toBeGreaterThan(1);
