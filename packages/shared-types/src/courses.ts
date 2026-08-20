@@ -65,6 +65,16 @@ export const ListCoursesQuery = z.object({
 });
 export type ListCoursesQuery = z.infer<typeof ListCoursesQuery>;
 
+/**
+ * Global class-section existence metadata for a course that the current caller
+ * is already authorized to see. The endpoint intentionally exposes only this
+ * boolean rather than another lecturer's Offering details.
+ */
+export type CourseSectionPresence = {
+  courseId: string;
+  hasSections: boolean;
+};
+
 export const SetCourseSpecResponsibleLecturersInputSchema = z.object({
   lecturerIds: z
     .array(z.string().uuid())
