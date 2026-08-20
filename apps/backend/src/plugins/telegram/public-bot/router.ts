@@ -19,6 +19,11 @@ import {
   type PublicCurriculumStudyPlan,
   type PublicCurriculumTotals,
 } from "../../programme/public-curriculum-read-service.ts";
+import type {
+  PublicAskDseResult,
+  PublicProgrammeSearchService,
+} from "../../programme/public-programme-search-service.ts";
+import { publicProgrammeSearchService } from "../../programme/public-programme-search-service.ts";
 import { getTelegramConfig, type TelegramConfig } from "../config.ts";
 import {
   MAIN_REPLY_KEYBOARD,
@@ -73,6 +78,7 @@ export interface PublicTelegramRouterDependencies {
   client?: TelegramPublicBotClient;
   publicRead?: PublicReadService;
   publicCurriculumRead?: PublicCurriculumReadService;
+  publicSearch?: PublicProgrammeSearchService;
 }
 
 const CALLBACK_ROUTE = new Map<string, RouteKey>(
@@ -196,6 +202,16 @@ function formatTotals(totals: PublicCurriculumTotals): string {
   return `Programme Study Load\n\n${breakdown.join("\n")}\n\nPublished route total: ${totals.totalCourses} courses · ${totals.totalCredits} credits · weekly hours ${hours}${conflictNote}\nSource: approved curriculum v${totals.provenance.curriculumVersion}`;
 }
 
+function formatAskDse(result: PublicAskDseResult): string {
+  if (result.kind === "answer") {
+    return `Ask DSE\n\n${result.faq.question}\n${result.faq.shortAnswer || result.faq.answer}`;
+  }
+  if (result.kind === "suggestions") {
+    return `Ask DSE · Possible matches\n\n${result.suggestions.map((item) => `• ${item.faq.question}`).join("\n")}\n\nPlease ask one of these more specifically.`;
+  }
+  return "I couldn't find a confirmed answer in the published DSE information. Try a more specific question, /courses, or choose a topic from the menu.";
+}
+
 async function sendCourseLookup(
   client: TelegramPublicBotClient,
   chatId: number,
@@ -266,7 +282,7 @@ async function renderRoute(
   if (route === "ask") {
     const faqs = await publicRead.listFaqs(programmeId, { featured: true });
     return {
-      text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nYou can also choose a topic below.`,
+      text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nYou can also type a question directly.`,
       replyMarkup: inlineKeyboard(route),
     };
   }
@@ -381,6 +397,7 @@ export function createPublicTelegramRouter(
     const programmeService = deps.publicRead && deps.publicCurriculumRead ? null : resolveProgrammeService();
     const publicRead = deps.publicRead ?? programmeService!.publicRead;
     const publicCurriculumRead = deps.publicCurriculumRead ?? programmeService!.publicCurriculumRead;
+    const publicSearch = deps.publicSearch ?? publicProgrammeSearchService;
     const programmeId = config.publicProgrammeId;
 
     try {
@@ -435,9 +452,10 @@ export function createPublicTelegramRouter(
               const rendered = await renderRoute(route, programmeId, publicRead);
               await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
             } else {
+              const searchResult = await publicSearch.search(programmeId, text);
               await client.sendMessage({
                 chatId: update.message.chat.id,
-                text: "I couldn't match that to a confirmed DSE topic yet. Choose a menu item, use /courses, or use /ask.",
+                text: formatAskDse(searchResult),
                 replyMarkup: replyKeyboard(),
               });
             }
