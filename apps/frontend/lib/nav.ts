@@ -64,11 +64,27 @@ const rubricBankManifest: PluginManifest = {
   ],
 };
 
+const publicInformationManifest: PluginManifest = {
+  id: "public-programme-information",
+  name: "Public Programme Information",
+  version: "0.1.0",
+  routes: [
+    {
+      label: "Public Information",
+      path: "/public-information",
+      icon: "megaphone",
+      roles: ["admin", "program_coordinator"],
+      group: "Administration",
+    },
+  ],
+};
+
 const frontendManifests = [
   ...pluginManifests.filter((manifest) => manifest.id !== "rubrics"),
   rubricBankManifest,
   curriculumWorkspaceManifest,
   communityManifest,
+  publicInformationManifest,
 ];
 
 export const iconMap: Record<string, LucideIcon> = {
