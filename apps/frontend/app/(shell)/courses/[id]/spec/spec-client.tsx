@@ -88,14 +88,13 @@ import type {
   PolicySection as PolicySectionValue,
   StudentResponsibilitySection as StudentResponsibilityValue,
 } from "@dse-pms/shared-types";
-import { ResourcesSectionForm } from "./resources-section";
+import { LearningResourcesSection } from "./learning-resources-section";
 import {
   EMPTY_RESOURCES,
   toResourcesForm,
   toResourcesPayload,
   type ResourcesForm,
 } from "./resources-model";
-import { ReferencesSectionForm } from "./references-section";
 import {
   EMPTY_REFERENCES,
   toReferencesForm,
@@ -122,7 +121,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "slt", label: "Weekly Plan" },
   { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
-  { id: "references", label: "References" },
   { id: "policy", label: "Policies & Responsibilities" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
@@ -150,6 +148,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
     const requested = normalizePoliciesResponsibilitiesTab(
       searchParams.get("tab"),
     );
+    if (requested === "references") return "resources";
     return TABS.some((t) => t.id === requested)
       ? (requested as TabId)
       : "overview";
@@ -210,7 +209,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
   );
   const setActiveTab = useCallback(
     (id: TabId) => {
-      const normalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      const policyNormalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      const normalizedId: TabId =
+        policyNormalizedId === "references" ? "resources" : policyNormalizedId;
       const locked =
         review !== null && !REVIEW_EDITABLE_STATUSES.has(review.status);
       const nextId =
@@ -618,6 +619,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
       if (sectionId === "courseInfo") {
         setActiveTab("overview");
         setCourseInfoDialogOpen(true);
+      } else if (sectionId === "references") {
+        setActiveTab("resources");
       } else {
         setActiveTab(sectionId);
       }
@@ -812,15 +815,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
             </TabsContent>
 
             <TabsContent value="resources" className="mt-4">
-              <ResourcesSectionForm
-                value={resources}
+              <LearningResourcesSection
+                references={references}
+                resources={resources}
                 weeklyPlan={weeklyPlan}
-                onPersist={persistResources}
+                onPersistReferences={persistReferences}
+                onPersistResources={persistResources}
+                onGoToWeeklyPlan={() => setActiveTab("slt")}
               />
-            </TabsContent>
-
-            <TabsContent value="references" className="mt-4">
-              <ReferencesSectionForm value={references} onPersist={persistReferences} />
             </TabsContent>
 
             <TabsContent value="policy" className="mt-4">
