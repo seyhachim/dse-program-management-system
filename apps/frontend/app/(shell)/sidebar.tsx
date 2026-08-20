@@ -1,13 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, type LucideIcon } from "lucide-react";
-import type { PluginRoute } from "@dse-pms/shared-types";
 import { getNavGroups, iconMap } from "@/lib/nav";
 import { useMe } from "@/lib/auth";
-import { coursesApi, type CourseView } from "@/lib/courses";
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -17,15 +13,17 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarTrigger,
 } from "@dse-pms/ui";
+
+function sidebarLabel(label: string, path: string): string {
+  return path === "/courses" && label === "Course Management"
+    ? "Courses & Specifications"
+    : label;
+}
 
 /** Sidebar follows the canvas theme (white in light mode, near-black in dark), collapsible to icons. Nav items come from the plugin manifest, grouped into sections. */
 export function AppSidebar() {
@@ -84,30 +82,19 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {group.routes.map((route) => {
                     const Icon = route.icon ? iconMap[route.icon] : undefined;
-                    // Programme-wide Course Management keeps the expandable course list.
-                    // Lecturer Course Specifications is intentionally a normal link.
-                    if (route.path === "/courses" && route.label === "Course Management") {
-                      return (
-                        <CourseNavItem
-                          key={route.path}
-                          route={route}
-                          Icon={Icon}
-                          pathname={pathname}
-                        />
-                      );
-                    }
                     const active =
                       pathname === route.path ||
                       pathname.startsWith(`${route.path}/`);
+                    const label = sidebarLabel(route.label, route.path);
                     return (
-                      <SidebarMenuItem key={route.path}>
+                      <SidebarMenuItem key={`${route.path}-${route.label}`}>
                         <SidebarMenuButton
                           isActive={active}
-                          tooltip={route.label}
+                          tooltip={label}
                           render={
                             <Link href={route.path}>
                               {Icon ? <Icon /> : null}
-                              <span>{route.label}</span>
+                              <span>{label}</span>
                             </Link>
                           }
                         />
@@ -129,15 +116,16 @@ export function AppSidebar() {
               const active =
                 pathname === route.path ||
                 pathname.startsWith(`${route.path}/`);
+              const label = sidebarLabel(route.label, route.path);
               return (
-                <SidebarMenuItem key={route.path}>
+                <SidebarMenuItem key={`${route.path}-${route.label}`}>
                   <SidebarMenuButton
                     isActive={active}
-                    tooltip={route.label}
+                    tooltip={label}
                     render={
                       <Link href={route.path}>
                         {Icon ? <Icon /> : null}
-                        <span>{route.label}</span>
+                        <span>{label}</span>
                       </Link>
                     }
                   />
@@ -151,95 +139,5 @@ export function AppSidebar() {
         </p>
       </SidebarFooter>
     </SidebarPrimitive>
-  );
-}
-
-/**
- * Expandable "Course Management" nav item. The label still links to the courses
- * list; the chevron toggles a sub-list of every course, each linking directly to
- * its Course Specification page (`/courses/:id/spec`). Courses are fetched the
- * first time the section is opened (auto-open when already on a course route).
- */
-function CourseNavItem({
-  route,
-  Icon,
-  pathname,
-}: {
-  route: PluginRoute;
-  Icon?: LucideIcon;
-  pathname: string;
-}) {
-  const onCourseRoute =
-    pathname === route.path || pathname.startsWith(`${route.path}/`);
-  const [open, setOpen] = useState(onCourseRoute);
-  const [courses, setCourses] = useState<CourseView[] | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open || courses !== null) return;
-    setLoading(true);
-    coursesApi
-      .list()
-      .then(setCourses)
-      .catch(() => setCourses([]))
-      .finally(() => setLoading(false));
-  }, [open, courses]);
-
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        isActive={pathname === route.path}
-        tooltip={route.label}
-        render={
-          <Link href={route.path} onClick={() => setOpen((o) => !o)}>
-            {Icon ? <Icon /> : null}
-            <span>{route.label}</span>
-          </Link>
-        }
-      />
-      <SidebarMenuAction
-        onClick={() => setOpen((o) => !o)}
-        aria-label={open ? "Collapse courses" : "Expand courses"}
-        aria-expanded={open}
-      >
-        <ChevronRight
-          className={`transition-transform ${open ? "rotate-90" : ""}`}
-        />
-      </SidebarMenuAction>
-
-      {open ? (
-        <SidebarMenuSub>
-          {loading && courses === null ? (
-            <SidebarMenuSubItem>
-              <SidebarMenuSkeleton />
-            </SidebarMenuSubItem>
-          ) : courses && courses.length > 0 ? (
-            courses.map((course) => (
-              <SidebarMenuSubItem key={course.id}>
-                <SidebarMenuSubButton
-                  isActive={pathname.startsWith(`/courses/${course.id}`)}
-                  render={
-                    <Link
-                      href={`/courses/${course.id}/spec`}
-                      title={`${course.code} – ${course.title}`}
-                    >
-                      <span>
-                        {course.code} – {course.title}
-                      </span>
-                    </Link>
-                  }
-                />
-              </SidebarMenuSubItem>
-            ))
-          ) : (
-            <SidebarMenuSubItem>
-              <span className="px-2 py-1 text-xs text-sidebar-muted">
-                No courses yet
-              </span>
-            </SidebarMenuSubItem>
-          )}
-        </SidebarMenuSub>
-      ) : null}
-    </SidebarMenuItem>
   );
 }

@@ -7,8 +7,8 @@ import { MyCoursesClient } from "./my-courses-client";
 import { TeachingRoleBadge } from "./teaching-role-badge";
 
 /**
- * Programme-wide roles that keep the curriculum-management "Course Management"
- * view — mirrors the backend's PROGRAMME_WIDE_ROLES (apps/backend/src/core/auth/token.ts),
+ * Programme-wide roles keep the shared courses/specification catalogue view —
+ * mirrors the backend's PROGRAMME_WIDE_ROLES (apps/backend/src/core/auth/token.ts),
  * duplicated here since the frontend has no import path to that backend module.
  * Anyone else holding "lecturer" gets the focused "Course Specifications" view;
  * a caller with neither (e.g. a not-yet-resolved session) falls back to the
@@ -44,7 +44,10 @@ export function CoursesPageClient() {
 
   return (
     <>
-      <Topbar title="Course Management" subtitle="Courses — CRUD, list, syllabus" />
+      <Topbar
+        title="Courses & Specifications"
+        subtitle="Course records, specifications, and responsible lecturers."
+      />
       <main className="flex-1 overflow-y-auto p-6">
         <CoursesClient />
       </main>

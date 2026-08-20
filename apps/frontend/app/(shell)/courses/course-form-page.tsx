@@ -21,6 +21,7 @@ import { coursesApi } from "@/lib/courses";
 import { CourseFormFields, type CourseFormValues } from "./course-form-fields";
 
 const BACK_HREF = "/courses";
+const COURSE_WORKSPACE_LABEL = "Courses & Specifications";
 
 const emptyDefaults: CourseFormValues = {
   code: "",
@@ -119,7 +120,7 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink render={<Link href={BACK_HREF}>Course Management</Link>} />
+                <BreadcrumbLink render={<Link href={BACK_HREF}>{COURSE_WORKSPACE_LABEL}</Link>} />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
@@ -140,7 +141,7 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
             <p className="text-sm text-muted-foreground">
               That course could not be found.{" "}
               <Link href={BACK_HREF} className="underline">
-                Back to Course Management
+                Back to {COURSE_WORKSPACE_LABEL}
               </Link>
             </p>
           ) : (
@@ -160,7 +161,11 @@ export function CourseFormPage({ courseId }: { courseId: string | null }) {
               />
 
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
-                <Button type="button" variant="outline" render={<Link href={BACK_HREF}>Cancel</Link>} />
+                <Button
+                  nativeButton={false}
+                  variant="outline"
+                  render={<Link href={BACK_HREF}>Cancel</Link>}
+                />
                 <Button type="submit" disabled={saving}>
                   {saving ? "Saving…" : editing ? "Save changes" : "Add course"}
                 </Button>
