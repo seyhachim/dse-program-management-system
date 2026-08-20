@@ -197,6 +197,63 @@ function makeCurriculumRead() {
   };
 }
 
+function makePublicSearch() {
+  return {
+    async search(_programmeId: string, question: string) {
+      if (/python/i.test(question)) {
+        return {
+          kind: "answer" as const,
+          score: 92,
+          faq: {
+            slug: "programming-experience",
+            category: "Admission" as const,
+            question: "Do I need programming experience before I study DSE?",
+            answer: "Prior programming experience is helpful but not required.",
+            shortAnswer: "Programming experience is not required.",
+            isFeatured: true,
+            sourceLabel: null,
+            sourceUrl: null,
+          },
+        };
+      }
+      if (/scholarship/i.test(question)) {
+        return {
+          kind: "suggestions" as const,
+          suggestions: [
+            {
+              score: 64,
+              faq: {
+                slug: "scholarships",
+                category: "FeesScholarships" as const,
+                question: "Are scholarships available?",
+                answer: "Published scholarship information.",
+                shortAnswer: null,
+                isFeatured: true,
+                sourceLabel: null,
+                sourceUrl: null,
+              },
+            },
+            {
+              score: 58,
+              faq: {
+                slug: "scholarship-deadline",
+                category: "FeesScholarships" as const,
+                question: "When is the scholarship deadline?",
+                answer: "Published deadline information.",
+                shortAnswer: null,
+                isFeatured: false,
+                sourceLabel: null,
+                sourceUrl: null,
+              },
+            },
+          ],
+        };
+      }
+      return { kind: "none" as const };
+    },
+  };
+}
+
 let server: Server;
 let baseUrl: string;
 let client: FakeClient;
@@ -210,6 +267,7 @@ beforeAll(async () => {
     client,
     publicRead: makePublicRead(),
     publicCurriculumRead: makeCurriculumRead(),
+    publicSearch: makePublicSearch(),
   }));
   server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", () => resolve()));
@@ -291,7 +349,7 @@ describe("public Telegram webhook", () => {
     expect(client.sent.at(-1)?.text).toContain("matches more than one published course");
   });
 
-  test("year and semester question renders a readable study plan", async () => {
+  test("year and semester question routes to published curriculum rather than FAQ search", async () => {
     const response = await webhook({ update_id: 32, message: { message_id: 32, chat: { id: 20 }, text: "what do I study in year 2 semester 2?" } });
     expect(response.status).toBe(200);
     const text = client.sent.at(-1)?.text ?? "";
@@ -306,6 +364,29 @@ describe("public Telegram webhook", () => {
     expect(text).toContain("Published route total: 2 courses · 5 credits");
     expect(text).toContain("rows sum to 6");
     expect(text).toContain("⚠️ Source conflict");
+  });
+
+  test("free-text strong Ask DSE match returns only the approved answer", async () => {
+    const response = await webhook({ update_id: 36, message: { message_id: 36, chat: { id: 20 }, text: "need python before study?" } });
+    expect(response.status).toBe(200);
+    const text = client.sent.at(-1)?.text ?? "";
+    expect(text).toContain("Do I need programming experience");
+    expect(text).toContain("Programming experience is not required.");
+  });
+
+  test("ambiguous Ask DSE search returns ranked confirmed question suggestions", async () => {
+    const response = await webhook({ update_id: 37, message: { message_id: 37, chat: { id: 20 }, text: "scholarship" } });
+    expect(response.status).toBe(200);
+    const text = client.sent.at(-1)?.text ?? "";
+    expect(text).toContain("Possible matches");
+    expect(text).toContain("Are scholarships available?");
+    expect(text).toContain("When is the scholarship deadline?");
+  });
+
+  test("no-match Ask DSE query fails safely without inventing an answer", async () => {
+    const response = await webhook({ update_id: 38, message: { message_id: 38, chat: { id: 20 }, text: "tell me today's football score" } });
+    expect(response.status).toBe(200);
+    expect(client.sent.at(-1)?.text).toContain("couldn't find a confirmed answer");
   });
 
   test("FAQ callback edits the existing message and answers the callback query", async () => {
