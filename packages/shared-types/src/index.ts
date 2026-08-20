@@ -2,6 +2,7 @@ export * from "./plugins.ts";
 export * from "./contracts.ts";
 export * from "./auth.ts";
 export * from "./programme.ts";
+export * from "./grading-scales.ts";
 export * from "./curriculum.ts";
 export * from "./curriculum-import.ts";
 export * from "./curriculum-artifact-types.ts";
