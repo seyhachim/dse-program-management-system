@@ -76,6 +76,14 @@ async function getImportantDate(programmeId: string, id: string) {
   return item;
 }
 
+function requireDraft(status: ProgrammePublicPublicationStatus, label: string): void {
+  if (status === ProgrammePublicPublicationStatus.Published) {
+    throw new PublicProgrammeInfoConflictError(
+      `Published ${label} must be unpublished before editing or deletion.`,
+    );
+  }
+}
+
 export const publicProgrammeInfoService = {
   async overview(programmeId: string) {
     await assertProgramme(programmeId);
@@ -128,7 +136,8 @@ export const publicProgrammeInfoService = {
   },
 
   async updateFaq(programmeId: string, id: string, input: ProgrammeFaqAdminWrite) {
-    await getFaq(programmeId, id);
+    const faq = await getFaq(programmeId, id);
+    requireDraft(faq.status, "FAQs");
     return prisma.programmeFaq.update({ where: { id }, data: faqData(input) });
   },
 
@@ -150,11 +159,7 @@ export const publicProgrammeInfoService = {
 
   async deleteFaq(programmeId: string, id: string) {
     const faq = await getFaq(programmeId, id);
-    if (faq.status === ProgrammePublicPublicationStatus.Published) {
-      throw new PublicProgrammeInfoConflictError(
-        "Published FAQs must be unpublished before deletion.",
-      );
-    }
+    requireDraft(faq.status, "FAQs");
     await prisma.programmeFaq.delete({ where: { id } });
   },
 
@@ -186,7 +191,8 @@ export const publicProgrammeInfoService = {
     id: string,
     input: ProgrammeImportantDateAdminWrite,
   ) {
-    await getImportantDate(programmeId, id);
+    const item = await getImportantDate(programmeId, id);
+    requireDraft(item.status, "important dates");
     return prisma.programmeImportantDate.update({
       where: { id },
       data: importantDateData(input),
@@ -211,11 +217,7 @@ export const publicProgrammeInfoService = {
 
   async deleteImportantDate(programmeId: string, id: string) {
     const item = await getImportantDate(programmeId, id);
-    if (item.status === ProgrammePublicPublicationStatus.Published) {
-      throw new PublicProgrammeInfoConflictError(
-        "Published important dates must be unpublished before deletion.",
-      );
-    }
+    requireDraft(item.status, "important dates");
     await prisma.programmeImportantDate.delete({ where: { id } });
   },
 
