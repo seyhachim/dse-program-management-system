@@ -229,11 +229,13 @@ export function MyCoursesClient() {
     {
       key: "status",
       header: "Spec Status",
+      className: "w-44",
       render: (row) => <SpecStatusCell progress={row.progress} />,
     },
     {
       key: "attention",
       header: "Attention",
+      className: "w-64",
       render: (row) => <AttentionCell progress={row.progress} />,
     },
   ];
