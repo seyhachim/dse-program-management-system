@@ -9,8 +9,9 @@ import { createCurriculumWorkflowRouter } from "./curriculum-workflow-router.ts"
 import { createGradingScaleRouter } from "./grading-scale-router.ts";
 import { createPublicProgrammeInfoRouter } from "./public-programme-info-router.ts";
 import { createPublicProgrammeReadRouter } from "./public-programme-read-router.ts";
+import { publicProgrammeReadService } from "./public-programme-read-service.ts";
 import { createProgrammeRouter } from "./router.ts";
-import { programmeService, type ProgrammeService } from "./service.ts";
+import { programmeService } from "./service.ts";
 
 const programmeRouter = Router();
 
@@ -29,8 +30,15 @@ authenticatedProgrammeRouter.use(createCurriculumImportRouter());
 authenticatedProgrammeRouter.use("/public-information", createPublicProgrammeInfoRouter());
 programmeRouter.use(authenticatedProgrammeRouter);
 
-export const programmePlugin: BackendPlugin<ProgrammeService> = {
+export const programmeBackendService = {
+  ...programmeService,
+  publicRead: publicProgrammeReadService,
+};
+
+export type ProgrammeBackendService = typeof programmeBackendService;
+
+export const programmePlugin: BackendPlugin<ProgrammeBackendService> = {
   manifest: programmeManifest,
   router: programmeRouter,
-  service: programmeService,
+  service: programmeBackendService,
 };
