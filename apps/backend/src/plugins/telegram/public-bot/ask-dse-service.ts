@@ -54,6 +54,23 @@ const STOP_WORDS = new Set([
   "to", "what", "when", "where", "which", "who", "with", "you",
 ]);
 
+const TOKEN_SYNONYMS: Record<string, string[]> = {
+  python: ["programming", "coding", "experience"],
+  code: ["coding", "programming"],
+  coding: ["programming"],
+  prereq: ["prerequisite", "requirement"],
+  prerequisite: ["requirement"],
+  scholarship: ["scholarships", "funding", "eligibility", "application", "deadline"],
+  scholarships: ["scholarship", "funding", "eligibility", "application", "deadline"],
+  fee: ["fees", "tuition", "cost"],
+  fees: ["fee", "tuition", "cost"],
+  job: ["jobs", "career", "careers"],
+  jobs: ["job", "career", "careers"],
+  work: ["career", "careers", "job"],
+  apply: ["application", "admission"],
+  deadline: ["date", "application"],
+};
+
 function normalize(value: string): string {
   return value
     .normalize("NFKC")
@@ -63,10 +80,19 @@ function normalize(value: string): string {
     .replace(/\s+/g, " ");
 }
 
-function tokens(value: string): string[] {
+function baseTokens(value: string): string[] {
   return normalize(value)
     .split(" ")
     .filter((token) => token.length >= 2 && !STOP_WORDS.has(token));
+}
+
+function queryTokens(value: string): string[] {
+  const expanded = new Set<string>();
+  for (const token of baseTokens(value)) {
+    expanded.add(token);
+    for (const synonym of TOKEN_SYNONYMS[token] ?? []) expanded.add(synonym);
+  }
+  return [...expanded];
 }
 
 function hasAny(text: string, phrases: string[]): boolean {
@@ -78,6 +104,10 @@ function sourceForCourse(course: PublicCurriculumCourse): string[] {
   const source = [`curriculum:${course.provenance.curriculumVersionId}@${course.provenance.curriculumVersion}`];
   if (course.provenance.sourceSha256) source.push(`sha256:${course.provenance.sourceSha256}`);
   return source;
+}
+
+function faqProvenance(faq: PublicProgrammeFaq): string[] {
+  return faq.sourceUrl ? [`faq:${faq.slug}`, faq.sourceUrl] : [`faq:${faq.slug}`];
 }
 
 function formatCourse(course: PublicCurriculumCourse): string {
@@ -129,23 +159,42 @@ function possibleCourseQuery(text: string): string | null {
   return explicit || null;
 }
 
-function faqScore(question: string, faq: PublicProgrammeFaq): number {
-  const queryTokens = tokens(question);
-  if (!queryTokens.length) return 0;
-  const haystack = new Set(tokens(`${faq.question} ${faq.shortAnswer ?? ""} ${faq.answer}`));
-  const overlap = queryTokens.filter((token) => haystack.has(token)).length;
-  const exactQuestion = normalize(faq.question) === normalize(question) ? 10 : 0;
-  return exactQuestion + overlap / queryTokens.length;
+type RankedFaq = { faq: PublicProgrammeFaq; score: number };
+
+function rankFaqs(question: string, faqs: PublicProgrammeFaq[]): RankedFaq[] {
+  const query = queryTokens(question);
+  if (!query.length) return [];
+  const normalizedQuestion = normalize(question);
+  return faqs
+    .map((faq) => {
+      const questionTokens = new Set(baseTokens(faq.question));
+      const answerTokens = new Set(baseTokens(`${faq.shortAnswer ?? ""} ${faq.answer}`));
+      let score = normalize(faq.question) === normalizedQuestion ? 10 : 0;
+      for (const token of query) {
+        if (questionTokens.has(token)) score += 1;
+        else if (answerTokens.has(token)) score += 0.35;
+      }
+      score /= Math.max(1, query.length);
+      if (faq.isFeatured) score += 0.03;
+      return { faq, score };
+    })
+    .filter((item) => item.score >= 0.2)
+    .sort((a, b) => b.score - a.score || a.faq.question.localeCompare(b.faq.question));
 }
 
-function bestFaq(question: string, faqs: PublicProgrammeFaq[]): PublicProgrammeFaq | null {
-  const scored = faqs
-    .map((faq) => ({ faq, score: faqScore(question, faq) }))
-    .filter((item) => item.score >= 0.5)
-    .sort((a, b) => b.score - a.score || a.faq.question.localeCompare(b.faq.question));
-  if (!scored.length) return null;
-  if (scored.length > 1 && scored[0]!.score === scored[1]!.score) return null;
-  return scored[0]!.faq;
+function directFaq(question: string, ranked: RankedFaq[]): PublicProgrammeFaq | null {
+  if (!ranked.length) return null;
+  const top = ranked[0]!;
+  if (normalize(top.faq.question) === normalize(question)) return top.faq;
+  const runnerUp = ranked[1]?.score ?? 0;
+  if (top.score >= 0.72 && top.score - runnerUp >= 0.18) return top.faq;
+  return null;
+}
+
+function faqSuggestions(ranked: RankedFaq[]): string | null {
+  const suggestions = ranked.filter((item) => item.score >= 0.28).slice(0, 4);
+  if (!suggestions.length) return null;
+  return `I found a few published DSE topics that may match. Please choose the closest one:\n\n${suggestions.map((item) => `• ${item.faq.question}`).join("\n")}`;
 }
 
 function contactText(contact: PublicProgrammeContact): string {
@@ -158,6 +207,29 @@ function contactText(contact: PublicProgrammeContact): string {
     contact.applicationUrl && `Apply: ${contact.applicationUrl}`,
   ].filter(Boolean);
   return lines.length ? `DSE contact information\n\n${lines.join("\n")}` : "No published contact information is available yet.";
+}
+
+function faqAnswer(question: string, faqs: PublicProgrammeFaq[]): AskDseAnswer | null {
+  const ranked = rankFaqs(question, faqs);
+  const direct = directFaq(question, ranked);
+  if (direct) {
+    return {
+      intent: "faq",
+      matched: true,
+      text: `${direct.question}\n\n${direct.shortAnswer ?? direct.answer}`,
+      provenance: faqProvenance(direct),
+    };
+  }
+  const suggestions = faqSuggestions(ranked);
+  if (suggestions) {
+    return {
+      intent: "faq",
+      matched: false,
+      text: suggestions,
+      provenance: ranked.slice(0, 4).flatMap((item) => faqProvenance(item.faq)),
+    };
+  }
+  return null;
 }
 
 export function createAskDseService(deps: AskDseDependencies) {
@@ -215,21 +287,28 @@ export function createAskDseService(deps: AskDseDependencies) {
           };
         }
 
-        if (hasAny(clean, ["admission", "admissions", "apply", "application", "eligibility", "requirement", "entrance exam"])) {
+        if (hasAny(clean, ["admission", "admissions", "apply", "application", "entrance exam"])) {
           const admission = await deps.publicRead.getAdmission(programmeId);
-          const faq = bestFaq(clean, admission.faqs);
+          const matchedFaq = faqAnswer(clean, admission.faqs);
+          if (matchedFaq?.matched) return { ...matchedFaq, intent: "admission" };
           const details = [
-            faq ? `${faq.question}\n${faq.shortAnswer ?? faq.answer}` : null,
+            matchedFaq?.text ?? null,
             admission.applicationUrl && `Apply: ${admission.applicationUrl}`,
             admission.admissionEmail && `Email: ${admission.admissionEmail}`,
             admission.phone && `Phone: ${admission.phone}`,
           ].filter(Boolean);
           return {
             intent: "admission",
-            matched: true,
+            matched: matchedFaq?.matched ?? true,
             text: `Admission\n\n${details.length ? details.join("\n\n") : "No published admission details are available yet."}`,
-            provenance: faq?.sourceUrl ? [`faq:${faq.slug}`, faq.sourceUrl] : faq ? [`faq:${faq.slug}`] : ["programme-public-profile"],
+            provenance: matchedFaq?.provenance.length ? matchedFaq.provenance : ["programme-public-profile"],
           };
+        }
+
+        if (hasAny(clean, ["scholarship", "scholarships", "funding"])) {
+          const data = await deps.publicRead.getFeesScholarships(programmeId);
+          const answer = faqAnswer(clean, data.faqs);
+          if (answer) return answer;
         }
 
         if (hasAny(clean, ["what is dse", "about dse", "programme overview", "program overview"])) {
@@ -242,16 +321,8 @@ export function createAskDseService(deps: AskDseDependencies) {
           };
         }
 
-        const faqs = await deps.publicRead.listFaqs(programmeId);
-        const faq = bestFaq(clean, faqs);
-        if (faq) {
-          return {
-            intent: "faq",
-            matched: true,
-            text: `${faq.question}\n\n${faq.shortAnswer ?? faq.answer}`,
-            provenance: faq.sourceUrl ? [`faq:${faq.slug}`, faq.sourceUrl] : [`faq:${faq.slug}`],
-          };
-        }
+        const answer = faqAnswer(clean, await deps.publicRead.listFaqs(programmeId));
+        if (answer) return answer;
       } catch (error) {
         if (error instanceof PublicCurriculumConflictError) {
           return {
