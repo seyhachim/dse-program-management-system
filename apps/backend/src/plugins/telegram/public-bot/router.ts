@@ -14,10 +14,9 @@ import { registry } from "../../../core/plugins/registry.ts";
 import type {
   PublicCurriculumCourse,
   PublicCurriculumReadService,
-  PublicCurriculumStudyPlan,
-  PublicCurriculumTotals,
 } from "../../programme/public-curriculum-read-service.ts";
 import { getTelegramConfig, type TelegramConfig } from "../config.ts";
+import { createAskDseService } from "./ask-dse-service.ts";
 import {
   MAIN_REPLY_KEYBOARD,
   MENUS,
@@ -148,7 +147,7 @@ function formatCourse(course: PublicCurriculumCourse): string {
   const hours = course.weeklyHoursTotal === null
     ? "Weekly hours: not available in the published source"
     : `Weekly hours: ${course.weeklyHoursTotal} (${course.weeklyLectureHours ?? 0} lecture + ${course.weeklyLabHours ?? 0} lab + ${course.weeklyFieldVisitHours ?? 0} field)`;
-  const lines = [
+  return [
     `${course.code} · ${course.title}`,
     `Year ${course.yearLevel}, Semester ${course.semester === "First" ? 1 : 2}`,
     `Credits: ${course.credits}`,
@@ -156,8 +155,7 @@ function formatCourse(course: PublicCurriculumCourse): string {
     course.lecturerText ? `Lecturer(s): ${course.lecturerText}` : null,
     course.conflicts.length ? `⚠️ Source conflict: ${course.conflicts.join("; ")}` : null,
     `Source: approved curriculum v${course.provenance.curriculumVersion}`,
-  ].filter(Boolean);
-  return lines.join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 function formatCourseList(courses: PublicCurriculumCourse[]): string {
@@ -165,27 +163,10 @@ function formatCourseList(courses: PublicCurriculumCourse[]): string {
   const lines = courses.slice(0, 40).map(
     (course) => `• ${course.code} — ${course.title} (${course.credits} cr)`,
   );
-  const suffix = courses.length > 40 ? `\n\nShowing 40 of ${courses.length} courses. Ask for a course code for details.` : "";
+  const suffix = courses.length > 40
+    ? `\n\nShowing 40 of ${courses.length} courses. Ask for a course code for details.`
+    : "";
   return `Courses · Published Curriculum\n\n${lines.join("\n")}${suffix}`;
-}
-
-function formatStudyPlan(plan: PublicCurriculumStudyPlan): string {
-  const heading = `Year ${plan.yearLevel} · Semester ${plan.semester === "First" ? 1 : 2}`;
-  const lines = plan.courses.map((course) => {
-    const hours = course.weeklyHoursTotal === null ? "hours n/a" : `${course.weeklyHoursTotal} h/wk`;
-    return `• ${course.code} — ${course.title} · ${course.credits} cr · ${hours}`;
-  });
-  const totalHours = plan.totalWeeklyHours === null ? "weekly hours incomplete" : `${plan.totalWeeklyHours} h/week`;
-  return `${heading}\n\n${lines.join("\n")}\n\nTotal: ${plan.totalCredits} credits · ${totalHours}\nSource: approved curriculum v${plan.provenance.curriculumVersion}`;
-}
-
-function formatTotals(totals: PublicCurriculumTotals): string {
-  const hours = totals.totalWeeklyHours === null ? "not fully available" : `${totals.totalWeeklyHours}`;
-  const breakdown = totals.byYearSemester.map((row) => {
-    const rowHours = row.weeklyHours === null ? "hours n/a" : `${row.weeklyHours} h/wk`;
-    return `• Year ${row.yearLevel} Sem ${row.semester === "First" ? 1 : 2}: ${row.courseCount} courses · ${row.credits} credits · ${rowHours}`;
-  });
-  return `Programme Study Load\n\n${breakdown.join("\n")}\n\nPublished route total: ${totals.totalCourses} courses · ${totals.totalCredits} credits · weekly hours ${hours}\nSource: approved curriculum v${totals.provenance.curriculumVersion}`;
 }
 
 async function renderRoute(
@@ -224,7 +205,7 @@ async function renderRoute(
   if (route === "ask") {
     const faqs = await publicRead.listFaqs(programmeId, { featured: true });
     return {
-      text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nYou can also choose a topic below.`,
+      text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nType /ask followed by a question, or just type a public DSE question directly.`,
       replyMarkup: inlineKeyboard(route),
     };
   }
@@ -303,15 +284,6 @@ async function renderStaticCallback(
   return renderRoute("home", programmeId, publicRead);
 }
 
-function parseStudyPlanQuestion(text: string): { year: number; semester: "First" | "Second" } | null {
-  const match = text.match(/\byear\s*([1-4])\b.*\bsem(?:ester)?\s*([12])\b/i)
-    ?? text.match(/\byear\s*([1-4])\b.*\b(first|second)\s+semester\b/i);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const semesterToken = match[2]?.toLocaleLowerCase();
-  return { year, semester: semesterToken === "1" || semesterToken === "first" ? "First" : "Second" };
-}
-
 export function createPublicTelegramRouter(
   deps: PublicTelegramRouterDependencies = {},
 ): Router {
@@ -339,6 +311,7 @@ export function createPublicTelegramRouter(
     const programmeService = deps.publicRead && deps.publicCurriculumRead ? null : resolveProgrammeService();
     const publicRead = deps.publicRead ?? programmeService!.publicRead;
     const publicCurriculumRead = deps.publicCurriculumRead ?? programmeService!.publicCurriculumRead;
+    const askDse = createAskDseService({ publicRead, publicCurriculumRead });
     const programmeId = config.publicProgrammeId;
 
     try {
@@ -348,12 +321,19 @@ export function createPublicTelegramRouter(
         if (text === "/start" || text === "/menu") {
           await client.sendMessage({
             chatId: update.message.chat.id,
-            text: "Welcome to the DSE Program Information Bot 👋\n\nChoose a topic below, type /courses, or type /ask for public DSE questions.",
+            text: "Welcome to the DSE Program Information Bot 👋\n\nChoose a topic below, type /courses, or ask a public DSE question.",
             replyMarkup: replyKeyboard(),
           });
         } else if (text === "/ask") {
           const rendered = await renderRoute("ask", programmeId, publicRead);
           await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
+        } else if (/^\/ask\s+\S+/i.test(text)) {
+          const answer = await askDse.answer(programmeId, text.replace(/^\/ask\s+/i, ""));
+          await client.sendMessage({
+            chatId: update.message.chat.id,
+            text: answer.text,
+            replyMarkup: replyKeyboard(),
+          });
         } else if (text === "/courses") {
           await client.sendMessage({
             chatId: update.message.chat.id,
@@ -361,46 +341,20 @@ export function createPublicTelegramRouter(
             replyMarkup: replyKeyboard(),
           });
         } else if (/^\/course\s+\S+/i.test(text)) {
-          const query = text.replace(/^\/course\s+/i, "").trim();
-          await client.sendMessage({
-            chatId: update.message.chat.id,
-            text: formatCourse(await publicCurriculumRead.getCourse(programmeId, query)),
-            replyMarkup: replyKeyboard(),
-          });
+          const answer = await askDse.answer(programmeId, text.replace(/^\/course\s+/i, "course "));
+          await client.sendMessage({ chatId: update.message.chat.id, text: answer.text, replyMarkup: replyKeyboard() });
         } else {
-          const studyPlan = parseStudyPlanQuestion(text);
-          const looksLikeCourseCode = /^[A-Z]{2,5}\d{3}$/i.test(text);
-          const coursePhrase = text.match(/^(?:tell me about|course)\s+(.+)$/i)?.[1]?.trim();
-          if (studyPlan) {
-            await client.sendMessage({
-              chatId: update.message.chat.id,
-              text: formatStudyPlan(await publicCurriculumRead.getStudyPlan(programmeId, studyPlan.year, studyPlan.semester)),
-              replyMarkup: replyKeyboard(),
-            });
-          } else if (/\b(?:credit load|credits|hours per week|weekly hours)\b/i.test(text)) {
-            await client.sendMessage({
-              chatId: update.message.chat.id,
-              text: formatTotals(await publicCurriculumRead.getTotals(programmeId)),
-              replyMarkup: replyKeyboard(),
-            });
-          } else if (looksLikeCourseCode || coursePhrase) {
-            await client.sendMessage({
-              chatId: update.message.chat.id,
-              text: formatCourse(await publicCurriculumRead.getCourse(programmeId, coursePhrase ?? text)),
-              replyMarkup: replyKeyboard(),
-            });
+          const route = routeForReplyText(text);
+          if (route) {
+            const rendered = await renderRoute(route, programmeId, publicRead);
+            await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
           } else {
-            const route = routeForReplyText(text);
-            if (route) {
-              const rendered = await renderRoute(route, programmeId, publicRead);
-              await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
-            } else {
-              await client.sendMessage({
-                chatId: update.message.chat.id,
-                text: "I couldn't match that to a confirmed DSE topic yet. Choose a menu item, use /courses, or use /ask.",
-                replyMarkup: replyKeyboard(),
-              });
-            }
+            const answer = await askDse.answer(programmeId, text);
+            await client.sendMessage({
+              chatId: update.message.chat.id,
+              text: answer.text,
+              replyMarkup: replyKeyboard(),
+            });
           }
         }
       } else if (update.callback_query) {
@@ -415,7 +369,7 @@ export function createPublicTelegramRouter(
           } else if (parsedCallback.kind === "course") {
             try {
               rendered = {
-                text: formatCourse(await publicCurriculumRead.getCourse(programmeId, parsedCallback.courseCode)),
+                text: formatCourse(await publicCurriculumRead.getCourse(programmeId, parsedCallback.code)),
                 replyMarkup: inlineKeyboard("curriculum"),
               };
             } catch {
