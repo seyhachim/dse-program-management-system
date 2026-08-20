@@ -22,6 +22,15 @@ type ResponsibilityRow = {
   lecturerId: string;
 };
 
+type CourseSpecProgressRow = {
+  courseId: string;
+  code: string;
+  title: string;
+  completed: number;
+  total: number;
+  incompleteSections: Array<{ id: string; title: string }>;
+};
+
 integrationDescribe("Course Spec Responsible Lecturer integration", () => {
   let appServer: Server;
   let baseUrl = "";
@@ -109,6 +118,113 @@ integrationDescribe("Course Spec Responsible Lecturer integration", () => {
     }
   });
 
+  test("spec progress includes Responsible-Lecturer and Offering scopes without leaking", async () => {
+    const createdCourseIds: string[] = [];
+    const createFixtureCourse = async (label: string) => {
+      const course = await createCourse(label);
+      createdCourseIds.push(course.id);
+      return course;
+    };
+
+    try {
+      const responsibleOnly = await createFixtureCourse("PROGRESS-RESP");
+      expect(
+        await prisma.offering.count({ where: { courseId: responsibleOnly.id } }),
+      ).toBe(0);
+      expect((await assignTeam(responsibleOnly.id, [lecturerA.id])).status).toBe(200);
+
+      const offeringPrimary = await createFixtureCourse("PROGRESS-PRIMARY");
+      const primarySpecId = await createApprovedSpec(offeringPrimary.id, []);
+      await createOfferingFixture(
+        offeringPrimary.id,
+        primarySpecId,
+        lecturerA.id,
+      );
+
+      const offeringCoLecturer = await createFixtureCourse("PROGRESS-CO");
+      const coSpecId = await createApprovedSpec(offeringCoLecturer.id, []);
+      await createOfferingFixture(
+        offeringCoLecturer.id,
+        coSpecId,
+        lecturerB.id,
+        [lecturerA.id],
+      );
+
+      const responsibleAndOffering = await createFixtureCourse("PROGRESS-BOTH");
+      const bothSpecId = await createApprovedSpec(
+        responsibleAndOffering.id,
+        [lecturerA.id],
+      );
+      await createOfferingFixture(
+        responsibleAndOffering.id,
+        bothSpecId,
+        lecturerA.id,
+      );
+
+      const lecturerProgressResponse = await request(
+        "/api/courses/spec-progress",
+        { token: signToken(lecturerA) },
+      );
+      expect(lecturerProgressResponse.status).toBe(200);
+      const lecturerProgress =
+        lecturerProgressResponse.body as CourseSpecProgressRow[];
+
+      for (const course of [
+        responsibleOnly,
+        offeringPrimary,
+        offeringCoLecturer,
+        responsibleAndOffering,
+      ]) {
+        expect(
+          lecturerProgress.filter((row) => row.courseId === course.id),
+        ).toHaveLength(1);
+      }
+
+      const responsibleOnlyProgress = lecturerProgress.find(
+        (row) => row.courseId === responsibleOnly.id,
+      );
+      expect(responsibleOnlyProgress).toBeDefined();
+      expect(responsibleOnlyProgress!.completed).toBe(0);
+      expect(responsibleOnlyProgress!.total).toBeGreaterThan(0);
+      expect(responsibleOnlyProgress!.incompleteSections).toHaveLength(
+        responsibleOnlyProgress!.total,
+      );
+
+      const outsiderProgressResponse = await request(
+        "/api/courses/spec-progress",
+        { token: signToken(outsider) },
+      );
+      expect(outsiderProgressResponse.status).toBe(200);
+      const outsiderProgress = outsiderProgressResponse.body as CourseSpecProgressRow[];
+      const protectedCourseIds = new Set([
+        responsibleOnly.id,
+        offeringPrimary.id,
+        offeringCoLecturer.id,
+        responsibleAndOffering.id,
+      ]);
+      expect(
+        outsiderProgress.some((row) => protectedCourseIds.has(row.courseId)),
+      ).toBe(false);
+
+      const coordinatorProgressResponse = await request(
+        "/api/courses/spec-progress",
+        { token: signToken(coordinator) },
+      );
+      expect(coordinatorProgressResponse.status).toBe(200);
+      const coordinatorProgress =
+        coordinatorProgressResponse.body as CourseSpecProgressRow[];
+      for (const courseId of protectedCourseIds) {
+        expect(
+          coordinatorProgress.some((row) => row.courseId === courseId),
+        ).toBe(true);
+      }
+    } finally {
+      for (const courseId of createdCourseIds.reverse()) {
+        await deleteCourse(courseId);
+      }
+    }
+  });
+
   test("Responsible Lecturer membership is locked after Course Spec submission", async () => {
     const course = await createCourse("LOCK");
     try {
@@ -182,6 +298,53 @@ integrationDescribe("Course Spec Responsible Lecturer integration", () => {
     });
   }
 
+  async function createApprovedSpec(
+    courseId: string,
+    lecturerIds: string[],
+  ): Promise<string> {
+    const assigned = await assignTeam(courseId, lecturerIds);
+    expect(assigned.status).toBe(200);
+    const courseSpecId = (assigned.body as { courseSpecId: string }).courseSpecId;
+    expect(courseSpecId).toBeTruthy();
+
+    await prisma.courseSpec.update({
+      where: { id: courseSpecId },
+      data: {
+        reviewStatus: "Approved",
+        approvedAt: new Date(),
+      },
+    });
+
+    return courseSpecId;
+  }
+
+  async function createOfferingFixture(
+    courseId: string,
+    courseSpecId: string,
+    lecturerId: string,
+    coLecturerIds: string[] = [],
+  ): Promise<void> {
+    const token = crypto.randomUUID().slice(0, 8);
+    await prisma.offering.create({
+      data: {
+        courseId,
+        courseSpecId,
+        lecturerId,
+        term: `I465-${token}`,
+        sectionCode: "A",
+        capacity: 30,
+        status: "Planned",
+        coLecturers: coLecturerIds.length
+          ? {
+              create: coLecturerIds.map((coLecturerId) => ({
+                lecturerId: coLecturerId,
+              })),
+            }
+          : undefined,
+      },
+    });
+  }
+
   async function request(
     path: string,
     options: { method?: string; token?: string; body?: unknown } = {},
@@ -217,6 +380,7 @@ async function createCourse(label: string) {
 }
 
 async function deleteCourse(courseId: string): Promise<void> {
+  await prisma.offering.deleteMany({ where: { courseId } });
   await prisma.course.delete({ where: { id: courseId } });
 }
 
