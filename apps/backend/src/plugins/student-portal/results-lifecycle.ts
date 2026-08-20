@@ -176,6 +176,16 @@ export function assertDraftWritable(publishedAt: Date | string | null | undefine
   }
 }
 
+export function assertGenericFinalizedCorrectionMode(
+  mode: "Individual" | "Group" | "GroupIndividual",
+) {
+  if (mode !== "Individual") {
+    throw new PortalConflictError(
+      "Group and Group + Individual results must be corrected through the group assessment source correction workflow",
+    );
+  }
+}
+
 export function publicationReadiness(
   enrollmentIds: string[],
   results: Array<{
@@ -672,7 +682,17 @@ export const resultsLifecycleService = {
         include: {
           enrollment: {
             include: {
-              offering: { include: { coLecturers: true } },
+              offering: {
+                include: {
+                  coLecturers: true,
+                  courseSpec: {
+                    select: {
+                      id: true,
+                      assessmentItems: { select: { id: true, mode: true } },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -690,6 +710,20 @@ export const resultsLifecycleService = {
       if (!result.finalizedAt || !result.finalizedById || !result.publishedAt) {
         throw new PortalConflictError("Only finalized results can use the controlled correction workflow");
       }
+
+      const spec = result.enrollment.offering.courseSpec;
+      if (!spec || spec.id !== result.courseSpecId) {
+        throw new PortalConflictError(
+          "Finalized result does not match the Offering's bound CourseSpec version.",
+        );
+      }
+      const assessment = spec.assessmentItems.find((item) => item.id === result.assessmentItemId);
+      if (!assessment) {
+        throw new PortalConflictError(
+          "Finalized result does not match the Offering's bound CourseSpec assessment.",
+        );
+      }
+      assertGenericFinalizedCorrectionMode(assessment.mode);
 
       const expectedUpdatedAt = new Date(input.expectedUpdatedAt).toISOString();
       if (result.updatedAt.toISOString() !== expectedUpdatedAt) {
