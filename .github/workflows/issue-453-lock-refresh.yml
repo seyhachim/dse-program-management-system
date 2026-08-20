@@ -1,0 +1,55 @@
+name: Issue 453 lock refresh
+
+on:
+  push:
+    branches:
+      - fix/issue-453-button-hydration-tailwind-merge
+    paths:
+      - .github/workflows/issue-453-lock-refresh.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-453-button-hydration-tailwind-merge
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Align UI tailwind-merge and refresh lockfile
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/ui/package.json')
+          text = path.read_text()
+          old = '"tailwind-merge": "^2.5.4"'
+          new = '"tailwind-merge": "^3.6.0"'
+          if old not in text:
+              raise SystemExit('expected tailwind-merge v2 constraint not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          bun install
+          if grep -q '"@dse-pms/ui/tailwind-merge"' bun.lock; then
+            echo 'nested UI tailwind-merge v2 entry still present' >&2
+            exit 1
+          fi
+          grep -q '"tailwind-merge": "^3.6.0"' packages/ui/package.json
+          grep -q '"tailwind-merge": \["tailwind-merge@3.6.0"' bun.lock
+
+      - name: Commit dependency alignment
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- packages/ui/package.json bun.lock
+          git diff --cached --check
+          git commit -m 'fix(ui): align tailwind-merge with Tailwind 4'
+          git push
