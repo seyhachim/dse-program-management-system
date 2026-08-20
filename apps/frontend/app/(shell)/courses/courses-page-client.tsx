@@ -4,7 +4,6 @@ import { Topbar } from "../topbar";
 import { useMe } from "@/lib/auth";
 import { CoursesClient } from "./courses-client";
 import { MyCoursesClient } from "./my-courses-client";
-import { TeachingRoleBadge } from "./teaching-role-badge";
 
 /**
  * Programme-wide roles keep the shared courses/specification catalogue view —
@@ -14,26 +13,36 @@ import { TeachingRoleBadge } from "./teaching-role-badge";
  * a caller with neither (e.g. a not-yet-resolved session) falls back to the
  * programme-wide view while `me` loads.
  */
-const PROGRAMME_WIDE_ROLES = ["admin", "program_coordinator", "program_secretary", "qa_reviewer"];
+const PROGRAMME_WIDE_ROLES = [
+  "admin",
+  "program_coordinator",
+  "program_secretary",
+  "qa_reviewer",
+];
 
 export function CoursesPageClient() {
   const { me } = useMe();
-  const isLecturerOnly = me != null && me.roles.includes("lecturer") && !me.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r));
+  const isLecturerOnly =
+    me != null &&
+    me.roles.includes("lecturer") &&
+    !me.roles.some((role) => PROGRAMME_WIDE_ROLES.includes(role));
 
   if (isLecturerOnly) {
     return (
       <>
         <Topbar
           title="Course Specifications"
-          subtitle="Specification status, completeness, and follow-up for the courses you teach."
+          subtitle="Specification status, completeness, and follow-up for the courses you teach or are responsible for."
         />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm">
-            <span className="font-medium text-foreground">Your specification role:</span>
-            <TeachingRoleBadge role="Primary" />
-            <TeachingRoleBadge role="Co-Lecturer" />
+            <span className="font-medium text-foreground">
+              Your Course Specifications
+            </span>
             <span className="text-muted-foreground">
-              Class sections that share a course are grouped under one course specification.
+              Courses appear when you are a Responsible Lecturer or are assigned
+              to teach a class section. A Course Spec can be prepared before
+              sections are created.
             </span>
           </div>
           <MyCoursesClient />
