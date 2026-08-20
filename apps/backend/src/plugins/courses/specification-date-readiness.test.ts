@@ -13,7 +13,7 @@ describe("Specification Date submission readiness", () => {
   });
 
   test("requires complete status plus a persisted date", () => {
-    expect(isSpecificationDateReady("incomplete", "2026-08-20")).toBe(false);
+    expect(isSpecificationDateReady("draft", "2026-08-20")).toBe(false);
     expect(isSpecificationDateReady("complete", null)).toBe(false);
     expect(isSpecificationDateReady("complete", "   ")).toBe(false);
     expect(isSpecificationDateReady("complete", "2026-08-20")).toBe(true);
