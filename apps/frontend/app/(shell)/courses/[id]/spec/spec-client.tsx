@@ -81,7 +81,7 @@ import { OverviewTab } from "./overview-tab";
 import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
-import { EMPTY_POLICY, PolicySection } from "./policy-section";
+import { EMPTY_POLICY } from "./policy-section";
 import { EMPTY_DATE } from "./date-section";
 import type {
   DateSection as DateSectionValue,
@@ -102,10 +102,10 @@ import {
   toReferencesPayload,
   type ReferencesForm,
 } from "./references-model";
-import {
-  EMPTY_STUDENT_RESPONSIBILITY,
-  StudentResponsibilitySection,
-} from "./student-responsibility-section";
+import { EMPTY_STUDENT_RESPONSIBILITY } from "./student-responsibility-section";
+import { PoliciesResponsibilitiesSection } from "./policies-responsibilities-section";
+import { normalizePoliciesResponsibilitiesTab } from "./policies-responsibilities-model";
+
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
   | "overview"
@@ -123,8 +123,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
   { id: "references", label: "References" },
-  { id: "responsibility", label: "Responsibility" },
-  { id: "policy", label: "Policies" },
+  { id: "policy", label: "Policies & Responsibilities" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
@@ -137,7 +136,6 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "mapping",
   "resources",
   "references",
-  "responsibility",
   "policy",
 ]);
 
@@ -149,7 +147,9 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
-    const requested = searchParams.get("tab");
+    const requested = normalizePoliciesResponsibilitiesTab(
+      searchParams.get("tab"),
+    );
     return TABS.some((t) => t.id === requested)
       ? (requested as TabId)
       : "overview";
@@ -210,9 +210,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
   );
   const setActiveTab = useCallback(
     (id: TabId) => {
+      const normalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
       const locked =
         review !== null && !REVIEW_EDITABLE_STATUSES.has(review.status);
-      const nextId = locked && EDITABLE_SPEC_TABS.has(id) ? "reviewSubmit" : id;
+      const nextId =
+        locked && EDITABLE_SPEC_TABS.has(normalizedId)
+          ? "reviewSubmit"
+          : normalizedId;
       setActiveTabState(nextId);
       router.replace(
         nextId === "overview" ? pathname : `${pathname}?tab=${nextId}`,
@@ -819,19 +823,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
               <ReferencesSectionForm value={references} onPersist={persistReferences} />
             </TabsContent>
 
-            <TabsContent value="responsibility" className="mt-4">
-              <StudentResponsibilitySection
-                value={responsibility}
-                onPersist={persistResponsibility}
-                disabled={editingLocked}
-              />
-            </TabsContent>
-
             <TabsContent value="policy" className="mt-4">
-              <PolicySection
-                value={policy}
+              <PoliciesResponsibilitiesSection
+                policy={policy}
+                responsibility={responsibility}
                 programPolicy={programme?.policy ?? null}
-                onPersist={persistPolicy}
+                onPersistPolicy={persistPolicy}
+                onPersistResponsibility={persistResponsibility}
                 disabled={editingLocked}
               />
             </TabsContent>
