@@ -128,8 +128,10 @@ describe("validateGradingScaleBands", () => {
 });
 
 describe("gradingScaleScoreLabel", () => {
-  test("formats the baseline edge bands for the course document", () => {
+  test("preserves the published DSE score-band wording", () => {
     expect(gradingScaleScoreLabel(baseline[0]!)).toBe("85–100");
+    expect(gradingScaleScoreLabel(baseline[1]!)).toBe("80–84");
+    expect(gradingScaleScoreLabel(baseline[6]!)).toBe("50–59");
     expect(gradingScaleScoreLabel(baseline[7]!)).toBe("<50");
   });
 });
