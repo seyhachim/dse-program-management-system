@@ -17,7 +17,7 @@ import type {
   CourseDeliveryOffering,
   CourseDeliveryResultRow,
 } from "@dse-pms/shared-types";
-import { Button, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@dse-pms/ui";
+import { Button, Input, StatusBadge, Tabs, TabsContent, TabsList, TabsTrigger } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { courseDeliveryApi, toDateTimeLocal } from "@/lib/course-delivery";
 import { Topbar } from "../topbar";
@@ -67,12 +67,12 @@ export function CourseDeliveryClient() {
             <>
               <CourseHeader offerings={offerings} selected={selected} onSelect={setSelectedId} />
               {notice ? (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <div className="flex items-center gap-2 rounded-xl border border-success/30 bg-success-bg px-4 py-3 text-sm text-success">
                   <CheckCircle2 className="h-4 w-4" />{notice}
                 </div>
               ) : null}
               {selected.specificationStatus !== "Approved" ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                <div className="rounded-xl border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning">
                   The course specification is {selected.specificationStatus?.toLowerCase() ?? "not available"}.
                   Students will see assessment details only after approval.
                 </div>
@@ -115,7 +115,7 @@ function CourseHeader({ offerings, selected, onSelect }: {
     0,
   );
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm md:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap gap-2 text-xs font-semibold">
@@ -282,14 +282,14 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
           </div>
         ) : <Muted>Add active assessments to the course specification first.</Muted>}
         {assessment ? (
-          <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-            <span className="rounded-full bg-muted px-3 py-1">{draftCount} draft</span>
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{publishedCount} published</span>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">{missingCount} missing</span>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <StatusBadge tone="neutral" label={`${draftCount} draft`} icon={false} />
+            <StatusBadge tone="success" label={`${publishedCount} published`} icon={false} />
+            <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
           </div>
         ) : null}
         {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
-        {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
+        {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-warning">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
       {assessment ? (
@@ -330,9 +330,9 @@ function ResultRow({ assessment, row, onChanged }: { assessment: CourseDeliveryA
           <div className="flex items-center gap-2">
             <p className="font-semibold">{row.studentName}</p>
             {locked ? (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Published · locked</span>
+              <StatusBadge tone="success" label="Published · locked" icon={false} />
             ) : row.score !== null ? (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">Draft</span>
+              <StatusBadge tone="neutral" label="Draft" icon={false} />
             ) : null}
           </div>
           <p className="text-xs text-muted-foreground">{row.studentCode}</p>
@@ -457,13 +457,13 @@ function CommentList({ comments, empty }: { comments: string[]; empty: string })
 
 type PanelProps = { offering: CourseDeliveryOffering; onChanged: (message: string) => Promise<void> };
 const textareaClass = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
-function Panel({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) { return <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><h3 className="font-semibold">{title}</h3>{description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}<div className="mt-4">{children}</div></section>; }
+function Panel({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) { return <section className="rounded-xl border border-border bg-card p-5 shadow-sm"><h3 className="font-semibold">{title}</h3>{description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}<div className="mt-4">{children}</div></section>; }
 function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) { return <label className={`block text-sm font-medium ${className}`}>{label}<div className="mt-1">{children}</div></label>; }
 function Metric({ icon: Icon, label, value }: { icon: typeof Bell; label: string; value: string }) { return <div className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4 text-primary" />{label}</div><p className="mt-2 text-2xl font-bold tracking-tight">{value}</p></div>; }
 function Muted({ children }: { children: React.ReactNode }) { return <p className="text-sm text-muted-foreground">{children}</p>; }
 function InlineError({ children }: { children: React.ReactNode }) { return <p className="mt-2 text-sm text-destructive">{children}</p>; }
 function messageFrom(reason: unknown, fallback: string) { return reason instanceof ApiError || reason instanceof Error ? reason.message : fallback; }
 function formatDate(value: string | null) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "Not published"; }
-function LoadingState() { return <div className="rounded-2xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading your course sections…</div>; }
-function ErrorState({ message, retry }: { message: string; retry: () => Promise<void> }) { return <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center"><p className="text-sm text-destructive">{message}</p><Button variant="outline" className="mt-4" onClick={() => void retry()}>Try again</Button></div>; }
-function EmptyState() { return <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center"><ClipboardCheck className="mx-auto h-9 w-9 text-muted-foreground" /><h2 className="mt-3 font-semibold">No assigned course sections</h2><p className="mt-1 text-sm text-muted-foreground">Course delivery appears after you are assigned as a primary or co-lecturer.</p></div>; }
+function LoadingState() { return <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading your course sections…</div>; }
+function ErrorState({ message, retry }: { message: string; retry: () => Promise<void> }) { return <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center"><p className="text-sm text-destructive">{message}</p><Button variant="outline" className="mt-4" onClick={() => void retry()}>Try again</Button></div>; }
+function EmptyState() { return <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center"><ClipboardCheck className="mx-auto h-9 w-9 text-muted-foreground" /><h2 className="mt-3 font-semibold">No assigned course sections</h2><p className="mt-1 text-sm text-muted-foreground">Course delivery appears after you are assigned as a primary or co-lecturer.</p></div>; }
