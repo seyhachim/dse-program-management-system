@@ -4,6 +4,10 @@ import { extname, join } from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
+import {
+  courseInfoSnapshotFromDocument,
+  courseInfoSnapshotWarnings,
+} from "./course-spec-import-course-info.ts";
 
 const prisma = new PrismaClient();
 
@@ -25,6 +29,7 @@ const CanonicalCourseSchema = z
     }),
     course: z
       .object({
+        programmeTitle: z.string().nullable().optional(),
         code: z.string().min(1),
         title: z.string().min(1),
         credits: z
@@ -48,7 +53,10 @@ const CanonicalCourseSchema = z
         primary: z
           .object({
             name: z.string().default(""),
+            title: z.string().nullable().optional(),
+            qualification: z.string().nullable().optional(),
             email: z.string().nullable().optional(),
+            phone: z.string().nullable().optional(),
           })
           .passthrough(),
         coLecturers: z.array(z.string()).default([]),
@@ -239,7 +247,9 @@ function parseArgs(argv: string[]): CliOptions {
   };
 }
 
-async function walkJsonFiles(path: string): Promise<string[]> {
+async function walkJsonFiles(path: string): 
+
+ Promise<string[]> {
   const out: string[] = [];
   for (const entry of await readdir(path, { withFileTypes: true })) {
     const full = join(path, entry.name);
@@ -427,7 +437,17 @@ async function importOne(doc: CanonicalCourse, file: string, options: CliOptions
   const lecturer = await resolveLecturer(doc);
   if (lecturer.warning) warnings.push(lecturer.warning);
   if ((doc.lecturers.coLecturers ?? []).length) warnings.push("Co-lecturers were preserved in source JSON but not imported because they belong to a term-specific Offering");
-  if (doc.course.availability?.semester || doc.course.availability?.year) warnings.push("Semester/programme year were not imported because the Offering model requires a real term");
+  warnings.push(...courseInfoSnapshotWarnings(doc));
+  if (
+    doc.source.semesterFolder ||
+    doc.source.yearFolder ||
+    doc.course.availability?.semester ||
+    doc.course.availability?.year
+  ) {
+    warnings.push(
+      "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term",
+    );
+  }
 
   const existingCourse = await prisma.course.findUnique({
     where: { code: courseCode },
@@ -470,7 +490,14 @@ async function importOne(doc: CanonicalCourse, file: string, options: CliOptions
         select: { id: true },
       });
       if (oldSpec && options.replaceExisting) await tx.courseSpec.delete({ where: { id: oldSpec.id } });
-      const spec = await tx.courseSpec.create({ data: { courseId: course.id } });
+      const spec = await tx.courseSpec.create({
+        data: {
+          courseId: course.id,
+          courseInfo: {
+            create: courseInfoSnapshotFromDocument(doc, grandTotalSlt(doc)),
+          },
+        },
+      });
 
       const teachingMethodNames = new Set<string>();
       const assessmentMethodNames = new Set<string>();
