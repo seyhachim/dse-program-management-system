@@ -15,6 +15,7 @@ import {
 import { createCourseSpecVersionHistoryRouter } from "./version-history-router.ts";
 import {
   courseService,
+  listSpecProgressForCourseIds,
   ReferenceError,
   type CourseService,
 } from "./service.ts";
@@ -63,13 +64,8 @@ courseService.listSpecProgress = async (lecturerScope) => {
 
   if (missingResponsibleCourseIds.length === 0) return rows;
 
-  // Reuse the canonical progress calculation instead of duplicating section
-  // completeness logic. The unscoped result stays server-side and is filtered
-  // to the current lecturer's Responsible Lecturer memberships before return.
-  const missingIds = new Set(missingResponsibleCourseIds);
-  const allProgress = await offeringScopedSpecProgress();
-  const responsibleOnlyRows = allProgress.filter((row) =>
-    missingIds.has(row.courseId),
+  const responsibleOnlyRows = await listSpecProgressForCourseIds(
+    missingResponsibleCourseIds,
   );
 
   return [...rows, ...responsibleOnlyRows].sort((a, b) =>
