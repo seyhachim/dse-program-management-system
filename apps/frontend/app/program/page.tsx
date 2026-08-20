@@ -17,7 +17,7 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
-import { publicProgrammeContent } from "@/lib/public-programme";
+import { loadPublicProgrammePage } from "@/lib/public-programme-live";
 import fixes from "./program-fixes.module.css";
 import styles from "./program.module.css";
 
@@ -46,8 +46,22 @@ const practiceIcons = {
 
 const snapshotIcons = [CalendarDays, GraduationCap, BookOpen, GraduationCap] as const;
 
-export default function ProgrammePage() {
-  const content = publicProgrammeContent;
+function formatPublicDate(value: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function categoryLabel(category: string): string {
+  return category
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace("Fees Scholarships", "Fees & Scholarships");
+}
+
+export default async function ProgrammePage() {
+  const content = await loadPublicProgrammePage();
+  const applicationUrl = content.contact?.applicationUrl;
 
   return (
     <main className={styles.page}>
@@ -63,6 +77,7 @@ export default function ProgrammePage() {
               <a href="#curriculum">Curriculum</a>
               <a href="#learning">Outcomes</a>
               <a href="#practice">Experience</a>
+              {content.faqs.length > 0 && <a href="#faq">FAQ</a>}
               <a href="#stories">News</a>
             </div>
             <div className={styles.navActions}>
@@ -78,6 +93,7 @@ export default function ProgrammePage() {
                   <a href="#curriculum">Curriculum</a>
                   <a href="#learning">Outcomes</a>
                   <a href="#practice">Experience</a>
+                  {content.faqs.length > 0 && <a href="#faq">FAQ</a>}
                   <a href="#stories">News</a>
                 </nav>
               </details>
@@ -96,9 +112,15 @@ export default function ProgrammePage() {
             <a href="#curriculum" className={styles.primaryButton}>
               Explore Curriculum <span aria-hidden="true">→</span>
             </a>
-            <a href="#learning" className={styles.secondaryButton}>
-              Discover DSE
-            </a>
+            {applicationUrl ? (
+              <a href={applicationUrl} className={styles.secondaryButton}>
+                Apply to DSE
+              </a>
+            ) : (
+              <a href="#learning" className={styles.secondaryButton}>
+                Discover DSE
+              </a>
+            )}
           </div>
         </div>
         <div className={styles.heroVisual} aria-hidden="true">
@@ -175,20 +197,26 @@ export default function ProgrammePage() {
                 <p className={styles.kicker}>{content.curriculumPreview.heading}</p>
                 <h3>Start with the foundations</h3>
               </div>
-              <span className={styles.sourceBadge}>Curriculum preview</span>
+              <span className={styles.sourceBadge}>{content.curriculumPreview.sourceBadge}</span>
             </div>
             <div className={styles.semesters}>
               {content.curriculumPreview.semesters.map((semester) => (
                 <article key={semester.title}>
                   <h4>{semester.title}</h4>
-                  <ul>
-                    {semester.courses.map((course) => (
-                      <li key={course.code}>
-                        <span>{course.title}</span>
-                        <code>{course.code}</code>
-                      </li>
-                    ))}
-                  </ul>
+                  {semester.courses.length > 0 ? (
+                    <ul>
+                      {semester.courses.map((course) => (
+                        <li key={course.code}>
+                          <span>{course.title}</span>
+                          <code>{course.code}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className={styles.previewNote}>
+                      No courses are currently published for this semester.
+                    </p>
+                  )}
                 </article>
               ))}
             </div>
@@ -233,6 +261,93 @@ export default function ProgrammePage() {
         </div>
       </section>
 
+      {content.faqs.length > 0 && (
+        <section className={`${styles.section} ${styles.shell}`} id="faq">
+          <div className={styles.sectionHeading}>
+            <p className={styles.kicker}>Published programme information</p>
+            <h2>Frequently asked questions</h2>
+            <p>Official answers maintained and published by the DSE programme.</p>
+          </div>
+          <div className={styles.storyGrid}>
+            {content.faqs.map((faq) => (
+              <article key={faq.slug}>
+                <div>
+                  <small>{categoryLabel(faq.category)}</small>
+                  <h3>{faq.question}</h3>
+                  <p>{faq.answer}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {content.importantDates.length > 0 && (
+        <section className={styles.curriculumSection} id="dates">
+          <div className={`${styles.section} ${styles.shell}`}>
+            <div className={styles.sectionHeading}>
+              <p className={styles.kicker}>Published schedule</p>
+              <h2>Important dates</h2>
+              <p>Current dates published by the DSE programme.</p>
+            </div>
+            <div className={styles.storyGrid}>
+              {content.importantDates.map((item) => (
+                <article key={`${item.kind}-${item.date}-${item.title}`}>
+                  <div>
+                    <small>{categoryLabel(item.kind)}</small>
+                    <h3>{item.title}</h3>
+                    <p>
+                      {formatPublicDate(item.date)}
+                      {item.endDate ? ` – ${formatPublicDate(item.endDate)}` : ""}
+                    </p>
+                    {item.description && <p>{item.description}</p>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {content.contact && (
+        <section className={styles.careersSection} id="contact">
+          <div className={`${styles.shell} ${styles.careersInner}`}>
+            <div>
+              <p className={styles.kicker}>Published contact information</p>
+              <h2>Contact DSE</h2>
+              {content.contact.campusAddress && <p>{content.contact.campusAddress}</p>}
+            </div>
+            <div className={styles.heroActions}>
+              {content.contact.admissionEmail && (
+                <a href={`mailto:${content.contact.admissionEmail}`} className={styles.secondaryButton}>
+                  Email admissions
+                </a>
+              )}
+              {content.contact.phone && (
+                <a href={`tel:${content.contact.phone.replace(/\s+/g, "")}`} className={styles.secondaryButton}>
+                  Call DSE
+                </a>
+              )}
+              {content.contact.websiteUrl && (
+                <a href={content.contact.websiteUrl} className={styles.secondaryButton}>
+                  DSE website
+                </a>
+              )}
+              {content.contact.facebookUrl && (
+                <a href={content.contact.facebookUrl} className={styles.secondaryButton}>
+                  Facebook
+                </a>
+              )}
+              {applicationUrl && (
+                <a href={applicationUrl} className={styles.primaryButton}>
+                  Apply to DSE
+                </a>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className={`${styles.section} ${styles.shell}`} id="stories">
         <div className={styles.sectionHeading}>
           <p className={styles.kicker}>Programme life</p>
@@ -265,6 +380,7 @@ export default function ProgrammePage() {
             <a href="#programme">Programme</a>
             <a href="#curriculum">Curriculum</a>
             <a href="#learning">Outcomes</a>
+            {content.faqs.length > 0 && <a href="#faq">FAQ</a>}
             <Link href="/login">PMS Login</Link>
           </nav>
         </div>
