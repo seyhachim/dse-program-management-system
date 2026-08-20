@@ -3,6 +3,7 @@ import {
   AddCurriculumCourseSchema,
   CreateCurriculumRevisionSchema,
   CreateInitialCurriculumSchema,
+  CurriculumPathwaySchema,
   RemoveCurriculumCourseSchema,
   ReorderCurriculumCoursesSchema,
   UpdateCurriculumCourseSchema,
@@ -51,5 +52,41 @@ describe("curriculum API contracts", () => {
   test("reorder requires a scoped semester and placement ids", () => {
     expect(ReorderCurriculumCoursesSchema.safeParse({ yearLevel: 3, semester: "First", placementIds: ["b9ef991c-3c4d-4e49-b438-95c971f99509"] }).success).toBe(true);
     expect(ReorderCurriculumCoursesSchema.safeParse({ yearLevel: 3, semester: "First", placementIds: [] }).success).toBe(false);
+  });
+
+  test("pathway read contract preserves mutually exclusive route metadata", () => {
+    const parsed = CurriculumPathwaySchema.parse({
+      id: "7df88fc8-f693-461c-a760-69a6acbf50bd",
+      code: "RESEARCH",
+      name: "Research / Thesis",
+      yearLevel: 4,
+      semester: "Second",
+      isDefault: false,
+      creditTarget: 15,
+      sortOrder: 1,
+      totalCredits: 15,
+      courses: [
+        {
+          placementId: "b9ef991c-3c4d-4e49-b438-95c971f99509",
+          courseId: "8df88fc8-f693-461c-a760-69a6acbf50bd",
+          code: "THE402",
+          title: "Thesis",
+          yearLevel: 4,
+          semester: "Second",
+          credits: 15,
+          courseType: "Specialization",
+          sortOrder: 0,
+          pathwayId: "7df88fc8-f693-461c-a760-69a6acbf50bd",
+        },
+      ],
+    });
+
+    expect(parsed).toMatchObject({
+      code: "RESEARCH",
+      isDefault: false,
+      creditTarget: 15,
+      totalCredits: 15,
+    });
+    expect(parsed.courses[0]?.pathwayId).toBe(parsed.id);
   });
 });

@@ -27,6 +27,23 @@ const versionSelect = {
   updatedAt: true,
 } as const;
 
+const pathwayCourseSelect = {
+  id: true,
+  courseId: true,
+  pathwayId: true,
+  yearLevel: true,
+  semester: true,
+  creditsSnapshot: true,
+  courseTypeSnapshot: true,
+  sortOrder: true,
+  course: {
+    select: {
+      code: true,
+      title: true,
+    },
+  },
+} as const;
+
 function toIsoDate(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
@@ -77,6 +94,31 @@ function toVersionSummary(version: {
 function parseEffectiveFrom(value: string | null | undefined): Date | null | undefined {
   if (value === undefined) return undefined;
   return value === null ? null : new Date(`${value}T00:00:00.000Z`);
+}
+
+function toCurriculumCourse(placement: {
+  id: string;
+  courseId: string;
+  pathwayId: string | null;
+  yearLevel: number;
+  semester: "First" | "Second";
+  creditsSnapshot: number;
+  courseTypeSnapshot: "Basic" | "Core" | "Elective" | "Specialization" | "MoeysHeip";
+  sortOrder: number;
+  course: { code: string; title: string };
+}) {
+  return {
+    placementId: placement.id,
+    courseId: placement.courseId,
+    code: placement.course.code,
+    title: placement.course.title,
+    yearLevel: placement.yearLevel,
+    semester: placement.semester,
+    credits: placement.creditsSnapshot,
+    courseType: placement.courseTypeSnapshot,
+    sortOrder: placement.sortOrder,
+    pathwayId: placement.pathwayId,
+  };
 }
 
 async function defaultRoutePlacementIds(versionId: string): Promise<string[]> {
@@ -346,27 +388,59 @@ export const curriculumService = {
     }
 
     const visiblePlacementIds = await defaultRoutePlacementIds(selectedSummary.id);
-    const placements = await prisma.programmeCurriculumCourse.findMany({
-      where: {
-        curriculumVersionId: selectedSummary.id,
-        id: { in: visiblePlacementIds },
-      },
-      orderBy: [{ yearLevel: "asc" }, { semester: "asc" }, { sortOrder: "asc" }, { courseId: "asc" }],
-      select: {
-        id: true,
-        courseId: true,
-        yearLevel: true,
-        semester: true,
-        creditsSnapshot: true,
-        courseTypeSnapshot: true,
-        sortOrder: true,
-        course: {
-          select: {
-            code: true,
-            title: true,
+    const [placements, pathwayRows] = await Promise.all([
+      prisma.programmeCurriculumCourse.findMany({
+        where: {
+          curriculumVersionId: selectedSummary.id,
+          id: { in: visiblePlacementIds },
+        },
+        orderBy: [
+          { yearLevel: "asc" },
+          { semester: "asc" },
+          { sortOrder: "asc" },
+          { courseId: "asc" },
+        ],
+        select: pathwayCourseSelect,
+      }),
+      prisma.programmeCurriculumPathway.findMany({
+        where: { curriculumVersionId: selectedSummary.id },
+        orderBy: [
+          { yearLevel: "asc" },
+          { semester: "asc" },
+          { sortOrder: "asc" },
+          { code: "asc" },
+        ],
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          yearLevel: true,
+          semester: true,
+          isDefault: true,
+          creditTarget: true,
+          sortOrder: true,
+          courses: {
+            orderBy: [{ sortOrder: "asc" }, { courseId: "asc" }],
+            select: pathwayCourseSelect,
           },
         },
-      },
+      }),
+    ]);
+
+    const pathways = pathwayRows.map((pathway) => {
+      const courses = pathway.courses.map(toCurriculumCourse);
+      return {
+        id: pathway.id,
+        code: pathway.code,
+        name: pathway.name,
+        yearLevel: pathway.yearLevel,
+        semester: pathway.semester,
+        isDefault: pathway.isDefault,
+        creditTarget: pathway.creditTarget,
+        sortOrder: pathway.sortOrder,
+        courses,
+        totalCredits: courses.reduce((total, course) => total + course.credits, 0),
+      };
     });
 
     const years = [1, 2, 3, 4].map((yearLevel) => {
@@ -376,17 +450,7 @@ export const curriculumService = {
             (placement) =>
               placement.yearLevel === yearLevel && placement.semester === semester,
           )
-          .map((placement) => ({
-            placementId: placement.id,
-            courseId: placement.courseId,
-            code: placement.course.code,
-            title: placement.course.title,
-            yearLevel: placement.yearLevel,
-            semester: placement.semester,
-            credits: placement.creditsSnapshot,
-            courseType: placement.courseTypeSnapshot,
-            sortOrder: placement.sortOrder,
-          }));
+          .map(toCurriculumCourse);
 
         return {
           semester,
@@ -444,6 +508,7 @@ export const curriculumService = {
       selectedVersion: toVersionSummary(selectedSummary),
       versions: curriculum.versions.map(toVersionSummary),
       years,
+      pathways,
       totals,
     };
   },

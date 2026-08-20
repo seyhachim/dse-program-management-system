@@ -37,6 +37,7 @@ function read(versionId: string, courses: CurriculumCourse[], id = curriculumId)
     },
     versions: [],
     years,
+    pathways: [],
     totals: { programmeCredits: 0, basicCredits: 0, coreCredits: 0, electiveCredits: 0, specializationCredits: 0, moeysHeipCredits: 0 },
   };
 }
@@ -52,6 +53,7 @@ function course(id: string, overrides: Partial<CurriculumCourse> = {}): Curricul
     credits: 3,
     courseType: "Core",
     sortOrder: 0,
+    pathwayId: null,
     ...overrides,
   };
 }
