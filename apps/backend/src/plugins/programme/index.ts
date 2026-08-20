@@ -5,10 +5,12 @@ import { createCurriculumDraftRouter } from "./curriculum-draft-router.ts";
 import { createCurriculumHistoryRouter } from "./curriculum-history-router.ts";
 import { createCurriculumImportRouter } from "./curriculum-import-router.ts";
 import { createCurriculumWorkflowRouter } from "./curriculum-workflow-router.ts";
+import { createGradingScaleRouter } from "./grading-scale-router.ts";
 import { createProgrammeRouter } from "./router.ts";
 import { programmeService, type ProgrammeService } from "./service.ts";
 
 const programmeRouter = createProgrammeRouter();
+programmeRouter.use(createGradingScaleRouter());
 programmeRouter.use(createCurriculumDraftRouter());
 programmeRouter.use(createCurriculumWorkflowRouter());
 programmeRouter.use(createCurriculumHistoryRouter());

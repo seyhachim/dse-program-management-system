@@ -16,7 +16,6 @@ import {
 } from "docx";
 
 import {
-  LETTER_GRADES,
   PLOS,
   referenceKindLabel,
 } from "@dse-pms/shared-types";
@@ -1553,14 +1552,33 @@ function dateTable(specDate: CourseDocumentModel["specDate"]) {
   return table(rows, w);
 }
 
-function ratingScaleTable() {
+function ratingScaleTable(document: CourseDocumentModel) {
   const w = colWidths([25, 25, 25, 25]);
   const headers = ["Letter Grade", "Grade Point", "Score", "Explanation"];
   const rows = [
     new TableRow({ children: headers.map((h, i) => headerCell(h, w[i])) }),
   ];
-  for (const grade of LETTER_GRADES) {
-    const rowValues = [grade.grade, grade.point, grade.score, grade.label];
+  const grades = document.gradingScale?.grades ?? [];
+  if (grades.length === 0) {
+    rows.push(
+      new TableRow({
+        children: [
+          cell("No approved programme grading scale is bound to this Course Specification.", { width: w[0] }),
+          cell("", { width: w[1] }),
+          cell("", { width: w[2] }),
+          cell("", { width: w[3] }),
+        ],
+      }),
+    );
+    return table(rows, w);
+  }
+  for (const grade of grades) {
+    const rowValues = [
+      grade.letterGrade,
+      grade.gradePoint.toFixed(2),
+      grade.scoreLabel,
+      grade.explanation,
+    ];
     rows.push(
       new TableRow({
         children: rowValues.map((v, i) => cell(v, { width: w[i] })),
@@ -1716,7 +1734,7 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
-    sectionBox([sectionTitle("24", "Rating Scale"), ratingScaleTable()]),
+    sectionBox([sectionTitle("24", "Rating Scale"), ratingScaleTable(document)]),
   );
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
