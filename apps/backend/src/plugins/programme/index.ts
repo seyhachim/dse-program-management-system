@@ -7,6 +7,7 @@ import { createCurriculumHistoryRouter } from "./curriculum-history-router.ts";
 import { createCurriculumImportRouter } from "./curriculum-import-router.ts";
 import { createCurriculumWorkflowRouter } from "./curriculum-workflow-router.ts";
 import { createGradingScaleRouter } from "./grading-scale-router.ts";
+import { publicCurriculumReadService } from "./public-curriculum-read-service.ts";
 import { createPublicProgrammeInfoRouter } from "./public-programme-info-router.ts";
 import { createPublicProgrammeReadRouter } from "./public-programme-read-router.ts";
 import { publicProgrammeReadService } from "./public-programme-read-service.ts";
@@ -33,6 +34,7 @@ programmeRouter.use(authenticatedProgrammeRouter);
 export const programmeBackendService = {
   ...programmeService,
   publicRead: publicProgrammeReadService,
+  publicCurriculumRead: publicCurriculumReadService,
 };
 
 export type ProgrammeBackendService = typeof programmeBackendService;
