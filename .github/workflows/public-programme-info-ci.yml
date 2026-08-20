@@ -1,0 +1,66 @@
+name: Public Programme Information Integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/programme/public-programme-info-**"
+      - "apps/frontend/app/(shell)/public-information/**"
+      - "apps/frontend/lib/public-programme-info*"
+      - "packages/shared-types/src/public-programme-info*"
+      - ".github/workflows/public-programme-info-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/programme/public-programme-info-**"
+      - "apps/frontend/app/(shell)/public-information/**"
+      - "apps/frontend/lib/public-programme-info*"
+      - "packages/shared-types/src/public-programme-info*"
+      - ".github/workflows/public-programme-info-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  public-programme-info-db-integrity:
+    name: Public information DB and lifecycle invariants
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_public_info_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_public_info_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_public_info_ci?schema=public
+      PUBLIC_PROGRAMME_INFO_DB_TESTS: "1"
+      PUBLIC_PROGRAMME_INFO_ADMIN_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - name: Verify public information schema invariants
+        run: bun test apps/backend/src/plugins/programme/public-programme-info-db.test.ts
+      - name: Verify admin public information lifecycle
+        run: bun test apps/backend/src/plugins/programme/public-programme-info-service-db.test.ts
+      - name: Verify management scope rules
+        run: bun test apps/backend/src/plugins/programme/public-programme-info-router.test.ts
+      - name: Verify frontend API contract
+        run: bun test apps/frontend/lib/public-programme-info.test.ts
