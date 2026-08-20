@@ -1,15 +1,23 @@
 import {
   FinalizedResultCorrectionHistorySchema,
   FinalizedResultCorrectionWorkspaceSchema,
+  type CorrectAssessmentGroupScoreInput,
+  type CorrectAssessmentIndividualComponentInput,
   type CorrectFinalizedAssessmentResultInput,
   type CorrectFinalizedAssessmentResultResponse,
   type CourseDeliveryOffering,
   type CourseDeliveryResultReview,
+  type FinalizeAssessmentResultsInput,
+  type GroupAssessmentWorkspace,
   type OfferingResultAccessPolicy,
   type PublishAnnouncementInput,
   type PublishAssessmentResultsInput,
+  type SaveAssessmentGroupScoreInput,
+  type SaveAssessmentGroupsInput,
+  type SaveAssessmentIndividualComponentInput,
   type SaveAssessmentResultInput,
   type SaveAssessmentCriterionScoresInput,
+  type SaveAssessmentSourceCriterionScoresInput,
   type SetAssessmentDeadlineInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
@@ -46,6 +54,72 @@ export const courseDeliveryApi = {
     api.put("/api/student-portal/manage/results/criteria", input),
   publishAssessmentResults: (input: PublishAssessmentResultsInput) =>
     api.post("/api/student-portal/manage/results/publish", input),
+  finalizeAssessmentResults: (input: FinalizeAssessmentResultsInput) =>
+    api.post("/api/student-portal/manage/results/finalize", input),
+
+  groupWorkspace: (offeringId: string, assessmentItemId: string) =>
+    api.get<GroupAssessmentWorkspace>(
+      `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/groups`,
+    ),
+  saveGroups: (offeringId: string, assessmentItemId: string, input: SaveAssessmentGroupsInput) =>
+    api.put<GroupAssessmentWorkspace>(
+      `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/groups`,
+      input,
+    ),
+  saveGroupScore: (
+    offeringId: string,
+    assessmentItemId: string,
+    groupId: string,
+    input: SaveAssessmentGroupScoreInput,
+  ) => api.put<GroupAssessmentWorkspace>(
+    `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/groups/${groupId}/score`,
+    input,
+  ),
+  saveGroupCriteria: (
+    offeringId: string,
+    assessmentItemId: string,
+    groupId: string,
+    input: SaveAssessmentSourceCriterionScoresInput,
+  ) => api.put<GroupAssessmentWorkspace>(
+    `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/groups/${groupId}/criteria`,
+    input,
+  ),
+  saveIndividualComponent: (
+    offeringId: string,
+    assessmentItemId: string,
+    enrollmentId: string,
+    input: SaveAssessmentIndividualComponentInput,
+  ) => api.put<GroupAssessmentWorkspace>(
+    `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/students/${enrollmentId}/individual`,
+    input,
+  ),
+  saveIndividualCriteria: (
+    offeringId: string,
+    assessmentItemId: string,
+    enrollmentId: string,
+    input: SaveAssessmentSourceCriterionScoresInput,
+  ) => api.put<GroupAssessmentWorkspace>(
+    `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/students/${enrollmentId}/individual/criteria`,
+    input,
+  ),
+  correctGroupScore: (
+    offeringId: string,
+    assessmentItemId: string,
+    groupId: string,
+    input: CorrectAssessmentGroupScoreInput,
+  ) => api.post<GroupAssessmentWorkspace>(
+    `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/groups/${groupId}/correct`,
+    input,
+  ),
+  correctIndividualComponent: (
+    offeringId: string,
+    assessmentItemId: string,
+    enrollmentId: string,
+    input: CorrectAssessmentIndividualComponentInput,
+  ) => api.post<GroupAssessmentWorkspace>(
+    `/api/student-portal/manage/offerings/${offeringId}/assessments/${assessmentItemId}/students/${enrollmentId}/individual/correct`,
+    input,
+  ),
 };
 
 export function toDateTimeLocal(value: string | null): string {

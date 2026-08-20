@@ -15,7 +15,10 @@ export type AssessmentForm = {
   name: string;
   type: string;
   description: string;
-  mode: "individual" | "group";
+  mode: "individual" | "group" | "group_individual";
+  groupWeight: string;
+  individualWeight: string;
+  individualCriterionIds: string[];
   status: "active" | "inactive";
   cloCodes: string[];
   countsTowardGrade: boolean;
@@ -74,6 +77,9 @@ export function emptyAssessment(): AssessmentForm {
     type: "Assignment",
     description: "",
     mode: "individual",
+    groupWeight: "",
+    individualWeight: "",
+    individualCriterionIds: [],
     status: "active",
     cloCodes: [],
     countsTowardGrade: true,
@@ -108,7 +114,16 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       name: str(d.name),
       type: str(d.type) || "Assignment",
       description: str(d.description),
-      mode: d.mode === "group" ? "group" : "individual",
+      mode:
+        d.mode === "group"
+          ? "group"
+          : d.mode === "group_individual"
+            ? "group_individual"
+            : "individual",
+      groupWeight: d.groupWeight == null ? "" : String(d.groupWeight),
+      individualWeight:
+        d.individualWeight == null ? "" : String(d.individualWeight),
+      individualCriterionIds: strArray(d.individualCriterionIds),
       status: d.status === "inactive" ? "inactive" : "active",
       cloCodes: strArray(d.cloCodes),
       countsTowardGrade: weight !== "" && Number(weight) > 0,
@@ -120,10 +135,12 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       instructions: str(d.instructions),
       rubricId: str(d.rubricId),
       criterionCloMappings: Array.isArray(d.criterionCloMappings)
-        ? (d.criterionCloMappings as Array<Record<string, unknown>>).map((mapping) => ({
-            criterionId: str(mapping.criterionId),
-            cloCodes: strArray(mapping.cloCodes),
-          })).filter((mapping) => mapping.criterionId !== "")
+        ? (d.criterionCloMappings as Array<Record<string, unknown>>)
+            .map((mapping) => ({
+              criterionId: str(mapping.criterionId),
+              cloCodes: strArray(mapping.cloCodes),
+            }))
+            .filter((mapping) => mapping.criterionId !== "")
         : [],
       feedbackMethod: str(d.feedbackMethod),
       feedbackTimeline: str(d.feedbackTimeline),
@@ -174,6 +191,16 @@ export function toAssessmentPayload(
       type: a.type,
       description: a.description.trim(),
       mode: a.mode,
+      groupWeight:
+        a.mode !== "group_individual" || a.groupWeight === ""
+          ? null
+          : Number(a.groupWeight),
+      individualWeight:
+        a.mode !== "group_individual" || a.individualWeight === ""
+          ? null
+          : Number(a.individualWeight),
+      individualCriterionIds:
+        a.mode === "group_individual" ? a.individualCriterionIds : [],
       status: a.status,
       cloCodes: a.cloCodes,
       weight:
@@ -209,10 +236,13 @@ export function assessmentTotalWeight(items: AssessmentForm[]): number {
     .reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
 }
 
-export function assessmentEvidenceLabel(item: Pick<AssessmentForm, "cloCodes" | "countsTowardGrade">): string {
+export function assessmentEvidenceLabel(
+  item: Pick<AssessmentForm, "cloCodes" | "countsTowardGrade">,
+): string {
   if (item.countsTowardGrade && item.cloCodes.length === 0) return "Grade only";
   if (!item.countsTowardGrade && item.cloCodes.length > 0) return "CLO evidence only";
-  if (!item.countsTowardGrade && item.cloCodes.length === 0) return "Formative / neither";
+  if (!item.countsTowardGrade && item.cloCodes.length === 0)
+    return "Formative / neither";
   return "Grade + CLO evidence";
 }
 

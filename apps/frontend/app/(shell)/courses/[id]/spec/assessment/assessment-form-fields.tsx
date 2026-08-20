@@ -47,7 +47,9 @@ export function AssessmentFormFields({
   courseId: string;
   touched: boolean;
 }) {
-  const nameError = touched && draft.name.trim().length === 0;
+  const errors = assessmentFormErrors(draft);
+  const nameError = touched && errors.name;
+  const groupWeightsError = touched && errors.groupWeights;
   const selectedRubric = rubrics.find((rubric) => rubric.id === draft.rubricId);
   const missingRubric = draft.rubricId !== "" && !selectedRubric;
   const totalAssessmentSlt = assessmentSltHours(draft);
@@ -59,6 +61,13 @@ export function AssessmentFormFields({
       : [...(current?.cloCodes ?? []), cloCode];
     const other = draft.criterionCloMappings.filter((mapping) => mapping.criterionId !== criterionId);
     set({ criterionCloMappings: cloCodes.length ? [...other, { criterionId, cloCodes }] : other });
+  };
+
+  const setCriterionScope = (criterionId: string, scope: "group" | "individual") => {
+    const current = new Set(draft.individualCriterionIds);
+    if (scope === "individual") current.add(criterionId);
+    else current.delete(criterionId);
+    set({ individualCriterionIds: [...current] });
   };
 
   const toggleTopic = (topic: number) => {
@@ -115,18 +124,59 @@ export function AssessmentFormFields({
             </select>
           </Field>
 
-          <Field label="Group / Individual" required>
+          <Field label="Assessment Mode" required>
             <select
               value={draft.mode}
-              onChange={(event) =>
-                set({ mode: event.target.value as AssessmentForm["mode"] })
-              }
+              onChange={(event) => {
+                const mode = event.target.value as AssessmentForm["mode"];
+                set({
+                  mode,
+                  ...(mode === "group_individual"
+                    ? {}
+                    : { groupWeight: "", individualWeight: "", individualCriterionIds: [] }),
+                });
+              }}
               className={selectCls}
             >
               <option value="individual">Individual</option>
               <option value="group">Group</option>
+              <option value="group_individual">Group + Individual</option>
             </select>
           </Field>
+
+          {draft.mode === "group_individual" ? (
+            <>
+              <Field
+                label="Group Contribution (%)"
+                required
+                error={groupWeightsError ? "Group and individual contributions must be positive and total 100%." : undefined}
+              >
+                <input
+                  type="number"
+                  min={0.01}
+                  max={100}
+                  step="0.01"
+                  value={draft.groupWeight}
+                  onChange={(event) => set({ groupWeight: event.target.value })}
+                  placeholder="e.g. 70"
+                  className={inputCls(groupWeightsError)}
+                />
+              </Field>
+              <Field label="Individual Contribution (%)" required>
+                <input
+                  type="number"
+                  min={0.01}
+                  max={100}
+                  step="0.01"
+                  value={draft.individualWeight}
+                  onChange={(event) => set({ individualWeight: event.target.value })}
+                  placeholder="e.g. 30"
+                  className={inputCls(groupWeightsError)}
+                />
+                <Hint>These two percentages define how the final student result is derived. They are separate from the assessment's course-grade weight below.</Hint>
+              </Field>
+            </>
+          ) : null}
 
           <Field label="Status" required>
             <label className="flex h-9 items-center gap-3 rounded-lg border border-border px-3">
@@ -363,7 +413,13 @@ export function AssessmentFormFields({
           <Field label="Rubric">
             <select
               value={draft.rubricId}
-              onChange={(event) => set({ rubricId: event.target.value, criterionCloMappings: [] })}
+              onChange={(event) =>
+                set({
+                  rubricId: event.target.value,
+                  criterionCloMappings: [],
+                  individualCriterionIds: [],
+                })
+              }
               className={selectCls}
             >
               <option value="">— No rubric —</option>
@@ -403,13 +459,28 @@ export function AssessmentFormFields({
               {selectedRubric.criteria.map((criterion, index) => (
                 <div
                   key={criterion.id}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm"
+                  className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm"
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-foreground">{criterion.name}</span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-foreground">{criterion.name}</span>
+                      {draft.mode === "group_individual" ? (
+                        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          Score as
+                          <select
+                            value={draft.individualCriterionIds.includes(criterion.id) ? "individual" : "group"}
+                            onChange={(event) => setCriterionScope(criterion.id, event.target.value as "group" | "individual")}
+                            className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                          >
+                            <option value="group">Group evidence</option>
+                            <option value="individual">Individual evidence</option>
+                          </select>
+                        </label>
+                      ) : null}
+                    </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {draft.cloCodes.map((cloCode) => {
                         const checked = draft.criterionCloMappings
@@ -528,11 +599,24 @@ export function AssessmentFormFields({
 }
 
 export function assessmentFormErrors(draft: AssessmentForm) {
+  const groupWeight = Number(draft.groupWeight);
+  const individualWeight = Number(draft.individualWeight);
   return {
     name: draft.name.trim().length === 0,
     weight:
       draft.countsTowardGrade &&
       (draft.weight === "" || Number(draft.weight) <= 0 || Number(draft.weight) > 100),
+    groupWeights:
+      draft.mode === "group_individual" &&
+      (draft.groupWeight === "" ||
+        draft.individualWeight === "" ||
+        !Number.isFinite(groupWeight) ||
+        !Number.isFinite(individualWeight) ||
+        groupWeight <= 0 ||
+        individualWeight <= 0 ||
+        groupWeight > 100 ||
+        individualWeight > 100 ||
+        Math.abs(groupWeight + individualWeight - 100) > 0.000001),
   };
 }
 

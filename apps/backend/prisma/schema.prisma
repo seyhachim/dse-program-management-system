@@ -197,6 +197,21 @@ enum CloRowStatus {
 enum AssessmentItemMode {
   Individual
   Group
+  GroupIndividual
+}
+
+enum AssessmentGroupAuditAction {
+  GroupsConfigured
+  MembershipLocked
+  GroupScoreSaved
+  GroupCriterionScoresSaved
+  IndividualComponentSaved
+  IndividualCriterionScoresSaved
+  ResultsMaterialized
+  Published
+  Finalized
+  GroupScoreCorrected
+  IndividualComponentCorrected
 }
 
 /// Mirrors the shared-types `AssessmentStatus` zod enum ("active"|"inactive") for a
@@ -334,6 +349,12 @@ model User {
   assessmentResultsPublished       AssessmentResult[]               @relation("AssessmentResultPublishedBy")
   assessmentResultsFinalized       AssessmentResult[]               @relation("AssessmentResultFinalizedBy")
   assessmentResultCorrections      AssessmentResultCorrection[]     @relation("AssessmentResultCorrectionActor")
+  assessmentGroupsCreated          AssessmentGroup[]                @relation("AssessmentGroupCreatedBy")
+  assessmentGroupScoresRecorded    AssessmentGroupScore[]           @relation("AssessmentGroupScoreActor")
+  assessmentIndividualScoresRecorded AssessmentIndividualComponent[] @relation("AssessmentIndividualComponentActor")
+  assessmentGroupAuditEvents       AssessmentGroupAuditEvent[]      @relation("AssessmentGroupAuditActor")
+  assessmentGroupScoreCorrections  AssessmentGroupScoreCorrection[] @relation("AssessmentGroupScoreCorrectionActor")
+  assessmentIndividualCorrections  AssessmentIndividualComponentCorrection[] @relation("AssessmentIndividualComponentCorrectionActor")
   classResponsibilitiesAssigned    ClassResponsibilityAssignment[]  @relation("ClassResponsibilityAssignedBy")
   classResponsibilitiesRevoked     ClassResponsibilityAssignment[]  @relation("ClassResponsibilityRevokedBy")
   classResponsibilityAuditEvents   ClassResponsibilityAuditEvent[]  @relation("ClassResponsibilityAuditActor")
@@ -1855,6 +1876,9 @@ model CourseSpecAssessmentItem {
   type                String
   description         String               @default("")
   mode                AssessmentItemMode   @default(Individual)
+  groupWeight         Float?
+  individualWeight    Float?
+  individualCriterionIds String[]          @default([])
   status              AssessmentItemStatus @default(Active)
   cloCodes            String[]             @default([])
   assessmentCategory  String               @default("continuous")
@@ -1873,6 +1897,7 @@ model CourseSpecAssessmentItem {
   rubricId            String?
   rubric              Rubric?              @relation(fields: [rubricId], references: [id], onDelete: SetNull)
   criterionCloMappings CourseSpecCriterionCloMapping[]
+  assessmentGroups     AssessmentGroup[]
   mappedPlos          String[]             @default([])
   notes               String               @default("")
 
@@ -2015,6 +2040,7 @@ model Offering {
   announcements                  CourseAnnouncement[]
   feedbackResponses              CourseFeedback[]
   resultAccessPolicy             OfferingResultAccessPolicy?
+  assessmentGroups               AssessmentGroup[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
   qaCloAttainmentSnapshots       QaCloAttainmentSnapshot[]
@@ -2072,7 +2098,9 @@ model Enrollment {
   studentId  String
   student    Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
   createdAt  DateTime           @default(now())
-  results    AssessmentResult[]
+  results                       AssessmentResult[]
+  assessmentGroupMemberships    AssessmentGroupMember[]
+  assessmentIndividualComponents AssessmentIndividualComponent[]
 
   @@unique([offeringId, studentId])
   @@index([studentId])
@@ -2220,6 +2248,210 @@ model AssessmentCriterionScore {
   @@unique([assessmentResultId, rubricId, criterionId])
   @@index([assessmentResultId])
   @@index([rubricId, criterionId])
+}
+
+
+/// Offering + assessment scoped group snapshot. Membership becomes immutable as
+/// soon as scoring starts and publication/finalization provenance is retained.
+model AssessmentGroup {
+  id                 String                   @id @default(uuid())
+  offeringId         String
+  offering           Offering                 @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  courseSpecId       String
+  assessmentItemId   String
+  assessmentItem     CourseSpecAssessmentItem @relation(fields: [courseSpecId, assessmentItemId], references: [courseSpecId, id], onDelete: Restrict)
+  name               String
+  sortOrder          Int                      @default(0)
+  membershipLockedAt DateTime?
+  publishedAt        DateTime?
+  finalizedAt        DateTime?
+  createdById        String
+  createdBy          User                     @relation("AssessmentGroupCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  members              AssessmentGroupMember[]
+  score                AssessmentGroupScore?
+  individualComponents AssessmentIndividualComponent[]
+
+  @@unique([id, offeringId, courseSpecId, assessmentItemId])
+  @@unique([offeringId, courseSpecId, assessmentItemId, name])
+  @@index([offeringId, assessmentItemId, sortOrder])
+  @@index([createdById])
+}
+
+/// Immutable-at-publication membership snapshot. Student identity fields are
+/// copied so later profile edits cannot reinterpret historical group evidence.
+model AssessmentGroupMember {
+  id                    String          @id @default(uuid())
+  groupId               String
+  offeringId            String
+  courseSpecId          String
+  assessmentItemId      String
+  group                  AssessmentGroup @relation(fields: [groupId, offeringId, courseSpecId, assessmentItemId], references: [id, offeringId, courseSpecId, assessmentItemId], onDelete: Cascade)
+  enrollmentId          String
+  enrollment            Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  studentIdSnapshot     String
+  studentCodeSnapshot   String
+  studentNameSnapshot   String
+  createdAt             DateTime        @default(now())
+
+  @@unique([offeringId, courseSpecId, assessmentItemId, enrollmentId])
+  @@index([groupId])
+  @@index([enrollmentId])
+}
+
+/// One shared draft score for a group. It is provenance only; final student
+/// grades are materialized into AssessmentResult rows.
+model AssessmentGroupScore {
+  id                String          @id @default(uuid())
+  groupId           String          @unique
+  group             AssessmentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  score             Float
+  maxScore          Float
+  feedback          String          @default("")
+  rubricId          String?
+  rubricContentHash String?
+  scoredById        String
+  scoredBy          User            @relation("AssessmentGroupScoreActor", fields: [scoredById], references: [id], onDelete: Restrict)
+  criterionScores   AssessmentGroupCriterionScore[]
+  corrections       AssessmentGroupScoreCorrection[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([scoredById])
+}
+
+model AssessmentGroupCriterionScore {
+  id                String               @id @default(uuid())
+  groupScoreId      String
+  groupScore        AssessmentGroupScore @relation(fields: [groupScoreId], references: [id], onDelete: Cascade)
+  rubricId          String
+  criterionId       String
+  criterionName     String
+  rubricContentHash String
+  score             Float
+  maxScore          Float
+  rubricLevelId     String?
+  rubricLevelLabel  String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([groupScoreId, rubricId, criterionId])
+  @@index([rubricId, criterionId])
+}
+
+/// Per-student component used only by GroupIndividual assessments. The optional
+/// adjustment is explicit and reasoned; it is included in deterministic materialization.
+model AssessmentIndividualComponent {
+  id                 String          @id @default(uuid())
+  groupId            String
+  offeringId         String
+  courseSpecId       String
+  assessmentItemId   String
+  group              AssessmentGroup @relation(fields: [groupId, offeringId, courseSpecId, assessmentItemId], references: [id, offeringId, courseSpecId, assessmentItemId], onDelete: Cascade)
+  enrollmentId       String
+  enrollment         Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  score              Float
+  maxScore           Float
+  feedback           String          @default("")
+  adjustmentPoints   Float           @default(0)
+  adjustmentReason   String          @default("")
+  scoredById         String
+  scoredBy           User            @relation("AssessmentIndividualComponentActor", fields: [scoredById], references: [id], onDelete: Restrict)
+  criterionScores    AssessmentIndividualCriterionScore[]
+  corrections        AssessmentIndividualComponentCorrection[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([enrollmentId, courseSpecId, assessmentItemId])
+  @@index([groupId])
+  @@index([scoredById])
+}
+
+model AssessmentIndividualCriterionScore {
+  id                String                        @id @default(uuid())
+  componentId       String
+  component         AssessmentIndividualComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  rubricId          String
+  criterionId       String
+  criterionName     String
+  rubricContentHash String
+  score             Float
+  maxScore          Float
+  rubricLevelId     String?
+  rubricLevelLabel  String?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+
+  @@unique([componentId, rubricId, criterionId])
+  @@index([rubricId, criterionId])
+}
+
+/// Structured source correction for a finalized shared group score. Student-level
+/// official history is additionally recorded in AssessmentResultCorrection.
+model AssessmentGroupScoreCorrection {
+  id             String               @id @default(uuid())
+  groupScoreId   String
+  groupScore     AssessmentGroupScore @relation(fields: [groupScoreId], references: [id], onDelete: Restrict)
+  beforeScore    Float
+  beforeMaxScore Float
+  beforeFeedback String
+  afterScore     Float
+  afterMaxScore  Float
+  afterFeedback  String
+  reason         String
+  correctedById  String
+  correctedBy    User                 @relation("AssessmentGroupScoreCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
+  createdAt      DateTime             @default(now())
+
+  @@index([groupScoreId, createdAt])
+  @@index([correctedById])
+}
+
+model AssessmentIndividualComponentCorrection {
+  id                       String                        @id @default(uuid())
+  componentId              String
+  component                AssessmentIndividualComponent @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  beforeScore              Float
+  beforeMaxScore           Float
+  beforeFeedback           String
+  beforeAdjustmentPoints   Float
+  beforeAdjustmentReason   String
+  afterScore               Float
+  afterMaxScore            Float
+  afterFeedback            String
+  afterAdjustmentPoints    Float
+  afterAdjustmentReason    String
+  reason                   String
+  correctedById            String
+  correctedBy              User                          @relation("AssessmentIndividualComponentCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
+  createdAt                DateTime                      @default(now())
+
+  @@index([componentId, createdAt])
+  @@index([correctedById])
+}
+
+/// Append-only operational + academic provenance for group configuration and
+/// scoring lifecycle actions. IDs in details are snapshots, not mutable links.
+model AssessmentGroupAuditEvent {
+  id               String                     @id @default(uuid())
+  offeringId       String
+  courseSpecId     String
+  assessmentItemId String
+  groupId          String?
+  enrollmentId     String?
+  action           AssessmentGroupAuditAction
+  actorId          String
+  actor            User                       @relation("AssessmentGroupAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  reason           String                     @default("")
+  details          Json?
+  createdAt        DateTime                   @default(now())
+
+  @@index([offeringId, assessmentItemId, createdAt])
+  @@index([groupId, createdAt])
+  @@index([enrollmentId, createdAt])
+  @@index([actorId])
 }
 
 /// Section-level notices. Draft notices have a null `publishedAt` and never

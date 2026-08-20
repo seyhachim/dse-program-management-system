@@ -7,6 +7,12 @@ import {
   PublishAssessmentResultsInput,
   SaveAssessmentCriterionScoresInput,
   SaveAssessmentResultInput,
+  SaveAssessmentGroupsInput,
+  SaveAssessmentGroupScoreInput,
+  SaveAssessmentSourceCriterionScoresInput,
+  SaveAssessmentIndividualComponentInput,
+  CorrectAssessmentGroupScoreInput,
+  CorrectAssessmentIndividualComponentInput,
   SetAssessmentDeadlineInput,
   SetOfferingResultAccessPolicyInput,
 } from "@dse-pms/shared-types";
@@ -15,6 +21,7 @@ import { PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { resultCorrectionsService } from "./result-corrections.ts";
+import { groupAssessmentService } from "./group-assessment-results.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
 import {
   applyProvisionalResultAccessPolicy,
@@ -108,6 +115,38 @@ export function createStudentPortalRouter(): Router {
         parsed.data.requireSurveyBeforeResults,
       ));
     } catch (error) { handleError(error, res); }
+  });
+
+  router.get("/manage/offerings/:offeringId/assessments/:assessmentItemId/groups", requirePermission("courses:write"), async (req, res) => {
+    try { res.json(await groupAssessmentService.workspace(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!)); } catch (error) { handleError(error, res); }
+  });
+  router.put("/manage/offerings/:offeringId/assessments/:assessmentItemId/groups", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SaveAssessmentGroupsInput.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid group configuration", details: parsed.error.flatten() });
+    try { res.json(await groupAssessmentService.replaceGroups(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!, parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.put("/manage/offerings/:offeringId/assessments/:assessmentItemId/groups/:groupId/score", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SaveAssessmentGroupScoreInput.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid group score", details: parsed.error.flatten() });
+    try { res.json(await groupAssessmentService.saveGroupScore(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!, req.params.groupId!, parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.put("/manage/offerings/:offeringId/assessments/:assessmentItemId/groups/:groupId/criteria", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SaveAssessmentSourceCriterionScoresInput.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid group criterion scores", details: parsed.error.flatten() });
+    try { res.json(await groupAssessmentService.saveGroupCriteria(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!, req.params.groupId!, parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.put("/manage/offerings/:offeringId/assessments/:assessmentItemId/students/:enrollmentId/individual", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SaveAssessmentIndividualComponentInput.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid individual component", details: parsed.error.flatten() });
+    try { res.json(await groupAssessmentService.saveIndividualComponent(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!, req.params.enrollmentId!, parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.put("/manage/offerings/:offeringId/assessments/:assessmentItemId/students/:enrollmentId/individual/criteria", requirePermission("courses:write"), async (req, res) => {
+    const parsed = SaveAssessmentSourceCriterionScoresInput.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid individual criterion scores", details: parsed.error.flatten() });
+    try { res.json(await groupAssessmentService.saveIndividualCriteria(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!, req.params.enrollmentId!, parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.post("/manage/offerings/:offeringId/assessments/:assessmentItemId/groups/:groupId/correct", requirePermission("courses:write"), async (req, res) => {
+    const parsed = CorrectAssessmentGroupScoreInput.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid group correction", details: parsed.error.flatten() });
+    try { res.json(await groupAssessmentService.correctGroupScore(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!, req.params.groupId!, parsed.data)); } catch (error) { handleError(error, res); }
+  });
+  router.post("/manage/offerings/:offeringId/assessments/:assessmentItemId/students/:enrollmentId/individual/correct", requirePermission("courses:write"), async (req, res) => {
+    const parsed = CorrectAssessmentIndividualComponentInput.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid individual correction", details: parsed.error.flatten() });
+    try { res.json(await groupAssessmentService.correctIndividualComponent(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!, req.params.assessmentItemId!, req.params.enrollmentId!, parsed.data)); } catch (error) { handleError(error, res); }
   });
   router.get("/manage/results/review/:offeringId", requirePermission("courses:write"), async (req, res) => {
     try { res.json(await resultsLifecycleService.review(req.user!.id, programmeWide(req.user!.roles), req.params.offeringId!)); } catch (error) { handleError(error, res); }

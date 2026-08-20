@@ -21,6 +21,7 @@ import { Button, Input, StatusBadge, Tabs, TabsContent, TabsList, TabsTrigger } 
 import { ApiError } from "@/lib/api";
 import { courseDeliveryApi, toDateTimeLocal } from "@/lib/course-delivery";
 import { Topbar } from "../topbar";
+import { GroupAssessmentPanel } from "./group-assessment-panel";
 
 export function CourseDeliveryClient() {
   const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
@@ -274,25 +275,31 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
                 {offering.assessments.map((item) => <option key={item.id} value={item.id}>{item.name} {item.weight === null ? "" : `(${item.weight}%)`}</option>)}
               </select>
             </label>
-            {assessment ? (
+            {assessment?.mode === "individual" ? (
               <Button type="button" onClick={publishAssessment} disabled={publishing || !readyToPublish}>
                 <CheckCircle2 />{publishing ? "Publishing…" : allPublished ? "Published & locked" : "Publish assessment"}
               </Button>
             ) : null}
           </div>
         ) : <Muted>Add active assessments to the course specification first.</Muted>}
-        {assessment ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <StatusBadge tone="neutral" label={`${draftCount} draft`} icon={false} />
-            <StatusBadge tone="success" label={`${publishedCount} published`} icon={false} />
-            <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
-          </div>
-        ) : null}
-        {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
-        {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-warning">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
+        {assessment?.mode === "individual" ? (
+  <>
+    <div className="mt-4 flex flex-wrap gap-2">
+      <StatusBadge tone="neutral" label={`${draftCount} draft`} icon={false} />
+      <StatusBadge tone="success" label={`${publishedCount} published`} icon={false} />
+      <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
+    </div>
+    {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
+    {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-warning">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
+  </>
+) : assessment ? (
+  <p className="mt-3 text-sm text-muted-foreground">This assessment uses {assessment.mode === "group" ? "Group" : "Group + Individual"} scoring. Configure membership and source evidence in the group workspace below.</p>
+) : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
-      {assessment ? (
+      {assessment && assessment.mode !== "individual" ? (
+        <GroupAssessmentPanel offeringId={offering.offeringId} assessment={assessment} onChanged={onChanged} />
+      ) : assessment ? (
         <Panel title={assessment.name} description={allPublished ? "Published results are locked against ordinary edits." : `${draftCount} of ${assessment.results.length} student marks saved as drafts.`}>
           <div className="space-y-3">
             {assessment.results.map((row) => <ResultRow key={row.enrollmentId} assessment={assessment} row={row} onChanged={onChanged} />)}

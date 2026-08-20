@@ -12,6 +12,9 @@ import type {
   SaveAssessmentCriterionScoresInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { groupAssessmentService } from "./group-assessment-results.ts";
+import { canManageOfferingResults } from "./result-management-access.ts";
+export { canManageOfferingResults } from "./result-management-access.ts";
 import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
 import {
@@ -48,15 +51,6 @@ function achievementStatus(percentage: number | null): PortalCloAchievement["sta
   if (percentage >= 70) return "achieved";
   if (percentage >= 50) return "developing";
   return "needs-attention";
-}
-
-export function canManageOfferingResults(
-  authorId: string,
-  programmeWide: boolean,
-  lecturerId: string | null,
-  coLecturerIds: string[],
-): boolean {
-  return programmeWide || lecturerId === authorId || coLecturerIds.includes(authorId);
 }
 
 export function buildStudentResultReview(input: {
@@ -373,7 +367,8 @@ export const resultsLifecycleService = {
     input: SaveAssessmentResultInput,
   ) {
     const context = await resultContext(input.enrollmentId, authorId, programmeWide);
-    assessmentFrom(context, input.assessmentItemId);
+    const assessment = assessmentFrom(context, input.assessmentItemId);
+    if (assessment.mode !== "Individual") throw new PortalConflictError("Use the group assessment workspace for Group and Group + Individual scoring");
 
     const key = {
       enrollmentId: context.enrollment.id,
@@ -417,6 +412,7 @@ export const resultsLifecycleService = {
   ) {
     const context = await resultContext(input.enrollmentId, authorId, programmeWide);
     const assessment = assessmentFrom(context, input.assessmentItemId);
+    if (assessment.mode !== "Individual") throw new PortalConflictError("Use the group assessment workspace for Group and Group + Individual criterion scoring");
     if (!assessment.rubricId || !assessment.rubric) {
       throw new PortalConflictError("This assessment has no linked rubric");
     }
@@ -496,6 +492,9 @@ export const resultsLifecycleService = {
     programmeWide: boolean,
     input: PublishAssessmentResultsInput,
   ): Promise<PublishAssessmentResultsResponse> {
+    if (await groupAssessmentService.modeFor(authorId, programmeWide, input) !== "Individual") {
+      return groupAssessmentService.publishAssessment(authorId, programmeWide, input);
+    }
     const { offering, spec, assessment } = await offeringLifecycleContext(
       input.offeringId,
       authorId,
@@ -577,6 +576,9 @@ export const resultsLifecycleService = {
     programmeWide: boolean,
     input: FinalizeAssessmentResultsInput,
   ): Promise<FinalizeAssessmentResultsResponse> {
+    if (await groupAssessmentService.modeFor(authorId, programmeWide, input) !== "Individual") {
+      return groupAssessmentService.finalizeAssessment(authorId, programmeWide, input);
+    }
     const { offering, spec, assessment } = await offeringLifecycleContext(
       input.offeringId,
       authorId,
