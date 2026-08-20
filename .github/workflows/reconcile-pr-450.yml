@@ -21,13 +21,17 @@ jobs:
         shell: bash
         run: |
           set +e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
-          git merge --no-commit --no-ff origin/main
+          git merge --no-commit --no-ff origin/main > /tmp/merge-output.txt 2>&1
           merge_status=$?
           {
             echo "merge_status=$merge_status"
             echo "main=$(git rev-parse origin/main)"
             echo "head_before=$(git rev-parse HEAD)"
+            echo "--- merge output ---"
+            cat /tmp/merge-output.txt
             echo "--- unmerged files ---"
             git diff --name-only --diff-filter=U
             echo "--- combined conflict diff ---"
@@ -35,8 +39,6 @@ jobs:
           } > /tmp/reconcile-pr-450-conflicts.txt
           git merge --abort || true
           cp /tmp/reconcile-pr-450-conflicts.txt .github/reconcile-pr-450-conflicts.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- .github/reconcile-pr-450-conflicts.txt
-          git commit -m "chore(ci): capture PR #450 merge conflicts"
+          git commit -m "chore(ci): refresh PR #450 merge conflicts"
           git push origin HEAD:agent/issue-449-group-assessment-results
