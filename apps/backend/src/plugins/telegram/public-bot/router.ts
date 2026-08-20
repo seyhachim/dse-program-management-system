@@ -11,11 +11,13 @@ import type {
   PublicProgrammeProfile,
 } from "@dse-pms/shared-types";
 import { registry } from "../../../core/plugins/registry.ts";
-import type {
-  PublicCurriculumCourse,
-  PublicCurriculumReadService,
-  PublicCurriculumStudyPlan,
-  PublicCurriculumTotals,
+import {
+  PublicCurriculumConflictError,
+  PublicCurriculumNotFoundError,
+  type PublicCurriculumCourse,
+  type PublicCurriculumReadService,
+  type PublicCurriculumStudyPlan,
+  type PublicCurriculumTotals,
 } from "../../programme/public-curriculum-read-service.ts";
 import { getTelegramConfig, type TelegramConfig } from "../config.ts";
 import {
@@ -183,9 +185,49 @@ function formatTotals(totals: PublicCurriculumTotals): string {
   const hours = totals.totalWeeklyHours === null ? "not fully available" : `${totals.totalWeeklyHours}`;
   const breakdown = totals.byYearSemester.map((row) => {
     const rowHours = row.weeklyHours === null ? "hours n/a" : `${row.weeklyHours} h/wk`;
-    return `• Year ${row.yearLevel} Sem ${row.semester === "First" ? 1 : 2}: ${row.courseCount} courses · ${row.credits} credits · ${rowHours}`;
+    const rowConflict = row.declaredCredits !== null && row.declaredCredits !== row.computedCredits
+      ? ` (rows sum ${row.computedCredits})`
+      : "";
+    return `• Year ${row.yearLevel} Sem ${row.semester === "First" ? 1 : 2}: ${row.courseCount} courses · ${row.credits} credits${rowConflict} · ${rowHours}`;
   });
-  return `Programme Study Load\n\n${breakdown.join("\n")}\n\nPublished route total: ${totals.totalCourses} courses · ${totals.totalCredits} credits · weekly hours ${hours}\nSource: approved curriculum v${totals.provenance.curriculumVersion}`;
+  const conflictNote = totals.conflicts.length
+    ? `\n⚠️ Source conflict: ${totals.conflicts.join("; ")}`
+    : "";
+  return `Programme Study Load\n\n${breakdown.join("\n")}\n\nPublished route total: ${totals.totalCourses} courses · ${totals.totalCredits} credits · weekly hours ${hours}${conflictNote}\nSource: approved curriculum v${totals.provenance.curriculumVersion}`;
+}
+
+async function sendCourseLookup(
+  client: TelegramPublicBotClient,
+  chatId: number,
+  publicCurriculumRead: PublicCurriculumReadService,
+  programmeId: string,
+  query: string,
+) {
+  try {
+    await client.sendMessage({
+      chatId,
+      text: formatCourse(await publicCurriculumRead.getCourse(programmeId, query)),
+      replyMarkup: replyKeyboard(),
+    });
+  } catch (error) {
+    if (error instanceof PublicCurriculumNotFoundError) {
+      await client.sendMessage({
+        chatId,
+        text: `I couldn't find “${query}” in the published DSE curriculum. Try /courses or a more specific course code/title.`,
+        replyMarkup: replyKeyboard(),
+      });
+      return;
+    }
+    if (error instanceof PublicCurriculumConflictError) {
+      await client.sendMessage({
+        chatId,
+        text: `“${query}” matches more than one published course. Please use a specific course code or a more exact title.`,
+        replyMarkup: replyKeyboard(),
+      });
+      return;
+    }
+    throw error;
+  }
 }
 
 async function renderRoute(
@@ -362,11 +404,7 @@ export function createPublicTelegramRouter(
           });
         } else if (/^\/course\s+\S+/i.test(text)) {
           const query = text.replace(/^\/course\s+/i, "").trim();
-          await client.sendMessage({
-            chatId: update.message.chat.id,
-            text: formatCourse(await publicCurriculumRead.getCourse(programmeId, query)),
-            replyMarkup: replyKeyboard(),
-          });
+          await sendCourseLookup(client, update.message.chat.id, publicCurriculumRead, programmeId, query);
         } else {
           const studyPlan = parseStudyPlanQuestion(text);
           const looksLikeCourseCode = /^[A-Z]{2,5}\d{3}$/i.test(text);
@@ -384,11 +422,13 @@ export function createPublicTelegramRouter(
               replyMarkup: replyKeyboard(),
             });
           } else if (looksLikeCourseCode || coursePhrase) {
-            await client.sendMessage({
-              chatId: update.message.chat.id,
-              text: formatCourse(await publicCurriculumRead.getCourse(programmeId, coursePhrase ?? text)),
-              replyMarkup: replyKeyboard(),
-            });
+            await sendCourseLookup(
+              client,
+              update.message.chat.id,
+              publicCurriculumRead,
+              programmeId,
+              coursePhrase ?? text,
+            );
           } else {
             const route = routeForReplyText(text);
             if (route) {
