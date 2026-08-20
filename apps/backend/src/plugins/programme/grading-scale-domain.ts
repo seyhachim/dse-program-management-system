@@ -20,6 +20,14 @@ export function gradingScaleScoreLabel(
   if (grade.maxInclusive) {
     return `${grade.minScore}–${grade.maxScore}`;
   }
+
+  // DSE's published scale is expressed as whole-number display bands such as
+  // 80–84 while the normalized calculation interval is [80, 85). Preserve that
+  // exact academic-document wording when both boundaries are integers.
+  if (Number.isInteger(grade.minScore) && Number.isInteger(grade.maxScore)) {
+    return `${grade.minScore}–${grade.maxScore - 1}`;
+  }
+
   return `${grade.minScore}–<${grade.maxScore}`;
 }
 
