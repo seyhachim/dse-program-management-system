@@ -9,6 +9,8 @@ describe("Telegram configuration", () => {
       botUsername: undefined,
       miniAppUrl: undefined,
       miniAppShortName: undefined,
+      webhookSecret: undefined,
+      publicProgrammeId: "dse",
       initDataMaxAgeSeconds: 300,
       initDataMaxFutureSkewSeconds: 30,
     });
@@ -22,6 +24,8 @@ describe("Telegram configuration", () => {
         TELEGRAM_BOT_USERNAME: "DSEPMSBot",
         TELEGRAM_MINI_APP_URL: "https://example.com/telegram",
         TELEGRAM_MINI_APP_SHORT_NAME: "pms",
+        TELEGRAM_WEBHOOK_SECRET: "webhook-secret",
+        TELEGRAM_PUBLIC_PROGRAMME_ID: "dse-public",
         TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: "600",
         TELEGRAM_INIT_DATA_MAX_FUTURE_SKEW_SECONDS: "45",
       } as NodeJS.ProcessEnv),
@@ -31,9 +35,23 @@ describe("Telegram configuration", () => {
       botUsername: "DSEPMSBot",
       miniAppUrl: "https://example.com/telegram",
       miniAppShortName: "pms",
+      webhookSecret: "webhook-secret",
+      publicProgrammeId: "dse-public",
       initDataMaxAgeSeconds: 600,
       initDataMaxFutureSkewSeconds: 45,
     });
+  });
+
+  test("keeps public webhook configuration optional for existing Mini App deployments", () => {
+    const value = getTelegramConfig({
+      TELEGRAM_ENABLED: "true",
+      TELEGRAM_BOT_TOKEN: "secret-token",
+      TELEGRAM_BOT_USERNAME: "DSEPMSBot",
+      TELEGRAM_MINI_APP_URL: "https://example.com/telegram",
+      TELEGRAM_MINI_APP_SHORT_NAME: "pms",
+    } as NodeJS.ProcessEnv);
+    expect(value.webhookSecret).toBeUndefined();
+    expect(value.publicProgrammeId).toBe("dse");
   });
 
   test("fails closed when enabled without the bot token", () => {
