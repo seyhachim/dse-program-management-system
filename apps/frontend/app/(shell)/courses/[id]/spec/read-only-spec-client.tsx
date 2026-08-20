@@ -54,7 +54,7 @@ import {
 } from "./course-info-section";
 import { buildCourseDocument } from "./course-document-model";
 import { CourseSpecReadOnlyBoundary } from "./course-spec-readonly-boundary";
-import { EMPTY_DATE, DateSection } from "./date-section";
+import { EMPTY_DATE } from "./date-section";
 import { DocumentPreview } from "./document-preview";
 import {
   EMPTY_MAPPING,
@@ -116,7 +116,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "references", label: "References" },
   { id: "responsibility", label: "Responsibility" },
   { id: "policy", label: "Policies" },
-  { id: "date", label: "Date" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
@@ -574,10 +573,6 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
               />
             </TabsContent>
 
-            <TabsContent value="date" className="mt-4">
-              <DateSection value={specDate} onPersist={rejectMutation} disabled />
-            </TabsContent>
-
             <TabsContent value="documentPreview" className="mt-4">
               <DocumentPreview document={courseDocument} />
             </TabsContent>
@@ -589,6 +584,8 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                 review={review}
                 cloReady={cloReady}
                 teachingLearningReady={teachingLearningReady}
+                specificationDate={specDate}
+                onSaveSpecificationDate={rejectMutation}
                 onSubmit={rejectMutation}
                 onPreview={() => setActiveTab("documentPreview")}
                 onGoToSection={goToSection}

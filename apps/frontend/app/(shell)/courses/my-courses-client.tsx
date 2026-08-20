@@ -9,6 +9,7 @@ import {
   specAttention,
   specCompletionLabel,
   specCompletionPercent,
+  type CourseSectionPresence,
   type CourseSpecProgress,
   type OfferingView,
   type Semester,
@@ -28,6 +29,7 @@ import { coursesApi, type CourseView } from "@/lib/courses";
 import { offeringsApi } from "@/lib/offerings";
 import { useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { courseSectionEmptyPresentation } from "./course-section-empty-state";
 import {
   ALL_COURSE_FILTER as ALL,
   buildCourseSpecRows,
@@ -41,6 +43,7 @@ export function MyCoursesClient() {
   const [courses, setCourses] = useState<CourseView[]>([]);
   const [offerings, setOfferings] = useState<OfferingView[]>([]);
   const [specProgress, setSpecProgress] = useState<CourseSpecProgress[]>([]);
+  const [sectionPresence, setSectionPresence] = useState<CourseSectionPresence[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -52,14 +55,17 @@ export function MyCoursesClient() {
     setLoading(true);
     setError(null);
     try {
-      const [coursesRes, offeringsRes, progressRes] = await Promise.all([
-        coursesApi.list(),
-        offeringsApi.list(),
-        coursesApi.specProgress(),
-      ]);
+      const [coursesRes, offeringsRes, progressRes, sectionPresenceRes] =
+        await Promise.all([
+          coursesApi.list(),
+          offeringsApi.list(),
+          coursesApi.specProgress(),
+          coursesApi.sectionPresence(),
+        ]);
       setCourses(coursesRes);
       setOfferings(offeringsRes);
       setSpecProgress(progressRes);
+      setSectionPresence(sectionPresenceRes);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -74,6 +80,14 @@ export function MyCoursesClient() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const sectionPresenceByCourse = useMemo(
+    () =>
+      new Map(
+        sectionPresence.map((presence) => [presence.courseId, presence.hasSections]),
+      ),
+    [sectionPresence],
+  );
 
   const terms = useMemo(
     () =>
@@ -142,14 +156,19 @@ export function MyCoursesClient() {
       key: "sections",
       header: "Sections",
       render: (row) => {
-        if (row.offerings.length === 0) {
+        const emptyPresentation = courseSectionEmptyPresentation(
+          row.offerings.length,
+          sectionPresenceByCourse.get(row.course.id),
+        );
+
+        if (emptyPresentation) {
           return (
             <div className="space-y-1">
               <span className="text-sm font-medium text-muted-foreground">
-                No section yet
+                {emptyPresentation.title}
               </span>
               <div className="text-xs text-muted-foreground">
-                Course Spec preparation only
+                {emptyPresentation.detail}
               </div>
             </div>
           );
@@ -308,7 +327,12 @@ export function MyCoursesClient() {
         columns={columns}
         rows={rows}
         getRowId={(row) => row.course.id}
-        groupBy={courseSpecRowGroupLabel}
+        groupBy={(row) =>
+          courseSectionEmptyPresentation(
+            row.offerings.length,
+            sectionPresenceByCourse.get(row.course.id),
+          )?.groupLabel ?? courseSpecRowGroupLabel(row)
+        }
         actions={[
           {
             key: "open-spec",

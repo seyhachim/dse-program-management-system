@@ -5,8 +5,13 @@ on:
     paths:
       - "apps/backend/prisma/migrations/**"
       - "apps/backend/src/plugins/courses/**"
+      - "apps/backend/src/plugins/offerings/course-section-presence-service.ts"
+      - "apps/backend/src/plugins/offerings/index.ts"
       - "apps/backend/src/integration/responsible-lecturers.integration.test.ts"
+      - "apps/backend/src/integration/course-section-presence.integration.test.ts"
+      - "packages/shared-types/src/contracts.ts"
       - "packages/shared-types/src/courses.ts"
+      - "apps/frontend/lib/courses.ts"
       - "apps/frontend/app/(shell)/courses/**"
       - ".github/workflows/course-spec-responsible-lecturers-integrity.yml"
   push:
@@ -15,8 +20,13 @@ on:
     paths:
       - "apps/backend/prisma/migrations/**"
       - "apps/backend/src/plugins/courses/**"
+      - "apps/backend/src/plugins/offerings/course-section-presence-service.ts"
+      - "apps/backend/src/plugins/offerings/index.ts"
       - "apps/backend/src/integration/responsible-lecturers.integration.test.ts"
+      - "apps/backend/src/integration/course-section-presence.integration.test.ts"
+      - "packages/shared-types/src/contracts.ts"
       - "packages/shared-types/src/courses.ts"
+      - "apps/frontend/lib/courses.ts"
       - "apps/frontend/app/(shell)/courses/**"
       - ".github/workflows/course-spec-responsible-lecturers-integrity.yml"
 
@@ -73,6 +83,9 @@ jobs:
 
       - name: Run Responsible Lecturer focused integration suite
         run: bun test apps/backend/src/integration/responsible-lecturers.integration.test.ts
+
+      - name: Run section-presence focused integration suite
+        run: bun test apps/backend/src/integration/course-section-presence.integration.test.ts
 
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
