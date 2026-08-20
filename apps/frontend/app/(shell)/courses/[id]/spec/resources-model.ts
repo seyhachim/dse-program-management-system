@@ -39,15 +39,40 @@ export function toResourcesForm(raw: unknown): ResourcesForm {
   });
 }
 
+/**
+ * Keep all lecturer-confirmed week provenance, including IDs for Weekly Plan
+ * entries that have since been removed. The UI surfaces those unresolved links
+ * for deliberate review rather than silently deleting auditable data on save.
+ */
 export function reconcileResources(
   resources: ResourcesForm,
-  weeks: WeeklyPlanForm,
+  _weeks: WeeklyPlanForm,
 ): ResourcesForm {
-  const weekIds = new Set(weeks.map((week) => week.id));
   return resources.map((item) => ({
     ...item,
-    evidenceWeekIds: item.evidenceWeekIds.filter((weekId) => weekIds.has(weekId)),
+    evidenceWeekIds: [...item.evidenceWeekIds],
   }));
+}
+
+export function unresolvedResourceWeekIds(
+  resources: ResourcesForm,
+  weeks: WeeklyPlanForm,
+): string[] {
+  const currentWeekIds = new Set(weeks.map((week) => week.id));
+  return [
+    ...new Set(
+      resources.flatMap((item) =>
+        item.evidenceWeekIds.filter((weekId) => !currentWeekIds.has(weekId)),
+      ),
+    ),
+  ];
+}
+
+export function resourcesForWeek(
+  resources: ResourcesForm,
+  weekId: string,
+): ResourcesForm {
+  return resources.filter((item) => item.evidenceWeekIds.includes(weekId));
 }
 
 export function toResourcesPayload(
