@@ -1,0 +1,209 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import express from "express";
+import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
+import type { TelegramConfig } from "../config.ts";
+import { createPublicTelegramRouter } from "./router.ts";
+import type {
+  TelegramAnswerCallbackInput,
+  TelegramEditMessageInput,
+  TelegramPublicBotClient,
+  TelegramSendMessageInput,
+} from "./telegram-client.ts";
+
+class FakeClient implements TelegramPublicBotClient {
+  sent: TelegramSendMessageInput[] = [];
+  edited: TelegramEditMessageInput[] = [];
+  answered: TelegramAnswerCallbackInput[] = [];
+  async sendMessage(input: TelegramSendMessageInput) { this.sent.push(input); }
+  async editMessage(input: TelegramEditMessageInput) { this.edited.push(input); }
+  async answerCallbackQuery(input: TelegramAnswerCallbackInput) { this.answered.push(input); }
+}
+
+const config: TelegramConfig = {
+  enabled: true,
+  botToken: "123:test-token",
+  botUsername: "dse_test_bot",
+  miniAppUrl: "https://example.edu/telegram",
+  miniAppShortName: "dse",
+  webhookSecret: "secret-123",
+  publicProgrammeId: "dse",
+  initDataMaxAgeSeconds: 300,
+  initDataMaxFutureSkewSeconds: 30,
+};
+
+function makePublicRead() {
+  return {
+    async getProgramme() {
+      return {
+        programmeName: "Data Science and Engineering",
+        shortName: "DSE",
+        overview: "Published overview",
+        admissionEmail: "admission@example.edu",
+        phone: null,
+        websiteUrl: null,
+        facebookUrl: null,
+        campusAddress: null,
+        mapUrl: null,
+        applicationUrl: null,
+      };
+    },
+    async listFaqs(_programmeId: string, filters?: { category?: string; featured?: boolean }) {
+      if (filters?.featured) {
+        return [{
+          slug: "what-is-dse",
+          category: "About" as const,
+          question: "What is DSE?",
+          answer: "Published DSE answer.",
+          shortAnswer: "Published DSE answer.",
+          isFeatured: true,
+          sourceLabel: null,
+          sourceUrl: null,
+        }];
+      }
+      return [{
+        slug: "admission-requirements",
+        category: (filters?.category ?? "Admission") as "Admission",
+        question: "What are the admission requirements?",
+        answer: "Published admission answer.",
+        shortAnswer: null,
+        isFeatured: false,
+        sourceLabel: null,
+        sourceUrl: null,
+      }];
+    },
+    async getAdmission() {
+      return {
+        applicationUrl: "https://example.edu/apply",
+        admissionEmail: "admission@example.edu",
+        phone: null,
+        faqs: [{
+          slug: "admission-requirements",
+          category: "Admission" as const,
+          question: "What are the admission requirements?",
+          answer: "Published admission answer.",
+          shortAnswer: null,
+          isFeatured: false,
+          sourceLabel: null,
+          sourceUrl: null,
+        }],
+      };
+    },
+    async getFeesScholarships() { return { faqs: [] }; },
+    async listImportantDates() { return []; },
+    async getContact() {
+      return {
+        admissionEmail: "admission@example.edu",
+        phone: null,
+        websiteUrl: null,
+        facebookUrl: null,
+        campusAddress: null,
+        mapUrl: null,
+        applicationUrl: null,
+      };
+    },
+  };
+}
+
+let server: Server;
+let baseUrl: string;
+let client: FakeClient;
+
+beforeAll(async () => {
+  client = new FakeClient();
+  const app = express();
+  app.use(express.json());
+  app.use("/api/telegram/public", createPublicTelegramRouter({
+    config,
+    client,
+    publicRead: makePublicRead(),
+  }));
+  server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", () => resolve()));
+  const address = server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+async function webhook(body: unknown, secret = config.webhookSecret!) {
+  return fetch(`${baseUrl}/api/telegram/public/webhook`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-telegram-bot-api-secret-token": secret,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("public Telegram webhook", () => {
+  test("rejects an invalid webhook secret before processing the update", async () => {
+    const before = client.sent.length;
+    const response = await webhook({ update_id: 1, message: { message_id: 1, chat: { id: 9 }, text: "/start" } }, "wrong");
+    expect(response.status).toBe(401);
+    expect(client.sent.length).toBe(before);
+  });
+
+  test("/start sends the persistent seven-action reply keyboard without PMS login", async () => {
+    const response = await webhook({ update_id: 2, message: { message_id: 2, chat: { id: 10 }, text: "/start" } });
+    expect(response.status).toBe(200);
+    const sent = client.sent.at(-1)!;
+    expect(sent.chatId).toBe(10);
+    expect(sent.text).toContain("DSE Program Information Bot");
+    expect(sent.replyMarkup).toHaveProperty("keyboard");
+    const keyboard = (sent.replyMarkup as { keyboard: Array<Array<{ text: string }>> }).keyboard;
+    expect(keyboard.flat()).toHaveLength(7);
+    expect(keyboard.flat().map((item) => item.text)).toContain("❓ Ask DSE");
+  });
+
+  test("primary Admission selection renders PMS-owned published FAQ content", async () => {
+    const response = await webhook({
+      update_id: 3,
+      message: { message_id: 3, chat: { id: 11 }, text: "📝 Admission" },
+    });
+    expect(response.status).toBe(200);
+    const sent = client.sent.at(-1)!;
+    expect(sent.text).toContain("Published admission answer.");
+    expect(sent.text).toContain("https://example.edu/apply");
+    expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
+  });
+
+  test("FAQ callback edits the existing message and answers the callback query", async () => {
+    const response = await webhook({
+      update_id: 4,
+      callback_query: {
+        id: "cb-1",
+        data: "faq:popular",
+        message: { message_id: 44, chat: { id: 12 } },
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(client.edited.at(-1)?.text).toContain("Published DSE answer.");
+    expect(client.edited.at(-1)?.messageId).toBe(44);
+    expect(client.answered.at(-1)).toEqual({ callbackQueryId: "cb-1" });
+  });
+
+  test("malformed callback fails safely without editing content", async () => {
+    const editsBefore = client.edited.length;
+    const response = await webhook({
+      update_id: 5,
+      callback_query: {
+        id: "cb-bad",
+        data: "admin:secret",
+        message: { message_id: 45, chat: { id: 13 } },
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(client.edited.length).toBe(editsBefore);
+    expect(client.answered.at(-1)?.text).toBe("This action is unavailable.");
+  });
+
+  test("malformed Telegram update is acknowledged and ignored", async () => {
+    const response = await webhook({ unexpected: true });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true });
+  });
+});
