@@ -97,7 +97,7 @@ courseService.saveSection = async (courseId, sectionId, values) => {
 
   await prisma.courseSpecSection.updateMany({
     where: { courseSpecId: currentSpec.id, sectionKey: "date" },
-    data: { status: "Incomplete" },
+    data: { status: "Draft" },
   });
 
   return (await courseService.getSpec(courseId)) ?? result;
@@ -119,7 +119,7 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
   if (
     currentSpec &&
     !isSpecificationDateReady(
-      currentSpec.sections[0]?.status === "Complete" ? "complete" : "incomplete",
+      currentSpec.sections[0]?.status === "Complete" ? "complete" : "draft",
       currentSpec.specDate?.toISOString().slice(0, 10) ?? null,
     )
   ) {
