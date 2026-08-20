@@ -5,13 +5,22 @@ import {
   PublicProgrammeImportantDateQuerySchema,
 } from "@dse-pms/shared-types";
 import {
+  PublicCurriculumConflictError,
+  PublicCurriculumNotFoundError,
+  publicCurriculumReadService,
+} from "./public-curriculum-read-service.ts";
+import {
   PublicProgrammeReadNotFoundError,
   publicProgrammeReadService,
 } from "./public-programme-read-service.ts";
 
 function sendReadError(res: Response, error: unknown): void {
-  if (error instanceof PublicProgrammeReadNotFoundError) {
+  if (error instanceof PublicProgrammeReadNotFoundError || error instanceof PublicCurriculumNotFoundError) {
     res.status(404).json({ error: error.message });
+    return;
+  }
+  if (error instanceof PublicCurriculumConflictError) {
+    res.status(409).json({ error: error.message });
     return;
   }
   console.error("Public programme read failed", error);
@@ -136,6 +145,60 @@ export function createPublicProgrammeReadRouter(): Router {
     if (!id) return;
     try {
       sendPublicJson(req, res, await publicProgrammeReadService.getContact(id));
+    } catch (error) {
+      sendReadError(res, error);
+    }
+  });
+
+  router.get("/programmes/:programmeId/curriculum/courses", async (req, res) => {
+    const id = programmeId(req, res);
+    if (!id) return;
+    try {
+      sendPublicJson(req, res, await publicCurriculumReadService.listCourses(id));
+    } catch (error) {
+      sendReadError(res, error);
+    }
+  });
+
+  router.get("/programmes/:programmeId/curriculum/courses/:query", async (req, res) => {
+    const id = programmeId(req, res);
+    const query = req.params.query?.trim();
+    if (!id) return;
+    if (!query) {
+      res.status(400).json({ error: "Course query is required" });
+      return;
+    }
+    try {
+      sendPublicJson(req, res, await publicCurriculumReadService.getCourse(id, query));
+    } catch (error) {
+      sendReadError(res, error);
+    }
+  });
+
+  router.get("/programmes/:programmeId/curriculum/study-plan", async (req, res) => {
+    const id = programmeId(req, res);
+    if (!id) return;
+    const yearLevel = Number(req.query.year);
+    const semesterRaw = String(req.query.semester ?? "").toLocaleLowerCase();
+    const semester = semesterRaw === "1" || semesterRaw === "first" ? "First"
+      : semesterRaw === "2" || semesterRaw === "second" ? "Second"
+      : null;
+    if (!Number.isInteger(yearLevel) || !semester) {
+      res.status(400).json({ error: "Study plan requires year=1..4 and semester=1|2" });
+      return;
+    }
+    try {
+      sendPublicJson(req, res, await publicCurriculumReadService.getStudyPlan(id, yearLevel, semester));
+    } catch (error) {
+      sendReadError(res, error);
+    }
+  });
+
+  router.get("/programmes/:programmeId/curriculum/totals", async (req, res) => {
+    const id = programmeId(req, res);
+    if (!id) return;
+    try {
+      sendPublicJson(req, res, await publicCurriculumReadService.getTotals(id));
     } catch (error) {
       sendReadError(res, error);
     }
