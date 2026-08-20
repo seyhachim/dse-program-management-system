@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  BarChart3,
-  ChevronDown,
-  ClipboardList,
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  ClipboardCheck,
   Download,
   FileText,
-  Filter as FilterIcon,
-  Grid3x3,
-  ListChecks,
-  Pencil,
+  Grid3X3,
   Target,
 } from "lucide-react";
 import {
@@ -20,13 +19,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -43,25 +35,46 @@ import {
   columnAverage,
   downloadTextFile,
   mappingCsv,
-  mappingMetrics,
   reconcileCells,
-  seedFromLinks,
   setCell,
   validRefs,
   type MappingColumn,
   type MappingForm,
 } from "./mapping-model";
+import {
+  ALIGNMENT_STATUS_LABELS,
+  deriveConstructiveAlignmentAudit,
+  sortedAlignmentIssues,
+  type CloAlignmentAudit,
+  type ConstructiveAlignmentStatus,
+} from "./constructive-alignment-model";
 
 type ViewBy = "clo" | "component";
-type AlignmentFilter = "all" | "3" | "2" | "1" | "0";
 
-/** Convert a #rrggbb colour to an rgba() string at the given alpha. */
-function tint(hex: string, alpha: number): string {
-  const n = hex.replace("#", "");
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+const STATUS_STYLE: Record<ConstructiveAlignmentStatus, string> = {
+  fullyAligned:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300",
+  teachingOnly:
+    "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300",
+  assessmentOnly:
+    "border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-300",
+  notAligned:
+    "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300",
+};
+
+const STATUS_COPY: Record<ConstructiveAlignmentStatus, string> = {
+  fullyAligned: "This CLO has both teaching and assessment coverage.",
+  teachingOnly:
+    "Students are taught this CLO, but there is no active assessment that measures it.",
+  assessmentOnly:
+    "This CLO is assessed, but no Weekly Plan item currently provides teaching coverage.",
+  notAligned:
+    "This CLO has no teaching or active assessment evidence in the current Course Specification.",
+};
+
+function goToTab(tab: "slt" | "assessmentPlan") {
+  if (typeof window === "undefined") return;
+  window.location.assign(`${window.location.pathname}?tab=${tab}`);
 }
 
 export function MappingSection({
@@ -79,56 +92,28 @@ export function MappingSection({
   onChange: (cells: MappingForm) => void;
   courseName?: string;
 }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [viewBy, setViewBy] = useState<ViewBy>("clo");
-  const [alignmentFilter, setAlignmentFilter] = useState<AlignmentFilter>("all");
-  const [showWeeks, setShowWeeks] = useState(true);
-  const [showAssessments, setShowAssessments] = useState(true);
-  const [onlyMapped, setOnlyMapped] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
-  const matrixRef = useRef<HTMLDivElement>(null);
 
-  // Drop cells whose CLO / week / assessment was removed elsewhere in the wizard.
+  const audit = useMemo(
+    () => deriveConstructiveAlignmentAudit(clos, weeklyPlan, assessments),
+    [clos, weeklyPlan, assessments],
+  );
+  const issues = useMemo(() => sortedAlignmentIssues(audit.clos), [audit.clos]);
   const cells = useMemo(
     () => reconcileCells(value, validRefs(clos, weeklyPlan, assessments)),
     [value, clos, weeklyPlan, assessments],
   );
-
   const { weekColumns, assessmentColumns } = useMemo(
     () => buildColumns(weeklyPlan, assessments),
     [weeklyPlan, assessments],
   );
-  const cloCodes = useMemo(() => clos.map((c) => c.code), [clos]);
-  const metrics = useMemo(
-    () => mappingMetrics(cells, cloCodes, weekColumns, assessmentColumns),
-    [cells, cloCodes, weekColumns, assessmentColumns],
+  const advancedColumns = useMemo(
+    () => [...weekColumns, ...assessmentColumns],
+    [weekColumns, assessmentColumns],
   );
-
-  const activeColumns = useMemo(() => {
-    const cols: MappingColumn[] = [];
-    if (showWeeks) cols.push(...weekColumns);
-    if (showAssessments) cols.push(...assessmentColumns);
-    return cols;
-  }, [showWeeks, showAssessments, weekColumns, assessmentColumns]);
-
-  const visibleClos = useMemo(
-    () =>
-      onlyMapped
-        ? clos.filter((c) => cells.some((cell) => cell.cloCode === c.code && cell.strength >= 1))
-        : clos,
-    [clos, cells, onlyMapped],
-  );
-
-  const setStrength = (col: MappingColumn, cloCode: string, strength: number | null) => {
-    onChange(setCell(cells, col.kind, col.ref, cloCode, strength));
-  };
-
-  // Seed a Medium rating for any newly linked CLO (§17/§18) that has no rating yet —
-  // replaces the old manual "Auto-fill from links" button with the same behavior by default.
-  useEffect(() => {
-    const seeded = seedFromLinks(cells, [...weekColumns, ...assessmentColumns]);
-    if (seeded.length !== cells.length) onChange(seeded);
-  }, [cells, weekColumns, assessmentColumns, onChange]);
 
   const exportCsv = () => {
     const csv = mappingCsv(cells, clos, weekColumns, assessmentColumns);
@@ -136,391 +121,510 @@ export function MappingSection({
     downloadTextFile(`${base}_clo-mapping.csv`, csv);
   };
 
-  const scrollToMatrix = () => matrixRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  if (clos.length === 0) {
+  if (audit.activeCloCount === 0) {
     return (
       <EmptyState
-        title="No CLOs to map yet"
-        body="Add Course Learning Outcomes in the CLOs tab first — the mapping matrix cross-references them against the Weekly Plan and Assessments."
+        title="No active CLOs available"
+        body="Constructive Alignment depends on active Course Learning Outcomes. Add or activate at least one CLO before reviewing alignment."
+        actionLabel="Go to CLOs"
+        onAction={() => {
+          if (typeof window !== "undefined") {
+            window.location.assign(`${window.location.pathname}?tab=clos`);
+          }
+        }}
       />
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-foreground">Mapping</h2>
-          <p className="text-sm text-muted-foreground">
-            Map CLOs with teaching and assessment components to ensure alignment.
+          <h2 className="text-xl font-bold text-foreground">Constructive Alignment</h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Verify that every active CLO is taught and assessed. Fix coverage gaps in the source sections before submission.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={viewBy} onValueChange={(v) => setViewBy(v as ViewBy)}>
-            <SelectTrigger className="w-[150px]">
-              <span className="text-muted-foreground">View by:&nbsp;</span>
-              <SelectValue>{(v) => (v === "component" ? "Component" : "CLO")}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="clo">CLO</SelectItem>
-              <SelectItem value="component">Component</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setAdvancedOpen((open) => !open)}>
+            <Grid3X3 className="h-4 w-4" />
+            {advancedOpen ? "Hide Advanced Matrix" : "View Advanced Matrix"}
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={exportCsv}>
+            <Download className="h-4 w-4" /> Export Alignment
+          </Button>
+        </div>
+      </header>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="outline" className="gap-2">
-                  <FilterIcon className="h-4 w-4" /> Filter
-                </Button>
+      <AlignmentSummary audit={audit} />
+      <SourceAvailability audit={audit} />
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Alignment by CLO</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Teaching coverage comes from Weekly Plan CLO links. Assessment coverage counts active assessments only.
+          </p>
+        </div>
+        <div className="space-y-3">
+          {audit.clos.map((row) => (
+            <CloAlignmentCard key={row.code} row={row} />
+          ))}
+        </div>
+      </section>
+
+      <AlignmentIssues issues={issues} />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <TeachingCoverage rows={audit.clos} />
+        <AssessmentCoverage rows={audit.clos} />
+      </div>
+
+      <AdvisoryWarnings audit={audit} />
+
+      {advancedOpen ? (
+        <section className="rounded-xl border border-border bg-card p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Advanced Alignment Matrix</h3>
+              <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
+                Optionally rate relationship strength for deeper curriculum analysis and QA evidence. Source links are not assigned a strength automatically; an unrated relationship stays unrated until you explicitly choose 0–3.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setReportOpen(true)}>
+                <FileText className="h-4 w-4" /> Report
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setHeatmapOpen(true)}>
+                <Target className="h-4 w-4" /> Heatmap
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">View by</span>
+            <Select value={viewBy} onValueChange={(value) => setViewBy(value as ViewBy)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="clo">CLO</SelectItem>
+                <SelectItem value="component">Component</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <StrengthLegend />
+          <div className="mt-4 overflow-x-auto">
+            <AdvancedMatrix
+              viewBy={viewBy}
+              clos={clos.filter((clo) => clo.status === "active")}
+              columns={advancedColumns}
+              cells={cells}
+              onSet={(column, cloCode, strength) =>
+                onChange(setCell(cells, column.kind, column.ref, cloCode, strength))
               }
             />
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel>Columns</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem checked={showWeeks} onCheckedChange={setShowWeeks}>
-                Weekly Plan
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem checked={showAssessments} onCheckedChange={setShowAssessments}>
-                Assessments
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Rows</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem checked={onlyMapped} onCheckedChange={setOnlyMapped}>
-                Only mapped CLOs
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <div className="flex">
-            <Button className="gap-2 rounded-r-none" onClick={exportCsv}>
-              <Download className="h-4 w-4" /> Export Mapping
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button className="rounded-l-none border-l border-primary-foreground/20 px-2" aria-label="Export options">
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportCsv}>Export as CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.print()}>Print / Save as PDF</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
-        {/* Main column */}
-        <div className="space-y-4">
-          <OverviewCards metrics={metrics} />
-
-          <section ref={matrixRef} className="rounded-xl border border-border bg-card p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-foreground">CLO Mapping Matrix</h3>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={alignmentFilter}
-                  onValueChange={(v) => setAlignmentFilter(v as AlignmentFilter)}
-                >
-                  <SelectTrigger className="w-[170px]">
-                    <span className="text-muted-foreground">Alignment Type:&nbsp;</span>
-                    <SelectValue>
-                      {(v) =>
-                        v === "all"
-                          ? "All"
-                          : ALIGNMENT_STRENGTHS.find((s) => String(s.value) === v)?.name ?? "All"
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    {ALIGNMENT_STRENGTHS.map((s) => (
-                      <SelectItem key={s.code} value={String(s.value)}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <StrengthLegend metrics={metrics} />
-
-            <div className="mt-4 overflow-x-auto">
-              <MatrixTable
-                viewBy={viewBy}
-                clos={visibleClos}
-                columns={activeColumns}
-                weekCount={showWeeks ? weekColumns.length : 0}
-                assessmentCount={showAssessments ? assessmentColumns.length : 0}
-                cells={cells}
-                alignmentFilter={alignmentFilter}
-                onSet={setStrength}
-              />
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Click on any cell to view or edit mapping details.
-            </p>
-          </section>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4">
-          <MappingSummary metrics={metrics} />
-          <AlignmentByClo metrics={metrics} onViewReport={() => setReportOpen(true)} />
-          <QuickActions
-            onEdit={scrollToMatrix}
-            onReport={() => setReportOpen(true)}
-            onHeatmap={() => setHeatmapOpen(true)}
-          />
-        </div>
-      </div>
+        </section>
+      ) : null}
 
       <ReportDialog
         open={reportOpen}
         onOpenChange={setReportOpen}
-        metrics={metrics}
-        weekColumns={weekColumns}
-        assessmentColumns={assessmentColumns}
+        rows={audit.clos}
+        columns={advancedColumns}
         cells={cells}
-        courseName={courseName}
       />
       <HeatmapDialog
         open={heatmapOpen}
         onOpenChange={setHeatmapOpen}
-        clos={clos}
-        columns={[...weekColumns, ...assessmentColumns]}
+        rows={audit.clos}
+        columns={advancedColumns}
         cells={cells}
       />
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ overview */
-
-function OverviewCards({ metrics }: { metrics: ReturnType<typeof mappingMetrics> }) {
-  const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
+function AlignmentSummary({ audit }: { audit: ReturnType<typeof deriveConstructiveAlignmentAudit> }) {
   return (
     <section className="rounded-xl border border-border bg-card p-5">
-      <h3 className="mb-4 text-sm font-semibold text-foreground">Mapping Overview</h3>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <OverviewCard
-          icon={ClipboardList}
-          tint="bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"
-          value={metrics.cloCount}
-          label="CLOs"
-        />
-        <OverviewCard
-          icon={ListChecks}
-          tint="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"
-          value={metrics.weeksTotal}
-          label="Weekly Topics"
-          sub={`Mapped: ${metrics.weeksMapped} (${pct(metrics.weeksMapped, metrics.weeksTotal)}%)`}
-        />
-        <OverviewCard
-          icon={Target}
-          tint="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
-          value={metrics.assessmentsTotal}
-          label="Assessments"
-          sub={`Mapped: ${metrics.assessmentsMapped} (${pct(metrics.assessmentsMapped, metrics.assessmentsTotal)}%)`}
-        />
-        <OverviewCard
-          icon={BarChart3}
-          tint="bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300"
-          value={`${metrics.overallPercent}%`}
-          label="Overall Alignment"
-          sub="(Average Strength)"
-        />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            {audit.allAligned ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            )}
+            <h3 className="font-semibold text-foreground">
+              {audit.allAligned ? "All aligned" : "Needs attention"}
+            </h3>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {audit.allAligned
+              ? "Every active CLO has teaching and active assessment coverage."
+              : `${audit.issueCount} ${audit.issueCount === 1 ? "CLO needs" : "CLOs need"} alignment attention.`}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard label="Active CLOs" value={audit.activeCloCount} />
+        <SummaryCard label="Taught" value={`${audit.taughtCount} / ${audit.activeCloCount}`} />
+        <SummaryCard label="Assessed" value={`${audit.assessedCount} / ${audit.activeCloCount}`} />
+        <SummaryCard label="Alignment Issues" value={audit.issueCount} attention={audit.issueCount > 0} />
       </div>
     </section>
   );
 }
 
-function OverviewCard({
-  icon: Icon,
-  tint,
-  value,
+function SummaryCard({
   label,
-  sub,
+  value,
+  attention = false,
 }: {
-  icon: typeof Target;
-  tint: string;
-  value: number | string;
   label: string;
-  sub?: string;
+  value: string | number;
+  attention?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background/40 p-3">
-      <span className={`mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg ${tint}`}>
-        <Icon className="h-4.5 w-4.5" />
-      </span>
-      <div className="text-2xl font-bold text-foreground">{value}</div>
-      <div className="text-xs font-medium text-foreground">{label}</div>
-      {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}
+    <div className="rounded-lg border border-border bg-background/50 p-4">
+      <div className={`text-2xl font-bold ${attention ? "text-amber-700 dark:text-amber-300" : "text-foreground"}`}>
+        {value}
+      </div>
+      <div className="mt-1 text-xs font-medium text-muted-foreground">{label}</div>
     </div>
   );
 }
 
-/* -------------------------------------------------------------------- legend */
+function SourceAvailability({ audit }: { audit: ReturnType<typeof deriveConstructiveAlignmentAudit> }) {
+  if (audit.hasWeeklyPlan && audit.hasAssessments) return null;
 
-function StrengthLegend({ metrics }: { metrics: ReturnType<typeof mappingMetrics> }) {
-  const countFor = (v: number) => metrics.distribution.find((d) => d.value === v)?.count ?? 0;
+  if (!audit.hasWeeklyPlan && !audit.hasAssessments) {
+    return (
+      <Notice
+        title="Alignment cannot be fully evaluated yet"
+        body="Add teaching coverage in Weekly Plan and assessment coverage in Assessment."
+        actions={[
+          { label: "Go to Weekly Plan", onClick: () => goToTab("slt") },
+          { label: "Go to Assessment", onClick: () => goToTab("assessmentPlan") },
+        ]}
+      />
+    );
+  }
+
+  if (!audit.hasWeeklyPlan) {
+    return (
+      <Notice
+        title="Teaching coverage is not available yet"
+        body="Your CLOs are defined, but no Weekly Plan has been created."
+        actions={[{ label: "Build Weekly Plan", onClick: () => goToTab("slt") }]}
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-      <span className="font-medium text-foreground">Alignment Strength:</span>
-      {ALIGNMENT_STRENGTHS.map((s) => (
-        <span key={s.code} className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-          {s.name} ({s.value})
-          <span className="text-foreground/60">· {countFor(s.value)}</span>
+    <Notice
+      title="Assessment coverage is not available yet"
+      body="Your CLOs may have teaching coverage, but no assessments have been created."
+      actions={[{ label: "Create Assessment", onClick: () => goToTab("assessmentPlan") }]}
+    />
+  );
+}
+
+function CloAlignmentCard({ row }: { row: CloAlignmentAudit }) {
+  const statusLabel = ALIGNMENT_STATUS_LABELS[row.status];
+  return (
+    <article className="rounded-xl border border-border bg-background/40 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-foreground">{row.code}</span>
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[row.status]}`}>
+              {statusLabel}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-foreground/90">{row.description || "No CLO description"}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{STATUS_COPY[row.status]}</p>
+        </div>
+        <CloActions row={row} />
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <CoverageBlock
+          icon={BookOpen}
+          title="Teaching coverage"
+          empty="No Weekly Plan item teaches this CLO."
+          items={row.teachingWeeks.map((week) =>
+            `W${week.week || "?"} — ${week.topic || "Untitled topic"}`,
+          )}
+        />
+        <CoverageBlock
+          icon={ClipboardCheck}
+          title="Assessment coverage"
+          empty="No active assessment measures this CLO."
+          items={row.activeAssessments.map((assessment) =>
+            `${assessment.name || "Untitled assessment"}${assessment.weight ? ` · ${assessment.weight}%` : ""}`,
+          )}
+        />
+      </div>
+
+      {row.inactiveAssessments.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Inactive mapping:</span>{" "}
+          {row.inactiveAssessments.map((item) => item.name || "Untitled assessment").join(", ")}. Inactive assessments do not count toward alignment coverage.
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function CloActions({ row }: { row: CloAlignmentAudit }) {
+  if (row.status === "fullyAligned") {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => goToTab("slt")}>View Weekly Plan</Button>
+        <Button variant="outline" size="sm" onClick={() => goToTab("assessmentPlan")}>View Assessment</Button>
+      </div>
+    );
+  }
+  if (row.status === "teachingOnly") {
+    return <Button size="sm" onClick={() => goToTab("assessmentPlan")}>Add assessment coverage</Button>;
+  }
+  if (row.status === "assessmentOnly") {
+    return <Button size="sm" onClick={() => goToTab("slt")}>Add teaching coverage</Button>;
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button size="sm" onClick={() => goToTab("slt")}>Add teaching coverage</Button>
+      <Button variant="outline" size="sm" onClick={() => goToTab("assessmentPlan")}>Add assessment coverage</Button>
+    </div>
+  );
+}
+
+function CoverageBlock({
+  icon: Icon,
+  title,
+  items,
+  empty,
+}: {
+  icon: typeof BookOpen;
+  title: string;
+  items: string[];
+  empty: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+        <Icon className="h-4 w-4 text-muted-foreground" /> {title}
+      </div>
+      {items.length > 0 ? (
+        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+          {items.map((item) => (
+            <li key={item} className="flex gap-2">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">— {empty}</p>
+      )}
+    </div>
+  );
+}
+
+function AlignmentIssues({ issues }: { issues: CloAlignmentAudit[] }) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <h3 className="text-sm font-semibold text-foreground">Alignment Issues</h3>
+      {issues.length === 0 ? (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Every active CLO is both taught and assessed.</span>
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {issues.map((row) => (
+            <div key={row.code} className="flex flex-col gap-2 rounded-lg border border-border bg-background/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div>
+                  <div className="text-sm font-medium text-foreground">
+                    {row.code} — {ALIGNMENT_STATUS_LABELS[row.status]}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{STATUS_COPY[row.status]}</div>
+                </div>
+              </div>
+              <CloActions row={row} />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TeachingCoverage({ rows }: { rows: CloAlignmentAudit[] }) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground">Teaching Coverage</h3>
+        <Button variant="ghost" size="sm" className="gap-1" onClick={() => goToTab("slt")}>
+          Weekly Plan <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="mt-3 space-y-3">
+        {rows.map((row) => (
+          <div key={row.code} className="border-b border-border pb-3 last:border-0 last:pb-0">
+            <div className="text-xs font-semibold text-foreground">{row.code}</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {row.teachingWeeks.length > 0
+                ? row.teachingWeeks.map((week) => `W${week.week || "?"} ${week.topic || "Untitled"}`).join(" · ")
+                : "No teaching coverage"}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AssessmentCoverage({ rows }: { rows: CloAlignmentAudit[] }) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground">Assessment Coverage</h3>
+        <Button variant="ghost" size="sm" className="gap-1" onClick={() => goToTab("assessmentPlan")}>
+          Assessment <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="mt-3 space-y-3">
+        {rows.map((row) => (
+          <div key={row.code} className="border-b border-border pb-3 last:border-0 last:pb-0">
+            <div className="text-xs font-semibold text-foreground">{row.code}</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {row.activeAssessments.length > 0
+                ? row.activeAssessments.map((item) => item.name || "Untitled assessment").join(" · ")
+                : "No active assessment coverage"}
+            </div>
+            {row.inactiveAssessments.length > 0 ? (
+              <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+                Inactive: {row.inactiveAssessments.map((item) => item.name || "Untitled assessment").join(", ")}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AdvisoryWarnings({ audit }: { audit: ReturnType<typeof deriveConstructiveAlignmentAudit> }) {
+  const lowTeaching = audit.clos.filter((row) => row.teachingWeeks.length === 1);
+  if (
+    audit.unmappedWeeks.length === 0 &&
+    audit.unmappedActiveAssessments.length === 0 &&
+    lowTeaching.length === 0
+  ) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <h3 className="text-sm font-semibold text-foreground">Advisory Quality Warnings</h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        These items do not change the core taught-and-assessed status, but they are worth reviewing.
+      </p>
+      <div className="mt-3 space-y-2 text-sm">
+        {audit.unmappedWeeks.map((week) => (
+          <Warning key={`week-${week.id}`}>
+            Week {week.week || "?"} ({week.topic || "Untitled topic"}) has no CLO linked.
+          </Warning>
+        ))}
+        {audit.unmappedActiveAssessments.map((item) => (
+          <Warning key={`assessment-${item.id}`}>
+            {item.name || "Untitled assessment"} does not currently measure any CLO.
+          </Warning>
+        ))}
+        {lowTeaching.map((row) => (
+          <Warning key={`low-${row.code}`}>
+            {row.code} appears in only one teaching week. Review whether the coverage is sufficient.
+          </Warning>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Warning({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-amber-200/70 bg-amber-50/60 px-3 py-2 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function StrengthLegend() {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">Strength:</span>
+      <span>— Unrated</span>
+      {ALIGNMENT_STRENGTHS.map((strength) => (
+        <span key={strength.code} className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: strength.color }} />
+          {strength.name} ({strength.value})
         </span>
       ))}
     </div>
   );
 }
 
-/* --------------------------------------------------------------------- matrix */
-
-/** A single editable cell showing the current strength as a tinted dot + value. */
-function MatrixCell({
-  strength,
-  dimmed,
-  onSet,
-  label,
-}: {
-  strength: number | null;
-  dimmed: boolean;
-  onSet: (strength: number | null) => void;
-  label: string;
-}) {
-  const band = alignmentBand(strength);
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            aria-label={label}
-            className={`mx-auto flex h-8 w-11 items-center justify-center rounded-md text-xs font-semibold transition hover:ring-2 hover:ring-primary/30 ${
-              dimmed ? "opacity-20" : ""
-            }`}
-            style={band ? { backgroundColor: tint(band.color, 0.14), color: band.color } : undefined}
-          >
-            {band ? (
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: band.color }} />
-                {band.value}
-              </span>
-            ) : (
-              <span className="text-muted-foreground/50">–</span>
-            )}
-          </button>
-        }
-      />
-      <DropdownMenuContent align="center" className="w-44">
-        <DropdownMenuLabel>{label}</DropdownMenuLabel>
-        {ALIGNMENT_STRENGTHS.map((s) => (
-          <DropdownMenuItem key={s.code} onClick={() => onSet(s.value)}>
-            <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-            {s.name} ({s.value})
-            {strength === s.value ? <span className="ml-auto text-primary">✓</span> : null}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onSet(null)} disabled={strength == null}>
-          Clear rating
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function AvgCell({ value }: { value: number | null }) {
-  const band = alignmentBand(value);
-  return (
-    <td className="px-1 py-2 text-center">
-      <span
-        className="inline-block min-w-9 rounded-md px-1.5 py-1 text-xs font-semibold"
-        style={
-          band ? { backgroundColor: tint(band.color, 0.12), color: band.color } : { color: "var(--muted-foreground)" }
-        }
-      >
-        {value == null ? "–" : value.toFixed(1)}
-      </span>
-    </td>
-  );
-}
-
-function matchesFilter(strength: number | null, filter: AlignmentFilter): boolean {
-  if (filter === "all") return true;
-  return strength != null && strength === Number(filter);
-}
-
-function MatrixTable({
+function AdvancedMatrix({
   viewBy,
   clos,
   columns,
-  weekCount,
-  assessmentCount,
   cells,
-  alignmentFilter,
   onSet,
 }: {
   viewBy: ViewBy;
   clos: CloForm[];
   columns: MappingColumn[];
-  weekCount: number;
-  assessmentCount: number;
   cells: MappingForm;
-  alignmentFilter: AlignmentFilter;
-  onSet: (col: MappingColumn, cloCode: string, strength: number | null) => void;
+  onSet: (column: MappingColumn, cloCode: string, strength: number | null) => void;
 }) {
   if (columns.length === 0) {
-    return <p className="py-6 text-center text-sm text-muted-foreground">No columns to show — enable Weekly Plan or Assessments in Filter.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">No Weekly Plan or Assessment components are available for the advanced matrix.</p>;
   }
 
-  // "View by: Component" transposes the grid so components are the rows.
   if (viewBy === "component") {
     return (
-      <table className="w-full border-collapse text-sm">
+      <table className="min-w-full border-separate border-spacing-0 text-xs">
         <thead>
-          <tr className="border-b border-border">
-            <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-              Component
-            </th>
+          <tr>
+            <th className="sticky left-0 z-10 min-w-52 border-b border-border bg-card px-3 py-2 text-left font-semibold text-foreground">Component</th>
             {clos.map((clo) => (
-              <th key={clo.code} className="px-1 py-2 text-center text-xs font-semibold text-primary">
-                {clo.code}
-              </th>
+              <th key={clo.code} className="min-w-28 border-b border-border px-3 py-2 text-center font-semibold text-foreground">{clo.code}</th>
             ))}
-            <th className="px-1 py-2 text-center text-xs font-semibold text-muted-foreground">Avg</th>
           </tr>
         </thead>
         <tbody>
-          {columns.map((col) => (
-            <tr key={`${col.kind}:${col.ref}`} className="border-b border-border/60">
-              <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-medium text-foreground" title={col.title}>
-                {col.label}
-              </th>
-              {clos.map((clo) => {
-                const strength = cellStrength(cells, col.kind, col.ref, clo.code);
-                return (
-                  <td key={clo.code} className="px-1 py-1.5">
-                    <MatrixCell
-                      strength={strength}
-                      dimmed={!matchesFilter(strength, alignmentFilter)}
-                      onSet={(s) => onSet(col, clo.code, s)}
-                      label={`${clo.code} × ${col.label}`}
-                    />
-                  </td>
-                );
-              })}
-              <AvgCell value={columnAverage(cells, col.kind, col.ref)} />
+          {columns.map((column) => (
+            <tr key={`${column.kind}-${column.ref}`}>
+              <td className="sticky left-0 z-10 border-b border-border bg-card px-3 py-2">
+                <div className="font-medium text-foreground">{column.label}</div>
+                <div className="max-w-48 truncate text-[11px] text-muted-foreground" title={column.title}>{column.title}</div>
+              </td>
+              {clos.map((clo) => (
+                <td key={clo.code} className="border-b border-border px-2 py-2 text-center">
+                  <StrengthSelect
+                    value={cellStrength(cells, column.kind, column.ref, clo.code)}
+                    onChange={(strength) => onSet(column, clo.code, strength)}
+                  />
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
@@ -528,403 +632,233 @@ function MatrixTable({
     );
   }
 
-  // Default "View by: CLO" — CLOs are the rows.
   return (
-    <table className="w-full border-collapse text-sm">
+    <table className="min-w-full border-separate border-spacing-0 text-xs">
       <thead>
         <tr>
-          <th rowSpan={2} className="sticky left-0 z-10 bg-card px-3 py-2 text-left align-bottom">
-            <div className="text-xs font-semibold text-foreground">CLOs</div>
-            <div className="text-[10px] font-normal text-muted-foreground">Course Learning Outcomes</div>
-          </th>
-          {weekCount > 0 ? (
-            <th colSpan={weekCount} className="border-b border-border px-2 py-1.5 text-center text-xs font-semibold text-muted-foreground">
-              Teaching &amp; Learning (Weekly Plan)
-            </th>
-          ) : null}
-          {assessmentCount > 0 ? (
-            <th colSpan={assessmentCount} className="border-b border-l border-border px-2 py-1.5 text-center text-xs font-semibold text-muted-foreground">
-              Assessments
-            </th>
-          ) : null}
-        </tr>
-        <tr className="border-b border-border">
-          {columns.map((col, i) => (
-            <th
-              key={`${col.kind}:${col.ref}`}
-              className={`px-1 py-2 text-center text-[11px] font-medium text-muted-foreground ${
-                col.kind === "assessment" && (i === 0 || columns[i - 1]?.kind === "week") ? "border-l border-border" : ""
-              }`}
-              title={col.title}
-            >
-              <span className="block max-w-[64px] truncate">{col.label}</span>
+          <th className="sticky left-0 z-10 min-w-48 border-b border-border bg-card px-3 py-2 text-left font-semibold text-foreground">CLO</th>
+          {columns.map((column) => (
+            <th key={`${column.kind}-${column.ref}`} className="min-w-28 border-b border-border px-2 py-2 text-center font-semibold text-foreground" title={column.title}>
+              {column.label}
             </th>
           ))}
         </tr>
       </thead>
       <tbody>
         {clos.map((clo) => (
-          <tr key={clo.code} className="border-b border-border/60 align-top">
-            <th className="sticky left-0 z-10 bg-card px-3 py-3 text-left">
-              <div className="text-sm font-semibold text-primary">{clo.code}</div>
-              <div className="max-w-[220px] text-xs font-normal text-muted-foreground">{clo.description}</div>
-            </th>
-            {columns.map((col, i) => {
-              const strength = cellStrength(cells, col.kind, col.ref, clo.code);
-              return (
-                <td
-                  key={`${col.kind}:${col.ref}`}
-                  className={`px-1 py-2 ${
-                    col.kind === "assessment" && (i === 0 || columns[i - 1]?.kind === "week") ? "border-l border-border" : ""
-                  }`}
-                >
-                  <MatrixCell
-                    strength={strength}
-                    dimmed={!matchesFilter(strength, alignmentFilter)}
-                    onSet={(s) => onSet(col, clo.code, s)}
-                    label={`${clo.code} × ${col.label}`}
-                  />
-                </td>
-              );
-            })}
+          <tr key={clo.code}>
+            <td className="sticky left-0 z-10 border-b border-border bg-card px-3 py-2">
+              <div className="font-medium text-foreground">{clo.code}</div>
+              <div className="max-w-44 truncate text-[11px] text-muted-foreground" title={clo.description}>{clo.description}</div>
+            </td>
+            {columns.map((column) => (
+              <td key={`${column.kind}-${column.ref}`} className="border-b border-border px-2 py-2 text-center">
+                <StrengthSelect
+                  value={cellStrength(cells, column.kind, column.ref, clo.code)}
+                  onChange={(strength) => onSet(column, clo.code, strength)}
+                />
+              </td>
+            ))}
           </tr>
         ))}
-        <tr className="border-t-2 border-border font-medium">
-          <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold text-foreground">
-            Average Alignment
-          </th>
-          {columns.map((col) => (
-            <AvgCell key={`${col.kind}:${col.ref}`} value={columnAverage(cells, col.kind, col.ref)} />
-          ))}
-        </tr>
       </tbody>
     </table>
   );
 }
 
-/* -------------------------------------------------------------------- sidebar */
-
-function MappingSummary({ metrics }: { metrics: ReturnType<typeof mappingMetrics> }) {
-  const total = metrics.ratedCount;
-  const segments = metrics.distribution.map((d) => {
-    const band = ALIGNMENT_STRENGTHS.find((s) => s.value === d.value)!;
-    return { ...band, count: d.count, percent: total ? Math.round((d.count / total) * 100) : 0 };
-  });
-  return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <h3 className="mb-4 text-sm font-semibold text-foreground">Mapping Summary</h3>
-      <div className="flex items-center gap-4">
-        <Donut segments={segments} total={total} center={`${metrics.overallPercent}%`} caption="Overall Alignment" />
-        <ul className="flex-1 space-y-2">
-          {segments.map((s) => (
-            <li key={s.code} className="text-xs">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
-                <span className="font-medium text-foreground">
-                  {s.name} ({s.count})
-                </span>
-              </div>
-              <div className="pl-4.5 text-muted-foreground">{s.percent}%</div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
-}
-
-function Donut({
-  segments,
-  total,
-  center,
-  caption,
+function StrengthSelect({
+  value,
+  onChange,
 }: {
-  segments: { color: string; count: number }[];
-  total: number;
-  center: string;
-  caption: string;
+  value: number | null;
+  onChange: (value: number | null) => void;
 }) {
-  const size = 120;
-  const stroke = 16;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
+  const band = alignmentBand(value);
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={stroke} />
-        {total > 0 &&
-          segments
-            .filter((s) => s.count > 0)
-            .map((s, i) => {
-              const len = (s.count / total) * c;
-              const dash = `${len} ${c - len}`;
-              const el = (
-                <circle
-                  key={i}
-                  cx={size / 2}
-                  cy={size / 2}
-                  r={r}
-                  fill="none"
-                  stroke={s.color}
-                  strokeWidth={stroke}
-                  strokeDasharray={dash}
-                  strokeDashoffset={-offset}
-                />
-              );
-              offset += len;
-              return el;
-            })}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl font-bold text-foreground">{center}</span>
-        <span className="max-w-[70px] text-center text-[9px] leading-tight text-muted-foreground">{caption}</span>
-      </div>
-    </div>
-  );
-}
-
-function AlignmentByClo({
-  metrics,
-  onViewReport,
-}: {
-  metrics: ReturnType<typeof mappingMetrics>;
-  onViewReport: () => void;
-}) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <h3 className="mb-4 text-sm font-semibold text-foreground">Alignment by CLO (Average)</h3>
-      <ul className="space-y-2.5">
-        {metrics.perClo.map((row) => {
-          const band = alignmentBand(row.average);
-          return (
-            <li key={row.code} className="flex items-center justify-between text-sm">
-              <span className="font-medium text-primary">{row.code}</span>
-              <span className="flex items-center gap-2 text-foreground">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: band?.color ?? "var(--muted)" }}
-                />
-                {row.average == null ? "–" : row.average.toFixed(1)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <button
-        type="button"
-        onClick={onViewReport}
-        className="mt-4 text-sm font-medium text-primary hover:underline"
-      >
-        View detailed alignment report →
-      </button>
-    </section>
-  );
-}
-
-function QuickActions({
-  onEdit,
-  onReport,
-  onHeatmap,
-}: {
-  onEdit: () => void;
-  onReport: () => void;
-  onHeatmap: () => void;
-}) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <h3 className="mb-4 text-sm font-semibold text-foreground">Quick Actions</h3>
-      <div className="space-y-2">
-        <ActionRow icon={Pencil} title="Edit Mapping" sub="View and edit CLO mappings" onClick={onEdit} />
-        <ActionRow icon={FileText} title="Mapping Report" sub="View the alignment report" onClick={onReport} />
-        <ActionRow icon={Grid3x3} title="Alignment Heatmap" sub="View heatmap visualization" onClick={onHeatmap} />
-      </div>
-    </section>
-  );
-}
-
-function ActionRow({
-  icon: Icon,
-  title,
-  sub,
-  onClick,
-}: {
-  icon: typeof Target;
-  title: string;
-  sub: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition hover:bg-muted/50"
+    <Select
+      value={value == null ? "unrated" : String(value)}
+      onValueChange={(next) => onChange(next === "unrated" ? null : Number(next))}
     >
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span>
-        <span className="block text-sm font-medium text-foreground">{title}</span>
-        <span className="block text-xs text-muted-foreground">{sub}</span>
-      </span>
-    </button>
+      <SelectTrigger className="mx-auto h-8 w-[86px] text-xs">
+        <SelectValue>
+          {() => (band ? `${band.value} ${band.name}` : "— Unrated")}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="unrated">— Unrated</SelectItem>
+        {[0, 1, 2, 3].map((strength) => (
+          <SelectItem key={strength} value={String(strength)}>
+            {strength} {alignmentBand(strength)?.name ?? ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
-
-/* -------------------------------------------------------------------- dialogs */
 
 function ReportDialog({
   open,
   onOpenChange,
-  metrics,
-  weekColumns,
-  assessmentColumns,
+  rows,
+  columns,
   cells,
-  courseName,
 }: {
   open: boolean;
-  onOpenChange: (v: boolean) => void;
-  metrics: ReturnType<typeof mappingMetrics>;
-  weekColumns: MappingColumn[];
-  assessmentColumns: MappingColumn[];
+  onOpenChange: (open: boolean) => void;
+  rows: CloAlignmentAudit[];
+  columns: MappingColumn[];
   cells: MappingForm;
-  courseName?: string;
 }) {
-  const unratedClos = metrics.perClo.filter((c) => c.average == null).map((c) => c.code);
-  const weakClos = metrics.perClo.filter((c) => c.average != null && c.average < 1.5).map((c) => c.code);
-  const unmappedWeeks = weekColumns.length - metrics.weeksMapped;
-  const unmappedAssessments = assessmentColumns.length - metrics.assessmentsMapped;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Alignment Report</DialogTitle>
-          <DialogDescription>{courseName ?? "This course"} — CLO alignment across teaching &amp; assessment.</DialogDescription>
+          <DialogTitle>Constructive Alignment Report</DialogTitle>
+          <DialogDescription>Coverage status and optional explicit strength ratings.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 text-sm">
-          <div className="grid grid-cols-2 gap-3">
-            <ReportStat label="Overall alignment" value={`${metrics.overallPercent}%`} />
-            <ReportStat label="Rated cells" value={metrics.ratedCount} />
-            <ReportStat label="Weeks mapped" value={`${metrics.weeksMapped}/${metrics.weeksTotal}`} />
-            <ReportStat label="Assessments mapped" value={`${metrics.assessmentsMapped}/${metrics.assessmentsTotal}`} />
+        <div className="space-y-4">
+          <div className="space-y-2">
+            {rows.map((row) => (
+              <div key={row.code} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+                <span className="font-medium text-foreground">{row.code}</span>
+                <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[row.status]}`}>
+                  {ALIGNMENT_STATUS_LABELS[row.status]}
+                </span>
+              </div>
+            ))}
           </div>
-
-          <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Average by CLO
-            </h4>
-            <ul className="space-y-1.5">
-              {metrics.perClo.map((row) => {
-                const band = alignmentBand(row.average);
-                return (
-                  <li key={row.code} className="flex items-center justify-between">
-                    <span className="font-medium text-primary">{row.code}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: band?.color ?? "var(--muted)" }} />
-                      {row.average == null ? "Not rated" : `${row.average.toFixed(1)} — ${band?.name}`}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-
-          {(unratedClos.length > 0 || weakClos.length > 0 || unmappedWeeks > 0 || unmappedAssessments > 0) && (
-            <div className="rounded-lg border border-amber-300/60 bg-amber-50/60 p-3 dark:bg-amber-950/20">
-              <h4 className="mb-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">Attention</h4>
-              <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-                {unratedClos.length > 0 ? <li>Not yet rated: {unratedClos.join(", ")}</li> : null}
-                {weakClos.length > 0 ? <li>Weak alignment (&lt; 1.5): {weakClos.join(", ")}</li> : null}
-                {unmappedWeeks > 0 ? <li>{unmappedWeeks} week(s) have no aligned CLO.</li> : null}
-                {unmappedAssessments > 0 ? <li>{unmappedAssessments} assessment(s) have no aligned CLO.</li> : null}
-              </ul>
+          {columns.length > 0 ? (
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">Explicit strength averages</h4>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {columns.map((column) => {
+                  const average = columnAverage(cells, column.kind, column.ref);
+                  return (
+                    <div key={`${column.kind}-${column.ref}`} className="rounded-lg border border-border px-3 py-2 text-xs">
+                      <div className="font-medium text-foreground">{column.label}</div>
+                      <div className="text-muted-foreground">{average == null ? "Not rated" : `Average ${average.toFixed(1)} / 3`}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          )}
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function ReportStat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-border p-3">
-      <div className="text-lg font-bold text-foreground">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </div>
   );
 }
 
 function HeatmapDialog({
   open,
   onOpenChange,
-  clos,
+  rows,
   columns,
   cells,
 }: {
   open: boolean;
-  onOpenChange: (v: boolean) => void;
-  clos: CloForm[];
+  onOpenChange: (open: boolean) => void;
+  rows: CloAlignmentAudit[];
   columns: MappingColumn[];
   cells: MappingForm;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-auto">
+      <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Alignment Heatmap</DialogTitle>
-          <DialogDescription>Darker cells indicate stronger CLO alignment.</DialogDescription>
+          <DialogTitle>Alignment Strength Heatmap</DialogTitle>
+          <DialogDescription>Only explicit lecturer ratings are coloured. Unrated relationships remain blank.</DialogDescription>
         </DialogHeader>
-        <div className="overflow-x-auto">
-          <table className="border-collapse text-xs">
-            <thead>
-              <tr>
-                <th className="px-2 py-1" />
-                {columns.map((col) => (
-                  <th key={`${col.kind}:${col.ref}`} className="px-1 py-1 text-center font-medium text-muted-foreground" title={col.title}>
-                    <span className="block max-w-[54px] truncate">{col.label}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {clos.map((clo) => (
-                <tr key={clo.code}>
-                  <th className="px-2 py-1 text-left font-semibold text-primary">{clo.code}</th>
-                  {columns.map((col) => {
-                    const s = cellStrength(cells, col.kind, col.ref, clo.code);
-                    const band = alignmentBand(s);
-                    return (
-                      <td key={`${col.kind}:${col.ref}`} className="p-0.5">
-                        <div
-                          className="h-7 w-8 rounded"
-                          title={`${clo.code} × ${col.label}: ${band ? band.name : "unrated"}`}
-                          style={{
-                            backgroundColor: band
-                              ? tint(band.color, s === 0 ? 0.15 : 0.25 + (s ?? 0) * 0.22)
-                              : "var(--muted)",
-                          }}
-                        />
-                      </td>
-                    );
-                  })}
+        {columns.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">No components available.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr>
+                  <th className="px-2 py-2 text-left">CLO</th>
+                  {columns.map((column) => (
+                    <th key={`${column.kind}-${column.ref}`} className="min-w-24 px-2 py-2 text-center">{column.label}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.code}>
+                    <td className="px-2 py-2 font-medium">{row.code}</td>
+                    {columns.map((column) => {
+                      const strength = cellStrength(cells, column.kind, column.ref, row.code);
+                      const band = alignmentBand(strength);
+                      return (
+                        <td key={`${column.kind}-${column.ref}`} className="px-2 py-2 text-center">
+                          <span
+                            className="inline-flex h-8 w-12 items-center justify-center rounded-md border border-border font-semibold"
+                            style={band ? { backgroundColor: `${band.color}22`, color: band.color } : undefined}
+                          >
+                            {strength == null ? "—" : strength}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
 
-/* ---------------------------------------------------------------------- empty */
-
-function EmptyState({ title, body }: { title: string; body: string }) {
+function Notice({
+  title,
+  body,
+  actions,
+}: {
+  title: string;
+  body: string;
+  actions: Array<{ label: string; onClick: () => void }>;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card py-12 text-center">
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{body}</p>
-    </div>
+    <section className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-5 dark:border-amber-900/50 dark:bg-amber-950/20">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+        <div className="flex-1">
+          <h3 className="font-semibold text-amber-950 dark:text-amber-100">{title}</h3>
+          <p className="mt-1 text-sm text-amber-900/80 dark:text-amber-200/80">{body}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {actions.map((action) => (
+              <Button key={action.label} variant="outline" size="sm" onClick={action.onClick}>
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EmptyState({
+  title,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  body: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <section className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+      <Target className="mx-auto h-9 w-9 text-muted-foreground" />
+      <h2 className="mt-3 text-lg font-semibold text-foreground">{title}</h2>
+      <p className="mx-auto mt-1 max-w-lg text-sm text-muted-foreground">{body}</p>
+      {actionLabel && onAction ? (
+        <Button className="mt-4" onClick={onAction}>{actionLabel}</Button>
+      ) : null}
+    </section>
   );
 }
