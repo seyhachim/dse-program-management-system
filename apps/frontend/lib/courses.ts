@@ -9,7 +9,10 @@ import type {
 import { api } from "./api";
 
 /** Course as returned by the API — lecturer joined via the registry. */
-export type CourseView = Course & { lecturer: Lecturer | null; reviewStatus?: string };
+export type CourseView = Course & {
+  lecturer: Lecturer | null;
+  reviewStatus?: string | null;
+};
 
 export const coursesApi = {
   list(search?: string): Promise<CourseView[]> {

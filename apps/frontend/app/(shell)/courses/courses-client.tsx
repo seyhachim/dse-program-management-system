@@ -16,6 +16,7 @@ import {
   type CourseWithCurriculumPlacement,
   type CurriculumPlacement,
 } from "./course-curriculum-groups";
+import { courseReviewStatusLabel } from "./course-review-status";
 
 type CourseListRow = CourseWithCurriculumPlacement<CourseView>;
 
@@ -156,9 +157,9 @@ export function CoursesClient() {
           key: "reviewStatus",
           header: "Review",
           render: (c: CourseListRow) => {
-            const status = c.reviewStatus ?? "Draft";
+            const status = c.reviewStatus;
             const pending = status === "Submitted" || status === "Resubmitted" || status === "UnderReview";
-            const label = status === "ChangesRequested" ? "Changes Requested" : status;
+            const label = courseReviewStatusLabel(status);
             return (
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
