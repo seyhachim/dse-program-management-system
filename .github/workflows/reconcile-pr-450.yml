@@ -1,4 +1,4 @@
-name: Reconcile PR 450 Probe
+name: Reconcile PR 450
 
 on:
   push:
@@ -11,34 +11,65 @@ permissions:
   contents: write
 
 jobs:
-  probe-merge-conflicts:
+  reconcile:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Capture exact merge conflicts
+      - name: Merge current main and resolve Course Delivery conflict
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
-          git merge --no-commit --no-ff origin/main > /tmp/merge-output.txt 2>&1
-          merge_status=$?
-          {
-            echo "merge_status=$merge_status"
-            echo "main=$(git rev-parse origin/main)"
-            echo "head_before=$(git rev-parse HEAD)"
-            echo "--- merge output ---"
-            cat /tmp/merge-output.txt
-            echo "--- unmerged files ---"
+          git merge --no-commit --no-ff origin/main || true
+
+          target='apps/frontend/app/(shell)/course-delivery/course-delivery-client.tsx'
+          unmerged="$(git diff --name-only --diff-filter=U)"
+          if [ "$unmerged" != "$target" ]; then
+            echo "Unexpected conflict set:"
+            printf '%s\n' "$unmerged"
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/frontend/app/(shell)/course-delivery/course-delivery-client.tsx')
+          text = path.read_text()
+          start = text.index('<<<<<<< HEAD')
+          middle = text.index('=======', start)
+          end_marker = '>>>>>>> origin/main'
+          end = text.index(end_marker, middle) + len(end_marker)
+
+          replacement = '''        {assessment?.mode === "individual" ? (
+            <>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <StatusBadge tone="neutral" label={`${draftCount} draft`} icon={false} />
+                <StatusBadge tone="success" label={`${publishedCount} published`} icon={false} />
+                <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
+              </div>
+              {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
+              {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-warning">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
+            </>
+          ) : assessment ? (
+            <p className="mt-3 text-sm text-muted-foreground">This assessment uses {assessment.mode === "group" ? "Group" : "Group + Individual"} scoring. Configure membership and source evidence in the group workspace below.</p>
+          ) : null}'''
+
+          path.write_text(text[:start] + replacement + text[end:])
+          PY
+
+          git add -- "$target"
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            echo "Unresolved conflicts remain"
             git diff --name-only --diff-filter=U
-            echo "--- combined conflict diff ---"
-            git diff --cc
-          } > /tmp/reconcile-pr-450-conflicts.txt
-          git merge --abort || true
-          cp /tmp/reconcile-pr-450-conflicts.txt .github/reconcile-pr-450-conflicts.txt
-          git add -- .github/reconcile-pr-450-conflicts.txt
-          git commit -m "chore(ci): refresh PR #450 merge conflicts"
+            exit 1
+          fi
+
+          git rm -- .github/workflows/reconcile-pr-450.yml .github/reconcile-pr-450-conflicts.txt
+          git diff --check
+          git status --short
+          git commit -m "Merge current main into PR #450"
           git push origin HEAD:agent/issue-449-group-assessment-results
