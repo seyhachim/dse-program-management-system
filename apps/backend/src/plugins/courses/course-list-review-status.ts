@@ -1,4 +1,4 @@
-import type { CourseSpecReviewStatus } from "@dse-pms/shared-types";
+import type { CourseSpecReviewStatus } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 
 type CourseRow = { id: string };
@@ -21,8 +21,9 @@ function isNewerSpec(
 }
 
 /**
- * Attach the review status of each course's latest academic CourseSpec version.
- * Courses without any CourseSpec are explicit `null`, never an inferred Draft.
+ * Attach the persisted review status of each course's latest academic CourseSpec
+ * version. Courses without any CourseSpec are explicit `null`, never an inferred
+ * Draft.
  */
 export function projectLatestCourseSpecReviewStatus<T extends CourseRow>(
   courses: readonly T[],
