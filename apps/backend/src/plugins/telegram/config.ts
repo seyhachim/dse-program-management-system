@@ -4,12 +4,15 @@ export interface TelegramConfig {
   botUsername?: string;
   miniAppUrl?: string;
   miniAppShortName?: string;
+  webhookSecret?: string;
+  publicProgrammeId: string;
   initDataMaxAgeSeconds: number;
   initDataMaxFutureSkewSeconds: number;
 }
 
 const DEFAULT_INIT_DATA_MAX_AGE_SECONDS = 300;
 const DEFAULT_INIT_DATA_MAX_FUTURE_SKEW_SECONDS = 30;
+const DEFAULT_PUBLIC_PROGRAMME_ID = "dse";
 
 function readEnabled(value: string | undefined): boolean {
   if (value === undefined || value === "" || value === "false") return false;
@@ -44,6 +47,8 @@ export function getTelegramConfig(
     botUsername: env.TELEGRAM_BOT_USERNAME?.trim() || undefined,
     miniAppUrl: env.TELEGRAM_MINI_APP_URL?.trim() || undefined,
     miniAppShortName: env.TELEGRAM_MINI_APP_SHORT_NAME?.trim() || undefined,
+    webhookSecret: env.TELEGRAM_WEBHOOK_SECRET?.trim() || undefined,
+    publicProgrammeId: env.TELEGRAM_PUBLIC_PROGRAMME_ID?.trim() || DEFAULT_PUBLIC_PROGRAMME_ID,
     initDataMaxAgeSeconds: readPositiveInteger(
       "TELEGRAM_INIT_DATA_MAX_AGE_SECONDS",
       env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS,

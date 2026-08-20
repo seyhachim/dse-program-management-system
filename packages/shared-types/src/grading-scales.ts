@@ -62,6 +62,7 @@ export const ProgrammeGradingScaleSchema = z.object({
   code: z.string(),
   name: z.string(),
   description: z.string(),
+  isDefault: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
   versions: z.array(ProgrammeGradingScaleVersionSchema),

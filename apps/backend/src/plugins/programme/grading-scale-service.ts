@@ -95,6 +95,7 @@ function serializeScale(row: ScaleWithVersions): ProgrammeGradingScale {
     code: row.code,
     name: row.name,
     description: row.description,
+    isDefault: row.isDefault,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     versions: row.versions.map((version) =>

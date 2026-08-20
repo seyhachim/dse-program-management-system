@@ -113,7 +113,7 @@ export function DashboardClient() {
   return (
     <div className="space-y-6">
       {failedSources.length > 0 ? (
-        <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
+        <div className="rounded-lg border border-warning/30 bg-warning-bg px-4 py-2 text-sm text-warning">
           Failed to load {failedSources.join(", ")} — showing the rest of the dashboard. Try refreshing.
         </div>
       ) : null}
@@ -121,25 +121,25 @@ export function DashboardClient() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           icon={Users}
-          tint="bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"
+          tint="bg-primary-light text-primary"
           value={students.length}
           label="Students"
         />
         <StatTile
           icon={BookOpen}
-          tint="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
+          tint="bg-info-bg text-info"
           value={courses.length}
           label="Courses"
         />
         <StatTile
           icon={CalendarRange}
-          tint="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"
+          tint="bg-success-bg text-success"
           value={offerings.length}
           label="Course Offerings"
         />
         <StatTile
           icon={GraduationCap}
-          tint="bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300"
+          tint="bg-warning-bg text-warning"
           value={lecturerCount}
           label="Lecturers"
         />

@@ -45,6 +45,7 @@ describe("Telegram service", () => {
     const service = createTelegramService({
       getConfig: () => ({
         enabled: false,
+        publicProgrammeId: "dse",
         initDataMaxAgeSeconds: 300,
         initDataMaxFutureSkewSeconds: 30,
       }),
@@ -63,6 +64,7 @@ describe("Telegram service", () => {
         botUsername: "DSEPMSBot",
         miniAppUrl: "https://example.com/telegram",
         miniAppShortName: "pms",
+        publicProgrammeId: "dse",
         initDataMaxAgeSeconds: 300,
         initDataMaxFutureSkewSeconds: 30,
       }),

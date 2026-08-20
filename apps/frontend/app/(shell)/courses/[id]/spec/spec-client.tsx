@@ -81,31 +81,30 @@ import { OverviewTab } from "./overview-tab";
 import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
-import { EMPTY_POLICY, PolicySection } from "./policy-section";
-import { DateSection, EMPTY_DATE } from "./date-section";
+import { EMPTY_POLICY } from "./policy-section";
+import { EMPTY_DATE } from "./date-section";
 import type {
   DateSection as DateSectionValue,
   PolicySection as PolicySectionValue,
   StudentResponsibilitySection as StudentResponsibilityValue,
 } from "@dse-pms/shared-types";
-import { ResourcesSectionForm } from "./resources-section";
+import { LearningResourcesSection } from "./learning-resources-section";
 import {
   EMPTY_RESOURCES,
   toResourcesForm,
   toResourcesPayload,
   type ResourcesForm,
 } from "./resources-model";
-import { ReferencesSectionForm } from "./references-section";
 import {
   EMPTY_REFERENCES,
   toReferencesForm,
   toReferencesPayload,
   type ReferencesForm,
 } from "./references-model";
-import {
-  EMPTY_STUDENT_RESPONSIBILITY,
-  StudentResponsibilitySection,
-} from "./student-responsibility-section";
+import { EMPTY_STUDENT_RESPONSIBILITY } from "./student-responsibility-section";
+import { PoliciesResponsibilitiesSection } from "./policies-responsibilities-section";
+import { normalizePoliciesResponsibilitiesTab } from "./policies-responsibilities-model";
+
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
   | "overview"
@@ -122,10 +121,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "slt", label: "Weekly Plan" },
   { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
-  { id: "references", label: "References" },
-  { id: "responsibility", label: "Responsibility" },
-  { id: "policy", label: "Policies" },
-  { id: "date", label: "Date" },
+  { id: "policy", label: "Policies & Responsibilities" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
@@ -138,9 +134,7 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "mapping",
   "resources",
   "references",
-  "responsibility",
   "policy",
-  "date",
 ]);
 
 const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
@@ -151,7 +145,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
-    const requested = searchParams.get("tab");
+    const requested = normalizePoliciesResponsibilitiesTab(
+      searchParams.get("tab"),
+    );
+    if (requested === "references") return "resources";
     return TABS.some((t) => t.id === requested)
       ? (requested as TabId)
       : "overview";
@@ -212,9 +209,15 @@ export function SpecClient({ courseId }: { courseId: string }) {
   );
   const setActiveTab = useCallback(
     (id: TabId) => {
+      const policyNormalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      const normalizedId: TabId =
+        policyNormalizedId === "references" ? "resources" : policyNormalizedId;
       const locked =
         review !== null && !REVIEW_EDITABLE_STATUSES.has(review.status);
-      const nextId = locked && EDITABLE_SPEC_TABS.has(id) ? "reviewSubmit" : id;
+      const nextId =
+        locked && EDITABLE_SPEC_TABS.has(normalizedId)
+          ? "reviewSubmit"
+          : normalizedId;
       setActiveTabState(nextId);
       router.replace(
         nextId === "overview" ? pathname : `${pathname}?tab=${nextId}`,
@@ -405,15 +408,23 @@ export function SpecClient({ courseId }: { courseId: string }) {
       }
       setSaving(true);
       setError(null);
+      const normalized = value.date?.trim() || null;
       try {
-        await courseSpecApi.saveSection(courseId, "date", value);
-        setSpecDate(value);
-        setStatus((s) => ({ ...s, date: "complete" }));
+        await courseSpecApi.saveSection(courseId, "date", { date: normalized });
+        setSpecDate({ date: normalized });
+        setStatus((s) => ({
+          ...s,
+          date: normalized ? "complete" : "draft",
+        }));
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to save the date");
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to save the Specification Date",
+        );
         return false;
       } finally {
         setSaving(false);
@@ -608,6 +619,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
       if (sectionId === "courseInfo") {
         setActiveTab("overview");
         setCourseInfoDialogOpen(true);
+      } else if (sectionId === "references") {
+        setActiveTab("resources");
       } else {
         setActiveTab(sectionId);
       }
@@ -802,36 +815,25 @@ export function SpecClient({ courseId }: { courseId: string }) {
             </TabsContent>
 
             <TabsContent value="resources" className="mt-4">
-              <ResourcesSectionForm
-                value={resources}
+              <LearningResourcesSection
+                references={references}
+                resources={resources}
                 weeklyPlan={weeklyPlan}
-                onPersist={persistResources}
-              />
-            </TabsContent>
-
-            <TabsContent value="references" className="mt-4">
-              <ReferencesSectionForm value={references} onPersist={persistReferences} />
-            </TabsContent>
-
-            <TabsContent value="responsibility" className="mt-4">
-              <StudentResponsibilitySection
-                value={responsibility}
-                onPersist={persistResponsibility}
-                disabled={editingLocked}
+                onPersistReferences={persistReferences}
+                onPersistResources={persistResources}
+                onGoToWeeklyPlan={() => setActiveTab("slt")}
               />
             </TabsContent>
 
             <TabsContent value="policy" className="mt-4">
-              <PolicySection
-                value={policy}
+              <PoliciesResponsibilitiesSection
+                policy={policy}
+                responsibility={responsibility}
                 programPolicy={programme?.policy ?? null}
-                onPersist={persistPolicy}
+                onPersistPolicy={persistPolicy}
+                onPersistResponsibility={persistResponsibility}
                 disabled={editingLocked}
               />
-            </TabsContent>
-
-            <TabsContent value="date" className="mt-4">
-              <DateSection value={specDate} onPersist={persistDate} disabled={editingLocked} />
             </TabsContent>
 
             <TabsContent value="documentPreview" className="mt-4">
@@ -854,6 +856,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
                   review={review}
                   cloReady={cloReady}
                   teachingLearningReady={teachingLearningReady}
+                  specificationDate={specDate}
+                  onSaveSpecificationDate={persistDate}
                   onSubmit={submitForReview}
                   onPreview={() => setActiveTab("documentPreview")}
                   onGoToSection={goToSection}

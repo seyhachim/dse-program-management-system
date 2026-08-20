@@ -6,7 +6,7 @@ import type {
   CourseSpecResponsibleLecturersView,
   Lecturer,
 } from "@dse-pms/shared-types";
-import { Button } from "@dse-pms/ui";
+import { Button, Input } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { lecturersApi } from "@/lib/lecturers";
 
@@ -16,6 +16,7 @@ export function ResponsibleLecturersClient({ courseId }: { courseId: string }) {
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [view, setView] = useState<CourseSpecResponsibleLecturersView | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +61,16 @@ export function ResponsibleLecturersClient({ courseId }: { courseId: string }) {
         .map((lecturer) => lecturer.name),
     [lecturers, selected],
   );
+  const filteredLecturers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return lecturers;
+
+    return lecturers.filter(
+      (lecturer) =>
+        lecturer.name.toLowerCase().includes(query) ||
+        lecturer.email.toLowerCase().includes(query),
+    );
+  }, [lecturers, search]);
 
   const toggle = (id: string) => {
     setSaved(false);
@@ -152,8 +163,23 @@ export function ResponsibleLecturersClient({ courseId }: { courseId: string }) {
           </p>
         ) : null}
 
-        <div className="mt-5 space-y-2">
-          {lecturers.map((lecturer) => (
+        {lecturers.length > 0 ? (
+          <div className="mt-5 space-y-2">
+            <Input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search lecturers by name or email"
+              aria-label="Search lecturers by name or email"
+            />
+            <p className="text-xs text-muted-foreground">
+              Showing {filteredLecturers.length} of {lecturers.length} lecturers
+            </p>
+          </div>
+        ) : null}
+
+        <div className="mt-4 space-y-2">
+          {filteredLecturers.map((lecturer) => (
             <label
               key={lecturer.id}
               className="flex cursor-pointer items-center gap-3 rounded-lg border p-3"
@@ -176,6 +202,10 @@ export function ResponsibleLecturersClient({ courseId }: { courseId: string }) {
           {lecturers.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No lecturers are available to assign.
+            </p>
+          ) : filteredLecturers.length === 0 ? (
+            <p className="rounded-lg border border-dashed px-3 py-5 text-center text-sm text-muted-foreground">
+              No lecturers match “{search.trim()}”.
             </p>
           ) : null}
         </div>

@@ -177,6 +177,74 @@ const CURRENT_SPEC_ORDER = [
   { versionMajor: "desc" as const },
   { versionMinor: "desc" as const },
 ];
+const SPEC_PROGRESS_COURSE_SELECT = {
+  id: true,
+  code: true,
+  title: true,
+  specs: {
+    orderBy: CURRENT_SPEC_ORDER,
+    take: 1,
+    select: { sections: { select: { sectionKey: true, status: true } } },
+  },
+} satisfies Prisma.CourseSelect;
+
+type SpecProgressCourse = Prisma.CourseGetPayload<{
+  select: typeof SPEC_PROGRESS_COURSE_SELECT;
+}>;
+
+function toCourseSpecProgress(course: SpecProgressCourse): CourseSpecProgress {
+  const sections = course.specs[0]?.sections ?? [];
+
+  const completedSectionIds = new Set(
+    sections
+      .filter(
+        (section) =>
+          section.status === "Complete" &&
+          COMPLETABLE_SECTION_IDS.includes(section.sectionKey as SpecSectionId),
+      )
+      .map((section) => section.sectionKey as SpecSectionId),
+  );
+
+  const incompleteSections = COMPLETABLE_SPEC_SECTIONS.filter(
+    (section) => !completedSectionIds.has(section.id),
+  ).map((section) => ({
+    id: section.id,
+    title: section.title,
+  }));
+
+  return {
+    courseId: course.id,
+    code: course.code,
+    title: course.title,
+    completed: completedSectionIds.size,
+    total: COMPLETABLE_SECTION_IDS.length,
+    incompleteSections,
+  };
+}
+
+async function listSpecProgressWhere(
+  where: Prisma.CourseWhereInput,
+): Promise<CourseSpecProgress[]> {
+  const courses = await prisma.course.findMany({
+    where,
+    orderBy: { code: "asc" },
+    select: SPEC_PROGRESS_COURSE_SELECT,
+  });
+  return courses.map(toCourseSpecProgress);
+}
+
+export function specProgressCourseFilter(
+  courseIds: readonly string[],
+): Prisma.CourseWhereInput {
+  return { id: { in: [...new Set(courseIds)] } };
+}
+
+export async function listSpecProgressForCourseIds(
+  courseIds: readonly string[],
+): Promise<CourseSpecProgress[]> {
+  if (courseIds.length === 0) return [];
+  return listSpecProgressWhere(specProgressCourseFilter(courseIds));
+}
 
 function toCourseSpecVersionRef(spec: {
   id: string;
@@ -238,49 +306,7 @@ export const courseService = {
     const scopeFilter = lecturerScope
       ? await ownerScopeFilter(lecturerScope)
       : {};
-    const courses = await prisma.course.findMany({
-      where: scopeFilter,
-      orderBy: { code: "asc" },
-      select: {
-        id: true,
-        code: true,
-        title: true,
-        specs: {
-          orderBy: CURRENT_SPEC_ORDER,
-          take: 1,
-          select: { sections: { select: { sectionKey: true, status: true } } },
-        },
-      },
-    });
-    return courses.map((course) => {
-      const sections = course.specs[0]?.sections ?? [];
-
-      const completedSectionIds = new Set(
-        sections
-          .filter(
-            (s) =>
-              s.status === "Complete" &&
-              COMPLETABLE_SECTION_IDS.includes(s.sectionKey as SpecSectionId),
-          )
-          .map((s) => s.sectionKey as SpecSectionId),
-      );
-
-      const incompleteSections = COMPLETABLE_SPEC_SECTIONS.filter(
-        (section) => !completedSectionIds.has(section.id),
-      ).map((section) => ({
-        id: section.id,
-        title: section.title,
-      }));
-
-      return {
-        courseId: course.id,
-        code: course.code,
-        title: course.title,
-        completed: completedSectionIds.size,
-        total: COMPLETABLE_SECTION_IDS.length,
-        incompleteSections,
-      };
-    });
+    return listSpecProgressWhere(scopeFilter);
   },
 
   /**
@@ -1181,10 +1207,10 @@ async function syncAssessmentPlan(
 }
 
 /**
- * Delete-and-rebuild CourseSpecResource rows for a `resources` (§19) section
- * save. Scoped to `section: "Resource"` — CourseSpecResource also backs §20
- * References (`section: "Reference"`), and an unscoped delete here would wipe
- * out that section's rows on every §19 save.
+ * Delete-and-rebuild CourseSpecResource rows for a `resources` (§19) section save.
+ * Scoped to `section: "Resource"` — CourseSpecResource also backs §20 References
+ * (`section: "Reference"`), and an unscoped delete here would wipe out that
+ * section's rows on every §19 save.
  */
 async function syncResources(
   tx: Prisma.TransactionClient,
@@ -1271,9 +1297,7 @@ async function syncStudentResponsibilities(
   courseSpecId: string,
   section: StudentResponsibilitySection,
 ) {
-  await tx.courseSpecStudentResponsibility.deleteMany({
-    where: { courseSpecId },
-  });
+  await tx.courseSpecStudentResponsibility.deleteMany({ where: { courseSpecId } });
   if (section.items.length === 0) return;
   await tx.courseSpecStudentResponsibility.createMany({
     data: section.items.map((item, order) => ({
