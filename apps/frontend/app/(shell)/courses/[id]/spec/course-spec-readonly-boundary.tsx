@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 const SAFE_BUTTON_PATTERN =
-  /\b(preview|rubric library|export|filter|view|report|heatmap|print|download|dismiss|close|go to)\b/i;
+  /\b(preview|rubric library|export|filter|view|report|heatmap|print|download|dismiss|close|go to|alignment type)\b/i;
 
 function isSafeReadOnlyControl(control: HTMLElement): boolean {
   if (control instanceof HTMLInputElement) {
