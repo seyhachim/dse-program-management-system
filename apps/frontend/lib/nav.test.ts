@@ -12,3 +12,12 @@ test("Rubric Bank is visible only to programme leadership", () => {
   expect(lecturer).toBeUndefined();
   expect(student).toBeUndefined();
 });
+
+test("Rating Scales management is visible only to Admin and Programme Coordinator", () => {
+  const path = "/programme-settings/rating-scales";
+  expect(getNavRoutes(["admin"]).find((route) => route.path === path)?.label).toBe("Rating Scales");
+  expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === path)?.label).toBe("Rating Scales");
+  expect(getNavRoutes(["lecturer"]).find((route) => route.path === path)).toBeUndefined();
+  expect(getNavRoutes(["program_secretary"]).find((route) => route.path === path)).toBeUndefined();
+  expect(getNavRoutes(["qa_reviewer"]).find((route) => route.path === path)).toBeUndefined();
+});

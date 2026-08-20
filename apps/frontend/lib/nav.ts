@@ -64,6 +64,21 @@ const rubricBankManifest: PluginManifest = {
   ],
 };
 
+const gradingScaleManagementManifest: PluginManifest = {
+  id: "programme-grading-scales",
+  name: "Programme Rating Scales",
+  version: "0.1.0",
+  routes: [
+    {
+      label: "Rating Scales",
+      path: "/programme-settings/rating-scales",
+      icon: "settings",
+      roles: ["admin", "program_coordinator"],
+      group: "Academic",
+    },
+  ],
+};
+
 const publicInformationManifest: PluginManifest = {
   id: "public-programme-information",
   name: "Public Programme Information",
@@ -82,6 +97,7 @@ const publicInformationManifest: PluginManifest = {
 const frontendManifests = [
   ...pluginManifests.filter((manifest) => manifest.id !== "rubrics"),
   rubricBankManifest,
+  gradingScaleManagementManifest,
   curriculumWorkspaceManifest,
   communityManifest,
   publicInformationManifest,
