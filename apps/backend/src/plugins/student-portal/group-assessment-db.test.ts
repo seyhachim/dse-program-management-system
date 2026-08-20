@@ -30,7 +30,11 @@ dbDescribe("group assessment database integrity", () => {
     const actor = await prisma.user.findFirst({ select: { id: true } });
     if (!actor) throw new Error("Seed user required");
     const event = await prisma.assessmentGroupAuditEvent.create({ data: { offeringId: crypto.randomUUID(), courseSpecId: crypto.randomUUID(), assessmentItemId: crypto.randomUUID(), action: "GroupsConfigured", actorId: actor.id, details: { test: true } } });
-    await expect(prisma.assessmentGroupAuditEvent.update({ where: { id: event.id }, data: { reason: "rewrite" } })).rejects.toThrow(/append-only/i);
-    await expect(prisma.assessmentGroupAuditEvent.delete({ where: { id: event.id } })).rejects.toThrow(/append-only/i);
+    await expect(async () => {
+      await prisma.assessmentGroupAuditEvent.update({ where: { id: event.id }, data: { reason: "rewrite" } });
+    }).toThrow(/append-only/i);
+    await expect(async () => {
+      await prisma.assessmentGroupAuditEvent.delete({ where: { id: event.id } });
+    }).toThrow(/append-only/i);
   });
 });
