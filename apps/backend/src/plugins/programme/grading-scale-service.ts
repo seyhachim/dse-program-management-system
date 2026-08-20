@@ -108,6 +108,22 @@ function toDate(value: string | null | undefined): Date | null | undefined {
   return value === null ? null : new Date(`${value}T00:00:00.000Z`);
 }
 
+function dateOnlyUtc(value = new Date()): Date {
+  return new Date(
+    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
+  );
+}
+
+function versionIsEffectiveOn(
+  version: Pick<VersionWithScale, "effectiveFrom" | "effectiveTo">,
+  date: Date,
+): boolean {
+  return (
+    (!version.effectiveFrom || version.effectiveFrom <= date) &&
+    (!version.effectiveTo || date < version.effectiveTo)
+  );
+}
+
 function gradeCreateRows(grades: readonly DraftGradingScaleGradeInput[]) {
   return grades.map((grade) => ({
     sortOrder: grade.sortOrder,
@@ -372,10 +388,19 @@ async function approve(
         status: "Approved",
         id: { not: versionId },
       },
-      select: { id: true, version: true },
+      select: { id: true, version: true, effectiveFrom: true },
     });
 
     for (const previous of active) {
+      if (
+        current.effectiveFrom &&
+        previous.effectiveFrom &&
+        current.effectiveFrom <= previous.effectiveFrom
+      ) {
+        throw new GradingScaleValidationError(
+          "A grading-scale revision must become effective after the current approved version",
+        );
+      }
       await tx.programmeGradingScaleVersion.update({
         where: { id: previous.id },
         data: {
@@ -447,13 +472,18 @@ async function courseBinding(courseId: string) {
   }
 
   if (!version) {
+    const today = dateOnlyUtc();
     version = await prisma.programmeGradingScaleVersion.findFirst({
       where: {
-        status: "Approved",
+        status: { in: ["Approved", "Superseded"] },
         gradingScale: { programmeId: course.programmeId, isDefault: true },
+        AND: [
+          { OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: today } }] },
+          { OR: [{ effectiveTo: null }, { effectiveTo: { gt: today } }] },
+        ],
       },
       include: VERSION_INCLUDE,
-      orderBy: [{ version: "desc" }],
+      orderBy: [{ effectiveFrom: "desc" }, { version: "desc" }],
     });
   }
 
@@ -504,11 +534,9 @@ async function bindCourseSpec(
       "Course Specifications can only bind to approved grading-scale versions",
     );
   }
-  if (
-    spec.effectiveFrom &&
-    ((version.effectiveFrom && spec.effectiveFrom < version.effectiveFrom) ||
-      (version.effectiveTo && spec.effectiveFrom >= version.effectiveTo))
-  ) {
+
+  const targetDate = spec.effectiveFrom ?? dateOnlyUtc();
+  if (!versionIsEffectiveOn(version, targetDate)) {
     throw new GradingScaleConflictError(
       "The grading-scale version is not effective for this Course Specification date",
     );
