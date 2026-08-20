@@ -2,6 +2,10 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
+import {
+  PublicCurriculumConflictError,
+  PublicCurriculumNotFoundError,
+} from "../../programme/public-curriculum-read-service.ts";
 import type { TelegramConfig } from "../config.ts";
 import { createPublicTelegramRouter } from "./router.ts";
 import type {
@@ -105,6 +109,94 @@ function makePublicRead() {
   };
 }
 
+function makeCurriculumRead() {
+  const provenance = {
+    curriculumVersionId: "curriculum-v1",
+    curriculumVersion: "1.0",
+    status: "Active" as const,
+    sourceFileName: "DSE Curriculum.json",
+    sourceSha256: "a".repeat(64),
+  };
+  const courses = [
+    {
+      code: "PAN202",
+      title: "Predictive Analytics",
+      yearLevel: 2,
+      semester: "Second" as const,
+      credits: 3,
+      courseType: "Core",
+      weeklyHoursTotal: 4,
+      weeklyLectureHours: 2,
+      weeklyLabHours: 2,
+      weeklyFieldVisitHours: 0,
+      lecturerText: "Mr. Chim Seyha",
+      pathwayCode: null,
+      conflicts: [],
+      provenance,
+    },
+    {
+      code: "NDA202",
+      title: "NoSQL Databases",
+      yearLevel: 2,
+      semester: "Second" as const,
+      credits: 3,
+      courseType: "Core",
+      weeklyHoursTotal: 4,
+      weeklyLectureHours: 2,
+      weeklyLabHours: 2,
+      weeklyFieldVisitHours: 0,
+      lecturerText: "",
+      pathwayCode: null,
+      conflicts: [],
+      provenance,
+    },
+  ];
+  return {
+    async listCourses() { return courses; },
+    async getCourse(_programmeId: string, query: string) {
+      if (query === "ambiguous") {
+        throw new PublicCurriculumConflictError("multiple published courses");
+      }
+      const course = courses.find((item) => item.code === query || item.title === query);
+      if (!course) throw new PublicCurriculumNotFoundError("not found");
+      return course;
+    },
+    async getStudyPlan() {
+      return {
+        yearLevel: 2,
+        semester: "Second" as const,
+        courses,
+        totalCredits: 6,
+        totalWeeklyHours: 8,
+        provenance,
+      };
+    },
+    async getTotals() {
+      return {
+        totalCourses: 2,
+        totalCredits: 5,
+        computedTotalCourses: 2,
+        computedTotalCredits: 6,
+        declaredTotalCourses: 2,
+        declaredTotalCredits: 5,
+        totalWeeklyHours: 8,
+        conflicts: ["Official source declares 5 credits while published route rows sum to 6"],
+        byYearSemester: [{
+          yearLevel: 2,
+          semester: "Second" as const,
+          courseCount: 2,
+          credits: 5,
+          computedCredits: 6,
+          declaredCredits: 5,
+          weeklyHours: 8,
+          conflicts: ["Official source declares 5 credits while published course rows sum to 6"],
+        }],
+        provenance,
+      };
+    },
+  };
+}
+
 let server: Server;
 let baseUrl: string;
 let client: FakeClient;
@@ -117,6 +209,7 @@ beforeAll(async () => {
     config,
     client,
     publicRead: makePublicRead(),
+    publicCurriculumRead: makeCurriculumRead(),
   }));
   server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", () => resolve()));
@@ -169,6 +262,50 @@ describe("public Telegram webhook", () => {
     expect(sent.text).toContain("Published admission answer.");
     expect(sent.text).toContain("https://example.edu/apply");
     expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
+  });
+
+  test("/courses lists curriculum-backed published courses", async () => {
+    const response = await webhook({ update_id: 30, message: { message_id: 30, chat: { id: 20 }, text: "/courses" } });
+    expect(response.status).toBe(200);
+    expect(client.sent.at(-1)?.text).toContain("PAN202 — Predictive Analytics");
+  });
+
+  test("course code lookup returns credits, weekly hours and curriculum provenance", async () => {
+    const response = await webhook({ update_id: 31, message: { message_id: 31, chat: { id: 20 }, text: "PAN202" } });
+    expect(response.status).toBe(200);
+    const text = client.sent.at(-1)?.text ?? "";
+    expect(text).toContain("Credits: 3");
+    expect(text).toContain("Weekly hours: 4");
+    expect(text).toContain("approved curriculum v1.0");
+  });
+
+  test("/course not-found lookup is acknowledged in chat instead of returning 500", async () => {
+    const response = await webhook({ update_id: 34, message: { message_id: 34, chat: { id: 20 }, text: "/course UNKNOWN" } });
+    expect(response.status).toBe(200);
+    expect(client.sent.at(-1)?.text).toContain("couldn't find");
+  });
+
+  test("/course ambiguous lookup asks for a more specific course instead of returning 500", async () => {
+    const response = await webhook({ update_id: 35, message: { message_id: 35, chat: { id: 20 }, text: "/course ambiguous" } });
+    expect(response.status).toBe(200);
+    expect(client.sent.at(-1)?.text).toContain("matches more than one published course");
+  });
+
+  test("year and semester question renders a readable study plan", async () => {
+    const response = await webhook({ update_id: 32, message: { message_id: 32, chat: { id: 20 }, text: "what do I study in year 2 semester 2?" } });
+    expect(response.status).toBe(200);
+    const text = client.sent.at(-1)?.text ?? "";
+    expect(text).toContain("Year 2 · Semester 2");
+    expect(text).toContain("Total: 6 credits · 8 h/week");
+  });
+
+  test("credit-load question preserves source-declared totals and exposes row conflicts", async () => {
+    const response = await webhook({ update_id: 33, message: { message_id: 33, chat: { id: 20 }, text: "what is the credit load?" } });
+    expect(response.status).toBe(200);
+    const text = client.sent.at(-1)?.text ?? "";
+    expect(text).toContain("Published route total: 2 courses · 5 credits");
+    expect(text).toContain("rows sum to 6");
+    expect(text).toContain("⚠️ Source conflict");
   });
 
   test("FAQ callback edits the existing message and answers the callback query", async () => {
