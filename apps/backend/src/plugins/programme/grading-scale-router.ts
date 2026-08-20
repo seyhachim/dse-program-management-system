@@ -245,7 +245,7 @@ export function createGradingScaleRouter(): Router {
 
   router.put(
     "/grading-scales/course-specs/:courseId",
-    requirePermission("courses:write"),
+    requirePermission("programme:write"),
     async (req, res) => {
       if (!req.user) return void res.status(401).json({ error: "Not authenticated" });
       const courseId = req.params.courseId;
@@ -256,8 +256,8 @@ export function createGradingScaleRouter(): Router {
       }
       const programmeId = await programmeForCourse(courseId);
       if (!programmeId) return void res.status(404).json({ error: "Course not found" });
-      if (!canRead(req.user, programmeId)) {
-        return void res.status(403).json({ error: "No Course Specification access for this programme" });
+      if (!canManage(req.user, programmeId)) {
+        return void res.status(403).json({ error: "Only programme managers can select a grading-scale version" });
       }
       try {
         res.json(
