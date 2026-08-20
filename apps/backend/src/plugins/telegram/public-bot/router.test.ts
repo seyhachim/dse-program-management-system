@@ -2,6 +2,10 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
+import {
+  PublicCurriculumConflictError,
+  PublicCurriculumNotFoundError,
+} from "../../programme/public-curriculum-read-service.ts";
 import type { TelegramConfig } from "../config.ts";
 import { createPublicTelegramRouter } from "./router.ts";
 import type {
@@ -150,8 +154,11 @@ function makeCurriculumRead() {
   return {
     async listCourses() { return courses; },
     async getCourse(_programmeId: string, query: string) {
+      if (query === "ambiguous") {
+        throw new PublicCurriculumConflictError("multiple published courses");
+      }
       const course = courses.find((item) => item.code === query || item.title === query);
-      if (!course) throw new Error("not found");
+      if (!course) throw new PublicCurriculumNotFoundError("not found");
       return course;
     },
     async getStudyPlan() {
@@ -167,14 +174,22 @@ function makeCurriculumRead() {
     async getTotals() {
       return {
         totalCourses: 2,
-        totalCredits: 6,
+        totalCredits: 5,
+        computedTotalCourses: 2,
+        computedTotalCredits: 6,
+        declaredTotalCourses: 2,
+        declaredTotalCredits: 5,
         totalWeeklyHours: 8,
+        conflicts: ["Official source declares 5 credits while published route rows sum to 6"],
         byYearSemester: [{
           yearLevel: 2,
           semester: "Second" as const,
           courseCount: 2,
-          credits: 6,
+          credits: 5,
+          computedCredits: 6,
+          declaredCredits: 5,
           weeklyHours: 8,
+          conflicts: ["Official source declares 5 credits while published course rows sum to 6"],
         }],
         provenance,
       };
@@ -264,6 +279,18 @@ describe("public Telegram webhook", () => {
     expect(text).toContain("approved curriculum v1.0");
   });
 
+  test("/course not-found lookup is acknowledged in chat instead of returning 500", async () => {
+    const response = await webhook({ update_id: 34, message: { message_id: 34, chat: { id: 20 }, text: "/course UNKNOWN" } });
+    expect(response.status).toBe(200);
+    expect(client.sent.at(-1)?.text).toContain("couldn't find");
+  });
+
+  test("/course ambiguous lookup asks for a more specific course instead of returning 500", async () => {
+    const response = await webhook({ update_id: 35, message: { message_id: 35, chat: { id: 20 }, text: "/course ambiguous" } });
+    expect(response.status).toBe(200);
+    expect(client.sent.at(-1)?.text).toContain("matches more than one published course");
+  });
+
   test("year and semester question renders a readable study plan", async () => {
     const response = await webhook({ update_id: 32, message: { message_id: 32, chat: { id: 20 }, text: "what do I study in year 2 semester 2?" } });
     expect(response.status).toBe(200);
@@ -272,10 +299,13 @@ describe("public Telegram webhook", () => {
     expect(text).toContain("Total: 6 credits · 8 h/week");
   });
 
-  test("credit-load question returns curriculum totals", async () => {
+  test("credit-load question preserves source-declared totals and exposes row conflicts", async () => {
     const response = await webhook({ update_id: 33, message: { message_id: 33, chat: { id: 20 }, text: "what is the credit load?" } });
     expect(response.status).toBe(200);
-    expect(client.sent.at(-1)?.text).toContain("6 credits");
+    const text = client.sent.at(-1)?.text ?? "";
+    expect(text).toContain("Published route total: 2 courses · 5 credits");
+    expect(text).toContain("rows sum to 6");
+    expect(text).toContain("⚠️ Source conflict");
   });
 
   test("FAQ callback edits the existing message and answers the callback query", async () => {
