@@ -7,6 +7,8 @@ on:
       - "apps/backend/prisma/schema.prisma"
       - "apps/backend/prisma/migrations/**"
       - "apps/backend/src/plugins/programme/public-programme-info-**"
+      - "apps/backend/src/plugins/programme/public-programme-read-**"
+      - "apps/backend/src/plugins/programme/index.ts"
       - "apps/frontend/app/(shell)/public-information/**"
       - "apps/frontend/lib/public-programme-info*"
       - "packages/shared-types/src/public-programme-info*"
@@ -17,6 +19,8 @@ on:
       - "apps/backend/prisma/schema.prisma"
       - "apps/backend/prisma/migrations/**"
       - "apps/backend/src/plugins/programme/public-programme-info-**"
+      - "apps/backend/src/plugins/programme/public-programme-read-**"
+      - "apps/backend/src/plugins/programme/index.ts"
       - "apps/frontend/app/(shell)/public-information/**"
       - "apps/frontend/lib/public-programme-info*"
       - "packages/shared-types/src/public-programme-info*"
@@ -47,6 +51,7 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_public_info_ci?schema=public
       PUBLIC_PROGRAMME_INFO_DB_TESTS: "1"
       PUBLIC_PROGRAMME_INFO_ADMIN_DB_TESTS: "1"
+      PUBLIC_PROGRAMME_INFO_READ_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -62,5 +67,9 @@ jobs:
         run: bun test apps/backend/src/plugins/programme/public-programme-info-service-db.test.ts
       - name: Verify management scope rules
         run: bun test apps/backend/src/plugins/programme/public-programme-info-router.test.ts
+      - name: Verify published-only public read service
+        run: bun test apps/backend/src/plugins/programme/public-programme-read-service-db.test.ts
+      - name: Verify anonymous read-only HTTP and cache boundary
+        run: bun test apps/backend/src/plugins/programme/public-programme-read-router-db.test.ts
       - name: Verify frontend API contract
         run: bun test apps/frontend/lib/public-programme-info.test.ts
