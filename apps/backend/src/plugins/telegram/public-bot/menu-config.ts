@@ -269,12 +269,13 @@ export function buildNavigationRows(menu: TelegramMenu): InlineButton[][] {
 }
 
 export function getMenuKeyboard(route: RouteKey): InlineButton[][] {
-  const menu = MENUS[route];
+  const menu: TelegramMenu = MENUS[route];
   return [...menu.rows.map((row) => [...row]), ...buildNavigationRows(menu)];
 }
 
 export function getParentRoute(route: RouteKey): RouteKey | null {
-  return MENUS[route].navigation?.backRoute ?? MENUS[route].parent ?? null;
+  const menu: TelegramMenu = MENUS[route];
+  return menu.navigation?.backRoute ?? menu.parent ?? null;
 }
 
 export function routeForReplyText(text: string): RouteKey | null {
