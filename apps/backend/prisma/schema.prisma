@@ -259,6 +259,36 @@ enum QaSarReviewDecision {
   MoreEvidenceRequested
 }
 
+enum ProgrammePublicPublicationStatus {
+  Draft
+  Published
+}
+
+enum ProgrammeFaqCategory {
+  About
+  Admission
+  Curriculum
+  Careers
+  FeesScholarships
+  StudentLife
+  Facilities
+  Lecturers
+  ImportantDates
+  Contact
+}
+
+enum ProgrammeImportantDateKind {
+  ApplicationOpen
+  ApplicationDeadline
+  EntranceExam
+  Interview
+  ResultsAnnouncement
+  Registration
+  SemesterStart
+  ScholarshipDeadline
+  Other
+}
+
 /// Optional form of address for a user. This is explicitly selected and never
 /// inferred from gender; academic position remains in User.title.
 enum UserHonorific {
@@ -387,6 +417,9 @@ model Programme {
   studentCohorts           StudentCohort[]
   qaCloAttainmentSnapshots QaCloAttainmentSnapshot[]
   outcomeIndicators        ProgrammeOutcomeIndicator[]
+  publicFaqs               ProgrammeFaq[]
+  publicImportantDates     ProgrammeImportantDate[]
+  publicProfile            ProgrammePublicProfile?
 }
 
 /// Canonical curriculum identity for one programme. Versions are immutable
@@ -2359,4 +2392,71 @@ model RubricCell {
 
   @@id([rubricId, criterionId, levelId])
   @@index([levelId])
+}
+
+/// PMS-owned public FAQ content. Telegram and future public channels consume
+/// published rows; channel-specific navigation must not become a data source.
+model ProgrammeFaq {
+  id          String                           @id @default(uuid())
+  programmeId String
+  programme   Programme                        @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  category    ProgrammeFaqCategory
+  slug        String                           @unique
+  question    String
+  answer      String
+  shortAnswer String?
+  keywords    String[]                         @default([])
+  sortOrder   Int                              @default(0)
+  isFeatured  Boolean                          @default(false)
+  status      ProgrammePublicPublicationStatus @default(Draft)
+  sourceLabel String?
+  sourceUrl   String?
+  publishedAt DateTime?
+  reviewedAt  DateTime?
+  createdAt   DateTime                         @default(now())
+  updatedAt   DateTime                         @updatedAt
+
+  @@index([programmeId, category, status, sortOrder])
+  @@index([programmeId, status, isFeatured])
+}
+
+/// Typed programme dates for public admission/academic communication. A date is
+/// public only when status=Published and publishedAt is set (enforced in SQL).
+model ProgrammeImportantDate {
+  id          String                           @id @default(uuid())
+  programmeId String
+  programme   Programme                        @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  kind        ProgrammeImportantDateKind
+  title       String
+  description String                           @default("")
+  date        DateTime                         @db.Date
+  endDate     DateTime?                        @db.Date
+  sortOrder   Int                              @default(0)
+  status      ProgrammePublicPublicationStatus @default(Draft)
+  publishedAt DateTime?
+  createdAt   DateTime                         @default(now())
+  updatedAt   DateTime                         @updatedAt
+
+  @@index([programmeId, status, date])
+  @@index([programmeId, kind, status])
+}
+
+/// Structured programme/contact information shared by public channels. One row
+/// per Programme avoids a Telegram-owned or generic key/value content silo.
+model ProgrammePublicProfile {
+  id             String    @id @default(uuid())
+  programmeId    String    @unique
+  programme      Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  programmeName  String
+  shortName      String
+  overview       String    @default("")
+  admissionEmail String?
+  phone          String?
+  websiteUrl     String?
+  facebookUrl    String?
+  campusAddress  String?
+  mapUrl         String?
+  applicationUrl String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
