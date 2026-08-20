@@ -41,13 +41,21 @@ export type PublicCurriculumStudyPlan = {
 export type PublicCurriculumTotals = {
   totalCourses: number;
   totalCredits: number;
+  computedTotalCourses: number;
+  computedTotalCredits: number;
+  declaredTotalCourses: number | null;
+  declaredTotalCredits: number | null;
   totalWeeklyHours: number | null;
+  conflicts: string[];
   byYearSemester: Array<{
     yearLevel: number;
     semester: "First" | "Second";
     courseCount: number;
     credits: number;
+    computedCredits: number;
+    declaredCredits: number | null;
     weeklyHours: number | null;
+    conflicts: string[];
   }>;
   provenance: PublicCurriculumProvenance;
 };
@@ -75,6 +83,18 @@ type SnapshotRow = {
   weeklyFieldVisitHours: number | null;
   lecturerText: string;
   scopeCode: string;
+};
+
+type DeclaredTotalsRow = {
+  semesterCredits: Prisma.JsonValue;
+  programmeCourseCount: number | null;
+  programmeCredits: number | null;
+};
+
+type DeclaredSemesterCredit = {
+  yearLevel: number;
+  semester: "First" | "Second";
+  credits: number;
 };
 
 async function publishedVersion(programmeId: string): Promise<VersionRow> {
@@ -194,6 +214,32 @@ function normalized(value: string): string {
   return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
 }
 
+function parseDeclaredSemesterCredits(value: Prisma.JsonValue): DeclaredSemesterCredit[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const row = item as Record<string, unknown>;
+    if (
+      typeof row.yearLevel !== "number" ||
+      (row.semester !== "First" && row.semester !== "Second") ||
+      typeof row.credits !== "number"
+    ) {
+      return [];
+    }
+    return [{ yearLevel: row.yearLevel, semester: row.semester, credits: row.credits }];
+  });
+}
+
+async function declaredTotals(versionId: string): Promise<DeclaredTotalsRow | null> {
+  const rows = await prisma.$queryRaw<DeclaredTotalsRow[]>(Prisma.sql`
+    SELECT "semesterCredits", "programmeCourseCount", "programmeCredits"
+    FROM curriculum_artifact."DeclaredTotals"
+    WHERE "curriculumVersionId" = ${versionId}
+    LIMIT 1
+  `);
+  return rows[0] ?? null;
+}
+
 export const publicCurriculumReadService = {
   async listCourses(programmeId: string): Promise<PublicCurriculumCourse[]> {
     const version = await publishedVersion(programmeId);
@@ -244,8 +290,12 @@ export const publicCurriculumReadService = {
   },
 
   async getTotals(programmeId: string): Promise<PublicCurriculumTotals> {
-    const courses = await this.listCourses(programmeId);
+    const version = await publishedVersion(programmeId);
+    const courses = await snapshots(version);
     if (!courses.length) throw new PublicCurriculumNotFoundError("Published curriculum contains no courses");
+
+    const declared = await declaredTotals(version.id);
+    const declaredSemesterCredits = parseDeclaredSemesterCredits(declared?.semesterCredits ?? []);
     const byYearSemester: PublicCurriculumTotals["byYearSemester"] = [];
     for (const yearLevel of [1, 2, 3, 4]) {
       for (const semester of ["First", "Second"] as const) {
@@ -253,23 +303,58 @@ export const publicCurriculumReadService = {
           (course) => course.yearLevel === yearLevel && course.semester === semester,
         );
         if (!items.length) continue;
+        const computedCredits = items.reduce((sum, course) => sum + course.credits, 0);
+        const declaredCredits = declaredSemesterCredits.find(
+          (row) => row.yearLevel === yearLevel && row.semester === semester,
+        )?.credits ?? null;
+        const conflicts: string[] = [];
+        if (declaredCredits !== null && declaredCredits !== computedCredits) {
+          conflicts.push(
+            `Official source declares ${declaredCredits} credits while published course rows sum to ${computedCredits}`,
+          );
+        }
         byYearSemester.push({
           yearLevel,
           semester,
           courseCount: items.length,
-          credits: items.reduce((sum, course) => sum + course.credits, 0),
+          credits: declaredCredits ?? computedCredits,
+          computedCredits,
+          declaredCredits,
           weeklyHours: items.every((course) => course.weeklyHoursTotal !== null)
             ? items.reduce((sum, course) => sum + (course.weeklyHoursTotal ?? 0), 0)
             : null,
+          conflicts,
         });
       }
     }
+
+    const computedTotalCourses = courses.length;
+    const computedTotalCredits = courses.reduce((sum, course) => sum + course.credits, 0);
+    const declaredTotalCourses = declared?.programmeCourseCount ?? null;
+    const declaredTotalCredits = declared?.programmeCredits ?? null;
+    const conflicts: string[] = [];
+    if (declaredTotalCourses !== null && declaredTotalCourses !== computedTotalCourses) {
+      conflicts.push(
+        `Official source declares ${declaredTotalCourses} courses while published route rows contain ${computedTotalCourses}`,
+      );
+    }
+    if (declaredTotalCredits !== null && declaredTotalCredits !== computedTotalCredits) {
+      conflicts.push(
+        `Official source declares ${declaredTotalCredits} credits while published route rows sum to ${computedTotalCredits}`,
+      );
+    }
+
     return {
-      totalCourses: courses.length,
-      totalCredits: courses.reduce((sum, course) => sum + course.credits, 0),
+      totalCourses: declaredTotalCourses ?? computedTotalCourses,
+      totalCredits: declaredTotalCredits ?? computedTotalCredits,
+      computedTotalCourses,
+      computedTotalCredits,
+      declaredTotalCourses,
+      declaredTotalCredits,
       totalWeeklyHours: courses.every((course) => course.weeklyHoursTotal !== null)
         ? courses.reduce((sum, course) => sum + (course.weeklyHoursTotal ?? 0), 0)
         : null,
+      conflicts,
       byYearSemester,
       provenance: courses[0]!.provenance,
     };
