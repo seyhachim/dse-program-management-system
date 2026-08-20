@@ -1,7 +1,4 @@
-import {
-  ProgrammePublicPublicationStatus,
-  type Prisma,
-} from "@prisma/client";
+import { ProgrammePublicPublicationStatus } from "@prisma/client";
 import type {
   ProgrammeFaqAdminWrite,
   ProgrammeImportantDateAdminWrite,
@@ -17,7 +14,7 @@ function nullable(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function faqData(input: ProgrammeFaqAdminWrite): Prisma.ProgrammeFaqUncheckedUpdateInput {
+function faqData(input: ProgrammeFaqAdminWrite) {
   return {
     category: input.category,
     slug: input.slug,
@@ -33,9 +30,7 @@ function faqData(input: ProgrammeFaqAdminWrite): Prisma.ProgrammeFaqUncheckedUpd
   };
 }
 
-function importantDateData(
-  input: ProgrammeImportantDateAdminWrite,
-): Prisma.ProgrammeImportantDateUncheckedUpdateInput {
+function importantDateData(input: ProgrammeImportantDateAdminWrite) {
   return {
     kind: input.kind,
     title: input.title,
@@ -46,9 +41,7 @@ function importantDateData(
   };
 }
 
-function profileData(
-  input: ProgrammePublicProfileAdminWrite,
-): Prisma.ProgrammePublicProfileUncheckedUpdateInput {
+function profileData(input: ProgrammePublicProfileAdminWrite) {
   return {
     programmeName: input.programmeName,
     shortName: input.shortName,
@@ -136,20 +129,14 @@ export const publicProgrammeInfoService = {
 
   async updateFaq(programmeId: string, id: string, input: ProgrammeFaqAdminWrite) {
     await getFaq(programmeId, id);
-    return prisma.programmeFaq.update({
-      where: { id },
-      data: faqData(input),
-    });
+    return prisma.programmeFaq.update({ where: { id }, data: faqData(input) });
   },
 
   async publishFaq(programmeId: string, id: string) {
     await getFaq(programmeId, id);
     return prisma.programmeFaq.update({
       where: { id },
-      data: {
-        status: ProgrammePublicPublicationStatus.Published,
-        publishedAt: new Date(),
-      },
+      data: { status: ProgrammePublicPublicationStatus.Published, publishedAt: new Date() },
     });
   },
 
@@ -157,10 +144,7 @@ export const publicProgrammeInfoService = {
     await getFaq(programmeId, id);
     return prisma.programmeFaq.update({
       where: { id },
-      data: {
-        status: ProgrammePublicPublicationStatus.Draft,
-        publishedAt: null,
-      },
+      data: { status: ProgrammePublicPublicationStatus.Draft, publishedAt: null },
     });
   },
 
@@ -213,10 +197,7 @@ export const publicProgrammeInfoService = {
     await getImportantDate(programmeId, id);
     return prisma.programmeImportantDate.update({
       where: { id },
-      data: {
-        status: ProgrammePublicPublicationStatus.Published,
-        publishedAt: new Date(),
-      },
+      data: { status: ProgrammePublicPublicationStatus.Published, publishedAt: new Date() },
     });
   },
 
@@ -224,10 +205,7 @@ export const publicProgrammeInfoService = {
     await getImportantDate(programmeId, id);
     return prisma.programmeImportantDate.update({
       where: { id },
-      data: {
-        status: ProgrammePublicPublicationStatus.Draft,
-        publishedAt: null,
-      },
+      data: { status: ProgrammePublicPublicationStatus.Draft, publishedAt: null },
     });
   },
 
@@ -251,7 +229,7 @@ export const publicProgrammeInfoService = {
     const data = profileData(input);
     return prisma.programmePublicProfile.upsert({
       where: { programmeId },
-      create: { programmeId, ...data } as Prisma.ProgrammePublicProfileUncheckedCreateInput,
+      create: { programmeId, ...data },
       update: data,
     });
   },
