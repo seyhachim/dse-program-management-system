@@ -57,6 +57,15 @@ export function calculateDerivedGroupResult(input: DerivedInput): { score: numbe
   return { score: Math.round(percentage * 10000) / 10000, maxScore: 100, feedback };
 }
 
+export function assertRubricLevelScoreMatches(
+  score: number,
+  selectedLevelPoints: number,
+) {
+  if (Math.abs(selectedLevelPoints - score) > 1e-9) {
+    throw new PortalConflictError("Selected rubric level points do not match the criterion score");
+  }
+}
+
 async function contextFor(db: Db, offeringId: string, assessmentItemId: string, actorId: string, programmeWide: boolean) {
   const offering = await db.offering.findUnique({
     where: { id: offeringId },
@@ -224,6 +233,7 @@ function validateSourceCriterionScores(context: Context, input: SaveAssessmentSo
     if (entry.score > maxScore) throw new PortalConflictError(`Criterion ${criterion.name} score exceeds the rubric maximum`);
     const level = entry.rubricLevelId ? levelById.get(entry.rubricLevelId) : undefined;
     if (entry.rubricLevelId && !level) throw new PortalConflictError("Unknown rubric level");
+    if (level) assertRubricLevelScoreMatches(entry.score, level.points);
     return { rubricId: context.assessment.rubricId!, criterionId: criterion.id, criterionName: criterion.name, rubricContentHash: hash, score: entry.score, maxScore, rubricLevelId: level?.id ?? null, rubricLevelLabel: level?.label ?? null };
   });
 }
