@@ -10,7 +10,7 @@ const PROGRAMME_ID = "dse";
 
 export function QaContributorManagement() {
   const { me } = useMe();
-  const canManage = me?.roles.some((role) => role === "admin" || role === "program_coordinator") ?? false;
+  const canManage = me?.permissions.includes("qa:manage") ?? false;
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [assignments, setAssignments] = useState<ProgrammeRoleAssignmentView[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
