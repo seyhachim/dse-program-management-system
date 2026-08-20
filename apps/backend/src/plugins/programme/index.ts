@@ -11,6 +11,7 @@ import { publicCurriculumReadService } from "./public-curriculum-read-service.ts
 import { createPublicProgrammeInfoRouter } from "./public-programme-info-router.ts";
 import { createPublicProgrammeReadRouter } from "./public-programme-read-router.ts";
 import { publicProgrammeReadService } from "./public-programme-read-service.ts";
+import { publicProgrammeSearchService } from "./public-programme-search-service.ts";
 import { createProgrammeRouter } from "./router.ts";
 import { programmeService } from "./service.ts";
 
@@ -35,6 +36,7 @@ export const programmeBackendService = {
   ...programmeService,
   publicRead: publicProgrammeReadService,
   publicCurriculumRead: publicCurriculumReadService,
+  publicSearch: publicProgrammeSearchService,
 };
 
 export type ProgrammeBackendService = typeof programmeBackendService;
