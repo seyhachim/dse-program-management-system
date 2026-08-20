@@ -37,7 +37,7 @@ CREATE TABLE "ProgrammeFaq" (
     "question" TEXT NOT NULL,
     "answer" TEXT NOT NULL,
     "shortAnswer" TEXT,
-    "keywords" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "keywords" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isFeatured" BOOLEAN NOT NULL DEFAULT false,
     "status" "ProgrammePublicPublicationStatus" NOT NULL DEFAULT 'Draft',
