@@ -132,7 +132,7 @@ const LECTURER_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+){0,7}$/;
 
 export type ParsedCallback =
   | { kind: "static"; data: StaticCallbackData }
-  | { kind: "course"; code: string; courseCode: string; data: `course:${string}` }
+  | { kind: "course"; code: string; data: `course:${string}` }
   | { kind: "lecturer"; slug: string; action: "courses" | "research"; data: LecturerCallbackData };
 
 export function callbackByteLength(value: string): number {
@@ -175,7 +175,7 @@ export function parseCallbackData(value: string): ParsedCallback | null {
   if (value.startsWith("course:")) {
     const code = value.slice("course:".length);
     if (!COURSE_CODE.test(code)) return null;
-    return { kind: "course", code, courseCode: code, data: value as `course:${string}` };
+    return { kind: "course", code, data: value as `course:${string}` };
   }
 
   if (value.startsWith("lecturer:")) {
