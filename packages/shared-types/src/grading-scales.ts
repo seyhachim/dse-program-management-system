@@ -112,14 +112,14 @@ export const UpdateProgrammeGradingScaleDraftSchema = z
     changeSummary: z.string().trim().min(1).max(1000).optional(),
     grades: z.array(DraftGradeInputSchema).min(1).optional(),
   })
+  .strict()
   .refine(
     (input) =>
       input.effectiveFrom !== undefined ||
       input.changeSummary !== undefined ||
       input.grades !== undefined,
     "At least one draft field must be supplied",
-  )
-  .strict();
+  );
 export type UpdateProgrammeGradingScaleDraftInput = z.infer<
   typeof UpdateProgrammeGradingScaleDraftSchema
 >;
