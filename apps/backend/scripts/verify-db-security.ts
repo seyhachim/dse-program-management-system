@@ -146,12 +146,28 @@ const EXPECTED_COURSE_SPEC_GOVERNANCE_TABLES = [
   "CourseSpecPeriodicReview",
 ] as const;
 
+const EXPECTED_PUBLIC_ANALYTICS_TABLES = [
+  "PublicQuestionEvent",
+  "PublicQuestionSuggestion",
+] as const;
+
 const FORBIDDEN_GRANTEES = new Set([
   "PUBLIC",
   "anon",
   "authenticated",
   "service_role",
 ]);
+
+const PROTECTED_SCHEMAS = [
+  "pms_attendance",
+  "telegram_security",
+  "qa_security",
+  "curriculum_artifact",
+  "course_spec_governance",
+  "public_analytics",
+] as const;
+
+const ALL_VERIFIED_SCHEMAS = ["public", ...PROTECTED_SCHEMAS] as const;
 
 type TableRow = {
   schema_name: string;
@@ -226,6 +242,7 @@ async function main(): Promise<void> {
     qaSecurityTables,
     curriculumArtifactTables,
     courseSpecGovernanceTables,
+    publicAnalyticsTables,
   ] = await Promise.all([
     tablesForSchema("public"),
     tablesForSchema("pms_attendance"),
@@ -233,6 +250,7 @@ async function main(): Promise<void> {
     tablesForSchema("qa_security"),
     tablesForSchema("curriculum_artifact"),
     tablesForSchema("course_spec_governance"),
+    tablesForSchema("public_analytics"),
   ]);
 
   errors.push(
@@ -266,6 +284,11 @@ async function main(): Promise<void> {
       EXPECTED_COURSE_SPEC_GOVERNANCE_TABLES,
       courseSpecGovernanceTables.map((table) => table.table_name),
     ),
+    ...compareInventory(
+      "public_analytics schema",
+      EXPECTED_PUBLIC_ANALYTICS_TABLES,
+      publicAnalyticsTables.map((table) => table.table_name),
+    ),
   );
 
   for (const table of [
@@ -275,13 +298,17 @@ async function main(): Promise<void> {
     ...qaSecurityTables,
     ...curriculumArtifactTables,
     ...courseSpecGovernanceTables,
+    ...publicAnalyticsTables,
   ]) {
     if (!table.rls_enabled) {
       errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
     }
   }
 
-  const tableGrants = await prisma.$queryRaw<GrantRow[]>`
+  const schemaSql = ALL_VERIFIED_SCHEMAS.map((schema) => `'${schema}'`).join(", ");
+  const protectedSchemaSql = PROTECTED_SCHEMAS.map((schema) => `'${schema}'`).join(", ");
+
+  const tableGrants = await prisma.$queryRawUnsafe<GrantRow[]>(`
     SELECT
       n.nspname::text AS schema_name,
       c.relname::text AS object_name,
@@ -293,7 +320,7 @@ async function main(): Promise<void> {
       COALESCE(c.relacl, acldefault('r', c.relowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact', 'course_spec_governance')
+    WHERE n.nspname IN (${schemaSql})
       AND c.relkind IN ('r', 'p')
       AND c.relname <> '_prisma_migrations'
       AND (
@@ -301,7 +328,7 @@ async function main(): Promise<void> {
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
       )
     ORDER BY n.nspname, c.relname, grantee, acl.privilege_type
-  `;
+  `);
 
   for (const grant of tableGrants) {
     if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
@@ -311,7 +338,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const schemaGrants = await prisma.$queryRaw<GrantRow[]>`
+  const schemaGrants = await prisma.$queryRawUnsafe<GrantRow[]>(`
     SELECT
       n.nspname::text AS schema_name,
       n.nspname::text AS object_name,
@@ -322,13 +349,13 @@ async function main(): Promise<void> {
       COALESCE(n.nspacl, acldefault('n', n.nspowner))
     ) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact', 'course_spec_governance')
+    WHERE n.nspname IN (${protectedSchemaSql})
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
       )
     ORDER BY n.nspname, grantee, acl.privilege_type
-  `;
+  `);
 
   for (const grant of schemaGrants) {
     if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
@@ -338,7 +365,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const defaultGrants = await prisma.$queryRaw<DefaultGrantRow[]>`
+  const defaultGrants = await prisma.$queryRawUnsafe<DefaultGrantRow[]>(`
     SELECT
       n.nspname::text AS schema_name,
       CASE d.defaclobjtype
@@ -354,14 +381,14 @@ async function main(): Promise<void> {
     JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     LEFT JOIN pg_roles r ON r.oid = acl.grantee
-    WHERE n.nspname IN ('public', 'pms_attendance', 'telegram_security', 'qa_security', 'curriculum_artifact', 'course_spec_governance')
+    WHERE n.nspname IN (${schemaSql})
       AND owner_role.rolname = current_user
       AND (
         acl.grantee = 0
         OR r.rolname IN ('anon', 'authenticated', 'service_role')
       )
     ORDER BY n.nspname, object_type, grantee, acl.privilege_type
-  `;
+  `);
 
   for (const grant of defaultGrants) {
     if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
@@ -381,7 +408,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, and ${courseSpecGovernanceTables.length} course-spec governance tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, and ${publicAnalyticsTables.length} public-analytics tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 

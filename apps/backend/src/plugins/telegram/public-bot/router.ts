@@ -68,9 +68,22 @@ type PublicReadService = {
   getContact(programmeId: string): Promise<PublicProgrammeContact>;
 };
 
+type PublicQuestionAnalyticsObserver = {
+  observeAskDse(input: {
+    programmeId: string;
+    source: "Telegram";
+    questionText: string;
+    result: PublicAskDseResult;
+    answerDelivered: boolean;
+    sourceEventKey?: string | null;
+    analyticsActorHash?: string | null;
+  }): Promise<unknown>;
+};
+
 type ProgrammeRegistryService = {
   publicRead: PublicReadService;
   publicCurriculumRead: PublicCurriculumReadService;
+  publicQuestionAnalytics: PublicQuestionAnalyticsObserver;
 };
 
 export interface PublicTelegramRouterDependencies {
@@ -79,6 +92,7 @@ export interface PublicTelegramRouterDependencies {
   publicRead?: PublicReadService;
   publicCurriculumRead?: PublicCurriculumReadService;
   publicSearch?: PublicProgrammeSearchService;
+  publicQuestionAnalytics?: PublicQuestionAnalyticsObserver;
 }
 
 const CALLBACK_ROUTE = new Map<string, RouteKey>(
@@ -124,6 +138,18 @@ function inlineKeyboard(route: RouteKey): TelegramReplyMarkup {
 
 function resolveProgrammeService(): ProgrammeRegistryService {
   return registry.get<ProgrammeRegistryService>("programme").service;
+}
+
+async function observeAskDseBestEffort(
+  analytics: PublicQuestionAnalyticsObserver,
+  input: Parameters<PublicQuestionAnalyticsObserver["observeAskDse"]>[0],
+): Promise<void> {
+  try {
+    await analytics.observeAskDse(input);
+  } catch {
+    // Analytics is deliberately fail-open. Never log the question or actor here.
+    console.error("Public Ask DSE analytics failed");
+  }
 }
 
 function formatFaqs(title: string, faqs: PublicProgrammeFaq[]): string {
@@ -394,10 +420,13 @@ export function createPublicTelegramRouter(
     }
 
     const client = deps.client ?? createTelegramPublicBotClient(config.botToken);
-    const programmeService = deps.publicRead && deps.publicCurriculumRead ? null : resolveProgrammeService();
+    const programmeService = deps.publicRead && deps.publicCurriculumRead && deps.publicQuestionAnalytics
+      ? null
+      : resolveProgrammeService();
     const publicRead = deps.publicRead ?? programmeService!.publicRead;
     const publicCurriculumRead = deps.publicCurriculumRead ?? programmeService!.publicCurriculumRead;
     const publicSearch = deps.publicSearch ?? publicProgrammeSearchService;
+    const publicQuestionAnalytics = deps.publicQuestionAnalytics ?? programmeService!.publicQuestionAnalytics;
     const programmeId = config.publicProgrammeId;
 
     try {
@@ -453,11 +482,23 @@ export function createPublicTelegramRouter(
               await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
             } else {
               const searchResult = await publicSearch.search(programmeId, text);
-              await client.sendMessage({
-                chatId: update.message.chat.id,
-                text: formatAskDse(searchResult),
-                replyMarkup: replyKeyboard(),
-              });
+              let delivered = false;
+              try {
+                await client.sendMessage({
+                  chatId: update.message.chat.id,
+                  text: formatAskDse(searchResult),
+                  replyMarkup: replyKeyboard(),
+                });
+                delivered = true;
+              } finally {
+                await observeAskDseBestEffort(publicQuestionAnalytics, {
+                  programmeId,
+                  source: "Telegram",
+                  questionText: text,
+                  result: searchResult,
+                  answerDelivered: delivered,
+                });
+              }
             }
           }
         }
