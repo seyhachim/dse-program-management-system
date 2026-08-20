@@ -4,6 +4,7 @@ import {
   POLICIES_RESPONSIBILITIES_TAB,
   mergePolicyFieldForSave,
   normalizePoliciesResponsibilitiesTab,
+  reconcilePolicyDraftWithPersisted,
 } from "./policies-responsibilities-model";
 
 const PERSISTED_POLICY: PolicySection = {
@@ -61,5 +62,42 @@ describe("Policies & Responsibilities Course Spec tab", () => {
 
     expect(PERSISTED_POLICY.academicIntegrity).toBe("Persisted integrity");
     expect(payload.academicIntegrity).toBe("Updated integrity");
+  });
+
+  test("preserves dirty sibling drafts while reconciling newly persisted fields", () => {
+    const draft: PolicySection = {
+      ...PERSISTED_POLICY,
+      attendancePreparation: "UNSAVED hidden attendance edit",
+    };
+    const nextPersisted: PolicySection = {
+      ...PERSISTED_POLICY,
+      examinationRules: "Saved exam edit",
+    };
+
+    const reconciled = reconcilePolicyDraftWithPersisted(
+      draft,
+      PERSISTED_POLICY,
+      nextPersisted,
+    );
+
+    expect(reconciled.attendancePreparation).toBe(
+      "UNSAVED hidden attendance edit",
+    );
+    expect(reconciled.examinationRules).toBe("Saved exam edit");
+  });
+
+  test("refreshes a locally clean field from the latest persisted value", () => {
+    const nextPersisted: PolicySection = {
+      ...PERSISTED_POLICY,
+      academicIntegrity: "New persisted integrity",
+    };
+
+    const reconciled = reconcilePolicyDraftWithPersisted(
+      PERSISTED_POLICY,
+      PERSISTED_POLICY,
+      nextPersisted,
+    );
+
+    expect(reconciled.academicIntegrity).toBe("New persisted integrity");
   });
 });
