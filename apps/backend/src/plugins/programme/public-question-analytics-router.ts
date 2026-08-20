@@ -1,4 +1,4 @@
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import {
   PublicQuestionEventFilterSchema,
   PublicQuestionReviewUpdateSchema,
@@ -8,10 +8,7 @@ import { requirePermission } from "../../core/permissions/index.ts";
 import { hasPublicInfoManagementScope } from "./public-programme-info-router.ts";
 import { publicQuestionAnalyticsService } from "./public-question-analytics-service.ts";
 
-function programmeIdOr403(
-  req: Parameters<Parameters<Router["get"]>[1]>[0],
-  res: Response,
-): string | null {
+function programmeIdOr403(req: Request, res: Response): string | null {
   const programmeId = req.params.programmeId;
   if (!programmeId) {
     res.status(400).json({ error: "Programme id is required" });
