@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { coursesManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import { attachLatestCourseSpecReviewStatus } from "./course-list-review-status.ts";
 import { createCourseRouter } from "./router.ts";
 import { createCourseSpecPeriodicReviewRouter } from "./periodic-review-router.ts";
 import { createResponsibleLecturersRouter } from "./responsible-lecturers-router.ts";
@@ -21,13 +22,16 @@ const offeringScopedAccess = courseService.lecturerCanAccess.bind(courseService)
 
 courseService.list = async (query, lecturerScope) => {
   const rows = await offeringScopedList(query, lecturerScope);
-  if (!lecturerScope) return rows;
-  return mergeResponsibleCourses(
-    rows,
-    lecturerScope,
-    query,
-    (courseId) => courseService.getDetailed(courseId),
-  );
+  const scopedRows = lecturerScope
+    ? await mergeResponsibleCourses(
+        rows,
+        lecturerScope,
+        query,
+        (courseId) => courseService.getDetailed(courseId),
+      )
+    : rows;
+
+  return attachLatestCourseSpecReviewStatus(scopedRows);
 };
 
 courseService.listSpecProgress = async (lecturerScope) => {
