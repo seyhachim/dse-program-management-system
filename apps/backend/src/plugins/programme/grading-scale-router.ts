@@ -224,6 +224,46 @@ export function createGradingScaleRouter(): Router {
   );
 
   router.get(
+    "/grading-scales/course-specs/:courseId/versions/:courseSpecId",
+    requirePermission("programme:read"),
+    async (req, res) => {
+      if (!req.user) return void res.status(401).json({ error: "Not authenticated" });
+      const courseId = req.params.courseId;
+      const courseSpecId = req.params.courseSpecId;
+      if (!courseId || !courseSpecId) {
+        return void res.status(400).json({ error: "Course id and Course Specification id are required" });
+      }
+
+      const spec = await prisma.courseSpec.findFirst({
+        where: { id: courseSpecId, courseId },
+        select: {
+          id: true,
+          gradingScaleVersionId: true,
+          course: { select: { programmeId: true } },
+        },
+      });
+      if (!spec) {
+        return void res.status(404).json({ error: "Course Specification version not found" });
+      }
+      if (!canRead(req.user, spec.course.programmeId)) {
+        return void res.status(403).json({ error: "No grading-scale access for this programme" });
+      }
+
+      try {
+        res.json({
+          courseId,
+          courseSpecId: spec.id,
+          gradingScaleVersion: spec.gradingScaleVersionId
+            ? await gradingScaleService.getVersion(spec.gradingScaleVersionId)
+            : null,
+        });
+      } catch (error) {
+        sendError(res, error);
+      }
+    },
+  );
+
+  router.get(
     "/grading-scales/course-specs/:courseId",
     requirePermission("programme:read"),
     async (req, res) => {
