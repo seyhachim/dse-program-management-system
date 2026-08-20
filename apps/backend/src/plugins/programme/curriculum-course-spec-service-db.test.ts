@@ -11,6 +11,136 @@ import {
 const describeDb = process.env.CURRICULUM_DB_TESTS === "1" ? describe : describe.skip;
 const prisma = new PrismaClient();
 
+async function createApprovedDefaultGradingScale(programmeId: string, actorId: string) {
+  const scale = await prisma.programmeGradingScale.create({
+    data: {
+      programmeId,
+      code: "standard",
+      name: "Test Standard Grading Scale",
+      isDefault: true,
+    },
+  });
+  const version = await prisma.programmeGradingScaleVersion.create({
+    data: {
+      gradingScaleId: scale.id,
+      version: 1,
+      status: "Draft",
+      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+      changeSummary: "Test grading-scale fixture",
+      createdById: actorId,
+    },
+  });
+  await prisma.programmeGradingScaleGrade.createMany({
+    data: [
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 1,
+        letterGrade: "A",
+        gradePoint: 4,
+        minScore: 85,
+        maxScore: 100,
+        minInclusive: true,
+        maxInclusive: true,
+        explanation: "Excellent",
+        isPassing: true,
+      },
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 2,
+        letterGrade: "B+",
+        gradePoint: 3.5,
+        minScore: 80,
+        maxScore: 85,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Very Good",
+        isPassing: true,
+      },
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 3,
+        letterGrade: "B",
+        gradePoint: 3,
+        minScore: 75,
+        maxScore: 80,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Good",
+        isPassing: true,
+      },
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 4,
+        letterGrade: "C+",
+        gradePoint: 2.5,
+        minScore: 70,
+        maxScore: 75,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Fairly Good",
+        isPassing: true,
+      },
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 5,
+        letterGrade: "C",
+        gradePoint: 2,
+        minScore: 65,
+        maxScore: 70,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Fair",
+        isPassing: true,
+      },
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 6,
+        letterGrade: "D+",
+        gradePoint: 1.5,
+        minScore: 60,
+        maxScore: 65,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Poor",
+        isPassing: true,
+      },
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 7,
+        letterGrade: "D",
+        gradePoint: 1,
+        minScore: 50,
+        maxScore: 60,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Very Poor",
+        isPassing: true,
+      },
+      {
+        gradingScaleVersionId: version.id,
+        sortOrder: 8,
+        letterGrade: "F",
+        gradePoint: 0,
+        minScore: 0,
+        maxScore: 50,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Fail",
+        isPassing: false,
+      },
+    ],
+  });
+  await prisma.programmeGradingScaleVersion.update({
+    where: { id: version.id },
+    data: {
+      status: "Approved",
+      approvedById: actorId,
+      approvedAt: new Date(),
+    },
+  });
+  return version.id;
+}
+
 describeDb("curriculum CourseSpec binding", () => {
   test("binds only exact approved same-course specs and keeps history stable", async () => {
     const token = crypto.randomUUID().slice(0, 8);
@@ -20,6 +150,7 @@ describeDb("curriculum CourseSpec binding", () => {
     const programme = await prisma.programme.create({
       data: { id: `curriculum-spec-${token}`, code: `CS${token}`, name: `Curriculum Spec ${token}` },
     });
+    await createApprovedDefaultGradingScale(programme.id, actor.id);
     const course = await prisma.course.create({
       data: {
         programmeId: programme.id,
