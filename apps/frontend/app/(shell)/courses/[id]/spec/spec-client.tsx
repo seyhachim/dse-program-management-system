@@ -409,7 +409,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setSpecDate({ date: normalized });
         setStatus((s) => ({
           ...s,
-          date: normalized ? "complete" : "incomplete",
+          date: normalized ? "complete" : "draft",
         }));
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 2000);
