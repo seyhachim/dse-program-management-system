@@ -1,5 +1,6 @@
 import type {
   Course,
+  CourseSectionPresence,
   CourseSpecProgress,
   CourseSpecVersionRef,
   CreateCourseInput,
@@ -21,6 +22,9 @@ export const coursesApi = {
   },
   specProgress(): Promise<CourseSpecProgress[]> {
     return api.get<CourseSpecProgress[]>("/api/courses/spec-progress");
+  },
+  sectionPresence(): Promise<CourseSectionPresence[]> {
+    return api.get<CourseSectionPresence[]>("/api/courses/section-presence");
   },
   get(id: string): Promise<CourseView> {
     return api.get<CourseView>(`/api/courses/${id}`);

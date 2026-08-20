@@ -3,6 +3,7 @@ import { coursesManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { attachLatestCourseSpecReviewStatus } from "./course-list-review-status.ts";
 import { createCourseRouter } from "./router.ts";
+import { createCourseSectionPresenceRouter } from "./section-presence-router.ts";
 import { createCourseSpecPeriodicReviewRouter } from "./periodic-review-router.ts";
 import { createResponsibleLecturersRouter } from "./responsible-lecturers-router.ts";
 import {
@@ -64,6 +65,8 @@ courseService.lecturerCanAccess = async (courseId, lecturerId) =>
   (await responsibleLecturerCanAccess(courseId, lecturerId));
 
 const router = Router();
+// Static Responsible-Lecturer metadata routes must precede the core `/:id` routes.
+router.use(createCourseSectionPresenceRouter());
 // Must precede the core `/:id/spec/:sectionId` route.
 router.use(createResponsibleLecturersRouter());
 router.use(createCourseRouter());

@@ -86,6 +86,14 @@ export interface OfferingsServiceContract {
    * offering of a course can see/open that course, even if they don't own it.
    */
   courseIdsForLecturer(lecturerId: string): Promise<string[]>;
+
+  /**
+   * Distinct requested course ids that have at least one Offering anywhere in
+   * the programme. Courses uses this narrow metadata query so Responsible
+   * Lecturers can distinguish a true pre-section course from an existing class
+   * that simply is not assigned to them, without exposing those Offering rows.
+   */
+  courseIdsWithOfferings(courseIds: readonly string[]): Promise<string[]>;
 }
 
 export interface AuthServiceContract {
