@@ -415,7 +415,7 @@ export function createPublicTelegramRouter(
           } else if (parsedCallback.kind === "course") {
             try {
               rendered = {
-                text: formatCourse(await publicCurriculumRead.getCourse(programmeId, parsedCallback.courseCode)),
+                text: formatCourse(await publicCurriculumRead.getCourse(programmeId, parsedCallback.code)),
                 replyMarkup: inlineKeyboard("curriculum"),
               };
             } catch {
