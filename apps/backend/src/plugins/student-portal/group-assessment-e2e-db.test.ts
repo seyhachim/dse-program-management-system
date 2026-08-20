@@ -127,13 +127,13 @@ dbDescribe("Group and Group + Individual end-to-end lifecycle integrity", () => 
     );
     expect(groupWorkspace.readiness.readyToPublish).toBe(true);
 
-    let groupResults = await prisma.assessmentResult.findMany({
+    const groupDraftResults = await prisma.assessmentResult.findMany({
       where: { courseSpecId: spec.id, assessmentItemId: groupAssessmentId },
       orderBy: { enrollmentId: "asc" },
     });
-    expect(groupResults).toHaveLength(2);
-    expect(groupResults.map((row) => [row.score, row.maxScore])).toEqual([[16, 20], [16, 20]]);
-    expect(groupResults.every((row) => row.publishedAt === null && row.finalizedAt === null)).toBe(true);
+    expect(groupDraftResults).toHaveLength(2);
+    expect(groupDraftResults.map((row) => [row.score, row.maxScore])).toEqual([[16, 20], [16, 20]]);
+    expect(groupDraftResults.every((row) => row.publishedAt === null && row.finalizedAt === null)).toBe(true);
 
     await resultsLifecycleService.publishAssessment(actor.id, false, {
       offeringId: offering.id,
@@ -163,13 +163,13 @@ dbDescribe("Group and Group + Individual end-to-end lifecycle integrity", () => 
       },
     );
 
-    groupResults = await prisma.assessmentResult.findMany({
+    const correctedGroupResults = await prisma.assessmentResult.findMany({
       where: { courseSpecId: spec.id, assessmentItemId: groupAssessmentId },
       include: { corrections: { orderBy: { createdAt: "asc" } } },
       orderBy: { enrollmentId: "asc" },
     });
-    expect(groupResults).toHaveLength(2);
-    for (const result of groupResults) {
+    expect(correctedGroupResults).toHaveLength(2);
+    for (const result of correctedGroupResults) {
       expect(result.score).toBe(18);
       expect(result.maxScore).toBe(20);
       expect(result.publishedAt).not.toBeNull();
@@ -235,15 +235,15 @@ dbDescribe("Group and Group + Individual end-to-end lifecycle integrity", () => 
     );
     expect(combinedWorkspace.readiness.readyToPublish).toBe(true);
 
-    let combinedResults = await prisma.assessmentResult.findMany({
+    const combinedDraftResults = await prisma.assessmentResult.findMany({
       where: { courseSpecId: spec.id, assessmentItemId: groupIndividualAssessmentId },
       orderBy: { enrollmentId: "asc" },
     });
-    expect(combinedResults).toHaveLength(2);
-    const draftByEnrollment = new Map(combinedResults.map((row) => [row.enrollmentId, row]));
+    expect(combinedDraftResults).toHaveLength(2);
+    const draftByEnrollment = new Map(combinedDraftResults.map((row) => [row.enrollmentId, row]));
     expect(draftByEnrollment.get(enrollmentA.id)?.score).toBeCloseTo(74, 8);
     expect(draftByEnrollment.get(enrollmentB.id)?.score).toBeCloseTo(83, 8);
-    expect(combinedResults.every((row) => row.maxScore === 100)).toBe(true);
+    expect(combinedDraftResults.every((row) => row.maxScore === 100)).toBe(true);
 
     await resultsLifecycleService.publishAssessment(actor.id, false, {
       offeringId: offering.id,
@@ -276,15 +276,17 @@ dbDescribe("Group and Group + Individual end-to-end lifecycle integrity", () => 
       },
     );
 
-    combinedResults = await prisma.assessmentResult.findMany({
+    const afterGroupCorrectionResults = await prisma.assessmentResult.findMany({
       where: { courseSpecId: spec.id, assessmentItemId: groupIndividualAssessmentId },
       include: { corrections: { orderBy: { createdAt: "asc" } } },
     });
-    let combinedByEnrollment = new Map(combinedResults.map((row) => [row.enrollmentId, row]));
-    expect(combinedByEnrollment.get(enrollmentA.id)?.score).toBeCloseTo(81, 8);
-    expect(combinedByEnrollment.get(enrollmentB.id)?.score).toBeCloseTo(90, 8);
-    expect(combinedByEnrollment.get(enrollmentA.id)?.corrections).toHaveLength(1);
-    expect(combinedByEnrollment.get(enrollmentB.id)?.corrections).toHaveLength(1);
+    const afterGroupCorrectionByEnrollment = new Map(
+      afterGroupCorrectionResults.map((row) => [row.enrollmentId, row]),
+    );
+    expect(afterGroupCorrectionByEnrollment.get(enrollmentA.id)?.score).toBeCloseTo(81, 8);
+    expect(afterGroupCorrectionByEnrollment.get(enrollmentB.id)?.score).toBeCloseTo(90, 8);
+    expect(afterGroupCorrectionByEnrollment.get(enrollmentA.id)?.corrections).toHaveLength(1);
+    expect(afterGroupCorrectionByEnrollment.get(enrollmentB.id)?.corrections).toHaveLength(1);
 
     combinedWorkspace = await groupAssessmentService.workspace(
       actor.id,
@@ -312,13 +314,13 @@ dbDescribe("Group and Group + Individual end-to-end lifecycle integrity", () => 
       },
     );
 
-    combinedResults = await prisma.assessmentResult.findMany({
+    const finalCombinedResults = await prisma.assessmentResult.findMany({
       where: { courseSpecId: spec.id, assessmentItemId: groupIndividualAssessmentId },
       include: { corrections: { orderBy: { createdAt: "asc" } } },
     });
-    combinedByEnrollment = new Map(combinedResults.map((row) => [row.enrollmentId, row]));
-    const finalA = combinedByEnrollment.get(enrollmentA.id)!;
-    const finalB = combinedByEnrollment.get(enrollmentB.id)!;
+    const finalCombinedByEnrollment = new Map(finalCombinedResults.map((row) => [row.enrollmentId, row]));
+    const finalA = finalCombinedByEnrollment.get(enrollmentA.id)!;
+    const finalB = finalCombinedByEnrollment.get(enrollmentB.id)!;
     expect(finalA.score).toBeCloseTo(84, 8);
     expect(finalB.score).toBeCloseTo(90, 8);
     expect(finalA.corrections).toHaveLength(2);
