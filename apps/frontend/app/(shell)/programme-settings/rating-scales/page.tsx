@@ -1,4 +1,4 @@
-import { Topbar } from "../../../topbar";
+import { Topbar } from "../../topbar";
 import { RatingScalesClient } from "./rating-scales-client";
 
 export default function RatingScalesPage() {
