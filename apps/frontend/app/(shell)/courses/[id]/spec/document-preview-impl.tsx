@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import type { CourseSpecGradingScaleBinding } from "@dse-pms/shared-types";
 import {
   ChevronDown,
   Download,
@@ -17,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@dse-pms/ui";
+import { api } from "@/lib/api";
 import type { CourseDocumentModel } from "./course-document-model";
 import { exportCourseSpecWord } from "./document-export";
 import { exportCourseSpecPdf } from "./document-pdf-export";
@@ -34,11 +37,58 @@ const ZOOM_STEP = 0.1;
 type DocumentPreviewProps = { document: CourseDocumentModel };
 
 export function DocumentPreview({ document }: DocumentPreviewProps) {
+  const params = useParams<{ id: string }>();
+  const courseId = params.id;
   const viewerRef = useRef<HTMLDivElement>(null);
   const printRootRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
-  const info = document.courseInformation;
+  const [gradingScaleBinding, setGradingScaleBinding] =
+    useState<CourseSpecGradingScaleBinding | null>(null);
+  const [gradingScaleLoading, setGradingScaleLoading] = useState(true);
+  const [gradingScaleError, setGradingScaleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setGradingScaleLoading(true);
+    setGradingScaleError(null);
+
+    api
+      .get<CourseSpecGradingScaleBinding>(
+        `/api/programme/grading-scales/course-specs/${encodeURIComponent(courseId)}`,
+      )
+      .then((binding) => {
+        if (!cancelled) setGradingScaleBinding(binding);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGradingScaleBinding(null);
+          setGradingScaleError(
+            "The programme grading scale could not be loaded. Preview is available, but downloads are disabled to avoid producing an incomplete academic document.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGradingScaleLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
+
+  const resolvedDocument = useMemo<CourseDocumentModel>(
+    () => ({
+      ...document,
+      gradingScale:
+        gradingScaleBinding?.gradingScaleVersion ?? document.gradingScale,
+    }),
+    [document, gradingScaleBinding],
+  );
+
+  const info = resolvedDocument.courseInformation;
+  const gradingScaleReady = resolvedDocument.gradingScale !== null;
+  const exportDisabled = isExporting || gradingScaleLoading || !gradingScaleReady;
 
   const fitWidth = useCallback(() => {
     const viewer = viewerRef.current;
@@ -60,10 +110,10 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
   }, [fitWidth]);
 
   const handleDownloadWord = async () => {
-    if (isExporting) return;
+    if (exportDisabled) return;
     try {
       setIsExporting(true);
-      await exportCourseSpecWord(document);
+      await exportCourseSpecWord(resolvedDocument);
     } catch (error) {
       console.error("Failed to export Course Specification:", error);
     } finally {
@@ -72,7 +122,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
   };
 
   const handleDownloadPdf = async () => {
-    if (isExporting) return;
+    if (exportDisabled) return;
     try {
       setIsExporting(true);
       const printRoot = printRootRef.current;
@@ -99,29 +149,38 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               Preview the required programme Part 1 cover and structured course
               specification.
             </p>
+            {gradingScaleError ? (
+              <p className="mt-2 max-w-2xl text-xs text-destructive">
+                {gradingScaleError}
+              </p>
+            ) : null}
           </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={<Button type="button" disabled={isExporting} />}
+            render={<Button type="button" disabled={exportDisabled} />}
           >
-            {isExporting ? (
+            {isExporting || gradingScaleLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            {isExporting ? "Generating..." : "Download"}
+            {isExporting
+              ? "Generating..."
+              : gradingScaleLoading
+                ? "Loading policy..."
+                : "Download"}
             <ChevronDown className="ml-1.5 h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
               onClick={handleDownloadWord}
-              disabled={isExporting}
+              disabled={exportDisabled}
             >
               <Download className="h-3.5 w-3.5" />
               Download Word
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDownloadPdf} disabled={isExporting}>
+            <DropdownMenuItem onClick={handleDownloadPdf} disabled={exportDisabled}>
               <Download className="h-3.5 w-3.5" />
               Download PDF
             </DropdownMenuItem>
@@ -153,6 +212,16 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               <div>
                 <dt className="text-xs text-muted-foreground">Format</dt>
                 <dd className="mt-0.5 font-medium">A4 Landscape</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Grading Scale</dt>
+                <dd className="mt-0.5 font-medium">
+                  {resolvedDocument.gradingScale
+                    ? `${resolvedDocument.gradingScale.name} · v${resolvedDocument.gradingScale.version}`
+                    : gradingScaleLoading
+                      ? "Loading…"
+                      : "Unavailable"}
+                </dd>
               </div>
             </dl>
           </div>
@@ -230,7 +299,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
               padding: VIEWER_PADDING,
             }}
           >
-            <DocumentPages document={document} zoom={zoom} />
+            <DocumentPages document={resolvedDocument} zoom={zoom} />
           </div>
         </main>
       </div>
