@@ -33,6 +33,16 @@ const twoBandScale = [
   },
 ] as const;
 
+async function expectDatabaseRejection(action: () => Promise<unknown>) {
+  let rejected = false;
+  try {
+    await action();
+  } catch {
+    rejected = true;
+  }
+  expect(rejected).toBe(true);
+}
+
 async function fixture() {
   const token = crypto.randomUUID().slice(0, 8);
   const user = await prisma.user.create({
@@ -164,12 +174,12 @@ describeDb("programme grading-scale database integrity", () => {
     expect(historical.gradingScaleVersionId).toBe(f.v1.id);
     expect(historical.gradingScaleVersionId).not.toBe(v2.id);
 
-    await expect(
-      prisma.courseSpec.update({
+    await expectDatabaseRejection(async () => {
+      await prisma.courseSpec.update({
         where: { id: spec.id },
         data: { gradingScaleVersionId: v2.id },
-      }),
-    ).rejects.toThrow();
+      });
+    });
 
     const revision = await prisma.courseSpec.create({
       data: {
@@ -188,25 +198,26 @@ describeDb("programme grading-scale database integrity", () => {
       where: { gradingScaleVersionId: f.v1.id },
     });
 
-    await expect(
-      prisma.programmeGradingScaleGrade.update({
+    await expectDatabaseRejection(async () => {
+      await prisma.programmeGradingScaleGrade.update({
         where: { id: grade.id },
         data: { explanation: "Mutated after approval" },
-      }),
-    ).rejects.toThrow();
+      });
+    });
 
-    await expect(
-      prisma.programmeGradingScaleVersion.update({
+    await expectDatabaseRejection(async () => {
+      await prisma.programmeGradingScaleVersion.update({
         where: { id: f.v1.id },
         data: { changeSummary: "Rewrite history" },
-      }),
-    ).rejects.toThrow();
+      });
+    });
   });
 
   test("rejects cross-programme CourseSpec binding", async () => {
     const left = await fixture();
     const right = await fixture();
-    await prisma.courseSpec.create({ data: { courseId: left.course.id } });
+    const spec = await prisma.courseSpec.create({ data: { courseId: left.course.id } });
+    expect(spec.gradingScaleVersionId).toBe(left.v1.id);
 
     await expect(
       gradingScaleService.bindCourseSpec(left.course.id, right.v1.id),
@@ -216,7 +227,8 @@ describeDb("programme grading-scale database integrity", () => {
       where: { courseId: left.course.id },
       orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
     });
-    expect(latest.gradingScaleVersionId).toBeNull();
+    expect(latest.gradingScaleVersionId).toBe(left.v1.id);
+    expect(latest.gradingScaleVersionId).not.toBe(right.v1.id);
   });
 });
 
