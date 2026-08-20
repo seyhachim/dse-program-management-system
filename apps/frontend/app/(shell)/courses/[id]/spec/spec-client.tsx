@@ -82,7 +82,7 @@ import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
 import { EMPTY_POLICY, PolicySection } from "./policy-section";
-import { DateSection, EMPTY_DATE } from "./date-section";
+import { EMPTY_DATE } from "./date-section";
 import type {
   DateSection as DateSectionValue,
   PolicySection as PolicySectionValue,
@@ -125,7 +125,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "references", label: "References" },
   { id: "responsibility", label: "Responsibility" },
   { id: "policy", label: "Policies" },
-  { id: "date", label: "Date" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
@@ -140,7 +139,6 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
   "references",
   "responsibility",
   "policy",
-  "date",
 ]);
 
 const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
@@ -405,15 +403,23 @@ export function SpecClient({ courseId }: { courseId: string }) {
       }
       setSaving(true);
       setError(null);
+      const normalized = value.date?.trim() || null;
       try {
-        await courseSpecApi.saveSection(courseId, "date", value);
-        setSpecDate(value);
-        setStatus((s) => ({ ...s, date: "complete" }));
+        await courseSpecApi.saveSection(courseId, "date", { date: normalized });
+        setSpecDate({ date: normalized });
+        setStatus((s) => ({
+          ...s,
+          date: normalized ? "complete" : "draft",
+        }));
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to save the date");
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to save the Specification Date",
+        );
         return false;
       } finally {
         setSaving(false);
@@ -830,10 +836,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
               />
             </TabsContent>
 
-            <TabsContent value="date" className="mt-4">
-              <DateSection value={specDate} onPersist={persistDate} disabled={editingLocked} />
-            </TabsContent>
-
             <TabsContent value="documentPreview" className="mt-4">
               {course ? (
                 <DocumentPreview document={courseDocument} />
@@ -854,6 +856,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
                   review={review}
                   cloReady={cloReady}
                   teachingLearningReady={teachingLearningReady}
+                  specificationDate={specDate}
+                  onSaveSpecificationDate={persistDate}
                   onSubmit={submitForReview}
                   onPreview={() => setActiveTab("documentPreview")}
                   onGoToSection={goToSection}
