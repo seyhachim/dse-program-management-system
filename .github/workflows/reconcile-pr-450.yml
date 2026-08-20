@@ -1,0 +1,33 @@
+name: Reconcile PR 450 Probe
+
+on:
+  push:
+    branches:
+      - agent/issue-449-group-assessment-results
+    paths:
+      - .github/workflows/reconcile-pr-450.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe-merge-conflicts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Probe merge with current main
+        shell: bash
+        run: |
+          set +e
+          git fetch origin main
+          git merge --no-commit --no-ff origin/main
+          merge_status=$?
+          echo "merge_status=$merge_status"
+          echo "--- unmerged files ---"
+          git diff --name-only --diff-filter=U
+          echo "--- combined conflict diff ---"
+          git diff --cc
+          git merge --abort || true
+          exit $merge_status
