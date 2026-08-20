@@ -8,6 +8,7 @@ import type {
   UpdateCourseInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
+import { optionalCourseSectionPresence } from "./course-section-presence";
 
 /** Course as returned by the API — lecturer joined via the registry. */
 export type CourseView = Course & {
@@ -24,7 +25,9 @@ export const coursesApi = {
     return api.get<CourseSpecProgress[]>("/api/courses/spec-progress");
   },
   sectionPresence(): Promise<CourseSectionPresence[]> {
-    return api.get<CourseSectionPresence[]>("/api/courses/section-presence");
+    return optionalCourseSectionPresence(
+      api.get<CourseSectionPresence[]>("/api/courses/section-presence"),
+    );
   },
   get(id: string): Promise<CourseView> {
     return api.get<CourseView>(`/api/courses/${id}`);

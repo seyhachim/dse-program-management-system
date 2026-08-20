@@ -146,6 +146,27 @@ integrationDescribe("Course section presence metadata", () => {
           (row) => row.courseId === unassignedSectionCourse.id,
         ),
       ).toEqual({ courseId: unassignedSectionCourse.id, hasSections: true });
+
+      const crossProgrammeCoordinator: AuthUser = {
+        ...coordinator,
+        programmeRoles: [
+          { role: "program_coordinator", programmeId: "other-programme" },
+        ],
+      };
+      const crossProgrammeResponse = await request(
+        "/api/courses/section-presence",
+        { token: signToken(crossProgrammeCoordinator) },
+      );
+      expect(crossProgrammeResponse.status).toBe(200);
+      const crossProgrammePresence =
+        crossProgrammeResponse.body as SectionPresenceRow[];
+      expect(
+        crossProgrammePresence.some(
+          (row) =>
+            row.courseId === noSectionCourse.id ||
+            row.courseId === unassignedSectionCourse.id,
+        ),
+      ).toBe(false);
     } finally {
       await deleteCourse(unassignedSectionCourse.id);
       await deleteCourse(noSectionCourse.id);
