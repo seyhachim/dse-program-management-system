@@ -1,0 +1,5 @@
+merge_status=128
+main=78b48df45b6008273c88db9d63814087a6ad3d06
+head_before=0446894d50c1be0a6869d7cadca558d50865245c
+--- unmerged files ---
+--- combined conflict diff ---
