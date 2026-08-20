@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -14,6 +14,10 @@ import type {
   PolicySection as PolicySectionValue,
   ProgramPolicy,
 } from "@dse-pms/shared-types";
+import {
+  mergePolicyFieldForSave,
+  reconcilePolicyDraftWithPersisted,
+} from "./policies-responsibilities-model";
 
 export const POLICY_FIELDS: {
   key: keyof PolicySectionValue;
@@ -91,10 +95,14 @@ export function PolicySection({
   const [editing, setEditing] = useState<keyof PolicySectionValue | null>(null);
   const [saving, setSaving] = useState<keyof PolicySectionValue | null>(null);
   const [saved, setSaved] = useState<keyof PolicySectionValue | null>(null);
+  const previousPersisted = useRef(value);
 
   useEffect(() => {
-    setDraft(value);
-    setEditing(null);
+    const previous = previousPersisted.current;
+    setDraft((current) =>
+      reconcilePolicyDraftWithPersisted(current, previous, value),
+    );
+    previousPersisted.current = value;
   }, [value]);
 
   const additions = useMemo(() => policyAdditionCount(value), [value]);
@@ -116,12 +124,12 @@ export function PolicySection({
   };
 
   const save = async (key: keyof PolicySectionValue) => {
-    const next = { ...draft, [key]: draft[key].trim() };
+    const next = mergePolicyFieldForSave(value, key, draft[key]);
     setSaving(key);
     setSaved(null);
     try {
       if (await onPersist(next)) {
-        setDraft(next);
+        setDraft((current) => ({ ...current, [key]: next[key] }));
         setEditing(null);
         setSaved(key);
         window.setTimeout(() => setSaved((current) => (current === key ? null : current)), 2500);
