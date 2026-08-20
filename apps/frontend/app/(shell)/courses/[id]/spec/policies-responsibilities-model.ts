@@ -20,3 +20,19 @@ export function mergePolicyFieldForSave(
     [key]: draftValue.trim(),
   };
 }
+
+export function reconcilePolicyDraftWithPersisted(
+  draft: PolicySection,
+  previousPersisted: PolicySection,
+  nextPersisted: PolicySection,
+): PolicySection {
+  const nextDraft = { ...draft };
+
+  for (const key of Object.keys(nextPersisted) as (keyof PolicySection)[]) {
+    if (draft[key] === previousPersisted[key]) {
+      nextDraft[key] = nextPersisted[key];
+    }
+  }
+
+  return nextDraft;
+}
