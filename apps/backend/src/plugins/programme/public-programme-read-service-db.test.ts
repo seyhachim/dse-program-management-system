@@ -39,7 +39,7 @@ function faqInput(slug: string, category: "Admission" | "Careers" | "FeesScholar
     sourceLabel: "DSE",
     sourceUrl: "https://example.edu/dse",
     reviewedAt: new Date("2026-08-20T00:00:00.000Z"),
-  } as const;
+  };
 }
 
 describeDb("published-only public programme read service", () => {
