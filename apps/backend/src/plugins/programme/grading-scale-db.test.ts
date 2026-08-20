@@ -211,6 +211,12 @@ describeDb("programme grading-scale database integrity", () => {
       });
     });
 
+    const approved = await prisma.courseSpec.update({
+      where: { id: spec.id },
+      data: { reviewStatus: "Approved", approvedAt: new Date() },
+    });
+    expect(approved.gradingScaleVersionId).toBe(f.v1.id);
+
     const revision = await prisma.courseSpec.create({
       data: {
         courseId: f.course.id,
