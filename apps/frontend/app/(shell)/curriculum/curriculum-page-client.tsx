@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CurriculumCourse, ProgrammeCurriculumRead } from "@dse-pms/shared-types";
+import { StatusBadge } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { coursesApi, type CourseView } from "@/lib/courses";
@@ -14,12 +15,12 @@ import {
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
 
-const STATUS_CLASS: Record<ProgrammeCurriculumRead["selectedVersion"]["status"], string> = {
-  Draft: "border-amber-200 bg-amber-50 text-amber-800",
-  Approved: "border-blue-200 bg-blue-50 text-blue-800",
-  Active: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  Superseded: "border-slate-200 bg-slate-100 text-slate-700",
-};
+const STATUS_TONE = {
+  Draft: "info",
+  Approved: "success",
+  Active: "success",
+  Superseded: "neutral",
+} as const satisfies Record<ProgrammeCurriculumRead["selectedVersion"]["status"], "info" | "success" | "neutral">;
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p></div>;
@@ -113,10 +114,10 @@ export function CurriculumPageClient() {
   const current=data.selectedVersion;
   const isHistorical=current.status!=="Draft";
   return <div className="space-y-6">
-    <section className="rounded-xl border bg-card p-5"><div className="flex flex-col gap-4 xl:flex-row xl:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold">{data.curriculum.name}</h2><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[current.status]}`}>{curriculumStatusLabel(current.status)}</span>{isHistorical&&<span className="rounded-full border bg-muted px-2.5 py-1 text-xs">Read-only snapshot</span>}</div><p className="mt-1 text-sm text-muted-foreground">{data.curriculum.code} · {current.cohortLabel||"No cohort label"}{current.academicYear?` · ${current.academicYear}`:""}</p></div>
+    <section className="rounded-xl border bg-card p-5"><div className="flex flex-col gap-4 xl:flex-row xl:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold">{data.curriculum.name}</h2><StatusBadge tone={STATUS_TONE[current.status]} label={curriculumStatusLabel(current.status)} icon={false}/>{isHistorical&&<span className="rounded-full border bg-muted px-2.5 py-1 text-xs">Read-only snapshot</span>}</div><p className="mt-1 text-sm text-muted-foreground">{data.curriculum.code} · {current.cohortLabel||"No cohort label"}{current.academicYear?` · ${current.academicYear}`:""}</p></div>
       <div className="flex flex-wrap items-end gap-3">{curricula.length>1&&<label className="text-sm">Curriculum<select value={selectedCurriculumId} onChange={e=>{setSelectedCurriculumId(e.target.value);void loadVersion(e.target.value);}} className="mt-1 block h-10 rounded-md border bg-background px-3">{curricula.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}<label className="text-sm">Version<select value={selectedVersionId} onChange={e=>void loadVersion(selectedCurriculumId,e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3">{(selectedListItem?.versions??data.versions).map(v=><option key={v.id} value={v.id}>{curriculumVersionLabel(v)} · {v.status}</option>)}</select></label>{editable&&!editMode&&<button onClick={()=>void enterEdit()} className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">Edit Draft</button>}{editMode&&<button onClick={()=>{setEditMode(false);setEditingPlacementId(null);setMutationError(null);}} className="h-10 rounded-md border px-4 text-sm">Exit editor</button>}</div></div></section>
 
-    {editMode&&<section className="rounded-xl border border-amber-200 bg-amber-50/50 p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><div className="flex-1"><p className="font-medium">Add programme course</p><select value={addCourseId} onChange={e=>setAddCourseId(e.target.value)} className="mt-2 h-10 w-full rounded-md border bg-background px-3"><option value="">Select a course…</option>{availableCourses.map(c=><option key={c.id} value={c.id}>{c.code} — {c.title}</option>)}</select></div><label className="text-sm">Year<select value={addYear} onChange={e=>setAddYear(Number(e.target.value))} className="mt-1 block h-10 rounded-md border bg-background px-3">{[1,2,3,4].map(v=><option key={v}>{v}</option>)}</select></label><label className="text-sm">Semester<select value={addSemester} onChange={e=>setAddSemester(e.target.value as "First"|"Second")} className="mt-1 block h-10 rounded-md border bg-background px-3"><option value="First">1</option><option value="Second">2</option></select></label><button disabled={mutating||!addCourseId} onClick={()=>void mutate(async()=>{const result=await curriculumApi.addCourse(current.id,{courseId:addCourseId,yearLevel:addYear,semester:addSemester,sortOrder:data.years[addYear-1]?.semesters[addSemester==="First"?0:1]?.courses.length??0});setAddCourseId("");return result;})} className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50">Add course</button></div>{mutationError&&<p className="mt-3 text-sm text-destructive">{mutationError}</p>}</section>}
+    {editMode&&<section className="rounded-xl border border-warning/30 bg-warning-bg/40 p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><div className="flex-1"><p className="font-medium">Add programme course</p><select value={addCourseId} onChange={e=>setAddCourseId(e.target.value)} className="mt-2 h-10 w-full rounded-md border bg-background px-3"><option value="">Select a course…</option>{availableCourses.map(c=><option key={c.id} value={c.id}>{c.code} — {c.title}</option>)}</select></div><label className="text-sm">Year<select value={addYear} onChange={e=>setAddYear(Number(e.target.value))} className="mt-1 block h-10 rounded-md border bg-background px-3">{[1,2,3,4].map(v=><option key={v}>{v}</option>)}</select></label><label className="text-sm">Semester<select value={addSemester} onChange={e=>setAddSemester(e.target.value as "First"|"Second")} className="mt-1 block h-10 rounded-md border bg-background px-3"><option value="First">1</option><option value="Second">2</option></select></label><button disabled={mutating||!addCourseId} onClick={()=>void mutate(async()=>{const result=await curriculumApi.addCourse(current.id,{courseId:addCourseId,yearLevel:addYear,semester:addSemester,sortOrder:data.years[addYear-1]?.semesters[addSemester==="First"?0:1]?.courses.length??0});setAddCourseId("");return result;})} className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50">Add course</button></div>{mutationError&&<p className="mt-3 text-sm text-destructive">{mutationError}</p>}</section>}
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Stat label="Total credits" value={data.totals.programmeCredits}/><Stat label="Core" value={data.totals.coreCredits}/><Stat label="Basic" value={data.totals.basicCredits}/><Stat label="Elective" value={data.totals.electiveCredits}/><Stat label="Specialization" value={data.totals.specializationCredits}/></section>
 

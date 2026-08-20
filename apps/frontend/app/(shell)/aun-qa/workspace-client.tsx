@@ -18,24 +18,11 @@ import type {
   QaRequirementAssignmentView,
   QaSarProgressItemView,
 } from "@dse-pms/shared-types";
+import { StatusBadge, type StatusBadgeTone } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 
 const PROGRAMME_ID = "dse";
-
-function statusClass(tone: "neutral" | "good" | "warn") {
-  if (tone === "good") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
-  if (tone === "warn") return "bg-amber-50 text-amber-700 ring-amber-200";
-  return "bg-slate-50 text-slate-600 ring-slate-200";
-}
-
-function StatusPill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "good" | "warn" }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${statusClass(tone)}`}>
-      {children}
-    </span>
-  );
-}
 
 export function AunQaWorkspaceClient() {
   const { me, loading: meLoading } = useMe();
@@ -141,17 +128,17 @@ export function AunQaWorkspaceClient() {
   }
 
   if (meLoading || loading) {
-    return <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">Loading AUN-QA workspace…</div>;
+    return <div className="rounded-xl border border-border bg-card p-8 text-sm text-muted-foreground">Loading AUN-QA workspace…</div>;
   }
 
   if (!me) {
-    return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Could not resolve your account.</div>;
+    return <div className="rounded-xl border border-error/30 bg-error-bg p-4 text-sm text-error">Could not resolve your account.</div>;
   }
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
       {error ? (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="flex items-start gap-2 rounded-xl border border-error/30 bg-error-bg p-4 text-sm text-error">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -195,7 +182,7 @@ function LeadershipWorkspace({
 }) {
   if (!dashboard?.selectedCycle) {
     return (
-      <div className="rounded-2xl border bg-white p-8">
+      <div className="rounded-2xl border border-border bg-card p-8">
         <h2 className="text-lg font-semibold">No AUN-QA assessment cycle yet</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Create an assessment cycle from the existing QA Dashboard before assigning SAR work.
@@ -212,7 +199,7 @@ function LeadershipWorkspace({
 
   return (
     <>
-      <section className="rounded-2xl border bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current assessment cycle</div>
@@ -234,20 +221,20 @@ function LeadershipWorkspace({
         <SummaryCard icon={CheckCircle2} label="Reviewed evidence" value={reviewedEvidence} help="Requirements with reviewed evidence" />
       </section>
 
-      <section className="rounded-2xl border bg-white shadow-sm">
-        <div className="border-b p-5">
+      <section className="rounded-2xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border p-5">
           <h2 className="text-lg font-semibold">Requirement ownership and readiness</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Assignment, evidence, SAR writing, and human review are tracked separately. These are workflow signals, not AUN-QA compliance scores.
           </p>
           {contributors.length === 0 ? (
-            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <p className="mt-3 rounded-lg bg-warning-bg px-3 py-2 text-sm text-warning">
               No QA Contributors are assigned yet. Add lecturers as QA Contributors from the QA Dashboard first.
             </p>
           ) : null}
         </div>
 
-        <div className="divide-y">
+        <div className="divide-y divide-border">
           {dashboard.criteria.map((criterion) => (
             <div key={criterion.code} className="p-4 md:p-5">
               <div className="mb-3 flex items-baseline gap-2">
@@ -265,7 +252,7 @@ function LeadershipWorkspace({
                       <th className="pb-2 font-medium">Review</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-border">
                     {criterion.requirements.map((requirement) => {
                       const owner = assignmentByRequirement.get(requirement.code);
                       const evidence = evidenceByRequirement.get(requirement.code) ?? { count: 0, reviewed: 0 };
@@ -283,7 +270,7 @@ function LeadershipWorkspace({
                               value={owner?.assignee.id ?? ""}
                               disabled={savingCode === requirement.code}
                               onChange={(event) => void onChangeAssignment(requirement.code, event.target.value)}
-                              className="h-9 min-w-48 rounded-md border bg-background px-2 text-sm disabled:opacity-50"
+                              className="h-9 min-w-48 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
                             >
                               <option value="">Unassigned</option>
                               {contributors.map((person) => (
@@ -293,11 +280,11 @@ function LeadershipWorkspace({
                           </td>
                           <td className="py-3 pr-4">
                             {evidence.count === 0 ? (
-                              <StatusPill>No evidence yet</StatusPill>
+                              <StatusBadge tone="neutral" label="No evidence yet" icon={false} />
                             ) : evidence.reviewed === evidence.count ? (
-                              <StatusPill tone="good">{evidence.count} reviewed</StatusPill>
+                              <StatusBadge tone="success" label={`${evidence.count} reviewed`} icon={false} />
                             ) : (
-                              <StatusPill tone="warn">{evidence.count} collected · {evidence.reviewed} reviewed</StatusPill>
+                              <StatusBadge tone="warning" label={`${evidence.count} collected · ${evidence.reviewed} reviewed`} icon={false} />
                             )}
                           </td>
                           <td className="py-3 pr-4">
@@ -306,9 +293,11 @@ function LeadershipWorkspace({
                             </Link>
                           </td>
                           <td className="py-3">
-                            <StatusPill tone={progress?.status === "approved" ? "good" : progress?.status === "underReview" || progress?.status === "changesRequested" ? "warn" : "neutral"}>
-                              {progress?.status === "approved" ? "Approved" : progress?.status === "underReview" ? "Under review" : progress?.status === "changesRequested" ? "Changes requested" : "Not submitted"}
-                            </StatusPill>
+                            <StatusBadge
+                              tone={progress?.status === "approved" ? "success" : progress?.status === "underReview" || progress?.status === "changesRequested" ? "warning" : "neutral"}
+                              label={progress?.status === "approved" ? "Approved" : progress?.status === "underReview" ? "Under review" : progress?.status === "changesRequested" ? "Changes requested" : "Not submitted"}
+                              icon={false}
+                            />
                           </td>
                         </tr>
                       );
@@ -327,7 +316,7 @@ function LeadershipWorkspace({
 function ContributorWorkspace({ workspace }: { workspace: QaContributorWorkspaceView | null }) {
   if (!workspace?.selectedCycle) {
     return (
-      <div className="rounded-2xl border bg-white p-8">
+      <div className="rounded-2xl border border-border bg-card p-8">
         <h2 className="text-lg font-semibold">No active AUN-QA work yet</h2>
         <p className="mt-2 text-sm text-muted-foreground">Your programme has not started an assessment cycle.</p>
       </div>
@@ -336,7 +325,7 @@ function ContributorWorkspace({ workspace }: { workspace: QaContributorWorkspace
 
   return (
     <>
-      <section className="rounded-2xl border bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">My AUN-QA work</div>
         <h2 className="mt-1 text-xl font-semibold">{workspace.selectedCycle.title}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -345,7 +334,7 @@ function ContributorWorkspace({ workspace }: { workspace: QaContributorWorkspace
       </section>
 
       {workspace.work.length === 0 ? (
-        <div className="rounded-2xl border border-dashed bg-white p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
           <ShieldCheck className="mx-auto h-9 w-9 text-muted-foreground" />
           <h3 className="mt-3 font-semibold">Nothing assigned to you yet</h3>
           <p className="mt-1 text-sm text-muted-foreground">The Head of Programme will assign AUN-QA requirements when work is ready.</p>
@@ -353,7 +342,7 @@ function ContributorWorkspace({ workspace }: { workspace: QaContributorWorkspace
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
           {workspace.work.map((item) => (
-            <article key={item.assignment.id} className="rounded-2xl border bg-white p-5 shadow-sm">
+            <article key={item.assignment.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-primary">{item.assignment.requirementCode}</div>
@@ -363,16 +352,16 @@ function ContributorWorkspace({ workspace }: { workspace: QaContributorWorkspace
                 <PenLine className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="mt-5 grid grid-cols-3 gap-2 text-xs">
-                <ReadinessBox label="Evidence" value={item.evidence.count === 0 ? "None yet" : `${item.evidence.count} collected`} tone={item.evidence.readiness === "reviewed" ? "good" : item.evidence.readiness === "collected" ? "warn" : "neutral"} />
+                <ReadinessBox label="Evidence" value={item.evidence.count === 0 ? "None yet" : `${item.evidence.count} collected`} tone={item.evidence.readiness === "reviewed" ? "success" : item.evidence.readiness === "collected" ? "warning" : "neutral"} />
                 <ReadinessBox
                   label="SAR writing"
                   value={item.writingStatus === "approved" ? "Approved" : item.writingStatus === "submitted" ? "Submitted" : item.writingStatus === "drafting" ? "Drafting" : "Not started"}
-                  tone={item.writingStatus === "approved" ? "good" : item.writingStatus === "submitted" ? "warn" : "neutral"}
+                  tone={item.writingStatus === "approved" ? "success" : item.writingStatus === "submitted" ? "warning" : "neutral"}
                 />
                 <ReadinessBox
                   label="Review"
                   value={item.reviewStatus === "approved" ? "Approved" : item.reviewStatus === "underReview" ? "Under review" : item.reviewStatus === "changesRequested" ? "Changes requested" : "Not submitted"}
-                  tone={item.reviewStatus === "approved" ? "good" : item.reviewStatus === "underReview" || item.reviewStatus === "changesRequested" ? "warn" : "neutral"}
+                  tone={item.reviewStatus === "approved" ? "success" : item.reviewStatus === "underReview" || item.reviewStatus === "changesRequested" ? "warning" : "neutral"}
                 />
               </div>
               <div className="mt-4 flex items-center justify-between gap-3">
@@ -394,7 +383,7 @@ function ContributorWorkspace({ workspace }: { workspace: QaContributorWorkspace
 
 function SummaryCard({ icon: Icon, label, value, help }: { icon: typeof ShieldCheck; label: string; value: number; help: string }) {
   return (
-    <div className="rounded-xl border bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-muted-foreground">{label}</div>
         <Icon className="h-4 w-4 text-muted-foreground" />
@@ -405,11 +394,11 @@ function SummaryCard({ icon: Icon, label, value, help }: { icon: typeof ShieldCh
   );
 }
 
-function ReadinessBox({ label, value, tone }: { label: string; value: string; tone: "neutral" | "good" | "warn" }) {
+function ReadinessBox({ label, value, tone }: { label: string; value: string; tone: Extract<StatusBadgeTone, "neutral" | "success" | "warning"> }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
+    <div className="rounded-lg bg-surface-secondary p-3">
       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-2"><StatusPill tone={tone}>{value}</StatusPill></div>
+      <div className="mt-2"><StatusBadge tone={tone} label={value} icon={false} /></div>
     </div>
   );
 }
