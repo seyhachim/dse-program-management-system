@@ -20,17 +20,34 @@ import {
 } from "./grading-scale-service.ts";
 
 const PROGRAMME_MANAGERS: Role[] = ["admin", "program_coordinator"];
+const COURSE_SPEC_GRADING_SCALE_READERS: Role[] = [
+  "admin",
+  "program_coordinator",
+  "program_secretary",
+  "lecturer",
+  "qa_reviewer",
+];
 
-function canManage(user: AuthUser, programmeId: string): boolean {
+export function canManageGradingScales(
+  user: AuthUser,
+  programmeId: string,
+): boolean {
   return hasAnyRoleInProgramme(user, PROGRAMME_MANAGERS, programmeId);
 }
 
-function canRead(user: AuthUser, programmeId: string): boolean {
+export function canReadCourseSpecGradingScale(
+  user: AuthUser,
+  programmeId: string,
+): boolean {
   return hasAnyRoleInProgramme(
     user,
-    ["admin", "program_coordinator", "program_secretary", "lecturer", "qa_reviewer"],
+    COURSE_SPEC_GRADING_SCALE_READERS,
     programmeId,
   );
+}
+
+export function isCourseSpecReadableGradingScaleStatus(status: string): boolean {
+  return status === "Approved" || status === "Superseded";
 }
 
 function sendError(res: Response, error: unknown): void {
@@ -91,8 +108,10 @@ export function createGradingScaleRouter(): Router {
         typeof req.query.programmeId === "string"
           ? req.query.programmeId
           : DEFAULT_PROGRAMME_ID;
-      if (!canRead(req.user, programmeId)) {
-        return void res.status(403).json({ error: "No grading-scale access for this programme" });
+      if (!canManageGradingScales(req.user, programmeId)) {
+        return void res.status(403).json({
+          error: "Only programme managers can browse grading-scale versions",
+        });
       }
       try {
         res.json(await gradingScaleService.list(programmeId));
@@ -114,7 +133,7 @@ export function createGradingScaleRouter(): Router {
           details: parsed.error.flatten(),
         });
       }
-      if (!canManage(req.user, parsed.data.programmeId)) {
+      if (!canManageGradingScales(req.user, parsed.data.programmeId)) {
         return void res.status(403).json({ error: "No grading-scale write access for this programme" });
       }
       try {
@@ -134,8 +153,10 @@ export function createGradingScaleRouter(): Router {
       if (!versionId) return void res.status(400).json({ error: "Version id is required" });
       const programmeId = await programmeForVersion(versionId);
       if (!programmeId) return void res.status(404).json({ error: "Grading-scale version not found" });
-      if (!canRead(req.user, programmeId)) {
-        return void res.status(403).json({ error: "No grading-scale access for this programme" });
+      if (!canManageGradingScales(req.user, programmeId)) {
+        return void res.status(403).json({
+          error: "Only programme managers can view grading-scale versions directly",
+        });
       }
       try {
         res.json(await gradingScaleService.getVersion(versionId));
@@ -158,7 +179,7 @@ export function createGradingScaleRouter(): Router {
       }
       const programmeId = await programmeForScale(gradingScaleId);
       if (!programmeId) return void res.status(404).json({ error: "Grading scale not found" });
-      if (!canManage(req.user, programmeId)) {
+      if (!canManageGradingScales(req.user, programmeId)) {
         return void res.status(403).json({ error: "No grading-scale write access for this programme" });
       }
       try {
@@ -188,7 +209,7 @@ export function createGradingScaleRouter(): Router {
       }
       const programmeId = await programmeForVersion(versionId);
       if (!programmeId) return void res.status(404).json({ error: "Grading-scale version not found" });
-      if (!canManage(req.user, programmeId)) {
+      if (!canManageGradingScales(req.user, programmeId)) {
         return void res.status(403).json({ error: "No grading-scale write access for this programme" });
       }
       try {
@@ -212,7 +233,7 @@ export function createGradingScaleRouter(): Router {
       }
       const programmeId = await programmeForVersion(versionId);
       if (!programmeId) return void res.status(404).json({ error: "Grading-scale version not found" });
-      if (!canManage(req.user, programmeId)) {
+      if (!canManageGradingScales(req.user, programmeId)) {
         return void res.status(403).json({ error: "No grading-scale approval access for this programme" });
       }
       try {
@@ -245,17 +266,22 @@ export function createGradingScaleRouter(): Router {
       if (!spec) {
         return void res.status(404).json({ error: "Course Specification version not found" });
       }
-      if (!canRead(req.user, spec.course.programmeId)) {
+      if (!canReadCourseSpecGradingScale(req.user, spec.course.programmeId)) {
         return void res.status(403).json({ error: "No grading-scale access for this programme" });
       }
 
       try {
+        const gradingScaleVersion = spec.gradingScaleVersionId
+          ? await gradingScaleService.getVersion(spec.gradingScaleVersionId)
+          : null;
         res.json({
           courseId,
           courseSpecId: spec.id,
-          gradingScaleVersion: spec.gradingScaleVersionId
-            ? await gradingScaleService.getVersion(spec.gradingScaleVersionId)
-            : null,
+          gradingScaleVersion:
+            gradingScaleVersion &&
+            isCourseSpecReadableGradingScaleStatus(gradingScaleVersion.status)
+              ? gradingScaleVersion
+              : null,
         });
       } catch (error) {
         sendError(res, error);
@@ -272,11 +298,21 @@ export function createGradingScaleRouter(): Router {
       if (!courseId) return void res.status(400).json({ error: "Course id is required" });
       const programmeId = await programmeForCourse(courseId);
       if (!programmeId) return void res.status(404).json({ error: "Course not found" });
-      if (!canRead(req.user, programmeId)) {
+      if (!canReadCourseSpecGradingScale(req.user, programmeId)) {
         return void res.status(403).json({ error: "No grading-scale access for this programme" });
       }
       try {
-        res.json(await gradingScaleService.courseBinding(courseId));
+        const binding = await gradingScaleService.courseBinding(courseId);
+        res.json({
+          ...binding,
+          gradingScaleVersion:
+            binding.gradingScaleVersion &&
+            isCourseSpecReadableGradingScaleStatus(
+              binding.gradingScaleVersion.status,
+            )
+              ? binding.gradingScaleVersion
+              : null,
+        });
       } catch (error) {
         sendError(res, error);
       }
@@ -296,7 +332,7 @@ export function createGradingScaleRouter(): Router {
       }
       const programmeId = await programmeForCourse(courseId);
       if (!programmeId) return void res.status(404).json({ error: "Course not found" });
-      if (!canManage(req.user, programmeId)) {
+      if (!canManageGradingScales(req.user, programmeId)) {
         return void res.status(403).json({ error: "Only programme managers can select a grading-scale version" });
       }
       try {
