@@ -163,7 +163,7 @@ export interface TelegramMenu {
   route: RouteKey;
   parent?: RouteKey;
   title: string;
-  rows: InlineButton[][];
+  rows: ReadonlyArray<ReadonlyArray<InlineButton>>;
   navigation?: {
     showBack?: boolean;
     showHome?: boolean;
