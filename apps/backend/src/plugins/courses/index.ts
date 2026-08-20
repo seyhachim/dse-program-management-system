@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { coursesManifest } from "@dse-pms/shared-types";
+import {
+  CONSTRUCTIVE_ALIGNMENT_REQUIRED_ERROR,
+  coursesManifest,
+  isConstructiveAlignmentReady,
+} from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { attachLatestCourseSpecReviewStatus } from "./course-list-review-status.ts";
@@ -109,6 +113,16 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
         where: { sectionKey: "date" },
         select: { status: true },
       },
+      clos: {
+        orderBy: { order: "asc" },
+        select: { order: true, status: true },
+      },
+      weeks: {
+        select: { cloCodes: true },
+      },
+      assessmentItems: {
+        select: { status: true, cloCodes: true },
+      },
     },
   });
 
@@ -122,13 +136,29 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
     throw new ReferenceError(SPECIFICATION_DATE_REQUIRED_ERROR);
   }
 
+  if (
+    currentSpec &&
+    !isConstructiveAlignmentReady(
+      currentSpec.clos.map((clo) => ({
+        code: `CLO${clo.order + 1}`,
+        status: clo.status === "Active" ? "active" : "inactive",
+      })),
+      currentSpec.weeks,
+      currentSpec.assessmentItems.map((assessment) => ({
+        status: assessment.status === "Active" ? "active" : "inactive",
+        cloCodes: assessment.cloCodes,
+      })),
+    )
+  ) {
+    throw new ReferenceError(CONSTRUCTIVE_ALIGNMENT_REQUIRED_ERROR);
+  }
+
   try {
     return await canonicalSubmitSpec(courseId, submittedById, note);
   } catch (error) {
-    // The Review & Submit contract intentionally defines six required items.
-    // Preserve all canonical submit validation, but do not keep the older
-    // backend-only Student Responsibility gate that was never represented in
-    // the readiness UI. Only bypass when it is the sole remaining legacy gap.
+    // The Review & Submit contract intentionally excludes the older backend-only
+    // Student Responsibility gate. Preserve canonical validation and bypass only
+    // when that legacy gate is the sole remaining gap.
     if (
       !(error instanceof ReferenceError) ||
       error.message !==
