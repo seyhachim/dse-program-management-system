@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,10 +13,15 @@ import {
 } from "lucide-react";
 import {
   type CourseSpecReviewStatus,
+  type DateSection as DateSectionValue,
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
-import { Button } from "@dse-pms/ui";
+import { Button, Input } from "@dse-pms/ui";
 import type { CourseView } from "@/lib/courses";
+import {
+  isSpecificationDateReady,
+  SPECIFICATION_DATE_SUBMISSION_ERROR,
+} from "./specification-date-readiness";
 
 const STATUS_META: Record<
   CourseSpecReviewStatus,
@@ -54,12 +59,18 @@ const isEditableReviewStatus = (status: CourseSpecReviewStatus) =>
   EDITABLE_REVIEW_STATUSES.includes(status);
 
 type ReadinessItem = {
-  id: "courseInfo" | "clos" | "teachingLearning" | "assessmentPlan" | "slt";
+  id:
+    | "courseInfo"
+    | "clos"
+    | "teachingLearning"
+    | "assessmentPlan"
+    | "slt"
+    | "date";
   title: string;
   complete: boolean;
 };
 
-type ReadinessSectionId = ReadinessItem["id"];
+type ReadinessSectionId = Exclude<ReadinessItem["id"], "date">;
 
 export function ReviewSubmitSection({
   course,
@@ -67,6 +78,8 @@ export function ReviewSubmitSection({
   review,
   cloReady,
   teachingLearningReady,
+  specificationDate,
+  onSaveSpecificationDate,
   onSubmit,
   onPreview,
   onGoToSection,
@@ -94,6 +107,8 @@ export function ReviewSubmitSection({
   };
   cloReady: boolean;
   teachingLearningReady: boolean;
+  specificationDate: DateSectionValue;
+  onSaveSpecificationDate: (value: DateSectionValue) => Promise<boolean>;
   onSubmit: (note: string) => Promise<boolean>;
   onPreview: () => void;
   onGoToSection: (id: ReadinessSectionId) => void;
@@ -106,6 +121,18 @@ export function ReviewSubmitSection({
   const [reviewNote, setReviewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [dateDraft, setDateDraft] = useState(specificationDate.date ?? "");
+  const [dateSaving, setDateSaving] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDateDraft(specificationDate.date ?? "");
+  }, [specificationDate.date]);
+
+  const specificationDateReady = isSpecificationDateReady(
+    status.date,
+    specificationDate.date,
+  );
   const readinessItems = useMemo<ReadinessItem[]>(
     () => [
       {
@@ -133,8 +160,13 @@ export function ReviewSubmitSection({
         title: "Weekly Plan",
         complete: status.slt === "complete",
       },
+      {
+        id: "date",
+        title: "Specification Date",
+        complete: specificationDateReady,
+      },
     ],
-    [status, cloReady, teachingLearningReady],
+    [status, cloReady, teachingLearningReady, specificationDateReady],
   );
   const completed = readinessItems.filter((item) => item.complete);
   const incomplete = readinessItems.filter((item) => !item.complete);
@@ -151,7 +183,39 @@ export function ReviewSubmitSection({
     review.status === "underReview" ||
     review.status === "resubmitted";
 
+  const focusSpecificationDate = () => {
+    document.getElementById("specification-date")?.focus();
+  };
+
+  const goToReadinessItem = (item: ReadinessItem) => {
+    if (item.id === "date") {
+      focusSpecificationDate();
+      return;
+    }
+    onGoToSection(item.id);
+  };
+
+  const saveSpecificationDate = async () => {
+    setDateSaving(true);
+    setDateError(null);
+    try {
+      const normalized = dateDraft.trim() || null;
+      const saved = await onSaveSpecificationDate({ date: normalized });
+      if (saved) setDateDraft(normalized ?? "");
+    } finally {
+      setDateSaving(false);
+    }
+  };
+
   const submit = async () => {
+    if (!specificationDateReady) {
+      setDateError(SPECIFICATION_DATE_SUBMISSION_ERROR);
+      focusSpecificationDate();
+      return;
+    }
+    if (!ready) return;
+
+    setDateError(null);
     setSubmitting(true);
     try {
       await onSubmit(note);
@@ -326,7 +390,7 @@ export function ReviewSubmitSection({
                 <button
                   key={section.id}
                   type="button"
-                  onClick={() => editingEnabled && !done && onGoToSection(section.id)}
+                  onClick={() => editingEnabled && !done && goToReadinessItem(section)}
                   disabled={!editingEnabled || done}
                   className={`flex w-full items-center gap-2 rounded-md px-1 py-1 text-left ${
                     editingEnabled && !done ? "hover:bg-muted/50" : "cursor-default"
@@ -372,7 +436,7 @@ export function ReviewSubmitSection({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => onGoToSection(item.id)}
+                  onClick={() => goToReadinessItem(item)}
                   className="flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-left text-xs text-amber-900 transition-colors hover:bg-amber-50"
                 >
                   <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -417,6 +481,57 @@ export function ReviewSubmitSection({
           )}
         </section>
       </div>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-sm font-semibold text-foreground">Specification Date</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Official date shown on this Course Specification document. Submission and approval timestamps are recorded automatically by the system.
+            </p>
+          </div>
+          <span
+            className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
+              specificationDateReady
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-amber-50 text-amber-700"
+            }`}
+          >
+            {specificationDateReady ? "Complete" : "Required"}
+          </span>
+        </div>
+        <div className="mt-4 flex max-w-xl flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="block flex-1">
+            <span className="text-xs font-medium text-foreground">Specification Date</span>
+            <Input
+              id="specification-date"
+              type="date"
+              value={dateDraft}
+              disabled={!editingEnabled || saving || dateSaving}
+              onChange={(event) => {
+                setDateDraft(event.target.value);
+                setDateError(null);
+              }}
+              className="mt-1.5"
+            />
+          </label>
+          {editingEnabled ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={saveSpecificationDate}
+              disabled={saving || dateSaving}
+            >
+              {dateSaving ? "Saving…" : "Save Date"}
+            </Button>
+          ) : null}
+        </div>
+        {editingEnabled && !specificationDateReady ? (
+          <p className="mt-3 text-xs text-amber-700">
+            {dateError ?? SPECIFICATION_DATE_SUBMISSION_ERROR}
+          </p>
+        ) : null}
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="rounded-xl border border-border bg-card p-5">
@@ -647,7 +762,9 @@ export function ReviewSubmitSection({
                     ? "Ready to submit"
                     : `${incomplete.length} required section${incomplete.length === 1 ? " needs" : "s need"} attention`
                   : review.status === "changesRequested"
-                    ? "Ready to update and resubmit"
+                    ? ready
+                      ? "Ready to update and resubmit"
+                      : `${incomplete.length} required section${incomplete.length === 1 ? " needs" : "s need"} attention`
                     : review.status === "approved"
                       ? "Course specification approved"
                       : STATUS_META[review.status].label}
@@ -656,10 +773,12 @@ export function ReviewSubmitSection({
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {review.status === "draft"
                 ? ready
-                  ? "All 5 required sections are complete. Review the document before submitting."
+                  ? "All 6 required sections are complete. Review the document before submitting."
                   : "Complete the required sections before submitting for review."
                 : review.status === "changesRequested"
-                  ? "Make the requested changes, then resubmit the updated version."
+                  ? ready
+                    ? "All 6 required sections are complete. Resubmit the updated version when ready."
+                    : "Complete the required sections before resubmitting."
                   : review.status === "approved"
                     ? "This approved version is read-only."
                     : "The course specification is locked while it is in the review workflow."}
@@ -688,21 +807,19 @@ export function ReviewSubmitSection({
             ) : review.status === "changesRequested" && incomplete.length > 0 ? (
               <Button
                 variant="default"
-                onClick={() => onGoToSection(incomplete[0]!.id)}
+                onClick={() => goToReadinessItem(incomplete[0]!)}
               >
                 Continue Editing
               </Button>
             ) : review.status === "changesRequested" ? (
-              <Button onClick={submit} disabled={saving || submitting}>
+              <Button onClick={submit} disabled={!canSubmit}>
                 <Send className="mr-2 h-4 w-4" />
                 {submitting ? "Resubmitting…" : "Resubmit for Review"}
               </Button>
             ) : null}
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }
