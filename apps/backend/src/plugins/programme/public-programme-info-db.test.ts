@@ -50,6 +50,33 @@ describeDb("public programme information database invariants", () => {
     expect(faq.isFeatured).toBe(false);
   });
 
+  test("reads and updates an FAQ through a draft-to-published round trip", async () => {
+    const programme = await createProgramme();
+    const created = await prisma.programmeFaq.create({ data: faqData(programme.id) });
+
+    const read = await prisma.programmeFaq.findUniqueOrThrow({ where: { id: created.id } });
+    expect(read.status).toBe(ProgrammePublicPublicationStatus.Draft);
+    expect(read.publishedAt).toBeNull();
+
+    const publishedAt = new Date();
+    const updated = await prisma.programmeFaq.update({
+      where: { id: created.id },
+      data: {
+        answer: "Updated approved admission guidance.",
+        keywords: ["admission", "apply"],
+        isFeatured: true,
+        status: ProgrammePublicPublicationStatus.Published,
+        publishedAt,
+      },
+    });
+
+    expect(updated.answer).toBe("Updated approved admission guidance.");
+    expect(updated.keywords).toEqual(["admission", "apply"]);
+    expect(updated.isFeatured).toBe(true);
+    expect(updated.status).toBe(ProgrammePublicPublicationStatus.Published);
+    expect(updated.publishedAt?.getTime()).toBe(publishedAt.getTime());
+  });
+
   test("enforces globally unique stable FAQ slugs", async () => {
     const firstProgramme = await createProgramme();
     const secondProgramme = await createProgramme();
