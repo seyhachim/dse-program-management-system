@@ -13,6 +13,7 @@ import {
   PublicProgrammeReadNotFoundError,
   publicProgrammeReadService,
 } from "./public-programme-read-service.ts";
+import { publicProgrammeSearchService } from "./public-programme-search-service.ts";
 
 function sendReadError(res: Response, error: unknown): void {
   if (error instanceof PublicProgrammeReadNotFoundError || error instanceof PublicCurriculumNotFoundError) {
@@ -100,6 +101,21 @@ export function createPublicProgrammeReadRouter(): Router {
     if (!id) return;
     try {
       sendPublicJson(req, res, await publicProgrammeReadService.listFaqCategories(id));
+    } catch (error) {
+      sendReadError(res, error);
+    }
+  });
+
+  router.get("/programmes/:programmeId/search", async (req, res) => {
+    const id = programmeId(req, res);
+    if (!id) return;
+    const question = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (!question || question.length > 500) {
+      res.status(400).json({ error: "Search requires q with 1..500 characters" });
+      return;
+    }
+    try {
+      sendPublicJson(req, res, await publicProgrammeSearchService.search(id, question));
     } catch (error) {
       sendReadError(res, error);
     }
