@@ -63,7 +63,11 @@ import {
 } from "./mapping-model";
 import { MappingSection } from "./mapping-section";
 import { OverviewTab } from "./overview-tab";
-import { EMPTY_POLICY, PolicySection } from "./policy-section";
+import { EMPTY_POLICY } from "./policy-section";
+import {
+  normalizePoliciesResponsibilitiesTab,
+} from "./policies-responsibilities-model";
+import { PoliciesResponsibilitiesSection } from "./policies-responsibilities-section";
 import {
   EMPTY_REFERENCES,
   toReferencesForm,
@@ -77,10 +81,7 @@ import {
   type ResourcesForm,
 } from "./resources-model";
 import { ReviewSubmitSection } from "./review-submit-section";
-import {
-  EMPTY_STUDENT_RESPONSIBILITY,
-  StudentResponsibilitySection,
-} from "./student-responsibility-section";
+import { EMPTY_STUDENT_RESPONSIBILITY } from "./student-responsibility-section";
 import { TeachingLearningSection } from "./teaching-learning-section";
 import {
   EMPTY_WEEKLY_PLAN,
@@ -114,8 +115,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "mapping", label: "Constructive Alignment" },
   { id: "resources", label: "Resources" },
   { id: "references", label: "References" },
-  { id: "responsibility", label: "Responsibility" },
-  { id: "policy", label: "Policies" },
+  { id: "policy", label: "Policies & Responsibilities" },
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
@@ -150,7 +150,9 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
   const { me } = useMe();
 
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
-    const requested = searchParams.get("tab");
+    const requested = normalizePoliciesResponsibilitiesTab(
+      searchParams.get("tab"),
+    );
     return TABS.some((tab) => tab.id === requested)
       ? (requested as TabId)
       : "overview";
@@ -188,10 +190,14 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
 
   const setActiveTab = useCallback(
     (id: TabId) => {
-      setActiveTabState(id);
-      router.replace(id === "overview" ? pathname : `${pathname}?tab=${id}`, {
-        scroll: false,
-      });
+      const normalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      setActiveTabState(normalizedId);
+      router.replace(
+        normalizedId === "overview"
+          ? pathname
+          : `${pathname}?tab=${normalizedId}`,
+        { scroll: false },
+      );
     },
     [pathname, router],
   );
@@ -556,19 +562,13 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
               </CourseSpecReadOnlyBoundary>
             </TabsContent>
 
-            <TabsContent value="responsibility" className="mt-4">
-              <StudentResponsibilitySection
-                value={responsibility}
-                onPersist={rejectMutation}
-                disabled
-              />
-            </TabsContent>
-
             <TabsContent value="policy" className="mt-4">
-              <PolicySection
-                value={policy}
+              <PoliciesResponsibilitiesSection
+                policy={policy}
+                responsibility={responsibility}
                 programPolicy={programme?.policy ?? null}
-                onPersist={rejectMutation}
+                onPersistPolicy={rejectMutation}
+                onPersistResponsibility={rejectMutation}
                 disabled
               />
             </TabsContent>

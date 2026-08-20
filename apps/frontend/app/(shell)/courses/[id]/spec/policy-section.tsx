@@ -14,6 +14,7 @@ import type {
   PolicySection as PolicySectionValue,
   ProgramPolicy,
 } from "@dse-pms/shared-types";
+import { mergePolicyFieldForSave } from "./policies-responsibilities-model";
 
 export const POLICY_FIELDS: {
   key: keyof PolicySectionValue;
@@ -116,12 +117,12 @@ export function PolicySection({
   };
 
   const save = async (key: keyof PolicySectionValue) => {
-    const next = { ...draft, [key]: draft[key].trim() };
+    const next = mergePolicyFieldForSave(value, key, draft[key]);
     setSaving(key);
     setSaved(null);
     try {
       if (await onPersist(next)) {
-        setDraft(next);
+        setDraft((current) => ({ ...current, [key]: next[key] }));
         setEditing(null);
         setSaved(key);
         window.setTimeout(() => setSaved((current) => (current === key ? null : current)), 2500);
