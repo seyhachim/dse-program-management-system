@@ -52,6 +52,7 @@ describeDb("programme curriculum revision/read service", () => {
     expect(result.selectedVersion.status).toBe("Draft");
     expect(result.selectedVersion.revisionType).toBe("Initial");
     expect(result.years.map((year) => year.yearLevel)).toEqual([1, 2, 3, 4]);
+    expect(result.pathways).toEqual([]);
     expect(result.totals.programmeCredits).toBe(0);
   });
 
@@ -111,6 +112,7 @@ describeDb("programme curriculum revision/read service", () => {
       credits: 4,
       courseType: "Core",
       sortOrder: 7,
+      pathwayId: null,
     });
 
     const predecessor = await curriculumService.getById(
@@ -238,6 +240,157 @@ describeDb("programme curriculum revision/read service", () => {
     });
     expect(result.years[0]?.semesters[0]?.courses[0]?.credits).toBe(3);
     expect(result.years[0]?.semesters[0]?.courses[0]?.courseType).toBe("Basic");
+    expect(result.years[0]?.semesters[0]?.courses[0]?.pathwayId).toBeNull();
+  });
+
+  test("returns all mutually exclusive pathways while totals use only the default route", async () => {
+    const { user, programme, token } = await createBase();
+    const initial = await curriculumService.createInitial(programme.id, user.id, {
+      code: `CURR-${token}`,
+      name: `Curriculum ${token}`,
+      cohortLabel: "",
+      intakeYear: null,
+      academicYear: "",
+      effectiveFrom: null,
+    });
+
+    const common = await prisma.course.create({
+      data: {
+        programmeId: programme.id,
+        code: `COMMON-${token}`,
+        title: "Common Curriculum",
+        credits: 131,
+        courseType: CourseType.Core,
+      },
+    });
+    const coursework = await prisma.course.create({
+      data: {
+        programmeId: programme.id,
+        code: `WORK-${token}`,
+        title: "Coursework Completion",
+        credits: 15,
+        courseType: CourseType.Specialization,
+      },
+    });
+    const thesis = await prisma.course.create({
+      data: {
+        programmeId: programme.id,
+        code: `THE-${token}`,
+        title: "Thesis",
+        credits: 15,
+        courseType: CourseType.Specialization,
+      },
+    });
+    const internship = await prisma.course.create({
+      data: {
+        programmeId: programme.id,
+        code: `INT-${token}`,
+        title: "Industrial Internship",
+        credits: 15,
+        courseType: CourseType.Specialization,
+      },
+    });
+
+    const [courseworkPathway, researchPathway, industryPathway] = await Promise.all([
+      prisma.programmeCurriculumPathway.create({
+        data: {
+          curriculumVersionId: initial.selectedVersion.id,
+          code: "COURSEWORK",
+          name: "Coursework",
+          yearLevel: 4,
+          semester: Semester.Second,
+          isDefault: true,
+          creditTarget: 15,
+          sortOrder: 0,
+        },
+      }),
+      prisma.programmeCurriculumPathway.create({
+        data: {
+          curriculumVersionId: initial.selectedVersion.id,
+          code: "RESEARCH",
+          name: "Research / Thesis",
+          yearLevel: 4,
+          semester: Semester.Second,
+          isDefault: false,
+          creditTarget: 15,
+          sortOrder: 1,
+        },
+      }),
+      prisma.programmeCurriculumPathway.create({
+        data: {
+          curriculumVersionId: initial.selectedVersion.id,
+          code: "INDUSTRY",
+          name: "Industrial Internship",
+          yearLevel: 4,
+          semester: Semester.Second,
+          isDefault: false,
+          creditTarget: 15,
+          sortOrder: 2,
+        },
+      }),
+    ]);
+
+    await prisma.programmeCurriculumCourse.createMany({
+      data: [
+        {
+          curriculumVersionId: initial.selectedVersion.id,
+          courseId: common.id,
+          yearLevel: 1,
+          semester: Semester.First,
+          creditsSnapshot: 131,
+          courseTypeSnapshot: CourseType.Core,
+          sortOrder: 0,
+        },
+        {
+          curriculumVersionId: initial.selectedVersion.id,
+          courseId: coursework.id,
+          pathwayId: courseworkPathway.id,
+          yearLevel: 4,
+          semester: Semester.Second,
+          creditsSnapshot: 15,
+          courseTypeSnapshot: CourseType.Specialization,
+          sortOrder: 0,
+        },
+        {
+          curriculumVersionId: initial.selectedVersion.id,
+          courseId: thesis.id,
+          pathwayId: researchPathway.id,
+          yearLevel: 4,
+          semester: Semester.Second,
+          creditsSnapshot: 15,
+          courseTypeSnapshot: CourseType.Specialization,
+          sortOrder: 0,
+        },
+        {
+          curriculumVersionId: initial.selectedVersion.id,
+          courseId: internship.id,
+          pathwayId: industryPathway.id,
+          yearLevel: 4,
+          semester: Semester.Second,
+          creditsSnapshot: 15,
+          courseTypeSnapshot: CourseType.Specialization,
+          sortOrder: 0,
+        },
+      ],
+    });
+
+    const result = await curriculumService.getById(initial.curriculum.id);
+
+    expect(result.pathways.map((pathway) => pathway.code)).toEqual([
+      "COURSEWORK",
+      "RESEARCH",
+      "INDUSTRY",
+    ]);
+    expect(result.pathways.map((pathway) => pathway.totalCredits)).toEqual([15, 15, 15]);
+    expect(result.pathways.find((pathway) => pathway.code === "RESEARCH")?.courses[0]).toMatchObject({
+      courseId: thesis.id,
+      credits: 15,
+      pathwayId: researchPathway.id,
+    });
+    expect(result.years[3]?.semesters[1]?.courses.map((course) => course.courseId)).toEqual([
+      coursework.id,
+    ]);
+    expect(result.totals.programmeCredits).toBe(146);
   });
 });
 

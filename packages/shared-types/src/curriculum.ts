@@ -117,8 +117,23 @@ export const CurriculumCourseSchema = z.object({
   credits: z.number().int().min(0),
   courseType: CourseTypeSchema,
   sortOrder: z.number().int().min(0),
+  pathwayId: z.string().uuid().nullable(),
 });
 export type CurriculumCourse = z.infer<typeof CurriculumCourseSchema>;
+
+export const CurriculumPathwaySchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  name: z.string(),
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  isDefault: z.boolean(),
+  creditTarget: z.number().int().min(0).nullable(),
+  sortOrder: z.number().int().min(0),
+  courses: z.array(CurriculumCourseSchema),
+  totalCredits: z.number().int().min(0),
+});
+export type CurriculumPathway = z.infer<typeof CurriculumPathwaySchema>;
 
 export const CurriculumSemesterGroupSchema = z.object({
   semester: CurriculumSemesterSchema,
@@ -170,6 +185,7 @@ export const ProgrammeCurriculumReadSchema = z.object({
   selectedVersion: CurriculumVersionSummarySchema,
   versions: z.array(CurriculumVersionSummarySchema),
   years: z.array(CurriculumYearGroupSchema),
+  pathways: z.array(CurriculumPathwaySchema),
   totals: z.object({
     programmeCredits: z.number().int().min(0),
     basicCredits: z.number().int().min(0),
