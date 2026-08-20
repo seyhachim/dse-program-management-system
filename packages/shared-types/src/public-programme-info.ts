@@ -232,3 +232,90 @@ export type ProgrammePublicInfoOverview = {
   importantDateDraft: number;
   hasProfile: boolean;
 };
+
+/** Published-only, channel-neutral public contracts. These deliberately omit
+ * database ids, programme ids, lifecycle timestamps, search keywords, review
+ * metadata, and admin timestamps so public channels receive only display data. */
+export const PublicProgrammeFaqSchema = z.object({
+  slug: slugSchema,
+  category: ProgrammeFaqCategorySchema,
+  question: z.string(),
+  answer: z.string(),
+  shortAnswer: z.string().nullable(),
+  isFeatured: z.boolean(),
+  sourceLabel: z.string().nullable(),
+  sourceUrl: z.string().url().nullable(),
+});
+export type PublicProgrammeFaq = z.infer<typeof PublicProgrammeFaqSchema>;
+
+export const PublicProgrammeImportantDateSchema = z.object({
+  kind: ProgrammeImportantDateKindSchema,
+  title: z.string(),
+  description: z.string(),
+  date: z.string(),
+  endDate: z.string().nullable(),
+});
+export type PublicProgrammeImportantDate = z.infer<
+  typeof PublicProgrammeImportantDateSchema
+>;
+
+export const PublicProgrammeProfileSchema = z.object({
+  programmeName: z.string(),
+  shortName: z.string(),
+  overview: z.string(),
+  admissionEmail: z.string().email().nullable(),
+  phone: z.string().nullable(),
+  websiteUrl: z.string().url().nullable(),
+  facebookUrl: z.string().url().nullable(),
+  campusAddress: z.string().nullable(),
+  mapUrl: z.string().url().nullable(),
+  applicationUrl: z.string().url().nullable(),
+});
+export type PublicProgrammeProfile = z.infer<typeof PublicProgrammeProfileSchema>;
+
+export const PublicProgrammeContactSchema = PublicProgrammeProfileSchema.pick({
+  admissionEmail: true,
+  phone: true,
+  websiteUrl: true,
+  facebookUrl: true,
+  campusAddress: true,
+  mapUrl: true,
+  applicationUrl: true,
+});
+export type PublicProgrammeContact = z.infer<typeof PublicProgrammeContactSchema>;
+
+export const PublicProgrammeFaqCategorySummarySchema = z.object({
+  category: ProgrammeFaqCategorySchema,
+  count: z.number().int().nonnegative(),
+});
+export type PublicProgrammeFaqCategorySummary = z.infer<
+  typeof PublicProgrammeFaqCategorySummarySchema
+>;
+
+export const PublicProgrammeAdmissionSchema = z.object({
+  applicationUrl: z.string().url().nullable(),
+  admissionEmail: z.string().email().nullable(),
+  phone: z.string().nullable(),
+  faqs: z.array(PublicProgrammeFaqSchema),
+});
+export type PublicProgrammeAdmission = z.infer<typeof PublicProgrammeAdmissionSchema>;
+
+export const PublicProgrammeFeesScholarshipsSchema = z.object({
+  faqs: z.array(PublicProgrammeFaqSchema),
+});
+export type PublicProgrammeFeesScholarships = z.infer<
+  typeof PublicProgrammeFeesScholarshipsSchema
+>;
+
+export const PublicProgrammeFaqQuerySchema = z.object({
+  category: ProgrammeFaqCategorySchema.optional(),
+  featured: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
+});
+export type PublicProgrammeFaqQuery = z.infer<typeof PublicProgrammeFaqQuerySchema>;
+
+export const PublicProgrammeImportantDateQuerySchema = z.object({
+  kind: ProgrammeImportantDateKindSchema.optional(),
+});
+export type PublicProgrammeImportantDateQuery = z.infer<
+  typeof PublicProgrammeImportantDateQuerySchema
+>;
