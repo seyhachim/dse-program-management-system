@@ -1,12 +1,6 @@
 -- Issue #457: versioned programme grading scales and exact CourseSpec binding.
---
--- The existing §24 DSE rating scale used to live only in the shared TypeScript
--- LETTER_GRADES constant. This migration makes that academic policy explicit,
--- versioned, auditable, and historically stable in PostgreSQL.
---
--- Existing CourseSpecs are not rewritten academically: DSE rows are bound to a
--- baseline version whose eight grade rows exactly match the old runtime constant.
--- The baseline deliberately has no invented historical effectiveFrom date.
+-- The baseline rows exactly reproduce the former shared LETTER_GRADES constant.
+-- No historical effective date is fabricated for that imported baseline.
 
 CREATE TYPE "ProgrammeGradingScaleVersionStatus" AS ENUM (
   'Draft',
@@ -53,8 +47,7 @@ CREATE TABLE "ProgrammeGradingScaleVersion" (
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "ProgrammeGradingScaleVersion_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "ProgrammeGradingScaleVersion_version_positive"
-    CHECK ("version" >= 1),
+  CONSTRAINT "ProgrammeGradingScaleVersion_version_positive" CHECK ("version" >= 1),
   CONSTRAINT "ProgrammeGradingScaleVersion_effective_range"
     CHECK (
       "effectiveTo" IS NULL
@@ -92,10 +85,8 @@ CREATE TABLE "ProgrammeGradingScaleGrade" (
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "ProgrammeGradingScaleGrade_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "ProgrammeGradingScaleGrade_sort_order_positive"
-    CHECK ("sortOrder" >= 1),
-  CONSTRAINT "ProgrammeGradingScaleGrade_grade_point_nonnegative"
-    CHECK ("gradePoint" >= 0),
+  CONSTRAINT "ProgrammeGradingScaleGrade_sort_order_positive" CHECK ("sortOrder" >= 1),
+  CONSTRAINT "ProgrammeGradingScaleGrade_grade_point_nonnegative" CHECK ("gradePoint" >= 0),
   CONSTRAINT "ProgrammeGradingScaleGrade_score_range"
     CHECK (
       "minScore" >= 0
@@ -124,9 +115,7 @@ CREATE TABLE "ProgrammeGradingScaleAuditAction" (
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-ALTER TABLE "CourseSpec"
-  ADD COLUMN "gradingScaleVersionId" TEXT;
-
+ALTER TABLE "CourseSpec" ADD COLUMN "gradingScaleVersionId" TEXT;
 ALTER TABLE "CourseSpec"
   ADD CONSTRAINT "CourseSpec_gradingScaleVersionId_fkey"
   FOREIGN KEY ("gradingScaleVersionId")
@@ -168,22 +157,20 @@ CREATE INDEX "ProgrammeGradingScaleAuditAction_version_createdAt_idx"
   ON "ProgrammeGradingScaleAuditAction"("gradingScaleVersionId", "createdAt");
 CREATE INDEX "ProgrammeGradingScaleAuditAction_actorId_idx"
   ON "ProgrammeGradingScaleAuditAction"("actorId");
-
 CREATE INDEX "CourseSpec_gradingScaleVersionId_idx"
   ON "CourseSpec"("gradingScaleVersionId");
 
--- The baseline is deterministic so a fresh database seeded after migrations and
--- an existing DSE database upgraded in place converge on the same academic rows.
--- No historical policy date is fabricated: legacyImported=true is the explicit
--- provenance for the one version whose effectiveFrom is legitimately unknown.
+-- Deterministic legacy baseline. This helper also runs when the fresh-db seed
+-- later inserts the DSE Programme, so migration-before-seed and upgrade-in-place
+-- produce the same policy rows without modifying the seed order.
 CREATE OR REPLACE FUNCTION "ensure_dse_baseline_grading_scale"(
   programme_id TEXT,
   programme_code TEXT
 )
 RETURNS VOID AS $$
 DECLARE
-  scale_id CONSTANT TEXT := '04570000-0000-4000-8000-000000000001';
-  version_id CONSTANT TEXT := '04570000-0000-4000-8000-000000000002';
+  scale_id TEXT := '04570000-0000-4000-8000-000000000001';
+  version_id TEXT := '04570000-0000-4000-8000-000000000002';
 BEGIN
   IF lower(programme_id) <> 'dse' AND lower(programme_code) <> 'dse' THEN
     RETURN;
@@ -203,8 +190,6 @@ BEGIN
   )
   ON CONFLICT ("programmeId", "code") DO NOTHING;
 
-  -- Resolve the real root in case an existing installation already created the
-  -- same programme/code with a different UUID before this migration is replayed.
   SELECT "id" INTO scale_id
   FROM "ProgrammeGradingScale"
   WHERE "programmeId" = programme_id AND "code" = 'standard';
@@ -261,7 +246,6 @@ AFTER INSERT ON "Programme"
 FOR EACH ROW
 EXECUTE FUNCTION "seed_dse_grading_scale_after_programme_insert"();
 
--- Existing installations already have the DSE programme at migration time.
 DO $$
 DECLARE
   programme_row RECORD;
@@ -297,7 +281,6 @@ BEGIN
 END
 $$;
 
--- A grading-scale predecessor must be another version of the same canonical root.
 CREATE OR REPLACE FUNCTION "check_programme_grading_scale_predecessor"()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -325,9 +308,6 @@ ON "ProgrammeGradingScaleVersion"
 FOR EACH ROW
 EXECUTE FUNCTION "check_programme_grading_scale_predecessor"();
 
--- Approved/Superseded academic policy is immutable. The only post-approval
--- transition is Approved -> Superseded, which may close the effective interval
--- and record supersededAt. Historical policy content never changes in place.
 CREATE OR REPLACE FUNCTION "protect_immutable_programme_grading_scale_version"()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -385,14 +365,17 @@ BEFORE UPDATE OR DELETE ON "ProgrammeGradingScaleVersion"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_immutable_programme_grading_scale_version"();
 
--- Grade rows may change only while their owning version is Draft.
 CREATE OR REPLACE FUNCTION "protect_programme_grading_scale_grade"()
 RETURNS TRIGGER AS $$
 DECLARE
   parent_status "ProgrammeGradingScaleVersionStatus";
   parent_id TEXT;
 BEGIN
-  parent_id := CASE WHEN TG_OP = 'DELETE' THEN OLD."gradingScaleVersionId" ELSE NEW."gradingScaleVersionId" END;
+  parent_id := CASE
+    WHEN TG_OP = 'DELETE' THEN OLD."gradingScaleVersionId"
+    ELSE NEW."gradingScaleVersionId"
+  END;
+
   SELECT "status" INTO parent_status
   FROM "ProgrammeGradingScaleVersion"
   WHERE "id" = parent_id;
@@ -401,9 +384,7 @@ BEGIN
     RAISE EXCEPTION 'Grade rows of Approved or Superseded grading scales are immutable';
   END IF;
 
-  IF TG_OP = 'DELETE' THEN
-    RETURN OLD;
-  END IF;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -413,8 +394,6 @@ BEFORE INSERT OR UPDATE OR DELETE ON "ProgrammeGradingScaleGrade"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_programme_grading_scale_grade"();
 
--- Audit records are append-only. Actor is nullable only for the one migration-
--- imported baseline, where inventing a human approver would be false provenance.
 CREATE OR REPLACE FUNCTION "protect_programme_grading_scale_audit_history"()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -427,9 +406,6 @@ BEFORE UPDATE OR DELETE ON "ProgrammeGradingScaleAuditAction"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_programme_grading_scale_audit_history"();
 
--- Exact CourseSpec binding. New revisions inherit their predecessor's binding;
--- first versions receive the currently Approved default programme scale when
--- they enter the review workflow. Once submitted, the binding is locked.
 CREATE OR REPLACE FUNCTION "protect_course_spec_grading_scale_binding"()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -438,15 +414,16 @@ DECLARE
   scale_status "ProgrammeGradingScaleVersionStatus";
   scale_effective_from DATE;
   scale_effective_to DATE;
+  selected_version_id TEXT;
 BEGIN
   IF TG_OP = 'INSERT'
     AND NEW."gradingScaleVersionId" IS NULL
     AND NEW."basedOnVersionId" IS NOT NULL
   THEN
-    SELECT "gradingScaleVersionId"
-      INTO NEW."gradingScaleVersionId"
+    SELECT "gradingScaleVersionId" INTO selected_version_id
     FROM "CourseSpec"
     WHERE "id" = NEW."basedOnVersionId";
+    NEW."gradingScaleVersionId" := selected_version_id;
   END IF;
 
   IF TG_OP = 'UPDATE'
@@ -463,8 +440,7 @@ BEGIN
   IF NEW."reviewStatus" IN ('Submitted', 'Resubmitted', 'UnderReview', 'Approved')
     AND NEW."gradingScaleVersionId" IS NULL
   THEN
-    SELECT v."id"
-      INTO NEW."gradingScaleVersionId"
+    SELECT v."id" INTO selected_version_id
     FROM "ProgrammeGradingScaleVersion" v
     JOIN "ProgrammeGradingScale" s ON s."id" = v."gradingScaleId"
     WHERE s."programmeId" = course_programme_id
@@ -473,9 +449,10 @@ BEGIN
     ORDER BY v."version" DESC
     LIMIT 1;
 
-    IF NEW."gradingScaleVersionId" IS NULL THEN
+    IF selected_version_id IS NULL THEN
       RAISE EXCEPTION 'CourseSpec submission requires an Approved default programme grading scale';
     END IF;
+    NEW."gradingScaleVersionId" := selected_version_id;
   END IF;
 
   IF NEW."gradingScaleVersionId" IS NULL THEN
@@ -503,10 +480,14 @@ BEGIN
       RAISE EXCEPTION 'A CourseSpec without an effective date must use the current Approved grading scale';
     END IF;
     IF NEW."effectiveFrom" IS NOT NULL THEN
-      IF scale_effective_from IS NOT NULL AND NEW."effectiveFrom" < scale_effective_from THEN
+      IF scale_effective_from IS NOT NULL
+        AND NEW."effectiveFrom"::date < scale_effective_from
+      THEN
         RAISE EXCEPTION 'CourseSpec effective date precedes its grading-scale version';
       END IF;
-      IF scale_effective_to IS NOT NULL AND NEW."effectiveFrom" >= scale_effective_to THEN
+      IF scale_effective_to IS NOT NULL
+        AND NEW."effectiveFrom"::date >= scale_effective_to
+      THEN
         RAISE EXCEPTION 'CourseSpec effective date falls after its grading-scale version was superseded';
       END IF;
     END IF;
@@ -516,14 +497,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER "CourseSpec_protect_grading_scale_binding"
-BEFORE INSERT OR UPDATE OF "gradingScaleVersionId", "reviewStatus", "effectiveFrom", "basedOnVersionId", "courseId"
+CREATE TRIGGER "CourseSpec_grading_scale_binding_on_insert"
+BEFORE INSERT ON "CourseSpec"
+FOR EACH ROW
+EXECUTE FUNCTION "protect_course_spec_grading_scale_binding"();
+
+CREATE TRIGGER "CourseSpec_grading_scale_binding_on_update"
+BEFORE UPDATE OF "gradingScaleVersionId", "reviewStatus", "effectiveFrom", "basedOnVersionId", "courseId"
 ON "CourseSpec"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_course_spec_grading_scale_binding"();
 
--- Backend-only access: grading policy and its history are academic records, not
--- Supabase Data API tables. Match the existing PMS security baseline.
 DO $$
 DECLARE
   table_name text;
