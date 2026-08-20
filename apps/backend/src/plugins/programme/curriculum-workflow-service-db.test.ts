@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { CourseType, PrismaClient } from "@prisma/client";
 import { curriculumCourseSpecService } from "./curriculum-course-spec-service.ts";
 import { curriculumDraftService, CurriculumDraftMutationError } from "./curriculum-draft-service.ts";
+import { gradingScaleService } from "./grading-scale-service.ts";
 import { curriculumService } from "./curriculum-service.ts";
 import {
   CurriculumWorkflowTransitionError,
@@ -12,10 +13,49 @@ import {
 const describeDb = process.env.CURRICULUM_DB_TESTS === "1" ? describe : describe.skip;
 const prisma = new PrismaClient();
 
+async function createFixtureGradingScale(programmeId: string, userId: string) {
+  const draft = await gradingScaleService.create(userId, {
+    programmeId,
+    code: "standard",
+    name: "Workflow Test Grading Scale",
+    description: "Minimal complete grading scale for curriculum workflow tests",
+    effectiveFrom: "2026-01-01",
+    changeSummary: "Test fixture policy",
+    grades: [
+      {
+        sortOrder: 1,
+        letterGrade: "P",
+        gradePoint: 1,
+        minScore: 50,
+        maxScore: 100,
+        minInclusive: true,
+        maxInclusive: true,
+        explanation: "Pass",
+        isPassing: true,
+      },
+      {
+        sortOrder: 2,
+        letterGrade: "F",
+        gradePoint: 0,
+        minScore: 0,
+        maxScore: 50,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Fail",
+        isPassing: false,
+      },
+    ],
+  });
+  await gradingScaleService.approve(draft.id, userId, {
+    note: "Approved fixture grading policy",
+  });
+}
+
 async function fixture(complete = true) {
   const token = crypto.randomUUID().slice(0, 8);
   const user = await prisma.user.create({ data: { email: `workflow-${token}@example.test`, name: `Workflow ${token}` } });
   const programme = await prisma.programme.create({ data: { id: `workflow-${token}`, code: `W${token}`, name: `Workflow Programme ${token}` } });
+  await createFixtureGradingScale(programme.id, user.id);
   const initial = await curriculumService.createInitial(programme.id, user.id, {
     code: `CURR-${token}`,
     name: `Curriculum ${token}`,

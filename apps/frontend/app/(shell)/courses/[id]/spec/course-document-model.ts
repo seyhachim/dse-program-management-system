@@ -9,6 +9,7 @@ import {
   type Method,
   type PolicySection as PolicySectionValue,
   type ProgrammeAcademicConfig,
+  type ProgrammeGradingScaleVersion,
   type Rubric,
   type StudentResponsibilitySection as StudentResponsibilityValue,
   type TeachingLearningProfile,
@@ -30,6 +31,8 @@ export type CourseDocumentModel = {
   title: string;
   partTitle: string;
   programmeProfile: ProgrammeAcademicConfig["profile"];
+  /** Exact programme grading-policy revision pinned to this CourseSpec. */
+  gradingScale: ProgrammeGradingScaleVersion | null;
   /** §25 Date — spec last revised/approved date, YYYY-MM-DD or null if unset. */
   specDate: string | null;
   /** Part 1 cover page PLO taxonomy table. */
@@ -261,6 +264,7 @@ type BuildCourseDocumentInput = {
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
   programme?: ProgrammeAcademicConfig | null;
+  gradingScale?: ProgrammeGradingScaleVersion | null;
   teachingLearningProfile?: TeachingLearningProfile;
   resources?: ResourcesForm;
   references?: ReferencesForm;
@@ -326,6 +330,7 @@ export function buildCourseDocument({
   teachingMethods = [],
   assessmentMethods = [],
   programme = null,
+  gradingScale = null,
   teachingLearningProfile = EMPTY_TEACHING_LEARNING_PROFILE,
   resources = [],
   references = [],
@@ -512,6 +517,7 @@ export function buildCourseDocument({
       educationalPhilosophy: [],
       peos: [],
     },
+    gradingScale,
     specDate: specDate?.date ?? null,
     plos: programme?.plos ?? [],
     courseInformation: {

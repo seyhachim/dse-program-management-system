@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Topbar } from "../../../topbar";
-import { SpecClient } from "./spec-client";
+import { CourseSpecClientGateway } from "./course-spec-client-gateway";
 import { VersionHistoryBar } from "./version-history-bar";
 
 export default async function CourseSpecPage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,7 +12,7 @@ export default async function CourseSpecPage({ params }: { params: Promise<{ id:
         <div className="mx-auto max-w-7xl space-y-4">
           <VersionHistoryBar courseId={id} />
           <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
-            <SpecClient courseId={id} />
+            <CourseSpecClientGateway courseId={id} />
           </Suspense>
         </div>
       </main>
