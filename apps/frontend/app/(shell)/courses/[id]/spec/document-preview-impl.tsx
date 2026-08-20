@@ -34,9 +34,16 @@ const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 1.5;
 const ZOOM_STEP = 0.1;
 
-type DocumentPreviewProps = { document: CourseDocumentModel };
+type DocumentPreviewProps = {
+  document: CourseDocumentModel;
+  /** Exact CourseSpec id when rendering an immutable historical version. */
+  courseSpecId?: string;
+};
 
-export function DocumentPreview({ document }: DocumentPreviewProps) {
+export function DocumentPreview({
+  document,
+  courseSpecId,
+}: DocumentPreviewProps) {
   const params = useParams<{ id: string }>();
   const courseId = params.id;
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -53,10 +60,12 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     setGradingScaleLoading(true);
     setGradingScaleError(null);
 
+    const bindingPath = courseSpecId
+      ? `/api/programme/grading-scales/course-specs/${encodeURIComponent(courseId)}/versions/${encodeURIComponent(courseSpecId)}`
+      : `/api/programme/grading-scales/course-specs/${encodeURIComponent(courseId)}`;
+
     api
-      .get<CourseSpecGradingScaleBinding>(
-        `/api/programme/grading-scales/course-specs/${encodeURIComponent(courseId)}`,
-      )
+      .get<CourseSpecGradingScaleBinding>(bindingPath)
       .then((binding) => {
         if (!cancelled) setGradingScaleBinding(binding);
       })
@@ -75,7 +84,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     return () => {
       cancelled = true;
     };
-  }, [courseId]);
+  }, [courseId, courseSpecId]);
 
   const resolvedDocument = useMemo<CourseDocumentModel>(
     () => ({
