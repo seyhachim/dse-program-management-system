@@ -12,6 +12,13 @@ import type {
 } from "@dse-pms/shared-types";
 import { registry } from "../../../core/plugins/registry.ts";
 import {
+  getPublicAbuseProtectionConfig,
+  publicAbuseRateLimiter,
+  purposeHmac,
+  type PublicAbuseProtectionConfig,
+  type RateLimiter,
+} from "../../../core/security/public-abuse-protection.ts";
+import {
   PublicCurriculumConflictError,
   PublicCurriculumNotFoundError,
   type PublicCurriculumCourse,
@@ -41,6 +48,8 @@ import {
   type TelegramReplyMarkup,
 } from "./telegram-client.ts";
 
+const MAX_CALLBACK_DATA_BYTES = 64;
+
 const TelegramMessageSchema = z.object({
   message_id: z.number().int(),
   chat: z.object({ id: z.number().int() }),
@@ -68,9 +77,22 @@ type PublicReadService = {
   getContact(programmeId: string): Promise<PublicProgrammeContact>;
 };
 
+type PublicQuestionAnalyticsObserver = {
+  observeAskDse(input: {
+    programmeId: string;
+    source: "Telegram";
+    questionText: string;
+    result: PublicAskDseResult;
+    answerDelivered: boolean;
+    sourceEventKey?: string | null;
+    analyticsActorHash?: string | null;
+  }): Promise<unknown>;
+};
+
 type ProgrammeRegistryService = {
   publicRead: PublicReadService;
   publicCurriculumRead: PublicCurriculumReadService;
+  publicQuestionAnalytics: PublicQuestionAnalyticsObserver;
 };
 
 export interface PublicTelegramRouterDependencies {
@@ -79,6 +101,10 @@ export interface PublicTelegramRouterDependencies {
   publicRead?: PublicReadService;
   publicCurriculumRead?: PublicCurriculumReadService;
   publicSearch?: PublicProgrammeSearchService;
+  publicQuestionAnalytics?: PublicQuestionAnalyticsObserver;
+  abuseConfig?: PublicAbuseProtectionConfig;
+  rateLimiter?: RateLimiter;
+  now?: () => number;
 }
 
 const CALLBACK_ROUTE = new Map<string, RouteKey>(
@@ -124,6 +150,17 @@ function inlineKeyboard(route: RouteKey): TelegramReplyMarkup {
 
 function resolveProgrammeService(): ProgrammeRegistryService {
   return registry.get<ProgrammeRegistryService>("programme").service;
+}
+
+async function observeAskDseBestEffort(
+  analytics: PublicQuestionAnalyticsObserver,
+  input: Parameters<PublicQuestionAnalyticsObserver["observeAskDse"]>[0],
+): Promise<void> {
+  try {
+    await analytics.observeAskDse(input);
+  } catch {
+    console.error("Public Ask DSE analytics failed");
+  }
 }
 
 function formatFaqs(title: string, faqs: PublicProgrammeFaq[]): string {
@@ -374,6 +411,9 @@ export function createPublicTelegramRouter(
   deps: PublicTelegramRouterDependencies = {},
 ): Router {
   const router = Router();
+  const abuseConfig = deps.abuseConfig ?? getPublicAbuseProtectionConfig();
+  const rateLimiter = deps.rateLimiter ?? publicAbuseRateLimiter;
+  const now = deps.now ?? Date.now;
 
   router.post("/webhook", async (req: Request, res) => {
     const config = deps.config ?? getTelegramConfig();
@@ -387,21 +427,75 @@ export function createPublicTelegramRouter(
       return;
     }
 
+    const contentLength = Number(req.get("content-length") ?? 0);
+    const serializedBytes = Buffer.byteLength(JSON.stringify(req.body ?? null), "utf8");
+    if (
+      (Number.isFinite(contentLength) && contentLength > abuseConfig.telegramMaxUpdateBytes)
+      || serializedBytes > abuseConfig.telegramMaxUpdateBytes
+    ) {
+      res.status(200).json({ ok: true, ignored: true });
+      return;
+    }
+
     const parsed = TelegramUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(200).json({ ok: true, ignored: true });
       return;
     }
 
+    const update = parsed.data;
+    const globalAdmission = rateLimiter.check(
+      "telegram:update:global",
+      abuseConfig.telegramGlobalUpdateMax,
+      abuseConfig.telegramWindowMs,
+      now(),
+    );
+    if (!globalAdmission.allowed) {
+      res.setHeader("Retry-After", String(globalAdmission.retryAfterSeconds));
+      res.status(200).json({ ok: true, rateLimited: true });
+      return;
+    }
+
+    const actorId = update.message?.chat.id ?? update.callback_query?.message?.chat.id;
+    if (actorId !== undefined) {
+      const actorAdmission = rateLimiter.check(
+        purposeHmac(config.webhookSecret, "telegram-rate-limit:actor:v1", actorId),
+        abuseConfig.telegramActorUpdateMax,
+        abuseConfig.telegramWindowMs,
+        now(),
+      );
+      if (!actorAdmission.allowed) {
+        res.setHeader("Retry-After", String(actorAdmission.retryAfterSeconds));
+        res.status(200).json({ ok: true, rateLimited: true });
+        return;
+      }
+    }
+
+    if (update.callback_query && actorId !== undefined) {
+      const callbackAdmission = rateLimiter.check(
+        purposeHmac(config.webhookSecret, "telegram-rate-limit:callback:v1", actorId),
+        abuseConfig.telegramCallbackMax,
+        abuseConfig.telegramWindowMs,
+        now(),
+      );
+      if (!callbackAdmission.allowed) {
+        res.setHeader("Retry-After", String(callbackAdmission.retryAfterSeconds));
+        res.status(200).json({ ok: true, rateLimited: true });
+        return;
+      }
+    }
+
     const client = deps.client ?? createTelegramPublicBotClient(config.botToken);
-    const programmeService = deps.publicRead && deps.publicCurriculumRead ? null : resolveProgrammeService();
+    const programmeService = deps.publicRead && deps.publicCurriculumRead && deps.publicQuestionAnalytics
+      ? null
+      : resolveProgrammeService();
     const publicRead = deps.publicRead ?? programmeService!.publicRead;
     const publicCurriculumRead = deps.publicCurriculumRead ?? programmeService!.publicCurriculumRead;
     const publicSearch = deps.publicSearch ?? publicProgrammeSearchService;
+    const publicQuestionAnalytics = deps.publicQuestionAnalytics ?? programmeService!.publicQuestionAnalytics;
     const programmeId = config.publicProgrammeId;
 
     try {
-      const update = parsed.data;
       if (update.message?.text) {
         const text = update.message.text.trim();
         if (text === "/start" || text === "/menu") {
@@ -452,18 +546,55 @@ export function createPublicTelegramRouter(
               const rendered = await renderRoute(route, programmeId, publicRead);
               await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
             } else {
+              const askAdmission = rateLimiter.check(
+                purposeHmac(config.webhookSecret, "telegram-rate-limit:ask-dse:v1", update.message.chat.id),
+                abuseConfig.telegramAskDseMax,
+                abuseConfig.telegramWindowMs,
+                now(),
+              );
+              if (!askAdmission.allowed) {
+                res.setHeader("Retry-After", String(askAdmission.retryAfterSeconds));
+                res.status(200).json({ ok: true, rateLimited: true });
+                return;
+              }
+
               const searchResult = await publicSearch.search(programmeId, text);
-              await client.sendMessage({
-                chatId: update.message.chat.id,
-                text: formatAskDse(searchResult),
-                replyMarkup: replyKeyboard(),
-              });
+              let delivered = false;
+              try {
+                await client.sendMessage({
+                  chatId: update.message.chat.id,
+                  text: formatAskDse(searchResult),
+                  replyMarkup: replyKeyboard(),
+                });
+                delivered = true;
+              } finally {
+                await observeAskDseBestEffort(publicQuestionAnalytics, {
+                  programmeId,
+                  source: "Telegram",
+                  questionText: text,
+                  result: searchResult,
+                  answerDelivered: delivered,
+                  sourceEventKey: purposeHmac(
+                    config.webhookSecret,
+                    "ask-dse-analytics-event:v1",
+                    update.update_id,
+                  ),
+                  analyticsActorHash: purposeHmac(
+                    config.webhookSecret,
+                    "ask-dse-analytics-actor:v1",
+                    update.message.chat.id,
+                  ),
+                });
+              }
             }
           }
         }
       } else if (update.callback_query) {
         const callback = update.callback_query;
-        const parsedCallback = callback.data ? parseCallbackData(callback.data) : null;
+        const callbackTooLarge = callback.data
+          ? Buffer.byteLength(callback.data, "utf8") > MAX_CALLBACK_DATA_BYTES
+          : false;
+        const parsedCallback = callback.data && !callbackTooLarge ? parseCallbackData(callback.data) : null;
         if (!parsedCallback || !callback.message) {
           await client.answerCallbackQuery({ callbackQueryId: callback.id, text: "This action is unavailable." });
         } else {

@@ -26,7 +26,7 @@ export function clearTelegramSession() {
   sessionStorage.removeItem(SESSION_EXPIRY_KEY);
 }
 
-function cachedSession(): string | null {
+export function getCachedTelegramSession(): string | null {
   const token = sessionStorage.getItem(SESSION_KEY);
   const expiresAt = sessionStorage.getItem(SESSION_EXPIRY_KEY);
   if (!token) return null;
@@ -38,7 +38,7 @@ function cachedSession(): string | null {
 }
 
 export async function getTelegramSession(): Promise<string> {
-  const cached = cachedSession();
+  const cached = getCachedTelegramSession();
   if (cached) return cached;
 
   const webApp = window.Telegram?.WebApp;
