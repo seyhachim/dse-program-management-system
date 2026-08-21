@@ -239,10 +239,29 @@ export const curriculumService = {
       where: { id: predecessorVersionId },
       include: {
         curriculum: { select: { id: true } },
+        pathways: {
+          orderBy: [
+            { yearLevel: "asc" },
+            { semester: "asc" },
+            { sortOrder: "asc" },
+            { code: "asc" },
+          ],
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            yearLevel: true,
+            semester: true,
+            isDefault: true,
+            creditTarget: true,
+            sortOrder: true,
+          },
+        },
         courses: {
           orderBy: [{ yearLevel: "asc" }, { semester: "asc" }, { sortOrder: "asc" }],
           select: {
             courseId: true,
+            pathwayId: true,
             yearLevel: true,
             semester: true,
             creditsSnapshot: true,
@@ -311,17 +330,48 @@ export const curriculumService = {
             select: { id: true },
           });
 
+          const clonedPathwayIds = new Map<string, string>();
+          for (const pathway of predecessor.pathways) {
+            const clonedPathway = await tx.programmeCurriculumPathway.create({
+              data: {
+                curriculumVersionId: version.id,
+                code: pathway.code,
+                name: pathway.name,
+                yearLevel: pathway.yearLevel,
+                semester: pathway.semester,
+                isDefault: pathway.isDefault,
+                creditTarget: pathway.creditTarget,
+                sortOrder: pathway.sortOrder,
+              },
+              select: { id: true },
+            });
+            clonedPathwayIds.set(pathway.id, clonedPathway.id);
+          }
+
           if (predecessor.courses.length > 0) {
-            await tx.programmeCurriculumCourse.createMany({
-              data: predecessor.courses.map((placement) => ({
+            const clonedPlacements = predecessor.courses.map((placement) => {
+              const pathwayId = placement.pathwayId
+                ? clonedPathwayIds.get(placement.pathwayId)
+                : null;
+              if (placement.pathwayId && !pathwayId) {
+                throw new InvalidCurriculumRevisionError(
+                  "Curriculum pathway membership could not be preserved",
+                );
+              }
+              return {
                 curriculumVersionId: version.id,
                 courseId: placement.courseId,
+                pathwayId,
                 yearLevel: placement.yearLevel,
                 semester: placement.semester,
                 creditsSnapshot: placement.creditsSnapshot,
                 courseTypeSnapshot: placement.courseTypeSnapshot,
                 sortOrder: placement.sortOrder,
-              })),
+              };
+            });
+
+            await tx.programmeCurriculumCourse.createMany({
+              data: clonedPlacements,
             });
           }
 
