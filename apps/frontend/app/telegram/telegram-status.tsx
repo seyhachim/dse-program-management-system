@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { TelegramHomeResponse, TelegramInitDataVerifyResponse } from "@dse-pms/shared-types";
 import { API_URL } from "../../lib/api";
-import { saveTelegramSession } from "./telegram-client";
+import {
+  clearTelegramSession,
+  getCachedTelegramSession,
+  saveTelegramSession,
+} from "./telegram-client";
 
 type State =
   | { status: "loading" }
@@ -13,12 +17,19 @@ type State =
   | { status: "ready"; home: TelegramHomeResponse }
   | { status: "error"; message: string };
 
+class TelegramSessionRequestError extends Error {
+  constructor(public readonly status: number) {
+    super("Telegram session request failed");
+    this.name = "TelegramSessionRequestError";
+  }
+}
+
 async function telegramFetch<T>(path: string, token: string): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
-  if (!response.ok) throw new Error("Telegram session request failed");
+  if (!response.ok) throw new TelegramSessionRequestError(response.status);
   return response.json() as Promise<T>;
 }
 
@@ -29,6 +40,23 @@ export function TelegramStatus() {
     let cancelled = false;
     async function boot() {
       try {
+        const cachedSession = getCachedTelegramSession();
+        if (cachedSession) {
+          try {
+            const home = await telegramFetch<TelegramHomeResponse>(
+              "/api/telegram/mini/home",
+              cachedSession,
+            );
+            if (!cancelled) setState({ status: "ready", home });
+            return;
+          } catch (error) {
+            if (!(error instanceof TelegramSessionRequestError) || error.status !== 401) {
+              throw error;
+            }
+            clearTelegramSession();
+          }
+        }
+
         const webApp = window.Telegram?.WebApp;
         webApp?.ready();
         webApp?.expand();
