@@ -391,6 +391,94 @@ describeDb("programme curriculum revision/read service", () => {
       coursework.id,
     ]);
     expect(result.totals.programmeCredits).toBe(146);
+
+    await approve(initial.selectedVersion.id);
+    const revision = await curriculumService.createRevision(
+      initial.curriculum.id,
+      initial.selectedVersion.id,
+      user.id,
+      {
+        revisionType: "Minor",
+        revisionTriggers: ["ScheduledReview"],
+        revisionReason: "Preserve curriculum pathway semantics",
+        changeSummary: "Clone pathway definitions and memberships into the revision",
+      },
+    );
+
+    expect(revision.pathways.map((pathway) => ({
+      code: pathway.code,
+      name: pathway.name,
+      yearLevel: pathway.yearLevel,
+      semester: pathway.semester,
+      isDefault: pathway.isDefault,
+      creditTarget: pathway.creditTarget,
+      sortOrder: pathway.sortOrder,
+      totalCredits: pathway.totalCredits,
+    }))).toEqual([
+      {
+        code: "COURSEWORK",
+        name: "Coursework",
+        yearLevel: 4,
+        semester: "Second",
+        isDefault: true,
+        creditTarget: 15,
+        sortOrder: 0,
+        totalCredits: 15,
+      },
+      {
+        code: "RESEARCH",
+        name: "Research / Thesis",
+        yearLevel: 4,
+        semester: "Second",
+        isDefault: false,
+        creditTarget: 15,
+        sortOrder: 1,
+        totalCredits: 15,
+      },
+      {
+        code: "INDUSTRY",
+        name: "Industrial Internship",
+        yearLevel: 4,
+        semester: "Second",
+        isDefault: false,
+        creditTarget: 15,
+        sortOrder: 2,
+        totalCredits: 15,
+      },
+    ]);
+
+    const originalPathwayIds = new Map([
+      ["COURSEWORK", courseworkPathway.id],
+      ["RESEARCH", researchPathway.id],
+      ["INDUSTRY", industryPathway.id],
+    ]);
+    for (const pathway of revision.pathways) {
+      expect(pathway.id).not.toBe(originalPathwayIds.get(pathway.code));
+      expect(pathway.courses).toHaveLength(1);
+      expect(pathway.courses[0]?.pathwayId).toBe(pathway.id);
+    }
+
+    expect(revision.years[0]?.semesters[0]?.courses[0]).toMatchObject({
+      courseId: common.id,
+      pathwayId: null,
+    });
+    expect(revision.years[3]?.semesters[1]?.courses.map((course) => course.courseId)).toEqual([
+      coursework.id,
+    ]);
+    expect(revision.totals.programmeCredits).toBe(146);
+
+    const predecessor = await curriculumService.getById(
+      initial.curriculum.id,
+      initial.selectedVersion.id,
+    );
+    expect(predecessor.selectedVersion.status).toBe("Approved");
+    expect(predecessor.pathways.map((pathway) => pathway.id)).toEqual([
+      courseworkPathway.id,
+      researchPathway.id,
+      industryPathway.id,
+    ]);
+    expect(predecessor.pathways.find((pathway) => pathway.code === "RESEARCH")?.courses[0]?.pathwayId)
+      .toBe(researchPathway.id);
   });
 });
 
