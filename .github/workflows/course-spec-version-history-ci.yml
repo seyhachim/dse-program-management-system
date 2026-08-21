@@ -9,6 +9,7 @@ on:
       - "apps/frontend/lib/course-spec-governance-actions*"
       - "apps/frontend/lib/course-spec-periodic-review.ts"
       - "packages/shared-types/src/course-spec-version-history.ts"
+      - ".github/actions/setup-bun/action.yml"
       - ".github/workflows/course-spec-version-history-ci.yml"
   push:
     branches:
@@ -20,10 +21,15 @@ on:
       - "apps/frontend/lib/course-spec-governance-actions*"
       - "apps/frontend/lib/course-spec-periodic-review.ts"
       - "packages/shared-types/src/course-spec-version-history.ts"
+      - ".github/actions/setup-bun/action.yml"
       - ".github/workflows/course-spec-version-history-ci.yml"
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   exact-version-integrity:
@@ -49,10 +55,7 @@ jobs:
       COURSE_SPEC_VERSION_HISTORY_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.23
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun
       - run: bun run db:generate
       - run: bun run db:migrate:deploy
       - run: bun run seed
