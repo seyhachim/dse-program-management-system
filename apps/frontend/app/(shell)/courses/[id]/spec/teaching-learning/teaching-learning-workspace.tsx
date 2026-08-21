@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   CircleCheck,
   Lightbulb,
   Loader2,
@@ -47,6 +48,8 @@ const FALLBACK_ACTIVE_LEARNING_CLUSTERS: ActiveLearningCluster[] =
     })),
   }));
 
+type SectionKey = "approach" | "active" | "support" | "coverage";
+
 export function TeachingLearningWorkspace({
   value,
   teachingMethods,
@@ -68,6 +71,9 @@ export function TeachingLearningWorkspace({
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<SectionKey>>(
+    () => new Set<SectionKey>(),
+  );
 
   const [philosophyTags, setPhilosophyTags] = useState<string[]>([]);
   const [philosophyStatement, setPhilosophyStatement] = useState("");
@@ -77,8 +83,12 @@ export function TeachingLearningWorkspace({
     ActiveLearningCluster[]
   >(FALLBACK_ACTIVE_LEARNING_CLUSTERS);
   const [independentLearning, setIndependentLearning] = useState<string[]>([]);
-  const [teachingLearningMaterials, setTeachingLearningMaterials] = useState<string[]>([]);
-  const [requiredDeliveryResources, setRequiredDeliveryResources] = useState<string[]>([]);
+  const [teachingLearningMaterials, setTeachingLearningMaterials] = useState<
+    string[]
+  >([]);
+  const [requiredDeliveryResources, setRequiredDeliveryResources] = useState<
+    string[]
+  >([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +102,7 @@ export function TeachingLearningWorkspace({
           methodsApi.list(),
         ]);
         if (cancelled) return;
+
         setPhilosophyTags(profile.philosophyTags);
         setPhilosophyStatement(profile.philosophyStatement);
         setCourseMethodIds(
@@ -123,36 +134,79 @@ export function TeachingLearningWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
-  const coveredClos = useMemo(
-    () =>
-      clos.filter(
-        (clo) => clo.status === "active" && clo.teachingMethodIds.length > 0,
-      ).length,
-    [clos],
-  );
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
     [clos],
   );
+  const coveredClos = useMemo(
+    () => activeClos.filter((clo) => clo.teachingMethodIds.length > 0).length,
+    [activeClos],
+  );
   const strategyOptions = useMemo(
     () =>
-      activeLearningClusters.flatMap((cluster) => cluster.strategies).map(
-        (strategy) => ({ id: strategy.id, name: strategy.name }),
+      activeLearningClusters.flatMap((cluster) =>
+        cluster.strategies.map((strategy) => ({
+          id: strategy.id,
+          name: strategy.name,
+        })),
       ),
     [activeLearningClusters],
   );
+  const selectedStrategyNames = useMemo(
+    () =>
+      strategyOptions
+        .filter((strategy) => strategyIds.includes(strategy.id))
+        .map((strategy) => strategy.name),
+    [strategyIds, strategyOptions],
+  );
+  const selectedMethodNames = useMemo(
+    () =>
+      teachingMethods
+        .filter((method) => courseMethodIds.includes(method.id))
+        .map((method) => method.name),
+    [courseMethodIds, teachingMethods],
+  );
+  const selectedPhilosophyNames = useMemo(
+    () =>
+      TEACHING_PHILOSOPHY_OPTIONS.filter((option) =>
+        philosophyTags.includes(option.id),
+      ).map((option) => option.label),
+    [philosophyTags],
+  );
 
-  const completion: [boolean, boolean, boolean, boolean, boolean] = [
-    philosophyTags.length > 0 || philosophyStatement.trim().length > 0,
-    courseMethodIds.length > 0,
-    strategyIds.length > 0,
+  const approachComplete =
+    (philosophyTags.length > 0 || philosophyStatement.trim().length > 0) &&
+    courseMethodIds.length > 0;
+  const activeLearningComplete = strategyIds.length > 0;
+  const supportComplete =
     independentLearning.length +
-        teachingLearningMaterials.length +
-        requiredDeliveryResources.length >
-      0,
-    activeClos.length > 0 && coveredClos === activeClos.length,
-  ];
-  const completeCount = completion.filter(Boolean).length;
+      teachingLearningMaterials.length +
+      requiredDeliveryResources.length >
+    0;
+  const coverageComplete =
+    activeClos.length > 0 && coveredClos === activeClos.length;
+
+  const ready = teachingLearningIsReady(
+    {
+      philosophyTags,
+      philosophyStatement,
+      teachingMethodIds: courseMethodIds,
+      activeLearningStrategyIds: strategyIds,
+      independentLearningTypes: independentLearning,
+      resourceTypes: teachingLearningMaterials,
+      technologyTypes: requiredDeliveryResources,
+    },
+    clos,
+  );
+
+  const toggleSection = (key: SectionKey) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const toggle = (
     id: string,
@@ -237,28 +291,23 @@ export function TeachingLearningWorkspace({
   }
 
   return (
-    <div className="space-y-5 pb-6">
-      <div className="rounded-2xl border border-border bg-card p-5">
+    <div className="space-y-4 pb-6">
+      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold">Teaching &amp; Learning</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Define the course-level philosophy, teaching strategy, delivery
-              requirements, and learning materials. Weekly Plan remains the
-              week-by-week execution workspace.
+              Set the course-level teaching approach. Expand a section only when
+              you need to review or edit it.
             </p>
           </div>
-          <div className="sm:w-56">
-            <div className="flex justify-between text-xs">
-              <span>{completeCount} of 5 sections complete</span>
-              <span>{completeCount * 20}%</span>
-            </div>
-            <div className="mt-2 h-1.5 rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${completeCount * 20}%` }}
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <StatusPill good={ready}>
+              {ready ? "Ready" : "Needs attention"}
+            </StatusPill>
+            <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1 font-medium text-muted-foreground">
+              {coveredClos}/{activeClos.length} active CLOs covered
+            </span>
           </div>
         </div>
       </div>
@@ -276,66 +325,83 @@ export function TeachingLearningWorkspace({
         </div>
       ) : null}
 
-      <Section
-        number={1}
-        title="Teaching Philosophy"
-        prompt="How do you want students to learn in this course?"
-        complete={completion[0]}
+      <ExpandableSection
+        id="teaching-approach"
+        title="Teaching Approach"
+        summary={summarizeApproach(
+          selectedPhilosophyNames,
+          selectedMethodNames,
+          philosophyStatement,
+        )}
+        complete={approachComplete}
+        expanded={expanded.has("approach")}
+        onToggle={() => toggleSection("approach")}
       >
-        <div className="flex flex-wrap gap-2">
-          {TEACHING_PHILOSOPHY_OPTIONS.map((option) => (
-            <Chip
-              key={option.id}
-              selected={philosophyTags.includes(option.id)}
-              onClick={() =>
-                toggle(option.id, philosophyTags, setPhilosophyTags)
-              }
-            >
-              {option.label}
-            </Chip>
-          ))}
-        </div>
-        <textarea
-          rows={3}
-          value={philosophyStatement}
-          onChange={(event) => setPhilosophyStatement(event.target.value)}
-          placeholder="Optional: describe the learning experience you want to create."
-          className="mt-4 w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/20"
-        />
-      </Section>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div>
+            <SectionLabel>Teaching philosophy</SectionLabel>
+            <p className="mt-1 text-xs text-muted-foreground">
+              How do you want students to learn in this course?
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {TEACHING_PHILOSOPHY_OPTIONS.map((option) => (
+                <Chip
+                  key={option.id}
+                  selected={philosophyTags.includes(option.id)}
+                  onClick={() =>
+                    toggle(option.id, philosophyTags, setPhilosophyTags)
+                  }
+                >
+                  {option.label}
+                </Chip>
+              ))}
+            </div>
+            <textarea
+              rows={3}
+              value={philosophyStatement}
+              onChange={(event) => setPhilosophyStatement(event.target.value)}
+              placeholder="Optional: describe the learning experience you want to create."
+              className="mt-3 w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/20"
+            />
+          </div>
 
-      <Section
-        number={2}
-        title="Teaching Methods"
-        prompt="How will you normally teach this course?"
-        complete={completion[1]}
-      >
-        <div className="flex flex-wrap gap-2">
-          {teachingMethods.filter((method) => method.active).map((method) => (
-            <Chip
-              key={method.id}
-              selected={courseMethodIds.includes(method.id)}
-              onClick={() =>
-                toggle(method.id, courseMethodIds, setCourseMethodIds)
-              }
-            >
-              {method.name}
-            </Chip>
-          ))}
+          <div>
+            <SectionLabel>Teaching methods</SectionLabel>
+            <p className="mt-1 text-xs text-muted-foreground">
+              How will you normally teach this course?
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {teachingMethods
+                .filter((method) => method.active)
+                .map((method) => (
+                  <Chip
+                    key={method.id}
+                    selected={courseMethodIds.includes(method.id)}
+                    onClick={() =>
+                      toggle(method.id, courseMethodIds, setCourseMethodIds)
+                    }
+                  >
+                    {method.name}
+                  </Chip>
+                ))}
+            </div>
+          </div>
         </div>
-      </Section>
+      </ExpandableSection>
 
-      <Section
-        number={3}
-        title="Active Learning Strategies"
-        prompt="Choose how students will actively participate in learning."
-        complete={completion[2]}
+      <ExpandableSection
+        id="active-learning"
+        title="Active Learning"
+        summary={summarizeNames(selectedStrategyNames, "No strategies selected")}
+        complete={activeLearningComplete}
+        expanded={expanded.has("active")}
+        onToggle={() => toggleSection("active")}
       >
         <div className="mb-3 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          <Lightbulb className="h-4 w-4" />
-          Programme-managed clusters keep selection quick and consistent across courses.
+          <Lightbulb className="h-4 w-4 shrink-0" />
+          Programme-managed clusters keep selection consistent across courses.
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {activeLearningClusters.map((cluster) => (
             <div
               key={cluster.id}
@@ -362,13 +428,15 @@ export function TeachingLearningWorkspace({
             </div>
           ))}
         </div>
-      </Section>
+      </ExpandableSection>
 
-      <Section
-        number={4}
-        title="Course-Level Learning Support"
-        prompt="Define what the institution must provide and what materials support learning across the course."
-        complete={completion[3]}
+      <ExpandableSection
+        id="learning-support"
+        title="Learning Support"
+        summary={`${independentLearning.length} independent · ${requiredDeliveryResources.length} delivery resources · ${teachingLearningMaterials.length} materials`}
+        complete={supportComplete}
+        expanded={expanded.has("support")}
+        onToggle={() => toggleSection("support")}
       >
         <div className="grid gap-5 lg:grid-cols-3">
           <Group
@@ -409,26 +477,31 @@ export function TeachingLearningWorkspace({
         </div>
         <div className="mt-4 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
           <strong className="text-foreground">§19</strong> is what the
-          university/department must provide to deliver the course.{" "}
-          <strong className="text-foreground">§20</strong> is what the lecturer
-          prepares or selects for teaching and student learning. Files, URLs, and
-          references can still be managed in the Resources tab.
+          university/department must provide. <strong className="text-foreground">§20</strong>{" "}
+          is what the lecturer prepares or selects. Files, URLs, and references
+          remain in Learning Resources.
         </div>
-      </Section>
+      </ExpandableSection>
 
-      <Section
-        number={5}
-        title="CLO Coverage Check"
-        prompt="Make sure every CLO has teaching support. Detailed alignment remains in Constructive Alignment."
-        complete={completion[4]}
+      <ExpandableSection
+        id="clo-teaching-coverage"
+        title="CLO Teaching Coverage"
+        summary={`${coveredClos}/${activeClos.length} active CLOs have teaching-method support`}
+        complete={coverageComplete}
+        expanded={expanded.has("coverage")}
+        onToggle={() => toggleSection("coverage")}
       >
+        <div className="mb-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
+          Keep this check focused on teaching support. Assessment coverage and
+          full alignment are reviewed in Constructive Alignment.
+        </div>
         <div className="space-y-2.5">
           {clos.map((clo) => (
             <div
               key={clo.id}
-              className="rounded-xl border border-border bg-background p-4"
+              className="rounded-xl border border-border bg-background p-3 sm:p-4"
             >
-              <div className="grid gap-4 xl:grid-cols-[minmax(220px,0.8fr)_minmax(300px,1fr)_minmax(300px,1fr)_140px] xl:items-start">
+              <div className="grid gap-4 xl:grid-cols-[minmax(220px,0.8fr)_minmax(260px,1fr)_minmax(260px,1fr)_140px] xl:items-start">
                 <div className="flex items-start gap-2.5">
                   <span className="rounded-md bg-muted px-2 py-1 text-xs font-bold">
                     {clo.code}
@@ -455,7 +528,7 @@ export function TeachingLearningWorkspace({
                   }
                   emptyMessage="No active-learning strategies defined yet."
                 />
-                <div className="flex justify-end">
+                <div className="flex xl:justify-end">
                   {savingCloId === clo.id ? (
                     <Status
                       icon={<Loader2 className="h-4 w-4 animate-spin" />}
@@ -473,16 +546,16 @@ export function TeachingLearningWorkspace({
                       icon={<CircleCheck className="h-4 w-4" />}
                       text="Inactive"
                     />
-                  ) : clo.teachingMethodIds.length ? (
+                  ) : clo.teachingMethodIds.length > 0 ? (
                     <Status
                       good
                       icon={<CircleCheck className="h-4 w-4" />}
-                      text="Supported"
+                      text="Covered"
                     />
                   ) : (
                     <Status
                       icon={<AlertTriangle className="h-4 w-4" />}
-                      text="Needs attention"
+                      text="Add method"
                     />
                   )}
                 </div>
@@ -490,41 +563,26 @@ export function TeachingLearningWorkspace({
             </div>
           ))}
         </div>
-      </Section>
+      </ExpandableSection>
 
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
-        <p className="font-semibold">How this supports Weekly Plan</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Teaching &amp; Learning defines the course-level approach. Assessment
-          defines how learning is measured. Weekly Plan will use both as
-          contextual suggestions while the lecturer decides what actually
-          happens each week.
-        </p>
-      </div>
-
-      <div className="sticky bottom-3 flex items-center justify-end gap-3 rounded-xl border border-border bg-background/95 p-3 shadow-sm backdrop-blur">
-        {!teachingLearningIsReady(
-          {
-            philosophyTags,
-            philosophyStatement,
-            teachingMethodIds: courseMethodIds,
-            activeLearningStrategyIds: strategyIds,
-            independentLearningTypes: independentLearning,
-            resourceTypes: teachingLearningMaterials,
-            technologyTypes: requiredDeliveryResources,
-          },
-          clos,
-        ) ? (
+      <div className="sticky bottom-3 flex flex-col gap-3 rounded-xl border border-border bg-background/95 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-end">
+        {!ready ? (
           <span className="mr-auto text-xs text-amber-600 dark:text-amber-400">
-            Complete philosophy, methods, active learning, and teaching support for every active CLO.
+            Complete the course approach, active learning, learning support, and
+            teaching support for every active CLO.
           </span>
-        ) : null}
+        ) : (
+          <span className="mr-auto text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            Teaching &amp; Learning is ready.
+          </span>
+        )}
         {profileSaved ? (
           <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
             <CircleCheck className="h-4 w-4" /> Saved to database
           </span>
         ) : null}
         <Button
+          className="w-full sm:w-auto"
           onClick={() => void saveProfile()}
           disabled={profileLoading || profileSaving}
         >
@@ -540,37 +598,72 @@ export function TeachingLearningWorkspace({
   );
 }
 
-function Section({
-  number,
+function ExpandableSection({
+  id,
   title,
-  prompt,
+  summary,
   complete,
+  expanded,
+  onToggle,
   children,
 }: {
-  number: number;
+  id: string;
   title: string;
-  prompt: string;
+  summary: string;
   complete: boolean;
+  expanded: boolean;
+  onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
-      <div className="mb-4 flex gap-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-          {number}
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={`${id}-content`}
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-muted/20 sm:p-5"
+      >
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+            complete
+              ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"
+          }`}
+        >
+          {complete ? (
+            <CircleCheck className="h-4 w-4" />
+          ) : (
+            <AlertTriangle className="h-4 w-4" />
+          )}
         </span>
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold">{title}</h3>
-            {complete ? (
-              <CircleCheck className="h-4 w-4 text-emerald-500" />
-            ) : null}
-          </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">{prompt}</p>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-bold text-foreground">{title}</h3>
+          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+            {summary}
+          </p>
         </div>
-      </div>
-      <div className="sm:pl-11">{children}</div>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+            expanded ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {expanded ? (
+        <div id={`${id}-content`} className="border-t border-border p-4 sm:p-5">
+          {children}
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {children}
+    </p>
   );
 }
 
@@ -589,7 +682,13 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-full border font-medium transition ${compact ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"} ${selected ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background hover:bg-muted/40"}`}
+      className={`inline-flex items-center gap-1 rounded-full border font-medium transition ${
+        compact ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"
+      } ${
+        selected
+          ? "border-primary/30 bg-primary/10 text-primary"
+          : "border-border bg-background hover:bg-muted/40"
+      }`}
     >
       {selected ? <Check className="h-3 w-3" /> : null}
       {children}
@@ -612,9 +711,7 @@ function Group({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </p>
+      <SectionLabel>{title}</SectionLabel>
       {description ? (
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
           {description}
@@ -636,6 +733,27 @@ function Group({
   );
 }
 
+function StatusPill({
+  good,
+  children,
+}: {
+  good: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold ${
+        good
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+          : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
+      }`}
+    >
+      {good ? <CircleCheck className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+      {children}
+    </span>
+  );
+}
+
 function Status({
   good = false,
   icon,
@@ -647,10 +765,34 @@ function Status({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs font-semibold ${good ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
+      className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+        good
+          ? "text-emerald-600 dark:text-emerald-400"
+          : "text-amber-600 dark:text-amber-400"
+      }`}
     >
       {icon}
       {text}
     </span>
   );
+}
+
+function summarizeNames(items: string[], empty: string): string {
+  if (items.length === 0) return empty;
+  if (items.length <= 3) return items.join(" · ");
+  return `${items.slice(0, 3).join(" · ")} · +${items.length - 3}`;
+}
+
+function summarizeApproach(
+  philosophies: string[],
+  methods: string[],
+  statement: string,
+): string {
+  const parts: string[] = [];
+  if (philosophies.length > 0) parts.push(summarizeNames(philosophies, ""));
+  else if (statement.trim()) parts.push("Custom philosophy");
+  if (methods.length > 0) {
+    parts.push(`${methods.length} teaching ${methods.length === 1 ? "method" : "methods"}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : "No teaching approach defined yet";
 }
