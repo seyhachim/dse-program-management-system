@@ -117,22 +117,27 @@ async function setup(options?: { analyticsFails?: boolean; sendFails?: boolean }
 }
 
 describe("public Telegram Ask DSE analytics boundary", () => {
-  test("records a delivered no-match without passing raw Telegram identity", async () => {
+  test("records a delivered no-match with purpose-specific hashes and no raw Telegram identity", async () => {
     const harness = await setup();
     const response = await harness.ask("What new DSE club is available?");
 
     expect(response.status).toBe(200);
     expect(harness.observed).toHaveLength(1);
-    expect(harness.observed[0]).toEqual({
+    expect(harness.observed[0]).toMatchObject({
       programmeId: "dse",
       source: "Telegram",
       questionText: "What new DSE club is available?",
       result: { kind: "none" },
       answerDelivered: true,
     });
+    expect(harness.observed[0]?.sourceEventKey).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(harness.observed[0]?.analyticsActorHash).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(harness.observed[0]?.sourceEventKey).not.toContain("491");
+    expect(harness.observed[0]?.analyticsActorHash).not.toContain("999999");
     expect(harness.observed[0]).not.toHaveProperty("chatId");
     expect(harness.observed[0]).not.toHaveProperty("telegramUserId");
     expect(harness.observed[0]).not.toHaveProperty("clientIp");
+    expect(harness.observed[0]).not.toHaveProperty("rateLimitState");
   });
 
   test("analytics failure is fail-open after a successful Telegram response", async () => {

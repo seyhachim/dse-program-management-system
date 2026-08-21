@@ -5,6 +5,10 @@ import {
   PublicProgrammeImportantDateQuerySchema,
 } from "@dse-pms/shared-types";
 import {
+  getPublicAbuseProtectionConfig,
+  publicAbuseRateLimiter,
+} from "../../core/security/public-abuse-protection.ts";
+import {
   PublicCurriculumConflictError,
   PublicCurriculumNotFoundError,
   publicCurriculumReadService,
@@ -55,6 +59,7 @@ function programmeId(req: Request, res: Response): string | null {
 
 export function createPublicProgrammeReadRouter(): Router {
   const router = Router();
+  const abuseConfig = getPublicAbuseProtectionConfig();
 
   router.get("/programmes/:programmeId", async (req, res) => {
     const id = programmeId(req, res);
@@ -114,6 +119,18 @@ export function createPublicProgrammeReadRouter(): Router {
       res.status(400).json({ error: "Search requires q with 1..500 characters" });
       return;
     }
+
+    const admission = publicAbuseRateLimiter.check(
+      `public-search:${id}`,
+      abuseConfig.publicSearchMax,
+      abuseConfig.publicSearchWindowMs,
+    );
+    if (!admission.allowed) {
+      res.setHeader("Retry-After", String(admission.retryAfterSeconds));
+      res.status(429).json({ error: "Too many public search requests. Please try again shortly." });
+      return;
+    }
+
     try {
       sendPublicJson(req, res, await publicProgrammeSearchService.search(id, question));
     } catch (error) {
