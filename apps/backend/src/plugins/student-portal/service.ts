@@ -86,6 +86,12 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+export function portalAssessmentMode(
+  mode: "Individual" | "Group" | "GroupIndividual",
+): PortalCourseDetail["assessments"][number]["mode"] {
+  return mode === "Group" ? "group" : mode === "GroupIndividual" ? "group_individual" : "individual";
+}
+
 function feedbackKey(userId: string, offeringId: string): string {
   const secret = process.env.FEEDBACK_SECRET ?? process.env.JWT_SECRET;
   if (!secret) throw new Error("FEEDBACK_SECRET or JWT_SECRET must be configured");
@@ -336,7 +342,7 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           name: item.name,
           type: item.type,
           description: item.description,
-          mode: item.mode === "Group" ? "group" as const : "individual" as const,
+          mode: portalAssessmentMode(item.mode),
           cloCodes: item.cloCodes,
           weight: item.weight,
           countsTowardGrade,
