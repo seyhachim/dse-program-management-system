@@ -38,10 +38,22 @@ export interface TelegramPublicBotClient {
 }
 
 export class TelegramApiError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly description?: string,
+  ) {
     super(message);
     this.name = "TelegramApiError";
   }
+}
+
+function isMessageNotModified(error: unknown): boolean {
+  return (
+    error instanceof TelegramApiError &&
+    error.status === 400 &&
+    error.description?.toLowerCase().includes("message is not modified") === true
+  );
 }
 
 export function createTelegramPublicBotClient(
@@ -55,7 +67,16 @@ export function createTelegramPublicBotClient(
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      throw new TelegramApiError(`Telegram ${method} failed with ${response.status}`);
+      const payload = (await response.json().catch(() => null)) as
+        | { description?: unknown }
+        | null;
+      const description =
+        typeof payload?.description === "string" ? payload.description : undefined;
+      throw new TelegramApiError(
+        `Telegram ${method} failed with ${response.status}${description ? `: ${description}` : ""}`,
+        response.status,
+        description,
+      );
     }
   }
 
@@ -68,12 +89,20 @@ export function createTelegramPublicBotClient(
       });
     },
     async editMessage(input) {
-      await call("editMessageText", {
-        chat_id: input.chatId,
-        message_id: input.messageId,
-        text: input.text,
-        ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
-      });
+      try {
+        await call("editMessageText", {
+          chat_id: input.chatId,
+          message_id: input.messageId,
+          text: input.text,
+          ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
+        });
+      } catch (error) {
+        // Telegram returns HTTP 400 when an inline callback renders exactly the
+        // same text and markup. That is a successful no-op for our router: it
+        // must continue so answerCallbackQuery can acknowledge the user's tap.
+        if (isMessageNotModified(error)) return;
+        throw error;
+      }
     },
     async answerCallbackQuery(input) {
       await call("answerCallbackQuery", {
