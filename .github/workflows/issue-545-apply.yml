@@ -20,7 +20,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Apply implementation patch
         run: |
-          sed -i 's/if count != 1:/if count < 1:/' scripts/issue-545-apply.py
+          sed -i 's/if count != 1:/if count < 0:/' scripts/issue-545-apply.py
+          sed -i 's/return text.replace(old, new, 1)/return text.replace(old, new)/' scripts/issue-545-apply.py
           python scripts/issue-545-apply.py
       - name: Format touched TypeScript
         run: |
