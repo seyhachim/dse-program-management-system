@@ -57,12 +57,19 @@ function chatIdFromBody(body: unknown): number | undefined {
     message?: { chat?: { id?: unknown } };
     callback_query?: { message?: { chat?: { id?: unknown } } };
   };
-  const value = candidate.message?.chat?.id ?? candidate.callback_query?.message?.chat?.id;
-  return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+  const value =
+    candidate.message?.chat?.id ?? candidate.callback_query?.message?.chat?.id;
+  return typeof value === "number" && Number.isInteger(value)
+    ? value
+    : undefined;
 }
 
 function localeKey(webhookSecret: string, chatId: number): string {
   return purposeHmac(webhookSecret, "telegram-public-locale:v1", chatId);
+}
+
+function localeForChat(webhookSecret: string, chatId: number): TelegramLocale {
+  return localeStore.get(localeKey(webhookSecret, chatId)) ?? "en";
 }
 
 function localizedClient(
@@ -77,7 +84,10 @@ function localizedClient(
     async sendMessage(input) {
       const key = localeKey(webhookSecret, input.chatId);
       const selected = localeStore.get(key);
-      if (!selected && input.text.startsWith("Welcome to the DSE Program Information Bot")) {
+      if (
+        !selected &&
+        input.text.startsWith("Welcome to the DSE Program Information Bot")
+      ) {
         await base.sendMessage({
           chatId: input.chatId,
           text: "សូមជ្រើសរើសភាសា / Choose your language",
@@ -108,7 +118,10 @@ function localizedClient(
   };
 }
 
-function preprocessLanguageSelection(req: Request, webhookSecret: string): void {
+function preprocessLanguageSelection(
+  req: Request,
+  webhookSecret: string,
+): void {
   if (req.method !== "POST" || req.path !== "/webhook") return;
   const chatId = chatIdFromBody(req.body);
   if (chatId === undefined) return;
@@ -156,17 +169,23 @@ export function createLocalizedPublicTelegramRouter(
     return createPublicTelegramRouter({ ...deps, config });
   }
 
-  const baseClient = deps.client ?? createTelegramPublicBotClient(config.botToken);
+  const baseClient =
+    deps.client ?? createTelegramPublicBotClient(config.botToken);
   const router = Router();
   router.use((req, _res, next) => {
     preprocessLanguageSelection(req, config.webhookSecret!);
     next();
   });
-  router.use(createPublicTelegramRouter({
-    ...deps,
-    config,
-    client: localizedClient(baseClient, config.webhookSecret),
-  }));
+  router.use(
+    createPublicTelegramRouter({
+      ...deps,
+      config,
+      client: localizedClient(baseClient, config.webhookSecret),
+      localeForChat:
+        deps.localeForChat ??
+        ((chatId) => localeForChat(config.webhookSecret!, chatId)),
+    }),
+  );
   return router;
 }
 

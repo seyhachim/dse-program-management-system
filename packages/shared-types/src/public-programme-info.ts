@@ -8,6 +8,9 @@ export type ProgrammePublicPublicationStatus = z.infer<
   typeof ProgrammePublicPublicationStatusSchema
 >;
 
+export const PublicProgrammeLocaleSchema = z.enum(["en", "km"]);
+export type PublicProgrammeLocale = z.infer<typeof PublicProgrammeLocaleSchema>;
+
 export const ProgrammeFaqCategorySchema = z.enum([
   "About",
   "Admission",
@@ -44,12 +47,7 @@ const slugSchema = z
   .max(120)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use a lowercase kebab-case slug");
 
-const optionalTrimmedUrl = z
-  .string()
-  .trim()
-  .url()
-  .nullable()
-  .optional();
+const optionalTrimmedUrl = z.string().trim().url().nullable().optional();
 
 const publicationFields = {
   status: ProgrammePublicPublicationStatusSchema.default("Draft"),
@@ -57,7 +55,10 @@ const publicationFields = {
 };
 
 function validatePublicationState(
-  value: { status: ProgrammePublicPublicationStatus; publishedAt?: Date | null },
+  value: {
+    status: ProgrammePublicPublicationStatus;
+    publishedAt?: Date | null;
+  },
   ctx: z.RefinementCtx,
 ) {
   if (value.status === "Published" && !value.publishedAt) {
@@ -101,6 +102,8 @@ export const ProgrammeImportantDateInputSchema = z
     kind: ProgrammeImportantDateKindSchema,
     title: z.string().trim().min(1).max(200),
     description: z.string().trim().max(2000).default(""),
+    titleKm: z.string().trim().max(200).nullable().optional(),
+    descriptionKm: z.string().trim().max(2000).nullable().optional(),
     date: z.coerce.date(),
     endDate: z.coerce.date().nullable().optional(),
     sortOrder: z.number().int().min(0).default(0),
@@ -125,11 +128,15 @@ export const ProgrammePublicProfileInputSchema = z.object({
   programmeName: z.string().trim().min(1).max(300),
   shortName: z.string().trim().min(1).max(80),
   overview: z.string().trim().default(""),
+  programmeNameKm: z.string().trim().max(300).nullable().optional(),
+  shortNameKm: z.string().trim().max(80).nullable().optional(),
+  overviewKm: z.string().trim().nullable().optional(),
   admissionEmail: z.string().trim().email().nullable().optional(),
   phone: z.string().trim().max(80).nullable().optional(),
   websiteUrl: optionalTrimmedUrl,
   facebookUrl: optionalTrimmedUrl,
   campusAddress: z.string().trim().max(1000).nullable().optional(),
+  campusAddressKm: z.string().trim().max(1000).nullable().optional(),
   mapUrl: optionalTrimmedUrl,
   applicationUrl: optionalTrimmedUrl,
 });
@@ -146,19 +153,27 @@ export const ProgrammeFaqAdminWriteSchema = z.object({
   answer: z.string().trim().min(1, "Answer is required"),
   shortAnswer: z.string().trim().max(1000).nullable().optional(),
   keywords: z.array(z.string().trim().min(1).max(80)).default([]),
+  questionKm: z.string().trim().max(500).nullable().optional(),
+  answerKm: z.string().trim().nullable().optional(),
+  shortAnswerKm: z.string().trim().max(1000).nullable().optional(),
+  keywordsKm: z.array(z.string().trim().min(1).max(80)).default([]),
   sortOrder: z.number().int().min(0).default(0),
   isFeatured: z.boolean().default(false),
   sourceLabel: z.string().trim().max(200).nullable().optional(),
   sourceUrl: optionalTrimmedUrl,
   reviewedAt: z.coerce.date().nullable().optional(),
 });
-export type ProgrammeFaqAdminWrite = z.infer<typeof ProgrammeFaqAdminWriteSchema>;
+export type ProgrammeFaqAdminWrite = z.infer<
+  typeof ProgrammeFaqAdminWriteSchema
+>;
 
 export const ProgrammeImportantDateAdminWriteSchema = z
   .object({
     kind: ProgrammeImportantDateKindSchema,
     title: z.string().trim().min(1, "Title is required").max(200),
     description: z.string().trim().max(2000).default(""),
+    titleKm: z.string().trim().max(200).nullable().optional(),
+    descriptionKm: z.string().trim().max(2000).nullable().optional(),
     date: z.coerce.date(),
     endDate: z.coerce.date().nullable().optional(),
     sortOrder: z.number().int().min(0).default(0),
@@ -177,14 +192,22 @@ export type ProgrammeImportantDateAdminWrite = z.infer<
 >;
 
 export const ProgrammePublicProfileAdminWriteSchema = z.object({
-  programmeName: z.string().trim().min(1, "Programme name is required").max(300),
+  programmeName: z
+    .string()
+    .trim()
+    .min(1, "Programme name is required")
+    .max(300),
   shortName: z.string().trim().min(1, "Short name is required").max(80),
   overview: z.string().trim().default(""),
+  programmeNameKm: z.string().trim().max(300).nullable().optional(),
+  shortNameKm: z.string().trim().max(80).nullable().optional(),
+  overviewKm: z.string().trim().nullable().optional(),
   admissionEmail: z.string().trim().email().nullable().optional(),
   phone: z.string().trim().max(80).nullable().optional(),
   websiteUrl: optionalTrimmedUrl,
   facebookUrl: optionalTrimmedUrl,
   campusAddress: z.string().trim().max(1000).nullable().optional(),
+  campusAddressKm: z.string().trim().max(1000).nullable().optional(),
   mapUrl: optionalTrimmedUrl,
   applicationUrl: optionalTrimmedUrl,
 });
@@ -271,7 +294,9 @@ export const PublicProgrammeProfileSchema = z.object({
   mapUrl: z.string().url().nullable(),
   applicationUrl: z.string().url().nullable(),
 });
-export type PublicProgrammeProfile = z.infer<typeof PublicProgrammeProfileSchema>;
+export type PublicProgrammeProfile = z.infer<
+  typeof PublicProgrammeProfileSchema
+>;
 
 export const PublicProgrammeContactSchema = PublicProgrammeProfileSchema.pick({
   admissionEmail: true,
@@ -282,7 +307,9 @@ export const PublicProgrammeContactSchema = PublicProgrammeProfileSchema.pick({
   mapUrl: true,
   applicationUrl: true,
 });
-export type PublicProgrammeContact = z.infer<typeof PublicProgrammeContactSchema>;
+export type PublicProgrammeContact = z.infer<
+  typeof PublicProgrammeContactSchema
+>;
 
 export const PublicProgrammeFaqCategorySummarySchema = z.object({
   category: ProgrammeFaqCategorySchema,
@@ -298,7 +325,9 @@ export const PublicProgrammeAdmissionSchema = z.object({
   phone: z.string().nullable(),
   faqs: z.array(PublicProgrammeFaqSchema),
 });
-export type PublicProgrammeAdmission = z.infer<typeof PublicProgrammeAdmissionSchema>;
+export type PublicProgrammeAdmission = z.infer<
+  typeof PublicProgrammeAdmissionSchema
+>;
 
 export const PublicProgrammeFeesScholarshipsSchema = z.object({
   faqs: z.array(PublicProgrammeFaqSchema),
@@ -307,14 +336,28 @@ export type PublicProgrammeFeesScholarships = z.infer<
   typeof PublicProgrammeFeesScholarshipsSchema
 >;
 
+export const PublicProgrammeLocaleQuerySchema = z.object({
+  locale: PublicProgrammeLocaleSchema.optional(),
+});
+export type PublicProgrammeLocaleQuery = z.infer<
+  typeof PublicProgrammeLocaleQuerySchema
+>;
+
 export const PublicProgrammeFaqQuerySchema = z.object({
   category: ProgrammeFaqCategorySchema.optional(),
-  featured: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
+  featured: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
+  locale: PublicProgrammeLocaleSchema.optional(),
 });
-export type PublicProgrammeFaqQuery = z.infer<typeof PublicProgrammeFaqQuerySchema>;
+export type PublicProgrammeFaqQuery = z.infer<
+  typeof PublicProgrammeFaqQuerySchema
+>;
 
 export const PublicProgrammeImportantDateQuerySchema = z.object({
   kind: ProgrammeImportantDateKindSchema.optional(),
+  locale: PublicProgrammeLocaleSchema.optional(),
 });
 export type PublicProgrammeImportantDateQuery = z.infer<
   typeof PublicProgrammeImportantDateQuerySchema

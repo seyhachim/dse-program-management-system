@@ -8,6 +8,7 @@ import type {
   PublicProgrammeFaq,
   PublicProgrammeFeesScholarships,
   PublicProgrammeImportantDate,
+  PublicProgrammeLocale,
   PublicProgrammeProfile,
 } from "@dse-pms/shared-types";
 import { registry } from "../../../core/plugins/registry.ts";
@@ -69,12 +70,34 @@ const TelegramUpdateSchema = z.object({
 });
 
 type PublicReadService = {
-  getProgramme(programmeId: string): Promise<PublicProgrammeProfile>;
-  listFaqs(programmeId: string, filters?: { category?: ProgrammeFaqCategory; featured?: boolean }): Promise<PublicProgrammeFaq[]>;
-  getAdmission(programmeId: string): Promise<PublicProgrammeAdmission>;
-  getFeesScholarships(programmeId: string): Promise<PublicProgrammeFeesScholarships>;
-  listImportantDates(programmeId: string): Promise<PublicProgrammeImportantDate[]>;
-  getContact(programmeId: string): Promise<PublicProgrammeContact>;
+  getProgramme(
+    programmeId: string,
+    locale?: PublicProgrammeLocale,
+  ): Promise<PublicProgrammeProfile>;
+  listFaqs(
+    programmeId: string,
+    filters?: {
+      category?: ProgrammeFaqCategory;
+      featured?: boolean;
+      locale?: PublicProgrammeLocale;
+    },
+  ): Promise<PublicProgrammeFaq[]>;
+  getAdmission(
+    programmeId: string,
+    locale?: PublicProgrammeLocale,
+  ): Promise<PublicProgrammeAdmission>;
+  getFeesScholarships(
+    programmeId: string,
+    locale?: PublicProgrammeLocale,
+  ): Promise<PublicProgrammeFeesScholarships>;
+  listImportantDates(
+    programmeId: string,
+    filters?: { locale?: PublicProgrammeLocale },
+  ): Promise<PublicProgrammeImportantDate[]>;
+  getContact(
+    programmeId: string,
+    locale?: PublicProgrammeLocale,
+  ): Promise<PublicProgrammeContact>;
 };
 
 type PublicQuestionAnalyticsObserver = {
@@ -105,10 +128,14 @@ export interface PublicTelegramRouterDependencies {
   abuseConfig?: PublicAbuseProtectionConfig;
   rateLimiter?: RateLimiter;
   now?: () => number;
+  localeForChat?: (chatId: number) => PublicProgrammeLocale;
 }
 
 const CALLBACK_ROUTE = new Map<string, RouteKey>(
-  Object.entries(ROUTE_CALLBACKS).map(([route, callback]) => [callback, route as RouteKey]),
+  Object.entries(ROUTE_CALLBACKS).map(([route, callback]) => [
+    callback,
+    route as RouteKey,
+  ]),
 );
 
 const CATEGORY_BY_PREFIX: Array<[string, ProgrammeFaqCategory]> = [
@@ -134,7 +161,9 @@ function secureEqual(actual: string | undefined, expected: string): boolean {
 
 function replyKeyboard(): TelegramReplyMarkup {
   return {
-    keyboard: MAIN_REPLY_KEYBOARD.map((row) => row.map((button) => ({ text: button.text }))),
+    keyboard: MAIN_REPLY_KEYBOARD.map((row) =>
+      row.map((button) => ({ text: button.text })),
+    ),
     resize_keyboard: true,
     is_persistent: true,
   };
@@ -145,7 +174,9 @@ function inlineKeyboard(route: RouteKey): TelegramReplyMarkup {
     button.type === "callback"
       ? { text: button.text, callback_data: button.callbackData }
       : { text: button.text, url: button.url };
-  return { inline_keyboard: getMenuKeyboard(route).map((row) => row.map(toButton)) };
+  return {
+    inline_keyboard: getMenuKeyboard(route).map((row) => row.map(toButton)),
+  };
 }
 
 function resolveProgrammeService(): ProgrammeRegistryService {
@@ -164,17 +195,24 @@ async function observeAskDseBestEffort(
 }
 
 function formatFaqs(title: string, faqs: PublicProgrammeFaq[]): string {
-  if (!faqs.length) return `${title}\n\nNo published information is available yet.`;
-  const items = faqs.slice(0, 8).map((faq) => `• ${faq.question}\n${faq.shortAnswer || faq.answer}`);
+  if (!faqs.length)
+    return `${title}\n\nNo published information is available yet.`;
+  const items = faqs
+    .slice(0, 8)
+    .map((faq) => `• ${faq.question}\n${faq.shortAnswer || faq.answer}`);
   return `${title}\n\n${items.join("\n\n")}`;
 }
 
 function formatDates(dates: PublicProgrammeImportantDate[]): string {
-  if (!dates.length) return "Important Dates\n\nNo official published dates are available yet.";
-  return `Important Dates\n\n${dates.slice(0, 10).map((item) => {
-    const range = item.endDate ? `${item.date} – ${item.endDate}` : item.date;
-    return `• ${item.title}: ${range}${item.description ? `\n${item.description}` : ""}`;
-  }).join("\n\n")}`;
+  if (!dates.length)
+    return "Important Dates\n\nNo official published dates are available yet.";
+  return `Important Dates\n\n${dates
+    .slice(0, 10)
+    .map((item) => {
+      const range = item.endDate ? `${item.date} – ${item.endDate}` : item.date;
+      return `• ${item.title}: ${range}${item.description ? `\n${item.description}` : ""}`;
+    })
+    .join("\n\n")}`;
 }
 
 function formatContact(contact: PublicProgrammeContact): string {
@@ -190,47 +228,68 @@ function formatContact(contact: PublicProgrammeContact): string {
 }
 
 function formatCourse(course: PublicCurriculumCourse): string {
-  const hours = course.weeklyHoursTotal === null
-    ? "Weekly hours: not available in the published source"
-    : `Weekly hours: ${course.weeklyHoursTotal} (${course.weeklyLectureHours ?? 0} lecture + ${course.weeklyLabHours ?? 0} lab + ${course.weeklyFieldVisitHours ?? 0} field)`;
+  const hours =
+    course.weeklyHoursTotal === null
+      ? "Weekly hours: not available in the published source"
+      : `Weekly hours: ${course.weeklyHoursTotal} (${course.weeklyLectureHours ?? 0} lecture + ${course.weeklyLabHours ?? 0} lab + ${course.weeklyFieldVisitHours ?? 0} field)`;
   const lines = [
     `${course.code} · ${course.title}`,
     `Year ${course.yearLevel}, Semester ${course.semester === "First" ? 1 : 2}`,
     `Credits: ${course.credits}`,
     hours,
     course.lecturerText ? `Lecturer(s): ${course.lecturerText}` : null,
-    course.conflicts.length ? `⚠️ Source conflict: ${course.conflicts.join("; ")}` : null,
+    course.conflicts.length
+      ? `⚠️ Source conflict: ${course.conflicts.join("; ")}`
+      : null,
     `Source: approved curriculum v${course.provenance.curriculumVersion}`,
   ].filter(Boolean);
   return lines.join("\n");
 }
 
 function formatCourseList(courses: PublicCurriculumCourse[]): string {
-  if (!courses.length) return "Courses\n\nNo published curriculum courses are available yet.";
-  const lines = courses.slice(0, 40).map(
-    (course) => `• ${course.code} — ${course.title} (${course.credits} cr)`,
-  );
-  const suffix = courses.length > 40 ? `\n\nShowing 40 of ${courses.length} courses. Ask for a course code for details.` : "";
+  if (!courses.length)
+    return "Courses\n\nNo published curriculum courses are available yet.";
+  const lines = courses
+    .slice(0, 40)
+    .map(
+      (course) => `• ${course.code} — ${course.title} (${course.credits} cr)`,
+    );
+  const suffix =
+    courses.length > 40
+      ? `\n\nShowing 40 of ${courses.length} courses. Ask for a course code for details.`
+      : "";
   return `Courses · Published Curriculum\n\n${lines.join("\n")}${suffix}`;
 }
 
 function formatStudyPlan(plan: PublicCurriculumStudyPlan): string {
   const heading = `Year ${plan.yearLevel} · Semester ${plan.semester === "First" ? 1 : 2}`;
   const lines = plan.courses.map((course) => {
-    const hours = course.weeklyHoursTotal === null ? "hours n/a" : `${course.weeklyHoursTotal} h/wk`;
+    const hours =
+      course.weeklyHoursTotal === null
+        ? "hours n/a"
+        : `${course.weeklyHoursTotal} h/wk`;
     return `• ${course.code} — ${course.title} · ${course.credits} cr · ${hours}`;
   });
-  const totalHours = plan.totalWeeklyHours === null ? "weekly hours incomplete" : `${plan.totalWeeklyHours} h/week`;
+  const totalHours =
+    plan.totalWeeklyHours === null
+      ? "weekly hours incomplete"
+      : `${plan.totalWeeklyHours} h/week`;
   return `${heading}\n\n${lines.join("\n")}\n\nTotal: ${plan.totalCredits} credits · ${totalHours}\nSource: approved curriculum v${plan.provenance.curriculumVersion}`;
 }
 
 function formatTotals(totals: PublicCurriculumTotals): string {
-  const hours = totals.totalWeeklyHours === null ? "not fully available" : `${totals.totalWeeklyHours}`;
+  const hours =
+    totals.totalWeeklyHours === null
+      ? "not fully available"
+      : `${totals.totalWeeklyHours}`;
   const breakdown = totals.byYearSemester.map((row) => {
-    const rowHours = row.weeklyHours === null ? "hours n/a" : `${row.weeklyHours} h/wk`;
-    const rowConflict = row.declaredCredits !== null && row.declaredCredits !== row.computedCredits
-      ? ` (rows sum ${row.computedCredits})`
-      : "";
+    const rowHours =
+      row.weeklyHours === null ? "hours n/a" : `${row.weeklyHours} h/wk`;
+    const rowConflict =
+      row.declaredCredits !== null &&
+      row.declaredCredits !== row.computedCredits
+        ? ` (rows sum ${row.computedCredits})`
+        : "";
     return `• Year ${row.yearLevel} Sem ${row.semester === "First" ? 1 : 2}: ${row.courseCount} courses · ${row.credits} credits${rowConflict} · ${rowHours}`;
   });
   const conflictNote = totals.conflicts.length
@@ -259,7 +318,9 @@ async function sendCourseLookup(
   try {
     await client.sendMessage({
       chatId,
-      text: formatCourse(await publicCurriculumRead.getCourse(programmeId, query)),
+      text: formatCourse(
+        await publicCurriculumRead.getCourse(programmeId, query),
+      ),
       replyMarkup: replyKeyboard(),
     });
   } catch (error) {
@@ -287,6 +348,7 @@ async function renderRoute(
   route: RouteKey,
   programmeId: string,
   publicRead: PublicReadService,
+  locale: PublicProgrammeLocale = "en",
 ): Promise<{ text: string; replyMarkup: TelegramReplyMarkup }> {
   if (route === "home") {
     return {
@@ -295,7 +357,7 @@ async function renderRoute(
     };
   }
   if (route === "admission") {
-    const admission = await publicRead.getAdmission(programmeId);
+    const admission = await publicRead.getAdmission(programmeId, locale);
     const details = [
       admission.applicationUrl && `Apply: ${admission.applicationUrl}`,
       admission.admissionEmail && `Email: ${admission.admissionEmail}`,
@@ -307,17 +369,31 @@ async function renderRoute(
     };
   }
   if (route === "fees" || route === "scholarships") {
-    const data = await publicRead.getFeesScholarships(programmeId);
-    return { text: formatFaqs("Fees & Scholarships", data.faqs), replyMarkup: inlineKeyboard(route) };
+    const data = await publicRead.getFeesScholarships(programmeId, locale);
+    return {
+      text: formatFaqs("Fees & Scholarships", data.faqs),
+      replyMarkup: inlineKeyboard(route),
+    };
   }
   if (route === "dates") {
-    return { text: formatDates(await publicRead.listImportantDates(programmeId)), replyMarkup: inlineKeyboard(route) };
+    return {
+      text: formatDates(
+        await publicRead.listImportantDates(programmeId, { locale }),
+      ),
+      replyMarkup: inlineKeyboard(route),
+    };
   }
   if (route === "contact") {
-    return { text: formatContact(await publicRead.getContact(programmeId)), replyMarkup: inlineKeyboard(route) };
+    return {
+      text: formatContact(await publicRead.getContact(programmeId, locale)),
+      replyMarkup: inlineKeyboard(route),
+    };
   }
   if (route === "ask") {
-    const faqs = await publicRead.listFaqs(programmeId, { featured: true });
+    const faqs = await publicRead.listFaqs(programmeId, {
+      featured: true,
+      locale,
+    });
     return {
       text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nYou can also type a question directly.`,
       replyMarkup: inlineKeyboard(route),
@@ -334,24 +410,34 @@ async function renderRoute(
   const category = categoryByRoute[route];
   if (category) {
     return {
-      text: formatFaqs(MENUS[route].title, await publicRead.listFaqs(programmeId, { category })),
+      text: formatFaqs(
+        MENUS[route].title,
+        await publicRead.listFaqs(programmeId, { category, locale }),
+      ),
       replyMarkup: inlineKeyboard(route),
     };
   }
-  return { text: `${MENUS[route].title}\n\nChoose an option below.`, replyMarkup: inlineKeyboard(route) };
+  return {
+    text: `${MENUS[route].title}\n\nChoose an option below.`,
+    replyMarkup: inlineKeyboard(route),
+  };
 }
 
 async function renderStaticCallback(
   data: string,
   programmeId: string,
   publicRead: PublicReadService,
+  locale: PublicProgrammeLocale = "en",
 ): Promise<{ text: string; replyMarkup: TelegramReplyMarkup }> {
   const route = CALLBACK_ROUTE.get(data);
-  if (route) return renderRoute(route, programmeId, publicRead);
+  if (route) return renderRoute(route, programmeId, publicRead, locale);
 
   if (data === "faq:popular") {
     return {
-      text: formatFaqs("Popular Questions", await publicRead.listFaqs(programmeId, { featured: true })),
+      text: formatFaqs(
+        "Popular Questions",
+        await publicRead.listFaqs(programmeId, { featured: true, locale }),
+      ),
       replyMarkup: inlineKeyboard("ask"),
     };
   }
@@ -364,47 +450,82 @@ async function renderStaticCallback(
   const explicitCategory = faqCategoryCallbacks[data];
   if (explicitCategory) {
     return {
-      text: formatFaqs("DSE Information", await publicRead.listFaqs(programmeId, { category: explicitCategory })),
+      text: formatFaqs(
+        "DSE Information",
+        await publicRead.listFaqs(programmeId, {
+          category: explicitCategory,
+          locale,
+        }),
+      ),
       replyMarkup: inlineKeyboard("ask"),
     };
   }
   if (data.startsWith("dates:")) {
-    return { text: formatDates(await publicRead.listImportantDates(programmeId)), replyMarkup: inlineKeyboard("dates") };
+    return {
+      text: formatDates(
+        await publicRead.listImportantDates(programmeId, { locale }),
+      ),
+      replyMarkup: inlineKeyboard("dates"),
+    };
   }
   if (data.startsWith("contact:")) {
-    return { text: formatContact(await publicRead.getContact(programmeId)), replyMarkup: inlineKeyboard("contact") };
-  }
-  const category = CATEGORY_BY_PREFIX.find(([prefix]) => data.startsWith(prefix))?.[1];
-  if (category) {
-    const routeForCategory: RouteKey = category === "About" ? "about"
-      : category === "Admission" ? "admission"
-      : category === "Curriculum" ? "curriculum"
-      : category === "Careers" ? "careers"
-      : category === "FeesScholarships" ? "fees"
-      : category === "StudentLife" ? "studentLife"
-      : category === "Facilities" ? "facilities"
-      : "lecturers";
     return {
-      text: formatFaqs(MENUS[routeForCategory].title, await publicRead.listFaqs(programmeId, { category })),
+      text: formatContact(await publicRead.getContact(programmeId, locale)),
+      replyMarkup: inlineKeyboard("contact"),
+    };
+  }
+  const category = CATEGORY_BY_PREFIX.find(([prefix]) =>
+    data.startsWith(prefix),
+  )?.[1];
+  if (category) {
+    const routeForCategory: RouteKey =
+      category === "About"
+        ? "about"
+        : category === "Admission"
+          ? "admission"
+          : category === "Curriculum"
+            ? "curriculum"
+            : category === "Careers"
+              ? "careers"
+              : category === "FeesScholarships"
+                ? "fees"
+                : category === "StudentLife"
+                  ? "studentLife"
+                  : category === "Facilities"
+                    ? "facilities"
+                    : "lecturers";
+    return {
+      text: formatFaqs(
+        MENUS[routeForCategory].title,
+        await publicRead.listFaqs(programmeId, { category, locale }),
+      ),
       replyMarkup: inlineKeyboard(routeForCategory),
     };
   }
   if (data.startsWith("explore:")) {
     const step = data.match(/^explore:step:([1-5])$/)?.[1];
     const routeKey = step ? (`explore.step${step}` as RouteKey) : "explore";
-    return renderRoute(routeKey, programmeId, publicRead);
+    return renderRoute(routeKey, programmeId, publicRead, locale);
   }
-  if (data.startsWith("fit:")) return renderRoute("fit", programmeId, publicRead);
-  return renderRoute("home", programmeId, publicRead);
+  if (data.startsWith("fit:"))
+    return renderRoute("fit", programmeId, publicRead, locale);
+  return renderRoute("home", programmeId, publicRead, locale);
 }
 
-function parseStudyPlanQuestion(text: string): { year: number; semester: "First" | "Second" } | null {
-  const match = text.match(/\byear\s*([1-4])\b.*\bsem(?:ester)?\s*([12])\b/i)
-    ?? text.match(/\byear\s*([1-4])\b.*\b(first|second)\s+semester\b/i);
+function parseStudyPlanQuestion(
+  text: string,
+): { year: number; semester: "First" | "Second" } | null {
+  const match =
+    text.match(/\byear\s*([1-4])\b.*\bsem(?:ester)?\s*([12])\b/i) ??
+    text.match(/\byear\s*([1-4])\b.*\b(first|second)\s+semester\b/i);
   if (!match) return null;
   const year = Number(match[1]);
   const semesterToken = match[2]?.toLocaleLowerCase();
-  return { year, semester: semesterToken === "1" || semesterToken === "first" ? "First" : "Second" };
+  return {
+    year,
+    semester:
+      semesterToken === "1" || semesterToken === "first" ? "First" : "Second",
+  };
 }
 
 export function createPublicTelegramRouter(
@@ -428,10 +549,14 @@ export function createPublicTelegramRouter(
     }
 
     const contentLength = Number(req.get("content-length") ?? 0);
-    const serializedBytes = Buffer.byteLength(JSON.stringify(req.body ?? null), "utf8");
+    const serializedBytes = Buffer.byteLength(
+      JSON.stringify(req.body ?? null),
+      "utf8",
+    );
     if (
-      (Number.isFinite(contentLength) && contentLength > abuseConfig.telegramMaxUpdateBytes)
-      || serializedBytes > abuseConfig.telegramMaxUpdateBytes
+      (Number.isFinite(contentLength) &&
+        contentLength > abuseConfig.telegramMaxUpdateBytes) ||
+      serializedBytes > abuseConfig.telegramMaxUpdateBytes
     ) {
       res.status(200).json({ ok: true, ignored: true });
       return;
@@ -456,10 +581,15 @@ export function createPublicTelegramRouter(
       return;
     }
 
-    const actorId = update.message?.chat.id ?? update.callback_query?.message?.chat.id;
+    const actorId =
+      update.message?.chat.id ?? update.callback_query?.message?.chat.id;
     if (actorId !== undefined) {
       const actorAdmission = rateLimiter.check(
-        purposeHmac(config.webhookSecret, "telegram-rate-limit:actor:v1", actorId),
+        purposeHmac(
+          config.webhookSecret,
+          "telegram-rate-limit:actor:v1",
+          actorId,
+        ),
         abuseConfig.telegramActorUpdateMax,
         abuseConfig.telegramWindowMs,
         now(),
@@ -473,27 +603,42 @@ export function createPublicTelegramRouter(
 
     if (update.callback_query && actorId !== undefined) {
       const callbackAdmission = rateLimiter.check(
-        purposeHmac(config.webhookSecret, "telegram-rate-limit:callback:v1", actorId),
+        purposeHmac(
+          config.webhookSecret,
+          "telegram-rate-limit:callback:v1",
+          actorId,
+        ),
         abuseConfig.telegramCallbackMax,
         abuseConfig.telegramWindowMs,
         now(),
       );
       if (!callbackAdmission.allowed) {
-        res.setHeader("Retry-After", String(callbackAdmission.retryAfterSeconds));
+        res.setHeader(
+          "Retry-After",
+          String(callbackAdmission.retryAfterSeconds),
+        );
         res.status(200).json({ ok: true, rateLimited: true });
         return;
       }
     }
 
-    const client = deps.client ?? createTelegramPublicBotClient(config.botToken);
-    const programmeService = deps.publicRead && deps.publicCurriculumRead && deps.publicQuestionAnalytics
-      ? null
-      : resolveProgrammeService();
+    const client =
+      deps.client ?? createTelegramPublicBotClient(config.botToken);
+    const programmeService =
+      deps.publicRead &&
+      deps.publicCurriculumRead &&
+      deps.publicQuestionAnalytics
+        ? null
+        : resolveProgrammeService();
     const publicRead = deps.publicRead ?? programmeService!.publicRead;
-    const publicCurriculumRead = deps.publicCurriculumRead ?? programmeService!.publicCurriculumRead;
+    const publicCurriculumRead =
+      deps.publicCurriculumRead ?? programmeService!.publicCurriculumRead;
     const publicSearch = deps.publicSearch ?? publicProgrammeSearchService;
-    const publicQuestionAnalytics = deps.publicQuestionAnalytics ?? programmeService!.publicQuestionAnalytics;
+    const publicQuestionAnalytics =
+      deps.publicQuestionAnalytics ?? programmeService!.publicQuestionAnalytics;
     const programmeId = config.publicProgrammeId;
+    const locale =
+      actorId === undefined ? "en" : (deps.localeForChat?.(actorId) ?? "en");
 
     try {
       if (update.message?.text) {
@@ -505,31 +650,61 @@ export function createPublicTelegramRouter(
             replyMarkup: replyKeyboard(),
           });
         } else if (text === "/ask") {
-          const rendered = await renderRoute("ask", programmeId, publicRead);
-          await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
+          const rendered = await renderRoute(
+            "ask",
+            programmeId,
+            publicRead,
+            locale,
+          );
+          await client.sendMessage({
+            chatId: update.message.chat.id,
+            ...rendered,
+          });
         } else if (text === "/courses") {
           await client.sendMessage({
             chatId: update.message.chat.id,
-            text: formatCourseList(await publicCurriculumRead.listCourses(programmeId)),
+            text: formatCourseList(
+              await publicCurriculumRead.listCourses(programmeId),
+            ),
             replyMarkup: replyKeyboard(),
           });
         } else if (/^\/course\s+\S+/i.test(text)) {
           const query = text.replace(/^\/course\s+/i, "").trim();
-          await sendCourseLookup(client, update.message.chat.id, publicCurriculumRead, programmeId, query);
+          await sendCourseLookup(
+            client,
+            update.message.chat.id,
+            publicCurriculumRead,
+            programmeId,
+            query,
+          );
         } else {
           const studyPlan = parseStudyPlanQuestion(text);
           const looksLikeCourseCode = /^[A-Z]{2,5}\d{3}$/i.test(text);
-          const coursePhrase = text.match(/^(?:tell me about|course)\s+(.+)$/i)?.[1]?.trim();
+          const coursePhrase = text
+            .match(/^(?:tell me about|course)\s+(.+)$/i)?.[1]
+            ?.trim();
           if (studyPlan) {
             await client.sendMessage({
               chatId: update.message.chat.id,
-              text: formatStudyPlan(await publicCurriculumRead.getStudyPlan(programmeId, studyPlan.year, studyPlan.semester)),
+              text: formatStudyPlan(
+                await publicCurriculumRead.getStudyPlan(
+                  programmeId,
+                  studyPlan.year,
+                  studyPlan.semester,
+                ),
+              ),
               replyMarkup: replyKeyboard(),
             });
-          } else if (/\b(?:credit load|credits|hours per week|weekly hours)\b/i.test(text)) {
+          } else if (
+            /\b(?:credit load|credits|hours per week|weekly hours)\b/i.test(
+              text,
+            )
+          ) {
             await client.sendMessage({
               chatId: update.message.chat.id,
-              text: formatTotals(await publicCurriculumRead.getTotals(programmeId)),
+              text: formatTotals(
+                await publicCurriculumRead.getTotals(programmeId),
+              ),
               replyMarkup: replyKeyboard(),
             });
           } else if (looksLikeCourseCode || coursePhrase) {
@@ -543,22 +718,41 @@ export function createPublicTelegramRouter(
           } else {
             const route = routeForReplyText(text);
             if (route) {
-              const rendered = await renderRoute(route, programmeId, publicRead);
-              await client.sendMessage({ chatId: update.message.chat.id, ...rendered });
+              const rendered = await renderRoute(
+                route,
+                programmeId,
+                publicRead,
+                locale,
+              );
+              await client.sendMessage({
+                chatId: update.message.chat.id,
+                ...rendered,
+              });
             } else {
               const askAdmission = rateLimiter.check(
-                purposeHmac(config.webhookSecret, "telegram-rate-limit:ask-dse:v1", update.message.chat.id),
+                purposeHmac(
+                  config.webhookSecret,
+                  "telegram-rate-limit:ask-dse:v1",
+                  update.message.chat.id,
+                ),
                 abuseConfig.telegramAskDseMax,
                 abuseConfig.telegramWindowMs,
                 now(),
               );
               if (!askAdmission.allowed) {
-                res.setHeader("Retry-After", String(askAdmission.retryAfterSeconds));
+                res.setHeader(
+                  "Retry-After",
+                  String(askAdmission.retryAfterSeconds),
+                );
                 res.status(200).json({ ok: true, rateLimited: true });
                 return;
               }
 
-              const searchResult = await publicSearch.search(programmeId, text);
+              const searchResult = await publicSearch.search(
+                programmeId,
+                text,
+                locale,
+              );
               let delivered = false;
               try {
                 await client.sendMessage({
@@ -594,28 +788,56 @@ export function createPublicTelegramRouter(
         const callbackTooLarge = callback.data
           ? Buffer.byteLength(callback.data, "utf8") > MAX_CALLBACK_DATA_BYTES
           : false;
-        const parsedCallback = callback.data && !callbackTooLarge ? parseCallbackData(callback.data) : null;
+        const parsedCallback =
+          callback.data && !callbackTooLarge
+            ? parseCallbackData(callback.data)
+            : null;
         if (!parsedCallback || !callback.message) {
-          await client.answerCallbackQuery({ callbackQueryId: callback.id, text: "This action is unavailable." });
+          await client.answerCallbackQuery({
+            callbackQueryId: callback.id,
+            text: "This action is unavailable.",
+          });
         } else {
           let rendered;
           if (parsedCallback.kind === "static") {
-            rendered = await renderStaticCallback(parsedCallback.data, programmeId, publicRead);
+            rendered = await renderStaticCallback(
+              parsedCallback.data,
+              programmeId,
+              publicRead,
+              locale,
+            );
           } else if (parsedCallback.kind === "course") {
             try {
               rendered = {
-                text: formatCourse(await publicCurriculumRead.getCourse(programmeId, parsedCallback.code)),
+                text: formatCourse(
+                  await publicCurriculumRead.getCourse(
+                    programmeId,
+                    parsedCallback.code,
+                  ),
+                ),
                 replyMarkup: inlineKeyboard("curriculum"),
               };
             } catch {
               rendered = {
-                text: formatFaqs("DSE Curriculum", await publicRead.listFaqs(programmeId, { category: "Curriculum" })),
+                text: formatFaqs(
+                  "DSE Curriculum",
+                  await publicRead.listFaqs(programmeId, {
+                    category: "Curriculum",
+                    locale,
+                  }),
+                ),
                 replyMarkup: inlineKeyboard("curriculum"),
               };
             }
           } else {
             rendered = {
-              text: formatFaqs("DSE Lecturers", await publicRead.listFaqs(programmeId, { category: "Lecturers" })),
+              text: formatFaqs(
+                "DSE Lecturers",
+                await publicRead.listFaqs(programmeId, {
+                  category: "Lecturers",
+                  locale,
+                }),
+              ),
               replyMarkup: inlineKeyboard("lecturers"),
             };
           }
