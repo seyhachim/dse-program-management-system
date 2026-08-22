@@ -1,0 +1,66 @@
+name: Student Roster Import Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/scripts/student-roster-import*"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/backend/src/plugins/students/**"
+      - "apps/backend/package.json"
+      - "packages/shared-types/src/students*"
+      - "packages/shared-types/src/contracts.ts"
+      - ".github/actions/setup-bun/action.yml"
+      - ".github/workflows/student-roster-import-integrity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/prisma/schema.prisma"
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/scripts/student-roster-import*"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/backend/src/plugins/students/**"
+      - "apps/backend/package.json"
+      - "packages/shared-types/src/students*"
+      - "packages/shared-types/src/contracts.ts"
+      - ".github/actions/setup-bun/action.yml"
+      - ".github/workflows/student-roster-import-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    name: Roster import DB and contract integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_student_roster_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_student_roster_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_student_roster_ci?schema=public
+      STUDENT_ROSTER_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun
+      - run: bun run db:generate
+      - run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - run: bun run db:security:verify
+      - name: Verify shared student contracts and importer planning
+        run: bun test packages/shared-types/src/students.test.ts apps/backend/scripts/student-roster-import.test.ts
+      - name: Verify atomic roster import against PostgreSQL
+        run: bun test apps/backend/scripts/student-roster-import-db.test.ts
