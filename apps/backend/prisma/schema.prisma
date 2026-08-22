@@ -2655,10 +2655,14 @@ model ProgrammeFaq {
   programme   Programme                        @relation(fields: [programmeId], references: [id], onDelete: Restrict)
   category    ProgrammeFaqCategory
   slug        String                           @unique
-  question    String
-  answer      String
-  shortAnswer String?
-  keywords    String[]                         @default([])
+  question      String
+  answer        String
+  shortAnswer   String?
+  keywords      String[]                         @default([])
+  questionKm    String?
+  answerKm      String?
+  shortAnswerKm String?
+  keywordsKm    String[]                         @default([])
   sortOrder   Int                              @default(0)
   isFeatured  Boolean                          @default(false)
   status      ProgrammePublicPublicationStatus @default(Draft)
@@ -2679,10 +2683,12 @@ model ProgrammeImportantDate {
   id          String                           @id @default(uuid())
   programmeId String
   programme   Programme                        @relation(fields: [programmeId], references: [id], onDelete: Restrict)
-  kind        ProgrammeImportantDateKind
-  title       String
-  description String                           @default("")
-  date        DateTime                         @db.Date
+  kind          ProgrammeImportantDateKind
+  title         String
+  description   String                           @default("")
+  titleKm       String?
+  descriptionKm String?
+  date          DateTime                         @db.Date
   endDate     DateTime?                        @db.Date
   sortOrder   Int                              @default(0)
   status      ProgrammePublicPublicationStatus @default(Draft)
@@ -2700,15 +2706,19 @@ model ProgrammePublicProfile {
   id             String    @id @default(uuid())
   programmeId    String    @unique
   programme      Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
-  programmeName  String
-  shortName      String
-  overview       String    @default("")
-  admissionEmail String?
+  programmeName   String
+  shortName       String
+  overview        String    @default("")
+  programmeNameKm String?
+  shortNameKm     String?
+  overviewKm      String?
+  admissionEmail  String?
   phone          String?
   websiteUrl     String?
-  facebookUrl    String?
-  campusAddress  String?
-  mapUrl         String?
+  facebookUrl     String?
+  campusAddress   String?
+  campusAddressKm String?
+  mapUrl          String?
   applicationUrl String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
