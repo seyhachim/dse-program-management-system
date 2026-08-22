@@ -225,6 +225,7 @@ async function queryRows(
             'studentId', s.id,
             'academicYear', p."academicYear",
             'term', p.term,
+            'programmeYear', p."programmeYear",
             'periodKey', p."academicYear" || ':' || p.term,
             'population', 'student',
             'status', p.status::text,

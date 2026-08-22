@@ -8,8 +8,12 @@ on:
       - "apps/backend/src/plugins/students/**"
       - "apps/backend/src/plugins/qa/evidence/**"
       - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/frontend/app/(shell)/students/cohorts/**"
+      - "apps/frontend/app/(shell)/programme-management/page.tsx"
+      - "apps/frontend/lib/student-cohorts.ts"
       - "packages/shared-types/src/student-progression*"
       - "packages/shared-types/src/qa-evidence-candidates.ts"
+      - ".github/actions/setup-bun/action.yml"
       - ".github/workflows/cohort-progression-ci.yml"
   push:
     branches: [main]
@@ -19,12 +23,20 @@ on:
       - "apps/backend/src/plugins/students/**"
       - "apps/backend/src/plugins/qa/evidence/**"
       - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/frontend/app/(shell)/students/cohorts/**"
+      - "apps/frontend/app/(shell)/programme-management/page.tsx"
+      - "apps/frontend/lib/student-cohorts.ts"
       - "packages/shared-types/src/student-progression*"
       - "packages/shared-types/src/qa-evidence-candidates.ts"
+      - ".github/actions/setup-bun/action.yml"
       - ".github/workflows/cohort-progression-ci.yml"
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integrity:
@@ -50,12 +62,13 @@ jobs:
       COHORT_PROGRESSION_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.23
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun
       - run: bun run db:generate
+      - run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
       - run: bun run db:migrate:deploy
       - run: bun run seed
-      - name: Verify cohort membership, progression history, and QA retrieval
-        run: bun test apps/backend/src/plugins/students/cohort-progression-db.test.ts
+      - run: bun run --cwd apps/backend db:security:verify
+      - name: Verify cohort contracts
+        run: bun test packages/shared-types/src/student-progression.test.ts
+      - name: Verify cohort membership, progression history, promotion, authorization, and QA retrieval
+        run: bun test apps/backend/src/plugins/students/cohort-progression-db.test.ts apps/backend/src/plugins/students/cohort-promotion-db.test.ts apps/backend/src/plugins/students/cohort-promotion-authorization.test.ts

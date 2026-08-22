@@ -1346,6 +1346,7 @@ model StudentProgressionRecord {
   membership   StudentCohortMembership  @relation(fields: [membershipId], references: [id], onDelete: Restrict)
   academicYear String
   term         String
+  programmeYear Int?
   periodStart  DateTime                 @db.Date
   periodEnd    DateTime                 @db.Date
   status       StudentProgressionStatus
@@ -1354,6 +1355,7 @@ model StudentProgressionRecord {
 
   @@unique([membershipId, academicYear, term])
   @@index([membershipId, periodStart])
+  @@index([membershipId, programmeYear, periodStart])
   @@index([academicYear, term, status])
 }
 
