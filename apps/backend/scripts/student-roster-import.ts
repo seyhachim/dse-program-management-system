@@ -100,7 +100,18 @@ export const StudentRosterImportDocumentSchema = z
       cohortCodes.add(key);
     }
 
+    const sourceRefs = new Set<string>();
     for (const [index, student] of document.students.entries()) {
+      const sourceKey = student.sourceRef.toLowerCase();
+      if (sourceRefs.has(sourceKey)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate sourceRef '${student.sourceRef}'`,
+          path: ["students", index, "sourceRef"],
+        });
+      }
+      sourceRefs.add(sourceKey);
+
       if (!cohortCodes.has(student.cohortCode.toLowerCase())) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
