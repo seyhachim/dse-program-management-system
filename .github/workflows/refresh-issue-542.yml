@@ -1,0 +1,34 @@
+name: Refresh issue 542 branch
+
+on:
+  push:
+    branches: [feat/issue-542-student-cohort-promotion]
+    paths:
+      - ".github/workflows/refresh-issue-542.yml"
+      - ".github/refresh-issue-542-trigger.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-542-student-cohort-promotion
+          fetch-depth: 0
+      - name: Merge current main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+      - name: Remove refresh bootstrap
+        run: |
+          rm .github/workflows/refresh-issue-542.yml .github/refresh-issue-542-trigger.txt
+          git add -A
+          git commit -m "chore: remove issue 542 refresh bootstrap"
+      - name: Push refreshed branch
+        run: git push origin HEAD:feat/issue-542-student-cohort-promotion
