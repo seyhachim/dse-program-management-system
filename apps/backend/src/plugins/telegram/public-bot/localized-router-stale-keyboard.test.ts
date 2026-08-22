@@ -142,6 +142,14 @@ async function webhook(body: unknown) {
   });
 }
 
+function inlineKeyboardOf(sent: TelegramSendMessageInput) {
+  return (
+    sent.replyMarkup as {
+      inline_keyboard: Array<Array<{ text: string; callback_data?: string }>>;
+    }
+  ).inline_keyboard;
+}
+
 describe("localized public Telegram stale reply keyboard", () => {
   test("recovers Khmer locale and routes Explore DSE after process locale state is absent", async () => {
     const response = await webhook({
@@ -158,16 +166,44 @@ describe("localized public Telegram stale reply keyboard", () => {
     expect(sent.text).toContain("Explore DSE");
     expect(sent.text).not.toContain("Admission");
 
-    const keyboard = (
-      sent.replyMarkup as {
-        inline_keyboard: Array<
-          Array<{ text: string; callback_data?: string }>
-        >;
-      }
-    ).inline_keyboard;
+    const keyboard = inlineKeyboardOf(sent);
     expect(
       keyboard.flat().map((item) => item.callback_data).filter(Boolean),
     ).toContain("explore:step:1");
     expect(keyboard.flat().map((item) => item.text)).toContain("1 · DSE ជាអ្វី?");
+  });
+
+  test("normalizes a stale Khmer label without overriding an explicit English locale", async () => {
+    const chatId = 9551002;
+    const languageResponse = await webhook({
+      update_id: 9552,
+      message: {
+        message_id: 2,
+        chat: { id: chatId },
+        text: "🇬🇧 English",
+      },
+    });
+    expect(languageResponse.status).toBe(200);
+
+    const response = await webhook({
+      update_id: 9553,
+      message: {
+        message_id: 3,
+        chat: { id: chatId },
+        text: "🚀 ស្វែងយល់អំពី DSE",
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const sent = client.sent.at(-1)!;
+    expect(sent.text).toContain("Explore DSE");
+    expect(sent.text).not.toContain("Admission");
+
+    const keyboard = inlineKeyboardOf(sent);
+    expect(
+      keyboard.flat().map((item) => item.callback_data).filter(Boolean),
+    ).toContain("explore:step:1");
+    expect(keyboard.flat().map((item) => item.text)).toContain("1 · What is DSE?");
+    expect(keyboard.flat().map((item) => item.text)).not.toContain("1 · DSE ជាអ្វី?");
   });
 });
