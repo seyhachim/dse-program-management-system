@@ -8,7 +8,7 @@ The importer treats the official `Student.studentId` as the canonical roster ide
 
 A supplied email is optional. If present it must be valid and cannot already belong to another student. Existing non-null Student/Profile fields are not overwritten by the importer; conflicts block the entire commit for human review. Existing `userId`, account linkage, status, Enrollment, results, attendance, CourseSpec, curriculum, and QA evidence are never modified.
 
-`--commit` is all-or-nothing. Planning and writes run inside one serializable Prisma transaction, and any blocked row prevents all writes.
+`--commit` is all-or-nothing. Planning and writes run inside one serializable Prisma transaction, and any blocked row prevents all writes. Every student row must also have a unique `sourceRef` so apply/report steps cannot ambiguously refer to two source rows.
 
 ## Do not commit production roster data
 
