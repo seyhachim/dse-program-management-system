@@ -97,7 +97,9 @@ describe("student roster importer", () => {
 
     expect(plan.students[1]?.action).toBe("blocked");
     expect(plan.students[1]?.blockers.join(" ")).toContain("Official studentId is missing");
-    expect(() => applyStudentRosterImportPlan(store, plan)).toThrow(StudentRosterImportBlockedError);
+    await expect(applyStudentRosterImportPlan(store, plan)).rejects.toBeInstanceOf(
+      StudentRosterImportBlockedError,
+    );
     expect(store.writes).toBe(0);
   });
 
