@@ -129,7 +129,7 @@ function faqToDraft(faq: ProgrammeFaqRecord): FaqDraft {
     questionKm: faq.questionKm ?? "",
     answerKm: faq.answerKm ?? "",
     shortAnswerKm: faq.shortAnswerKm ?? "",
-    keywordsKm: faq.keywordsKm.join(", "),
+    keywordsKm: faq.keywordsKm?.join(", ") ?? "",
     sortOrder: String(faq.sortOrder),
     isFeatured: faq.isFeatured,
     sourceLabel: faq.sourceLabel ?? "",

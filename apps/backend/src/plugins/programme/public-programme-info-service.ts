@@ -25,7 +25,7 @@ function faqData(input: ProgrammeFaqAdminWrite) {
     questionKm: nullable(input.questionKm),
     answerKm: nullable(input.answerKm),
     shortAnswerKm: nullable(input.shortAnswerKm),
-    keywordsKm: input.keywordsKm,
+    keywordsKm: input.keywordsKm ?? [],
     sortOrder: input.sortOrder,
     isFeatured: input.isFeatured,
     sourceLabel: nullable(input.sourceLabel),

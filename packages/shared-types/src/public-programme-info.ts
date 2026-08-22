@@ -156,7 +156,7 @@ export const ProgrammeFaqAdminWriteSchema = z.object({
   questionKm: z.string().trim().max(500).nullable().optional(),
   answerKm: z.string().trim().nullable().optional(),
   shortAnswerKm: z.string().trim().max(1000).nullable().optional(),
-  keywordsKm: z.array(z.string().trim().min(1).max(80)).default([]),
+  keywordsKm: z.array(z.string().trim().min(1).max(80)).optional(),
   sortOrder: z.number().int().min(0).default(0),
   isFeatured: z.boolean().default(false),
   sourceLabel: z.string().trim().max(200).nullable().optional(),
