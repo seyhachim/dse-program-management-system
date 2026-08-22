@@ -82,8 +82,17 @@ suite("cohort promotion authorization", () => {
       },
       body: JSON.stringify(body),
     });
-    const json = await response.json() as { error?: string };
-    return { status: response.status, error: json.error ?? "" };
+    const text = await response.text();
+    let error = "";
+    if (text) {
+      try {
+        const json = JSON.parse(text) as { error?: unknown };
+        error = json.error === undefined ? "" : String(json.error);
+      } catch {
+        error = text;
+      }
+    }
+    return { status: response.status, error };
   }
 });
 
