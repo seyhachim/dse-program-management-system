@@ -69,7 +69,12 @@ async function studentForUser(userId: string) {
   if (!student || student.status !== "Active") {
     throw new PortalAccessError("No active student profile is linked to this account");
   }
-  return student;
+  // Roster-only Students may legitimately have no email, but a linked Student
+  // Portal account must have been provisioned through an official email.
+  if (!student.email) {
+    throw new PortalAccessError("The linked student portal profile has no official email");
+  }
+  return { ...student, email: student.email };
 }
 
 async function enrolledRows(userId: string) {

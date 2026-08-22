@@ -10,28 +10,80 @@ export const STUDENT_STATUSES = ["Active", "Inactive", "Pending"] as const;
 export const StudentStatusSchema = z.enum(STUDENT_STATUSES);
 export type StudentStatus = z.infer<typeof StudentStatusSchema>;
 
+const nullableText = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== "string") return value;
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  },
+  z.string().min(1).nullable(),
+);
+
+/**
+ * Roster records may exist before a portal/login email is known. Blank form
+ * values normalize to null; any supplied value must still be a valid email.
+ */
+export const StudentEmailSchema = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== "string") return value;
+    const normalized = value.trim().toLowerCase();
+    return normalized.length > 0 ? normalized : null;
+  },
+  z.string().email("Valid email required").nullable(),
+);
+
+export const StudentProfileInputSchema = z
+  .object({
+    khmerFamilyName: nullableText.optional(),
+    khmerGivenName: nullableText.optional(),
+    latinFamilyName: nullableText.optional(),
+    latinGivenName: nullableText.optional(),
+    gender: nullableText.optional(),
+  })
+  .strict();
+export type StudentProfileInput = z.infer<typeof StudentProfileInputSchema>;
+
+export const StudentProfileSchema = StudentProfileInputSchema.extend({
+  id: z.string().uuid(),
+  studentRecordId: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type StudentProfile = z.infer<typeof StudentProfileSchema>;
+
 /** Full student as returned by the API. */
 export const StudentSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
-  email: z.string().email(),
+  email: StudentEmailSchema,
   studentId: z.string().min(1),
   status: StudentStatusSchema,
   createdAt: z.string().datetime(),
+  // Optional for compatibility with consumers that only need the core roster
+  // fields; the Students management API includes this relation when available.
+  profile: StudentProfileSchema.nullable().optional(),
 });
 export type Student = z.infer<typeof StudentSchema>;
 
-/** Body for POST /api/students. */
-export const CreateStudentInput = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Valid email required"),
-  studentId: z.string().min(1, "Student ID is required"),
+const StudentCoreWriteInput = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  email: StudentEmailSchema,
+  studentId: z.string().trim().min(1, "Student ID is required"),
   status: StudentStatusSchema.default("Active"),
+});
+
+/** Body for POST /api/students. */
+export const CreateStudentInput = StudentCoreWriteInput.extend({
+  profile: StudentProfileInputSchema.optional(),
 });
 export type CreateStudentInput = z.infer<typeof CreateStudentInput>;
 
-/** Body for PATCH /api/students/:id — all fields optional. */
-export const UpdateStudentInput = CreateStudentInput.partial();
+/** Body for PATCH /api/students/:id — all core/profile fields optional. */
+export const UpdateStudentInput = StudentCoreWriteInput.partial().extend({
+  profile: StudentProfileInputSchema.partial().optional(),
+});
 export type UpdateStudentInput = z.infer<typeof UpdateStudentInput>;
 
 /** Body for PATCH /api/students/:id/status. */
