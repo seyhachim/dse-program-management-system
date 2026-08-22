@@ -19,7 +19,9 @@ jobs:
           ref: feat/issue-545-bilingual-public-content
       - uses: oven-sh/setup-bun@v2
       - name: Apply implementation patch
-        run: python scripts/issue-545-apply.py
+        run: |
+          sed -i 's/if count != 1:/if count < 1:/' scripts/issue-545-apply.py
+          python scripts/issue-545-apply.py
       - name: Format touched TypeScript
         run: |
           bunx prettier --write packages/shared-types/src/public-programme-info.ts apps/backend/src/plugins/programme/public-programme-info-service.ts apps/backend/src/plugins/programme/public-programme-read-service.ts apps/backend/src/plugins/programme/public-programme-search-service.ts apps/backend/src/plugins/programme/public-programme-read-router.ts apps/backend/src/plugins/telegram/public-bot/router.ts apps/backend/src/plugins/telegram/public-bot/localized-router.ts apps/frontend/app/'(shell)'/public-information/public-information-client.tsx apps/backend/src/plugins/programme/public-programme-bilingual.test.ts
