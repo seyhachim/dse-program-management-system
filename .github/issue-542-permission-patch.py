@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Temporary self-deleting patch runner for issue #542.
 
 def replace_once(path: str, old: str, new: str) -> None:
     file = Path(path)
