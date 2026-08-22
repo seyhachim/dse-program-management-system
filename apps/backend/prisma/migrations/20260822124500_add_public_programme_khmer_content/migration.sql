@@ -1,5 +1,6 @@
 -- Issue #545: additive bilingual public programme content.
 -- English fields remain authoritative fallback; NULL Khmer fields mean "use English".
+-- Translations live on the same logical records and therefore share the existing Draft/Published lifecycle.
 ALTER TABLE "ProgrammeFaq"
   ADD COLUMN "questionKm" TEXT,
   ADD COLUMN "answerKm" TEXT,
