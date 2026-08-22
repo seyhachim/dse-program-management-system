@@ -82,6 +82,11 @@ type PublicReadService = {
       locale?: PublicProgrammeLocale;
     },
   ): Promise<PublicProgrammeFaq[]>;
+  getFaqBySlug?(
+    programmeId: string,
+    slug: string,
+    locale?: PublicProgrammeLocale,
+  ): Promise<PublicProgrammeFaq>;
   getAdmission(
     programmeId: string,
     locale?: PublicProgrammeLocale,
@@ -92,7 +97,7 @@ type PublicReadService = {
   ): Promise<PublicProgrammeFeesScholarships>;
   listImportantDates(
     programmeId: string,
-    filters?: { locale?: PublicProgrammeLocale },
+    filters?: { kind?: string; locale?: PublicProgrammeLocale },
   ): Promise<PublicProgrammeImportantDate[]>;
   getContact(
     programmeId: string,
@@ -152,6 +157,89 @@ const CATEGORY_BY_PREFIX: Array<[string, ProgrammeFaqCategory]> = [
   ["lecturer:", "Lecturers"],
 ];
 
+const FAQ_SLUG_BY_CALLBACK: Record<string, string> = {
+  "about:what_is_dse": "what-is-dse",
+  "about:why_dse": "why-dse",
+  "about:what_learn": "what-will-i-study",
+  "about:duration": "programme-duration",
+  "about:who_should_join": "who-should-join-dse",
+  "about:vs_cs": "dse-vs-computer-science",
+  "about:vs_it": "dse-vs-information-technology",
+  "admission:eligibility": "admission-eligibility",
+  "admission:requirements": "admission-requirements",
+  "admission:how_to_apply": "how-to-apply",
+  "admission:documents": "admission-documents",
+  "admission:exam": "entrance-exam",
+  "admission:english": "english-requirement",
+  "admission:programming": "programming-requirement",
+  "admission:math": "mathematics-requirement",
+  "curriculum:overview": "what-will-i-study",
+  "curriculum:topic:programming": "curriculum-programming",
+  "curriculum:topic:data": "curriculum-data",
+  "curriculum:topic:ai_ml": "curriculum-ai-ml",
+  "curriculum:topic:math": "curriculum-math-statistics",
+  "curriculum:projects": "curriculum-projects",
+  "curriculum:internship": "curriculum-internship",
+  "curriculum:final_project": "final-year-options",
+  "careers:jobs": "career-opportunities",
+  "careers:explorer": "career-opportunities",
+  "career:data_analyst": "career-data-analyst",
+  "career:data_scientist": "career-data-scientist",
+  "career:ml_engineer": "career-ml-engineer",
+  "career:data_engineer": "career-data-engineer",
+  "career:software_engineer": "career-software-engineer",
+  "career:bi_analyst": "career-bi-analyst",
+  "career:research": "career-research",
+  "career:government": "career-government",
+  "career:agritech": "career-agritech",
+  "fees:tuition": "tuition-fee",
+  "fees:other_costs": "other-study-costs",
+  "fees:payment_schedule": "payment-schedule",
+  "fees:support": "financial-support",
+  "scholarships:available": "scholarships-available",
+  "scholarships:eligibility": "scholarship-eligibility",
+  "scholarships:apply": "scholarship-how-to-apply",
+  "scholarships:deadline": "scholarship-deadline",
+  "studentlife:experience": "student-life-experience",
+  "studentlife:projects": "student-life-projects",
+  "studentlife:internships": "student-life-internships",
+  "studentlife:clubs": "student-life-clubs",
+  "studentlife:competitions": "student-life-competitions",
+  "studentlife:workload": "student-life-workload",
+  "studentlife:team_projects": "student-life-team-projects",
+  "studentlife:support": "student-life-support",
+  "facility:computer_labs": "facility-computer-labs",
+  "facility:data_computing": "facility-data-computing-lab",
+  "facility:smart_agriculture": "facility-smart-agriculture-systems-lab",
+  "facility:software": "facility-software-tools",
+  "facility:research": "facility-research",
+  "lecturers:leadership": "programme-leadership",
+  "lecturers:list:1": "lecturers",
+  "lecturers:expertise": "lecturer-expertise",
+  "lecturers:research": "lecturer-research",
+  "fit:q1:programming": "fit-programming",
+  "fit:q1:data": "fit-data-numbers",
+  "fit:q1:ai": "fit-ai-technology",
+  "fit:q1:research": "fit-research",
+  "fit:q1:unsure": "fit-not-sure",
+  "fit:q2:love": "fit-math-love",
+  "fit:q2:okay": "fit-math-okay",
+  "fit:q2:difficult": "fit-math-difficult",
+  "fit:q3:yes": "fit-programming-yes",
+  "fit:q3:little": "fit-programming-little",
+  "fit:q3:never": "fit-programming-never",
+};
+
+const DATE_KIND_BY_CALLBACK: Record<string, string> = {
+  "dates:application_open": "ApplicationOpen",
+  "dates:application_deadline": "ApplicationDeadline",
+  "dates:exam": "EntranceExam",
+  "dates:interview": "Interview",
+  "dates:results": "Results",
+  "dates:registration": "Registration",
+  "dates:semester_start": "SemesterStart",
+};
+
 function secureEqual(actual: string | undefined, expected: string): boolean {
   if (!actual) return false;
   const a = Buffer.from(actual);
@@ -192,6 +280,14 @@ async function observeAskDseBestEffort(
   } catch {
     console.error("Public Ask DSE analytics failed");
   }
+}
+
+function formatFaq(faq: PublicProgrammeFaq): string {
+  return `${faq.question}\n\n${faq.shortAnswer || faq.answer}`;
+}
+
+function formatMissingPublishedTopic(slug: string): string {
+  return `DSE Information\n\nNo published information is available yet for “${slug.replaceAll("-", " ")}”.`;
 }
 
 function formatFaqs(title: string, faqs: PublicProgrammeFaq[]): string {
@@ -423,10 +519,26 @@ async function renderRoute(
   };
 }
 
+function callbackParentRoute(data: string): RouteKey {
+  if (data.startsWith("about:")) return "about";
+  if (data.startsWith("admission:")) return "admission";
+  if (data.startsWith("curriculum:")) return "curriculum";
+  if (data.startsWith("career")) return "careers";
+  if (data.startsWith("fees:") || data.startsWith("scholarships:")) return "fees";
+  if (data.startsWith("studentlife:")) return "studentLife";
+  if (data.startsWith("facility:")) return "facilities";
+  if (data.startsWith("lecturers:")) return "lecturers";
+  if (data.startsWith("dates:")) return "dates";
+  if (data.startsWith("contact:")) return "contact";
+  if (data.startsWith("fit:")) return "fit";
+  return "home";
+}
+
 async function renderStaticCallback(
   data: string,
   programmeId: string,
   publicRead: PublicReadService,
+  publicCurriculumRead: PublicCurriculumReadService,
   locale: PublicProgrammeLocale = "en",
 ): Promise<{ text: string; replyMarkup: TelegramReplyMarkup }> {
   const route = CALLBACK_ROUTE.get(data);
@@ -441,6 +553,7 @@ async function renderStaticCallback(
       replyMarkup: inlineKeyboard("ask"),
     };
   }
+
   const faqCategoryCallbacks: Record<string, ProgrammeFaqCategory> = {
     "faq:category:admission": "Admission",
     "faq:category:curriculum": "Curriculum",
@@ -460,20 +573,78 @@ async function renderStaticCallback(
       replyMarkup: inlineKeyboard("ask"),
     };
   }
-  if (data.startsWith("dates:")) {
+
+  if (data === "curriculum:courses:page:1") {
+    return {
+      text: formatCourseList(await publicCurriculumRead.listCourses(programmeId)),
+      replyMarkup: inlineKeyboard("curriculum"),
+    };
+  }
+
+  const yearMatch = data.match(/^curriculum:year:([1-4])$/);
+  if (yearMatch) {
+    const year = Number(yearMatch[1]);
+    const [first, second] = await Promise.all([
+      publicCurriculumRead.getStudyPlan(programmeId, year, "First"),
+      publicCurriculumRead.getStudyPlan(programmeId, year, "Second"),
+    ]);
+    return {
+      text: `${formatStudyPlan(first)}\n\n${formatStudyPlan(second)}`,
+      replyMarkup: inlineKeyboard("curriculum"),
+    };
+  }
+
+  const faqSlug = FAQ_SLUG_BY_CALLBACK[data];
+  if (faqSlug && publicRead.getFaqBySlug) {
+    try {
+      return {
+        text: formatFaq(
+          await publicRead.getFaqBySlug(programmeId, faqSlug, locale),
+        ),
+        replyMarkup: inlineKeyboard(callbackParentRoute(data)),
+      };
+    } catch {
+      return {
+        text: formatMissingPublishedTopic(faqSlug),
+        replyMarkup: inlineKeyboard(callbackParentRoute(data)),
+      };
+    }
+  }
+
+  const dateKind = DATE_KIND_BY_CALLBACK[data];
+  if (dateKind) {
     return {
       text: formatDates(
-        await publicRead.listImportantDates(programmeId, { locale }),
+        await publicRead.listImportantDates(programmeId, {
+          kind: dateKind,
+          locale,
+        }),
       ),
       replyMarkup: inlineKeyboard("dates"),
     };
   }
+
   if (data.startsWith("contact:")) {
+    const contact = await publicRead.getContact(programmeId, locale);
+    const selected: Record<string, { label: string; value: string | null | undefined }> = {
+      "contact:location": { label: "Location", value: contact.campusAddress },
+      "contact:phone": { label: "Phone", value: contact.phone },
+      "contact:email": { label: "Email", value: contact.admissionEmail },
+      "contact:website": { label: "Website", value: contact.websiteUrl },
+      "contact:admissions": {
+        label: "Admissions contact",
+        value: contact.applicationUrl ?? contact.admissionEmail ?? contact.phone,
+      },
+    };
+    const item = selected[data];
     return {
-      text: formatContact(await publicRead.getContact(programmeId, locale)),
+      text: item?.value
+        ? `${item.label}\n\n${item.value}`
+        : `${item?.label ?? "Contact"}\n\nNo published information is available yet.`,
       replyMarkup: inlineKeyboard("contact"),
     };
   }
+
   const category = CATEGORY_BY_PREFIX.find(([prefix]) =>
     data.startsWith(prefix),
   )?.[1];
@@ -502,13 +673,18 @@ async function renderStaticCallback(
       replyMarkup: inlineKeyboard(routeForCategory),
     };
   }
+
   if (data.startsWith("explore:")) {
     const step = data.match(/^explore:step:([1-5])$/)?.[1];
     const routeKey = step ? (`explore.step${step}` as RouteKey) : "explore";
     return renderRoute(routeKey, programmeId, publicRead, locale);
   }
-  if (data.startsWith("fit:"))
-    return renderRoute("fit", programmeId, publicRead, locale);
+  if (data.startsWith("fit:")) {
+    return {
+      text: formatMissingPublishedTopic(FAQ_SLUG_BY_CALLBACK[data] ?? "dse-suitability-guide"),
+      replyMarkup: inlineKeyboard("fit"),
+    };
+  }
   return renderRoute("home", programmeId, publicRead, locale);
 }
 
@@ -804,6 +980,7 @@ export function createPublicTelegramRouter(
               parsedCallback.data,
               programmeId,
               publicRead,
+              publicCurriculumRead,
               locale,
             );
           } else if (parsedCallback.kind === "course") {
