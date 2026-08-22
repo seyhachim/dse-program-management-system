@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PluginManifest } from "./plugins.ts";
 
 export const GraduationProjectStatusSchema = z.enum(["Proposed", "Active", "Completed", "Archived"]);
 export type GraduationProjectStatus = z.infer<typeof GraduationProjectStatusSchema>;
@@ -52,3 +53,14 @@ export interface GraduationProjectMeetingView { id: string; projectId: string; o
 export interface GraduationProjectSummary { id: string; programmeId: string; cohortId: string | null; title: string; abstract: string; status: GraduationProjectStatus; createdAt: string; updatedAt: string; members: GraduationProjectMemberView[]; advisors: GraduationProjectAdvisorView[]; phases: GraduationProjectPhaseView[] }
 export interface GraduationProjectDetail extends GraduationProjectSummary { milestones: GraduationProjectMilestoneView[]; meetings: GraduationProjectMeetingView[] }
 export interface GraduationProjectAdvisorWorkload { lecturerId: string; lecturerName: string; activeProjectCount: number; primaryProjectCount: number; coAdvisorProjectCount: number }
+
+export const graduationProjectsManifest: PluginManifest = {
+  id: "graduation-projects",
+  name: "Graduation Projects",
+  version: "0.1.0",
+  description: "Year-4 final project, thesis and internship supervision lifecycle.",
+  routes: [
+    { label: "Final Projects", path: "/graduation-projects", icon: "graduation-cap", roles: ["admin", "program_coordinator", "lecturer"], group: "Academic" },
+    { label: "My Final Project", path: "/portal/final-project", icon: "graduation-cap", roles: ["student"], group: "Progress" },
+  ],
+};
