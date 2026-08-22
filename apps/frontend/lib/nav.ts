@@ -103,6 +103,15 @@ const frontendManifests = [
   publicInformationManifest,
 ];
 
+const SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS: Role[] = ["admin", "program_coordinator"];
+
+function sidebarManifestsForRoles(roles: Role[]): PluginManifest[] {
+  const hidePlaceholders = roles.some((role) => SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS.includes(role));
+  return hidePlaceholders
+    ? frontendManifests.filter((manifest) => manifest.id !== "placeholders")
+    : frontendManifests;
+}
+
 export const iconMap: Record<string, LucideIcon> = {
   users: Users,
   book: Book,
@@ -136,5 +145,5 @@ export function getNavRoutes(roles?: Role[]): PluginRoute[] {
 
 /** Nav routes for `roles` (union across all of them), grouped into sidebar sections. */
 export function getNavGroups(roles: Role[]): NavGroup[] {
-  return navGroupsForRole(frontendManifests, roles);
+  return navGroupsForRole(sidebarManifestsForRoles(roles), roles);
 }
