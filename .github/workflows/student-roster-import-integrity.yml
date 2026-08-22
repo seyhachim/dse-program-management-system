@@ -59,7 +59,7 @@ jobs:
       - run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
       - run: bun run db:migrate:deploy
       - run: bun run seed
-      - run: bun run db:security:verify
+      - run: bun run --cwd apps/backend db:security:verify
       - name: Verify shared student contracts and importer planning
         run: bun test packages/shared-types/src/students.test.ts apps/backend/scripts/student-roster-import.test.ts
       - name: Verify atomic roster import against PostgreSQL
