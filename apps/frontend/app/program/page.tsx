@@ -64,7 +64,11 @@ export default async function ProgrammePage() {
       <header className={styles.header}>
         <div className={`${styles.shell} ${styles.nav}`}>
           <Link href="/program" className={styles.brand} aria-label="DSE programme home">
-            <span className={styles.logoLockup} aria-hidden="true">
+            <span
+              className={styles.logoLockup}
+              aria-hidden="true"
+              style={{ background: "#0b1f3a", borderRadius: 14, padding: "7px 11px" }}
+            >
               <span className={styles.ruppMark}>
                 <img src="/rupp-logo.png" alt="" />
               </span>
@@ -117,13 +121,9 @@ export default async function ProgrammePage() {
             <a href="#curriculum" className={styles.primaryButton}>
               Explore Curriculum <ArrowRight aria-hidden="true" />
             </a>
-            {applicationUrl ? (
+            {applicationUrl && (
               <a href={applicationUrl} className={styles.secondaryButton}>
                 Apply Now <ArrowRight aria-hidden="true" />
-              </a>
-            ) : (
-              <a href="#contact" className={styles.secondaryButton}>
-                Contact DSE <ArrowRight aria-hidden="true" />
               </a>
             )}
           </div>
