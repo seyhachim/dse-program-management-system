@@ -30,6 +30,7 @@ export * from "./methods.ts";
 export * from "./rubrics.ts";
 export * from "./student-portal.ts";
 export * from "./result-corrections.ts";
+export * from "./graduation-projects.ts";
 export * from "./telegram.ts";
 export * from "./telegram-phase2.ts";
 export * from "./qa.ts";
