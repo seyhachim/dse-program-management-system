@@ -73,7 +73,7 @@ export function createStudentCohortRouter(): Router {
     catch (err) { res.status(notFound(err) ? 404 : 400).json({ error: notFound(err) ? "Cohort not found" : "Could not preview cohort promotion" }); }
   });
 
-  router.post("/:cohortId/promotion/apply", requirePermission("students:write"), async (req, res) => {
+  router.post("/:cohortId/promotion/apply", requirePermission("programme:write"), async (req, res) => {
     const parsed = ApplyStudentPromotionInput.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
     try { res.status(201).json(await studentCohortService.applyPromotion(req.params.cohortId!, parsed.data)); }
