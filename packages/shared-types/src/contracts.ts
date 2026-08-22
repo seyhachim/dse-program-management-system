@@ -16,7 +16,7 @@ export interface StudentRef {
   id: string;
   name: string;
   studentId: string;
-  email: string;
+  email: string | null;
   status: StudentStatus;
 }
 
