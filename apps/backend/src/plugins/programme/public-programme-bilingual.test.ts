@@ -18,6 +18,18 @@ const khmerFaq: PublicProgrammeFaq & { keywords?: string[] } = {
   sourceUrl: null,
 };
 
+const khmerApplicationFaq: PublicProgrammeFaq & { keywords?: string[] } = {
+  slug: "how-to-apply",
+  category: "Admission",
+  question: "តើខ្ញុំអាចដាក់ពាក្យចូលរៀន DSE បានដោយរបៀបណា?",
+  answer: "បេក្ខជនអាចដាក់ពាក្យចូលរៀនតាមដំណើរការដែលកម្មវិធី DSE បានផ្សព្វផ្សាយ។",
+  shortAnswer: "សូមអនុវត្តតាមដំណើរការដាក់ពាក្យ DSE។",
+  keywords: ["ចូលរៀន", "បេក្ខជន", "ដាក់ពាក្យ"],
+  isFeatured: true,
+  sourceLabel: null,
+  sourceUrl: null,
+};
+
 describe("bilingual public programme content", () => {
   test("keeps Khmer letters during deterministic normalization", () => {
     expect(normalizePublicSearchText("តើ ចូលរៀន DSE ដូចម្តេច?")).toContain(
@@ -30,6 +42,17 @@ describe("bilingual public programme content", () => {
       khmerFaq,
     ]);
     expect(result.kind).toBe("answer");
+  });
+
+  test("returns Khmer suggestions when multiple published FAQs are similarly relevant", () => {
+    const result = chooseAskDseResult("បេក្ខជន ចូលរៀន", [
+      khmerFaq,
+      khmerApplicationFaq,
+    ]);
+    expect(result.kind).toBe("suggestions");
+    if (result.kind === "suggestions") {
+      expect(result.suggestions).toHaveLength(2);
+    }
   });
 
   test("uses Khmer keywords for a deterministic match", () => {
