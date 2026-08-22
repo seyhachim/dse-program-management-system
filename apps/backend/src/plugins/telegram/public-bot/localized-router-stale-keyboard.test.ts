@@ -155,8 +155,8 @@ describe("localized public Telegram stale reply keyboard", () => {
 
     expect(response.status).toBe(200);
     const sent = client.sent.at(-1)!;
-    expect(sent.text).toContain("ស្វែងយល់អំពី DSE");
-    expect(sent.text).not.toContain("ការចូលរៀន");
+    expect(sent.text).toContain("Explore DSE");
+    expect(sent.text).not.toContain("Admission");
 
     const keyboard = (
       sent.replyMarkup as {
