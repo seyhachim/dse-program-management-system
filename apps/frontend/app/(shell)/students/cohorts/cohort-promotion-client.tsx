@@ -18,7 +18,7 @@ const PROGRAMME_ID = "dse";
 
 export function CohortPromotionClient() {
   const { me } = useMe();
-  const canWrite = me?.permissions.includes("students:write") ?? false;
+  const canWrite = me?.permissions.includes("programme:write") ?? false;
   const [cohorts, setCohorts] = useState<StudentCohortSummaryView[]>([]);
   const [cohortId, setCohortId] = useState("");
   const [sourceProgrammeYear, setSourceProgrammeYear] = useState<StudentProgrammeYear>(1);
