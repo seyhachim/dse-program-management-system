@@ -86,16 +86,27 @@ export function StudentsClient() {
     }
   };
 
+  const selectedStudent = selectedIds.length === 1
+    ? rows.find((row) => row.id === selectedIds[0]) ?? null
+    : null;
+
   const handleInvite = async () => {
-    const student = rows.find((row) => row.id === selectedIds[0]);
-    if (!student || selectedIds.length !== 1) return;
-    if (!confirm(`Send a student portal invitation to ${student.email}?`)) return;
+    if (!selectedStudent) return;
+    if (!selectedStudent.email) {
+      setError("Add an official email to this student before sending a portal invitation.");
+      return;
+    }
+    if (!confirm(`Send a student portal invitation to ${selectedStudent.email}?`)) return;
     setInviting(true);
     setError(null);
     setNotice(null);
     try {
-      await authApi.createAccount({ name: student.name, email: student.email, role: "student" });
-      setNotice(`Portal invitation sent to ${student.email}.`);
+      await authApi.createAccount({
+        name: selectedStudent.name,
+        email: selectedStudent.email,
+        role: "student",
+      });
+      setNotice(`Portal invitation sent to ${selectedStudent.email}.`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to send portal invitation");
     } finally {
@@ -110,7 +121,11 @@ export function StudentsClient() {
       render: (s) => <span className="font-medium">{s.name}</span>,
     },
     { key: "studentId", header: "Student ID", render: (s) => s.studentId },
-    { key: "email", header: "Email", render: (s) => s.email },
+    {
+      key: "email",
+      header: "Email",
+      render: (s) => s.email ?? <span className="text-muted-foreground">—</span>,
+    },
     {
       key: "status",
       header: "Status",
@@ -145,11 +160,17 @@ export function StudentsClient() {
       />
 
       {me?.permissions.includes("accounts:create") ? (
-        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
           <p className="text-sm text-muted-foreground">
-            Select one student to provision their secure portal login.
+            {selectedStudent && !selectedStudent.email
+              ? "This roster record has no official email yet. Add one before provisioning portal access."
+              : "Select one student with an official email to provision their secure portal login."}
           </p>
-          <Button variant="outline" disabled={selectedIds.length !== 1 || inviting} onClick={handleInvite}>
+          <Button
+            variant="outline"
+            disabled={!selectedStudent?.email || inviting}
+            onClick={handleInvite}
+          >
             <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
           </Button>
         </div>
