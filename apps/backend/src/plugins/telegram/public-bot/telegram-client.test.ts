@@ -27,7 +27,7 @@ describe("Telegram public bot client", () => {
         400,
         "Bad Request: message is not modified: specified new message content and reply markup are exactly the same",
       );
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
     const client = createTelegramPublicBotClient("123:test-token", fetchImpl);
 
     await expect(
@@ -44,7 +44,10 @@ describe("Telegram public bot client", () => {
 
   test("still fails closed for real Telegram edit errors", async () => {
     const fetchImpl = (async () =>
-      jsonResponse(400, "Bad Request: message to edit not found")) as typeof fetch;
+      jsonResponse(
+        400,
+        "Bad Request: message to edit not found",
+      )) as unknown as typeof fetch;
     const client = createTelegramPublicBotClient("123:test-token", fetchImpl);
 
     try {
