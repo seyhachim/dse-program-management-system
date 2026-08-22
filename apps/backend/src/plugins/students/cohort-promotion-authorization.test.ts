@@ -11,6 +11,7 @@ import { prisma } from "../../core/db/prisma.ts";
 const enabled = process.env.COHORT_PROGRESSION_DB_TESTS === "1";
 const suite = enabled ? describe : describe.skip;
 const TEST_SECRET = "issue-542-promotion-auth-secret-at-least-32-chars";
+const COHORTS_API = "/api/students/cohorts";
 
 suite("cohort promotion authorization", () => {
   let server: Server;
@@ -61,13 +62,13 @@ suite("cohort promotion authorization", () => {
     };
 
     for (const actor of [users.admin, users.coordinator]) {
-      const response = await request(`/api/student-cohorts/${cohortId}/promotion/apply`, actor, body);
+      const response = await request(`${COHORTS_API}/${cohortId}/promotion/apply`, actor, body);
       expect(response.status).toBe(404);
       expect(response.error).toContain("Cohort not found");
     }
 
     for (const actor of [users.secretary, users.lecturer, users.student]) {
-      const response = await request(`/api/student-cohorts/${cohortId}/promotion/apply`, actor, body);
+      const response = await request(`${COHORTS_API}/${cohortId}/promotion/apply`, actor, body);
       expect(response.status).toBe(403);
       expect(response.error).toContain("programme:write");
     }
