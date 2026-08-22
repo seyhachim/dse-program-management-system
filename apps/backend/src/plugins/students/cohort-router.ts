@@ -1,16 +1,18 @@
 import { Router } from "express";
 import {
   AddStudentCohortMembershipInput,
+  ApplyStudentPromotionInput,
   AppendStudentProgressionInput,
   CreateStudentCohortInput,
   ExitStudentCohortMembershipInput,
   ListStudentCohortsQuery,
   ListStudentProgressionQuery,
   ListStudentCompletionOutcomesQuery,
+  PreviewStudentPromotionInput,
   RecordStudentCompletionOutcomeInput,
 } from "@dse-pms/shared-types";
 import { requirePermission } from "../../core/permissions/index.ts";
-import { studentCohortService } from "./cohort-service.ts";
+import { StudentPromotionConflictError, studentCohortService } from "./cohort-service.ts";
 
 const notFound = (err: unknown) => typeof err === "object" && err !== null && (err as { code?: string }).code === "P2025";
 const conflict = (err: unknown) => typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
@@ -62,6 +64,27 @@ export function createStudentCohortRouter(): Router {
     if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
     try { res.status(201).json(await studentCohortService.appendProgression(req.params.cohortId!, parsed.data)); }
     catch (err) { res.status(notFound(err) ? 404 : conflict(err) ? 409 : 400).json({ error: notFound(err) ? "Cohort membership not found" : conflict(err) ? "Progression already recorded for this academic period" : "Could not append progression record" }); }
+  });
+
+  router.post("/:cohortId/promotion/preview", requirePermission("students:read"), async (req, res) => {
+    const parsed = PreviewStudentPromotionInput.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+    try { res.json(await studentCohortService.previewPromotion(req.params.cohortId!, parsed.data)); }
+    catch (err) { res.status(notFound(err) ? 404 : 400).json({ error: notFound(err) ? "Cohort not found" : "Could not preview cohort promotion" }); }
+  });
+
+  router.post("/:cohortId/promotion/apply", requirePermission("students:write"), async (req, res) => {
+    const parsed = ApplyStudentPromotionInput.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+    try { res.status(201).json(await studentCohortService.applyPromotion(req.params.cohortId!, parsed.data)); }
+    catch (err) {
+      if (notFound(err)) return void res.status(404).json({ error: "Cohort not found" });
+      if (err instanceof StudentPromotionConflictError) {
+        return void res.status(409).json({ error: "Cohort promotion is blocked", blockers: err.blockers });
+      }
+      if (conflict(err)) return void res.status(409).json({ error: "Progression already recorded for this academic period" });
+      res.status(400).json({ error: err instanceof Error ? err.message : "Could not apply cohort promotion" });
+    }
   });
 
   router.get("/:cohortId/completion-outcomes", requirePermission("students:read"), async (req, res) => {
