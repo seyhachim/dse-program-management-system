@@ -1,9 +1,10 @@
 name: Apply issue 545 implementation
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/issue-545-bilingual-public-content
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
