@@ -53,7 +53,6 @@ export function ProgrammeThemeToggle({ className }: { className?: string }) {
       title={`${label} · click to change`}
     >
       <Icon aria-hidden="true" />
-      <span className="sr-only">{label}</span>
     </button>
   );
 }
