@@ -145,16 +145,19 @@ function preprocessLanguageSelection(
 
   // Telegram keeps a reply keyboard on the device across backend deploys, while
   // this lightweight locale store is intentionally process-local. A known Khmer
-  // keyboard label therefore carries enough presentation context to restore the
-  // lost locale and route through the same canonical English RouteKey input.
+  // keyboard label therefore carries enough presentation context to restore a
+  // missing locale and route through the same canonical English RouteKey input.
+  // If the user explicitly selected English, keep that preference while still
+  // normalizing the stale Khmer keyboard label for typed routing.
+  const storedLocale = localeStore.get(key);
   const normalizedReplyText = toEnglishReplyText(message.text);
   if (normalizedReplyText !== message.text) {
-    localeStore.set(key, "km");
+    if (!storedLocale) localeStore.set(key, "km");
     message.text = normalizedReplyText;
     return;
   }
 
-  if (localeStore.get(key) === "km") {
+  if (storedLocale === "km") {
     message.text = normalizedReplyText;
   }
 }
@@ -170,8 +173,8 @@ function preprocessLanguageSelection(
  * Locale preference is intentionally lightweight and process-local. It is stored
  * only under a purpose-separated HMAC key, never under a raw Telegram identifier.
  * After a process restart, a tap on an existing Khmer reply keyboard safely
- * rehydrates Khmer presentation state; otherwise English remains the fallback.
- * No authorization decision depends on this preference.
+ * rehydrates missing Khmer presentation state; an explicit English choice is
+ * preserved. No authorization decision depends on this preference.
  */
 export function createLocalizedPublicTelegramRouter(
   deps: PublicTelegramRouterDependencies = {},
