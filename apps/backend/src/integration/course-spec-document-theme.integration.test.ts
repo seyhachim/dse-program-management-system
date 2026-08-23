@@ -7,6 +7,7 @@ import {
   updateCourseSpecDocumentTheme,
   updateProgrammeCourseSpecDocumentTheme,
 } from "../plugins/courses/document-theme-service.ts";
+import { lecturerCanReadCourseSpecTheme } from "../plugins/courses/document-theme-router.ts";
 import { CourseSpecLockedError } from "../plugins/courses/spec-lock.ts";
 import { gradingScaleService } from "../plugins/programme/grading-scale-service.ts";
 
@@ -208,6 +209,49 @@ describeDb("Course Specification document theme integration", () => {
           row.courseSpecId === spec.id,
       ),
     ).toBe(true);
+  });
+
+  test("a responsible-only lecturer can read the same exact version theme as governance", async () => {
+    const f = await fixture();
+    const lecturer = await prisma.user.create({
+      data: {
+        email: `theme-lecturer-${crypto.randomUUID().slice(0, 8)}@example.test`,
+        name: "Theme Responsible Lecturer",
+      },
+    });
+    const spec = await prisma.courseSpec.create({
+      data: { courseId: f.course.id },
+    });
+    await ensureCourseSpecThemeSnapshot(f.course.id, spec.id);
+
+    const officialTheme = {
+      ...DEFAULT_COURSE_SPEC_DOCUMENT_THEME,
+      bodyFontFamily: "Times New Roman" as const,
+      bodyFontSizePt: 11,
+      tableFontSizePt: 9.5,
+      marginsMm: { top: 15, bottom: 15, left: 15, right: 15 },
+    };
+    await updateCourseSpecDocumentTheme(
+      f.course.id,
+      officialTheme,
+      f.actor.id,
+      spec.id,
+    );
+
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "CourseSpecResponsibleLecturer" ("courseSpecId", "lecturerId")
+      VALUES (${spec.id}, ${lecturer.id})
+    `);
+
+    expect(await lecturerCanReadCourseSpecTheme(f.course.id, lecturer.id)).toBe(
+      true,
+    );
+
+    const governanceView = await getCourseSpecDocumentTheme(f.course.id, spec.id);
+    const lecturerView = await getCourseSpecDocumentTheme(f.course.id, spec.id);
+    expect(lecturerView.courseSpecId).toBe(spec.id);
+    expect(lecturerView.theme).toEqual(governanceView.theme);
+    expect(lecturerView.theme).toEqual(officialTheme);
   });
 });
 
