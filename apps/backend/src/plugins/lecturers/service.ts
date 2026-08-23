@@ -14,10 +14,10 @@ import { defaultProgrammeIdForRole } from "../../core/auth/token.ts";
  * Lecturers = Users with role "lecturer". `list`/`getById` are the public
  * cross-plugin surface (LecturersServiceContract) so Courses and Offerings can
  * resolve lecturers via the registry. create/update/remove back the admin
- * editing UI; they return the same richer shape (incl. syllabus contact fields).
+ * editing UI; they return the same lean syllabus/contact shape.
  */
 
-/** Fields exposed for a lecturer — authId is only used to derive accountAccess. */
+/** Lean lecturer reference used by admin lists and cross-plugin consumers. */
 const lecturerSelect = {
   id: true,
   authId: true,
@@ -27,6 +27,11 @@ const lecturerSelect = {
   title: true,
   qualification: true,
   phone: true,
+} as const;
+
+/** Richer self-profile select; professional metadata is not added to broad lecturer lists. */
+const ownLecturerSelect = {
+  ...lecturerSelect,
   lecturerProfile: {
     select: {
       gender: true,
@@ -39,12 +44,25 @@ const lecturerSelect = {
 } as const;
 
 type LecturerRow = Awaited<ReturnType<typeof selectLecturerRow>>;
+type OwnLecturerRow = Awaited<ReturnType<typeof selectOwnLecturerRow>>;
 
 function selectLecturerRow(id: string) {
   return prisma.user.findUnique({ where: { id }, select: lecturerSelect });
 }
 
+function selectOwnLecturerRow(id: string) {
+  return prisma.user.findUnique({ where: { id }, select: ownLecturerSelect });
+}
+
 function presentLecturer(row: NonNullable<LecturerRow>) {
+  const { authId, ...lecturer } = row;
+  return {
+    ...lecturer,
+    accountAccess: authId ? ("has_access" as const) : ("no_access" as const),
+  };
+}
+
+function presentOwnLecturer(row: NonNullable<OwnLecturerRow>) {
   const { authId, lecturerProfile, ...lecturer } = row;
   return {
     ...lecturer,
@@ -85,6 +103,14 @@ export const lecturerService = {
     return row ? presentLecturer(row) : null;
   },
 
+  async getOwnProfile(userId: string) {
+    const row = await prisma.user.findFirst({
+      where: { id: userId, ...isLecturer },
+      select: ownLecturerSelect,
+    });
+    return row ? presentOwnLecturer(row) : null;
+  },
+
   async updateOwnProfile(userId: string, input: UpdateMyLecturerProfileInput) {
     // The target comes exclusively from req.user.id. The client never chooses it.
     const existing = await prisma.user.findFirst({
@@ -99,29 +125,37 @@ export const lecturerService = {
       yearsOfExperience,
       ...userProfile
     } = input;
+    const hasProfessionalUpdate =
+      employmentType !== undefined ||
+      fieldOfSpecialization !== undefined ||
+      yearsOfExperience !== undefined;
 
     const row = await prisma.user.update({
       where: { id: userId },
       data: {
         ...userProfile,
-        lecturerProfile: {
-          upsert: {
-            create: {
-              employmentType,
-              fieldOfSpecialization,
-              yearsOfExperience,
-            },
-            update: {
-              employmentType,
-              fieldOfSpecialization,
-              yearsOfExperience,
-            },
-          },
-        },
+        ...(hasProfessionalUpdate
+          ? {
+              lecturerProfile: {
+                upsert: {
+                  create: {
+                    employmentType,
+                    fieldOfSpecialization,
+                    yearsOfExperience,
+                  },
+                  update: {
+                    employmentType,
+                    fieldOfSpecialization,
+                    yearsOfExperience,
+                  },
+                },
+              },
+            }
+          : {}),
       },
-      select: lecturerSelect,
+      select: ownLecturerSelect,
     });
-    return presentLecturer(row);
+    return presentOwnLecturer(row);
   },
 
   async create(input: CreateLecturerInput) {
