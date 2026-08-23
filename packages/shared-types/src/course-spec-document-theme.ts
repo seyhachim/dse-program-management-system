@@ -33,22 +33,30 @@ export type CourseSpecDocumentTheme = z.infer<
   typeof CourseSpecDocumentThemeSchema
 >;
 
+/**
+ * Official DSE Course Specification baseline.
+ *
+ * Keep structural layout (A4 landscape, outer frame, table flow/page-break rules)
+ * in the renderer. Governance may tune bounded typography and spacing, but the
+ * default should open looking like the controlled Word template rather than a
+ * loose web document.
+ */
 export const DEFAULT_COURSE_SPEC_DOCUMENT_THEME: CourseSpecDocumentTheme = {
-  bodyFontFamily: "Arial",
-  bodyFontSizePt: 9,
-  documentTitleSizePt: 16,
-  heading1SizePt: 15,
-  heading2SizePt: 13,
+  bodyFontFamily: "Times New Roman",
+  bodyFontSizePt: 11,
+  documentTitleSizePt: 14,
+  heading1SizePt: 12,
+  heading2SizePt: 11,
   heading3SizePt: 11,
-  lineHeight: 1.3,
-  paragraphSpacingPt: 4,
+  lineHeight: 1.1,
+  paragraphSpacingPt: 2,
   letterSpacingPx: 0,
   defaultAlignment: "left",
-  marginsMm: { top: 10, bottom: 10, left: 10, right: 10 },
-  tableFontSizePt: 7.5,
-  tableCellPaddingPt: 3,
-  headerFontSizePt: 9,
-  footerFontSizePt: 7,
+  marginsMm: { top: 15, bottom: 15, left: 15, right: 15 },
+  tableFontSizePt: 9.5,
+  tableCellPaddingPt: 2,
+  headerFontSizePt: 10,
+  footerFontSizePt: 8,
   showHeader: true,
   showFooter: true,
   showPageNumbers: true,
