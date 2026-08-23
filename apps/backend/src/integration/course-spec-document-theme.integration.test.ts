@@ -8,6 +8,7 @@ import {
   updateProgrammeCourseSpecDocumentTheme,
 } from "../plugins/courses/document-theme-service.ts";
 import { CourseSpecLockedError } from "../plugins/courses/spec-lock.ts";
+import { gradingScaleService } from "../plugins/programme/grading-scale-service.ts";
 
 const describeDb = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 const prisma = new PrismaClient();
@@ -34,6 +35,45 @@ async function fixture() {
       programmeId: programme.id,
     },
   });
+
+  // Submission is intentionally protected by the programme grading-policy
+  // invariant. Use a real approved default policy rather than bypassing it.
+  const draftScale = await gradingScaleService.create(actor.id, {
+    programmeId: programme.id,
+    code: "standard",
+    name: "Theme fixture grading scale",
+    description: "Approved policy required for Course Spec submission",
+    effectiveFrom: "2026-01-01",
+    changeSummary: "Theme integration fixture",
+    grades: [
+      {
+        sortOrder: 1,
+        letterGrade: "P",
+        gradePoint: 1,
+        minScore: 50,
+        maxScore: 100,
+        minInclusive: true,
+        maxInclusive: true,
+        explanation: "Pass",
+        isPassing: true,
+      },
+      {
+        sortOrder: 2,
+        letterGrade: "F",
+        gradePoint: 0,
+        minScore: 0,
+        maxScore: 50,
+        minInclusive: true,
+        maxInclusive: false,
+        explanation: "Fail",
+        isPassing: false,
+      },
+    ],
+  });
+  await gradingScaleService.approve(draftScale.id, actor.id, {
+    note: "Approve theme fixture grading policy",
+  });
+
   return { programme, actor, course };
 }
 
@@ -108,7 +148,12 @@ describeDb("Course Specification document theme integration", () => {
 
     await prisma.courseSpec.update({
       where: { id: spec.id },
-      data: { reviewStatus: "Submitted" },
+      data: {
+        reviewStatus: "Submitted",
+        submittedAt: new Date(),
+        submittedById: f.actor.id,
+        submissionVersion: 1,
+      },
     });
 
     await expect(
@@ -155,7 +200,14 @@ describeDb("Course Specification document theme integration", () => {
       WHERE "programmeId" = ${f.programme.id}
       ORDER BY "createdAt" ASC
     `);
-    expect(rows.some((row) => row.scope === "VERSION" && row.actorId === f.actor.id && row.courseSpecId === spec.id)).toBe(true);
+    expect(
+      rows.some(
+        (row) =>
+          row.scope === "VERSION" &&
+          row.actorId === f.actor.id &&
+          row.courseSpecId === spec.id,
+      ),
+    ).toBe(true);
   });
 });
 
