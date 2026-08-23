@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { QaSarDocumentModelView } from "@dse-pms/shared-types";
+import { serializeDocumentContent, type QaSarDocumentModelView } from "@dse-pms/shared-types";
 import { buildSarDocumentLayout } from "./sar-document-layout";
 import { sarDocumentLines } from "./sar-export";
 
@@ -30,7 +30,21 @@ const model: QaSarDocumentModelView = {
           content: {
             version: 1,
             blocks: [
-              { id: "p1", type: "paragraph", text: "Pass rates are monitored." },
+              {
+                id: "rich-1",
+                type: "richText",
+                content: serializeDocumentContent({
+                  type: "doc",
+                  version: 1,
+                  content: [
+                    {
+                      type: "paragraph",
+                      align: "justify",
+                      content: [{ type: "text", text: "Pass rates are monitored.", marks: { bold: true } }],
+                    },
+                  ],
+                }),
+              },
               { id: "e1-ref", type: "evidenceReference", evidenceId: "e1", label: "Graduate outcomes report" },
               { id: "pms-1", type: "pmsData", source: "assessmentSummary", label: "Assessment summary" },
             ],
@@ -53,13 +67,17 @@ const model: QaSarDocumentModelView = {
 };
 
 describe("SAR canonical document layout", () => {
-  test("carries the same section metadata needed by preview and export", () => {
+  test("carries rich narrative and evidence metadata needed by preview and export", () => {
     const layout = buildSarDocumentLayout(model);
     const section = layout.criteria[0]!.sections[0]!;
 
     expect(layout.modeLabel).toBe("OFFICIAL SAR");
     expect(section.statusLabel).toBe("Approved");
     expect(section.submissionLabel).toBe("Approved submission v3");
+    const rich = section.blocks.find((block) => block.type === "richText");
+    expect(rich?.text).toBe("Pass rates are monitored.");
+    if (rich?.type !== "richText") throw new Error("expected rich text");
+    expect(rich.document.content[0]).toMatchObject({ type: "paragraph", align: "justify" });
     expect(section.blocks.find((block) => block.type === "evidenceReference")?.text).toBe(
       "[E001] Graduate outcomes report",
     );
@@ -74,11 +92,12 @@ describe("SAR canonical document layout", () => {
     });
   });
 
-  test("text export is derived from the canonical layout metadata", () => {
+  test("text export remains readable for rich narrative and extension blocks", () => {
     const lines = sarDocumentLines(model);
 
     expect(lines).toContain("Status: Approved");
     expect(lines).toContain("Approved submission v3");
+    expect(lines).toContain("Pass rates are monitored.");
     expect(lines).toContain("[E001] Graduate outcomes report");
     expect(lines).toContain("[PMS data] Assessment summary");
   });
