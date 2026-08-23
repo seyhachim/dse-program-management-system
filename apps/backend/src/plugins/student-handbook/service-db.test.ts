@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { DEFAULT_STUDENT_HANDBOOK_DOCUMENT_THEME } from "@dse-pms/shared-types";
 import {
   approveHandbook,
   createHandbook,
@@ -13,6 +14,7 @@ import {
   StudentHandbookConflictError,
   submitHandbook,
 } from "./service.ts";
+import { getHandbookTheme, updateHandbookTheme } from "./theme.ts";
 
 const describeDb = process.env.STUDENT_HANDBOOK_DB_TESTS === "1" ? describe : describe.skip;
 const prisma = new PrismaClient();
@@ -113,6 +115,46 @@ describeDb("student handbook service", () => {
 
     handbook = await deleteSection(handbook.id, custom!.id, f.lecturer.id);
     expect(handbook.sections.some((section) => section.id === custom!.id)).toBe(false);
+  });
+
+  test("stores version-scoped document theme and freezes it after publication", async () => {
+    const f = await fixture();
+    const handbook = await createHandbook(
+      {
+        programmeId: f.programme.id,
+        assignedLecturerId: f.lecturer.id,
+        version: "theme-2026",
+        title: "Student Handbook",
+      },
+      f.creator.id,
+    );
+
+    expect(await getHandbookTheme(handbook.id)).toEqual(DEFAULT_STUDENT_HANDBOOK_DOCUMENT_THEME);
+    const customTheme = {
+      ...DEFAULT_STUDENT_HANDBOOK_DOCUMENT_THEME,
+      bodyFontFamily: "Times New Roman" as const,
+      bodyFontSizePt: 12,
+      defaultAlignment: "left" as const,
+      marginsMm: { top: 20, bottom: 20, left: 22, right: 22 },
+    };
+    expect(await updateHandbookTheme(handbook.id, customTheme, f.creator.id)).toEqual(customTheme);
+    expect(await getHandbookTheme(handbook.id)).toEqual(customTheme);
+
+    await submitHandbook(handbook.id, f.lecturer.id);
+    await approveHandbook(handbook.id, f.creator.id, "Approved");
+    await publishHandbook(handbook.id, f.creator.id, "Publish");
+    await expect(
+      updateHandbookTheme(handbook.id, DEFAULT_STUDENT_HANDBOOK_DOCUMENT_THEME, f.creator.id),
+    ).rejects.toBeInstanceOf(StudentHandbookConflictError);
+
+    const mutateThemeDirectly = async () => {
+      await prisma.$executeRaw(Prisma.sql`
+        UPDATE student_handbook."StudentHandbook"
+        SET "theme" = '{}'::jsonb
+        WHERE "id" = ${handbook.id}
+      `);
+    };
+    await expect(mutateThemeDirectly()).rejects.toThrow(/immutable/i);
   });
 
   test("workflow reaches approved before publication", async () => {
