@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DSE_DOCUMENT_PREFIX } from "./document-content.ts";
 
 const SarTextBlockBase = z.object({
   id: z.string().trim().min(1),
@@ -9,6 +10,16 @@ export const QaSarBlockSchema = z.discriminatedUnion("type", [
   SarTextBlockBase.extend({ type: z.literal("paragraph") }),
   SarTextBlockBase.extend({ type: z.literal("heading"), level: z.union([z.literal(2), z.literal(3)]) }),
   SarTextBlockBase.extend({ type: z.literal("bullet") }),
+  z.object({
+    id: z.string().trim().min(1),
+    type: z.literal("richText"),
+    content: z
+      .string()
+      .max(120000)
+      .refine((value) => value.startsWith(DSE_DOCUMENT_PREFIX), {
+        message: "SAR rich text must use the shared DSE document format",
+      }),
+  }),
   z.object({
     id: z.string().trim().min(1),
     type: z.literal("evidenceReference"),
