@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import type {
   CreateStudentHandbookInput,
+  CreateStudentHandbookSectionInput,
+  RenameStudentHandbookSectionInput,
+  ReorderStudentHandbookSectionsInput,
   SaveStudentHandbookSectionInput,
   StudentHandbookBlockView,
   StudentHandbookSectionView,
@@ -15,7 +18,7 @@ import { registry } from "../../core/plugins/registry.ts";
 const STARTER_SECTIONS = [
   ["welcome", "Welcome to DSE"],
   ["degree", "Your Degree"],
-  ["study-plan", "Study Plan"],
+  ["study-plan", "Study Plan & Curriculum"],
   ["attendance-leave", "Attendance & Leave"],
   ["assessment-grades", "Assessment & Grades"],
   ["academic-integrity-ai", "Academic Integrity & AI Use"],
@@ -62,6 +65,7 @@ type SectionRow = {
   key: string;
   title: string;
   sortOrder: number;
+  isCore: boolean;
 };
 
 type BlockRow = {
@@ -76,6 +80,8 @@ type BlockRow = {
 };
 
 type LecturerRow = { id: string };
+
+type HandbookMutationClient = Pick<typeof prisma, "$executeRaw" | "$queryRaw">;
 
 export class StudentHandbookNotFoundError extends Error {}
 export class StudentHandbookConflictError extends Error {}
@@ -150,6 +156,38 @@ async function audit(
       CASE WHEN ${detailsJson}::text IS NULL THEN NULL ELSE ${detailsJson}::jsonb END
     )
   `);
+}
+
+async function markEdited(
+  client: Pick<typeof prisma, "$executeRaw">,
+  handbookId: string,
+) {
+  await client.$executeRaw(Prisma.sql`
+    UPDATE student_handbook."StudentHandbook"
+    SET "status" = CASE WHEN "status" = 'CHANGES_REQUESTED' THEN 'DRAFT' ELSE "status" END,
+        "updatedAt" = now()
+    WHERE "id" = ${handbookId}
+  `);
+}
+
+function assertEditable(header: HandbookHeaderRow) {
+  if (!["DRAFT", "CHANGES_REQUESTED"].includes(header.status)) {
+    throw new StudentHandbookConflictError("This handbook is not editable");
+  }
+}
+
+async function getSectionRow(
+  handbookId: string,
+  sectionId: string,
+  client: HandbookMutationClient = prisma,
+): Promise<SectionRow | null> {
+  const rows = await client.$queryRaw<SectionRow[]>(Prisma.sql`
+    SELECT "id", "key", "title", "sortOrder", "isCore"
+    FROM student_handbook."StudentHandbookSection"
+    WHERE "handbookId" = ${handbookId} AND "id" = ${sectionId}
+    LIMIT 1
+  `);
+  return rows[0] ?? null;
 }
 
 export async function assertLecturerInProgramme(
@@ -235,7 +273,7 @@ export async function getHandbook(handbookId: string): Promise<StudentHandbookVi
 
   const [sections, blocks] = await Promise.all([
     prisma.$queryRaw<SectionRow[]>(Prisma.sql`
-      SELECT "id", "key", "title", "sortOrder"
+      SELECT "id", "key", "title", "sortOrder", "isCore"
       FROM student_handbook."StudentHandbookSection"
       WHERE "handbookId" = ${handbookId}
       ORDER BY "sortOrder" ASC
@@ -325,8 +363,8 @@ export async function createHandbook(
         const [key, title] = STARTER_SECTIONS[index]!;
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO student_handbook."StudentHandbookSection"
-            ("handbookId", "key", "title", "sortOrder")
-          VALUES (${createdId}, ${key}, ${title}, ${index})
+            ("handbookId", "key", "title", "sortOrder", "isCore")
+          VALUES (${createdId}, ${key}, ${title}, ${index}, TRUE)
         `);
       }
       await audit(tx, createdId, actorId, "CREATED", "", {
@@ -352,11 +390,7 @@ export async function assignLecturer(
 ): Promise<StudentHandbookView> {
   const header = await getHandbookHeader(handbookId);
   if (!header) throw new StudentHandbookNotFoundError("Student Handbook not found");
-  if (!['DRAFT', 'CHANGES_REQUESTED'].includes(header.status)) {
-    throw new StudentHandbookConflictError(
-      "The handbook owner can only be changed while the handbook is editable",
-    );
-  }
+  assertEditable(header);
   await assertLecturerInProgramme(header.programmeId, lecturerId);
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw(Prisma.sql`
@@ -380,9 +414,7 @@ export async function replaceSectionBlocks(
 ): Promise<StudentHandbookView> {
   const header = await getHandbookHeader(handbookId);
   if (!header) throw new StudentHandbookNotFoundError("Student Handbook not found");
-  if (!['DRAFT', 'CHANGES_REQUESTED'].includes(header.status)) {
-    throw new StudentHandbookConflictError("This handbook is not editable");
-  }
+  assertEditable(header);
   const sectionRows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
     SELECT "id"
     FROM student_handbook."StudentHandbookSection"
@@ -419,15 +451,166 @@ export async function replaceSectionBlocks(
         `);
       }
     }
-    await tx.$executeRaw(Prisma.sql`
-      UPDATE student_handbook."StudentHandbook"
-      SET "status" = CASE WHEN "status" = 'CHANGES_REQUESTED' THEN 'DRAFT' ELSE "status" END,
-          "updatedAt" = now()
-      WHERE "id" = ${handbookId}
-    `);
+    await markEdited(tx, handbookId);
     await audit(tx, handbookId, actorId, "SECTION_SAVED", "", {
       sectionKey,
       blockCount: input.blocks.length,
+    });
+  });
+  return getHandbook(handbookId);
+}
+
+export async function createSection(
+  handbookId: string,
+  input: CreateStudentHandbookSectionInput,
+  actorId: string,
+): Promise<StudentHandbookView> {
+  const header = await getHandbookHeader(handbookId);
+  if (!header) throw new StudentHandbookNotFoundError("Student Handbook not found");
+  assertEditable(header);
+  const sectionId = crypto.randomUUID();
+  const key = `custom-${sectionId}`;
+
+  await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ nextOrder: number }>>(Prisma.sql`
+      SELECT COALESCE(MAX("sortOrder") + 1, 0)::int AS "nextOrder"
+      FROM student_handbook."StudentHandbookSection"
+      WHERE "handbookId" = ${handbookId}
+    `);
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO student_handbook."StudentHandbookSection"
+        ("id", "handbookId", "key", "title", "sortOrder", "isCore")
+      VALUES (${sectionId}, ${handbookId}, ${key}, ${input.title}, ${rows[0]?.nextOrder ?? 0}, FALSE)
+    `);
+    await markEdited(tx, handbookId);
+    await audit(tx, handbookId, actorId, "SECTION_ADDED", "", {
+      sectionId,
+      title: input.title,
+    });
+  });
+  return getHandbook(handbookId);
+}
+
+export async function renameSection(
+  handbookId: string,
+  sectionId: string,
+  input: RenameStudentHandbookSectionInput,
+  actorId: string,
+): Promise<StudentHandbookView> {
+  const header = await getHandbookHeader(handbookId);
+  if (!header) throw new StudentHandbookNotFoundError("Student Handbook not found");
+  assertEditable(header);
+  const section = await getSectionRow(handbookId, sectionId);
+  if (!section) throw new StudentHandbookNotFoundError("Handbook section not found");
+  if (section.isCore) {
+    throw new StudentHandbookConflictError("Core handbook sections cannot be renamed");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE student_handbook."StudentHandbookSection"
+      SET "title" = ${input.title}, "updatedAt" = now()
+      WHERE "handbookId" = ${handbookId} AND "id" = ${sectionId}
+    `);
+    await markEdited(tx, handbookId);
+    await audit(tx, handbookId, actorId, "SECTION_RENAMED", "", {
+      sectionId,
+      previousTitle: section.title,
+      title: input.title,
+    });
+  });
+  return getHandbook(handbookId);
+}
+
+export async function reorderSections(
+  handbookId: string,
+  input: ReorderStudentHandbookSectionsInput,
+  actorId: string,
+): Promise<StudentHandbookView> {
+  const header = await getHandbookHeader(handbookId);
+  if (!header) throw new StudentHandbookNotFoundError("Student Handbook not found");
+  assertEditable(header);
+  const current = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT "id"
+    FROM student_handbook."StudentHandbookSection"
+    WHERE "handbookId" = ${handbookId}
+    ORDER BY "sortOrder"
+  `);
+  const currentIds = current.map((row) => row.id);
+  const submitted = input.sectionIds;
+  const unique = new Set(submitted);
+  if (
+    submitted.length !== currentIds.length ||
+    unique.size !== submitted.length ||
+    currentIds.some((id) => !unique.has(id))
+  ) {
+    throw new StudentHandbookValidationError(
+      "Section order must contain every handbook section exactly once",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE student_handbook."StudentHandbookSection"
+      SET "sortOrder" = "sortOrder" + 10000, "updatedAt" = now()
+      WHERE "handbookId" = ${handbookId}
+    `);
+    for (let index = 0; index < submitted.length; index += 1) {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE student_handbook."StudentHandbookSection"
+        SET "sortOrder" = ${index}, "updatedAt" = now()
+        WHERE "handbookId" = ${handbookId} AND "id" = ${submitted[index]!}
+      `);
+    }
+    await markEdited(tx, handbookId);
+    await audit(tx, handbookId, actorId, "SECTIONS_REORDERED", "", {
+      sectionIds: submitted,
+    });
+  });
+  return getHandbook(handbookId);
+}
+
+export async function deleteSection(
+  handbookId: string,
+  sectionId: string,
+  actorId: string,
+): Promise<StudentHandbookView> {
+  const header = await getHandbookHeader(handbookId);
+  if (!header) throw new StudentHandbookNotFoundError("Student Handbook not found");
+  assertEditable(header);
+  const section = await getSectionRow(handbookId, sectionId);
+  if (!section) throw new StudentHandbookNotFoundError("Handbook section not found");
+  if (section.isCore) {
+    throw new StudentHandbookConflictError("Core handbook sections cannot be deleted");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM student_handbook."StudentHandbookSection"
+      WHERE "handbookId" = ${handbookId} AND "id" = ${sectionId}
+    `);
+    const remaining = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id"
+      FROM student_handbook."StudentHandbookSection"
+      WHERE "handbookId" = ${handbookId}
+      ORDER BY "sortOrder"
+    `);
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE student_handbook."StudentHandbookSection"
+      SET "sortOrder" = "sortOrder" + 10000
+      WHERE "handbookId" = ${handbookId}
+    `);
+    for (let index = 0; index < remaining.length; index += 1) {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE student_handbook."StudentHandbookSection"
+        SET "sortOrder" = ${index}, "updatedAt" = now()
+        WHERE "id" = ${remaining[index]!.id}
+      `);
+    }
+    await markEdited(tx, handbookId);
+    await audit(tx, handbookId, actorId, "SECTION_DELETED", "", {
+      sectionId,
+      title: section.title,
     });
   });
   return getHandbook(handbookId);
