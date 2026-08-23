@@ -345,6 +345,10 @@ model User {
   gradingScaleAuditActions         ProgrammeGradingScaleAuditAction[] @relation("ProgrammeGradingScaleAuditActor")
   studentProfile                   Student?
   lecturerProfile                  LecturerProfile?
+  portfolioVerificationEvents       StudentPortfolioVerificationEvent[]      @relation("StudentPortfolioVerifier")
+  portfolioSupervisorAssignments   StudentPortfolioSupervisorRelationship[] @relation("PortfolioSupervisorUser")
+  portfolioSupervisorApprovals     StudentPortfolioSupervisorRelationship[] @relation("PortfolioSupervisorApprovedBy")
+  portfolioSupervisorRevocations   StudentPortfolioSupervisorRelationship[] @relation("PortfolioSupervisorRevokedBy")
   announcementsAuthored            CourseAnnouncement[]             @relation("AnnouncementAuthor")
   assessmentResultsPublished       AssessmentResult[]               @relation("AssessmentResultPublishedBy")
   assessmentResultsFinalized       AssessmentResult[]               @relation("AssessmentResultFinalizedBy")
@@ -1270,6 +1274,8 @@ model Student {
   profile   StudentProfile?
   portfolioProfile StudentPortfolioProfile?
   portfolioEvidence StudentPortfolioEvidence[]
+  portfolioProfessionalLinks StudentPortfolioProfessionalLink[]
+  portfolioSupervisorRelationships StudentPortfolioSupervisorRelationship[]
 
   enrollments                    Enrollment[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
@@ -1342,7 +1348,10 @@ model StudentPortfolioEvidence {
   sourceLinkedAt         DateTime?
   createdAt              DateTime                            @default(now())
   updatedAt              DateTime                            @updatedAt
+  archivedAt             DateTime?
   links                  StudentPortfolioEvidenceLink[]
+  verificationEvents     StudentPortfolioVerificationEvent[]
+  softSkills             StudentPortfolioEvidenceSoftSkill[]
 
   @@index([studentId, updatedAt])
   @@index([studentId, isPublic, isFeatured])
@@ -1385,6 +1394,112 @@ enum StudentPortfolioArtifactKind {
   Presentation
   Dataset
   Other
+}
+
+enum StudentPortfolioProfessionalProvider {
+  GitHub
+  GitLab
+  LinkedIn
+  Kaggle
+  HuggingFace
+  Website
+  ORCID
+  GoogleScholar
+  ResearchGate
+  CodingPractice
+  BIProfile
+  CV
+  Other
+}
+
+enum StudentPortfolioSupervisorStatus {
+  Pending
+  Approved
+  Revoked
+}
+
+enum StudentPortfolioVerificationState {
+  Unverified
+  Verified
+  NeedsChanges
+  Revoked
+}
+
+enum StudentPortfolioVerificationContext {
+  Lecturer
+  Supervisor
+  System
+}
+
+/// Raw-SQL-backed student professional links. Declared in Prisma so future schema
+/// diffs preserve the migration-managed table instead of treating it as drift.
+model StudentPortfolioProfessionalLink {
+  id        String                               @id
+  studentId String
+  student   Student                              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  provider  StudentPortfolioProfessionalProvider
+  label     String                               @default("")
+  url       String
+  isPublic  Boolean                              @default(false)
+  createdAt DateTime                             @default(now())
+  updatedAt DateTime                             @default(now())
+
+  @@unique([studentId, provider, url])
+  @@index([studentId, isPublic])
+}
+
+/// Explicit trusted supervisor authority. Free-text names/emails never grant
+/// verification rights; approval/revocation stays attributable to PMS users.
+model StudentPortfolioSupervisorRelationship {
+  id               String                           @id
+  studentId        String
+  student           Student                          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  supervisorUserId String
+  supervisorUser   User                             @relation("PortfolioSupervisorUser", fields: [supervisorUserId], references: [id], onDelete: Restrict)
+  status           StudentPortfolioSupervisorStatus @default(Pending)
+  approvedById     String?
+  approvedBy       User?                            @relation("PortfolioSupervisorApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  approvedAt       DateTime?
+  revokedById      String?
+  revokedBy        User?                            @relation("PortfolioSupervisorRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  revokedAt        DateTime?
+  createdAt        DateTime                         @default(now())
+  updatedAt        DateTime                         @default(now())
+
+  @@unique([studentId, supervisorUserId])
+  @@index([supervisorUserId, status])
+}
+
+/// Append-only verification transition snapshot. Database triggers reject update
+/// and delete; portfolio edits append invalidation/reverification events instead.
+model StudentPortfolioVerificationEvent {
+  id            String                              @id
+  evidenceId    String
+  evidence      StudentPortfolioEvidence            @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  actorId       String?
+  actor         User?                               @relation("StudentPortfolioVerifier", fields: [actorId], references: [id], onDelete: Restrict)
+  actorContext  StudentPortfolioVerificationContext
+  previousState StudentPortfolioVerificationState
+  newState      StudentPortfolioVerificationState
+  reason        String                              @default("")
+  snapshot      Json
+  snapshotHash  String
+  createdAt     DateTime                            @default(now())
+
+  @@index([evidenceId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+/// Student-selected soft-skill vocabulary mappings. These are presentation
+/// mappings only; verified counts depend on verification events, never self scores.
+model StudentPortfolioEvidenceSoftSkill {
+  evidenceId String
+  evidence   StudentPortfolioEvidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  skillCode  String
+  createdAt  DateTime                 @default(now())
+
+  @@id([evidenceId, skillCode])
+  @@index([skillCode])
 }
 
 /// Authoritative programme cohort identity. Cohort membership and progression
