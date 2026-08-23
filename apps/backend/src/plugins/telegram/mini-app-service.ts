@@ -5,6 +5,7 @@ import type {
   LecturerArrivalConfirmationView,
   SaveAttendanceInput,
   TelegramCourseCard,
+  TelegramPermissionPendingAction,
   TelegramStudentToday,
   TelegramTodayClass,
 } from "@dse-pms/shared-types";
@@ -93,11 +94,25 @@ interface OfferingView {
   }>;
 }
 
+interface PendingPermissionRow {
+  permissionPendingId: string;
+  offeringId: string;
+  date: Date;
+  createdAt: Date;
+  note: string;
+  courseCode: string;
+  courseTitle: string;
+  sectionCode: string;
+}
+
 interface OfferingsContract {
   getById(id: string): Promise<OfferingView | null>;
   attendance: {
     get(offeringId: string, date: string): Promise<unknown>;
-    save(offeringId: string, date: string, input: SaveAttendanceInput): Promise<unknown>;
+    save(offeringId: string, date: string, input: SaveAttendanceInput, actorUserId?: string): Promise<unknown>;
+  };
+  studentAttendanceHistory: {
+    pendingForUser(userId: string): Promise<PendingPermissionRow[]>;
   };
   classResponsibilities: {
     getActiveForUser(userId: string, offeringId: string): Promise<ClassResponsibilityView | null>;
@@ -326,6 +341,21 @@ export async function buildStudentToday(
   };
 }
 
+function pendingAction(row: PendingPermissionRow): TelegramPermissionPendingAction {
+  return {
+    kind: "permission_pending",
+    permissionPendingId: row.permissionPendingId,
+    offeringId: row.offeringId,
+    courseCode: row.courseCode,
+    courseTitle: row.courseTitle,
+    sectionCode: row.sectionCode,
+    date: row.date.toISOString().slice(0, 10),
+    createdAt: row.createdAt.toISOString(),
+    note: row.note,
+    deepLink: `/telegram/attendance?offeringId=${encodeURIComponent(row.offeringId)}`,
+  };
+}
+
 export const telegramMiniAppService = {
   async courses(user: TelegramSessionUser) {
     return isStudent(user) ? studentCourses(user.id) : lecturerCourses(user);
@@ -334,16 +364,18 @@ export const telegramMiniAppService = {
   async home(user: TelegramSessionUser) {
     let courses: TelegramCourseCard[];
     let today: TelegramStudentToday | null = null;
+    let actions: TelegramPermissionPendingAction[] = [];
     let unreadAnnouncements = 0;
     let publishedResultCount = 0;
     let surveyActions = 0;
     if (isStudent(user)) {
       const portalCourses = await portal().courses(user.id);
       courses = studentCourseCards(portalCourses);
-      const [announcements, details, studentToday] = await Promise.all([
+      const [announcements, details, studentToday, pendingPermissions] = await Promise.all([
         portal().announcements(user.id),
         Promise.all(courses.map((course) => portal().course(user.id, course.offeringId))),
         buildStudentToday(user.id, portalCourses, offerings()),
+        offerings().studentAttendanceHistory.pendingForUser(user.id),
       ]);
       unreadAnnouncements = announcements.length;
       publishedResultCount = details.reduce(
@@ -352,6 +384,7 @@ export const telegramMiniAppService = {
       );
       surveyActions = details.filter((course) => !course.feedbackSubmitted).length;
       today = studentToday;
+      actions = pendingPermissions.map(pendingAction);
     } else {
       courses = await lecturerCourses(user);
     }
@@ -359,6 +392,7 @@ export const telegramMiniAppService = {
       user: { id: user.id, name: user.name, email: user.email, roles: user.roles },
       courses,
       today,
+      actions,
       unreadAnnouncements,
       publishedResultCount,
       surveyActions,
@@ -423,7 +457,7 @@ export const telegramMiniAppService = {
 
   async saveAttendance(user: TelegramSessionUser, offeringId: string, date: string, input: SaveAttendanceInput) {
     await assertOfferingAccess(user, offeringId, true);
-    const result = await offerings().attendance.save(offeringId, date, input);
+    const result = await offerings().attendance.save(offeringId, date, input, user.id);
     await telegramIdentityStore.audit({
       identityId: user.identity.id,
       userId: user.id,
