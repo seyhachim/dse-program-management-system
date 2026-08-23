@@ -5,6 +5,7 @@ export interface AttendanceCounts {
   Absent: number;
   Late: number;
   Excused: number;
+  PermissionPending: number;
   Unmarked: number;
   Total: number;
 }
@@ -22,12 +23,14 @@ export function getAttendanceCounts(records: AttendanceRecordView[]): Attendance
     Absent: 0,
     Late: 0,
     Excused: 0,
+    PermissionPending: 0,
     Unmarked: 0,
     Total: records.length,
   };
 
   for (const record of records) {
     if (record.status) counts[record.status] += 1;
+    else if (record.permissionPending) counts.PermissionPending += 1;
     else counts.Unmarked += 1;
   }
 
@@ -59,21 +62,26 @@ export function getPreviousIndex(currentIndex: number, length: number): number {
 }
 
 export function getUnmarkedStudentIds(records: AttendanceRecordView[]): string[] {
-  return records.filter((record) => record.status === null).map((record) => record.studentId);
+  return records
+    .filter((record) => record.status === null && !record.permissionPending)
+    .map((record) => record.studentId);
 }
 
 export function getSkipFeedback(record: AttendanceRecordView): string {
+  if (record.permissionPending) {
+    return `${record.studentName} skipped; existing Permission Pending kept.`;
+  }
   if (record.status === null) {
     return `${record.studentName} skipped and left Unmarked.`;
   }
-  const label = record.status === "Excused" ? "Excused Absence" : record.status;
+  const label = record.status === "Excused" ? "Permission / Excused" : record.status;
   return `${record.studentName} skipped; existing ${label} status kept.`;
 }
 
 export function updateAttendanceRecord(
   records: AttendanceRecordView[],
   studentId: string,
-  patch: Partial<Pick<AttendanceRecordView, "status" | "note">>,
+  patch: Partial<Pick<AttendanceRecordView, "status" | "permissionPending" | "permissionPendingSince" | "note">>,
 ): AttendanceRecordView[] {
   return records.map((record) => (record.studentId === studentId ? { ...record, ...patch } : record));
 }
@@ -83,15 +91,20 @@ export function markAttendanceStatus(
   studentId: string,
   status: AttendanceStatus,
 ): AttendanceRecordView[] {
-  return updateAttendanceRecord(records, studentId, { status });
+  return updateAttendanceRecord(records, studentId, {
+    status,
+    permissionPending: false,
+    permissionPendingSince: null,
+  });
 }
 
 export function toSaveAttendanceRecords(records: AttendanceRecordView[]): SaveAttendanceInput["records"] {
   return records
-    .filter((record): record is AttendanceRecordView & { status: AttendanceStatus } => record.status !== null)
+    .filter((record) => record.status !== null || record.permissionPending)
     .map((record) => ({
       studentId: record.studentId,
       status: record.status,
+      permissionPending: record.permissionPending,
       note: record.note.trim(),
     }));
 }
@@ -104,6 +117,7 @@ export function attendanceRecordsEqual(a: AttendanceRecordView[], b: AttendanceR
       other !== undefined &&
       record.studentId === other.studentId &&
       record.status === other.status &&
+      record.permissionPending === other.permissionPending &&
       record.note === other.note
     );
   });
