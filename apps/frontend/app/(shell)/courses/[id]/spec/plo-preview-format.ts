@@ -1,8 +1,8 @@
 export function contiguousRowSpans<T>(
   items: readonly T[],
   valueOf: (item: T) => string | null | undefined,
-): Record<number, number> {
-  const spans: Record<number, number> = Array<number>(items.length).fill(0);
+): number[] {
+  const spans = Array<number>(items.length).fill(0);
 
   for (let index = 0; index < items.length; ) {
     const rawValue = valueOf(items[index]!);
