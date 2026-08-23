@@ -15,6 +15,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "UserRoleAssignment",
   "Student",
   "StudentProfile",
+  "StudentPortfolioProfile",
   "StudentCohort",
   "StudentCohortMembership",
   "StudentProgressionRecord",
