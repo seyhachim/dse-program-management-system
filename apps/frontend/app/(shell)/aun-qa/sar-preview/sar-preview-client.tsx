@@ -9,6 +9,7 @@ import type {
   QaSarDocumentMode,
   QaSarReleaseView,
 } from "@dse-pms/shared-types";
+import { DocumentRenderer } from "@/components/document-editor";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import {
@@ -231,6 +232,7 @@ function Metric({ label, value, warning = false }: { label: string; value: numbe
 }
 
 function RenderedBlock({ block }: { block: SarLayoutBlock }) {
+  if (block.type === "richText") return <DocumentRenderer value={block.document} />;
   if (block.type === "heading") return <h4 className={block.level === 2 ? "text-lg font-semibold" : "font-semibold"}>{block.text}</h4>;
   if (block.type === "bullet") return <div className="flex gap-2"><span>•</span><p>{block.text}</p></div>;
   if (block.type === "evidenceReference") return <span className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800">{block.text}</span>;
