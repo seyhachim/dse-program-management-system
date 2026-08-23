@@ -1,0 +1,187 @@
+name: Issue 573 schema integration
+
+on:
+  push:
+    branches:
+      - feat/issue-573-student-portfolio-evidence
+    paths:
+      - .github/workflows/issue-573-schema-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-573-student-portfolio-evidence
+          fetch-depth: 0
+      - name: Integrate portfolio evidence schema and security inventory
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          schema_path = Path('apps/backend/prisma/schema.prisma')
+          schema = schema_path.read_text()
+
+          student_anchor = '  portfolioProfile StudentPortfolioProfile?\n\n  enrollments'
+          if 'portfolioEvidence StudentPortfolioEvidence[]' not in schema:
+              if student_anchor not in schema:
+                  raise SystemExit('Student portfolio relation anchor not found')
+              schema = schema.replace(
+                  student_anchor,
+                  '  portfolioProfile StudentPortfolioProfile?\n  portfolioEvidence StudentPortfolioEvidence[]\n\n  enrollments',
+                  1,
+              )
+
+          model_anchor = '''model StudentPortfolioProfile {
+            id              String   @id @default(uuid())
+            studentId       String   @unique
+            student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+            headline        String   @default("")
+            bio             String   @default("")
+            careerInterests String[] @default([])
+            isPublic        Boolean  @default(false)
+            publicSlug      String?  @unique
+            createdAt       DateTime @default(now())
+            updatedAt       DateTime @updatedAt
+
+            @@index([isPublic])
+          }
+          '''
+          evidence_models = '''model StudentPortfolioProfile {
+            id              String   @id @default(uuid())
+            studentId       String   @unique
+            student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+            headline        String   @default("")
+            bio             String   @default("")
+            careerInterests String[] @default([])
+            isPublic        Boolean  @default(false)
+            publicSlug      String?  @unique
+            createdAt       DateTime @default(now())
+            updatedAt       DateTime @updatedAt
+
+            @@index([isPublic])
+          }
+
+          /// Student-owned portfolio presentation item. Optional PMS provenance is
+          /// immutable after creation and references canonical academic rows rather
+          /// than copying marks/results or other authoritative academic truth.
+          model StudentPortfolioEvidence {
+            id                     String                             @id @default(uuid())
+            studentId              String
+            student                Student                            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+            origin                 StudentPortfolioEvidenceOrigin
+            title                  String
+            summary                String                             @default("")
+            role                   String                             @default("")
+            contribution           String                             @default("")
+            startDate              DateTime?                          @db.Date
+            endDate                DateTime?                          @db.Date
+            skills                 String[]                           @default([])
+            isPublic               Boolean                            @default(false)
+            isFeatured             Boolean                            @default(false)
+            sourceType             StudentPortfolioEvidenceSourceType?
+            sourceOfferingId       String?
+            sourceOffering         Offering?                          @relation(fields: [sourceOfferingId], references: [id], onDelete: Restrict)
+            sourceCourseSpecId     String?
+            sourceAssessmentItemId String?
+            sourceAssessmentItem   CourseSpecAssessmentItem?          @relation(fields: [sourceCourseSpecId, sourceAssessmentItemId], references: [courseSpecId, id], onDelete: Restrict)
+            sourceLinkedAt         DateTime?
+            createdAt              DateTime                            @default(now())
+            updatedAt              DateTime                            @updatedAt
+            links                  StudentPortfolioEvidenceLink[]
+
+            @@index([studentId, updatedAt])
+            @@index([studentId, isPublic, isFeatured])
+            @@index([sourceOfferingId])
+            @@index([sourceCourseSpecId, sourceAssessmentItemId])
+          }
+
+          model StudentPortfolioEvidenceLink {
+            id         String                       @id @default(uuid())
+            evidenceId String
+            evidence   StudentPortfolioEvidence     @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+            kind       StudentPortfolioArtifactKind
+            label      String                       @default("")
+            url        String
+            createdAt  DateTime                     @default(now())
+
+            @@unique([evidenceId, kind, url])
+            @@index([evidenceId])
+          }
+
+          enum StudentPortfolioEvidenceOrigin {
+            ExternalProject
+            CourseAssessment
+            Practicum
+            Internship
+            FinalProject
+            Competition
+            Achievement
+            Other
+          }
+
+          enum StudentPortfolioEvidenceSourceType {
+            CourseAssessment
+          }
+
+          enum StudentPortfolioArtifactKind {
+            Repository
+            Demo
+            Report
+            Presentation
+            Dataset
+            Other
+          }
+          '''
+          if 'model StudentPortfolioEvidence {' not in schema:
+              if model_anchor not in schema:
+                  raise SystemExit('StudentPortfolioProfile model anchor not found')
+              schema = schema.replace(model_anchor, evidence_models, 1)
+
+          assessment_anchor = '  notes               String               @default("")\n\n  @@id([courseSpecId, id])'
+          if 'portfolioEvidence      StudentPortfolioEvidence[]' not in schema:
+              if assessment_anchor not in schema:
+                  raise SystemExit('CourseSpecAssessmentItem relation anchor not found')
+              schema = schema.replace(
+                  assessment_anchor,
+                  '  notes               String               @default("")\n  portfolioEvidence   StudentPortfolioEvidence[]\n\n  @@id([courseSpecId, id])',
+                  1,
+              )
+
+          offering_anchor = '  qaCloAttainmentSnapshots       QaCloAttainmentSnapshot[]\n\n  @@unique([courseId, term, sectionCode])'
+          if 'portfolioEvidence              StudentPortfolioEvidence[]' not in schema:
+              if offering_anchor not in schema:
+                  raise SystemExit('Offering relation anchor not found')
+              schema = schema.replace(
+                  offering_anchor,
+                  '  qaCloAttainmentSnapshots       QaCloAttainmentSnapshot[]\n  portfolioEvidence              StudentPortfolioEvidence[]\n\n  @@unique([courseId, term, sectionCode])',
+                  1,
+              )
+
+          schema_path.write_text(schema)
+
+          security_path = Path('apps/backend/scripts/verify-db-security.ts')
+          security = security_path.read_text()
+          security_anchor = '  "StudentPortfolioProfile",\n'
+          if '"StudentPortfolioEvidence",' not in security:
+              if security_anchor not in security:
+                  raise SystemExit('DB security StudentPortfolioProfile anchor not found')
+              security = security.replace(
+                  security_anchor,
+                  security_anchor + '  "StudentPortfolioEvidence",\n  "StudentPortfolioEvidenceLink",\n',
+                  1,
+              )
+          security_path.write_text(security)
+          PY
+      - name: Remove one-shot workflow and commit integration
+        run: |
+          rm .github/workflows/issue-573-schema-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backend/prisma/schema.prisma apps/backend/scripts/verify-db-security.ts .github/workflows/issue-573-schema-patch.yml
+          git commit -m "feat(portfolio): integrate evidence schema and security [skip ci]"
+          git push origin HEAD:feat/issue-573-student-portfolio-evidence
