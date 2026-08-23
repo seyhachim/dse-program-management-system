@@ -1,10 +1,28 @@
-import type { CourseFeedbackInput, SaveAttendanceInput } from "@dse-pms/shared-types";
+import type {
+  ClassResponsibilityView,
+  ClassSessionStatusView,
+  CourseFeedbackInput,
+  LecturerArrivalConfirmationView,
+  SaveAttendanceInput,
+  TelegramStudentToday,
+  TelegramTodayClass,
+} from "@dse-pms/shared-types";
 import { hasAnyRoleInProgramme, type AuthUser, type Role } from "../../core/auth/token.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { telegramIdentityStore } from "./identity-store.ts";
 import type { TelegramSessionUser } from "./session.ts";
 
 const WIDE_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"];
+const DSE_TIME_ZONE = "Asia/Phnom_Penh";
+const WEEK_DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
 
 class TelegramMiniNotFoundError extends Error {}
 class TelegramMiniAccessError extends Error {}
@@ -15,7 +33,11 @@ interface PortalCourse {
   title: string;
   term: string;
   sectionCode: string;
+  lifecycle?: "planned" | "current" | "historical";
+  lecturer?: { id: string; name: string } | null;
+  coLecturers?: Array<{ id: string; name: string }>;
   meetings: Array<{
+    id: string;
     dayOfWeek: string;
     startTime: string;
     endTime: string;
@@ -71,6 +93,13 @@ interface OfferingsContract {
     get(offeringId: string, date: string): Promise<unknown>;
     save(offeringId: string, date: string, input: SaveAttendanceInput): Promise<unknown>;
   };
+  classResponsibilities: {
+    getActiveForUser(userId: string, offeringId: string): Promise<ClassResponsibilityView | null>;
+  };
+  classDelivery: {
+    getLecturerArrival(offeringId: string, date: string): Promise<LecturerArrivalConfirmationView | null>;
+    getClassSessionStatus(offeringId: string, date: string): Promise<ClassSessionStatusView | null>;
+  };
 }
 
 function portal() {
@@ -114,8 +143,8 @@ function nextMeeting(meetings: PortalCourse["meetings"] = []) {
   } : null;
 }
 
-async function studentCourses(userId: string) {
-  return (await portal().courses(userId)).map((course) => ({
+function studentCourseCards(courses: PortalCourse[]) {
+  return courses.map((course) => ({
     offeringId: course.offeringId,
     courseCode: course.code,
     courseTitle: course.title,
@@ -124,6 +153,10 @@ async function studentCourses(userId: string) {
     role: "student" as const,
     nextMeeting: nextMeeting(course.meetings),
   }));
+}
+
+async function studentCourses(userId: string) {
+  return studentCourseCards(await portal().courses(userId));
 }
 
 async function lecturerDelivery(user: TelegramSessionUser) {
@@ -157,20 +190,154 @@ async function lecturerCourses(user: TelegramSessionUser) {
   }));
 }
 
+function requiredPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
+  const value = parts.find((part) => part.type === type)?.value;
+  if (!value) throw new Error(`Could not resolve ${type} in DSE timezone`);
+  return value;
+}
+
+export function dseCalendarContext(now: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DSE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const year = requiredPart(parts, "year");
+  const month = requiredPart(parts, "month");
+  const day = requiredPart(parts, "day");
+  const hour = requiredPart(parts, "hour");
+  const minute = requiredPart(parts, "minute");
+  return {
+    date: `${year}-${month}-${day}`,
+    dayOfWeek: requiredPart(parts, "weekday"),
+    localTime: `${hour}:${minute}`,
+  };
+}
+
+function addCalendarDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function lecturerNames(course: PortalCourse) {
+  return Array.from(new Set([
+    ...(course.lecturer?.name ? [course.lecturer.name] : []),
+    ...(course.coLecturers ?? []).map((lecturer) => lecturer.name).filter(Boolean),
+  ]));
+}
+
+function staticMeeting(
+  course: PortalCourse,
+  meeting: PortalCourse["meetings"][number],
+  date: string,
+): TelegramTodayClass {
+  return {
+    meetingId: meeting.id,
+    offeringId: course.offeringId,
+    courseCode: course.code,
+    courseTitle: course.title,
+    sectionCode: course.sectionCode,
+    date,
+    dayOfWeek: meeting.dayOfWeek,
+    startTime: meeting.startTime,
+    endTime: meeting.endTime,
+    room: meeting.room,
+    activityType: meeting.activityType,
+    lecturerNames: lecturerNames(course),
+    arrivalStatus: null,
+    arrivalRecordedAt: null,
+    sessionStatus: "Scheduled",
+    canConfirmLecturerArrival: false,
+  };
+}
+
+export async function buildStudentToday(
+  userId: string,
+  courses: PortalCourse[],
+  offeringService: OfferingsContract,
+  now = new Date(),
+): Promise<TelegramStudentToday> {
+  const calendar = dseCalendarContext(now);
+  const currentCourses = courses.filter((course) => course.lifecycle == null || course.lifecycle === "current");
+  const todayMeetings = currentCourses
+    .flatMap((course) =>
+      course.meetings
+        .filter((meeting) => meeting.dayOfWeek === calendar.dayOfWeek)
+        .map((meeting) => ({ course, meeting })),
+    )
+    .sort((a, b) => a.meeting.startTime.localeCompare(b.meeting.startTime));
+
+  const classes = await Promise.all(todayMeetings.map(async ({ course, meeting }) => {
+    const [confirmation, session, responsibility] = await Promise.all([
+      offeringService.classDelivery.getLecturerArrival(course.offeringId, calendar.date),
+      offeringService.classDelivery.getClassSessionStatus(course.offeringId, calendar.date),
+      offeringService.classResponsibilities.getActiveForUser(userId, course.offeringId),
+    ]);
+    const sessionStatus = session?.status ?? "Scheduled";
+    return {
+      ...staticMeeting(course, meeting, calendar.date),
+      arrivalStatus: confirmation?.status ?? null,
+      arrivalRecordedAt: confirmation?.recordedAt ?? null,
+      sessionStatus,
+      canConfirmLecturerArrival: Boolean(responsibility) && sessionStatus === "Scheduled",
+    } satisfies TelegramTodayClass;
+  }));
+
+  let nextClass: TelegramTodayClass | null = null;
+  if (classes.length === 0) {
+    const todayIndex = WEEK_DAYS.indexOf(calendar.dayOfWeek as (typeof WEEK_DAYS)[number]);
+    const candidates = currentCourses.flatMap((course) =>
+      course.meetings.flatMap((meeting) => {
+        const targetIndex = WEEK_DAYS.indexOf(meeting.dayOfWeek as (typeof WEEK_DAYS)[number]);
+        if (todayIndex < 0 || targetIndex < 0) return [];
+        let offset = (targetIndex - todayIndex + 7) % 7;
+        if (offset === 0) offset = 7;
+        return [{ offset, course, meeting }];
+      }),
+    ).sort((a, b) => a.offset - b.offset || a.meeting.startTime.localeCompare(b.meeting.startTime));
+    const candidate = candidates[0];
+    if (candidate) {
+      nextClass = staticMeeting(
+        candidate.course,
+        candidate.meeting,
+        addCalendarDays(calendar.date, candidate.offset),
+      );
+    }
+  }
+
+  return {
+    date: calendar.date,
+    dayOfWeek: calendar.dayOfWeek,
+    localTime: calendar.localTime,
+    classes,
+    nextClass,
+  };
+}
+
 export const telegramMiniAppService = {
   async courses(user: TelegramSessionUser) {
     return isStudent(user) ? studentCourses(user.id) : lecturerCourses(user);
   },
 
   async home(user: TelegramSessionUser) {
-    const courses = await this.courses(user);
+    let courses;
+    let today: TelegramStudentToday | null = null;
     let unreadAnnouncements = 0;
     let publishedResultCount = 0;
     let surveyActions = 0;
     if (isStudent(user)) {
-      const [announcements, details] = await Promise.all([
+      const portalCourses = await portal().courses(user.id);
+      courses = studentCourseCards(portalCourses);
+      const [announcements, details, studentToday] = await Promise.all([
         portal().announcements(user.id),
         Promise.all(courses.map((course) => portal().course(user.id, course.offeringId))),
+        buildStudentToday(user.id, portalCourses, offerings()),
       ]);
       unreadAnnouncements = announcements.length;
       publishedResultCount = details.reduce(
@@ -178,10 +345,14 @@ export const telegramMiniAppService = {
         0,
       );
       surveyActions = details.filter((course) => !course.feedbackSubmitted).length;
+      today = studentToday;
+    } else {
+      courses = await lecturerCourses(user);
     }
     return {
       user: { id: user.id, name: user.name, email: user.email, roles: user.roles },
       courses,
+      today,
       unreadAnnouncements,
       publishedResultCount,
       surveyActions,
