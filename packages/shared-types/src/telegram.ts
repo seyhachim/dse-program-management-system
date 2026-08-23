@@ -1,10 +1,16 @@
 import { z } from "zod";
+import {
+  ClassSessionStatusSchema,
+  LecturerArrivalStatusSchema,
+} from "./class-delivery.ts";
 import type { PluginManifest } from "./plugins.ts";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ISO_DATE_TIME_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const TelegramPublicConfigSchema = z.object({
   enabled: z.boolean(),
@@ -90,6 +96,35 @@ export const TelegramCourseCardSchema = z.object({
 });
 export type TelegramCourseCard = z.infer<typeof TelegramCourseCardSchema>;
 
+export const TelegramTodayClassSchema = z.object({
+  meetingId: z.string(),
+  offeringId: z.string(),
+  courseCode: z.string(),
+  courseTitle: z.string(),
+  sectionCode: z.string(),
+  date: z.string().regex(ISO_DATE_PATTERN),
+  dayOfWeek: z.string(),
+  startTime: z.string().regex(TIME_PATTERN),
+  endTime: z.string().regex(TIME_PATTERN),
+  room: z.string().nullable(),
+  activityType: z.string(),
+  lecturerNames: z.array(z.string()),
+  arrivalStatus: LecturerArrivalStatusSchema.nullable(),
+  arrivalRecordedAt: z.string().datetime().nullable(),
+  sessionStatus: ClassSessionStatusSchema,
+  canConfirmLecturerArrival: z.boolean(),
+});
+export type TelegramTodayClass = z.infer<typeof TelegramTodayClassSchema>;
+
+export const TelegramStudentTodaySchema = z.object({
+  date: z.string().regex(ISO_DATE_PATTERN),
+  dayOfWeek: z.string(),
+  localTime: z.string().regex(TIME_PATTERN),
+  classes: z.array(TelegramTodayClassSchema),
+  nextClass: TelegramTodayClassSchema.nullable(),
+});
+export type TelegramStudentToday = z.infer<typeof TelegramStudentTodaySchema>;
+
 export const TelegramHomeResponseSchema = z.object({
   user: z.object({
     id: z.string(),
@@ -98,6 +133,7 @@ export const TelegramHomeResponseSchema = z.object({
     roles: z.array(TelegramMiniRoleSchema),
   }),
   courses: z.array(TelegramCourseCardSchema),
+  today: TelegramStudentTodaySchema.nullable(),
   unreadAnnouncements: z.number().int().nonnegative(),
   publishedResultCount: z.number().int().nonnegative(),
   surveyActions: z.number().int().nonnegative(),
