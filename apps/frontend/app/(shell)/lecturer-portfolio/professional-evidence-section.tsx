@@ -274,6 +274,7 @@ export function AunQaStaffEvidenceSection() {
 
 function EvidenceCard({ item, onEdit, onDelete }: { item: LecturerPortfolioItem; onEdit: () => void; onDelete: () => void }) {
   const statusLabel = item.verificationStatus === "verified" ? "Verified" : item.verificationStatus === "rejected" ? "Needs correction" : "Self-declared";
+  const hasAuditHistory = item.verificationEvents.length > 0;
   return (
     <article className="rounded-lg border border-border p-4">
       <div className="flex items-start justify-between gap-3">
@@ -287,10 +288,11 @@ function EvidenceCard({ item, onEdit, onDelete }: { item: LecturerPortfolioItem;
       {item.tags.length ? <div className="mt-3 flex flex-wrap gap-1.5">{item.tags.map((tag) => <span key={tag} className="rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">{tag}</span>)}</div> : null}
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
         <Button type="button" variant="outline" size="sm" onClick={onEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
-        <Button type="button" variant="outline" size="sm" onClick={onDelete} disabled={item.verificationStatus === "verified"}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete</Button>
+        <Button type="button" variant="outline" size="sm" onClick={onDelete} disabled={hasAuditHistory} title={hasAuditHistory ? "Reviewed evidence is retained for audit history; edit it instead." : undefined}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete</Button>
         {item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" />Open source</a> : null}
         <span className="ml-auto text-[11px] text-muted-foreground">{item.isPublic ? "Public-eligible" : "Private"}</span>
       </div>
+      {hasAuditHistory ? <p className="mt-2 text-[11px] text-muted-foreground">Reviewed evidence is retained for auditability. Edit it to make a correction and trigger re-review.</p> : null}
     </article>
   );
 }
