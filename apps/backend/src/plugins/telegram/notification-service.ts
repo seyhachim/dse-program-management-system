@@ -79,6 +79,15 @@ async function finishDelivery(deliveryId: string, work: () => Promise<string>) {
   }
 }
 
+export function attendanceWarningEventKey(input: {
+  studentId: string;
+  offeringId: string;
+  warningKind: "attendance" | "punctuality";
+  eventSessionId: string;
+}) {
+  return `attendance-warning:${input.studentId}:${input.offeringId}:${input.warningKind}:3:${input.eventSessionId}`;
+}
+
 export const telegramNotificationService = {
   async deliverAnnouncement(input: { announcementId: string; offeringId: string; title: string; body: string }) {
     const offering = await prisma.offering.findUnique({
@@ -124,6 +133,34 @@ export const telegramNotificationService = {
       `Permission letter reminder\n\n${offering.course.code} · ${input.date}\nYour permission is still pending. Please give the paper permission letter to your lecturer, preferably before your next class.`,
       deepLink,
     ));
+  },
+
+  async deliverAttendanceWarning(input: {
+    studentId: string;
+    offeringId: string;
+    warningKind: "attendance" | "punctuality";
+    count: number;
+    eventSessionId: string;
+    absentCount: number;
+    excusedCount: number;
+  }) {
+    if (input.count !== 3) return;
+    const [recipient, offering] = await Promise.all([
+      eligibleStudentRecipient(input.studentId),
+      prisma.offering.findUnique({
+        where: { id: input.offeringId },
+        select: { course: { select: { code: true, title: true } } },
+      }),
+    ]);
+    if (!recipient || !offering) return;
+    const eventKey = attendanceWarningEventKey(input);
+    const deliveryId = await claimDelivery(recipient.identityId, eventKey, "attendance_warning", input.eventSessionId);
+    if (!deliveryId) return;
+    const deepLink = createTelegramDeepLink(`/telegram/attendance?offeringId=${encodeURIComponent(input.offeringId)}`);
+    const text = input.warningKind === "punctuality"
+      ? `Punctuality reminder\n\n${offering.course.code} · ${offering.course.title}\nYou have been late to your last 3 finalized classes. Try to arrive 10–15 minutes early, set a reminder, and check the room and schedule in advance. If the issue continues, speak with your lecturer or adviser.`
+      : `Attendance reminder\n\n${offering.course.code} · ${offering.course.title}\nYour finalized record now includes ${input.absentCount} absent and ${input.excusedCount} permission / excused (${input.absentCount + input.excusedCount} combined). Please review missed learning and contact your lecturer or programme team if you need support.`;
+    await finishDelivery(deliveryId, () => sendTelegramMessage(recipient.telegramUserId, text, deepLink));
   },
 
   async preferences(identityId: string) {

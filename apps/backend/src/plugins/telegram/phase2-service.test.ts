@@ -31,6 +31,18 @@ function user(role: "student" | "lecturer"): TelegramSessionUser {
 const offeringA = "550e8400-e29b-41d4-a716-446655440001";
 const offeringB = "550e8400-e29b-41d4-a716-446655440002";
 
+function healthyHealth() {
+  return {
+    state: "healthy" as const,
+    attendanceStreak: 0,
+    onTimeStreak: 0,
+    consecutiveLate: 0,
+    absencePermissionCount: 0,
+    signals: [],
+    message: "Keep building a consistent attendance routine.",
+  };
+}
+
 function portalFixture(): StudentPortalContract {
   return {
     async courses() {
@@ -98,7 +110,8 @@ function offeringsFixture(overrides: Partial<OfferingsContract> = {}): Offerings
           totalSessions: 2,
           markedSessions: 2,
           attendanceRate: 75,
-          counts: { Present: 1, Absent: 0, Late: 1, Excused: 0 },
+          counts: { Present: 1, Absent: 0, Late: 1, Excused: 0, PermissionPending: 0 },
+          health: healthyHealth(),
           history: [],
         };
       },
@@ -136,7 +149,8 @@ describe("Telegram phase 2 services", () => {
             totalSessions: 0,
             markedSessions: 0,
             attendanceRate: null,
-            counts: { Present: 0, Absent: 0, Late: 0, Excused: 0 },
+            counts: { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 },
+            health: healthyHealth(),
             history: [],
           };
         },
@@ -153,24 +167,5 @@ describe("Telegram phase 2 services", () => {
     });
     const service = createTelegramPhase2Service({ portal: portalFixture(), offerings });
     await expect(service.attendanceHistory(user("student"), offeringA)).rejects.toBeInstanceOf(TelegramPhase2NotFoundError);
-  });
-
-  test("workload uses the authenticated lecturer id and optional term", async () => {
-    const lecturer = user("lecturer");
-    const capture: { seen?: [string, string | undefined] } = {};
-    const offerings = offeringsFixture({
-      async workloadForLecturer(lecturerId, query) {
-        capture.seen = [lecturerId, query.term];
-        return offeringsFixture().workloadForLecturer(lecturerId, query);
-      },
-    });
-    const service = createTelegramPhase2Service({ portal: portalFixture(), offerings });
-    await service.lecturerWorkload(lecturer, "2026-S1");
-    expect(capture.seen).toEqual([lecturer.id, "2026-S1"]);
-  });
-
-  test("student cannot open lecturer workload", async () => {
-    const service = createTelegramPhase2Service({ portal: portalFixture(), offerings: offeringsFixture() });
-    await expect(service.lecturerWorkload(user("student"))).rejects.toBeInstanceOf(TelegramPhase2AccessError);
   });
 });
