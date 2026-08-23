@@ -5,37 +5,19 @@ import type {
   StudentPortfolioProfessionalProvider,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
-import { PortalAccessError, PortalNotFoundError } from "./service.ts";
+import { PortalAccessError, PortalConflictError, PortalNotFoundError } from "./service.ts";
 
 const PROVIDER_TO_DB: Record<StudentPortfolioProfessionalProvider, string> = {
-  github: "GitHub",
-  gitlab: "GitLab",
-  linkedin: "LinkedIn",
-  kaggle: "Kaggle",
-  hugging_face: "HuggingFace",
-  website: "Website",
-  orcid: "ORCID",
-  google_scholar: "GoogleScholar",
-  research_gate: "ResearchGate",
-  coding_practice: "CodingPractice",
-  bi_profile: "BIProfile",
-  cv: "CV",
-  other: "Other",
+  github: "GitHub", gitlab: "GitLab", linkedin: "LinkedIn", kaggle: "Kaggle",
+  hugging_face: "HuggingFace", website: "Website", orcid: "ORCID",
+  google_scholar: "GoogleScholar", research_gate: "ResearchGate",
+  coding_practice: "CodingPractice", bi_profile: "BIProfile", cv: "CV", other: "Other",
 };
-
 const PROVIDER_FROM_DB = Object.fromEntries(
   Object.entries(PROVIDER_TO_DB).map(([key, value]) => [value, key]),
 ) as Record<string, StudentPortfolioProfessionalProvider>;
 
-type LinkRow = {
-  id: string;
-  provider: string;
-  label: string;
-  url: string;
-  isPublic: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-};
+type LinkRow = { id: string; provider: string; label: string; url: string; isPublic: boolean; createdAt: Date; updatedAt: Date };
 
 async function studentIdForUser(userId: string): Promise<string> {
   const student = await prisma.student.findUnique({ where: { userId }, select: { id: true, status: true, email: true } });
@@ -48,7 +30,7 @@ async function studentIdForUser(userId: string): Promise<string> {
 function serialize(row: LinkRow): StudentPortfolioProfessionalLink {
   return {
     id: row.id,
-    provider: PROVIDER_FROM_DB[row.provider],
+    provider: PROVIDER_FROM_DB[row.provider] ?? "other",
     label: row.label,
     url: row.url,
     visibility: row.isPublic ? "public" : "private",
@@ -63,9 +45,7 @@ export const studentPortfolioLinksService = {
     const studentId = await studentIdForUser(userId);
     const rows = await prisma.$queryRaw<LinkRow[]>`
       SELECT "id", "provider"::text AS "provider", "label", "url", "isPublic", "createdAt", "updatedAt"
-      FROM "StudentPortfolioProfessionalLink"
-      WHERE "studentId" = ${studentId}
-      ORDER BY "createdAt" ASC
+      FROM "StudentPortfolioProfessionalLink" WHERE "studentId" = ${studentId} ORDER BY "createdAt" ASC
     `;
     return rows.map(serialize);
   },
@@ -91,6 +71,15 @@ export const studentPortfolioLinksService = {
   async update(userId: string, linkId: string, input: StudentPortfolioProfessionalLinkInput): Promise<StudentPortfolioProfessionalLink> {
     const studentId = await studentIdForUser(userId);
     const provider = PROVIDER_TO_DB[input.provider];
+    const conflict = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "StudentPortfolioProfessionalLink"
+      WHERE "studentId" = ${studentId}
+        AND "provider" = ${provider}::"StudentPortfolioProfessionalProvider"
+        AND "url" = ${input.url}
+        AND "id" <> ${linkId}
+      LIMIT 1
+    `;
+    if (conflict[0]) throw new PortalConflictError("That professional link already exists in your portfolio");
     const rows = await prisma.$queryRaw<LinkRow[]>`
       UPDATE "StudentPortfolioProfessionalLink"
       SET "provider" = ${provider}::"StudentPortfolioProfessionalProvider",
