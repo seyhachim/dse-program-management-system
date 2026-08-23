@@ -1,4 +1,5 @@
-import type { QaSarDocumentModelView } from "@dse-pms/shared-types";
+import type { DseDocumentContent, QaSarDocumentModelView } from "@dse-pms/shared-types";
+import { documentContentToPlainText, parseStoredDocumentContent } from "@/lib/document-content";
 
 export const SAR_DOCUMENT_STYLE = {
   pageMarginTwips: 900,
@@ -10,6 +11,7 @@ export const SAR_DOCUMENT_STYLE = {
 export type SarLayoutBlock =
   | { id: string; type: "heading"; text: string; level: number }
   | { id: string; type: "bullet" | "paragraph"; text: string }
+  | { id: string; type: "richText"; document: DseDocumentContent; text: string }
   | { id: string; type: "evidenceReference"; text: string; evidenceId: string; evidenceNumber: string; label: string }
   | { id: string; type: "pmsData"; text: string; label: string };
 
@@ -96,6 +98,15 @@ export function buildSarDocumentLayout(model: QaSarDocumentModelView): SarDocume
             ? "No approved submission; excluded from official SAR"
             : "SAR writing has not started",
         blocks: section.content?.blocks.map((block): SarLayoutBlock => {
+          if (block.type === "richText") {
+            const document = parseStoredDocumentContent(block.content);
+            return {
+              id: block.id,
+              type: "richText",
+              document,
+              text: documentContentToPlainText(document),
+            };
+          }
           if (block.type === "heading") {
             return { id: block.id, type: "heading", text: block.text, level: block.level };
           }
