@@ -25,21 +25,13 @@ import type {
 import { useMe } from "@/lib/auth";
 import { lecturersApi } from "@/lib/lecturers";
 import { studentHandbookApi } from "@/lib/student-handbook";
+import { studentHandbookSourceLabel } from "@/lib/student-handbook-source-catalog";
 import { getStudentHandbookUnavailableSourceState } from "@/lib/student-handbook-source-state";
+import { StudentHandbookSourceBrowser } from "./student-handbook-source-browser";
 
 type EditableBlock = SaveStudentHandbookSectionInput["blocks"][number] & {
   clientKey: string;
 };
-
-const SOURCE_OPTIONS: Array<{ value: StudentHandbookSourceKind; label: string }> = [
-  { value: "CURRICULUM_SUMMARY", label: "Curriculum summary" },
-  { value: "PROGRAMME_PROFILE", label: "Programme profile" },
-  { value: "PROGRAMME_CONTACT", label: "Programme contacts" },
-];
-
-function sourceLabel(kind: StudentHandbookSourceKind): string {
-  return SOURCE_OPTIONS.find((item) => item.value === kind)?.label ?? kind;
-}
 
 function statusClasses(status: StudentHandbookView["status"]): string {
   if (status === "PUBLISHED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -141,8 +133,8 @@ export function StudentHandbookClient() {
   const [error, setError] = useState<string | null>(null);
   const [selectedSectionKey, setSelectedSectionKey] = useState<string>("welcome");
   const [draftBlocks, setDraftBlocks] = useState<EditableBlock[]>([]);
-  const [sourceKind, setSourceKind] = useState<StudentHandbookSourceKind>("CURRICULUM_SUMMARY");
   const [sourcePreview, setSourcePreview] = useState<StudentHandbookSourcePreview | null>(null);
+  const [sourceBrowserOpen, setSourceBrowserOpen] = useState(false);
   const [reviewNote, setReviewNote] = useState("");
   const [createVersion, setCreateVersion] = useState("2026.1");
   const [createLecturerId, setCreateLecturerId] = useState("");
@@ -161,6 +153,13 @@ export function StudentHandbookClient() {
     isOwner && active && (active.status === "DRAFT" || active.status === "CHANGES_REQUESTED"),
   );
   const selectedSection = active?.sections.find((item) => item.key === selectedSectionKey) ?? null;
+  const existingSourceKinds = useMemo(
+    () =>
+      draftBlocks.flatMap((block) =>
+        block.type === "SOURCE_DATA" ? [block.sourceKind] : [],
+      ),
+    [draftBlocks],
+  );
 
   async function reload(preferredId?: string) {
     setLoading(true);
@@ -286,6 +285,20 @@ export function StudentHandbookClient() {
     }
   }
 
+  function insertSources(kinds: StudentHandbookSourceKind[]) {
+    const existing = new Set(existingSourceKinds);
+    const additions: EditableBlock[] = kinds
+      .filter((kind) => !existing.has(kind))
+      .map((kind) => ({
+        clientKey: crypto.randomUUID(),
+        type: "SOURCE_DATA" as const,
+        sourceKind: kind,
+        label: studentHandbookSourceLabel(kind),
+      }));
+    if (additions.length) setDraftBlocks((rows) => [...rows, ...additions]);
+    setSourceBrowserOpen(false);
+  }
+
   if (meLoading || loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
@@ -363,6 +376,14 @@ export function StudentHandbookClient() {
     <div className="p-4 md:p-6">
       {sourcePreview ? (
         <SourcePreviewModal preview={sourcePreview} onClose={() => setSourcePreview(null)} />
+      ) : null}
+      {sourceBrowserOpen ? (
+        <StudentHandbookSourceBrowser
+          sectionKey={selectedSectionKey}
+          existingKinds={existingSourceKinds}
+          onClose={() => setSourceBrowserOpen(false)}
+          onInsert={insertSources}
+        />
       ) : null}
 
       <div className="mb-4 flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
@@ -541,7 +562,7 @@ export function StudentHandbookClient() {
                       <FileText className="h-4 w-4 text-blue-700" />
                     )}
                     <span className={`rounded-full px-2 py-1 text-xs font-medium ${block.type === "SOURCE_DATA" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>
-                      {block.type === "SOURCE_DATA" ? sourceLabel(block.sourceKind) : "Narrative"}
+                      {block.type === "SOURCE_DATA" ? studentHandbookSourceLabel(block.sourceKind) : "Narrative"}
                     </span>
                     <span className="text-xs text-muted-foreground">Block {index + 1}</span>
                   </div>
@@ -579,7 +600,7 @@ export function StudentHandbookClient() {
                 ) : (
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium">{block.label ?? sourceLabel(block.sourceKind)}</p>
+                      <p className="text-sm font-medium">{block.label ?? studentHandbookSourceLabel(block.sourceKind)}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Source of truth: PMS · cannot be edited from the handbook
                       </p>
@@ -611,31 +632,12 @@ export function StudentHandbookClient() {
               >
                 <Plus className="h-4 w-4" /> Add Narrative
               </button>
-              <select
-                value={sourceKind}
-                onChange={(event) => setSourceKind(event.target.value as StudentHandbookSourceKind)}
-                className="rounded-md border bg-background px-3 py-2 text-sm"
-              >
-                {SOURCE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
               <button
                 type="button"
-                onClick={() =>
-                  setDraftBlocks((rows) => [
-                    ...rows,
-                    {
-                      clientKey: crypto.randomUUID(),
-                      type: "SOURCE_DATA",
-                      sourceKind,
-                      label: sourceLabel(sourceKind),
-                    },
-                  ])
-                }
+                onClick={() => setSourceBrowserOpen(true)}
                 className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800"
               >
-                <Database className="h-4 w-4" /> Add Data Block
+                <Database className="h-4 w-4" /> Insert PMS Data
               </button>
             </div>
           ) : null}
@@ -657,7 +659,7 @@ export function StudentHandbookClient() {
                 ) : (
                   <div key={block.clientKey} className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-emerald-900">
-                      <Database className="h-4 w-4" /> {block.label ?? sourceLabel(block.sourceKind)}
+                      <Database className="h-4 w-4" /> {block.label ?? studentHandbookSourceLabel(block.sourceKind)}
                     </div>
                     <p className="mt-1 text-xs text-emerald-800/80">Authoritative PMS data block</p>
                   </div>
