@@ -7,9 +7,10 @@ import { telegramApi } from "../telegram-client";
 
 type CourseHistory = TelegramStudentAttendanceHistory & { courseCode: string; courseTitle: string; sectionCode: string };
 
-function statusLabel(status: TelegramStudentAttendanceHistory["history"][number]["status"]) {
-  if (status === "Excused") return "Excused Absence";
-  return status ?? "Unmarked";
+function statusLabel(session: TelegramStudentAttendanceHistory["history"][number]) {
+  if (session.permissionPending) return "Permission Pending";
+  if (session.status === "Excused") return "Permission / Excused";
+  return session.status ?? "Unmarked";
 }
 
 export default function TelegramAttendanceHistoryPage() {
@@ -44,9 +45,10 @@ export default function TelegramAttendanceHistoryPage() {
     {!items && !error ? <p className="text-sm text-slate-500">Loading attendance…</p> : null}
     {items?.length === 0 ? <div className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">No enrolled classes are available.</div> : null}
     {items?.map((item) => <article key={item.offeringId} className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium text-slate-500">{item.courseCode} · {item.sectionCode}</p><h2 className="font-semibold">{item.courseTitle}</h2></div><div className="text-right"><p className="text-xl font-semibold">{item.attendanceRate === null ? "—" : `${item.attendanceRate}%`}</p><p className="text-xs text-slate-500">attendance</p></div></div>
-      <div className="mt-3 grid grid-cols-4 gap-1 text-center text-xs"><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Present}</b>Present</div><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Late}</b>Late</div><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Absent}</b>Absent</div><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Excused}</b>Excused</div></div>
-      <div className="mt-4 space-y-2">{item.history.length === 0 ? <p className="text-sm text-slate-500">No attendance sessions recorded yet.</p> : item.history.map((session) => <div key={session.sessionId} className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm"><div><p>{new Date(`${session.date}T00:00:00`).toLocaleDateString()}</p>{session.note ? <p className="text-xs text-slate-500">{session.note}</p> : null}</div><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium">{statusLabel(session.status)}</span></div>)}</div>
+      <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium text-slate-500">{item.courseCode} · {item.sectionCode}</p><h2 className="font-semibold">{item.courseTitle}</h2></div><div className="text-right"><p className="text-xl font-semibold">{item.attendanceRate === null ? "—" : `${item.attendanceRate}%`}</p><p className="text-xs text-slate-500">finalized attendance</p></div></div>
+      {item.counts.PermissionPending > 0 ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">🟠 Permission letter pending</p><p className="mt-1 leading-5">Please give your paper permission letter to your lecturer. Pending records are not counted as finalized P or A.</p></div> : null}
+      <div className="mt-3 grid grid-cols-5 gap-1 text-center text-xs"><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Present}</b>Present</div><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Late}</b>Late</div><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Absent}</b>Absent</div><div className="rounded-lg bg-slate-100 p-2"><b className="block text-sm">{item.counts.Excused}</b>Permission</div><div className="rounded-lg bg-amber-50 p-2 text-amber-900"><b className="block text-sm">{item.counts.PermissionPending}</b>Pending</div></div>
+      <div className="mt-4 space-y-2">{item.history.length === 0 ? <p className="text-sm text-slate-500">No attendance sessions recorded yet.</p> : item.history.map((session) => <div key={session.sessionId} className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm"><div><p>{new Date(`${session.date}T00:00:00`).toLocaleDateString()}</p>{session.note ? <p className="text-xs text-slate-500">{session.note}</p> : null}</div><span className={`rounded-full px-2 py-1 text-xs font-medium ${session.permissionPending ? "bg-amber-50 text-amber-800" : "bg-slate-100"}`}>{statusLabel(session)}</span></div>)}</div>
     </article>)}
   </section>;
 }
