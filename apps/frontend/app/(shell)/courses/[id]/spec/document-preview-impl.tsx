@@ -48,6 +48,13 @@ type DocumentPreviewProps = {
   courseSpecId?: string;
 };
 
+function themesEqual(
+  left: CourseSpecDocumentTheme,
+  right: CourseSpecDocumentTheme,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export function DocumentPreview({
   document,
   courseSpecId,
@@ -66,10 +73,15 @@ export function DocumentPreview({
   const [theme, setTheme] = useState<CourseSpecDocumentTheme>(
     DEFAULT_COURSE_SPEC_DOCUMENT_THEME,
   );
+  const [savedTheme, setSavedTheme] = useState<CourseSpecDocumentTheme>(
+    DEFAULT_COURSE_SPEC_DOCUMENT_THEME,
+  );
   const [programmeDefault, setProgrammeDefault] =
     useState<CourseSpecDocumentTheme>(DEFAULT_COURSE_SPEC_DOCUMENT_THEME);
   const [themeCourseSpecId, setThemeCourseSpecId] = useState<string | null>(null);
   const [themeReviewStatus, setThemeReviewStatus] = useState<string | null>(null);
+  const [themeLoading, setThemeLoading] = useState(true);
+  const [themeError, setThemeError] = useState<string | null>(null);
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeMessage, setThemeMessage] = useState<string | null>(null);
 
@@ -80,14 +92,55 @@ export function DocumentPreview({
     themeCourseSpecId !== null &&
     themeReviewStatus !== null &&
     EDITABLE_THEME_STATUSES.has(themeReviewStatus);
+  const effectiveCourseSpecId = courseSpecId ?? themeCourseSpecId;
+  const themeDirty = canManageTheme && !themesEqual(theme, savedTheme);
 
   useEffect(() => {
+    let cancelled = false;
+    setThemeLoading(true);
+    setThemeError(null);
+    setThemeMessage(null);
+
+    courseSpecDocumentThemeApi
+      .get(courseId, courseSpecId)
+      .then((response) => {
+        if (cancelled) return;
+        setTheme(response.theme);
+        setSavedTheme(response.theme);
+        setProgrammeDefault(response.programmeDefault);
+        setThemeCourseSpecId(response.courseSpecId);
+        setThemeReviewStatus(response.reviewStatus);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setThemeCourseSpecId(null);
+          setThemeReviewStatus(null);
+          setThemeError(
+            "The version-scoped document style could not be loaded. Preview and downloads are blocked so Admin and Lecturer cannot produce different official documents.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setThemeLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, courseSpecId]);
+
+  useEffect(() => {
+    if (themeLoading || themeError) {
+      setGradingScaleLoading(themeLoading);
+      return;
+    }
+
     let cancelled = false;
     setGradingScaleLoading(true);
     setGradingScaleError(null);
 
-    const bindingPath = courseSpecId
-      ? `/api/programme/grading-scales/course-specs/${encodeURIComponent(courseId)}/versions/${encodeURIComponent(courseSpecId)}`
+    const bindingPath = effectiveCourseSpecId
+      ? `/api/programme/grading-scales/course-specs/${encodeURIComponent(courseId)}/versions/${encodeURIComponent(effectiveCourseSpecId)}`
       : `/api/programme/grading-scales/course-specs/${encodeURIComponent(courseId)}`;
 
     api
@@ -110,33 +163,7 @@ export function DocumentPreview({
     return () => {
       cancelled = true;
     };
-  }, [courseId, courseSpecId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setThemeMessage(null);
-    courseSpecDocumentThemeApi
-      .get(courseId, courseSpecId)
-      .then((response) => {
-        if (cancelled) return;
-        setTheme(response.theme);
-        setProgrammeDefault(response.programmeDefault);
-        setThemeCourseSpecId(response.courseSpecId);
-        setThemeReviewStatus(response.reviewStatus);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setTheme(DEFAULT_COURSE_SPEC_DOCUMENT_THEME);
-          setProgrammeDefault(DEFAULT_COURSE_SPEC_DOCUMENT_THEME);
-          setThemeMessage(
-            "Document style settings could not be loaded. The safe default style is shown.",
-          );
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [courseId, courseSpecId]);
+  }, [courseId, effectiveCourseSpecId, themeError, themeLoading]);
 
   const resolvedDocument = useMemo<CourseDocumentModel>(
     () => ({
@@ -149,7 +176,13 @@ export function DocumentPreview({
 
   const info = resolvedDocument.courseInformation;
   const gradingScaleReady = resolvedDocument.gradingScale !== null;
-  const exportDisabled = isExporting || gradingScaleLoading || !gradingScaleReady;
+  const officialThemeReady = !themeLoading && !themeError;
+  const exportDisabled =
+    isExporting ||
+    !officialThemeReady ||
+    gradingScaleLoading ||
+    !gradingScaleReady ||
+    themeDirty;
 
   const fitWidth = useCallback(() => {
     const viewer = viewerRef.current;
@@ -203,9 +236,10 @@ export function DocumentPreview({
       const saved = await courseSpecDocumentThemeApi.updateVersion(
         courseId,
         theme,
-        courseSpecId,
+        effectiveCourseSpecId ?? undefined,
       );
       setTheme(saved);
+      setSavedTheme(saved);
       setThemeMessage("Style saved for this Course Specification version.");
     } catch (error) {
       setThemeMessage(
@@ -226,7 +260,7 @@ export function DocumentPreview({
       );
       setProgrammeDefault(saved);
       setThemeMessage(
-        "Programme default saved. Existing Course Spec versions remain unchanged.",
+        "Programme default saved. Existing Course Spec versions remain unchanged. Save for this version as well if you want the current document to use these settings.",
       );
     } catch (error) {
       setThemeMessage(
@@ -257,6 +291,16 @@ export function DocumentPreview({
                 {gradingScaleError}
               </p>
             ) : null}
+            {themeError ? (
+              <p className="mt-2 max-w-2xl text-xs text-destructive">
+                {themeError}
+              </p>
+            ) : null}
+            {themeDirty ? (
+              <p className="mt-2 max-w-2xl text-xs font-medium text-amber-700 dark:text-amber-300">
+                Unsaved style preview. Save for this version before downloading or comparing with Lecturer view.
+              </p>
+            ) : null}
             {themeMessage ? (
               <p className="mt-2 max-w-2xl text-xs text-muted-foreground">
                 {themeMessage}
@@ -268,16 +312,18 @@ export function DocumentPreview({
           <DropdownMenuTrigger
             render={<Button type="button" disabled={exportDisabled} />}
           >
-            {isExporting || gradingScaleLoading ? (
+            {isExporting || gradingScaleLoading || themeLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
             {isExporting
               ? "Generating..."
-              : gradingScaleLoading
-                ? "Loading policy..."
-                : "Download"}
+              : themeLoading
+                ? "Loading style..."
+                : gradingScaleLoading
+                  ? "Loading policy..."
+                  : "Download"}
             <ChevronDown className="ml-1.5 h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -296,153 +342,173 @@ export function DocumentPreview({
         </DropdownMenu>
       </div>
 
-      <div
-        className={
-          canManageTheme
-            ? "grid min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)_280px]"
-            : "grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]"
-        }
-      >
-        <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
-          <div className="rounded-lg border bg-card p-4">
-            <h3 className="text-sm font-semibold">Document Information</h3>
-            <dl className="mt-4 space-y-3 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground">Course Code</dt>
-                <dd className="mt-0.5 font-medium">
-                  {displayDocumentValue(info.courseCode)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Course Title</dt>
-                <dd className="mt-0.5 font-medium">
-                  {displayDocumentValue(info.courseTitle)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Sections</dt>
-                <dd className="mt-0.5 font-medium">Part 1 + Sections 1–25</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Format</dt>
-                <dd className="mt-0.5 font-medium">A4 Landscape</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Grading Scale</dt>
-                <dd className="mt-0.5 font-medium">
-                  {resolvedDocument.gradingScale
-                    ? `${resolvedDocument.gradingScale.name} · v${resolvedDocument.gradingScale.version}`
-                    : gradingScaleLoading
-                      ? "Loading…"
-                      : "Unavailable"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Document style</dt>
-                <dd className="mt-0.5 font-medium">
-                  {theme.bodyFontFamily} · {theme.bodyFontSizePt} pt
-                </dd>
-              </div>
-            </dl>
+      {!officialThemeReady ? (
+        <div className="flex min-h-[360px] items-center justify-center rounded-lg border bg-muted/30 p-6 text-center">
+          <div className="max-w-lg">
+            {themeLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /> : null}
+            <p className="mt-3 text-sm font-medium">
+              {themeLoading ? "Loading the version-scoped document style…" : "Official preview unavailable"}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              The PMS only renders an official Course Specification after its exact saved style is available, so different roles cannot silently receive different formatting.
+            </p>
           </div>
-
-          <div className="rounded-lg border bg-card p-4">
-            <h3 className="text-sm font-semibold">Contents</h3>
-            <nav className="mt-3 space-y-1 text-sm">
-              <a href="#programme-overview" className="block rounded-md px-2 py-2 hover:bg-muted">Part 1. Programme Overview</a>
-              <a href="#plo-taxonomy" className="block rounded-md px-2 py-2 hover:bg-muted">Part 1. PLO Taxonomy</a>
-              <a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">1–13. Course Information</a>
-              <a href="#clos" className="block rounded-md px-2 py-2 hover:bg-muted">14. CLOs</a>
-              <a href="#mapping" className="block rounded-md px-2 py-2 hover:bg-muted">15. CLO–PLO Mapping</a>
-              <a href="#slt" className="block rounded-md px-2 py-2 hover:bg-muted">16. Student Learning Time</a>
-              <a href="#assessment-plan" className="block rounded-md px-2 py-2 hover:bg-muted">17. Assessment Plan</a>
-              <a href="#lesson-plan" className="block rounded-md px-2 py-2 hover:bg-muted">18. Detailed Lesson Plan</a>
-              <a href="#resources" className="block rounded-md px-2 py-2 hover:bg-muted">19. Required Resources</a>
-              <a href="#references" className="block rounded-md px-2 py-2 hover:bg-muted">20. References / Textbooks</a>
-              <a href="#responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">21. Student Responsibility</a>
-              <a href="#rubric" className="block rounded-md px-2 py-2 hover:bg-muted">22. Rubric</a>
-              <a href="#policy" className="block rounded-md px-2 py-2 hover:bg-muted">23. Course Policy</a>
-              <a href="#rating-scale" className="block rounded-md px-2 py-2 hover:bg-muted">24. Rating Scale</a>
-              <a href="#spec-date" className="block rounded-md px-2 py-2 hover:bg-muted">25. Date</a>
-            </nav>
-          </div>
-        </aside>
-
-        <main
-          ref={viewerRef}
-          className="relative min-h-[650px] overflow-auto rounded-lg border bg-muted/40"
+        </div>
+      ) : (
+        <div
+          className={
+            canManageTheme
+              ? "grid min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)_280px]"
+              : "grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]"
+          }
         >
-          <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
-            <button
-              type="button"
-              onClick={() =>
-                setZoom((z) =>
-                  Math.max(MIN_ZOOM, Number((z - ZOOM_STEP).toFixed(2))),
-                )
-              }
-              disabled={zoom <= MIN_ZOOM}
-              className="flex h-7 w-7 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:opacity-40"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
-            <span className="min-w-[54px] text-center text-xs font-medium tabular-nums">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() =>
-                setZoom((z) =>
-                  Math.min(MAX_ZOOM, Number((z + ZOOM_STEP).toFixed(2))),
-                )
-              }
-              disabled={zoom >= MAX_ZOOM}
-              className="flex h-7 w-7 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:opacity-40"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-            <div className="mx-1 h-5 w-px bg-border" />
-            <button
-              type="button"
-              onClick={fitWidth}
-              className="flex h-7 items-center gap-1.5 rounded-md border bg-background px-2.5 text-xs font-medium hover:bg-muted"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-              Fit Width
-            </button>
-          </div>
+          <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="text-sm font-semibold">Document Information</h3>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Course Code</dt>
+                  <dd className="mt-0.5 font-medium">
+                    {displayDocumentValue(info.courseCode)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Course Title</dt>
+                  <dd className="mt-0.5 font-medium">
+                    {displayDocumentValue(info.courseTitle)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Sections</dt>
+                  <dd className="mt-0.5 font-medium">Part 1 + Sections 1–25</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Format</dt>
+                  <dd className="mt-0.5 font-medium">A4 Landscape</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Version source</dt>
+                  <dd className="mt-0.5 break-all font-medium">
+                    {effectiveCourseSpecId ?? "Programme default / not started"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Grading Scale</dt>
+                  <dd className="mt-0.5 font-medium">
+                    {resolvedDocument.gradingScale
+                      ? `${resolvedDocument.gradingScale.name} · v${resolvedDocument.gradingScale.version}`
+                      : gradingScaleLoading
+                        ? "Loading…"
+                        : "Unavailable"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Document style</dt>
+                  <dd className="mt-0.5 font-medium">
+                    {theme.bodyFontFamily} · {theme.bodyFontSizePt} pt
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
-          <div
-            ref={printRootRef}
-            className="mx-auto"
-            style={{
-              width: PAGE_WIDTH * zoom + VIEWER_PADDING * 2,
-              padding: VIEWER_PADDING,
-            }}
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="text-sm font-semibold">Contents</h3>
+              <nav className="mt-3 space-y-1 text-sm">
+                <a href="#programme-overview" className="block rounded-md px-2 py-2 hover:bg-muted">Part 1. Programme Overview</a>
+                <a href="#plo-taxonomy" className="block rounded-md px-2 py-2 hover:bg-muted">Part 1. PLO Taxonomy</a>
+                <a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">1–13. Course Information</a>
+                <a href="#clos" className="block rounded-md px-2 py-2 hover:bg-muted">14. CLOs</a>
+                <a href="#mapping" className="block rounded-md px-2 py-2 hover:bg-muted">15. CLO–PLO Mapping</a>
+                <a href="#slt" className="block rounded-md px-2 py-2 hover:bg-muted">16. Student Learning Time</a>
+                <a href="#assessment-plan" className="block rounded-md px-2 py-2 hover:bg-muted">17. Assessment Plan</a>
+                <a href="#lesson-plan" className="block rounded-md px-2 py-2 hover:bg-muted">18. Detailed Lesson Plan</a>
+                <a href="#resources" className="block rounded-md px-2 py-2 hover:bg-muted">19. Required Resources</a>
+                <a href="#references" className="block rounded-md px-2 py-2 hover:bg-muted">20. References / Textbooks</a>
+                <a href="#responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">21. Student Responsibility</a>
+                <a href="#rubric" className="block rounded-md px-2 py-2 hover:bg-muted">22. Rubric</a>
+                <a href="#policy" className="block rounded-md px-2 py-2 hover:bg-muted">23. Course Policy</a>
+                <a href="#rating-scale" className="block rounded-md px-2 py-2 hover:bg-muted">24. Rating Scale</a>
+                <a href="#spec-date" className="block rounded-md px-2 py-2 hover:bg-muted">25. Date</a>
+              </nav>
+            </div>
+          </aside>
+
+          <main
+            ref={viewerRef}
+            className="relative min-h-[650px] overflow-auto rounded-lg border bg-muted/40"
           >
-            <ThemedDocumentPages
-              document={resolvedDocument}
-              zoom={zoom}
-              theme={theme}
-            />
-          </div>
-        </main>
+            <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
+              <button
+                type="button"
+                onClick={() =>
+                  setZoom((z) =>
+                    Math.max(MIN_ZOOM, Number((z - ZOOM_STEP).toFixed(2))),
+                  )
+                }
+                disabled={zoom <= MIN_ZOOM}
+                className="flex h-7 w-7 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:opacity-40"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <span className="min-w-[54px] text-center text-xs font-medium tabular-nums">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setZoom((z) =>
+                    Math.min(MAX_ZOOM, Number((z + ZOOM_STEP).toFixed(2))),
+                  )
+                }
+                disabled={zoom >= MAX_ZOOM}
+                className="flex h-7 w-7 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+              <div className="mx-1 h-5 w-px bg-border" />
+              <button
+                type="button"
+                onClick={fitWidth}
+                className="flex h-7 items-center gap-1.5 rounded-md border bg-background px-2.5 text-xs font-medium hover:bg-muted"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+                Fit Width
+              </button>
+            </div>
 
-        {canManageTheme ? (
-          <CourseSpecDocumentThemePanel
-            value={theme}
-            programmeDefault={programmeDefault}
-            onChange={setTheme}
-            onSaveVersion={saveVersionTheme}
-            onSaveProgrammeDefault={saveProgrammeDefault}
-            onResetToProgrammeDefault={() => {
-              setTheme(programmeDefault);
-              setThemeMessage("Programme default loaded into the preview. Save explicitly to apply it.");
-            }}
-            saving={themeSaving}
-            versionEditable={versionThemeEditable}
-          />
-        ) : null}
-      </div>
+            <div
+              ref={printRootRef}
+              className="mx-auto"
+              style={{
+                width: PAGE_WIDTH * zoom + VIEWER_PADDING * 2,
+                padding: VIEWER_PADDING,
+              }}
+            >
+              <ThemedDocumentPages
+                document={resolvedDocument}
+                zoom={zoom}
+                theme={theme}
+              />
+            </div>
+          </main>
+
+          {canManageTheme ? (
+            <CourseSpecDocumentThemePanel
+              value={theme}
+              programmeDefault={programmeDefault}
+              onChange={setTheme}
+              onSaveVersion={saveVersionTheme}
+              onSaveProgrammeDefault={saveProgrammeDefault}
+              onResetToProgrammeDefault={() => {
+                setTheme(programmeDefault);
+                setThemeMessage("Programme default loaded into the preview. Save for this version to make it the official current-version style.");
+              }}
+              saving={themeSaving}
+              versionEditable={versionThemeEditable}
+            />
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
