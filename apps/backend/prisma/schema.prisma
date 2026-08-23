@@ -1268,6 +1268,7 @@ model Student {
   userId    String?       @unique
   user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   profile   StudentProfile?
+  portfolioProfile StudentPortfolioProfile?
 
   enrollments                    Enrollment[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
@@ -1293,6 +1294,25 @@ model StudentProfile {
   updatedAt        DateTime @updatedAt
 
   @@index([gender])
+}
+
+
+/// Student-owned professional portfolio metadata. Institutional identity and
+/// academic records remain on their canonical Student/User/CourseSpec/Result models.
+/// New portfolio records are private by default; public rendering is a separate boundary.
+model StudentPortfolioProfile {
+  id              String   @id @default(uuid())
+  studentId       String   @unique
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  headline        String   @default("")
+  bio             String   @default("")
+  careerInterests String[] @default([])
+  isPublic        Boolean  @default(false)
+  publicSlug      String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isPublic])
 }
 
 /// Authoritative programme cohort identity. Cohort membership and progression
