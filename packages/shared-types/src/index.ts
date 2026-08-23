@@ -29,6 +29,7 @@ export * from "./course-spec-version-history.ts";
 export * from "./methods.ts";
 export * from "./rubrics.ts";
 export * from "./student-portal.ts";
+export * from "./student-portfolio.ts";
 export * from "./result-corrections.ts";
 export * from "./telegram.ts";
 export * from "./telegram-phase2.ts";
