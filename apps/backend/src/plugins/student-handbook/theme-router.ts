@@ -1,6 +1,5 @@
 import { Router, type Response } from "express";
 import { UpdateStudentHandbookThemeSchema } from "@dse-pms/shared-types";
-import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type Role } from "../../core/auth/token.ts";
 import {
   getHandbookHeader,
@@ -30,7 +29,6 @@ function sendThemeError(res: Response, error: unknown) {
 
 export function createStudentHandbookThemeRouter(): Router {
   const router = Router();
-  router.use(requireAuth);
 
   router.get("/:handbookId/theme", async (req, res) => {
     if (!req.user) return;
