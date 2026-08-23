@@ -11,16 +11,10 @@ import { prisma } from "../../core/db/prisma.ts";
 import { PortalAccessError, PortalNotFoundError } from "./service.ts";
 
 const STATE_TO_DB: Record<StudentPortfolioVerificationState, string> = {
-  unverified: "Unverified",
-  verified: "Verified",
-  needs_changes: "NeedsChanges",
-  revoked: "Revoked",
+  unverified: "Unverified", verified: "Verified", needs_changes: "NeedsChanges", revoked: "Revoked",
 };
 const STATE_FROM_DB: Record<string, StudentPortfolioVerificationState> = {
-  Unverified: "unverified",
-  Verified: "verified",
-  NeedsChanges: "needs_changes",
-  Revoked: "revoked",
+  Unverified: "unverified", Verified: "verified", NeedsChanges: "needs_changes", Revoked: "revoked",
 };
 const CONTEXT_FROM_DB = { Lecturer: "lecturer", Supervisor: "supervisor", System: "system" } as const;
 
@@ -58,17 +52,20 @@ function hashSnapshot(snapshot: Snapshot): string {
   return createHash("sha256").update(stableJson(snapshot)).digest("hex");
 }
 
+async function assertEvidenceNotArchived(evidenceId: string): Promise<void> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "StudentPortfolioEvidence" WHERE "id" = ${evidenceId} AND "archivedAt" IS NULL LIMIT 1
+  `;
+  if (!rows[0]) throw new PortalNotFoundError("Portfolio evidence was not found");
+}
+
 async function evidenceSnapshot(evidenceId: string): Promise<{ studentId: string; snapshot: Snapshot; lecturerIds: string[] }> {
+  await assertEvidenceNotArchived(evidenceId);
   const row = await prisma.studentPortfolioEvidence.findUnique({
     where: { id: evidenceId },
     include: {
       links: { orderBy: { createdAt: "asc" } },
-      sourceOffering: {
-        select: {
-          lecturerId: true,
-          coLecturers: { select: { lecturerId: true } },
-        },
-      },
+      sourceOffering: { select: { lecturerId: true, coLecturers: { select: { lecturerId: true } } } },
     },
   });
   if (!row) throw new PortalNotFoundError("Portfolio evidence was not found");
@@ -89,21 +86,15 @@ async function evidenceSnapshot(evidenceId: string): Promise<{ studentId: string
       skills: [...row.skills].sort(),
       links: row.links.map((link) => ({ kind: link.kind, label: link.label, url: link.url })),
       softSkillCodes: softSkills.map((item) => item.skillCode),
-      source: {
-        offeringId: row.sourceOfferingId,
-        courseSpecId: row.sourceCourseSpecId,
-        assessmentItemId: row.sourceAssessmentItemId,
-      },
+      source: { offeringId: row.sourceOfferingId, courseSpecId: row.sourceCourseSpecId, assessmentItemId: row.sourceAssessmentItemId },
     },
   };
 }
 
 async function currentState(evidenceId: string): Promise<StudentPortfolioVerificationState> {
   const rows = await prisma.$queryRaw<Array<{ newState: string }>>`
-    SELECT "newState"::text AS "newState"
-    FROM "StudentPortfolioVerificationEvent"
-    WHERE "evidenceId" = ${evidenceId}
-    ORDER BY "createdAt" DESC, "id" DESC LIMIT 1
+    SELECT "newState"::text AS "newState" FROM "StudentPortfolioVerificationEvent"
+    WHERE "evidenceId" = ${evidenceId} ORDER BY "createdAt" DESC, "id" DESC LIMIT 1
   `;
   return rows[0] ? STATE_FROM_DB[rows[0].newState] : "unverified";
 }
@@ -118,15 +109,14 @@ async function appendEvent(input: {
   snapshot: Snapshot;
 }) {
   const id = randomUUID();
-  const previous = STATE_TO_DB[input.previousState];
-  const next = STATE_TO_DB[input.newState];
   await prisma.$executeRaw`
     INSERT INTO "StudentPortfolioVerificationEvent" (
       "id", "evidenceId", "actorId", "actorContext", "previousState", "newState",
       "reason", "snapshot", "snapshotHash", "createdAt"
     ) VALUES (
       ${id}, ${input.evidenceId}, ${input.actorId}, ${input.actorContext}::"StudentPortfolioVerificationContext",
-      ${previous}::"StudentPortfolioVerificationState", ${next}::"StudentPortfolioVerificationState",
+      ${STATE_TO_DB[input.previousState]}::"StudentPortfolioVerificationState",
+      ${STATE_TO_DB[input.newState]}::"StudentPortfolioVerificationState",
       ${input.reason}, ${JSON.stringify(input.snapshot)}::jsonb, ${hashSnapshot(input.snapshot)}, CURRENT_TIMESTAMP
     )
   `;
@@ -135,16 +125,32 @@ async function appendEvent(input: {
 async function actorContext(actor: AuthUser, studentId: string, lecturerIds: string[]): Promise<"Lecturer" | "Supervisor"> {
   const student = await prisma.student.findUnique({ where: { id: studentId }, select: { userId: true } });
   if (student?.userId === actor.id) throw new PortalAccessError("Students cannot verify their own portfolio evidence");
-
   if (actor.roles.includes("lecturer") && lecturerIds.includes(actor.id)) return "Lecturer";
-
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT "id" FROM "StudentPortfolioSupervisorRelationship"
-    WHERE "studentId" = ${studentId} AND "supervisorUserId" = ${actor.id} AND "status" = 'Approved'
-    LIMIT 1
+    WHERE "studentId" = ${studentId} AND "supervisorUserId" = ${actor.id} AND "status" = 'Approved' LIMIT 1
   `;
   if (rows[0]) return "Supervisor";
   throw new PortalAccessError("You do not have verification authority for this evidence");
+}
+
+async function summary(evidenceId: string): Promise<StudentPortfolioVerificationSummary> {
+  const rows = await prisma.$queryRaw<EventRow[]>`
+    SELECT e."id", e."previousState"::text AS "previousState", e."newState"::text AS "newState",
+           e."actorContext"::text AS "actorContext", u."name" AS "actorName", e."reason", e."createdAt"
+    FROM "StudentPortfolioVerificationEvent" e
+    LEFT JOIN "User" u ON u."id" = e."actorId"
+    WHERE e."evidenceId" = ${evidenceId}
+    ORDER BY e."createdAt" DESC, e."id" DESC LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) return { state: "unverified", context: null, verifiedAt: null, actorName: null };
+  return {
+    state: STATE_FROM_DB[row.newState],
+    context: CONTEXT_FROM_DB[row.actorContext],
+    verifiedAt: row.newState === "Verified" ? row.createdAt.toISOString() : null,
+    actorName: row.actorName,
+  };
 }
 
 export async function invalidateVerifiedEvidenceAfterMaterialEdit(evidenceId: string, beforeHash: string): Promise<void> {
@@ -168,24 +174,7 @@ export async function portfolioEvidenceSnapshotHash(evidenceId: string): Promise
 }
 
 export const studentPortfolioVerificationService = {
-  async summary(evidenceId: string): Promise<StudentPortfolioVerificationSummary> {
-    const rows = await prisma.$queryRaw<EventRow[]>`
-      SELECT e."id", e."previousState"::text AS "previousState", e."newState"::text AS "newState",
-             e."actorContext"::text AS "actorContext", u."name" AS "actorName", e."reason", e."createdAt"
-      FROM "StudentPortfolioVerificationEvent" e
-      LEFT JOIN "User" u ON u."id" = e."actorId"
-      WHERE e."evidenceId" = ${evidenceId}
-      ORDER BY e."createdAt" DESC, e."id" DESC LIMIT 1
-    `;
-    const row = rows[0];
-    if (!row) return { state: "unverified", context: null, verifiedAt: null, actorName: null };
-    return {
-      state: STATE_FROM_DB[row.newState],
-      context: CONTEXT_FROM_DB[row.actorContext],
-      verifiedAt: row.newState === "Verified" ? row.createdAt.toISOString() : null,
-      actorName: row.actorName,
-    };
-  },
+  summary,
 
   async history(userId: string, evidenceId: string): Promise<StudentPortfolioVerificationEvent[]> {
     const student = await prisma.student.findUnique({ where: { userId }, select: { id: true } });
@@ -223,7 +212,7 @@ export const studentPortfolioVerificationService = {
       reason: decision.reason,
       snapshot,
     });
-    return this.summary(evidenceId);
+    return summary(evidenceId);
   },
 
   async approveSupervisor(actor: AuthUser, input: StudentPortfolioSupervisorRelationshipInput) {
