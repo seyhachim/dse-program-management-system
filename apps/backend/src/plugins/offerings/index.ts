@@ -4,6 +4,7 @@ import { attendanceService } from "./attendance-service.ts";
 import { classDeliveryService } from "./class-delivery-service.ts";
 import { classResponsibilityService } from "./class-responsibility-service.ts";
 import { courseSectionPresenceService } from "./course-section-presence-service.ts";
+import { portfolioTeachingEvidenceService } from "./portfolio-evidence-service.ts";
 import { createOfferingRouter } from "./router.ts";
 import { offeringService } from "./service.ts";
 import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
@@ -11,6 +12,7 @@ import { studentAttendanceHistoryService } from "./student-attendance-history-se
 export const offeringsService = {
   ...offeringService,
   ...courseSectionPresenceService,
+  ...portfolioTeachingEvidenceService,
   attendance: attendanceService,
   studentAttendanceHistory: studentAttendanceHistoryService,
   classResponsibilities: classResponsibilityService,
