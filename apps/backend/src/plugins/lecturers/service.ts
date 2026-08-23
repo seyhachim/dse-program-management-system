@@ -27,6 +27,15 @@ const lecturerSelect = {
   title: true,
   qualification: true,
   phone: true,
+  lecturerProfile: {
+    select: {
+      gender: true,
+      employmentType: true,
+      fieldOfSpecialization: true,
+      yearsOfExperience: true,
+      legacyCoursesTaught: true,
+    },
+  },
 } as const;
 
 type LecturerRow = Awaited<ReturnType<typeof selectLecturerRow>>;
@@ -36,9 +45,10 @@ function selectLecturerRow(id: string) {
 }
 
 function presentLecturer(row: NonNullable<LecturerRow>) {
-  const { authId, ...lecturer } = row;
+  const { authId, lecturerProfile, ...lecturer } = row;
   return {
     ...lecturer,
+    professionalProfile: lecturerProfile,
     accountAccess: authId ? ("has_access" as const) : ("no_access" as const),
   };
 }
@@ -82,7 +92,35 @@ export const lecturerService = {
       select: { id: true },
     });
     if (!existing) throw new NotFoundError("Lecturer profile not found");
-    const row = await prisma.user.update({ where: { id: userId }, data: input, select: lecturerSelect });
+
+    const {
+      employmentType,
+      fieldOfSpecialization,
+      yearsOfExperience,
+      ...userProfile
+    } = input;
+
+    const row = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...userProfile,
+        lecturerProfile: {
+          upsert: {
+            create: {
+              employmentType,
+              fieldOfSpecialization,
+              yearsOfExperience,
+            },
+            update: {
+              employmentType,
+              fieldOfSpecialization,
+              yearsOfExperience,
+            },
+          },
+        },
+      },
+      select: lecturerSelect,
+    });
     return presentLecturer(row);
   },
 
