@@ -5,6 +5,11 @@ import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
 } from "./course-document-model";
+import {
+  contiguousRowSpans,
+  programmePloCountLabel,
+  splitLeadingWord,
+} from "./plo-preview-format";
 
 export const PAGE_WIDTH = COURSE_DOCUMENT_STYLE.page.preview.width;
 const PAGE_HEIGHT = COURSE_DOCUMENT_STYLE.page.preview.height;
@@ -404,15 +409,75 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
   const policyPage = rubricStartPage + rubricPages.length;
   const ratingScalePage = policyPage + 1;
   const datePage = ratingScalePage + 1;
+  const majorRowSpans = contiguousRowSpans(document.plos, (plo) => plo.major);
+  const capRowSpans = contiguousRowSpans(document.plos, (plo) => plo.cap);
 
   return (
     <>
       <Page zoom={zoom} pageNumber={1}><div id="programme-overview" className="h-full"><ProgrammeProfilePage document={document} /></div></Page>
       <Page zoom={zoom} pageNumber={2}>
-        <div id="plo-taxonomy" className="h-full px-[54px] py-[42px]">
-          <h2 className="mb-3 text-[13px] font-bold uppercase">Part 1 (continued): Programme Learning Outcomes — Taxonomy</h2>
+        <div id="plo-taxonomy" className="h-full px-[30px] py-[18px]">
+          <h2 className="text-[13px] font-bold">PROGRAM LEARNING OUTCOME (PLOs)</h2>
+          <p className="mb-2 mt-1 text-[10px]">
+            Our program has {programmePloCountLabel(document.plos.length)} PLOs:
+          </p>
           {document.plos.length === 0 ? <p className="text-[11px]">No programme learning outcomes have been configured.</p> : (
-            <Table><colgroup><col className="w-[6%]" /><col className="w-[8%]" /><col className="w-[38%]" /><col className="w-[16%]" /><col className="w-[16%]" /><col className="w-[8%]" /><col className="w-[8%]" /></colgroup><thead><tr><TH>No.</TH><TH>PLO</TH><TH>Description</TH><TH>Major</TH><TH>Learning Domain</TH><TH>Specific / Generic</TH><TH>C/A/P</TH></tr></thead><tbody>{document.plos.map((plo, index) => <tr key={plo.id}><TD className="text-center">{index + 1}</TD><TD className="font-medium">{plo.code}</TD><TD>{plo.description}</TD><TD>{displayDocumentValue(plo.major)}</TD><TD>{displayDocumentValue(plo.learningDomain)}</TD><TD>{displayDocumentValue(plo.specificOrGeneric)}</TD><TD>{displayDocumentValue(plo.cap)}</TD></tr>)}</tbody></Table>
+            <>
+              <table className="w-full table-fixed border-collapse text-[9.5px] leading-[1.16]">
+                <colgroup>
+                  <col className="w-[19%]" />
+                  <col className="w-[19%]" />
+                  <col className="w-[35%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th colSpan={2} className="border border-black px-1.5 py-1 text-center align-middle font-bold">CQF Learning Domains</th>
+                    <th rowSpan={2} className="border border-black px-1.5 py-1 text-center align-middle font-bold">PLO</th>
+                    <th rowSpan={2} className="border border-black px-1.5 py-1 text-center align-middle font-bold">Specific/Generic</th>
+                    <th rowSpan={2} className="border border-black px-1.5 py-1 text-center align-middle font-bold">Learning/Assessment Domains</th>
+                  </tr>
+                  <tr>
+                    <th className="border border-black px-1.5 py-1 text-center align-middle font-bold">Major Domain</th>
+                    <th className="border border-black px-1.5 py-1 text-center align-middle font-bold">Learning Domain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {document.plos.map((plo, index) => {
+                    const { leadingWord, remainder } = splitLeadingWord(plo.description);
+                    return (
+                      <tr key={plo.id}>
+                        {majorRowSpans[index] > 0 ? (
+                          <td rowSpan={majorRowSpans[index]} className="border border-black px-1.5 py-1 align-middle">
+                            {displayDocumentValue(plo.major)}
+                          </td>
+                        ) : null}
+                        <td className="border border-black px-1.5 py-1 align-middle">
+                          {displayDocumentValue(plo.learningDomain)}
+                        </td>
+                        <td className="border border-black px-1.5 py-1 align-middle">
+                          <strong>{plo.code}: {leadingWord}</strong>{remainder ? ` ${remainder}` : ""}
+                        </td>
+                        <td className="border border-black px-1.5 py-1 text-center align-middle">
+                          {displayDocumentValue(plo.specificOrGeneric)}
+                        </td>
+                        {capRowSpans[index] > 0 ? (
+                          <td rowSpan={capRowSpans[index]} className="border border-black px-1.5 py-1 text-center align-middle">
+                            {displayDocumentValue(plo.cap)}
+                          </td>
+                        ) : null}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className="mt-2 text-[9px] leading-[1.25]">
+                <p>*</p>
+                <p><strong>Specific (Subject-Specific) PLOs:</strong> Directly related to data science and engineering knowledge, tools, and technical skills)</p>
+                <p><strong>Generic PLOs:</strong> Transferable skills applicable across disciplines and professions</p>
+              </div>
+            </>
           )}
           <PageFooter courseCode={info.courseCode} page={2} />
         </div>
