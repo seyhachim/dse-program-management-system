@@ -12,7 +12,10 @@ import type {
   StudentPortfolioProfileInput,
   StudentPortfolioSoftSkillCode,
   StudentPortfolioSoftSkillSummary,
+  StudentPortfolioVerificationDecisionInput,
   StudentPortfolioVerificationEvent,
+  StudentPortfolioVerificationInboxItem,
+  StudentPortfolioVerificationSummary,
 } from "@dse-pms/shared-types";
 import { api, API_URL } from "./api";
 
@@ -41,6 +44,10 @@ export const studentPortfolioApi = {
   competencies: () => api.get<StudentPortfolioCompetencySummary[]>("/api/student-portal/portfolio/competencies"),
   verificationHistory: (evidenceId: string) =>
     api.get<StudentPortfolioVerificationEvent[]>(`/api/student-portal/portfolio/evidence/${evidenceId}/verification`),
+  verificationInbox: () =>
+    api.get<StudentPortfolioVerificationInboxItem[]>("/api/student-portal/portfolio/verification/inbox"),
+  decideVerification: (evidenceId: string, input: StudentPortfolioVerificationDecisionInput) =>
+    api.post<StudentPortfolioVerificationSummary>(`/api/student-portal/portfolio/evidence/${evidenceId}/verification`, input),
 };
 
 export async function publicStudentPortfolio(slug: string): Promise<PublicStudentPortfolio> {
