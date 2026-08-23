@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -18,7 +17,6 @@ import {
   Send,
   Trash2,
   UserRound,
-  X,
 } from "lucide-react";
 import {
   DEFAULT_STUDENT_HANDBOOK_DOCUMENT_THEME,
@@ -26,7 +24,6 @@ import {
   type SaveStudentHandbookSectionInput,
   type StudentHandbookDocumentTheme,
   type StudentHandbookSourceKind,
-  type StudentHandbookSourcePreview,
   type StudentHandbookView,
 } from "@dse-pms/shared-types";
 import { DocumentRenderer, RichTextEditor } from "@/components/document-editor";
@@ -40,8 +37,8 @@ import { useMe } from "@/lib/auth";
 import { lecturersApi } from "@/lib/lecturers";
 import { studentHandbookApi } from "@/lib/student-handbook";
 import { studentHandbookSourceLabel } from "@/lib/student-handbook-source-catalog";
-import { getStudentHandbookUnavailableSourceState } from "@/lib/student-handbook-source-state";
 import { StudentHandbookDocumentPreview } from "./student-handbook-document-preview";
+import { SourcePreviewModal } from "./student-handbook-source-preview";
 import { StudentHandbookSourceBrowser } from "./student-handbook-source-browser";
 import { StudentHandbookThemePanel } from "./student-handbook-theme-panel";
 
@@ -74,50 +71,6 @@ function toEditableBlocks(handbook: StudentHandbookView, sectionKey: string): Ed
   );
 }
 
-function SourcePreviewModal({ preview, onClose }: { preview: StudentHandbookSourcePreview; onClose: () => void }) {
-  const unavailable = getStudentHandbookUnavailableSourceState(preview);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl border bg-card shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Database className="h-4 w-4 text-emerald-600" />
-              <h2 className="font-semibold text-foreground">{unavailable?.title ?? preview.label}</h2>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Authoritative PMS data · Read only{preview.snapshot ? " · Published snapshot" : ""}
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-md p-2 text-muted-foreground hover:bg-muted" aria-label="Close source preview">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="max-h-[68vh] overflow-auto p-5">
-          {unavailable ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-                <div>
-                  <p className="font-medium text-foreground">{unavailable.message}</p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{unavailable.explanation}</p>
-                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">
-                    <Database className="h-3.5 w-3.5" /> Read-only PMS source
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <pre className="whitespace-pre-wrap rounded-lg bg-muted/50 p-4 text-xs leading-6 text-foreground">
-              {JSON.stringify(preview.data, null, 2)}
-            </pre>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function StudentHandbookClient() {
   const { me, loading: meLoading } = useMe();
   const [handbooks, setHandbooks] = useState<StudentHandbookView[]>([]);
@@ -128,7 +81,7 @@ export function StudentHandbookClient() {
   const [error, setError] = useState<string | null>(null);
   const [selectedSectionKey, setSelectedSectionKey] = useState<string>("welcome");
   const [draftBlocks, setDraftBlocks] = useState<EditableBlock[]>([]);
-  const [sourcePreview, setSourcePreview] = useState<StudentHandbookSourcePreview | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<import("@dse-pms/shared-types").StudentHandbookSourcePreview | null>(null);
   const [sourceBrowserOpen, setSourceBrowserOpen] = useState(false);
   const [reviewNote, setReviewNote] = useState("");
   const [createVersion, setCreateVersion] = useState("2026.1");
