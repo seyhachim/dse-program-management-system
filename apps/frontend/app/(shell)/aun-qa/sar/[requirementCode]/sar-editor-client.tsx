@@ -6,7 +6,6 @@ import {
   BookOpen,
   Database,
   FileCheck2,
-  List,
   MessageSquare,
   Plus,
   RotateCcw,
@@ -20,13 +19,18 @@ import type {
   QaEvidenceItemView,
   QaKnowledgeView,
   QaSarBlock,
-  QaSarDocument,
   QaSarSectionView,
   QaSarSubmissionView,
 } from "@dse-pms/shared-types";
-import { EMPTY_QA_SAR_DOCUMENT } from "@dse-pms/shared-types";
+import { DocumentRenderer, RichTextEditor } from "@/components/document-editor";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
+import {
+  newQaSarRichTextBlock,
+  qaSarDocumentToEditorBlocks,
+  qaSarEditorBlocksToDocument,
+  type QaSarEditorBlock,
+} from "@/lib/qa-sar-rich-content";
 
 const PROGRAMME_ID = "dse";
 
@@ -52,7 +56,7 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
   const [section, setSection] = useState<QaSarSectionView | null>(null);
   const [submissions, setSubmissions] = useState<QaSarSubmissionView[]>([]);
   const [cycleId, setCycleId] = useState<string | null>(null);
-  const [content, setContent] = useState<QaSarDocument>(EMPTY_QA_SAR_DOCUMENT);
+  const [editorBlocks, setEditorBlocks] = useState<QaSarEditorBlock[]>([]);
   const [evidence, setEvidence] = useState<QaEvidenceItemView[]>([]);
   const [knowledge, setKnowledge] = useState<QaKnowledgeView | null>(null);
   const [readiness, setReadiness] = useState({
@@ -65,6 +69,7 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const content = useMemo(() => qaSarEditorBlocksToDocument(editorBlocks), [editorBlocks]);
   const leadershipOrReviewer =
     me?.roles.some((role) => ["admin", "program_coordinator", "qa_reviewer"].includes(role)) ?? false;
   const roleCanEdit =
@@ -95,7 +100,7 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
         api.get<QaKnowledgeView>("/api/qa/knowledge"),
       ]);
       setSection(sectionView);
-      setContent(sectionView.content);
+      setEditorBlocks(qaSarDocumentToEditorBlocks(sectionView.content));
       setReadiness(sectionView.readiness);
       setEvidence(library);
       setKnowledge(knowledgeView);
@@ -143,43 +148,37 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
       ["notStarted", "drafting", "changesRequested"].includes(section.status),
   );
 
-  function addBlock(block: QaSarBlock) {
-    setContent((current) => ({ ...current, blocks: [...current.blocks, block] }));
-  }
-
-  function addText(type: "paragraph" | "heading" | "bullet") {
-    if (type === "heading") addBlock({ id: newId(), type, level: 2, text: "" });
-    else addBlock({ id: newId(), type, text: "" });
-  }
-
-  function updateText(id: string, text: string) {
-    setContent((current) => ({
-      ...current,
-      blocks: current.blocks.map((block) =>
-        block.id === id && "text" in block ? { ...block, text } : block,
-      ),
-    }));
+  function updateRichText(id: string, document: Extract<QaSarEditorBlock, { type: "richText" }>["document"]) {
+    setEditorBlocks((current) =>
+      current.map((block) => (block.id === id && block.type === "richText" ? { ...block, document } : block)),
+    );
   }
 
   function removeBlock(id: string) {
-    setContent((current) => {
-      const blocks = current.blocks.filter((block) => block.id !== id);
-      return {
-        ...current,
-        blocks: blocks.length ? blocks : [{ id: newId(), type: "paragraph", text: "" }],
-      };
+    setEditorBlocks((current) => {
+      const blocks = current.filter((block) => block.id !== id);
+      return blocks.length ? blocks : [newQaSarRichTextBlock()];
     });
   }
 
+  function continueWriting() {
+    setEditorBlocks((current) =>
+      current.at(-1)?.type === "richText" ? current : [...current, newQaSarRichTextBlock()],
+    );
+  }
+
   function insertEvidence(item: QaEvidenceItemView) {
-    addBlock({ id: newId(), type: "evidenceReference", evidenceId: item.id, label: item.title });
+    setEditorBlocks((current) => [
+      ...current,
+      { id: newId(), type: "evidenceReference", evidenceId: item.id, label: item.title },
+    ]);
   }
 
   function insertPmsData(
     source: Extract<QaSarBlock, { type: "pmsData" }>["source"],
     label: string,
   ) {
-    addBlock({ id: newId(), type: "pmsData", source, label });
+    setEditorBlocks((current) => [...current, { id: newId(), type: "pmsData", source, label }]);
   }
 
   async function saveDraft(): Promise<QaSarSectionView | null> {
@@ -192,7 +191,7 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
         { programmeId: PROGRAMME_ID, content, readiness },
       );
       setSection(saved);
-      setContent(saved.content);
+      setEditorBlocks(qaSarDocumentToEditorBlocks(saved.content));
       setReadiness(saved.readiness);
       return saved;
     } catch (caught) {
@@ -325,36 +324,37 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
         </aside>
 
         <section className="rounded-xl border bg-white shadow-sm">
-          <div className="flex flex-wrap gap-2 border-b p-3">
-            <button disabled={!editable} onClick={() => addText("paragraph")} className="rounded-md border px-2.5 py-1.5 text-xs">Paragraph</button>
-            <button disabled={!editable} onClick={() => addText("heading")} className="rounded-md border px-2.5 py-1.5 text-xs">Heading</button>
-            <button disabled={!editable} onClick={() => addText("bullet")} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><List className="h-3 w-3" /> Bullet</button>
-            <div className="mx-1 border-l" />
+          <div className="flex flex-wrap items-center gap-2 border-b p-3">
+            <span className="text-xs font-medium text-muted-foreground">DSE Content Editor</span>
+            <div className="mx-1 h-5 border-l" />
             <button disabled={!editable} onClick={() => insertPmsData("cloAttainment", "CLO attainment summary")} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><Database className="h-3 w-3" /> CLO attainment</button>
             <button disabled={!editable} onClick={() => insertPmsData("assessmentSummary", "Assessment results summary")} className="rounded-md border px-2.5 py-1.5 text-xs">Assessment data</button>
           </div>
 
-          <div className="min-h-[650px] space-y-1 p-5 md:p-8">
-            {content.blocks.map((block) => (
-              <div key={block.id} className="group relative rounded-md px-2 py-1 hover:bg-slate-50">
-                {"text" in block ? (
-                  <textarea
-                    value={block.text}
-                    disabled={!editable}
-                    onChange={(event) => updateText(block.id, event.target.value)}
-                    placeholder={block.type === "heading" ? "Section heading" : block.type === "bullet" ? "List item" : "Write your SAR narrative…"}
-                    rows={block.type === "paragraph" ? 3 : 1}
-                    className={`w-full resize-none border-0 bg-transparent px-1 py-2 outline-none disabled:text-foreground ${block.type === "heading" ? "text-xl font-semibold" : block.type === "bullet" ? "pl-5 text-sm" : "text-sm leading-7"}`}
-                  />
+          <div className="min-h-[650px] space-y-3 p-5 md:p-8">
+            {editorBlocks.map((block) => (
+              <div key={block.id} className="group relative rounded-lg">
+                {block.type === "richText" ? (
+                  editable ? (
+                    <RichTextEditor
+                      value={block.document}
+                      onChange={(document) => updateRichText(block.id, document)}
+                      minHeight={220}
+                    />
+                  ) : (
+                    <div className="rounded-lg border bg-white p-4">
+                      <DocumentRenderer value={block.document} />
+                    </div>
+                  )
                 ) : block.type === "evidenceReference" ? (
                   <div className="my-2 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800"><FileCheck2 className="h-4 w-4" /> Evidence: {block.label}</div>
                 ) : (
                   <div className="my-2 inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800"><Database className="h-4 w-4" /> PMS data: {block.label}</div>
                 )}
-                {editable ? <button onClick={() => removeBlock(block.id)} className="absolute right-1 top-1 hidden rounded p-1 text-muted-foreground hover:bg-white group-hover:block" aria-label="Remove block"><Trash2 className="h-3.5 w-3.5" /></button> : null}
+                {editable && block.type !== "richText" ? <button onClick={() => removeBlock(block.id)} className="absolute right-1 top-1 hidden rounded p-1 text-muted-foreground hover:bg-white group-hover:block" aria-label="Remove block"><Trash2 className="h-3.5 w-3.5" /></button> : null}
               </div>
             ))}
-            {editable ? <button onClick={() => addText("paragraph")} className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><Plus className="h-3 w-3" /> Continue writing</button> : null}
+            {editable ? <button onClick={continueWriting} className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><Plus className="h-3 w-3" /> Continue writing</button> : null}
           </div>
         </section>
 
