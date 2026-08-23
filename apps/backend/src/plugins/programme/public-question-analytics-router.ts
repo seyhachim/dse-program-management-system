@@ -2,11 +2,13 @@ import { Router, type Request, type Response } from "express";
 import {
   PublicQuestionEventFilterSchema,
   PublicQuestionReviewUpdateSchema,
+  TelegramAnalyticsRangeSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { hasPublicInfoManagementScope } from "./public-programme-info-router.ts";
 import { publicQuestionAnalyticsService } from "./public-question-analytics-service.ts";
+import { telegramAnalyticsService } from "./telegram-analytics-service.ts";
 
 function programmeIdOr403(req: Request, res: Response): string | null {
   const programmeId = req.params.programmeId;
@@ -34,6 +36,27 @@ function sendError(res: Response, error: unknown, fallback: string): void {
 export function createPublicQuestionAnalyticsRouter(): Router {
   const router = Router();
   router.use(requireAuth);
+
+  router.get(
+    "/programmes/:programmeId/telegram-analytics",
+    requirePermission("programme:read"),
+    async (req, res) => {
+      const programmeId = programmeIdOr403(req, res);
+      if (!programmeId) return;
+      const parsed = TelegramAnalyticsRangeSchema.safeParse({
+        days: typeof req.query.days === "string" ? req.query.days : undefined,
+      });
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid analytics range", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.json(await telegramAnalyticsService.dashboard(programmeId, parsed.data.days));
+      } catch (error) {
+        sendError(res, error, "Could not load Telegram analytics");
+      }
+    },
+  );
 
   router.get(
     "/programmes/:programmeId/question-events",
