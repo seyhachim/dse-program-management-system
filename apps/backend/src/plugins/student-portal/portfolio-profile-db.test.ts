@@ -57,6 +57,7 @@ dbDescribe("student portfolio profile database boundary", () => {
       expect(profileA?.isPublic).toBe(false);
       expect(profileB).toBeNull();
     } finally {
+      await prisma.student.deleteMany({ where: { userId: { in: [userA.id, userB.id] } } });
       await prisma.user.deleteMany({ where: { id: { in: [userA.id, userB.id] } } });
     }
   });
