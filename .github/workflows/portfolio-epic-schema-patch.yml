@@ -1,3 +1,4 @@
+# implementation trigger v2
 name: Portfolio epic schema patch
 on:
   push:
@@ -16,22 +17,17 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           schema_path = Path('apps/backend/prisma/schema.prisma')
           schema = schema_path.read_text()
-
           user_anchor = '  studentProfile                   Student?\n  lecturerProfile                  LecturerProfile?\n'
           if 'portfolioVerificationEvents' not in schema:
               schema = schema.replace(user_anchor, user_anchor + '''  portfolioVerificationEvents       StudentPortfolioVerificationEvent[]        @relation("StudentPortfolioVerifier")\n  portfolioSupervisorAssignments   StudentPortfolioSupervisorRelationship[]   @relation("PortfolioSupervisorUser")\n  portfolioSupervisorApprovals     StudentPortfolioSupervisorRelationship[]   @relation("PortfolioSupervisorApprovedBy")\n  portfolioSupervisorRevocations   StudentPortfolioSupervisorRelationship[]   @relation("PortfolioSupervisorRevokedBy")\n''')
-
           student_anchor = '  portfolioProfile StudentPortfolioProfile?\n  portfolioEvidence StudentPortfolioEvidence[]\n'
           if 'portfolioProfessionalLinks' not in schema:
               schema = schema.replace(student_anchor, student_anchor + '''  portfolioProfessionalLinks StudentPortfolioProfessionalLink[]\n  portfolioSupervisorRelationships StudentPortfolioSupervisorRelationship[]\n''')
-
           evidence_anchor = '  links                  StudentPortfolioEvidenceLink[]\n\n  @@index([studentId, updatedAt])'
           if 'verificationEvents' not in schema:
               schema = schema.replace(evidence_anchor, '''  links                  StudentPortfolioEvidenceLink[]\n  verificationEvents     StudentPortfolioVerificationEvent[]\n  softSkills             StudentPortfolioEvidenceSoftSkill[]\n\n  @@index([studentId, updatedAt])''')
-
           insert_anchor = '/// Authoritative programme cohort identity. Cohort membership and progression\n'
           if 'model StudentPortfolioProfessionalLink {' not in schema:
               block = r'''
@@ -47,13 +43,9 @@ model StudentPortfolioProfessionalLink {
   isPublic  Boolean                              @default(false)
   createdAt DateTime                             @default(now())
   updatedAt DateTime                             @updatedAt
-
   @@unique([studentId, provider, url])
   @@index([studentId, isPublic])
 }
-
-/// Explicit internal supervisor trust relationship. A free-text name/email never
-/// grants portfolio verification authority.
 model StudentPortfolioSupervisorRelationship {
   id               String                           @id @default(uuid())
   studentId        String
@@ -69,13 +61,9 @@ model StudentPortfolioSupervisorRelationship {
   revokedAt        DateTime?
   createdAt        DateTime                         @default(now())
   updatedAt        DateTime                         @updatedAt
-
   @@unique([studentId, supervisorUserId])
   @@index([supervisorUserId, status])
 }
-
-/// Append-only verification history. Student edits never rewrite prior decisions;
-/// material presentation changes append a System transition back to Unverified.
 model StudentPortfolioVerificationEvent {
   id            String                              @id @default(uuid())
   evidenceId    String
@@ -89,70 +77,31 @@ model StudentPortfolioVerificationEvent {
   snapshot      Json
   snapshotHash  String
   createdAt     DateTime                            @default(now())
-
   @@index([evidenceId, createdAt])
   @@index([actorId, createdAt])
 }
-
-/// System-configured soft-skill vocabulary mapped to exact evidence records.
-/// Skills have no free-standing student score; presentation is derived from evidence.
 model StudentPortfolioEvidenceSoftSkill {
   evidenceId String
   evidence   StudentPortfolioEvidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
   skillCode  String
   createdAt  DateTime                 @default(now())
-
   @@id([evidenceId, skillCode])
   @@index([skillCode])
 }
-
-enum StudentPortfolioProfessionalProvider {
-  GitHub
-  GitLab
-  LinkedIn
-  Kaggle
-  HuggingFace
-  Website
-  ORCID
-  GoogleScholar
-  ResearchGate
-  CodingPractice
-  BIProfile
-  CV
-  Other
-}
-
-enum StudentPortfolioSupervisorStatus {
-  Pending
-  Approved
-  Revoked
-}
-
-enum StudentPortfolioVerificationState {
-  Unverified
-  Verified
-  NeedsChanges
-  Revoked
-}
-
-enum StudentPortfolioVerificationContext {
-  Lecturer
-  Supervisor
-  System
-}
+enum StudentPortfolioProfessionalProvider { GitHub GitLab LinkedIn Kaggle HuggingFace Website ORCID GoogleScholar ResearchGate CodingPractice BIProfile CV Other }
+enum StudentPortfolioSupervisorStatus { Pending Approved Revoked }
+enum StudentPortfolioVerificationState { Unverified Verified NeedsChanges Revoked }
+enum StudentPortfolioVerificationContext { Lecturer Supervisor System }
 
 '''
               schema = schema.replace(insert_anchor, block + insert_anchor)
-
           schema_path.write_text(schema)
-
           security_path = Path('apps/backend/scripts/verify-db-security.ts')
           security = security_path.read_text()
           anchor = '  "StudentPortfolioEvidenceLink",\n'
           if 'StudentPortfolioProfessionalLink' not in security:
-              security = security.replace(anchor, anchor + '''  "StudentPortfolioProfessionalLink",\n  "StudentPortfolioSupervisorRelationship",\n  "StudentPortfolioVerificationEvent",\n  "StudentPortfolioEvidenceSoftSkill",\n''')
+              security = security.replace(anchor, anchor + '  "StudentPortfolioProfessionalLink",\n  "StudentPortfolioSupervisorRelationship",\n  "StudentPortfolioVerificationEvent",\n  "StudentPortfolioEvidenceSoftSkill",\n')
           security_path.write_text(security)
-
           plugins_path = Path('packages/shared-types/src/plugins.ts')
           plugins = plugins_path.read_text()
           marker = '''    {\n      label: "Account Settings",\n      path: "/account-settings",\n      icon: "settings",\n      roles: ["lecturer"],\n      group: "Personal",\n    },'''
@@ -160,7 +109,6 @@ enum StudentPortfolioVerificationContext {
               addition = '''    {\n      label: "Portfolio Evidence Review",\n      path: "/portfolio-verification",\n      icon: "shield-check",\n      roles: ["lecturer"],\n      group: "Delivery",\n    },\n'''
               plugins = plugins.replace(marker, addition + marker)
           plugins_path.write_text(plugins)
-
           Path('.github/workflows/portfolio-epic-schema-patch.yml').unlink()
           PY
           git config user.name "github-actions[bot]"
