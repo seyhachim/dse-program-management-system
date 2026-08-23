@@ -27,6 +27,7 @@ import {
 import {
   communityManifest,
   curriculumWorkspaceManifest,
+  lecturerPortfolioManifest,
   navForRole,
   navFromManifests,
   navGroupsForRole,
@@ -100,6 +101,7 @@ const frontendManifests = [
   gradingScaleManagementManifest,
   curriculumWorkspaceManifest,
   communityManifest,
+  lecturerPortfolioManifest,
   publicInformationManifest,
 ];
 
