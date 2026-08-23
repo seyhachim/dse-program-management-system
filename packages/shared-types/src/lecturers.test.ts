@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   CreateLecturerInput,
+  LecturerSchema,
   USER_HONORIFIC_LABELS,
   UpdateMyLecturerProfileInput,
   UserHonorificSchema,
@@ -8,6 +9,20 @@ import {
 } from "./lecturers.ts";
 
 test("self-profile input accepts only editable lecturer fields", () => {
+  expect(
+    UpdateMyLecturerProfileInput.safeParse({
+      name: "Ada Lovelace",
+      title: "Dr.",
+      qualification: "PhD",
+      phone: "+855 12 345 678",
+      employmentType: "Full-time",
+      fieldOfSpecialization: "Machine Learning",
+      yearsOfExperience: 8,
+    }).success,
+  ).toBe(true);
+});
+
+test("self-profile input keeps new portfolio fields additive for older callers", () => {
   expect(
     UpdateMyLecturerProfileInput.safeParse({
       name: "Ada Lovelace",
@@ -41,7 +56,7 @@ test("self-profile input rejects an empty name", () => {
 });
 
 test("self-profile input rejects identity and protected fields", () => {
-  for (const protectedField of ["id", "email", "roles", "authId"]) {
+  for (const protectedField of ["id", "email", "roles", "authId", "legacyCoursesTaught", "gender"]) {
     const result = UpdateMyLecturerProfileInput.safeParse({
       name: "Ada Lovelace",
       title: null,
@@ -51,6 +66,42 @@ test("self-profile input rejects identity and protected fields", () => {
     });
     expect(result.success).toBe(false);
   }
+});
+
+test("self-profile input bounds years of experience", () => {
+  const base = {
+    name: "Ada Lovelace",
+    title: "Lecturer",
+    qualification: "PhD",
+    phone: null,
+  };
+  expect(UpdateMyLecturerProfileInput.safeParse({ ...base, yearsOfExperience: 0 }).success).toBe(true);
+  expect(UpdateMyLecturerProfileInput.safeParse({ ...base, yearsOfExperience: 80 }).success).toBe(true);
+  expect(UpdateMyLecturerProfileInput.safeParse({ ...base, yearsOfExperience: -1 }).success).toBe(false);
+  expect(UpdateMyLecturerProfileInput.safeParse({ ...base, yearsOfExperience: 81 }).success).toBe(false);
+});
+
+test("lecturer DTO exposes structured professional metadata without auth identifiers", () => {
+  const parsed = LecturerSchema.parse({
+    id: "11111111-1111-4111-8111-111111111111",
+    name: "Chim Seyha",
+    email: "seyha@example.edu",
+    honorific: "Mr",
+    title: "Lecturer",
+    qualification: "MSc in Data Science",
+    phone: "012345678",
+    professionalProfile: {
+      gender: "Male",
+      employmentType: "Full-time",
+      fieldOfSpecialization: "Machine Learning and Time Series",
+      yearsOfExperience: 8,
+      legacyCoursesTaught: "Historical source text",
+    },
+    accountAccess: "has_access",
+  });
+
+  expect(parsed.professionalProfile?.fieldOfSpecialization).toBe("Machine Learning and Time Series");
+  expect("authId" in parsed).toBe(false);
 });
 
 test("UserHonorificSchema exposes only the canonical allowed values", () => {
