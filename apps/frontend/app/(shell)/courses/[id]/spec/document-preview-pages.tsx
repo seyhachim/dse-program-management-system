@@ -446,10 +446,12 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
                 <tbody>
                   {document.plos.map((plo, index) => {
                     const { leadingWord, remainder } = splitLeadingWord(plo.description);
+                    const majorRowSpan = majorRowSpans[index] ?? 0;
+                    const capRowSpan = capRowSpans[index] ?? 0;
                     return (
                       <tr key={plo.id}>
-                        {majorRowSpans[index] > 0 ? (
-                          <td rowSpan={majorRowSpans[index]} className="border border-black px-1.5 py-1 align-middle">
+                        {majorRowSpan > 0 ? (
+                          <td rowSpan={majorRowSpan} className="border border-black px-1.5 py-1 align-middle">
                             {displayDocumentValue(plo.major)}
                           </td>
                         ) : null}
@@ -462,8 +464,8 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
                         <td className="border border-black px-1.5 py-1 text-center align-middle">
                           {displayDocumentValue(plo.specificOrGeneric)}
                         </td>
-                        {capRowSpans[index] > 0 ? (
-                          <td rowSpan={capRowSpans[index]} className="border border-black px-1.5 py-1 text-center align-middle">
+                        {capRowSpan > 0 ? (
+                          <td rowSpan={capRowSpan} className="border border-black px-1.5 py-1 text-center align-middle">
                             {displayDocumentValue(plo.cap)}
                           </td>
                         ) : null}
