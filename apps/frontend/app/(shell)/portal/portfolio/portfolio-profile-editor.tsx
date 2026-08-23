@@ -24,6 +24,7 @@ export function PortfolioProfileEditor() {
 
   if (loading) return <PortalLoading />;
   if (error || !data) return <PortalError message={error ?? "Could not load your portfolio"} />;
+  const currentProfile = data;
 
   async function save() {
     setSaving(true);
@@ -34,8 +35,8 @@ export function PortfolioProfileEditor() {
         headline,
         bio,
         careerInterests: normalizeCareerInterests(interests),
-        visibility: data.visibility,
-        publicSlug: data.publicSlug,
+        visibility: currentProfile.visibility,
+        publicSlug: currentProfile.publicSlug,
       });
       setData(updated);
       setSaved(true);
@@ -52,10 +53,10 @@ export function PortfolioProfileEditor() {
         <span className="rounded-2xl bg-primary/10 p-3 text-primary"><UserRound className="h-6 w-6" /></span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">PMS identity</p>
-          <h2 className="mt-1 text-xl font-semibold">{data.identity.name}</h2>
+          <h2 className="mt-1 text-xl font-semibold">{currentProfile.identity.name}</h2>
           <div className="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-            <p>Student ID: {data.identity.studentId}</p>
-            <p className="truncate">Email: {data.identity.email}</p>
+            <p>Student ID: {currentProfile.identity.studentId}</p>
+            <p className="truncate">Email: {currentProfile.identity.email}</p>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">Institutional identity is read-only here. Portfolio edits cannot change your student record or academic results.</p>
         </div>
