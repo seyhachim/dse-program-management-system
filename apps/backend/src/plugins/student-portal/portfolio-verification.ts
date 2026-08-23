@@ -52,6 +52,12 @@ function hashSnapshot(snapshot: Snapshot): string {
   return createHash("sha256").update(stableJson(snapshot)).digest("hex");
 }
 
+function stateFromDb(value: string): StudentPortfolioVerificationState {
+  const state = STATE_FROM_DB[value];
+  if (!state) throw new Error(`Unsupported student portfolio verification state: ${value}`);
+  return state;
+}
+
 async function assertEvidenceNotArchived(evidenceId: string): Promise<void> {
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT "id" FROM "StudentPortfolioEvidence" WHERE "id" = ${evidenceId} AND "archivedAt" IS NULL LIMIT 1
@@ -96,7 +102,7 @@ async function currentState(evidenceId: string): Promise<StudentPortfolioVerific
     SELECT "newState"::text AS "newState" FROM "StudentPortfolioVerificationEvent"
     WHERE "evidenceId" = ${evidenceId} ORDER BY "createdAt" DESC, "id" DESC LIMIT 1
   `;
-  return rows[0] ? STATE_FROM_DB[rows[0].newState] : "unverified";
+  return rows[0] ? stateFromDb(rows[0].newState) : "unverified";
 }
 
 async function appendEvent(input: {
@@ -146,7 +152,7 @@ async function summary(evidenceId: string): Promise<StudentPortfolioVerification
   const row = rows[0];
   if (!row) return { state: "unverified", context: null, verifiedAt: null, actorName: null };
   return {
-    state: STATE_FROM_DB[row.newState],
+    state: stateFromDb(row.newState),
     context: CONTEXT_FROM_DB[row.actorContext],
     verifiedAt: row.newState === "Verified" ? row.createdAt.toISOString() : null,
     actorName: row.actorName,
@@ -190,8 +196,8 @@ export const studentPortfolioVerificationService = {
     `;
     return rows.map((row) => ({
       id: row.id,
-      previousState: STATE_FROM_DB[row.previousState],
-      newState: STATE_FROM_DB[row.newState],
+      previousState: stateFromDb(row.previousState),
+      newState: stateFromDb(row.newState),
       actorContext: CONTEXT_FROM_DB[row.actorContext],
       actorName: row.actorName,
       reason: row.reason,
