@@ -28,6 +28,14 @@ export const TelegramAttendanceHealthSignalSchema = z.object({
 });
 export type TelegramAttendanceHealthSignal = z.infer<typeof TelegramAttendanceHealthSignalSchema>;
 
+export const TelegramAttendanceAchievementSchema = z.object({
+  kind: z.enum(["perfect_week", "consistency", "on_time", "comeback"]),
+  title: z.string(),
+  description: z.string(),
+  icon: z.string(),
+});
+export type TelegramAttendanceAchievement = z.infer<typeof TelegramAttendanceAchievementSchema>;
+
 export const TelegramAttendanceHealthSchema = z.object({
   state: z.enum(["healthy", "watch", "warning", "recovery"]),
   attendanceStreak: z.number().int().nonnegative(),
@@ -35,6 +43,7 @@ export const TelegramAttendanceHealthSchema = z.object({
   consecutiveLate: z.number().int().nonnegative(),
   absencePermissionCount: z.number().int().nonnegative(),
   signals: z.array(TelegramAttendanceHealthSignalSchema),
+  achievements: z.array(TelegramAttendanceAchievementSchema).optional(),
   message: z.string(),
 });
 export type TelegramAttendanceHealth = z.infer<typeof TelegramAttendanceHealthSchema>;
