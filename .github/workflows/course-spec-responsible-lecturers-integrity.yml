@@ -9,9 +9,13 @@ on:
       - "apps/backend/src/plugins/offerings/index.ts"
       - "apps/backend/src/integration/responsible-lecturers.integration.test.ts"
       - "apps/backend/src/integration/course-section-presence.integration.test.ts"
+      - "apps/backend/src/integration/course-spec-document-theme.integration.test.ts"
       - "packages/shared-types/src/contracts.ts"
       - "packages/shared-types/src/courses.ts"
+      - "packages/shared-types/src/document-theme.ts"
+      - "packages/shared-types/src/course-spec-document-theme.ts"
       - "apps/frontend/lib/courses.ts"
+      - "apps/frontend/lib/course-spec-document-theme.ts"
       - "apps/frontend/app/(shell)/courses/**"
       - ".github/workflows/course-spec-responsible-lecturers-integrity.yml"
   push:
@@ -24,9 +28,13 @@ on:
       - "apps/backend/src/plugins/offerings/index.ts"
       - "apps/backend/src/integration/responsible-lecturers.integration.test.ts"
       - "apps/backend/src/integration/course-section-presence.integration.test.ts"
+      - "apps/backend/src/integration/course-spec-document-theme.integration.test.ts"
       - "packages/shared-types/src/contracts.ts"
       - "packages/shared-types/src/courses.ts"
+      - "packages/shared-types/src/document-theme.ts"
+      - "packages/shared-types/src/course-spec-document-theme.ts"
       - "apps/frontend/lib/courses.ts"
+      - "apps/frontend/lib/course-spec-document-theme.ts"
       - "apps/frontend/app/(shell)/courses/**"
       - ".github/workflows/course-spec-responsible-lecturers-integrity.yml"
 
@@ -86,6 +94,9 @@ jobs:
 
       - name: Run section-presence focused integration suite
         run: bun test apps/backend/src/integration/course-section-presence.integration.test.ts
+
+      - name: Run Course Spec document-theme integration suite
+        run: bun test apps/backend/src/integration/course-spec-document-theme.integration.test.ts
 
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify

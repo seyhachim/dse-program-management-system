@@ -9,6 +9,7 @@ import {
   courseSpecRevisionService,
   type RevisionKind,
 } from "./revision-service.ts";
+import { ensureCourseSpecThemeSnapshot } from "./document-theme-service.ts";
 
 export class CourseSpecRevisionRequestError extends Error {
   constructor(
@@ -93,6 +94,10 @@ export const courseSpecRevisionRequestService = {
         ...impactToColumns(input.impact),
       },
     });
+
+    // New revisions inherit the programme default at creation time. The
+    // resulting version snapshot is independent from future programme edits.
+    await ensureCourseSpecThemeSnapshot(courseId, result.id);
 
     const request = await prisma.courseSpecRevisionRequest.findUniqueOrThrow({
       where: { courseSpecId: result.id },

@@ -21,6 +21,8 @@ export * from "./offerings.ts";
 export * from "./attendance.ts";
 export * from "./class-responsibilities.ts";
 export * from "./class-delivery.ts";
+export * from "./document-theme.ts";
+export * from "./course-spec-document-theme.ts";
 export * from "./course-spec.ts";
 export * from "./course-spec-alignment-readiness.ts";
 export * from "./course-spec-revision.ts";

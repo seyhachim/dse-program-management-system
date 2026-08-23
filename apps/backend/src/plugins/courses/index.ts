@@ -17,6 +17,8 @@ import {
   responsibleLecturerCanAccess,
 } from "./responsible-lecturers.ts";
 import { createCourseSpecVersionHistoryRouter } from "./version-history-router.ts";
+import { createCourseSpecDocumentThemeRouter } from "./document-theme-router.ts";
+import { ensureCourseSpecThemeSnapshot } from "./document-theme-service.ts";
 import {
   courseService,
   listSpecProgressForCourseIds,
@@ -83,6 +85,9 @@ courseService.lecturerCanAccess = async (courseId, lecturerId) =>
 
 courseService.saveSection = async (courseId, sectionId, values) => {
   const result = await canonicalSaveSection(courseId, sectionId, values);
+  // The first successful Course Spec save creates the academic version. Snapshot
+  // the programme style immediately so later default changes cannot restyle it.
+  await ensureCourseSpecThemeSnapshot(courseId);
   if (sectionId !== "date") return result;
 
   const dateValue = (values as { date?: unknown } | null)?.date;
@@ -216,6 +221,8 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
 const router = Router();
 // Static Responsible-Lecturer metadata routes must precede the core `/:id` routes.
 router.use(createCourseSectionPresenceRouter());
+// Document theme routes must precede the core `/:id/spec/:sectionId` save route.
+router.use(createCourseSpecDocumentThemeRouter());
 // Must precede the core `/:id/spec/:sectionId` route.
 router.use(createResponsibleLecturersRouter());
 router.use(createCourseRouter());
