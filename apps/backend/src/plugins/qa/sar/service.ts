@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import {
   AUN_QA_V4_ID,
+  documentContentToPlainText,
   EMPTY_QA_SAR_DOCUMENT,
+  parseStoredDocumentContent,
   QaSarDocumentSchema,
   type QaSarBlock,
   type QaSarSectionStatus,
@@ -50,9 +52,12 @@ async function resolveContext(programmeId: string, cycleId: string, requirementC
   return { cycle, requirement };
 }
 
-function plainText(blocks: QaSarBlock[]): string {
+export function qaSarPlainText(blocks: QaSarBlock[]): string {
   return blocks
     .map((block) => {
+      if (block.type === "richText") {
+        return documentContentToPlainText(parseStoredDocumentContent(block.content));
+      }
       if ("text" in block) return block.text.trim();
       if (block.type === "evidenceReference") return `[Evidence: ${block.label}]`;
       if (block.type === "pmsData") return `[PMS data: ${block.label}]`;
@@ -200,7 +205,7 @@ export async function saveQaSarSection(
     );
   }
 
-  const text = plainText(input.content.blocks);
+  const text = qaSarPlainText(input.content.blocks);
   const saved = await prisma.qaSarSection.upsert({
     where: {
       cycleId_requirementId: {
