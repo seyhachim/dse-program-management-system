@@ -1,12 +1,17 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Prisma, PrismaClient } from "@prisma/client";
 import {
+  approveHandbook,
   createHandbook,
+  createSection,
+  deleteSection,
   getHandbook,
   publishHandbook,
+  renameSection,
+  reorderSections,
   replaceSectionBlocks,
+  StudentHandbookConflictError,
   submitHandbook,
-  approveHandbook,
 } from "./service.ts";
 
 const describeDb = process.env.STUDENT_HANDBOOK_DB_TESTS === "1" ? describe : describe.skip;
@@ -45,6 +50,10 @@ describeDb("student handbook service", () => {
 
     expect(handbook.assignedLecturer.id).toBe(f.lecturer.id);
     expect(handbook.sections).toHaveLength(10);
+    expect(handbook.sections.every((section) => section.isCore)).toBe(true);
+    expect(handbook.sections.find((section) => section.key === "study-plan")?.title).toBe(
+      "Study Plan & Curriculum",
+    );
 
     const saved = await replaceSectionBlocks(
       handbook.id,
@@ -59,6 +68,51 @@ describeDb("student handbook service", () => {
     );
     const section = saved.sections.find((row) => row.key === "study-plan");
     expect(section?.blocks.map((row) => row.type)).toEqual(["NARRATIVE", "SOURCE_DATA"]);
+  });
+
+  test("supports custom section add, rename, reorder and delete while protecting core sections", async () => {
+    const f = await fixture();
+    let handbook = await createHandbook(
+      {
+        programmeId: f.programme.id,
+        assignedLecturerId: f.lecturer.id,
+        version: "sections-2026",
+        title: "Student Handbook",
+      },
+      f.creator.id,
+    );
+
+    handbook = await createSection(handbook.id, { title: "Scholarships" }, f.lecturer.id);
+    const custom = handbook.sections.find((section) => section.title === "Scholarships");
+    expect(custom?.isCore).toBe(false);
+
+    handbook = await renameSection(
+      handbook.id,
+      custom!.id,
+      { title: "Scholarships & Mobility" },
+      f.lecturer.id,
+    );
+    expect(handbook.sections.find((section) => section.id === custom!.id)?.title).toBe(
+      "Scholarships & Mobility",
+    );
+
+    const reordered = [custom!.id, ...handbook.sections.filter((section) => section.id !== custom!.id).map((section) => section.id)];
+    handbook = await reorderSections(handbook.id, { sectionIds: reordered }, f.lecturer.id);
+    expect(handbook.sections[0]?.id).toBe(custom!.id);
+    expect(handbook.sections.map((section) => section.sortOrder)).toEqual(
+      handbook.sections.map((_, index) => index),
+    );
+
+    const core = handbook.sections.find((section) => section.isCore)!;
+    await expect(
+      renameSection(handbook.id, core.id, { title: "Changed core" }, f.lecturer.id),
+    ).rejects.toBeInstanceOf(StudentHandbookConflictError);
+    await expect(deleteSection(handbook.id, core.id, f.lecturer.id)).rejects.toBeInstanceOf(
+      StudentHandbookConflictError,
+    );
+
+    handbook = await deleteSection(handbook.id, custom!.id, f.lecturer.id);
+    expect(handbook.sections.some((section) => section.id === custom!.id)).toBe(false);
   });
 
   test("workflow reaches approved before publication", async () => {
@@ -96,7 +150,6 @@ describeDb("student handbook service", () => {
     await submitHandbook(handbook.id, f.lecturer.id);
     await approveHandbook(handbook.id, f.creator.id, "Approved");
 
-    // No SOURCE_DATA block is present, so publish does not depend on a programme public-read fixture.
     expect((await publishHandbook(handbook.id, f.creator.id, "Publish")).status).toBe("PUBLISHED");
 
     const mutatePublishedSection = async () => {
