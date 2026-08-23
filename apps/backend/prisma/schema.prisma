@@ -1269,6 +1269,7 @@ model Student {
   user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   profile   StudentProfile?
   portfolioProfile StudentPortfolioProfile?
+  portfolioEvidence StudentPortfolioEvidence[]
 
   enrollments                    Enrollment[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
@@ -1313,6 +1314,77 @@ model StudentPortfolioProfile {
   updatedAt       DateTime @updatedAt
 
   @@index([isPublic])
+}
+
+/// Student-owned portfolio presentation item. Optional PMS provenance is
+/// immutable after creation and references canonical academic rows rather
+/// than copying marks/results or other authoritative academic truth.
+model StudentPortfolioEvidence {
+  id                     String                             @id @default(uuid())
+  studentId              String
+  student                Student                            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  origin                 StudentPortfolioEvidenceOrigin
+  title                  String
+  summary                String                             @default("")
+  role                   String                             @default("")
+  contribution           String                             @default("")
+  startDate              DateTime?                          @db.Date
+  endDate                DateTime?                          @db.Date
+  skills                 String[]                           @default([])
+  isPublic               Boolean                            @default(false)
+  isFeatured             Boolean                            @default(false)
+  sourceType             StudentPortfolioEvidenceSourceType?
+  sourceOfferingId       String?
+  sourceOffering         Offering?                          @relation(fields: [sourceOfferingId], references: [id], onDelete: Restrict)
+  sourceCourseSpecId     String?
+  sourceAssessmentItemId String?
+  sourceAssessmentItem   CourseSpecAssessmentItem?          @relation(fields: [sourceCourseSpecId, sourceAssessmentItemId], references: [courseSpecId, id], onDelete: Restrict)
+  sourceLinkedAt         DateTime?
+  createdAt              DateTime                            @default(now())
+  updatedAt              DateTime                            @updatedAt
+  links                  StudentPortfolioEvidenceLink[]
+
+  @@index([studentId, updatedAt])
+  @@index([studentId, isPublic, isFeatured])
+  @@index([sourceOfferingId])
+  @@index([sourceCourseSpecId, sourceAssessmentItemId])
+}
+
+model StudentPortfolioEvidenceLink {
+  id         String                       @id @default(uuid())
+  evidenceId String
+  evidence   StudentPortfolioEvidence     @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  kind       StudentPortfolioArtifactKind
+  label      String                       @default("")
+  url        String
+  createdAt  DateTime                     @default(now())
+
+  @@unique([evidenceId, kind, url])
+  @@index([evidenceId])
+}
+
+enum StudentPortfolioEvidenceOrigin {
+  ExternalProject
+  CourseAssessment
+  Practicum
+  Internship
+  FinalProject
+  Competition
+  Achievement
+  Other
+}
+
+enum StudentPortfolioEvidenceSourceType {
+  CourseAssessment
+}
+
+enum StudentPortfolioArtifactKind {
+  Repository
+  Demo
+  Report
+  Presentation
+  Dataset
+  Other
 }
 
 /// Authoritative programme cohort identity. Cohort membership and progression
@@ -1943,6 +2015,7 @@ model CourseSpecAssessmentItem {
   assessmentGroups     AssessmentGroup[]
   mappedPlos          String[]             @default([])
   notes               String               @default("")
+  portfolioEvidence   StudentPortfolioEvidence[]
 
   @@id([courseSpecId, id])
   @@index([rubricId])
@@ -2087,6 +2160,7 @@ model Offering {
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
   qaCloAttainmentSnapshots       QaCloAttainmentSnapshot[]
+  portfolioEvidence              StudentPortfolioEvidence[]
 
   @@unique([courseId, term, sectionCode])
   @@index([status])
