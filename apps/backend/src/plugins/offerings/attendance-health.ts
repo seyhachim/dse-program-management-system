@@ -63,8 +63,7 @@ export function evaluateAttendanceHealth(
   records: AttendanceHealthRecord[],
   counts: { Absent: number; Excused: number },
 ): { health: TelegramAttendanceHealth; warningCandidates: AttendanceWarningCandidate[] } {
-  const newestFirst = [...records]
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const newestFirst = [...records].sort((a, b) => b.date.localeCompare(a.date));
 
   const attendanceStreak = currentRun(newestFirst, (status) => status === "Present" || status === "Late");
   const onTimeStreak = currentRun(newestFirst, (status) => status === "Present");
@@ -79,8 +78,14 @@ export function evaluateAttendanceHealth(
       kind: "punctuality",
       level,
       count: consecutiveLate,
-      title: level === "warning" ? "Punctuality needs attention" : "Punctuality reminder",
-      message: `You have been late to your last ${consecutiveLate} finalized classes.`,
+      title: consecutiveLate >= 5
+        ? "Repeated lateness needs support"
+        : level === "warning"
+          ? "Punctuality needs attention"
+          : "Punctuality reminder",
+      message: consecutiveLate >= 5
+        ? `You have been late to your last ${consecutiveLate} finalized classes. If a recurring transport, timetable, or personal issue is affecting you, please speak with your lecturer or adviser so they can help.`
+        : `You have been late to your last ${consecutiveLate} finalized classes.`,
       advice: punctualityAdvice,
     });
     if (consecutiveLate === 3 && newestFirst[0]) {
