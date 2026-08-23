@@ -20,6 +20,60 @@ export const StudentHandbookSourceKindSchema = z.enum([
 ]);
 export type StudentHandbookSourceKind = z.infer<typeof StudentHandbookSourceKindSchema>;
 
+export const StudentHandbookFontFamilySchema = z.enum([
+  "Arial",
+  "Calibri",
+  "Times New Roman",
+]);
+export type StudentHandbookFontFamily = z.infer<typeof StudentHandbookFontFamilySchema>;
+
+export const StudentHandbookTextAlignmentSchema = z.enum([
+  "left",
+  "center",
+  "right",
+  "justify",
+]);
+export type StudentHandbookTextAlignment = z.infer<typeof StudentHandbookTextAlignmentSchema>;
+
+export const StudentHandbookDocumentThemeSchema = z.object({
+  bodyFontFamily: StudentHandbookFontFamilySchema,
+  bodyFontSizePt: z.number().min(9).max(14),
+  heading1SizePt: z.number().min(14).max(26),
+  heading2SizePt: z.number().min(12).max(22),
+  heading3SizePt: z.number().min(11).max(18),
+  lineHeight: z.number().min(1).max(2),
+  paragraphSpacingPt: z.number().min(0).max(24),
+  defaultAlignment: StudentHandbookTextAlignmentSchema,
+  marginsMm: z.object({
+    top: z.number().min(10).max(40),
+    bottom: z.number().min(10).max(40),
+    left: z.number().min(10).max(40),
+    right: z.number().min(10).max(40),
+  }),
+  showHeader: z.boolean(),
+  showFooter: z.boolean(),
+  showPageNumbers: z.boolean(),
+});
+export type StudentHandbookDocumentTheme = z.infer<typeof StudentHandbookDocumentThemeSchema>;
+
+export const DEFAULT_STUDENT_HANDBOOK_DOCUMENT_THEME: StudentHandbookDocumentTheme = {
+  bodyFontFamily: "Arial",
+  bodyFontSizePt: 11,
+  heading1SizePt: 18,
+  heading2SizePt: 15,
+  heading3SizePt: 13,
+  lineHeight: 1.15,
+  paragraphSpacingPt: 6,
+  defaultAlignment: "justify",
+  marginsMm: { top: 25, bottom: 25, left: 25, right: 25 },
+  showHeader: true,
+  showFooter: true,
+  showPageNumbers: true,
+};
+
+export const UpdateStudentHandbookThemeSchema = StudentHandbookDocumentThemeSchema;
+export type UpdateStudentHandbookThemeInput = z.infer<typeof UpdateStudentHandbookThemeSchema>;
+
 export const CreateStudentHandbookSchema = z.object({
   programmeId: z.string().trim().min(1),
   assignedLecturerId: z.string().uuid(),
