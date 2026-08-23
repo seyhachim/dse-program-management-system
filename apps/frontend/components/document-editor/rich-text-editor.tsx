@@ -94,6 +94,7 @@ function parseEditorElement(root: HTMLElement): DseDocumentContent {
   const blocks: DseDocumentBlock[] = [];
 
   for (const child of Array.from(root.children)) {
+    if (!(child instanceof HTMLElement)) continue;
     const tag = child.tagName.toLowerCase();
     if (tag === "p" || tag === "div") {
       blocks.push({ type: "paragraph", align: readAlign(child), content: parseInlineNodes(child) });
@@ -110,7 +111,7 @@ function parseEditorElement(root: HTMLElement): DseDocumentContent {
     }
     if (tag === "ul" || tag === "ol") {
       const items = Array.from(child.children)
-        .filter((item) => item.tagName.toLowerCase() === "li")
+        .filter((item): item is HTMLElement => item instanceof HTMLElement && item.tagName.toLowerCase() === "li")
         .map((item) => parseInlineNodes(item));
       blocks.push({ type: tag === "ol" ? "orderedList" : "bulletList", items });
       continue;
@@ -191,7 +192,7 @@ export function RichTextEditor({
     if (!href) return;
     try {
       const url = new URL(href, window.location.origin);
-      if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) return;
+      if (!["http:", "https:", "mailto:"].includes(url.protocol)) return;
       run("createLink", href);
     } catch {
       return;
