@@ -1,4 +1,4 @@
-import type { LecturerWorkloadSummary } from "@dse-pms/shared-types";
+import type { LecturerWorkloadSummary, TelegramStudentAttendanceHistory } from "@dse-pms/shared-types";
 import { registry } from "../../core/plugins/registry.ts";
 import type { TelegramSessionUser } from "./session.ts";
 
@@ -27,27 +27,10 @@ export interface StudentPortalContract {
   course(userId: string, offeringId: string): Promise<PortalCourseDetail>;
 }
 
-export interface StudentAttendanceHistory {
-  offeringId: string;
-  studentId: string;
-  studentNumber: string;
-  totalSessions: number;
-  markedSessions: number;
-  attendanceRate: number | null;
-  counts: { Present: number; Absent: number; Late: number; Excused: number };
-  history: Array<{
-    sessionId: string;
-    date: string;
-    status: "Present" | "Absent" | "Late" | "Excused" | null;
-    note: string;
-    updatedAt: string;
-  }>;
-}
-
 export interface OfferingsContract {
   workloadForLecturer(lecturerId: string, query: { term?: string }): Promise<LecturerWorkloadSummary>;
   studentAttendanceHistory: {
-    forUser(userId: string, offeringId: string): Promise<StudentAttendanceHistory>;
+    forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory>;
   };
 }
 
@@ -67,10 +50,7 @@ function requireLecturer(user: TelegramSessionUser) {
   if (!user.roles.includes("lecturer")) throw new TelegramPhase2AccessError("This view is only available to lecturers");
 }
 
-export function createTelegramPhase2Service(deps?: {
-  portal?: StudentPortalContract;
-  offerings?: OfferingsContract;
-}) {
+export function createTelegramPhase2Service(deps?: { portal?: StudentPortalContract; offerings?: OfferingsContract }) {
   const portal = () => deps?.portal ?? productionPortal();
   const offerings = () => deps?.offerings ?? productionOfferings();
 
@@ -80,19 +60,17 @@ export function createTelegramPhase2Service(deps?: {
       const courses = await portal().courses(user.id);
       const details = await Promise.all(courses.map((course) => portal().course(user.id, course.offeringId)));
       const assessments = details.flatMap((course) =>
-        (course.assessments ?? [])
-          .filter((assessment) => !assessment.result)
-          .map((assessment) => ({
-            offeringId: course.offeringId,
-            courseCode: course.code,
-            courseTitle: course.title,
-            sectionCode: course.sectionCode,
-            assessmentId: assessment.id,
-            name: assessment.name,
-            dueAt: assessment.dueAt,
-            dueWeek: assessment.dueWeek,
-            weight: assessment.weight,
-          })),
+        (course.assessments ?? []).filter((assessment) => !assessment.result).map((assessment) => ({
+          offeringId: course.offeringId,
+          courseCode: course.code,
+          courseTitle: course.title,
+          sectionCode: course.sectionCode,
+          assessmentId: assessment.id,
+          name: assessment.name,
+          dueAt: assessment.dueAt,
+          dueWeek: assessment.dueWeek,
+          weight: assessment.weight,
+        })),
       ).sort((a, b) => {
         if (a.dueAt && b.dueAt) return a.dueAt.localeCompare(b.dueAt);
         if (a.dueAt) return -1;
