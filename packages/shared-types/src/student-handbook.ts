@@ -37,7 +37,7 @@ export type AssignStudentHandbookLecturerInput = z.infer<
 
 const NarrativeBlockInputSchema = z.object({
   type: z.literal("NARRATIVE"),
-  content: z.string().max(50_000),
+  content: z.string().max(100_000),
 });
 
 const SourceDataBlockInputSchema = z.object({
@@ -50,6 +50,21 @@ export const SaveStudentHandbookSectionSchema = z.object({
   blocks: z.array(z.discriminatedUnion("type", [NarrativeBlockInputSchema, SourceDataBlockInputSchema])).max(100),
 });
 export type SaveStudentHandbookSectionInput = z.infer<typeof SaveStudentHandbookSectionSchema>;
+
+export const CreateStudentHandbookSectionSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+});
+export type CreateStudentHandbookSectionInput = z.infer<typeof CreateStudentHandbookSectionSchema>;
+
+export const RenameStudentHandbookSectionSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+});
+export type RenameStudentHandbookSectionInput = z.infer<typeof RenameStudentHandbookSectionSchema>;
+
+export const ReorderStudentHandbookSectionsSchema = z.object({
+  sectionIds: z.array(z.string().uuid()).min(1).max(100),
+});
+export type ReorderStudentHandbookSectionsInput = z.infer<typeof ReorderStudentHandbookSectionsSchema>;
 
 export const StudentHandbookReviewSchema = z.object({
   note: z.string().trim().max(2_000).default(""),
@@ -79,6 +94,7 @@ export type StudentHandbookSectionView = {
   key: string;
   title: string;
   sortOrder: number;
+  isCore: boolean;
   blocks: StudentHandbookBlockView[];
 };
 
