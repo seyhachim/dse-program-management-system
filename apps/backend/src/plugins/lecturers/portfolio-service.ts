@@ -266,9 +266,10 @@ export const lecturerPortfolioService = {
   async deleteOwnItem(lecturerId: string, itemId: string): Promise<void> {
     const existing = await findItem(prisma, itemId, lecturerId);
     if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
-    if (existing.verificationStatus === "Verified") {
+    const events = await verificationEvents(prisma, itemId);
+    if (events.length > 0) {
       throw new PortfolioConflictError(
-        "Verified evidence cannot be deleted by the lecturer; edit it to reset verification first.",
+        "Reviewed evidence cannot be deleted because its verification history is auditable. Edit the record instead.",
       );
     }
     await prisma.$executeRaw`
