@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type {
   ClassResponsibilityView,
+  ClassSessionStatusView,
   LecturerArrivalConfirmationView,
 } from "@dse-pms/shared-types";
 import { buildStudentToday, dseCalendarContext } from "./mini-app-service.ts";
@@ -57,9 +58,21 @@ const presentConfirmation: LecturerArrivalConfirmationView = {
   updatedAt: "2026-08-23T02:04:00.000Z",
 };
 
+const cancelledSession: ClassSessionStatusView = {
+  id: "550e8400-e29b-41d4-a716-446655440040",
+  offeringId: course.offeringId,
+  date: "2026-08-23",
+  status: "Cancelled",
+  reason: "Class cancelled",
+  recordedBy: { id: "550e8400-e29b-41d4-a716-446655440023", name: "Coordinator" },
+  recordedAt: "2026-08-23T01:00:00.000Z",
+  updatedAt: "2026-08-23T01:00:00.000Z",
+};
+
 function offeringService(options: {
   responsibility?: ClassResponsibilityView | null;
   confirmation?: LecturerArrivalConfirmationView | null;
+  session?: ClassSessionStatusView | null;
 } = {}): HomeOfferings {
   return {
     getById: async () => null,
@@ -72,7 +85,7 @@ function offeringService(options: {
     },
     classDelivery: {
       getLecturerArrival: async () => options.confirmation ?? null,
-      getClassSessionStatus: async () => null,
+      getClassSessionStatus: async () => options.session ?? null,
     },
   };
 }
@@ -119,6 +132,20 @@ describe("Telegram Mini App student home", () => {
       new Date("2026-08-23T02:04:00.000Z"),
     );
     expect(revoked.classes[0]?.canConfirmLecturerArrival).toBe(false);
+  });
+
+  test("suppresses the monitor action when the class session is not scheduled", async () => {
+    const today = await buildStudentToday(
+      activeResponsibility.student.userId!,
+      [course],
+      offeringService({ responsibility: activeResponsibility, session: cancelledSession }),
+      new Date("2026-08-23T02:04:00.000Z"),
+    );
+
+    expect(today.classes[0]).toMatchObject({
+      sessionStatus: "Cancelled",
+      canConfirmLecturerArrival: false,
+    });
   });
 
   test("returns the next current class when there are no meetings today", async () => {
