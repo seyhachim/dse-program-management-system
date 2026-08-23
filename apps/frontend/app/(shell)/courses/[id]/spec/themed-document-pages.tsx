@@ -33,6 +33,7 @@ export function ThemedDocumentPages({
     "--cs-cell-padding": `${theme.tableCellPaddingPt}pt`,
     "--cs-header-size": `${theme.headerFontSizePt}pt`,
     "--cs-footer-size": `${theme.footerFontSizePt}pt`,
+    "--cs-frame-gap": "3mm",
   } as CSSProperties;
 
   return (
@@ -49,24 +50,69 @@ export function ThemedDocumentPages({
           font-family: var(--cs-font-family) !important;
           letter-spacing: var(--cs-letter-spacing);
           line-height: var(--cs-line-height);
+          position: absolute;
         }
+
+        /* Official Course Specification frame. Keep this structural rather than
+           user-editable so exported academic documents retain one controlled layout. */
+        .course-spec-theme-root article[data-doc-page]::before {
+          content: "";
+          position: absolute;
+          z-index: 20;
+          pointer-events: none;
+          top: var(--cs-margin-top);
+          bottom: var(--cs-margin-bottom);
+          left: var(--cs-margin-left);
+          right: var(--cs-margin-right);
+          border: 1px solid #000;
+        }
+
         .course-spec-theme-root article[data-doc-page] > div,
         .course-spec-theme-root article[data-doc-page] #programme-overview > div {
           box-sizing: border-box;
-          padding-top: var(--cs-margin-top) !important;
-          padding-bottom: var(--cs-margin-bottom) !important;
-          padding-left: var(--cs-margin-left) !important;
-          padding-right: var(--cs-margin-right) !important;
+          padding-top: calc(var(--cs-margin-top) + var(--cs-frame-gap)) !important;
+          padding-bottom: calc(var(--cs-margin-bottom) + var(--cs-frame-gap)) !important;
+          padding-left: calc(var(--cs-margin-left) + var(--cs-frame-gap)) !important;
+          padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
+
         .course-spec-theme-root article[data-doc-page] p,
         .course-spec-theme-root article[data-doc-page] li {
           font-size: var(--cs-body-size);
           line-height: var(--cs-line-height);
           text-align: var(--cs-align);
         }
-        .course-spec-theme-root article[data-doc-page] p + p {
-          margin-top: var(--cs-paragraph-gap);
+
+        .course-spec-theme-root article[data-doc-page] p {
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
         }
+
+        .course-spec-theme-root article[data-doc-page] p + p {
+          margin-top: var(--cs-paragraph-gap) !important;
+        }
+
+        .course-spec-theme-root article[data-doc-page] ul,
+        .course-spec-theme-root article[data-doc-page] ol {
+          margin-top: 2pt !important;
+          margin-bottom: 2pt !important;
+        }
+
+        .course-spec-theme-root article[data-doc-page] li + li {
+          margin-top: 1pt;
+        }
+
+        .course-spec-theme-root article[data-doc-page] h1,
+        .course-spec-theme-root article[data-doc-page] h2,
+        .course-spec-theme-root article[data-doc-page] h3,
+        .course-spec-theme-root article[data-doc-page] h4,
+        .course-spec-theme-root article[data-doc-page] h5,
+        .course-spec-theme-root article[data-doc-page] h6 {
+          line-height: 1.1 !important;
+          margin-top: 0 !important;
+          margin-bottom: 4pt !important;
+        }
+
         .course-spec-theme-root article[data-doc-page] h1 {
           font-size: var(--cs-title-size) !important;
         }
@@ -81,21 +127,45 @@ export function ThemedDocumentPages({
         .course-spec-theme-root article[data-doc-page] h6 {
           font-size: var(--cs-h3-size) !important;
         }
+
         .course-spec-theme-root article[data-doc-page] table {
+          width: 100% !important;
+          border-collapse: collapse !important;
           font-size: var(--cs-table-size) !important;
           line-height: var(--cs-line-height) !important;
+          margin-top: 2pt !important;
+          margin-bottom: 2pt !important;
         }
+
         .course-spec-theme-root article[data-doc-page] th,
         .course-spec-theme-root article[data-doc-page] td {
           padding: var(--cs-cell-padding) !important;
         }
+
+        .course-spec-theme-root article[data-doc-page] th {
+          vertical-align: middle;
+        }
+
+        .course-spec-theme-root article[data-doc-page] td {
+          vertical-align: top;
+        }
+
+        .course-spec-theme-root article[data-doc-page] header {
+          margin-bottom: 6pt !important;
+        }
+
         .course-spec-theme-root article[data-doc-page] header p {
           font-size: var(--cs-header-size) !important;
           text-align: center;
         }
+
         .course-spec-theme-root article[data-doc-page] div[class*="bottom-[24px]"][class*="left-[54px]"] {
+          left: calc(var(--cs-margin-left) + var(--cs-frame-gap)) !important;
+          right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
+          bottom: calc(var(--cs-margin-bottom) + 2mm) !important;
           font-size: var(--cs-footer-size) !important;
         }
+
         .course-spec-theme-root[data-show-header="false"] article[data-doc-page] header {
           display: none !important;
         }
