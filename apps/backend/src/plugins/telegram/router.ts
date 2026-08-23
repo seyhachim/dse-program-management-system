@@ -30,6 +30,10 @@ import {
   type TelegramService,
   telegramService,
 } from "./service.ts";
+import {
+  recordTelegramUsage,
+  telegramUsageAnalyticsMiddleware,
+} from "./usage-analytics.ts";
 
 function sendVerificationError(res: Response, error: unknown) {
   if (error instanceof TelegramDisabledError) {
@@ -92,6 +96,7 @@ export function createTelegramRouter(service: TelegramService = telegramService)
       await telegramIdentityStore.markVerified(identity, result.telegramUser.username);
       const session = issueTelegramSession(identity);
       const user = await resolveTelegramSession(session.token);
+      recordTelegramUsage(user, "MiniAppOpened");
       res.json({
         ...result,
         linked: true,
@@ -136,7 +141,7 @@ export function createTelegramRouter(service: TelegramService = telegramService)
     try { await telegramIdentityStore.revoke(req.user!.id); res.status(204).end(); } catch (error) { sendMiniAppError(res, error); }
   });
 
-  router.use("/mini", requireTelegramSession);
+  router.use("/mini", requireTelegramSession, telegramUsageAnalyticsMiddleware);
 
   router.get("/mini/home", async (req, res) => {
     try { res.json(await telegramMiniAppService.home(req.telegramUser!)); } catch (error) { sendMiniAppError(res, error); }

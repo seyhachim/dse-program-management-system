@@ -32,6 +32,7 @@ export * from "./student-portal.ts";
 export * from "./result-corrections.ts";
 export * from "./telegram.ts";
 export * from "./telegram-phase2.ts";
+export * from "./telegram-analytics.ts";
 export * from "./qa.ts";
 export * from "./qa-knowledge.ts";
 export * from "./qa-evidence-semantics.ts";
