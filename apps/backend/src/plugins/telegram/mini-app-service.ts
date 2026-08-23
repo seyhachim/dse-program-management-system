@@ -4,6 +4,7 @@ import type {
   CourseFeedbackInput,
   LecturerArrivalConfirmationView,
   SaveAttendanceInput,
+  TelegramCourseCard,
   TelegramStudentToday,
   TelegramTodayClass,
 } from "@dse-pms/shared-types";
@@ -47,6 +48,11 @@ interface PortalCourse {
   assessments?: Array<{ result: unknown | null }>;
   feedbackSubmitted?: boolean;
 }
+
+type MeetingSummary = Pick<
+  PortalCourse["meetings"][number],
+  "dayOfWeek" | "startTime" | "endTime" | "room" | "activityType"
+>;
 
 interface DeliveryOffering {
   offeringId: string;
@@ -132,7 +138,7 @@ async function assertOfferingAccess(user: TelegramSessionUser, offeringId: strin
   return offering;
 }
 
-function nextMeeting(meetings: PortalCourse["meetings"] = []) {
+function nextMeeting(meetings: MeetingSummary[] = []) {
   const meeting = meetings[0];
   return meeting ? {
     dayOfWeek: meeting.dayOfWeek,
@@ -326,7 +332,7 @@ export const telegramMiniAppService = {
   },
 
   async home(user: TelegramSessionUser) {
-    let courses;
+    let courses: TelegramCourseCard[];
     let today: TelegramStudentToday | null = null;
     let unreadAnnouncements = 0;
     let publishedResultCount = 0;
