@@ -339,7 +339,7 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
                     <RichTextEditor
                       value={block.document}
                       onChange={(document) => updateRichText(block.id, document)}
-                      minHeight={220}
+                      ariaLabel={`SAR narrative for ${section.requirementCode}`}
                     />
                   ) : (
                     <div className="rounded-lg border bg-white p-4">
