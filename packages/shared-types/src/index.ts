@@ -55,3 +55,4 @@ export * from "./qa-research-metrics.ts";
 export * from "./qa-pilot.ts";
 export * from "./community.ts";
 export * from "./community-plugin.ts";
+export * from "./student-handbook.ts";
