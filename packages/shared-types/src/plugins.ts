@@ -259,6 +259,7 @@ export const studentPortalManifest: PluginManifest = {
     { label: "Assessments", path: "/portal/assessments", icon: "file-check", roles: ["student"], group: "Learning" },
     { label: "Results", path: "/portal/results", icon: "chart", roles: ["student"], group: "Progress" },
     { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },
+    { label: "Portfolio", path: "/portal/portfolio", icon: "user-cog", roles: ["student"], group: "Personal" },
   ],
   permissions: ["student-portal:read", "student-portal:feedback"],
 };
