@@ -1,6 +1,7 @@
-import type { AttendanceStatus } from "@dse-pms/shared-types";
+import type { AttendanceStatus, TelegramStudentAttendanceHistory } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
+import { evaluateAttendanceHealth, type AttendanceHealthRecord } from "./attendance-health.ts";
 import { ReferenceError } from "./service.ts";
 
 type SessionRow = {
@@ -34,8 +35,75 @@ function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: 
   return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 };
 }
 
+async function historyForStudent(
+  student: { id: string; studentId: string },
+  offeringId: string,
+): Promise<TelegramStudentAttendanceHistory> {
+  const sessions = await prisma.$queryRaw<SessionRow[]>`
+    SELECT "id", "sessionDate", "updatedAt"
+    FROM "pms_attendance"."AttendanceSession"
+    WHERE "offeringId" = ${offeringId}
+    ORDER BY "sessionDate" DESC
+  `;
+
+  const counts = emptyCounts();
+  const healthRecords: AttendanceHealthRecord[] = [];
+  const history: TelegramStudentAttendanceHistory["history"] = [];
+
+  for (const session of sessions) {
+    const records = await prisma.$queryRaw<StudentRecordRow[]>`
+      SELECT "status", "note"
+      FROM "pms_attendance"."AttendanceRecord"
+      WHERE "sessionId" = ${session.id}
+        AND "studentId" = ${student.id}
+      LIMIT 1
+    `;
+    const pendingRows = await prisma.$queryRaw<PendingRow[]>`
+      SELECT "id", "note", "createdAt"
+      FROM "pms_attendance"."AttendancePermissionPending"
+      WHERE "sessionId" = ${session.id}
+        AND "studentId" = ${student.id}
+        AND "resolvedAt" IS NULL
+      LIMIT 1
+    `;
+    const record = records[0] ?? null;
+    const pending = record ? null : pendingRows[0] ?? null;
+    const date = session.sessionDate.toISOString().slice(0, 10);
+    if (record) {
+      counts[record.status] += 1;
+      healthRecords.push({ sessionId: session.id, date, status: record.status });
+    } else if (pending) {
+      counts.PermissionPending += 1;
+    }
+    history.push({
+      sessionId: session.id,
+      date,
+      status: record?.status ?? null,
+      permissionPending: Boolean(pending),
+      permissionPendingSince: pending?.createdAt.toISOString() ?? null,
+      note: record?.note ?? pending?.note ?? "",
+      updatedAt: session.updatedAt.toISOString(),
+    });
+  }
+
+  const marked = counts.Present + counts.Absent + counts.Late + counts.Excused;
+  const attended = counts.Present + counts.Late;
+  const { health } = evaluateAttendanceHealth(healthRecords, counts);
+  return {
+    offeringId,
+    studentId: student.id,
+    studentNumber: student.studentId,
+    totalSessions: sessions.length,
+    markedSessions: marked,
+    attendanceRate: marked === 0 ? null : Math.round((attended / marked) * 10_000) / 100,
+    counts,
+    health,
+    history,
+  };
+}
+
 export const studentAttendanceHistoryService = {
-  async forUser(userId: string, offeringId: string) {
+  async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
     const student = await students().getByUserId(userId);
     if (!student || student.status !== "Active") {
       throw new ReferenceError("No active student profile is linked to this account");
@@ -46,68 +114,21 @@ export const studentAttendanceHistoryService = {
       select: { id: true },
     });
     if (!enrollment) throw new ReferenceError("Student is not enrolled in this offering");
+    return historyForStudent(student, offeringId);
+  },
 
-    const sessions = await prisma.$queryRaw<SessionRow[]>`
-      SELECT "id", "sessionDate", "updatedAt"
-      FROM "pms_attendance"."AttendanceSession"
-      WHERE "offeringId" = ${offeringId}
-      ORDER BY "sessionDate" DESC
-    `;
-
-    const counts = emptyCounts();
-    const history: Array<{
-      sessionId: string;
-      date: string;
-      status: AttendanceStatus | null;
-      permissionPending: boolean;
-      permissionPendingSince: string | null;
-      note: string;
-      updatedAt: string;
-    }> = [];
-
-    for (const session of sessions) {
-      const records = await prisma.$queryRaw<StudentRecordRow[]>`
-        SELECT "status", "note"
-        FROM "pms_attendance"."AttendanceRecord"
-        WHERE "sessionId" = ${session.id}
-          AND "studentId" = ${student.id}
-        LIMIT 1
-      `;
-      const pendingRows = await prisma.$queryRaw<PendingRow[]>`
-        SELECT "id", "note", "createdAt"
-        FROM "pms_attendance"."AttendancePermissionPending"
-        WHERE "sessionId" = ${session.id}
-          AND "studentId" = ${student.id}
-          AND "resolvedAt" IS NULL
-        LIMIT 1
-      `;
-      const record = records[0] ?? null;
-      const pending = record ? null : pendingRows[0] ?? null;
-      if (record) counts[record.status] += 1;
-      else if (pending) counts.PermissionPending += 1;
-      history.push({
-        sessionId: session.id,
-        date: session.sessionDate.toISOString().slice(0, 10),
-        status: record?.status ?? null,
-        permissionPending: Boolean(pending),
-        permissionPendingSince: pending?.createdAt.toISOString() ?? null,
-        note: record?.note ?? pending?.note ?? "",
-        updatedAt: session.updatedAt.toISOString(),
-      });
-    }
-
-    const marked = counts.Present + counts.Absent + counts.Late + counts.Excused;
-    const attended = counts.Present + counts.Late;
-    return {
-      offeringId,
-      studentId: student.id,
-      studentNumber: student.studentId,
-      totalSessions: sessions.length,
-      markedSessions: marked,
-      attendanceRate: marked === 0 ? null : Math.round((attended / marked) * 10_000) / 100,
-      counts,
-      history,
-    };
+  async healthForStudent(studentId: string, offeringId: string) {
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true, studentId: true },
+    });
+    if (!student) return null;
+    const history = await historyForStudent(student, offeringId);
+    const finalized = history.history
+      .filter((row): row is typeof row & { status: AttendanceStatus } => row.status !== null)
+      .map((row) => ({ sessionId: row.sessionId, date: row.date, status: row.status }));
+    const evaluation = evaluateAttendanceHealth(finalized, history.counts);
+    return { history, ...evaluation };
   },
 
   async pendingForUser(userId: string) {
