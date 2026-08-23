@@ -40,6 +40,19 @@ describe("attendance health evaluator", () => {
     ]);
   });
 
+  test("combined P/A remains a warning above threshold without repeat notification candidates", () => {
+    const result = evaluateAttendanceHealth([
+      record("a1", "2026-08-19", "Absent"),
+      record("p1", "2026-08-20", "Excused"),
+      record("a2", "2026-08-21", "Absent"),
+      record("p2", "2026-08-22", "Excused"),
+    ], { Absent: 2, Excused: 2 });
+
+    expect(result.health.state).toBe("warning");
+    expect(result.health.absencePermissionCount).toBe(4);
+    expect(result.warningCandidates).toEqual([]);
+  });
+
   test("two consecutive late records are advice-only and three generate a warning candidate", () => {
     const rows = [
       record("l1", "2026-08-20", "Late"),
@@ -58,6 +71,22 @@ describe("attendance health evaluator", () => {
     expect(warning.warningCandidates).toEqual([
       { kind: "punctuality", count: 3, eventSessionId: "l3" },
     ]);
+  });
+
+  test("five consecutive late records keep warning state with stronger support but no repeat Telegram candidate", () => {
+    const result = evaluateAttendanceHealth([
+      record("l1", "2026-08-18", "Late"),
+      record("l2", "2026-08-19", "Late"),
+      record("l3", "2026-08-20", "Late"),
+      record("l4", "2026-08-21", "Late"),
+      record("l5", "2026-08-22", "Late"),
+    ], { Absent: 0, Excused: 0 });
+
+    expect(result.health.state).toBe("warning");
+    expect(result.health.consecutiveLate).toBe(5);
+    expect(result.health.signals[0]?.title).toBe("Repeated lateness needs support");
+    expect(result.health.signals[0]?.message).toContain("speak with your lecturer or adviser");
+    expect(result.warningCandidates).toEqual([]);
   });
 
   test("a non-late finalized record resets the current late run", () => {
