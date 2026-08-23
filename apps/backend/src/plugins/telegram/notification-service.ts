@@ -14,12 +14,23 @@ async function eligibleAnnouncementRecipients(offeringId: string): Promise<Recip
     FROM "Enrollment" e
     JOIN "Student" s ON s."id" = e."studentId"
     JOIN "telegram_security"."TelegramIdentity" ti ON ti."userId" = s."userId"
-    LEFT JOIN "telegram_security"."TelegramNotificationPreference" pref
-      ON pref."identityId" = ti."id"
+    LEFT JOIN "telegram_security"."TelegramNotificationPreference" pref ON pref."identityId" = ti."id"
     WHERE e."offeringId" = ${offeringId}
       AND ti."revokedAt" IS NULL
       AND COALESCE(pref."announcementsEnabled", TRUE) = TRUE
   `;
+}
+
+async function eligibleStudentRecipient(studentId: string): Promise<RecipientRow | null> {
+  const rows = await prisma.$queryRaw<RecipientRow[]>`
+    SELECT ti."id" AS "identityId", ti."telegramUserId"
+    FROM "Student" s
+    JOIN "telegram_security"."TelegramIdentity" ti ON ti."userId" = s."userId"
+    WHERE s."id" = ${studentId}
+      AND ti."revokedAt" IS NULL
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
 }
 
 async function sendTelegramMessage(chatId: string, text: string, url: string) {
@@ -39,24 +50,37 @@ async function sendTelegramMessage(chatId: string, text: string, url: string) {
   return String(payload.result?.message_id ?? "");
 }
 
-async function claimDelivery(identityId: string, eventKey: string, resourceId: string) {
+async function claimDelivery(identityId: string, eventKey: string, kind: string, resourceId: string) {
   const id = randomUUID();
   const inserted = await prisma.$executeRaw`
     INSERT INTO "telegram_security"."TelegramNotificationDelivery"
       ("id", "identityId", "eventKey", "kind", "resourceId", "status", "attempts")
-    VALUES (${id}, ${identityId}, ${eventKey}, 'announcement', ${resourceId}, 'pending', 0)
+    VALUES (${id}, ${identityId}, ${eventKey}, ${kind}, ${resourceId}, 'pending', 0)
     ON CONFLICT ("identityId", "eventKey") DO NOTHING
   `;
   return inserted > 0 ? id : null;
 }
 
+async function finishDelivery(deliveryId: string, work: () => Promise<string>) {
+  try {
+    const messageId = await work();
+    await prisma.$executeRaw`
+      UPDATE "telegram_security"."TelegramNotificationDelivery"
+      SET "status" = 'sent', "attempts" = 1, "telegramMessageId" = ${messageId}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${deliveryId}
+    `;
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 1000) : "Unknown Telegram delivery failure";
+    await prisma.$executeRaw`
+      UPDATE "telegram_security"."TelegramNotificationDelivery"
+      SET "status" = 'failed', "attempts" = 1, "lastError" = ${message}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${deliveryId}
+    `;
+  }
+}
+
 export const telegramNotificationService = {
-  async deliverAnnouncement(input: {
-    announcementId: string;
-    offeringId: string;
-    title: string;
-    body: string;
-  }) {
+  async deliverAnnouncement(input: { announcementId: string; offeringId: string; title: string; body: string }) {
     const offering = await prisma.offering.findUnique({
       where: { id: input.offeringId },
       select: { course: { select: { code: true } } },
@@ -67,44 +91,52 @@ export const telegramNotificationService = {
     const deepLink = createTelegramDeepLink(`/telegram/classes/${encodeURIComponent(input.offeringId)}?announcement=${encodeURIComponent(input.announcementId)}`);
 
     await Promise.allSettled(recipients.map(async (recipient) => {
-      const deliveryId = await claimDelivery(recipient.identityId, eventKey, input.announcementId);
+      const deliveryId = await claimDelivery(recipient.identityId, eventKey, "announcement", input.announcementId);
       if (!deliveryId) return;
-      try {
-        const messageId = await sendTelegramMessage(
-          recipient.telegramUserId,
-          `${offering.course.code}: ${input.title}\n\n${input.body}`,
-          deepLink,
-        );
-        await prisma.$executeRaw`
-          UPDATE "telegram_security"."TelegramNotificationDelivery"
-          SET "status" = 'sent', "attempts" = 1, "telegramMessageId" = ${messageId}, "updatedAt" = CURRENT_TIMESTAMP
-          WHERE "id" = ${deliveryId}
-        `;
-      } catch (error) {
-        const message = error instanceof Error ? error.message.slice(0, 1000) : "Unknown Telegram delivery failure";
-        await prisma.$executeRaw`
-          UPDATE "telegram_security"."TelegramNotificationDelivery"
-          SET "status" = 'failed', "attempts" = 1, "lastError" = ${message}, "updatedAt" = CURRENT_TIMESTAMP
-          WHERE "id" = ${deliveryId}
-        `;
-      }
+      await finishDelivery(deliveryId, () => sendTelegramMessage(
+        recipient.telegramUserId,
+        `${offering.course.code}: ${input.title}\n\n${input.body}`,
+        deepLink,
+      ));
     }));
+  },
+
+  async deliverPermissionPending(input: {
+    permissionPendingId: string;
+    studentId: string;
+    offeringId: string;
+    date: string;
+  }) {
+    const [recipient, offering] = await Promise.all([
+      eligibleStudentRecipient(input.studentId),
+      prisma.offering.findUnique({
+        where: { id: input.offeringId },
+        select: { course: { select: { code: true } } },
+      }),
+    ]);
+    if (!recipient || !offering) return;
+    const eventKey = `permission-pending:${input.permissionPendingId}`;
+    const deliveryId = await claimDelivery(recipient.identityId, eventKey, "permission_pending", input.permissionPendingId);
+    if (!deliveryId) return;
+    const deepLink = createTelegramDeepLink(`/telegram/attendance?offeringId=${encodeURIComponent(input.offeringId)}`);
+    await finishDelivery(deliveryId, () => sendTelegramMessage(
+      recipient.telegramUserId,
+      `Permission letter reminder\n\n${offering.course.code} · ${input.date}\nYour permission is still pending. Please give the paper permission letter to your lecturer, preferably before your next class.`,
+      deepLink,
+    ));
   },
 
   async preferences(identityId: string) {
     const rows = await prisma.$queryRaw<Array<{ announcementsEnabled: boolean }>>`
-      SELECT "announcementsEnabled"
-      FROM "telegram_security"."TelegramNotificationPreference"
-      WHERE "identityId" = ${identityId}
-      LIMIT 1
+      SELECT "announcementsEnabled" FROM "telegram_security"."TelegramNotificationPreference"
+      WHERE "identityId" = ${identityId} LIMIT 1
     `;
     return { announcementsEnabled: rows[0]?.announcementsEnabled ?? true };
   },
 
   async setPreferences(identityId: string, announcementsEnabled: boolean) {
     await prisma.$executeRaw`
-      INSERT INTO "telegram_security"."TelegramNotificationPreference"
-        ("identityId", "announcementsEnabled", "updatedAt")
+      INSERT INTO "telegram_security"."TelegramNotificationPreference" ("identityId", "announcementsEnabled", "updatedAt")
       VALUES (${identityId}, ${announcementsEnabled}, CURRENT_TIMESTAMP)
       ON CONFLICT ("identityId") DO UPDATE
       SET "announcementsEnabled" = EXCLUDED."announcementsEnabled", "updatedAt" = CURRENT_TIMESTAMP

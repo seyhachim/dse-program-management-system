@@ -11,6 +11,17 @@ import { ReferenceError } from "./service.ts";
 
 const students = () => registry.get<StudentsServiceContract>("students").service;
 
+type TelegramNotificationContract = {
+  notifications: {
+    deliverPermissionPending(input: {
+      permissionPendingId: string;
+      studentId: string;
+      offeringId: string;
+      date: string;
+    }): Promise<void>;
+  };
+};
+
 interface EnrollmentRow {
   studentId: string;
 }
@@ -30,6 +41,17 @@ interface RecordRow {
   note: string;
 }
 
+interface PendingRow {
+  id: string;
+  sessionId: string;
+  studentId: string;
+  studentNumber: string;
+  studentName: string;
+  note: string;
+  createdAt: Date;
+  resolvedAt: Date | null;
+}
+
 function dateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
@@ -39,7 +61,13 @@ function dateValue(value: string): Date {
 }
 
 function emptyCounts() {
-  return { Present: 0, Absent: 0, Late: 0, Excused: 0 } satisfies Record<AttendanceStatus, number>;
+  return {
+    Present: 0,
+    Absent: 0,
+    Late: 0,
+    Excused: 0,
+    PermissionPending: 0,
+  } satisfies Record<AttendanceStatus, number> & { PermissionPending: number };
 }
 
 async function roster(offeringId: string): Promise<EnrollmentRow[]> {
@@ -61,6 +89,15 @@ async function sessionByDate(offeringId: string, date: string): Promise<SessionR
   return rows[0] ?? null;
 }
 
+async function activePending(sessionId: string): Promise<PendingRow[]> {
+  return prisma.$queryRaw<PendingRow[]>`
+    SELECT "id", "sessionId", "studentId", "studentNumber", "studentName", "note", "createdAt", "resolvedAt"
+    FROM "pms_attendance"."AttendancePermissionPending"
+    WHERE "sessionId" = ${sessionId}
+      AND "resolvedAt" IS NULL
+  `;
+}
+
 async function getAttendance(offeringId: string, date: string): Promise<AttendanceSessionView> {
   const [enrollments, session] = await Promise.all([roster(offeringId), sessionByDate(offeringId, date)]);
   const currentStudentIds = enrollments.map((row) => row.studentId);
@@ -74,7 +111,9 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
         WHERE "sessionId" = ${session.id}
       `
     : [];
+  const pendingRows = session ? await activePending(session.id) : [];
   const recordByStudent = new Map(recordRows.map((record) => [record.studentId, record]));
+  const pendingByStudent = new Map(pendingRows.map((pending) => [pending.studentId, pending]));
 
   const counts = { ...emptyCounts(), Unmarked: 0 };
   const records = currentStudentIds
@@ -82,29 +121,49 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       const student = studentById.get(studentId);
       if (!student) return null;
       const attendance = recordByStudent.get(studentId);
+      const pending = pendingByStudent.get(studentId);
       if (attendance) counts[attendance.status] += 1;
+      else if (pending) counts.PermissionPending += 1;
       else counts.Unmarked += 1;
       return {
         studentId,
-        studentNumber: attendance?.studentNumber ?? student.studentId,
-        studentName: attendance?.studentName ?? student.name,
+        studentNumber: attendance?.studentNumber ?? pending?.studentNumber ?? student.studentId,
+        studentName: attendance?.studentName ?? pending?.studentName ?? student.name,
         status: attendance?.status ?? null,
-        note: attendance?.note ?? "",
+        permissionPending: !attendance && Boolean(pending),
+        permissionPendingSince: !attendance && pending ? pending.createdAt.toISOString() : null,
+        note: attendance?.note ?? pending?.note ?? "",
       };
     })
     .filter((record): record is NonNullable<typeof record> => record !== null);
 
-  // A student removed from the current roster remains visible on historical
-  // registers using the identity snapshot captured when attendance was saved.
+  const historicalIds = new Set(currentStudentIds);
   for (const historical of recordRows) {
-    if (currentStudentIds.includes(historical.studentId)) continue;
+    if (historicalIds.has(historical.studentId)) continue;
+    historicalIds.add(historical.studentId);
     counts[historical.status] += 1;
     records.push({
       studentId: historical.studentId,
       studentNumber: historical.studentNumber,
       studentName: historical.studentName,
       status: historical.status,
+      permissionPending: false,
+      permissionPendingSince: null,
       note: historical.note,
+    });
+  }
+  for (const pending of pendingRows) {
+    if (historicalIds.has(pending.studentId)) continue;
+    historicalIds.add(pending.studentId);
+    counts.PermissionPending += 1;
+    records.push({
+      studentId: pending.studentId,
+      studentNumber: pending.studentNumber,
+      studentName: pending.studentName,
+      status: null,
+      permissionPending: true,
+      permissionPendingSince: pending.createdAt.toISOString(),
+      note: pending.note,
     });
   }
 
@@ -130,11 +189,9 @@ export const attendanceService = {
     `;
     if (sessions.length === 0) return [];
 
-    const counts = new Map<string, Record<AttendanceStatus, number>>();
+    const counts = new Map<string, ReturnType<typeof emptyCounts>>();
     for (const session of sessions) counts.set(session.id, emptyCounts());
 
-    // Use one small query per session. Class attendance history is low-volume,
-    // and this avoids driver-specific array parameter casting in raw SQL.
     for (const session of sessions) {
       const rows = await prisma.$queryRaw<Array<{ status: AttendanceStatus; count: bigint }>>`
         SELECT "status", COUNT(*)::bigint AS "count"
@@ -144,6 +201,13 @@ export const attendanceService = {
       `;
       const sessionCounts = counts.get(session.id)!;
       for (const row of rows) sessionCounts[row.status] = Number(row.count);
+      const pending = await prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS "count"
+        FROM "pms_attendance"."AttendancePermissionPending"
+        WHERE "sessionId" = ${session.id}
+          AND "resolvedAt" IS NULL
+      `;
+      sessionCounts.PermissionPending = Number(pending[0]?.count ?? 0n);
     }
 
     return sessions.map((session) => ({
@@ -157,17 +221,18 @@ export const attendanceService = {
 
   get: getAttendance,
 
-  async save(offeringId: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
-    // Current roster rows use the canonical Students service identity. Historical-only
-    // rows deliberately do not depend on the current Student record; their exact saved
-    // identity snapshot is resolved inside the transaction below.
+  async save(
+    offeringId: string,
+    date: string,
+    input: SaveAttendanceInput,
+    actorUserId?: string,
+  ): Promise<AttendanceSessionView> {
     const requestedStudentIds = [...new Set(input.records.map((record) => record.studentId))];
     const studentRows = await students().findByIds(requestedStudentIds);
     const studentById = new Map(studentRows.map((student) => [student.id, student]));
+    const newlyPending: Array<{ permissionPendingId: string; studentId: string }> = [];
 
     await prisma.$transaction(async (tx) => {
-      // Lock current Enrollment rows for the duration of replacement so a concurrent
-      // unenrollment cannot invalidate roster eligibility after validation succeeds.
       const enrollments = await tx.$queryRaw<EnrollmentRow[]>`
         SELECT "studentId"
         FROM "Enrollment"
@@ -176,9 +241,6 @@ export const attendanceService = {
       `;
       const currentStudentIds = new Set(enrollments.map((row) => row.studentId));
 
-      // Lock the exact historical session while correcting it. Eligibility for a
-      // historical-only student is scoped to records already stored in this session,
-      // never to another date or another offering.
       const existing = await tx.$queryRaw<SessionRow[]>`
         SELECT "id", "offeringId", "sessionDate", "updatedAt"
         FROM "pms_attendance"."AttendanceSession"
@@ -195,14 +257,22 @@ export const attendanceService = {
             WHERE "sessionId" = ${existingSession.id}
           `
         : [];
+      const pendingHistory = existingSession
+        ? await tx.$queryRaw<PendingRow[]>`
+            SELECT "id", "sessionId", "studentId", "studentNumber", "studentName", "note", "createdAt", "resolvedAt"
+            FROM "pms_attendance"."AttendancePermissionPending"
+            WHERE "sessionId" = ${existingSession.id}
+          `
+        : [];
       const historicalByStudent = new Map(historicalRows.map((record) => [record.studentId, record]));
+      const pendingHistoryByStudent = new Map(pendingHistory.map((record) => [record.studentId, record]));
+      const activePendingByStudent = new Map(
+        pendingHistory.filter((record) => record.resolvedAt === null).map((record) => [record.studentId, record]),
+      );
 
-      // Validate the complete replacement before mutating anything. New registers stay
-      // current-roster-only; existing registers additionally accept only students that
-      // already belong to this exact saved session.
       for (const record of input.records) {
         const isCurrent = currentStudentIds.has(record.studentId);
-        const historical = historicalByStudent.get(record.studentId);
+        const historical = historicalByStudent.get(record.studentId) ?? pendingHistoryByStudent.get(record.studentId);
         if (!isCurrent && !historical) {
           throw new ReferenceError(
             "Attendance can only be recorded for current students or students already present in this saved register",
@@ -227,19 +297,58 @@ export const attendanceService = {
         `;
       }
 
+      const requestedByStudent = new Map(input.records.map((record) => [record.studentId, record]));
+      for (const pending of activePendingByStudent.values()) {
+        const requested = requestedByStudent.get(pending.studentId);
+        if (requested?.permissionPending) continue;
+        const resolution = requested?.status ?? "Cleared";
+        await tx.$executeRaw`
+          UPDATE "pms_attendance"."AttendancePermissionPending"
+          SET "resolvedAt" = CURRENT_TIMESTAMP,
+              "resolvedById" = ${actorUserId ?? null},
+              "resolution" = ${resolution},
+              "updatedAt" = CURRENT_TIMESTAMP
+          WHERE "id" = ${pending.id}
+            AND "resolvedAt" IS NULL
+        `;
+      }
+
+      for (const requested of input.records) {
+        if (!requested.permissionPending) continue;
+        const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
+        const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
+        const studentNumber = currentStudent?.studentId ?? historical!.studentNumber;
+        const studentName = currentStudent?.name ?? historical!.studentName;
+        const existingPending = activePendingByStudent.get(requested.studentId);
+        if (existingPending) {
+          await tx.$executeRaw`
+            UPDATE "pms_attendance"."AttendancePermissionPending"
+            SET "note" = ${requested.note}, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${existingPending.id}
+          `;
+        } else {
+          const id = crypto.randomUUID();
+          await tx.$executeRaw`
+            INSERT INTO "pms_attendance"."AttendancePermissionPending"
+              ("id", "sessionId", "studentId", "studentNumber", "studentName", "note", "createdById")
+            VALUES
+              (${id}, ${sessionId}, ${requested.studentId}, ${studentNumber}, ${studentName}, ${requested.note}, ${actorUserId ?? null})
+          `;
+          newlyPending.push({ permissionPendingId: id, studentId: requested.studentId });
+        }
+      }
+
       await tx.$executeRaw`
         DELETE FROM "pms_attendance"."AttendanceRecord"
         WHERE "sessionId" = ${sessionId}
       `;
 
       for (const record of input.records) {
-        const currentStudent = currentStudentIds.has(record.studentId)
-          ? studentById.get(record.studentId)
-          : null;
-        const historical = historicalByStudent.get(record.studentId);
+        if (record.status === null) continue;
+        const currentStudent = currentStudentIds.has(record.studentId) ? studentById.get(record.studentId) : null;
+        const historical = historicalByStudent.get(record.studentId) ?? pendingHistoryByStudent.get(record.studentId);
         const studentNumber = currentStudent?.studentId ?? historical!.studentNumber;
         const studentName = currentStudent?.name ?? historical!.studentName;
-
         await tx.$executeRaw`
           INSERT INTO "pms_attendance"."AttendanceRecord"
             ("sessionId", "studentId", "studentNumber", "studentName", "status", "note")
@@ -248,6 +357,19 @@ export const attendanceService = {
         `;
       }
     });
+
+    if (newlyPending.length > 0 && registry.has("telegram")) {
+      const telegram = registry.get<TelegramNotificationContract>("telegram").service;
+      await Promise.allSettled(
+        newlyPending.map((pending) =>
+          telegram.notifications.deliverPermissionPending({
+            ...pending,
+            offeringId,
+            date,
+          }),
+        ),
+      );
+    }
 
     return getAttendance(offeringId, date);
   },

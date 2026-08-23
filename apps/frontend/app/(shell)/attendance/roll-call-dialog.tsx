@@ -32,7 +32,7 @@ interface RollCallDialogProps {
   saving: boolean;
   onUpdateRecord: (
     studentId: string,
-    patch: Partial<Pick<AttendanceRecordView, "status" | "note">>,
+    patch: Partial<Pick<AttendanceRecordView, "status" | "permissionPending" | "permissionPendingSince" | "note">>,
   ) => void;
   onRequestClose: () => void;
   onSaveAndClose: () => Promise<void>;
@@ -68,7 +68,7 @@ const STATUS_ACTIONS: Array<{
   },
   {
     status: "Excused",
-    label: "Excused Absence",
+    label: "Permission / Excused",
     shortcut: "E",
     icon: FileCheck2,
     className: "border-border bg-muted/50 text-foreground hover:bg-muted",
@@ -151,9 +151,23 @@ export function RollCallDialog({
 
   function mark(status: AttendanceStatus) {
     if (!current) return;
-    const label = status === "Excused" ? "Excused Absence" : status;
-    onUpdateRecord(current.studentId, { status });
+    const label = status === "Excused" ? "Permission / Excused" : status;
+    onUpdateRecord(current.studentId, {
+      status,
+      permissionPending: false,
+      permissionPendingSince: null,
+    });
     setFeedback(`${current.studentName} marked ${label}.`);
+    setIndex((currentIndex) => getNextIndex(currentIndex, sequence.length));
+  }
+
+  function markPermissionPending() {
+    if (!current) return;
+    onUpdateRecord(current.studentId, {
+      status: null,
+      permissionPending: true,
+    });
+    setFeedback(`${current.studentName} marked Permission Pending. Paper letter still needs confirmation.`);
     setIndex((currentIndex) => getNextIndex(currentIndex, sequence.length));
   }
 
@@ -188,6 +202,9 @@ export function RollCallDialog({
       } else if (key === "e") {
         event.preventDefault();
         mark("Excused");
+      } else if (key === "r") {
+        event.preventDefault();
+        markPermissionPending();
       } else if (key === "s") {
         event.preventDefault();
         skip();
@@ -204,6 +221,12 @@ export function RollCallDialog({
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  const currentLabel = current?.permissionPending
+    ? "Permission Pending"
+    : current?.status === "Excused"
+      ? "Permission / Excused"
+      : current?.status ?? "Unmarked";
+
   return (
     <Dialog
       open={open}
@@ -218,7 +241,7 @@ export function RollCallDialog({
         <DialogTitle className="sr-only">Roll Call Mode</DialogTitle>
         <DialogDescription className="sr-only">
           Mark attendance one student at a time. Keyboard shortcuts are P for Present, L for Late, A for Absent,
-          E for Excused Absence, S to Skip, and the left and right arrows to navigate students.
+          E for Permission or Excused, R for Permission Pending, S to Skip, and the left and right arrows to navigate students.
         </DialogDescription>
 
         <div className="flex h-full min-h-0 flex-col">
@@ -226,144 +249,61 @@ export function RollCallDialog({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-foreground">Roll Call Mode</h2>
-                <span className="rounded-full border border-status-live/30 bg-status-live-bg px-2 py-0.5 text-xs font-medium text-status-live">
-                  Live
-                </span>
-                {reviewStudentIds ? (
-                  <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                    Unmarked review
-                  </span>
-                ) : null}
+                <span className="rounded-full border border-status-live/30 bg-status-live-bg px-2 py-0.5 text-xs font-medium text-status-live">Live</span>
+                {reviewStudentIds ? <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Unmarked review</span> : null}
               </div>
-              <p className="mt-1 font-medium text-foreground">
-                {courseTitle} · Class {offering?.sectionCode ?? "—"}
-              </p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {weekLabel} · {formatAttendanceDate(date)} · {sequence.length === 0 ? 0 : index + 1} / {sequence.length}
-              </p>
+              <p className="mt-1 font-medium text-foreground">{courseTitle} · Class {offering?.sectionCode ?? "—"}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{weekLabel} · {formatAttendanceDate(date)} · {sequence.length === 0 ? 0 : index + 1} / {sequence.length}</p>
             </div>
-            <button
-              type="button"
-              onClick={onRequestClose}
-              className="h-10 rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Close
-            </button>
+            <button type="button" onClick={onRequestClose} className="h-10 rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Close</button>
           </header>
 
           <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_300px]">
             <section className="flex min-h-0 flex-col overflow-y-auto px-5 py-6 sm:px-8 lg:px-10">
-              {feedback ? (
-                <div aria-live="polite" className="mb-5 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
-                  {feedback}
-                </div>
-              ) : (
-                <div aria-live="polite" className="sr-only" />
-              )}
+              {feedback ? <div aria-live="polite" className="mb-5 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">{feedback}</div> : <div aria-live="polite" className="sr-only" />}
 
               {current ? (
                 <>
                   <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <div className="mb-5 flex h-28 w-28 items-center justify-center rounded-full border border-border bg-muted text-3xl font-semibold text-foreground sm:h-32 sm:w-32 sm:text-4xl">
-                      {initials(current.studentName) || <UserRound className="h-12 w-12" />}
-                    </div>
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                      Student {sequence.length === 0 ? 0 : index + 1} of {sequence.length}
-                    </p>
-                    <h3 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                      {current.studentName}
-                    </h3>
+                    <div className="mb-5 flex h-28 w-28 items-center justify-center rounded-full border border-border bg-muted text-3xl font-semibold text-foreground sm:h-32 sm:w-32 sm:text-4xl">{initials(current.studentName) || <UserRound className="h-12 w-12" />}</div>
+                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Student {sequence.length === 0 ? 0 : index + 1} of {sequence.length}</p>
+                    <h3 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">{current.studentName}</h3>
                     <p className="mt-4 font-mono text-base text-muted-foreground">{current.studentNumber}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Current status:{" "}
-                      <span className="font-medium text-foreground">
-                        {current.status === "Excused" ? "Excused Absence" : current.status ?? "Unmarked"}
-                      </span>
-                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">Current status: <span className="font-medium text-foreground">{currentLabel}</span></p>
                   </div>
 
-                  <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                     {STATUS_ACTIONS.map((action) => {
                       const Icon = action.icon;
-                      const selected = current.status === action.status;
+                      const selected = current.status === action.status && !current.permissionPending;
                       return (
-                        <button
-                          key={action.status}
-                          type="button"
-                          onClick={() => mark(action.status)}
-                          aria-pressed={selected}
-                          className={`relative min-h-24 rounded-xl border px-4 py-4 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${action.className} ${selected ? "ring-2 ring-ring" : ""}`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <Icon className="h-6 w-6" />
-                            <kbd className="rounded border border-current/20 px-1.5 py-0.5 text-[11px] font-semibold opacity-80">
-                              {action.shortcut}
-                            </kbd>
-                          </div>
+                        <button key={action.status} type="button" onClick={() => mark(action.status)} aria-pressed={selected} className={`relative min-h-24 rounded-xl border px-4 py-4 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${action.className} ${selected ? "ring-2 ring-ring" : ""}`}>
+                          <div className="flex items-start justify-between gap-2"><Icon className="h-6 w-6" /><kbd className="rounded border border-current/20 px-1.5 py-0.5 text-[11px] font-semibold opacity-80">{action.shortcut}</kbd></div>
                           <div className="mt-3 font-semibold">{action.label}</div>
-                          {selected ? (
-                            <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium">
-                              <Check className="h-3.5 w-3.5" /> Selected
-                            </span>
-                          ) : null}
+                          {selected ? <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium"><Check className="h-3.5 w-3.5" /> Selected</span> : null}
                         </button>
                       );
                     })}
-                    <button
-                      type="button"
-                      onClick={skip}
-                      className="min-h-24 rounded-xl border border-border bg-background px-4 py-4 text-left text-foreground outline-none transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <SkipForward className="h-6 w-6" />
-                        <kbd className="rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                          S
-                        </kbd>
-                      </div>
+                    <button type="button" onClick={markPermissionPending} aria-pressed={current.permissionPending} className={`relative min-h-24 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-left text-amber-900 outline-none transition hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-ring ${current.permissionPending ? "ring-2 ring-ring" : ""}`}>
+                      <div className="flex items-start justify-between gap-2"><Clock3 className="h-6 w-6" /><kbd className="rounded border border-amber-500/30 px-1.5 py-0.5 text-[11px] font-semibold">R</kbd></div>
+                      <div className="mt-3 font-semibold">Permission Pending</div>
+                      <div className="mt-1 text-xs">Paper letter not confirmed yet</div>
+                    </button>
+                    <button type="button" onClick={skip} className="min-h-24 rounded-xl border border-border bg-background px-4 py-4 text-left text-foreground outline-none transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                      <div className="flex items-start justify-between gap-2"><SkipForward className="h-6 w-6" /><kbd className="rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">S</kbd></div>
                       <div className="mt-3 font-semibold">Skip</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {current.status === null ? "Leave Unmarked" : "Keep existing status"}
-                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">{current.status === null && !current.permissionPending ? "Leave Unmarked" : "Keep existing status"}</div>
                     </button>
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-                    <label className="space-y-1.5">
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance note</span>
-                      <input
-                        value={current.note}
-                        maxLength={300}
-                        placeholder="Optional note or approved absence reason"
-                        onChange={(event) => onUpdateRecord(current.studentId, { note: event.target.value })}
-                        className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={previous}
-                      disabled={index === 0}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                    >
-                      <ChevronLeft className="h-4 w-4" /> Previous
-                    </button>
-                    <button
-                      type="button"
-                      onClick={next}
-                      disabled={index >= sequence.length - 1}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </button>
+                    <label className="space-y-1.5"><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance note</span><input value={current.note} maxLength={300} placeholder={current.permissionPending ? "Optional note about pending permission" : "Optional note or approved absence reason"} onChange={(event) => onUpdateRecord(current.studentId, { note: event.target.value })} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" /></label>
+                    <button type="button" onClick={previous} disabled={index === 0} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"><ChevronLeft className="h-4 w-4" /> Previous</button>
+                    <button type="button" onClick={next} disabled={index >= sequence.length - 1} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">Next <ChevronRight className="h-4 w-4" /></button>
                   </div>
                 </>
               ) : (
-                <div className="flex flex-1 flex-col items-center justify-center text-center">
-                  <CheckCircle2 className="h-14 w-14 text-status-live" />
-                  <h3 className="mt-4 text-2xl font-semibold text-foreground">No students in this pass</h3>
-                  <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                    There are no students to review in the current roll-call pass.
-                  </p>
-                </div>
+                <div className="flex flex-1 flex-col items-center justify-center text-center"><CheckCircle2 className="h-14 w-14 text-status-live" /><h3 className="mt-4 text-2xl font-semibold text-foreground">No students in this pass</h3><p className="mt-2 max-w-md text-sm text-muted-foreground">There are no students to review in the current roll-call pass.</p></div>
               )}
             </section>
 
@@ -374,44 +314,19 @@ export function RollCallDialog({
                 <SummaryRow label="Present" value={counts.Present} />
                 <SummaryRow label="Late" value={counts.Late} />
                 <SummaryRow label="Absent" value={counts.Absent} />
-                <SummaryRow label="Excused Absence" value={counts.Excused} />
+                <SummaryRow label="Permission / Excused" value={counts.Excused} />
+                <SummaryRow label="Permission Pending" value={counts.PermissionPending} emphasized={counts.PermissionPending > 0} />
                 <SummaryRow label="Unmarked" value={counts.Unmarked} emphasized={counts.Unmarked > 0} />
                 <div className="my-3 border-t border-border" />
                 <SummaryRow label="Total" value={counts.Total} />
               </div>
 
-              {counts.Unmarked > 0 ? (
-                <button
-                  type="button"
-                  onClick={reviewUnmarked}
-                  className="mt-5 w-full rounded-md border border-border bg-background px-4 py-3 text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  Review Unmarked Students ({counts.Unmarked})
-                </button>
-              ) : (
-                <div className="mt-5 rounded-lg border border-status-live/30 bg-status-live-bg px-3 py-3 text-sm font-medium text-status-live">
-                  Everyone has a status.
-                </div>
-              )}
+              {counts.Unmarked > 0 ? <button type="button" onClick={reviewUnmarked} className="mt-5 w-full rounded-md border border-border bg-background px-4 py-3 text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Review Unmarked Students ({counts.Unmarked})</button> : <div className="mt-5 rounded-lg border border-status-live/30 bg-status-live-bg px-3 py-3 text-sm font-medium text-status-live">Everyone has a status or pending permission.</div>}
 
-              <div className="mt-6 rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">Keyboard shortcuts</p>
-                <p className="mt-2 leading-5">P Present · L Late · A Absent · E Excused · S Skip</p>
-                <p className="leading-5">← Previous · → Next</p>
-              </div>
+              <div className="mt-6 rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground"><p className="font-medium text-foreground">Keyboard shortcuts</p><p className="mt-2 leading-5">P Present · L Late · A Absent · E Permission · R Permission Pending · S Skip</p><p className="leading-5">← Previous · → Next</p></div>
 
-              <button
-                type="button"
-                onClick={() => void onSaveAndClose()}
-                disabled={saving || records.length === 0}
-                className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? "Saving…" : "Save Attendance"}
-              </button>
-              <p className="mt-2 text-center text-xs text-muted-foreground">
-                Unmarked students remain unmarked and are not converted to Absent.
-              </p>
+              <button type="button" onClick={() => void onSaveAndClose()} disabled={saving || records.length === 0} className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save Attendance"}</button>
+              <p className="mt-2 text-center text-xs text-muted-foreground">Permission Pending stays unresolved until an authorized lecturer changes it. It never becomes Absent automatically.</p>
             </aside>
           </div>
         </div>
@@ -422,11 +337,7 @@ export function RollCallDialog({
 
 function SummaryRow({ label, value, emphasized = false }: { label: string; value: number; emphasized?: boolean }) {
   return (
-    <div
-      className={`flex items-center justify-between rounded-md px-3 py-2 ${
-        emphasized ? "bg-status-upcoming-bg" : "bg-background"
-      }`}
-    >
+    <div className={`flex items-center justify-between rounded-md px-3 py-2 ${emphasized ? "bg-status-upcoming-bg" : "bg-background"}`}>
       <span className={emphasized ? "font-medium text-foreground" : "text-muted-foreground"}>{label}</span>
       <span className="font-semibold tabular-nums text-foreground">{value}</span>
     </div>

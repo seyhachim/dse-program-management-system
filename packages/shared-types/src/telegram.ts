@@ -125,6 +125,20 @@ export const TelegramStudentTodaySchema = z.object({
 });
 export type TelegramStudentToday = z.infer<typeof TelegramStudentTodaySchema>;
 
+export const TelegramPermissionPendingActionSchema = z.object({
+  kind: z.literal("permission_pending"),
+  permissionPendingId: z.string().uuid(),
+  offeringId: z.string(),
+  courseCode: z.string(),
+  courseTitle: z.string(),
+  sectionCode: z.string(),
+  date: z.string().regex(ISO_DATE_PATTERN),
+  createdAt: z.string().datetime(),
+  note: z.string(),
+  deepLink: z.string(),
+});
+export type TelegramPermissionPendingAction = z.infer<typeof TelegramPermissionPendingActionSchema>;
+
 export const TelegramHomeResponseSchema = z.object({
   user: z.object({
     id: z.string(),
@@ -134,6 +148,7 @@ export const TelegramHomeResponseSchema = z.object({
   }),
   courses: z.array(TelegramCourseCardSchema),
   today: TelegramStudentTodaySchema.nullable(),
+  actions: z.array(TelegramPermissionPendingActionSchema).default([]),
   unreadAnnouncements: z.number().int().nonnegative(),
   publishedResultCount: z.number().int().nonnegative(),
   surveyActions: z.number().int().nonnegative(),

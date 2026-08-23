@@ -120,6 +120,7 @@ const EXPECTED_PUBLIC_TABLES = [
 const EXPECTED_ATTENDANCE_TABLES = [
   "AttendanceSession",
   "AttendanceRecord",
+  "AttendancePermissionPending",
   "LecturerArrivalConfirmation",
   "ClassSessionStatus",
 ] as const;

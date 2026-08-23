@@ -80,6 +80,9 @@ function offeringService(options: {
       get: async () => null,
       save: async () => null,
     },
+    studentAttendanceHistory: {
+      pendingForUser: async () => [],
+    },
     classResponsibilities: {
       getActiveForUser: async () => options.responsibility ?? null,
     },

@@ -138,7 +138,7 @@ export function createOfferingRouter(): Router {
       return;
     }
     try {
-      res.json(await attendanceService.save(req.params.id!, parsedDate.data, parsedBody.data));
+      res.json(await attendanceService.save(req.params.id!, parsedDate.data, parsedBody.data, req.user!.id));
     } catch (err) {
       handleError(err, res, "Could not save attendance");
     }
