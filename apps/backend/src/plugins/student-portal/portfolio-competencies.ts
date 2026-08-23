@@ -41,6 +41,7 @@ async function eligibleAcademicEvidence(studentId: string, publicOnly: boolean):
       ON a."courseSpecId" = e."sourceCourseSpecId" AND a."id" = e."sourceAssessmentItemId" AND a."status" = 'Active'
     WHERE e."studentId" = ${studentId}
       AND e."sourceType" = 'CourseAssessment'
+      AND e."archivedAt" IS NULL
       AND (${publicOnly} = false OR e."isPublic" = true)
     ORDER BY e."updatedAt" DESC
   `;
@@ -54,14 +55,9 @@ export async function competenciesForStudentId(studentId: string, publicOnly = f
   const competencies = await prisma.programCompetency.findMany({
     where: { active: true },
     orderBy: { order: "asc" },
-    include: {
-      ploLinks: {
-        include: { plo: true },
-      },
-    },
+    include: { ploLinks: { include: { plo: true } } },
   });
   const evidenceRows = await eligibleAcademicEvidence(studentId, publicOnly);
-
   const cloRows = evidenceRows.length
     ? await prisma.courseSpecClo.findMany({
         where: { courseSpecId: { in: [...new Set(evidenceRows.map((item) => item.sourceCourseSpecId))] } },
@@ -72,12 +68,9 @@ export async function competenciesForStudentId(studentId: string, publicOnly = f
   return Promise.all(competencies.map(async (competency) => {
     const linkedPloCodes = competency.ploLinks.filter((link) => link.plo.active).map((link) => link.plo.code);
     const evidence: StudentPortfolioCompetencyEvidence[] = [];
-
     for (const row of evidenceRows) {
       const mappedClos = cloRows.filter((clo) =>
-        clo.courseSpecId === row.sourceCourseSpecId &&
-        clo.status === "Active" &&
-        row.cloCodes.includes(cloCode(clo.order)),
+        clo.courseSpecId === row.sourceCourseSpecId && clo.status === "Active" && row.cloCodes.includes(cloCode(clo.order)),
       );
       const matchedPloCodes = [...new Set(mappedClos.flatMap((clo) => clo.mappedPlos).filter((code) => linkedPloCodes.includes(code)))];
       if (matchedPloCodes.length === 0) continue;
@@ -95,17 +88,10 @@ export async function competenciesForStudentId(studentId: string, publicOnly = f
         verification,
       });
     }
-
     const verified = evidence.filter((item) => item.verification.state === "verified");
     const coveredPloCodes = new Set(verified.flatMap((item) => item.ploCodes));
     const distinctCourses = new Set(verified.map((item) => item.courseCode));
     const allLinkedPlosCovered = linkedPloCodes.length > 0 && linkedPloCodes.every((code) => coveredPloCodes.has(code));
-
-    // v1 rule is deliberately conservative and not count-only:
-    // - Demonstrated: verified evidence covers every active competency PLO AND spans >= 2 distinct courses.
-    // - Practiced: at least one verified approved academic evidence item.
-    // - Supporting: eligible approved academic evidence exists but is not currently verified.
-    // Portfolio state never writes official PLO/CLO attainment or QA snapshots.
     const status = allLinkedPlosCovered && distinctCourses.size >= 2
       ? "demonstrated" as const
       : verified.length > 0
@@ -113,7 +99,6 @@ export async function competenciesForStudentId(studentId: string, publicOnly = f
         : evidence.length > 0
           ? "supporting" as const
           : "not_yet_evidenced" as const;
-
     return {
       competencyId: competency.id,
       code: competency.code,
