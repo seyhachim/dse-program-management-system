@@ -1,0 +1,56 @@
+name: Portfolio Prisma schema sync
+on:
+  push:
+    branches: [feat/epic-570-student-portfolio-completion]
+    paths: [.github/workflows/portfolio-prisma-sync.yml]
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/epic-570-student-portfolio-completion
+      - name: Synchronize portfolio migration shape into Prisma schema
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/backend/prisma/schema.prisma')
+          s = p.read_text()
+
+          user_anchor = '  studentProfile                   Student?\n  lecturerProfile                  LecturerProfile?\n'
+          user_add = '''  portfolioVerificationEvents       StudentPortfolioVerificationEvent[]      @relation("StudentPortfolioVerifier")\n  portfolioSupervisorAssignments   StudentPortfolioSupervisorRelationship[] @relation("PortfolioSupervisorUser")\n  portfolioSupervisorApprovals     StudentPortfolioSupervisorRelationship[] @relation("PortfolioSupervisorApprovedBy")\n  portfolioSupervisorRevocations   StudentPortfolioSupervisorRelationship[] @relation("PortfolioSupervisorRevokedBy")\n'''
+          if 'portfolioVerificationEvents' not in s:
+              s = s.replace(user_anchor, user_anchor + user_add)
+
+          student_anchor = '  portfolioProfile StudentPortfolioProfile?\n  portfolioEvidence StudentPortfolioEvidence[]\n'
+          student_add = '''  portfolioProfessionalLinks StudentPortfolioProfessionalLink[]\n  portfolioSupervisorRelationships StudentPortfolioSupervisorRelationship[]\n'''
+          if 'portfolioProfessionalLinks' not in s:
+              s = s.replace(student_anchor, student_anchor + student_add)
+
+          evidence_anchor = '  updatedAt              DateTime                            @updatedAt\n  links                  StudentPortfolioEvidenceLink[]\n'
+          evidence_repl = '''  updatedAt              DateTime                            @updatedAt\n  archivedAt             DateTime?\n  links                  StudentPortfolioEvidenceLink[]\n  verificationEvents     StudentPortfolioVerificationEvent[]\n  softSkills             StudentPortfolioEvidenceSoftSkill[]\n'''
+          if 'archivedAt             DateTime?' not in s:
+              s = s.replace(evidence_anchor, evidence_repl)
+
+          insert_anchor = '/// Authoritative programme cohort identity. Cohort membership and progression\n'
+          if 'model StudentPortfolioProfessionalLink {' not in s:
+              block = '''enum StudentPortfolioProfessionalProvider {\n  GitHub\n  GitLab\n  LinkedIn\n  Kaggle\n  HuggingFace\n  Website\n  ORCID\n  GoogleScholar\n  ResearchGate\n  CodingPractice\n  BIProfile\n  CV\n  Other\n}\n\nenum StudentPortfolioSupervisorStatus {\n  Pending\n  Approved\n  Revoked\n}\n\nenum StudentPortfolioVerificationState {\n  Unverified\n  Verified\n  NeedsChanges\n  Revoked\n}\n\nenum StudentPortfolioVerificationContext {\n  Lecturer\n  Supervisor\n  System\n}\n\n/// Raw-SQL-backed student professional links. Declared in Prisma so future schema\n/// diffs preserve the migration-managed table instead of treating it as drift.\nmodel StudentPortfolioProfessionalLink {\n  id        String                               @id\n  studentId String\n  student   Student                              @relation(fields: [studentId], references: [id], onDelete: Cascade)\n  provider  StudentPortfolioProfessionalProvider\n  label     String                               @default("")\n  url       String\n  isPublic  Boolean                              @default(false)\n  createdAt DateTime                             @default(now())\n  updatedAt DateTime                             @default(now())\n\n  @@unique([studentId, provider, url])\n  @@index([studentId, isPublic])\n}\n\n/// Explicit trusted supervisor authority. Free-text names/emails never grant\n/// verification rights; approval/revocation stays attributable to PMS users.\nmodel StudentPortfolioSupervisorRelationship {\n  id               String                           @id\n  studentId        String\n  student           Student                          @relation(fields: [studentId], references: [id], onDelete: Cascade)\n  supervisorUserId String\n  supervisorUser   User                             @relation("PortfolioSupervisorUser", fields: [supervisorUserId], references: [id], onDelete: Restrict)\n  status           StudentPortfolioSupervisorStatus @default(Pending)\n  approvedById     String?\n  approvedBy       User?                            @relation("PortfolioSupervisorApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)\n  approvedAt       DateTime?\n  revokedById      String?\n  revokedBy        User?                            @relation("PortfolioSupervisorRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)\n  revokedAt        DateTime?\n  createdAt        DateTime                         @default(now())\n  updatedAt        DateTime                         @default(now())\n\n  @@unique([studentId, supervisorUserId])\n  @@index([supervisorUserId, status])\n}\n\n/// Append-only verification transition snapshot. Database triggers reject update\n/// and delete; portfolio edits append invalidation/reverification events instead.\nmodel StudentPortfolioVerificationEvent {\n  id            String                              @id\n  evidenceId    String\n  evidence      StudentPortfolioEvidence            @relation(fields: [evidenceId], references: [id], onDelete: Restrict)\n  actorId       String?\n  actor         User?                               @relation("StudentPortfolioVerifier", fields: [actorId], references: [id], onDelete: Restrict)\n  actorContext  StudentPortfolioVerificationContext\n  previousState StudentPortfolioVerificationState\n  newState      StudentPortfolioVerificationState\n  reason        String                              @default("")\n  snapshot      Json\n  snapshotHash  String\n  createdAt     DateTime                            @default(now())\n\n  @@index([evidenceId, createdAt])\n  @@index([actorId, createdAt])\n}\n\n/// Student-selected soft-skill vocabulary mappings. These are presentation\n/// mappings only; verified counts depend on verification events, never self scores.\nmodel StudentPortfolioEvidenceSoftSkill {\n  evidenceId String\n  evidence   StudentPortfolioEvidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)\n  skillCode  String\n  createdAt  DateTime                 @default(now())\n\n  @@id([evidenceId, skillCode])\n  @@index([skillCode])\n}\n\n'''
+              s = s.replace(insert_anchor, block + insert_anchor)
+
+          p.write_text(s)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/backend/prisma/schema.prisma
+          if git diff --cached --quiet; then
+            echo 'Prisma schema already synchronized.'
+          else
+            git commit -m 'chore(portfolio): align Prisma schema with portfolio migrations'
+            git push origin HEAD:feat/epic-570-student-portfolio-completion
+          fi
+          rm .github/workflows/portfolio-prisma-sync.yml
+          git add .github/workflows/portfolio-prisma-sync.yml
+          git commit -m 'chore(portfolio): remove schema sync helper'
+          git push origin HEAD:feat/epic-570-student-portfolio-completion
