@@ -8,6 +8,7 @@ import {
 import { requirePermission } from "../../core/permissions/index.ts";
 import { CourseSpecLockedError } from "./spec-lock.ts";
 import { courseService } from "./service.ts";
+import { responsibleLecturerCanAccess } from "./responsible-lecturers.ts";
 import {
   CourseSpecThemeIntegrityError,
   CourseSpecThemeNotFoundError,
@@ -21,6 +22,25 @@ const GOVERNANCE_ROLES: Role[] = ["admin", "program_coordinator"];
 function getCourseSpecId(req: Request): string | undefined {
   const value = req.query.courseSpecId;
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+/**
+ * Document presentation is part of the same academic Course Spec record.
+ * Responsible-Lecturer-only assignments must therefore receive the exact same
+ * saved version theme as Offering-based lecturers and governance users.
+ *
+ * `courseService.lecturerCanAccess` is extended by the courses plugin at runtime,
+ * but the explicit responsible check keeps this router correct in isolation too
+ * (including focused integration tests and future mount-order refactors).
+ */
+export async function lecturerCanReadCourseSpecTheme(
+  courseId: string,
+  lecturerId: string,
+): Promise<boolean> {
+  return (
+    (await courseService.lecturerCanAccess(courseId, lecturerId)) ||
+    (await responsibleLecturerCanAccess(courseId, lecturerId))
+  );
 }
 
 async function ensureThemeAccess(
@@ -38,7 +58,10 @@ async function ensureThemeAccess(
     GOVERNANCE_ROLES,
     course.programmeId,
   );
-  if (!governance && !(await courseService.lecturerCanAccess(courseId, req.user!.id))) {
+  if (
+    !governance &&
+    !(await lecturerCanReadCourseSpecTheme(courseId, req.user!.id))
+  ) {
     res.status(403).json({ error: "You can only access your own courses" });
     return null;
   }
