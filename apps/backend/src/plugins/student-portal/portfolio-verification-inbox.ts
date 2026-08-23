@@ -27,6 +27,7 @@ export const studentPortfolioVerificationInboxService = {
       LEFT JOIN "StudentPortfolioSupervisorRelationship" sr
         ON sr."studentId" = e."studentId" AND sr."supervisorUserId" = ${actor.id} AND sr."status" = 'Approved'
       WHERE s."status" = 'Active'
+        AND e."archivedAt" IS NULL
         AND (
           (${actor.roles.includes("lecturer")} = true AND (o."lecturerId" = ${actor.id} OR co."lecturerId" = ${actor.id}))
           OR sr."id" IS NOT NULL
