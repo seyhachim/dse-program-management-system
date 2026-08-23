@@ -65,4 +65,8 @@ jobs:
         run: bun run seed
 
       - name: Verify Student Portal authorization and publication boundaries
-        run: bun test apps/backend/src/plugins/student-portal/portal-mvp-db.test.ts apps/backend/src/plugins/student-portal/portfolio-evidence-db.test.ts
+        run: >-
+          bun test
+          apps/backend/src/plugins/student-portal/portal-mvp-db.test.ts
+          apps/backend/src/plugins/student-portal/portfolio-evidence-db.test.ts
+          apps/backend/src/plugins/student-portal/portfolio-complete-db.test.ts
