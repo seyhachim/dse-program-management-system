@@ -7,6 +7,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { courseSpecRevisionService } from "./revision-service.ts";
+import { ensureCourseSpecThemeSnapshot } from "./document-theme-service.ts";
 
 type ReviewRow = {
   id: string;
@@ -226,7 +227,7 @@ export const courseSpecPeriodicReviewService = {
 
     const reviewId = randomUUID();
     const revisionType = input.outcome === "MajorRevision" ? "Major" : "Minor";
-    await courseSpecRevisionService.createCourseSpecRevision({
+    const revision = await courseSpecRevisionService.createCourseSpecRevision({
       courseId,
       revisionType,
       triggers: ["ScheduledReview"],
@@ -244,6 +245,8 @@ export const courseSpecPeriodicReviewService = {
         outcome: input.outcome,
       },
     });
+
+    await ensureCourseSpecThemeSnapshot(courseId, revision.id);
 
     return reviewById(reviewId);
   },
