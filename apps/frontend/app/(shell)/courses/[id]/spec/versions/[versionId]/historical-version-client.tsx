@@ -93,7 +93,7 @@ export function HistoricalVersionClient({ courseId, versionId }: { courseId: str
           </div>
         </div>
       </section>
-      <DocumentPreview document={document} />
+      <DocumentPreview document={document} courseSpecId={versionId} />
     </div>
   );
 }
