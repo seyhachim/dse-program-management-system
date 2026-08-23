@@ -117,15 +117,17 @@ function ensureDateOrder(startDate: Date | null, endDate: Date | null): void {
   }
 }
 
+async function listItems(lecturerId: string): Promise<LecturerPortfolioItem[]> {
+  const rows = await prisma.lecturerPortfolioItem.findMany({
+    where: { lecturerId },
+    include: itemInclude,
+    orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
+  });
+  return rows.map(presentItem);
+}
+
 export const lecturerPortfolioService = {
-  async listOwnItems(lecturerId: string): Promise<LecturerPortfolioItem[]> {
-    const rows = await prisma.lecturerPortfolioItem.findMany({
-      where: { lecturerId },
-      include: itemInclude,
-      orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
-    });
-    return rows.map(presentItem);
-  },
+  listOwnItems: listItems,
 
   async createOwnItem(
     lecturerId: string,
@@ -152,8 +154,10 @@ export const lecturerPortfolioService = {
     });
     if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
 
-    const nextStart = toDate(input.startDate) ?? existing.startDate;
-    const nextEnd = toDate(input.endDate) ?? existing.endDate;
+    const parsedStart = toDate(input.startDate);
+    const parsedEnd = toDate(input.endDate);
+    const nextStart = parsedStart === undefined ? existing.startDate : parsedStart;
+    const nextEnd = parsedEnd === undefined ? existing.endDate : parsedEnd;
     ensureDateOrder(nextStart, nextEnd);
 
     const shouldReset = existing.verificationStatus !== "SelfDeclared";
@@ -166,21 +170,20 @@ export const lecturerPortfolioService = {
         },
         include: itemInclude,
       });
-      if (shouldReset) {
-        await tx.lecturerPortfolioVerification.create({
-          data: {
-            itemId,
-            action: "Reset",
-            actorId: lecturerId,
-            note: "Verification reset automatically because the lecturer edited this record.",
-          },
-        });
-        return tx.lecturerPortfolioItem.findUniqueOrThrow({
-          where: { id: itemId },
-          include: itemInclude,
-        });
-      }
-      return updated;
+      if (!shouldReset) return updated;
+
+      await tx.lecturerPortfolioVerification.create({
+        data: {
+          itemId,
+          action: "Reset",
+          actorId: lecturerId,
+          note: "Verification reset automatically because the lecturer edited this record.",
+        },
+      });
+      return tx.lecturerPortfolioItem.findUniqueOrThrow({
+        where: { id: itemId },
+        include: itemInclude,
+      });
     });
     return presentItem(row);
   },
@@ -222,14 +225,16 @@ export const lecturerPortfolioService = {
         data: { itemId, action, actorId, note: input.note },
       }),
     ]);
-    return presentItem(await findItem(itemId) as NonNullable<ItemRow>);
+    const row = await findItem(itemId);
+    if (!row) throw new PortfolioNotFoundError("Portfolio item not found");
+    return presentItem(row);
   },
 
   async aunQaEvidenceExport(lecturerId: string): Promise<LecturerAunQaEvidenceExport> {
     const offerings = registry.get<OfferingsServiceContract>("offerings").service;
     const [profile, items, teaching] = await Promise.all([
       lecturerService.getOwnProfile(lecturerId),
-      this.listOwnItems(lecturerId),
+      listItems(lecturerId),
       offerings.portfolioTeachingForLecturer(lecturerId),
     ]);
     if (!profile) throw new PortfolioNotFoundError("Lecturer profile not found");
