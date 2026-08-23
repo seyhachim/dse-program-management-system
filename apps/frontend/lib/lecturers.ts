@@ -21,6 +21,9 @@ export const lecturersApi = {
   portfolioItems(): Promise<LecturerPortfolioItem[]> {
     return api.get<LecturerPortfolioItem[]>("/api/lecturers/me/portfolio-items");
   },
+  portfolioItemsForLecturer(lecturerId: string): Promise<LecturerPortfolioItem[]> {
+    return api.get<LecturerPortfolioItem[]>(`/api/lecturers/${lecturerId}/portfolio-items`);
+  },
   createPortfolioItem(input: CreateLecturerPortfolioItemInput): Promise<LecturerPortfolioItem> {
     return api.post<LecturerPortfolioItem>("/api/lecturers/me/portfolio-items", input);
   },
