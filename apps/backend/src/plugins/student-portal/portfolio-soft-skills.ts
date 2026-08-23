@@ -1,4 +1,5 @@
 import type {
+  StudentPortfolioEvidenceOrigin,
   StudentPortfolioSoftSkillCode,
   StudentPortfolioSoftSkillSummary,
   StudentPortfolioSoftSkillMappingInput,
@@ -11,6 +12,17 @@ import {
   portfolioEvidenceSnapshotHash,
   studentPortfolioVerificationService,
 } from "./portfolio-verification.ts";
+
+const ORIGIN_FROM_DB: Record<string, StudentPortfolioEvidenceOrigin> = {
+  ExternalProject: "external_project",
+  CourseAssessment: "course_assessment",
+  Practicum: "practicum",
+  Internship: "internship",
+  FinalProject: "final_project",
+  Competition: "competition",
+  Achievement: "achievement",
+  Other: "other",
+};
 
 async function studentIdForUser(userId: string): Promise<string> {
   const student = await prisma.student.findUnique({ where: { userId }, select: { id: true, status: true, email: true } });
@@ -34,16 +46,17 @@ export async function softSkillsForStudentId(studentId: string, publicOnly = fal
     FROM "StudentPortfolioEvidenceSoftSkill" m
     JOIN "StudentPortfolioEvidence" e ON e."id" = m."evidenceId"
     WHERE e."studentId" = ${studentId}
+      AND e."archivedAt" IS NULL
       AND (${publicOnly} = false OR e."isPublic" = true)
     ORDER BY e."updatedAt" DESC
   `;
 
-  const summaries = await Promise.all(STUDENT_PORTFOLIO_SOFT_SKILLS.map(async (skill) => {
+  return Promise.all(STUDENT_PORTFOLIO_SOFT_SKILLS.map(async (skill) => {
     const evidenceRows = rows.filter((row) => row.skillCode === skill.code);
     const evidence = await Promise.all(evidenceRows.map(async (row) => ({
       id: row.evidenceId,
       title: row.title,
-      origin: row.origin.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase() as any,
+      origin: ORIGIN_FROM_DB[row.origin] ?? "other",
       public: row.isPublic,
       sourceLabel: row.sourceOfferingId ? "PMS-linked academic evidence" : "Student-provided evidence",
       verification: await studentPortfolioVerificationService.summary(row.evidenceId),
@@ -61,7 +74,6 @@ export async function softSkillsForStudentId(studentId: string, publicOnly = fal
       evidence,
     };
   }));
-  return summaries;
 }
 
 export const studentPortfolioSoftSkillService = {
@@ -71,8 +83,11 @@ export const studentPortfolioSoftSkillService = {
 
   async updateEvidenceMapping(userId: string, evidenceId: string, input: StudentPortfolioSoftSkillMappingInput) {
     const studentId = await studentIdForUser(userId);
-    const evidence = await prisma.studentPortfolioEvidence.findFirst({ where: { id: evidenceId, studentId }, select: { id: true } });
-    if (!evidence) throw new PortalNotFoundError("Portfolio evidence was not found");
+    const active = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "StudentPortfolioEvidence"
+      WHERE "id" = ${evidenceId} AND "studentId" = ${studentId} AND "archivedAt" IS NULL LIMIT 1
+    `;
+    if (!active[0]) throw new PortalNotFoundError("Portfolio evidence was not found");
     const beforeHash = await portfolioEvidenceSnapshotHash(evidenceId);
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`DELETE FROM "StudentPortfolioEvidenceSoftSkill" WHERE "evidenceId" = ${evidenceId}`;
@@ -89,8 +104,11 @@ export const studentPortfolioSoftSkillService = {
 
   async evidenceMapping(userId: string, evidenceId: string): Promise<StudentPortfolioSoftSkillCode[]> {
     const studentId = await studentIdForUser(userId);
-    const evidence = await prisma.studentPortfolioEvidence.findFirst({ where: { id: evidenceId, studentId }, select: { id: true } });
-    if (!evidence) throw new PortalNotFoundError("Portfolio evidence was not found");
+    const active = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "StudentPortfolioEvidence"
+      WHERE "id" = ${evidenceId} AND "studentId" = ${studentId} AND "archivedAt" IS NULL LIMIT 1
+    `;
+    if (!active[0]) throw new PortalNotFoundError("Portfolio evidence was not found");
     const rows = await prisma.$queryRaw<Array<{ skillCode: StudentPortfolioSoftSkillCode }>>`
       SELECT "skillCode" FROM "StudentPortfolioEvidenceSoftSkill" WHERE "evidenceId" = ${evidenceId} ORDER BY "skillCode"
     `;
