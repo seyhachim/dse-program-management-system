@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatLecturerDisplayName, type Lecturer } from "@dse-pms/shared-types";
 import { Button, DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
@@ -20,9 +21,6 @@ export function LecturersClient() {
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Creating/editing/deleting a lecturer record needs `lecturers:write`
-  // (admin, program_coordinator); provisioning a login needs `accounts:create`
-  // (admin only). The unified form keeps those permission boundaries intact.
   const { me } = useMe();
   const canWrite = me?.permissions.includes("lecturers:write") ?? false;
   const canCreateAccount = me?.permissions.includes("accounts:create") ?? false;
@@ -53,9 +51,6 @@ export function LecturersClient() {
         await lecturersApi.update(editing.id, values);
         setNotice(`${values.name} updated.`);
       } else if (giveDseAccess) {
-        // Account provisioning is admin-only on the backend. It upserts the
-        // lecturer User by email and assigns the lecturer role; then we persist
-        // the syllabus/contact fields on that same User row.
         const account = await authApi.createAccount({
           name: values.name,
           email: values.email,
@@ -109,7 +104,16 @@ export function LecturersClient() {
       key: "name",
       header: "Name",
       render: (l) => (
-        <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
+        <div>
+          <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
+          {canWrite ? (
+            <div>
+              <Link href={`/lecturers/${l.id}/portfolio`} className="text-xs font-medium text-primary hover:underline">
+                Review portfolio evidence
+              </Link>
+            </div>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -157,7 +161,7 @@ export function LecturersClient() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Add each lecturer once. Admins can send DSE access during creation; program coordinators can maintain the academic profile without provisioning a login.
+        Add each lecturer once. Admins can send DSE access during creation; program coordinators can maintain the academic profile and review professional portfolio evidence without provisioning a login.
       </p>
 
       <TableToolbar
