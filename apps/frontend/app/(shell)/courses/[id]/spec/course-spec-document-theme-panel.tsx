@@ -179,10 +179,10 @@ export function CourseSpecDocumentThemePanel({
           disabled={saving}
           className="w-full px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
         >
-          Preview programme default
+          Load programme default into form
         </button>
         <p className="text-[11px] leading-4 text-muted-foreground">
-          Programme-default changes apply only to future Course Spec versions. Existing version snapshots stay unchanged.
+          Style edits are staged until saved. The official Preview remains on the saved version theme so every role sees the same document. Programme-default changes apply only to future Course Spec versions.
         </p>
       </div>
     </aside>
