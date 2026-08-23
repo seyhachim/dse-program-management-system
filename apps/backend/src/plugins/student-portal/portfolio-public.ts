@@ -24,6 +24,12 @@ const KIND_FROM_DB: Record<string, StudentPortfolioArtifactKind> = {
 type PublicProfileRow = { studentId: string; name: string; headline: string; bio: string; careerInterests: string[]; publicSlug: string };
 type PublicLinkRow = { provider: string; label: string; url: string };
 
+function artifactKindFromDb(value: string): StudentPortfolioArtifactKind {
+  const kind = KIND_FROM_DB[value];
+  if (!kind) throw new Error(`Unsupported student portfolio artifact kind: ${value}`);
+  return kind;
+}
+
 function publicVerification(summary: Awaited<ReturnType<typeof studentPortfolioVerificationService.summary>>) {
   return { state: summary.state, context: summary.context, verifiedAt: summary.verifiedAt, actorName: null };
 }
@@ -98,7 +104,7 @@ export const studentPortfolioPublicService = {
       endDate: row.endDate ? row.endDate.toISOString().slice(0, 10) : null,
       skills: row.skills,
       featured: row.isFeatured,
-      links: row.links.map((link) => ({ kind: KIND_FROM_DB[link.kind], label: link.label, url: link.url })),
+      links: row.links.map((link) => ({ kind: artifactKindFromDb(link.kind), label: link.label, url: link.url })),
       verification: publicVerification(await studentPortfolioVerificationService.summary(row.id)),
     })));
     const allowedEvidenceIds = new Set(evidence.map((item) => item.id));
