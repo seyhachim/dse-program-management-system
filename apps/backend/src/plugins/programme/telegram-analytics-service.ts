@@ -61,7 +61,7 @@ export const telegramAnalyticsService = {
       await Promise.all([
         prisma.$queryRaw<MiniSummaryRow[]>(Prisma.sql`
           SELECT
-            COUNT(*)::int AS "totalEvents",
+            COUNT(*) FILTER (WHERE "eventType" <> 'MiniAppOpened')::int AS "totalEvents",
             COUNT(*) FILTER (WHERE "eventType" = 'MiniAppOpened')::int AS "opens",
             COUNT(DISTINCT "actorUserId") FILTER (WHERE "actorUserId" IS NOT NULL)::int AS "uniqueUsers"
           FROM public_analytics."TelegramUsageEvent"
@@ -101,7 +101,7 @@ export const telegramAnalyticsService = {
         prisma.$queryRaw<UnresolvedRow[]>(Prisma.sql`
           SELECT
             "normalizedQuestion",
-            MIN("questionTextSanitized") AS "sampleQuestion",
+            (ARRAY_AGG("questionTextSanitized" ORDER BY "createdAt" DESC))[1] AS "sampleQuestion",
             COUNT(*)::int AS "count"
           FROM public_analytics."PublicQuestionEvent"
           WHERE "programmeId" = ${programmeId}
