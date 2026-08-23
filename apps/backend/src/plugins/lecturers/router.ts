@@ -17,7 +17,7 @@ export function createLecturerRouter(): Router {
   // Keep /me before /:id. Both operations derive the record ID from the
   // verified bearer token, so one lecturer cannot select another target.
   router.get("/me", async (req, res) => {
-    const lecturer = await lecturerService.getById(req.user!.id);
+    const lecturer = await lecturerService.getOwnProfile(req.user!.id);
     if (!lecturer) {
       res.status(404).json({ error: "Lecturer profile not found" });
       return;
