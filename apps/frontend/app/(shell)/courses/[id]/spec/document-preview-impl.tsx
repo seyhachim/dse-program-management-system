@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import type { CourseSpecGradingScaleBinding } from "@dse-pms/shared-types";
+import {
+  DEFAULT_COURSE_SPEC_DOCUMENT_THEME,
+  type CourseSpecDocumentTheme,
+  type CourseSpecGradingScaleBinding,
+} from "@dse-pms/shared-types";
 import {
   ChevronDown,
   Download,
@@ -20,19 +24,23 @@ import {
   DropdownMenuTrigger,
 } from "@dse-pms/ui";
 import { api } from "@/lib/api";
+import { useMe } from "@/lib/auth";
+import { courseSpecDocumentThemeApi } from "@/lib/course-spec-document-theme";
 import type { CourseDocumentModel } from "./course-document-model";
 import { exportCourseSpecWord } from "./document-export";
 import { exportCourseSpecPdf } from "./document-pdf-export";
 import {
-  DocumentPages,
   PAGE_WIDTH,
   displayDocumentValue,
 } from "./document-preview-pages";
+import { ThemedDocumentPages } from "./themed-document-pages";
+import { CourseSpecDocumentThemePanel } from "./course-spec-document-theme-panel";
 
 const VIEWER_PADDING = 24;
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 1.5;
 const ZOOM_STEP = 0.1;
+const EDITABLE_THEME_STATUSES = new Set(["Draft", "ChangesRequested"]);
 
 type DocumentPreviewProps = {
   document: CourseDocumentModel;
@@ -46,6 +54,7 @@ export function DocumentPreview({
 }: DocumentPreviewProps) {
   const params = useParams<{ id: string }>();
   const courseId = params.id;
+  const { me } = useMe();
   const viewerRef = useRef<HTMLDivElement>(null);
   const printRootRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -54,6 +63,23 @@ export function DocumentPreview({
     useState<CourseSpecGradingScaleBinding | null>(null);
   const [gradingScaleLoading, setGradingScaleLoading] = useState(true);
   const [gradingScaleError, setGradingScaleError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<CourseSpecDocumentTheme>(
+    DEFAULT_COURSE_SPEC_DOCUMENT_THEME,
+  );
+  const [programmeDefault, setProgrammeDefault] =
+    useState<CourseSpecDocumentTheme>(DEFAULT_COURSE_SPEC_DOCUMENT_THEME);
+  const [themeCourseSpecId, setThemeCourseSpecId] = useState<string | null>(null);
+  const [themeReviewStatus, setThemeReviewStatus] = useState<string | null>(null);
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [themeMessage, setThemeMessage] = useState<string | null>(null);
+
+  const canManageTheme =
+    me?.roles.some((role) => role === "admin" || role === "program_coordinator") ??
+    false;
+  const versionThemeEditable =
+    themeCourseSpecId !== null &&
+    themeReviewStatus !== null &&
+    EDITABLE_THEME_STATUSES.has(themeReviewStatus);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,6 +107,32 @@ export function DocumentPreview({
         if (!cancelled) setGradingScaleLoading(false);
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, courseSpecId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setThemeMessage(null);
+    courseSpecDocumentThemeApi
+      .get(courseId, courseSpecId)
+      .then((response) => {
+        if (cancelled) return;
+        setTheme(response.theme);
+        setProgrammeDefault(response.programmeDefault);
+        setThemeCourseSpecId(response.courseSpecId);
+        setThemeReviewStatus(response.reviewStatus);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTheme(DEFAULT_COURSE_SPEC_DOCUMENT_THEME);
+          setProgrammeDefault(DEFAULT_COURSE_SPEC_DOCUMENT_THEME);
+          setThemeMessage(
+            "Document style settings could not be loaded. The safe default style is shown.",
+          );
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -143,6 +195,48 @@ export function DocumentPreview({
     }
   };
 
+  const saveVersionTheme = async () => {
+    if (!versionThemeEditable) return;
+    setThemeSaving(true);
+    setThemeMessage(null);
+    try {
+      const saved = await courseSpecDocumentThemeApi.updateVersion(
+        courseId,
+        theme,
+        courseSpecId,
+      );
+      setTheme(saved);
+      setThemeMessage("Style saved for this Course Specification version.");
+    } catch (error) {
+      setThemeMessage(
+        error instanceof Error ? error.message : "Could not save document style.",
+      );
+    } finally {
+      setThemeSaving(false);
+    }
+  };
+
+  const saveProgrammeDefault = async () => {
+    setThemeSaving(true);
+    setThemeMessage(null);
+    try {
+      const saved = await courseSpecDocumentThemeApi.updateProgrammeDefault(
+        courseId,
+        theme,
+      );
+      setProgrammeDefault(saved);
+      setThemeMessage(
+        "Programme default saved. Existing Course Spec versions remain unchanged.",
+      );
+    } catch (error) {
+      setThemeMessage(
+        error instanceof Error ? error.message : "Could not save programme default.",
+      );
+    } finally {
+      setThemeSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -161,6 +255,11 @@ export function DocumentPreview({
             {gradingScaleError ? (
               <p className="mt-2 max-w-2xl text-xs text-destructive">
                 {gradingScaleError}
+              </p>
+            ) : null}
+            {themeMessage ? (
+              <p className="mt-2 max-w-2xl text-xs text-muted-foreground">
+                {themeMessage}
               </p>
             ) : null}
           </div>
@@ -197,7 +296,13 @@ export function DocumentPreview({
         </DropdownMenu>
       </div>
 
-      <div className="grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
+      <div
+        className={
+          canManageTheme
+            ? "grid min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)_280px]"
+            : "grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]"
+        }
+      >
         <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
           <div className="rounded-lg border bg-card p-4">
             <h3 className="text-sm font-semibold">Document Information</h3>
@@ -232,6 +337,12 @@ export function DocumentPreview({
                       : "Unavailable"}
                 </dd>
               </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Document style</dt>
+                <dd className="mt-0.5 font-medium">
+                  {theme.bodyFontFamily} · {theme.bodyFontSizePt} pt
+                </dd>
+              </div>
             </dl>
           </div>
 
@@ -259,7 +370,7 @@ export function DocumentPreview({
 
         <main
           ref={viewerRef}
-          className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40"
+          className="relative min-h-[650px] overflow-auto rounded-lg border bg-muted/40"
         >
           <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
             <button
@@ -308,9 +419,29 @@ export function DocumentPreview({
               padding: VIEWER_PADDING,
             }}
           >
-            <DocumentPages document={resolvedDocument} zoom={zoom} />
+            <ThemedDocumentPages
+              document={resolvedDocument}
+              zoom={zoom}
+              theme={theme}
+            />
           </div>
         </main>
+
+        {canManageTheme ? (
+          <CourseSpecDocumentThemePanel
+            value={theme}
+            programmeDefault={programmeDefault}
+            onChange={setTheme}
+            onSaveVersion={saveVersionTheme}
+            onSaveProgrammeDefault={saveProgrammeDefault}
+            onResetToProgrammeDefault={() => {
+              setTheme(programmeDefault);
+              setThemeMessage("Programme default loaded into the preview. Save explicitly to apply it.");
+            }}
+            saving={themeSaving}
+            versionEditable={versionThemeEditable}
+          />
+        ) : null}
       </div>
     </div>
   );
