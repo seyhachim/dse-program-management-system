@@ -70,7 +70,7 @@ export function DocumentPreview({
     useState<CourseSpecGradingScaleBinding | null>(null);
   const [gradingScaleLoading, setGradingScaleLoading] = useState(true);
   const [gradingScaleError, setGradingScaleError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<CourseSpecDocumentTheme>(
+  const [themeDraft, setThemeDraft] = useState<CourseSpecDocumentTheme>(
     DEFAULT_COURSE_SPEC_DOCUMENT_THEME,
   );
   const [savedTheme, setSavedTheme] = useState<CourseSpecDocumentTheme>(
@@ -86,14 +86,16 @@ export function DocumentPreview({
   const [themeMessage, setThemeMessage] = useState<string | null>(null);
 
   const canManageTheme =
-    me?.roles.some((role) => role === "admin" || role === "program_coordinator") ??
-    false;
+    me?.roles.some(
+      (role) => role === "admin" || role === "program_coordinator",
+    ) ?? false;
   const versionThemeEditable =
     themeCourseSpecId !== null &&
     themeReviewStatus !== null &&
     EDITABLE_THEME_STATUSES.has(themeReviewStatus);
   const effectiveCourseSpecId = courseSpecId ?? themeCourseSpecId;
-  const themeDirty = canManageTheme && !themesEqual(theme, savedTheme);
+  const themeDirty =
+    canManageTheme && !themesEqual(themeDraft, savedTheme);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,7 +107,7 @@ export function DocumentPreview({
       .get(courseId, courseSpecId)
       .then((response) => {
         if (cancelled) return;
-        setTheme(response.theme);
+        setThemeDraft(response.theme);
         setSavedTheme(response.theme);
         setProgrammeDefault(response.programmeDefault);
         setThemeCourseSpecId(response.courseSpecId);
@@ -235,15 +237,19 @@ export function DocumentPreview({
     try {
       const saved = await courseSpecDocumentThemeApi.updateVersion(
         courseId,
-        theme,
+        themeDraft,
         effectiveCourseSpecId ?? undefined,
       );
-      setTheme(saved);
+      setThemeDraft(saved);
       setSavedTheme(saved);
-      setThemeMessage("Style saved for this Course Specification version.");
+      setThemeMessage(
+        "Style saved for this Course Specification version. Admin and Lecturer now see the same official formatting.",
+      );
     } catch (error) {
       setThemeMessage(
-        error instanceof Error ? error.message : "Could not save document style.",
+        error instanceof Error
+          ? error.message
+          : "Could not save document style.",
       );
     } finally {
       setThemeSaving(false);
@@ -256,15 +262,17 @@ export function DocumentPreview({
     try {
       const saved = await courseSpecDocumentThemeApi.updateProgrammeDefault(
         courseId,
-        theme,
+        themeDraft,
       );
       setProgrammeDefault(saved);
       setThemeMessage(
-        "Programme default saved. Existing Course Spec versions remain unchanged. Save for this version as well if you want the current document to use these settings.",
+        "Programme default saved for future Course Spec versions. The current official preview stays on its saved version theme until you save for this version.",
       );
     } catch (error) {
       setThemeMessage(
-        error instanceof Error ? error.message : "Could not save programme default.",
+        error instanceof Error
+          ? error.message
+          : "Could not save programme default.",
       );
     } finally {
       setThemeSaving(false);
@@ -283,8 +291,7 @@ export function DocumentPreview({
               AUN Course Specification Preview
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Preview the required programme Part 1 cover and structured course
-              specification.
+              Official saved preview for the selected Course Specification version.
             </p>
             {gradingScaleError ? (
               <p className="mt-2 max-w-2xl text-xs text-destructive">
@@ -298,7 +305,7 @@ export function DocumentPreview({
             ) : null}
             {themeDirty ? (
               <p className="mt-2 max-w-2xl text-xs font-medium text-amber-700 dark:text-amber-300">
-                Unsaved style preview. Save for this version before downloading or comparing with Lecturer view.
+                Unsaved style settings are staged in the right panel. The official preview remains on the saved version theme so Admin and Lecturer stay identical. Save for this version to apply them.
               </p>
             ) : null}
             {themeMessage ? (
@@ -334,7 +341,10 @@ export function DocumentPreview({
               <Download className="h-3.5 w-3.5" />
               Download Word
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDownloadPdf} disabled={exportDisabled}>
+            <DropdownMenuItem
+              onClick={handleDownloadPdf}
+              disabled={exportDisabled}
+            >
               <Download className="h-3.5 w-3.5" />
               Download PDF
             </DropdownMenuItem>
@@ -345,9 +355,13 @@ export function DocumentPreview({
       {!officialThemeReady ? (
         <div className="flex min-h-[360px] items-center justify-center rounded-lg border bg-muted/30 p-6 text-center">
           <div className="max-w-lg">
-            {themeLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /> : null}
+            {themeLoading ? (
+              <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+            ) : null}
             <p className="mt-3 text-sm font-medium">
-              {themeLoading ? "Loading the version-scoped document style…" : "Official preview unavailable"}
+              {themeLoading
+                ? "Loading the version-scoped document style…"
+                : "Official preview unavailable"}
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               The PMS only renders an official Course Specification after its exact saved style is available, so different roles cannot silently receive different formatting.
@@ -403,9 +417,9 @@ export function DocumentPreview({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">Document style</dt>
+                  <dt className="text-xs text-muted-foreground">Official style</dt>
                   <dd className="mt-0.5 font-medium">
-                    {theme.bodyFontFamily} · {theme.bodyFontSizePt} pt
+                    {savedTheme.bodyFontFamily} · {savedTheme.bodyFontSizePt} pt
                   </dd>
                 </div>
               </dl>
@@ -441,8 +455,11 @@ export function DocumentPreview({
               <button
                 type="button"
                 onClick={() =>
-                  setZoom((z) =>
-                    Math.max(MIN_ZOOM, Number((z - ZOOM_STEP).toFixed(2))),
+                  setZoom((current) =>
+                    Math.max(
+                      MIN_ZOOM,
+                      Number((current - ZOOM_STEP).toFixed(2)),
+                    ),
                   )
                 }
                 disabled={zoom <= MIN_ZOOM}
@@ -456,8 +473,11 @@ export function DocumentPreview({
               <button
                 type="button"
                 onClick={() =>
-                  setZoom((z) =>
-                    Math.min(MAX_ZOOM, Number((z + ZOOM_STEP).toFixed(2))),
+                  setZoom((current) =>
+                    Math.min(
+                      MAX_ZOOM,
+                      Number((current + ZOOM_STEP).toFixed(2)),
+                    ),
                   )
                 }
                 disabled={zoom >= MAX_ZOOM}
@@ -487,21 +507,23 @@ export function DocumentPreview({
               <ThemedDocumentPages
                 document={resolvedDocument}
                 zoom={zoom}
-                theme={theme}
+                theme={savedTheme}
               />
             </div>
           </main>
 
           {canManageTheme ? (
             <CourseSpecDocumentThemePanel
-              value={theme}
+              value={themeDraft}
               programmeDefault={programmeDefault}
-              onChange={setTheme}
+              onChange={setThemeDraft}
               onSaveVersion={saveVersionTheme}
               onSaveProgrammeDefault={saveProgrammeDefault}
               onResetToProgrammeDefault={() => {
-                setTheme(programmeDefault);
-                setThemeMessage("Programme default loaded into the preview. Save for this version to make it the official current-version style.");
+                setThemeDraft(programmeDefault);
+                setThemeMessage(
+                  "Programme default loaded into the style form. The official preview remains unchanged until you save for this version.",
+                );
               }}
               saving={themeSaving}
               versionEditable={versionThemeEditable}
