@@ -6,7 +6,11 @@ import type {
 import { STUDENT_PORTFOLIO_SOFT_SKILLS } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { PortalAccessError, PortalNotFoundError } from "./service.ts";
-import { studentPortfolioVerificationService } from "./portfolio-verification.ts";
+import {
+  invalidateVerifiedEvidenceAfterMaterialEdit,
+  portfolioEvidenceSnapshotHash,
+  studentPortfolioVerificationService,
+} from "./portfolio-verification.ts";
 
 async function studentIdForUser(userId: string): Promise<string> {
   const student = await prisma.student.findUnique({ where: { userId }, select: { id: true, status: true, email: true } });
@@ -39,9 +43,7 @@ export async function softSkillsForStudentId(studentId: string, publicOnly = fal
     const evidence = await Promise.all(evidenceRows.map(async (row) => ({
       id: row.evidenceId,
       title: row.title,
-      origin: row.origin
-        .replace(/([a-z])([A-Z])/g, "$1_$2")
-        .toLowerCase() as any,
+      origin: row.origin.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase() as any,
       public: row.isPublic,
       sourceLabel: row.sourceOfferingId ? "PMS-linked academic evidence" : "Student-provided evidence",
       verification: await studentPortfolioVerificationService.summary(row.evidenceId),
@@ -71,6 +73,7 @@ export const studentPortfolioSoftSkillService = {
     const studentId = await studentIdForUser(userId);
     const evidence = await prisma.studentPortfolioEvidence.findFirst({ where: { id: evidenceId, studentId }, select: { id: true } });
     if (!evidence) throw new PortalNotFoundError("Portfolio evidence was not found");
+    const beforeHash = await portfolioEvidenceSnapshotHash(evidenceId);
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`DELETE FROM "StudentPortfolioEvidenceSoftSkill" WHERE "evidenceId" = ${evidenceId}`;
       for (const skillCode of input.skillCodes) {
@@ -80,6 +83,7 @@ export const studentPortfolioSoftSkillService = {
         `;
       }
     });
+    await invalidateVerifiedEvidenceAfterMaterialEdit(evidenceId, beforeHash);
     return { skillCodes: input.skillCodes };
   },
 
