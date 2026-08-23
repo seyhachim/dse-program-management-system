@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
   CreateLecturerPortfolioItemInput,
   LecturerAunQaEvidenceExport,
@@ -27,45 +29,107 @@ const KIND_TO_DB = {
   other: "Other",
 } as const;
 
-const DB_TO_KIND = Object.fromEntries(
-  Object.entries(KIND_TO_DB).map(([key, value]) => [value, key]),
-) as Record<(typeof KIND_TO_DB)[LecturerPortfolioItemKind], LecturerPortfolioItemKind>;
+type DbKind = (typeof KIND_TO_DB)[LecturerPortfolioItemKind];
+type DbStatus = "SelfDeclared" | "Verified" | "Rejected";
+type DbAction = "Verified" | "Rejected" | "Reset";
 
-const STATUS_FROM_DB = {
+type ItemRow = {
+  id: string;
+  lecturerId: string;
+  kind: DbKind;
+  title: string;
+  organization: string;
+  description: string;
+  role: string;
+  identifier: string;
+  url: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  tags: string[];
+  isPublic: boolean;
+  isFeatured: boolean;
+  verificationStatus: DbStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type VerificationRow = {
+  id: string;
+  itemId: string;
+  action: DbAction;
+  note: string;
+  actorId: string;
+  actorName: string;
+  createdAt: Date;
+};
+
+type DbClient = Pick<PrismaClient, "$queryRaw" | "$executeRaw">;
+
+const DB_TO_KIND = Object.fromEntries(
+  Object.entries(KIND_TO_DB).map(([kind, dbKind]) => [dbKind, kind]),
+) as Record<DbKind, LecturerPortfolioItemKind>;
+
+const STATUS_FROM_DB: Record<DbStatus, LecturerPortfolioVerificationStatus> = {
   SelfDeclared: "self_declared",
   Verified: "verified",
   Rejected: "rejected",
-} as const;
+};
 
-const ACTION_FROM_DB = {
+const ACTION_FROM_DB: Record<DbAction, LecturerPortfolioVerificationAction> = {
   Verified: "verified",
   Rejected: "rejected",
   Reset: "reset",
-} as const;
-
-const itemInclude = {
-  verificationEvents: {
-    include: { actor: { select: { id: true, name: true } } },
-    orderBy: { createdAt: "asc" as const },
-  },
-} as const;
-
-type ItemRow = Awaited<ReturnType<typeof findItem>>;
-
-function findItem(id: string) {
-  return prisma.lecturerPortfolioItem.findUnique({ where: { id }, include: itemInclude });
-}
+};
 
 function dateOnly(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
 
-function toDate(value: string | null | undefined): Date | null | undefined {
-  if (value === undefined) return undefined;
+function toDate(value: string | null): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
-function presentItem(row: NonNullable<ItemRow>): LecturerPortfolioItem {
+function ensureDateOrder(startDate: string | null, endDate: string | null): void {
+  if (startDate && endDate && endDate < startDate) {
+    throw new PortfolioValidationError("End date must be on or after start date");
+  }
+}
+
+function tagsSql(tags: readonly string[]): Prisma.Sql {
+  if (tags.length === 0) return Prisma.sql`ARRAY[]::text[]`;
+  return Prisma.sql`ARRAY[${Prisma.join(tags)}]::text[]`;
+}
+
+async function findItem(db: DbClient, id: string, lecturerId?: string): Promise<ItemRow | null> {
+  const rows = lecturerId
+    ? await db.$queryRaw<ItemRow[]>`
+        SELECT *
+        FROM lecturer_portfolio."LecturerPortfolioItem"
+        WHERE "id" = ${id} AND "lecturerId" = ${lecturerId}
+        LIMIT 1
+      `
+    : await db.$queryRaw<ItemRow[]>`
+        SELECT *
+        FROM lecturer_portfolio."LecturerPortfolioItem"
+        WHERE "id" = ${id}
+        LIMIT 1
+      `;
+  return rows[0] ?? null;
+}
+
+async function verificationEvents(db: DbClient, itemId: string): Promise<VerificationRow[]> {
+  return db.$queryRaw<VerificationRow[]>`
+    SELECT v."id", v."itemId", v."action"::text AS "action", v."note",
+           v."actorId", u."name" AS "actorName", v."createdAt"
+    FROM lecturer_portfolio."LecturerPortfolioVerification" v
+    JOIN public."User" u ON u."id" = v."actorId"
+    WHERE v."itemId" = ${itemId}
+    ORDER BY v."createdAt" ASC, v."id" ASC
+  `;
+}
+
+async function presentItem(db: DbClient, row: ItemRow): Promise<LecturerPortfolioItem> {
+  const events = await verificationEvents(db, row.id);
   return {
     id: row.id,
     lecturerId: row.lecturerId,
@@ -81,49 +145,27 @@ function presentItem(row: NonNullable<ItemRow>): LecturerPortfolioItem {
     tags: row.tags,
     isPublic: row.isPublic,
     isFeatured: row.isFeatured,
-    verificationStatus: STATUS_FROM_DB[row.verificationStatus] as LecturerPortfolioVerificationStatus,
+    verificationStatus: STATUS_FROM_DB[row.verificationStatus],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    verificationEvents: row.verificationEvents.map((event) => ({
+    verificationEvents: events.map((event) => ({
       id: event.id,
-      action: ACTION_FROM_DB[event.action] as LecturerPortfolioVerificationAction,
+      action: ACTION_FROM_DB[event.action],
       note: event.note,
-      actor: event.actor,
+      actor: { id: event.actorId, name: event.actorName },
       createdAt: event.createdAt.toISOString(),
     })),
   };
 }
 
-function itemData(input: CreateLecturerPortfolioItemInput | UpdateLecturerPortfolioItemInput) {
-  return {
-    ...(input.kind !== undefined ? { kind: KIND_TO_DB[input.kind] } : {}),
-    ...(input.title !== undefined ? { title: input.title } : {}),
-    ...(input.organization !== undefined ? { organization: input.organization } : {}),
-    ...(input.description !== undefined ? { description: input.description } : {}),
-    ...(input.role !== undefined ? { role: input.role } : {}),
-    ...(input.identifier !== undefined ? { identifier: input.identifier } : {}),
-    ...(input.url !== undefined ? { url: input.url } : {}),
-    ...(input.startDate !== undefined ? { startDate: toDate(input.startDate) } : {}),
-    ...(input.endDate !== undefined ? { endDate: toDate(input.endDate) } : {}),
-    ...(input.tags !== undefined ? { tags: [...new Set(input.tags)] } : {}),
-    ...(input.isPublic !== undefined ? { isPublic: input.isPublic } : {}),
-    ...(input.isFeatured !== undefined ? { isFeatured: input.isFeatured } : {}),
-  };
-}
-
-function ensureDateOrder(startDate: Date | null, endDate: Date | null): void {
-  if (startDate && endDate && endDate < startDate) {
-    throw new PortfolioValidationError("End date must be on or after start date");
-  }
-}
-
 async function listItems(lecturerId: string): Promise<LecturerPortfolioItem[]> {
-  const rows = await prisma.lecturerPortfolioItem.findMany({
-    where: { lecturerId },
-    include: itemInclude,
-    orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
-  });
-  return rows.map(presentItem);
+  const rows = await prisma.$queryRaw<ItemRow[]>`
+    SELECT *
+    FROM lecturer_portfolio."LecturerPortfolioItem"
+    WHERE "lecturerId" = ${lecturerId}
+    ORDER BY "isFeatured" DESC, "updatedAt" DESC, "id" ASC
+  `;
+  return Promise.all(rows.map((row) => presentItem(prisma, row)));
 }
 
 export const lecturerPortfolioService = {
@@ -136,12 +178,24 @@ export const lecturerPortfolioService = {
     if (!(await lecturerService.getById(lecturerId))) {
       throw new PortfolioNotFoundError("Lecturer profile not found");
     }
-    ensureDateOrder(toDate(input.startDate) ?? null, toDate(input.endDate) ?? null);
-    const row = await prisma.lecturerPortfolioItem.create({
-      data: { lecturerId, ...itemData(input) },
-      include: itemInclude,
-    });
-    return presentItem(row);
+    ensureDateOrder(input.startDate, input.endDate);
+    const id = randomUUID();
+    const dbKind = KIND_TO_DB[input.kind];
+    const tags = [...new Set(input.tags)];
+    const rows = await prisma.$queryRaw<ItemRow[]>(Prisma.sql`
+      INSERT INTO lecturer_portfolio."LecturerPortfolioItem" (
+        "id", "lecturerId", "kind", "title", "organization", "description",
+        "role", "identifier", "url", "startDate", "endDate", "tags",
+        "isPublic", "isFeatured"
+      ) VALUES (
+        ${id}, ${lecturerId}, ${dbKind}::lecturer_portfolio."LecturerPortfolioItemKind",
+        ${input.title}, ${input.organization}, ${input.description}, ${input.role},
+        ${input.identifier}, ${input.url}, ${toDate(input.startDate)}, ${toDate(input.endDate)},
+        ${tagsSql(tags)}, ${input.isPublic}, ${input.isFeatured}
+      )
+      RETURNING *
+    `);
+    return presentItem(prisma, rows[0]!);
   },
 
   async updateOwnItem(
@@ -149,57 +203,78 @@ export const lecturerPortfolioService = {
     itemId: string,
     input: UpdateLecturerPortfolioItemInput,
   ): Promise<LecturerPortfolioItem> {
-    const existing = await prisma.lecturerPortfolioItem.findFirst({
-      where: { id: itemId, lecturerId },
-    });
+    const existing = await findItem(prisma, itemId, lecturerId);
     if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
 
-    const parsedStart = toDate(input.startDate);
-    const parsedEnd = toDate(input.endDate);
-    const nextStart = parsedStart === undefined ? existing.startDate : parsedStart;
-    const nextEnd = parsedEnd === undefined ? existing.endDate : parsedEnd;
-    ensureDateOrder(nextStart, nextEnd);
-
+    const next = {
+      kind: input.kind ?? DB_TO_KIND[existing.kind],
+      title: input.title ?? existing.title,
+      organization: input.organization ?? existing.organization,
+      description: input.description ?? existing.description,
+      role: input.role ?? existing.role,
+      identifier: input.identifier ?? existing.identifier,
+      url: input.url ?? existing.url,
+      startDate: input.startDate === undefined ? dateOnly(existing.startDate) : input.startDate,
+      endDate: input.endDate === undefined ? dateOnly(existing.endDate) : input.endDate,
+      tags: input.tags ?? existing.tags,
+      isPublic: input.isPublic ?? existing.isPublic,
+      isFeatured: input.isFeatured ?? existing.isFeatured,
+    };
+    ensureDateOrder(next.startDate, next.endDate);
+    const dbKind = KIND_TO_DB[next.kind];
+    const tags = [...new Set(next.tags)];
     const shouldReset = existing.verificationStatus !== "SelfDeclared";
-    const row = await prisma.$transaction(async (tx) => {
-      const updated = await tx.lecturerPortfolioItem.update({
-        where: { id: itemId },
-        data: {
-          ...itemData(input),
-          ...(shouldReset ? { verificationStatus: "SelfDeclared" } : {}),
-        },
-        include: itemInclude,
-      });
-      if (!shouldReset) return updated;
 
-      await tx.lecturerPortfolioVerification.create({
-        data: {
-          itemId,
-          action: "Reset",
-          actorId: lecturerId,
-          note: "Verification reset automatically because the lecturer edited this record.",
-        },
-      });
-      return tx.lecturerPortfolioItem.findUniqueOrThrow({
-        where: { id: itemId },
-        include: itemInclude,
-      });
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE lecturer_portfolio."LecturerPortfolioItem"
+        SET "kind" = ${dbKind}::lecturer_portfolio."LecturerPortfolioItemKind",
+            "title" = ${next.title},
+            "organization" = ${next.organization},
+            "description" = ${next.description},
+            "role" = ${next.role},
+            "identifier" = ${next.identifier},
+            "url" = ${next.url},
+            "startDate" = ${toDate(next.startDate)},
+            "endDate" = ${toDate(next.endDate)},
+            "tags" = ${tagsSql(tags)},
+            "isPublic" = ${next.isPublic},
+            "isFeatured" = ${next.isFeatured},
+            "verificationStatus" = ${shouldReset ? "SelfDeclared" : existing.verificationStatus}::lecturer_portfolio."LecturerPortfolioVerificationStatus",
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${itemId} AND "lecturerId" = ${lecturerId}
+      `);
+      if (shouldReset) {
+        await tx.$executeRaw`
+          INSERT INTO lecturer_portfolio."LecturerPortfolioVerification"
+            ("id", "itemId", "action", "actorId", "note")
+          VALUES (
+            ${randomUUID()}, ${itemId},
+            'Reset'::lecturer_portfolio."LecturerPortfolioVerificationAction",
+            ${lecturerId},
+            'Verification reset automatically because the lecturer edited this record.'
+          )
+        `;
+      }
     });
-    return presentItem(row);
+
+    const row = await findItem(prisma, itemId, lecturerId);
+    if (!row) throw new PortfolioNotFoundError("Portfolio item not found");
+    return presentItem(prisma, row);
   },
 
   async deleteOwnItem(lecturerId: string, itemId: string): Promise<void> {
-    const existing = await prisma.lecturerPortfolioItem.findFirst({
-      where: { id: itemId, lecturerId },
-      select: { id: true, verificationStatus: true },
-    });
+    const existing = await findItem(prisma, itemId, lecturerId);
     if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
     if (existing.verificationStatus === "Verified") {
       throw new PortfolioConflictError(
         "Verified evidence cannot be deleted by the lecturer; edit it to reset verification first.",
       );
     }
-    await prisma.lecturerPortfolioItem.delete({ where: { id: itemId } });
+    await prisma.$executeRaw`
+      DELETE FROM lecturer_portfolio."LecturerPortfolioItem"
+      WHERE "id" = ${itemId} AND "lecturerId" = ${lecturerId}
+    `;
   },
 
   async reviewItem(
@@ -208,26 +283,32 @@ export const lecturerPortfolioService = {
     itemId: string,
     input: ReviewLecturerPortfolioItemInput,
   ): Promise<LecturerPortfolioItem> {
-    const existing = await prisma.lecturerPortfolioItem.findFirst({
-      where: { id: itemId, lecturerId },
-      select: { id: true },
-    });
+    const existing = await findItem(prisma, itemId, lecturerId);
     if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
 
-    const status = input.action === "verified" ? "Verified" : "Rejected";
-    const action = input.action === "verified" ? "Verified" : "Rejected";
-    await prisma.$transaction([
-      prisma.lecturerPortfolioItem.update({
-        where: { id: itemId },
-        data: { verificationStatus: status },
-      }),
-      prisma.lecturerPortfolioVerification.create({
-        data: { itemId, action, actorId, note: input.note },
-      }),
-    ]);
-    const row = await findItem(itemId);
+    const status: DbStatus = input.action === "verified" ? "Verified" : "Rejected";
+    const action: DbAction = input.action === "verified" ? "Verified" : "Rejected";
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE lecturer_portfolio."LecturerPortfolioItem"
+        SET "verificationStatus" = ${status}::lecturer_portfolio."LecturerPortfolioVerificationStatus",
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${itemId} AND "lecturerId" = ${lecturerId}
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO lecturer_portfolio."LecturerPortfolioVerification"
+          ("id", "itemId", "action", "note", "actorId")
+        VALUES (
+          ${randomUUID()}, ${itemId},
+          ${action}::lecturer_portfolio."LecturerPortfolioVerificationAction",
+          ${input.note}, ${actorId}
+        )
+      `);
+    });
+
+    const row = await findItem(prisma, itemId, lecturerId);
     if (!row) throw new PortfolioNotFoundError("Portfolio item not found");
-    return presentItem(row);
+    return presentItem(prisma, row);
   },
 
   async aunQaEvidenceExport(lecturerId: string): Promise<LecturerAunQaEvidenceExport> {
