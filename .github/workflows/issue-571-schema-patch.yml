@@ -1,0 +1,99 @@
+name: Issue 571 schema patch
+
+on:
+  push:
+    branches:
+      - feat/issue-571-student-portfolio-foundation
+    paths:
+      - .github/workflows/issue-571-schema-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-571-student-portfolio-foundation
+          fetch-depth: 0
+      - name: Patch Prisma schema and security inventory
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          schema_path = Path('apps/backend/prisma/schema.prisma')
+          schema = schema_path.read_text()
+          student_anchor = '  profile   StudentProfile?\n'
+          if 'portfolioProfile StudentPortfolioProfile?' not in schema:
+              if student_anchor not in schema:
+                  raise SystemExit('Student profile relation anchor not found')
+              schema = schema.replace(
+                  student_anchor,
+                  student_anchor + '  portfolioProfile StudentPortfolioProfile?\n',
+                  1,
+              )
+
+          profile_block = '''model StudentProfile {
+            id               String   @id @default(uuid())
+            studentRecordId  String   @unique
+            student           Student  @relation(fields: [studentRecordId], references: [id], onDelete: Cascade)
+            khmerFamilyName  String?
+            khmerGivenName   String?
+            latinFamilyName  String?
+            latinGivenName   String?
+            gender           String?
+            createdAt        DateTime @default(now())
+            updatedAt        DateTime @updatedAt
+
+            @@index([gender])
+          }
+          '''
+          portfolio_block = '''
+
+          /// Student-owned professional portfolio metadata. Institutional identity and
+          /// academic records remain on their canonical Student/User/CourseSpec/Result models.
+          /// New portfolio records are private by default; public rendering is a separate boundary.
+          model StudentPortfolioProfile {
+            id              String   @id @default(uuid())
+            studentId       String   @unique
+            student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+            headline        String   @default("")
+            bio             String   @default("")
+            careerInterests String[] @default([])
+            isPublic        Boolean  @default(false)
+            publicSlug      String?  @unique
+            createdAt       DateTime @default(now())
+            updatedAt       DateTime @updatedAt
+
+            @@index([isPublic])
+          }
+          '''
+          if 'model StudentPortfolioProfile {' not in schema:
+              if profile_block not in schema:
+                  raise SystemExit('StudentProfile block anchor not found')
+              schema = schema.replace(profile_block, profile_block + portfolio_block, 1)
+          schema_path.write_text(schema)
+
+          security_path = Path('apps/backend/scripts/verify-db-security.ts')
+          security = security_path.read_text()
+          inventory_anchor = '  "StudentProfile",\n'
+          if '  "StudentPortfolioProfile",\n' not in security:
+              if inventory_anchor not in security:
+                  raise SystemExit('DB security inventory anchor not found')
+              security = security.replace(
+                  inventory_anchor,
+                  inventory_anchor + '  "StudentPortfolioProfile",\n',
+                  1,
+              )
+          security_path.write_text(security)
+          PY
+      - name: Remove one-shot workflow and commit generated patch
+        run: |
+          rm .github/workflows/issue-571-schema-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backend/prisma/schema.prisma apps/backend/scripts/verify-db-security.ts .github/workflows/issue-571-schema-patch.yml
+          git commit -m "feat(portfolio): add profile schema and security inventory [skip ci]"
+          git push origin HEAD:feat/issue-571-student-portfolio-foundation
