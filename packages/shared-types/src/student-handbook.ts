@@ -164,7 +164,6 @@ export type StudentHandbookView = {
   title: string;
   version: string;
   status: StudentHandbookStatus;
-  theme: StudentHandbookDocumentTheme;
   assignedLecturer: StudentHandbookOwnerView;
   submittedAt: string | null;
   approvedAt: string | null;
