@@ -150,6 +150,7 @@ const EXPECTED_COURSE_SPEC_GOVERNANCE_TABLES = [
 const EXPECTED_PUBLIC_ANALYTICS_TABLES = [
   "PublicQuestionEvent",
   "PublicQuestionSuggestion",
+  "TelegramUsageEvent",
 ] as const;
 
 const FORBIDDEN_GRANTEES = new Set([
