@@ -72,7 +72,7 @@ CREATE TABLE lecturer_portfolio."LecturerPortfolioVerification" (
 
   CONSTRAINT "LecturerPortfolioVerification_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "LecturerPortfolioVerification_itemId_fkey"
-    FOREIGN KEY ("itemId") REFERENCES lecturer_portfolio."LecturerPortfolioItem"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY ("itemId") REFERENCES lecturer_portfolio."LecturerPortfolioItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "LecturerPortfolioVerification_actorId_fkey"
     FOREIGN KEY ("actorId") REFERENCES public."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
