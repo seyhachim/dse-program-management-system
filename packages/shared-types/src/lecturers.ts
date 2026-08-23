@@ -21,6 +21,20 @@ export function formatLecturerDisplayName(
 }
 
 /**
+ * Existing structured professional metadata stored in LecturerProfile.
+ * `legacyCoursesTaught` is migration/history evidence only; current teaching
+ * must always be derived from Course/Offering assignments.
+ */
+export const LecturerProfessionalProfileSchema = z.object({
+  gender: z.string().nullable(),
+  employmentType: z.string().nullable(),
+  fieldOfSpecialization: z.string().nullable(),
+  yearsOfExperience: z.number().int().min(0).nullable(),
+  legacyCoursesTaught: z.string().nullable(),
+});
+export type LecturerProfessionalProfile = z.infer<typeof LecturerProfessionalProfileSchema>;
+
+/**
  * Lecturers are Users with role = lecturer, surfaced via the Lecturers plugin.
  * Courses and Offerings consume this through registry.get('lecturers').
  *
@@ -36,6 +50,7 @@ export const LecturerSchema = z.object({
   title: z.string().nullable().optional(),
   qualification: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
+  professionalProfile: LecturerProfessionalProfileSchema.nullable(),
   /**
    * Whether this lecturer profile is linked to a provisioned Supabase Auth
    * identity. We intentionally do not label this "active" vs "invited" because
@@ -66,6 +81,9 @@ export const UpdateMyLecturerProfileInput = z
     title: z.string().trim().max(100).nullable(),
     qualification: z.string().trim().max(500).nullable(),
     phone: z.string().trim().max(50).nullable(),
+    employmentType: z.string().trim().max(120).nullable(),
+    fieldOfSpecialization: z.string().trim().max(500).nullable(),
+    yearsOfExperience: z.number().int().min(0).max(80).nullable(),
   })
   .strict();
 export type UpdateMyLecturerProfileInput = z.infer<typeof UpdateMyLecturerProfileInput>;
