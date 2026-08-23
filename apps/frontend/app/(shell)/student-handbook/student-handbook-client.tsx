@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   BookOpen,
   CheckCircle2,
   ChevronRight,
@@ -24,6 +25,7 @@ import type {
 import { useMe } from "@/lib/auth";
 import { lecturersApi } from "@/lib/lecturers";
 import { studentHandbookApi } from "@/lib/student-handbook";
+import { getStudentHandbookUnavailableSourceState } from "@/lib/student-handbook-source-state";
 
 type EditableBlock = SaveStudentHandbookSectionInput["blocks"][number] & {
   clientKey: string;
@@ -76,6 +78,8 @@ function SourcePreviewModal({
   preview: StudentHandbookSourcePreview;
   onClose: () => void;
 }) {
+  const unavailable = getStudentHandbookUnavailableSourceState(preview);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl border bg-card shadow-xl">
@@ -83,7 +87,9 @@ function SourcePreviewModal({
           <div>
             <div className="flex items-center gap-2">
               <Database className="h-4 w-4 text-emerald-600" />
-              <h2 className="font-semibold text-foreground">{preview.label}</h2>
+              <h2 className="font-semibold text-foreground">
+                {unavailable?.title ?? preview.label}
+              </h2>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Authoritative PMS data · Read only{preview.snapshot ? " · Published snapshot" : ""}
@@ -99,9 +105,26 @@ function SourcePreviewModal({
           </button>
         </div>
         <div className="max-h-[68vh] overflow-auto p-5">
-          <pre className="whitespace-pre-wrap rounded-lg bg-muted/50 p-4 text-xs leading-6 text-foreground">
-            {JSON.stringify(preview.data, null, 2)}
-          </pre>
+          {unavailable ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+                <div>
+                  <p className="font-medium text-foreground">{unavailable.message}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {unavailable.explanation}
+                  </p>
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">
+                    <Database className="h-3.5 w-3.5" /> Read-only PMS source
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <pre className="whitespace-pre-wrap rounded-lg bg-muted/50 p-4 text-xs leading-6 text-foreground">
+              {JSON.stringify(preview.data, null, 2)}
+            </pre>
+          )}
         </div>
       </div>
     </div>
@@ -137,7 +160,6 @@ export function StudentHandbookClient() {
   const editable = Boolean(
     isOwner && active && (active.status === "DRAFT" || active.status === "CHANGES_REQUESTED"),
   );
-
   const selectedSection = active?.sections.find((item) => item.key === selectedSectionKey) ?? null;
 
   async function reload(preferredId?: string) {
@@ -146,8 +168,7 @@ export function StudentHandbookClient() {
     try {
       const rows = await studentHandbookApi.list("dse");
       setHandbooks(rows);
-      const nextId = preferredId ?? activeId ?? rows[0]?.id ?? null;
-      setActiveId(nextId);
+      setActiveId(preferredId ?? activeId ?? rows[0]?.id ?? null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load Student Handbook");
     } finally {
@@ -276,7 +297,11 @@ export function StudentHandbookClient() {
   if (!active) {
     return (
       <div className="mx-auto max-w-3xl p-6">
-        {error ? <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
         {isGovernance ? (
           <div className="rounded-xl border bg-card p-6 shadow-sm">
             <div className="flex items-start gap-3">
@@ -336,7 +361,9 @@ export function StudentHandbookClient() {
 
   return (
     <div className="p-4 md:p-6">
-      {sourcePreview ? <SourcePreviewModal preview={sourcePreview} onClose={() => setSourcePreview(null)} /> : null}
+      {sourcePreview ? (
+        <SourcePreviewModal preview={sourcePreview} onClose={() => setSourcePreview(null)} />
+      ) : null}
 
       <div className="mb-4 flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -345,7 +372,9 @@ export function StudentHandbookClient() {
             <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusClasses(active.status)}`}>
               {active.status.replaceAll("_", " ")}
             </span>
-            <span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">v{active.version}</span>
+            <span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
+              v{active.version}
+            </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Assigned to {active.assignedLecturer.name} · one lecturer owns the full handbook
@@ -378,7 +407,11 @@ export function StudentHandbookClient() {
         </div>
       </div>
 
-      {error ? <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       {isGovernance ? (
         <div className="mb-4 grid gap-3 rounded-xl border bg-card p-4 lg:grid-cols-[1fr_1fr_auto]">
@@ -409,16 +442,31 @@ export function StudentHandbookClient() {
           <div className="flex items-end gap-2">
             {active.status === "SUBMITTED" ? (
               <>
-                <button type="button" disabled={saving} onClick={() => void runWorkflow("request")} className="rounded-md border px-3 py-2 text-sm font-medium">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void runWorkflow("request")}
+                  className="rounded-md border px-3 py-2 text-sm font-medium"
+                >
                   Request Changes
                 </button>
-                <button type="button" disabled={saving} onClick={() => void runWorkflow("approve")} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void runWorkflow("approve")}
+                  className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                >
                   Approve
                 </button>
               </>
             ) : null}
             {active.status === "APPROVED" ? (
-              <button type="button" disabled={saving} onClick={() => void runWorkflow("publish")} className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void runWorkflow("publish")}
+                className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white"
+              >
                 Publish
               </button>
             ) : null}
@@ -428,7 +476,9 @@ export function StudentHandbookClient() {
 
       <div className="grid gap-4 xl:grid-cols-[250px_minmax(0,1fr)_360px]">
         <aside className="rounded-xl border bg-card p-3 shadow-sm">
-          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sections</p>
+          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Sections
+          </p>
           <nav className="space-y-1">
             {active.sections.map((section, index) => (
               <button
