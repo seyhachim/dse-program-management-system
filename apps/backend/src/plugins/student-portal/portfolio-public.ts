@@ -1,7 +1,7 @@
 import type {
   PublicStudentPortfolio,
   PublicStudentPortfolioEvidence,
-  StudentPortfolioProfessionalLink,
+  StudentPortfolioArtifactKind,
   StudentPortfolioProfessionalProvider,
   StudentPortfolioSoftSkillSummary,
 } from "@dse-pms/shared-types";
@@ -12,62 +12,20 @@ import { softSkillsForStudentId } from "./portfolio-soft-skills.ts";
 import { competenciesForStudentId } from "./portfolio-competencies.ts";
 
 const PROVIDER_FROM_DB: Record<string, StudentPortfolioProfessionalProvider> = {
-  GitHub: "github",
-  GitLab: "gitlab",
-  LinkedIn: "linkedin",
-  Kaggle: "kaggle",
-  HuggingFace: "hugging_face",
-  Website: "website",
-  ORCID: "orcid",
-  GoogleScholar: "google_scholar",
-  ResearchGate: "research_gate",
-  CodingPractice: "coding_practice",
-  BIProfile: "bi_profile",
-  CV: "cv",
-  Other: "other",
+  GitHub: "github", GitLab: "gitlab", LinkedIn: "linkedin", Kaggle: "kaggle",
+  HuggingFace: "hugging_face", Website: "website", ORCID: "orcid",
+  GoogleScholar: "google_scholar", ResearchGate: "research_gate",
+  CodingPractice: "coding_practice", BIProfile: "bi_profile", CV: "cv", Other: "other",
+};
+const KIND_FROM_DB: Record<string, StudentPortfolioArtifactKind> = {
+  Repository: "repository", Demo: "demo", Report: "report", Presentation: "presentation", Dataset: "dataset", Other: "other",
 };
 
-const ORIGIN_FROM_DB: Record<string, any> = {
-  ExternalProject: "external_project",
-  CourseAssessment: "course_assessment",
-  Practicum: "practicum",
-  Internship: "internship",
-  FinalProject: "final_project",
-  Competition: "competition",
-  Achievement: "achievement",
-  Other: "other",
-};
-const KIND_FROM_DB: Record<string, any> = {
-  Repository: "repository",
-  Demo: "demo",
-  Report: "report",
-  Presentation: "presentation",
-  Dataset: "dataset",
-  Other: "other",
-};
-
-type PublicProfileRow = {
-  studentId: string;
-  name: string;
-  headline: string;
-  bio: string;
-  careerInterests: string[];
-  publicSlug: string;
-};
-
-type PublicLinkRow = {
-  provider: string;
-  label: string;
-  url: string;
-};
+type PublicProfileRow = { studentId: string; name: string; headline: string; bio: string; careerInterests: string[]; publicSlug: string };
+type PublicLinkRow = { provider: string; label: string; url: string };
 
 function publicVerification(summary: Awaited<ReturnType<typeof studentPortfolioVerificationService.summary>>) {
-  return {
-    state: summary.state,
-    context: summary.context,
-    verifiedAt: summary.verifiedAt,
-    actorName: null,
-  };
+  return { state: summary.state, context: summary.context, verifiedAt: summary.verifiedAt, actorName: null };
 }
 
 function recalculatePublicSoftSkill(summary: StudentPortfolioSoftSkillSummary, allowedEvidenceIds: Set<string>): StudentPortfolioSoftSkillSummary {
@@ -103,13 +61,13 @@ export const studentPortfolioPublicService = {
       ORDER BY "createdAt" ASC
     `;
 
-    // Course-linked public evidence is only eligible while the canonical source remains
-    // enrolled/approved/active. Self-added evidence has no academic source to re-authorize.
+    const archived = new Set((await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "StudentPortfolioEvidence"
+      WHERE "studentId" = ${profile.studentId} AND "archivedAt" IS NOT NULL
+    `).map((row) => row.id));
+
     const evidenceRows = await prisma.studentPortfolioEvidence.findMany({
-      where: {
-        studentId: profile.studentId,
-        isPublic: true,
-      },
+      where: { studentId: profile.studentId, isPublic: true },
       orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
       include: {
         links: { orderBy: { createdAt: "asc" } },
@@ -118,11 +76,11 @@ export const studentPortfolioPublicService = {
       },
     });
     const enrolledOfferingIds = new Set((await prisma.enrollment.findMany({
-      where: { studentId: profile.studentId },
-      select: { offeringId: true },
+      where: { studentId: profile.studentId }, select: { offeringId: true },
     })).map((row) => row.offeringId));
 
     const safeEvidenceRows = evidenceRows.filter((row) => {
+      if (archived.has(row.id)) return false;
       if (!row.sourceOfferingId) return true;
       return enrolledOfferingIds.has(row.sourceOfferingId)
         && row.sourceOffering?.courseSpecId === row.sourceCourseSpecId
@@ -145,8 +103,7 @@ export const studentPortfolioPublicService = {
     })));
     const allowedEvidenceIds = new Set(evidence.map((item) => item.id));
 
-    const rawSoftSkills = await softSkillsForStudentId(profile.studentId, true);
-    const softSkills = rawSoftSkills
+    const softSkills = (await softSkillsForStudentId(profile.studentId, true))
       .map((item) => recalculatePublicSoftSkill(item, allowedEvidenceIds))
       .filter((item) => item.evidenceCount > 0);
 
@@ -166,7 +123,7 @@ export const studentPortfolioPublicService = {
       bio: profile.bio,
       careerInterests: profile.careerInterests,
       links: linkRows.map((row) => ({
-        provider: PROVIDER_FROM_DB[row.provider],
+        provider: PROVIDER_FROM_DB[row.provider] ?? "other",
         label: row.label,
         url: row.url,
         status: "added" as const,
