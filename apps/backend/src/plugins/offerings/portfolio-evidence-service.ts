@@ -1,4 +1,5 @@
 import type {
+  CourseRef,
   CoursesServiceContract,
   LecturerTeachingEvidenceRef,
 } from "@dse-pms/shared-types";
@@ -30,7 +31,6 @@ export const portfolioTeachingEvidenceService = {
         term: true,
         sectionCode: true,
         status: true,
-        coLecturers: { select: { lecturerId: true } },
       },
       orderBy: [{ term: "desc" }, { sectionCode: "asc" }],
     });
@@ -39,7 +39,7 @@ export const portfolioTeachingEvidenceService = {
       (await Promise.all(
         [...new Set(rows.map((row) => row.courseId))].map((id) => courses().getById(id)),
       ))
-        .filter((course): course is NonNullable<typeof course> => course != null)
+        .filter((course): course is CourseRef => course != null)
         .map((course) => [course.id, course]),
     );
 
