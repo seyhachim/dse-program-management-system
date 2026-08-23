@@ -12,15 +12,33 @@ export const AttendanceDateSchema = z
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
   }, "Use a valid calendar date");
 
+export const SaveAttendanceRecordInput = z
+  .object({
+    studentId: z.string().uuid(),
+    status: AttendanceStatusSchema.nullable().default(null),
+    permissionPending: z.boolean().default(false),
+    note: z.string().trim().max(300).default(""),
+  })
+  .superRefine((record, ctx) => {
+    if (record.status !== null && record.permissionPending) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Final attendance status and Permission Pending cannot both be set",
+        path: ["permissionPending"],
+      });
+    }
+    if (record.status === null && !record.permissionPending) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Attendance record must contain a finalized status or Permission Pending",
+        path: ["status"],
+      });
+    }
+  });
+
 export const SaveAttendanceInput = z.object({
   records: z
-    .array(
-      z.object({
-        studentId: z.string().uuid(),
-        status: AttendanceStatusSchema,
-        note: z.string().trim().max(300).default(""),
-      }),
-    )
+    .array(SaveAttendanceRecordInput)
     .max(1000)
     .superRefine((records, ctx) => {
       const ids = new Set<string>();
@@ -43,6 +61,8 @@ export interface AttendanceRecordView {
   studentNumber: string;
   studentName: string;
   status: AttendanceStatus | null;
+  permissionPending: boolean;
+  permissionPendingSince: string | null;
   note: string;
 }
 
@@ -51,7 +71,7 @@ export interface AttendanceSessionView {
   offeringId: string;
   date: string;
   records: AttendanceRecordView[];
-  counts: Record<AttendanceStatus, number> & { Unmarked: number };
+  counts: Record<AttendanceStatus, number> & { PermissionPending: number; Unmarked: number };
   updatedAt: string | null;
 }
 
@@ -59,6 +79,6 @@ export interface AttendanceSessionSummary {
   sessionId: string;
   offeringId: string;
   date: string;
-  counts: Record<AttendanceStatus, number>;
+  counts: Record<AttendanceStatus, number> & { PermissionPending: number };
   updatedAt: string;
 }
