@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
-  X,
 } from "lucide-react";
 import {
   STUDENT_PORTFOLIO_SOFT_SKILLS,
@@ -19,6 +18,7 @@ import {
   type StudentPortfolioSoftSkillCode,
   type StudentPortfolioVerificationEvent,
 } from "@dse-pms/shared-types";
+import { Dialog, DialogContent, DialogTitle } from "@dse-pms/ui";
 import { studentPortfolioApi } from "@/lib/student-portfolio";
 import { PortalError, PortalLoading } from "../portal-state";
 import { PortfolioEvidenceManager } from "./portfolio-evidence-manager";
@@ -64,28 +64,142 @@ function EvidenceDrawer({ evidence, onClose }: { evidence: StudentPortfolioEvide
   }, [evidence.id]);
 
   const currentVerification = history.at(-1);
+
   async function saveSoftSkills() {
-    setSavingSkills(true); setError(null);
+    setSavingSkills(true);
+    setError(null);
     try {
       const result = await studentPortfolioApi.updateEvidenceSoftSkills(evidence.id, skillCodes);
       setSkillCodes(result.skillCodes);
       setHistory(await studentPortfolioApi.verificationHistory(evidence.id));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not update soft skills"); }
-    finally { setSavingSkills(false); }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not update soft skills");
+    } finally {
+      setSavingSkills(false);
+    }
   }
 
-  return <div className="fixed inset-0 z-50 bg-black/35" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-    <aside role="dialog" aria-modal="true" aria-label={`${evidence.title} evidence detail`} className="absolute inset-0 ml-auto flex w-full flex-col bg-background shadow-2xl md:left-auto md:w-[62vw] md:min-w-[640px] md:max-w-[960px]">
-      <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 md:px-7"><div><p className="text-xs font-semibold uppercase tracking-wide text-primary">View Evidence</p><h2 className="mt-1 text-xl font-semibold">{evidence.title}</h2><div className="mt-2 flex flex-wrap gap-2"><StatusPill>{humanStatus(evidence.origin)}</StatusPill><StatusPill>{evidence.visibility}</StatusPill><StatusPill>{currentVerification ? humanStatus(currentVerification.newState) : "Unverified"}</StatusPill></div></div><button type="button" onClick={onClose} aria-label="Close evidence detail" className="rounded-xl border border-border p-2 hover:bg-muted"><X className="h-5 w-5" /></button></header>
-      <nav aria-label="Evidence detail sections" className="flex gap-1 border-b border-border px-5 py-2 md:px-7">{(["overview", "evidence", "verification"] as DrawerTab[]).map((item) => <button key={item} type="button" onClick={() => setTab(item)} className={`rounded-lg px-3 py-2 text-sm font-medium ${tab === item ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{humanStatus(item)}</button>)}</nav>
-      <div className="flex-1 overflow-y-auto p-5 md:p-7">
-        {error ? <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
-        {tab === "overview" ? <div className="space-y-5"><section className="rounded-2xl border border-border p-5"><h3 className="font-semibold">Contribution</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{evidence.contribution || "No contribution statement yet."}</p>{evidence.role ? <p className="mt-3 text-sm"><span className="font-medium">Role:</span> {evidence.role}</p> : null}</section><section className="rounded-2xl border border-border p-5"><h3 className="font-semibold">Summary</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{evidence.summary || "No summary yet."}</p></section>{evidence.source ? <section className="rounded-2xl border border-border p-5"><h3 className="font-semibold">PMS provenance</h3><p className="mt-2 text-sm text-muted-foreground">{evidence.source.available ? `${evidence.source.courseCode} · ${evidence.source.assessmentName} · ${evidence.source.term}/${evidence.source.sectionCode}` : "The academic source is currently restricted or unavailable. Provenance is retained without exposing source detail."}</p></section> : null}</div> : null}
-        {tab === "evidence" ? <div className="space-y-5"><section className="rounded-2xl border border-border p-5"><h3 className="font-semibold">Supporting artifacts</h3>{evidence.links.length ? <div className="mt-3 space-y-2">{evidence.links.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-sm font-medium text-primary hover:bg-muted"><span>{link.label || humanStatus(link.kind)}</span><ExternalLink className="h-4 w-4" /></a>)}</div> : <p className="mt-2 text-sm text-muted-foreground">No artifact links added.</p>}</section><section className="rounded-2xl border border-border p-5"><h3 className="font-semibold">Soft skills supported by this evidence</h3><p className="mt-1 text-sm text-muted-foreground">These are evidence links, not self-ratings. Changing them invalidates a current verification so the new claim can be reviewed.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{STUDENT_PORTFOLIO_SOFT_SKILLS.map((skill) => <label key={skill.code} className="flex items-start gap-2 rounded-xl border border-border p-3 text-sm"><input type="checkbox" className="mt-0.5" checked={skillCodes.includes(skill.code)} onChange={(event) => setSkillCodes((current) => event.target.checked ? [...current, skill.code] : current.filter((code) => code !== skill.code))} /><span><span className="font-medium">{skill.name}</span><span className="mt-0.5 block text-xs text-muted-foreground">{skill.description}</span></span></label>)}</div><button type="button" onClick={saveSoftSkills} disabled={savingSkills} className="mt-4 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{savingSkills ? "Saving…" : "Save soft-skill evidence"}</button></section></div> : null}
-        {tab === "verification" ? <section className="rounded-2xl border border-border p-5"><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3 className="font-semibold">Verification history</h3></div>{history.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">This evidence has not been verified yet.</p> : <ol className="mt-4 space-y-3">{history.map((event) => <li key={event.id} className="rounded-xl border border-border p-4"><div className="flex flex-wrap items-center gap-2"><StatusPill>{humanStatus(event.previousState)} → {humanStatus(event.newState)}</StatusPill><span className="text-xs text-muted-foreground">{new Date(event.createdAt).toLocaleString()}</span></div><p className="mt-2 text-sm font-medium">{event.actorName ?? "System"} · {humanStatus(event.actorContext)}</p>{event.reason ? <p className="mt-1 text-sm text-muted-foreground">{event.reason}</p> : null}</li>)}</ol>}</section> : null}
-      </div>
-    </aside>
-  </div>;
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="inset-0 left-0 top-0 flex h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none bg-background p-0 text-foreground ring-0 md:left-auto md:right-0 md:w-[62vw] md:min-w-[640px] md:max-w-[960px]">
+        <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 pr-14 md:px-7 md:pr-14">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">View Evidence</p>
+            <DialogTitle className="mt-1 text-xl font-semibold">{evidence.title}</DialogTitle>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <StatusPill>{humanStatus(evidence.origin)}</StatusPill>
+              <StatusPill>{evidence.visibility}</StatusPill>
+              <StatusPill>{currentVerification ? humanStatus(currentVerification.newState) : "Unverified"}</StatusPill>
+            </div>
+          </div>
+        </header>
+
+        <nav aria-label="Evidence detail sections" className="flex gap-1 overflow-x-auto border-b border-border px-5 py-2 md:px-7">
+          {(["overview", "evidence", "verification"] as DrawerTab[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setTab(item)}
+              aria-pressed={tab === item}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${tab === item ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+            >
+              {humanStatus(item)}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex-1 overflow-y-auto p-5 md:p-7">
+          {error ? <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
+
+          {tab === "overview" ? (
+            <div className="space-y-5">
+              <section className="rounded-2xl border border-border p-5">
+                <h3 className="font-semibold">Contribution</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{evidence.contribution || "No contribution statement yet."}</p>
+                {evidence.role ? <p className="mt-3 text-sm"><span className="font-medium">Role:</span> {evidence.role}</p> : null}
+              </section>
+              <section className="rounded-2xl border border-border p-5">
+                <h3 className="font-semibold">Summary</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{evidence.summary || "No summary yet."}</p>
+              </section>
+              {evidence.source ? (
+                <section className="rounded-2xl border border-border p-5">
+                  <h3 className="font-semibold">PMS provenance</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {evidence.source.available
+                      ? `${evidence.source.courseCode} · ${evidence.source.assessmentName} · ${evidence.source.term}/${evidence.source.sectionCode}`
+                      : "The academic source is currently restricted or unavailable. Provenance is retained without exposing source detail."}
+                  </p>
+                </section>
+              ) : null}
+            </div>
+          ) : null}
+
+          {tab === "evidence" ? (
+            <div className="space-y-5">
+              <section className="rounded-2xl border border-border p-5">
+                <h3 className="font-semibold">Supporting artifacts</h3>
+                {evidence.links.length ? (
+                  <div className="mt-3 space-y-2">
+                    {evidence.links.map((link) => (
+                      <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-sm font-medium text-primary hover:bg-muted">
+                        <span>{link.label || humanStatus(link.kind)}</span>
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    ))}
+                  </div>
+                ) : <p className="mt-2 text-sm text-muted-foreground">No artifact links added.</p>}
+              </section>
+
+              <section className="rounded-2xl border border-border p-5">
+                <h3 className="font-semibold">Soft skills supported by this evidence</h3>
+                <p className="mt-1 text-sm text-muted-foreground">These are evidence links, not self-ratings. Changing them invalidates a current verification so the new claim can be reviewed.</p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {STUDENT_PORTFOLIO_SOFT_SKILLS.map((skill) => (
+                    <label key={skill.code} className="flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={skillCodes.includes(skill.code)}
+                        onChange={(event) => setSkillCodes((current) => event.target.checked ? [...current, skill.code] : current.filter((code) => code !== skill.code))}
+                      />
+                      <span>
+                        <span className="font-medium">{skill.name}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">{skill.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <button type="button" onClick={saveSoftSkills} disabled={savingSkills} className="mt-4 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                  {savingSkills ? "Saving…" : "Save soft-skill evidence"}
+                </button>
+              </section>
+            </div>
+          ) : null}
+
+          {tab === "verification" ? (
+            <section className="rounded-2xl border border-border p-5">
+              <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3 className="font-semibold">Verification history</h3></div>
+              {history.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">This evidence has not been verified yet.</p> : (
+                <ol className="mt-4 space-y-3">
+                  {history.map((event) => (
+                    <li key={event.id} className="rounded-xl border border-border p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusPill>{humanStatus(event.previousState)} → {humanStatus(event.newState)}</StatusPill>
+                        <span className="text-xs text-muted-foreground">{new Date(event.createdAt).toLocaleString()}</span>
+                      </div>
+                      <p className="mt-2 text-sm font-medium">{event.actorName ?? "System"} · {humanStatus(event.actorContext)}</p>
+                      {event.reason ? <p className="mt-1 text-sm text-muted-foreground">{event.reason}</p> : null}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function PortfolioWorkspace() {
@@ -97,12 +211,17 @@ export function PortfolioWorkspace() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const [nextOverview, nextEvidence] = await Promise.all([studentPortfolioApi.overview(), studentPortfolioApi.evidence()]);
-      setOverview(nextOverview); setEvidence(nextEvidence);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not load portfolio"); }
-    finally { setLoading(false); }
+      setOverview(nextOverview);
+      setEvidence(nextEvidence);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not load portfolio");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -116,7 +235,21 @@ export function PortfolioWorkspace() {
   if (!overview) return <PortalError message="Could not load portfolio" />;
 
   return <div className="mx-auto max-w-7xl space-y-5">
-    <div className="overflow-x-auto rounded-2xl border border-border bg-card p-1.5"><div className="flex min-w-max gap-1">{TABS.map((item) => <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`rounded-xl px-4 py-2.5 text-sm font-medium ${tab === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{item.label}</button>)}</div></div>
+    <div className="overflow-x-auto rounded-2xl border border-border bg-card p-1.5">
+      <div className="flex min-w-max gap-1">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            aria-pressed={tab === item.id}
+            className={`rounded-xl px-4 py-2.5 text-sm font-medium ${tab === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
 
     {error ? <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
 
