@@ -50,7 +50,7 @@ export const LecturerSchema = z.object({
   title: z.string().nullable().optional(),
   qualification: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
-  professionalProfile: LecturerProfessionalProfileSchema.nullable(),
+  professionalProfile: LecturerProfessionalProfileSchema.nullable().optional(),
   /**
    * Whether this lecturer profile is linked to a provisioned Supabase Auth
    * identity. We intentionally do not label this "active" vs "invited" because
@@ -81,9 +81,9 @@ export const UpdateMyLecturerProfileInput = z
     title: z.string().trim().max(100).nullable(),
     qualification: z.string().trim().max(500).nullable(),
     phone: z.string().trim().max(50).nullable(),
-    employmentType: z.string().trim().max(120).nullable(),
-    fieldOfSpecialization: z.string().trim().max(500).nullable(),
-    yearsOfExperience: z.number().int().min(0).max(80).nullable(),
+    employmentType: z.string().trim().max(120).nullable().optional(),
+    fieldOfSpecialization: z.string().trim().max(500).nullable().optional(),
+    yearsOfExperience: z.number().int().min(0).max(80).nullable().optional(),
   })
   .strict();
 export type UpdateMyLecturerProfileInput = z.infer<typeof UpdateMyLecturerProfileInput>;
