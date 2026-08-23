@@ -16,6 +16,7 @@ export * from "./students.ts";
 export * from "./student-progression.ts";
 export * from "./programme-outcome-indicators.ts";
 export * from "./lecturers.ts";
+export * from "./lecturer-portfolio.ts";
 export * from "./lecturer-portfolio-plugin.ts";
 export * from "./courses.ts";
 export * from "./offerings.ts";
