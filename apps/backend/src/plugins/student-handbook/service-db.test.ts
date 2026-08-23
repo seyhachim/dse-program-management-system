@@ -99,13 +99,14 @@ describeDb("student handbook service", () => {
     // No SOURCE_DATA block is present, so publish does not depend on a programme public-read fixture.
     expect((await publishHandbook(handbook.id, f.creator.id, "Publish")).status).toBe("PUBLISHED");
 
-    await expect(
-      prisma.$executeRaw(Prisma.sql`
+    const mutatePublishedSection = async () => {
+      await prisma.$executeRaw(Prisma.sql`
         UPDATE student_handbook."StudentHandbookSection"
         SET "title" = 'Changed after publication'
         WHERE "handbookId" = ${handbook.id}
-      `),
-    ).rejects.toThrow(/immutable/i);
+      `);
+    };
+    await expect(mutatePublishedSection()).rejects.toThrow(/immutable/i);
 
     expect((await getHandbook(handbook.id)).status).toBe("PUBLISHED");
   });
