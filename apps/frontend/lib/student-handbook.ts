@@ -1,6 +1,9 @@
 import type {
   AssignStudentHandbookLecturerInput,
   CreateStudentHandbookInput,
+  CreateStudentHandbookSectionInput,
+  RenameStudentHandbookSectionInput,
+  ReorderStudentHandbookSectionsInput,
   SaveStudentHandbookSectionInput,
   StudentHandbookReviewInput,
   StudentHandbookSourceKind,
@@ -23,6 +26,21 @@ export const studentHandbookApi = {
       `/api/student-handbook/${handbookId}/assignment`,
       input,
     ),
+  addSection: (handbookId: string, input: CreateStudentHandbookSectionInput) =>
+    api.post<StudentHandbookView>(`/api/student-handbook/${handbookId}/sections`, input),
+  renameSection: (
+    handbookId: string,
+    sectionId: string,
+    input: RenameStudentHandbookSectionInput,
+  ) =>
+    api.patch<StudentHandbookView>(
+      `/api/student-handbook/${handbookId}/sections/${sectionId}`,
+      input,
+    ),
+  reorderSections: (handbookId: string, input: ReorderStudentHandbookSectionsInput) =>
+    api.put<StudentHandbookView>(`/api/student-handbook/${handbookId}/sections-order`, input),
+  deleteSection: (handbookId: string, sectionId: string) =>
+    api.delete<StudentHandbookView>(`/api/student-handbook/${handbookId}/sections/${sectionId}`),
   saveSection: (
     handbookId: string,
     sectionKey: string,

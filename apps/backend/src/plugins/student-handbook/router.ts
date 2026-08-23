@@ -2,6 +2,9 @@ import { Router, type Response } from "express";
 import {
   AssignStudentHandbookLecturerSchema,
   CreateStudentHandbookSchema,
+  CreateStudentHandbookSectionSchema,
+  RenameStudentHandbookSectionSchema,
+  ReorderStudentHandbookSectionsSchema,
   SaveStudentHandbookSectionSchema,
   StudentHandbookReviewSchema,
   StudentHandbookSourceKindSchema,
@@ -16,11 +19,15 @@ import {
   approveHandbook,
   assignLecturer,
   createHandbook,
+  createSection,
+  deleteSection,
   getHandbook,
   getHandbookHeader,
   getSourcePreview,
   listHandbooks,
   publishHandbook,
+  renameSection,
+  reorderSections,
   replaceSectionBlocks,
   requestChanges,
   StudentHandbookConflictError,
@@ -131,6 +138,93 @@ export function createStudentHandbookRouter(): Router {
     }
     try {
       res.json(await assignLecturer(header.id, parsed.data.assignedLecturerId, req.user.id));
+    } catch (error) {
+      sendServiceError(res, error);
+    }
+  });
+
+  router.post("/:handbookId/sections", async (req, res) => {
+    const parsed = CreateStudentHandbookSectionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid handbook section", details: parsed.error.flatten() });
+      return;
+    }
+    if (!req.user) return;
+    const header = await getHandbookHeader(req.params.handbookId!);
+    if (!header) {
+      res.status(404).json({ error: "Student Handbook not found" });
+      return;
+    }
+    if (!canEdit(req.user, header)) {
+      res.status(403).json({ error: "Only the assigned lecturer can add handbook sections" });
+      return;
+    }
+    try {
+      res.status(201).json(await createSection(header.id, parsed.data, req.user.id));
+    } catch (error) {
+      sendServiceError(res, error);
+    }
+  });
+
+  router.patch("/:handbookId/sections/:sectionId", async (req, res) => {
+    const parsed = RenameStudentHandbookSectionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid section title", details: parsed.error.flatten() });
+      return;
+    }
+    if (!req.user) return;
+    const header = await getHandbookHeader(req.params.handbookId!);
+    if (!header) {
+      res.status(404).json({ error: "Student Handbook not found" });
+      return;
+    }
+    if (!canEdit(req.user, header)) {
+      res.status(403).json({ error: "Only the assigned lecturer can rename handbook sections" });
+      return;
+    }
+    try {
+      res.json(await renameSection(header.id, req.params.sectionId!, parsed.data, req.user.id));
+    } catch (error) {
+      sendServiceError(res, error);
+    }
+  });
+
+  router.put("/:handbookId/sections-order", async (req, res) => {
+    const parsed = ReorderStudentHandbookSectionsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid section order", details: parsed.error.flatten() });
+      return;
+    }
+    if (!req.user) return;
+    const header = await getHandbookHeader(req.params.handbookId!);
+    if (!header) {
+      res.status(404).json({ error: "Student Handbook not found" });
+      return;
+    }
+    if (!canEdit(req.user, header)) {
+      res.status(403).json({ error: "Only the assigned lecturer can reorder handbook sections" });
+      return;
+    }
+    try {
+      res.json(await reorderSections(header.id, parsed.data, req.user.id));
+    } catch (error) {
+      sendServiceError(res, error);
+    }
+  });
+
+  router.delete("/:handbookId/sections/:sectionId", async (req, res) => {
+    if (!req.user) return;
+    const header = await getHandbookHeader(req.params.handbookId!);
+    if (!header) {
+      res.status(404).json({ error: "Student Handbook not found" });
+      return;
+    }
+    if (!canEdit(req.user, header)) {
+      res.status(403).json({ error: "Only the assigned lecturer can delete custom handbook sections" });
+      return;
+    }
+    try {
+      res.json(await deleteSection(header.id, req.params.sectionId!, req.user.id));
     } catch (error) {
       sendServiceError(res, error);
     }
