@@ -1,11 +1,11 @@
 export function contiguousRowSpans<T>(
   items: readonly T[],
   valueOf: (item: T) => string | null | undefined,
-): number[] {
-  const spans = Array<number>(items.length).fill(0);
+): Record<number, number> {
+  const spans: Record<number, number> = Array<number>(items.length).fill(0);
 
   for (let index = 0; index < items.length; ) {
-    const rawValue = valueOf(items[index]);
+    const rawValue = valueOf(items[index]!);
     const value = rawValue?.trim() ?? "";
 
     if (!value) {
@@ -16,7 +16,7 @@ export function contiguousRowSpans<T>(
 
     let end = index + 1;
     while (end < items.length) {
-      const nextValue = valueOf(items[end])?.trim() ?? "";
+      const nextValue = valueOf(items[end]!)?.trim() ?? "";
       if (nextValue !== value) break;
       end += 1;
     }
