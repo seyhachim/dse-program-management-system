@@ -64,7 +64,6 @@ export function evaluateAttendanceHealth(
   counts: { Absent: number; Excused: number },
 ): { health: TelegramAttendanceHealth; warningCandidates: AttendanceWarningCandidate[] } {
   const newestFirst = [...records]
-    .filter((record) => record.status != null)
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const attendanceStreak = currentRun(newestFirst, (status) => status === "Present" || status === "Late");
@@ -84,7 +83,7 @@ export function evaluateAttendanceHealth(
       message: `You have been late to your last ${consecutiveLate} finalized classes.`,
       advice: punctualityAdvice,
     });
-    if (consecutiveLate >= 3 && newestFirst[0]) {
+    if (consecutiveLate === 3 && newestFirst[0]) {
       warningCandidates.push({
         kind: "punctuality",
         count: consecutiveLate,
@@ -103,7 +102,7 @@ export function evaluateAttendanceHealth(
       message: `${counts.Absent} absent · ${counts.Excused} permission / excused.`,
       advice: attendanceAdvice(counts.Absent, counts.Excused),
     });
-    if (absencePermissionCount >= 3) {
+    if (absencePermissionCount === 3) {
       const latestContribution = newestFirst.find(
         (record) => record.status === "Absent" || record.status === "Excused",
       );
