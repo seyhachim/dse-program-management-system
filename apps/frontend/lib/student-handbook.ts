@@ -5,10 +5,12 @@ import type {
   RenameStudentHandbookSectionInput,
   ReorderStudentHandbookSectionsInput,
   SaveStudentHandbookSectionInput,
+  StudentHandbookDocumentTheme,
   StudentHandbookReviewInput,
   StudentHandbookSourceKind,
   StudentHandbookSourcePreview,
   StudentHandbookView,
+  UpdateStudentHandbookThemeInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
@@ -26,6 +28,10 @@ export const studentHandbookApi = {
       `/api/student-handbook/${handbookId}/assignment`,
       input,
     ),
+  theme: (handbookId: string) =>
+    api.get<StudentHandbookDocumentTheme>(`/api/student-handbook/${handbookId}/theme`),
+  updateTheme: (handbookId: string, input: UpdateStudentHandbookThemeInput) =>
+    api.put<StudentHandbookDocumentTheme>(`/api/student-handbook/${handbookId}/theme`, input),
   addSection: (handbookId: string, input: CreateStudentHandbookSectionInput) =>
     api.post<StudentHandbookView>(`/api/student-handbook/${handbookId}/sections`, input),
   renameSection: (
