@@ -113,7 +113,19 @@ const evidencePresentationShape = {
     .transform((items) => [...new Set(items)]),
   visibility: StudentPortfolioVisibility.default("private"),
   featured: z.boolean().default(false),
-  links: z.array(StudentPortfolioArtifactLinkInput).max(8).default([]),
+  links: z
+    .array(StudentPortfolioArtifactLinkInput)
+    .max(8)
+    .default([])
+    .transform((items) => {
+      const seen = new Set<string>();
+      return items.filter((item) => {
+        const key = `${item.kind}:${item.url}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }),
 };
 
 function validateEvidenceDates(
