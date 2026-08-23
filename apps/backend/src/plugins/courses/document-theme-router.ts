@@ -38,8 +38,8 @@ export async function lecturerCanReadCourseSpecTheme(
   lecturerId: string,
 ): Promise<boolean> {
   return (
-    (await courseService.lecturerCanAccess(courseId, lecturerId)) ||
-    (await responsibleLecturerCanAccess(courseId, lecturerId))
+    (await responsibleLecturerCanAccess(courseId, lecturerId)) ||
+    (await courseService.lecturerCanAccess(courseId, lecturerId))
   );
 }
 
