@@ -43,6 +43,9 @@ export const lecturersApi = {
     const qs = search ? `?search=${encodeURIComponent(search)}` : "";
     return api.get<Lecturer[]>(`/api/lecturers${qs}`);
   },
+  get(id: string): Promise<Lecturer> {
+    return api.get<Lecturer>(`/api/lecturers/${id}`);
+  },
   create(input: CreateLecturerInput): Promise<Lecturer> {
     return api.post<Lecturer>("/api/lecturers", input);
   },
