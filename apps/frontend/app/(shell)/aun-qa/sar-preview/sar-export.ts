@@ -13,7 +13,12 @@ import {
   WidthType,
 } from "docx";
 import { jsPDF } from "jspdf";
-import type { QaSarDocumentModelView } from "@dse-pms/shared-types";
+import type {
+  DseDocumentContent,
+  DseTextAlign,
+  DseTextNode,
+  QaSarDocumentModelView,
+} from "@dse-pms/shared-types";
 import {
   SAR_DOCUMENT_STYLE,
   buildSarDocumentLayout,
@@ -77,26 +82,87 @@ function safeFilename(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function docxBlock(block: SarLayoutBlock): Paragraph {
+function docxAlignment(align?: DseTextAlign): AlignmentType | undefined {
+  if (align === "center") return AlignmentType.CENTER;
+  if (align === "right") return AlignmentType.RIGHT;
+  if (align === "justify") return AlignmentType.JUSTIFIED;
+  if (align === "left") return AlignmentType.LEFT;
+  return undefined;
+}
+
+function richTextRuns(nodes: DseTextNode[]): TextRun[] {
+  return nodes.map(
+    (node) =>
+      new TextRun({
+        text: node.text,
+        bold: node.marks?.bold,
+        italics: node.marks?.italic,
+        underline: node.marks?.underline ? {} : undefined,
+      }),
+  );
+}
+
+function richDocxBlocks(document: DseDocumentContent): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+  for (const block of document.content) {
+    if (block.type === "heading") {
+      const heading = block.level === 1
+        ? HeadingLevel.HEADING_1
+        : block.level === 2
+          ? HeadingLevel.HEADING_2
+          : HeadingLevel.HEADING_3;
+      paragraphs.push(
+        new Paragraph({
+          children: richTextRuns(block.content),
+          heading,
+          alignment: docxAlignment(block.align),
+          spacing: { before: 100, after: 80 },
+        }),
+      );
+      continue;
+    }
+    if (block.type === "paragraph") {
+      paragraphs.push(
+        new Paragraph({
+          children: richTextRuns(block.content),
+          alignment: docxAlignment(block.align),
+          spacing: { after: 100 },
+        }),
+      );
+      continue;
+    }
+    for (const item of block.items) {
+      paragraphs.push(
+        block.type === "bulletList"
+          ? new Paragraph({ children: richTextRuns(item), bullet: { level: 0 }, spacing: { after: 40 } })
+          : new Paragraph({ children: richTextRuns(item), numbering: { reference: "sar-numbering", level: 0 }, spacing: { after: 40 } }),
+      );
+    }
+  }
+  return paragraphs;
+}
+
+function docxBlock(block: SarLayoutBlock): Paragraph[] {
+  if (block.type === "richText") return richDocxBlocks(block.document);
   if (block.type === "heading") {
-    return new Paragraph({ text: block.text, heading: HeadingLevel.HEADING_3 });
+    return [new Paragraph({ text: block.text, heading: HeadingLevel.HEADING_3 })];
   }
   if (block.type === "bullet") {
-    return new Paragraph({ text: block.text, bullet: { level: 0 } });
+    return [new Paragraph({ text: block.text, bullet: { level: 0 } })];
   }
   if (block.type === "evidenceReference") {
-    return new Paragraph({
+    return [new Paragraph({
       children: [new TextRun({ text: block.text, bold: true })],
       spacing: { before: 80, after: 80 },
-    });
+    })];
   }
   if (block.type === "pmsData") {
-    return new Paragraph({
+    return [new Paragraph({
       children: [new TextRun({ text: block.text, italics: true })],
       spacing: { before: 80, after: 80 },
-    });
+    })];
   }
-  return new Paragraph({ text: block.text, spacing: { after: 100 } });
+  return [new Paragraph({ text: block.text, spacing: { after: 100 } })];
 }
 
 export async function exportSarDocx(model: QaSarDocumentModelView, baseName?: string) {
@@ -161,7 +227,7 @@ export async function exportSarDocx(model: QaSarDocumentModelView, baseName?: st
         continue;
       }
 
-      children.push(...section.blocks.map(docxBlock));
+      children.push(...section.blocks.flatMap(docxBlock));
     }
   }
 
@@ -204,6 +270,21 @@ export async function exportSarDocx(model: QaSarDocumentModelView, baseName?: st
   children.push(new Table({ rows: evidenceRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
 
   const doc = new Document({
+    numbering: {
+      config: [
+        {
+          reference: "sar-numbering",
+          levels: [
+            {
+              level: 0,
+              format: "decimal",
+              text: "%1.",
+              alignment: AlignmentType.LEFT,
+            },
+          ],
+        },
+      ],
+    },
     sections: [
       {
         properties: {
