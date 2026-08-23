@@ -54,10 +54,8 @@ interface PendingRow {
 
 function dateOnly(value: Date): string { return value.toISOString().slice(0, 10); }
 function dateValue(value: string): Date { return new Date(`${value}T00:00:00.000Z`); }
-function emptyCounts() {
-  const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 }
-    satisfies Record<AttendanceStatus, number> & { PermissionPending: number };
-  return counts;
+function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: number } {
+  return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 };
 }
 
 async function roster(offeringId: string): Promise<EnrollmentRow[]> {
