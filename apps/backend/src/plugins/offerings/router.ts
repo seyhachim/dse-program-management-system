@@ -32,10 +32,13 @@ export function createOfferingRouter(): Router {
       res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
       return;
     }
+    // Lecturers only ever see offerings they're assigned to (primary or
+    // co-lecturer) — issue #104. Programme-wide roles see everything.
     const ownerScope = req.user!.roles.some((r) => PROGRAMME_WIDE_ROLES.includes(r)) ? undefined : req.user!.id;
     res.json(await offeringService.list(parsed.data, ownerScope));
   });
 
+  // Must stay before /:id so "workload" is never interpreted as an offering id.
   router.get("/workload/me", requirePermission("offerings:read"), async (req, res) => {
     const parsed = ListLecturerWorkloadQuery.safeParse(req.query);
     if (!parsed.success) {
@@ -72,7 +75,12 @@ export function createOfferingRouter(): Router {
     try {
       if (!(await assertCanManageClassResponsibilities(req, res))) return;
       res.status(201).json(
-        await classResponsibilityService.assign(req.params.id!, parsed.data.studentId, parsed.data.role, req.user!.id),
+        await classResponsibilityService.assign(
+          req.params.id!,
+          parsed.data.studentId,
+          parsed.data.role,
+          req.user!.id,
+        ),
       );
     } catch (err) {
       handleClassResponsibilityError(err, res);
@@ -88,7 +96,10 @@ export function createOfferingRouter(): Router {
     try {
       if (!(await assertCanManageClassResponsibilities(req, res))) return;
       const changed = await classResponsibilityService.revoke(
-        req.params.id!, req.params.assignmentId!, req.user!.id, parsed.data.reason,
+        req.params.id!,
+        req.params.assignmentId!,
+        req.user!.id,
+        parsed.data.reason,
       );
       if (!changed) {
         res.status(409).json({ error: "Class responsibility assignment is already revoked" });
@@ -139,8 +150,13 @@ export function createOfferingRouter(): Router {
       res.status(404).json({ error: "Offering not found" });
       return;
     }
+    // A lecturer may only fetch an offering they're assigned to (issue #104);
+    // a caller holding a programme-wide role for the offering's own course's
+    // programme (globally, or scoped to that programme — issue #147) may
+    // fetch any offering in it.
     if (!hasAnyRoleInProgramme(req.user!, PROGRAMME_WIDE_ROLES, offering.course?.programmeId ?? null)) {
-      const isAssigned = offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
+      const isAssigned =
+        offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
       if (!isAssigned) {
         res.status(403).json({ error: "You can only access your own offerings" });
         return;
@@ -149,6 +165,8 @@ export function createOfferingRouter(): Router {
     res.json(offering);
   });
 
+  // Scheduling an offering (term, capacity, status, lecturer assignment) is
+  // curriculum-admin work, not something a lecturer does for their own class.
   router.post("/", requirePermission("offerings:manage"), async (req, res) => {
     const parsed = CreateOfferingInput.safeParse(req.body);
     if (!parsed.success) {
@@ -186,6 +204,8 @@ export function createOfferingRouter(): Router {
     }
   });
 
+  // Enrollment management (links Students <-> this offering). A lecturer may only
+  // manage the roster of an offering they're assigned to; admins can manage any.
   router.post("/:id/enrollments", requirePermission("offerings:write"), async (req, res) => {
     if (!(await assertOwnOfferingOrAdmin(req, res))) return;
     const parsed = EnrollInput.safeParse(req.body);
@@ -200,14 +220,18 @@ export function createOfferingRouter(): Router {
     }
   });
 
-  router.delete("/:id/enrollments/:studentId", requirePermission("offerings:write"), async (req, res) => {
-    if (!(await assertOwnOfferingOrAdmin(req, res))) return;
-    try {
-      res.json(await offeringService.unenroll(req.params.id!, req.params.studentId!));
-    } catch (err) {
-      handleError(err, res, "Could not unenroll student");
-    }
-  });
+  router.delete(
+    "/:id/enrollments/:studentId",
+    requirePermission("offerings:write"),
+    async (req, res) => {
+      if (!(await assertOwnOfferingOrAdmin(req, res))) return;
+      try {
+        res.json(await offeringService.unenroll(req.params.id!, req.params.studentId!));
+      } catch (err) {
+        handleError(err, res, "Could not unenroll student");
+      }
+    },
+  );
 
   return router;
 }
@@ -227,6 +251,12 @@ async function assertCanManageClassResponsibilities(
   return true;
 }
 
+/**
+ * True (and untouched response) if the caller may manage this offering —
+ * scheduling (PATCH/DELETE), its roster, or section delivery records: a
+ * programme-wide role scoped to the offering's programme, the primary lecturer,
+ * or an assigned co-lecturer.
+ */
 async function assertOwnOfferingOrAdmin(
   req: import("express").Request,
   res: import("express").Response,
@@ -237,8 +267,11 @@ async function assertOwnOfferingOrAdmin(
     res.status(404).json({ error: "Offering not found" });
     return false;
   }
-  if (hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, offering.course?.programmeId ?? null)) return true;
-  const isAssigned = offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
+  if (hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, offering.course?.programmeId ?? null)) {
+    return true;
+  }
+  const isAssigned =
+    offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
   if (!isAssigned) {
     res.status(403).json({ error: `You can only ${action} your own offerings` });
     return false;
@@ -251,18 +284,40 @@ function handleClassResponsibilityError(err: unknown, res: import("express").Res
     res.status(404).json({ error: err.message });
     return;
   }
-  if (err instanceof ClassResponsibilityConflictError || err instanceof ClassResponsibilityEligibilityError) {
+  if (err instanceof ClassResponsibilityEligibilityError) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  if (err instanceof ClassResponsibilityConflictError) {
     res.status(409).json({ error: err.message });
     return;
   }
-  handleError(err, res, "Could not manage class responsibility");
+  const code = (err as { code?: string }).code;
+  if (code === "P2002" || code === "23505") {
+    res.status(409).json({ error: "Another active class responsibility conflicts with this assignment" });
+    return;
+  }
+  console.error("Class responsibility request failed", err);
+  res.status(500).json({ error: "Could not complete the class responsibility request" });
 }
 
 function handleError(err: unknown, res: import("express").Response, fallback: string): void {
-  if (err instanceof ReferenceError || err instanceof CapacityError) {
+  if (err instanceof ReferenceError) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  if (err instanceof CapacityError) {
     res.status(409).json({ error: err.message });
     return;
   }
-  console.error(err);
-  res.status(500).json({ error: fallback });
+  const code = (err as { code?: string }).code;
+  if (code === "P2002") {
+    res.status(409).json({ error: "That course, term, and class section already exist" });
+    return;
+  }
+  if (code === "P2025") {
+    res.status(404).json({ error: "Offering not found" });
+    return;
+  }
+  res.status(409).json({ error: fallback });
 }
