@@ -54,7 +54,10 @@ export const SaveAttendanceInput = z.object({
       });
     }),
 });
-export type SaveAttendanceInput = z.infer<typeof SaveAttendanceInput>;
+
+// Callers may omit defaulted fields; parsed data still normalizes them to
+// status=null, permissionPending=false, note="" before reaching the service.
+export type SaveAttendanceInput = z.input<typeof SaveAttendanceInput>;
 
 export interface AttendanceRecordView {
   studentId: string;
