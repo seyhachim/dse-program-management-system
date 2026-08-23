@@ -24,19 +24,12 @@ jobs:
           from pathlib import Path
           path = Path('packages/shared-types/src/plugins.ts')
           text = path.read_text()
-          old = '''    { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },
-          ],
-          permissions: ["student-portal:read", "student-portal:feedback"],
-          };'''
-          new = '''    { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },
-              { label: "Portfolio", path: "/portal/portfolio", icon: "user-cog", roles: ["student"], group: "Personal" },
-          ],
-          permissions: ["student-portal:read", "student-portal:feedback"],
-          };'''
+          anchor = '    { label: "Announcements", path: "/portal/announcements", icon: "bell", roles: ["student"], group: "Progress" },\n'
+          addition = '    { label: "Portfolio", path: "/portal/portfolio", icon: "user-cog", roles: ["student"], group: "Personal" },\n'
           if 'path: "/portal/portfolio"' not in text:
-              if old not in text:
+              if anchor not in text:
                   raise SystemExit('student portal manifest anchor not found')
-              text = text.replace(old, new, 1)
+              text = text.replace(anchor, anchor + addition, 1)
           path.write_text(text)
           PY
       - name: Remove one-shot workflow and commit patch
