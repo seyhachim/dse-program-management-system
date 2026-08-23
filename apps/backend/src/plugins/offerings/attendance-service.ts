@@ -55,8 +55,9 @@ interface PendingRow {
 function dateOnly(value: Date): string { return value.toISOString().slice(0, 10); }
 function dateValue(value: string): Date { return new Date(`${value}T00:00:00.000Z`); }
 function emptyCounts() {
-  return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 }
+  const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 }
     satisfies Record<AttendanceStatus, number> & { PermissionPending: number };
+  return counts;
 }
 
 async function roster(offeringId: string): Promise<EnrollmentRow[]> {
@@ -156,7 +157,6 @@ async function deliverPostSaveNotifications(
   const work: Array<Promise<void>> = newlyPending.map((pending) =>
     telegram.notifications.deliverPermissionPending({ ...pending, offeringId, date }),
   );
-
   for (const studentId of requestedStudentIds) {
     const evaluation = await studentAttendanceHistoryService.healthForStudent(studentId, offeringId);
     if (!evaluation) continue;
