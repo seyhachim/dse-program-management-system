@@ -82,7 +82,7 @@ function safeFilename(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function docxAlignment(align?: DseTextAlign): AlignmentType | undefined {
+function docxAlignment(align?: DseTextAlign) {
   if (align === "center") return AlignmentType.CENTER;
   if (align === "right") return AlignmentType.RIGHT;
   if (align === "justify") return AlignmentType.JUSTIFIED;
