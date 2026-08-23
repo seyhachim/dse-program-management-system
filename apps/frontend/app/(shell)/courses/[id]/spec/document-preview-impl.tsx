@@ -15,9 +15,14 @@ import {
   Maximize2,
   Minus,
   Plus,
+  Settings2,
 } from "lucide-react";
 import {
   Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -27,20 +32,39 @@ import { api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { courseSpecDocumentThemeApi } from "@/lib/course-spec-document-theme";
 import type { CourseDocumentModel } from "./course-document-model";
+import { CourseSpecDocumentThemePanel } from "./course-spec-document-theme-panel";
 import { exportCourseSpecWord } from "./document-export";
+import { getCourseSpecPreviewLayout } from "./document-preview-layout";
 import { exportCourseSpecPdf } from "./document-pdf-export";
 import {
   PAGE_WIDTH,
   displayDocumentValue,
 } from "./document-preview-pages";
 import { ThemedDocumentPages } from "./themed-document-pages";
-import { CourseSpecDocumentThemePanel } from "./course-spec-document-theme-panel";
 
 const VIEWER_PADDING = 24;
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 1.5;
 const ZOOM_STEP = 0.1;
 const EDITABLE_THEME_STATUSES = new Set(["Draft", "ChangesRequested"]);
+
+const DOCUMENT_CONTENTS = [
+  ["programme-overview", "Part 1. Programme Overview"],
+  ["plo-taxonomy", "Part 1. PLO Taxonomy"],
+  ["course-information", "1–13. Course Information"],
+  ["clos", "14. CLOs"],
+  ["mapping", "15. CLO–PLO Mapping"],
+  ["slt", "16. Student Learning Time"],
+  ["assessment-plan", "17. Assessment Plan"],
+  ["lesson-plan", "18. Detailed Lesson Plan"],
+  ["resources", "19. Required Resources"],
+  ["references", "20. References / Textbooks"],
+  ["responsibility", "21. Student Responsibility"],
+  ["rubric", "22. Rubric"],
+  ["policy", "23. Course Policy"],
+  ["rating-scale", "24. Rating Scale"],
+  ["spec-date", "25. Date"],
+] as const;
 
 type DocumentPreviewProps = {
   document: CourseDocumentModel;
@@ -84,11 +108,13 @@ export function DocumentPreview({
   const [themeError, setThemeError] = useState<string | null>(null);
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeMessage, setThemeMessage] = useState<string | null>(null);
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
 
   const canManageTheme =
     me?.roles.some(
       (role) => role === "admin" || role === "program_coordinator",
     ) ?? false;
+  const previewLayout = getCourseSpecPreviewLayout(canManageTheme);
   const versionThemeEditable =
     themeCourseSpecId !== null &&
     themeReviewStatus !== null &&
@@ -305,7 +331,7 @@ export function DocumentPreview({
             ) : null}
             {themeDirty ? (
               <p className="mt-2 max-w-2xl text-xs font-medium text-amber-700 dark:text-amber-300">
-                Unsaved style settings are staged in the right panel. The official preview remains on the saved version theme so Admin and Lecturer stay identical. Save for this version to apply them.
+                Unsaved style settings are staged in Document Style. The official preview remains on the saved version theme so Admin and Lecturer stay identical. Save for this version to apply them.
               </p>
             ) : null}
             {themeMessage ? (
@@ -315,41 +341,54 @@ export function DocumentPreview({
             ) : null}
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button type="button" disabled={exportDisabled} />}
-          >
-            {isExporting || gradingScaleLoading || themeLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            {isExporting
-              ? "Generating..."
-              : themeLoading
-                ? "Loading style..."
-                : gradingScaleLoading
-                  ? "Loading policy..."
-                  : "Download"}
-            <ChevronDown className="ml-1.5 h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={handleDownloadWord}
-              disabled={exportDisabled}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {previewLayout.showDocumentStyleControl ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setThemeDialogOpen(true)}
+              disabled={!officialThemeReady}
             >
-              <Download className="h-3.5 w-3.5" />
-              Download Word
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={handleDownloadPdf}
-              disabled={exportDisabled}
+              <Settings2 className="mr-2 h-4 w-4" />
+              Document Style
+            </Button>
+          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button type="button" disabled={exportDisabled} />}
             >
-              <Download className="h-3.5 w-3.5" />
-              Download PDF
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {isExporting || gradingScaleLoading || themeLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isExporting
+                ? "Generating..."
+                : themeLoading
+                  ? "Loading style..."
+                  : gradingScaleLoading
+                    ? "Loading policy..."
+                    : "Download"}
+              <ChevronDown className="ml-1.5 h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={handleDownloadWord}
+                disabled={exportDisabled}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download Word
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleDownloadPdf}
+                disabled={exportDisabled}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {!officialThemeReady ? (
@@ -369,13 +408,7 @@ export function DocumentPreview({
           </div>
         </div>
       ) : (
-        <div
-          className={
-            canManageTheme
-              ? "grid min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)_280px]"
-              : "grid h-[calc(100vh-250px)] min-h-[650px] gap-4 lg:grid-cols-[210px_minmax(0,1fr)]"
-          }
-        >
+        <div className={previewLayout.gridClassName}>
           <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
             <div className="rounded-lg border bg-card p-4">
               <h3 className="text-sm font-semibold">Document Information</h3>
@@ -428,28 +461,22 @@ export function DocumentPreview({
             <div className="rounded-lg border bg-card p-4">
               <h3 className="text-sm font-semibold">Contents</h3>
               <nav className="mt-3 space-y-1 text-sm">
-                <a href="#programme-overview" className="block rounded-md px-2 py-2 hover:bg-muted">Part 1. Programme Overview</a>
-                <a href="#plo-taxonomy" className="block rounded-md px-2 py-2 hover:bg-muted">Part 1. PLO Taxonomy</a>
-                <a href="#course-information" className="block rounded-md px-2 py-2 hover:bg-muted">1–13. Course Information</a>
-                <a href="#clos" className="block rounded-md px-2 py-2 hover:bg-muted">14. CLOs</a>
-                <a href="#mapping" className="block rounded-md px-2 py-2 hover:bg-muted">15. CLO–PLO Mapping</a>
-                <a href="#slt" className="block rounded-md px-2 py-2 hover:bg-muted">16. Student Learning Time</a>
-                <a href="#assessment-plan" className="block rounded-md px-2 py-2 hover:bg-muted">17. Assessment Plan</a>
-                <a href="#lesson-plan" className="block rounded-md px-2 py-2 hover:bg-muted">18. Detailed Lesson Plan</a>
-                <a href="#resources" className="block rounded-md px-2 py-2 hover:bg-muted">19. Required Resources</a>
-                <a href="#references" className="block rounded-md px-2 py-2 hover:bg-muted">20. References / Textbooks</a>
-                <a href="#responsibility" className="block rounded-md px-2 py-2 hover:bg-muted">21. Student Responsibility</a>
-                <a href="#rubric" className="block rounded-md px-2 py-2 hover:bg-muted">22. Rubric</a>
-                <a href="#policy" className="block rounded-md px-2 py-2 hover:bg-muted">23. Course Policy</a>
-                <a href="#rating-scale" className="block rounded-md px-2 py-2 hover:bg-muted">24. Rating Scale</a>
-                <a href="#spec-date" className="block rounded-md px-2 py-2 hover:bg-muted">25. Date</a>
+                {DOCUMENT_CONTENTS.map(([id, label]) => (
+                  <a
+                    key={id}
+                    href={`#${id}`}
+                    className="block rounded-md px-2 py-2 hover:bg-muted"
+                  >
+                    {label}
+                  </a>
+                ))}
               </nav>
             </div>
           </aside>
 
           <main
             ref={viewerRef}
-            className="relative min-h-[650px] overflow-auto rounded-lg border bg-muted/40"
+            className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40"
           >
             <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
               <button
@@ -511,26 +538,35 @@ export function DocumentPreview({
               />
             </div>
           </main>
-
-          {canManageTheme ? (
-            <CourseSpecDocumentThemePanel
-              value={themeDraft}
-              programmeDefault={programmeDefault}
-              onChange={setThemeDraft}
-              onSaveVersion={saveVersionTheme}
-              onSaveProgrammeDefault={saveProgrammeDefault}
-              onResetToProgrammeDefault={() => {
-                setThemeDraft(programmeDefault);
-                setThemeMessage(
-                  "Programme default loaded into the style form. The official preview remains unchanged until you save for this version.",
-                );
-              }}
-              saving={themeSaving}
-              versionEditable={versionThemeEditable}
-            />
-          ) : null}
         </div>
       )}
+
+      {previewLayout.showDocumentStyleControl ? (
+        <Dialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen}>
+          <DialogContent className="p-0 sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Course Specification Document Style</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[85vh] overflow-y-auto p-4">
+              <CourseSpecDocumentThemePanel
+                value={themeDraft}
+                programmeDefault={programmeDefault}
+                onChange={setThemeDraft}
+                onSaveVersion={saveVersionTheme}
+                onSaveProgrammeDefault={saveProgrammeDefault}
+                onResetToProgrammeDefault={() => {
+                  setThemeDraft(programmeDefault);
+                  setThemeMessage(
+                    "Programme default loaded into the style form. The official preview remains unchanged until you save for this version.",
+                  );
+                }}
+                saving={themeSaving}
+                versionEditable={versionThemeEditable}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
