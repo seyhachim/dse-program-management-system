@@ -1,5 +1,6 @@
 import type {
   AttendanceStatus,
+  TelegramAttendanceAchievement,
   TelegramAttendanceHealth,
   TelegramAttendanceHealthSignal,
 } from "@dse-pms/shared-types";
@@ -37,6 +38,66 @@ function hadPriorLateWarning(recordsNewestFirst: AttendanceHealthRecord[], curre
     }
   }
   return false;
+}
+
+function weekKey(date: string) {
+  const current = new Date(`${date}T00:00:00.000Z`);
+  const day = current.getUTCDay() || 7;
+  current.setUTCDate(current.getUTCDate() - day + 1);
+  return current.toISOString().slice(0, 10);
+}
+
+function deriveAchievements(
+  recordsNewestFirst: AttendanceHealthRecord[],
+  onTimeStreak: number,
+  state: TelegramAttendanceHealth["state"],
+): TelegramAttendanceAchievement[] {
+  const achievements: TelegramAttendanceAchievement[] = [];
+  const latestWeek = recordsNewestFirst[0] ? weekKey(recordsNewestFirst[0].date) : null;
+  const latestWeekRecords = latestWeek
+    ? recordsNewestFirst.filter((record) => weekKey(record.date) === latestWeek)
+    : [];
+
+  if (latestWeekRecords.length >= 2 && latestWeekRecords.every((record) => record.status === "Present")) {
+    achievements.push({
+      kind: "perfect_week",
+      title: "Perfect Week",
+      description: `Present and on time for all ${latestWeekRecords.length} finalized classes in your latest attendance week.`,
+      icon: "🏅",
+    });
+  }
+
+  const marked = recordsNewestFirst.length;
+  const attended = recordsNewestFirst.filter((record) => record.status === "Present" || record.status === "Late").length;
+  const attendanceRate = marked === 0 ? 0 : (attended / marked) * 100;
+  if (marked >= 5 && attendanceRate >= 90) {
+    achievements.push({
+      kind: "consistency",
+      title: "Consistency",
+      description: `${Math.round(attendanceRate)}% finalized attendance across ${marked} recorded classes.`,
+      icon: "✨",
+    });
+  }
+
+  if (onTimeStreak >= 5) {
+    achievements.push({
+      kind: "on_time",
+      title: "On Time",
+      description: `On time for your last ${onTimeStreak} finalized classes.`,
+      icon: "⏰",
+    });
+  }
+
+  if (state === "recovery") {
+    achievements.push({
+      kind: "comeback",
+      title: "Comeback",
+      description: "You rebuilt your punctuality with at least 3 on-time classes after an earlier late pattern.",
+      icon: "🌱",
+    });
+  }
+
+  return achievements;
 }
 
 function attendanceAdvice(absent: number, excused: number) {
@@ -89,11 +150,7 @@ export function evaluateAttendanceHealth(
       advice: punctualityAdvice,
     });
     if (consecutiveLate === 3 && newestFirst[0]) {
-      warningCandidates.push({
-        kind: "punctuality",
-        count: consecutiveLate,
-        eventSessionId: newestFirst[0].sessionId,
-      });
+      warningCandidates.push({ kind: "punctuality", count: consecutiveLate, eventSessionId: newestFirst[0].sessionId });
     }
   }
 
@@ -108,15 +165,9 @@ export function evaluateAttendanceHealth(
       advice: attendanceAdvice(counts.Absent, counts.Excused),
     });
     if (absencePermissionCount === 3) {
-      const latestContribution = newestFirst.find(
-        (record) => record.status === "Absent" || record.status === "Excused",
-      );
+      const latestContribution = newestFirst.find((record) => record.status === "Absent" || record.status === "Excused");
       if (latestContribution) {
-        warningCandidates.push({
-          kind: "attendance",
-          count: absencePermissionCount,
-          eventSessionId: latestContribution.sessionId,
-        });
+        warningCandidates.push({ kind: "attendance", count: absencePermissionCount, eventSessionId: latestContribution.sessionId });
       }
     }
   }
@@ -142,6 +193,8 @@ export function evaluateAttendanceHealth(
           ? `Great consistency — you have attended your last ${attendanceStreak} finalized classes.`
           : "Keep building a consistent attendance routine.";
 
+  const achievements = deriveAchievements(newestFirst, onTimeStreak, state);
+
   return {
     health: {
       state,
@@ -150,6 +203,7 @@ export function evaluateAttendanceHealth(
       consecutiveLate,
       absencePermissionCount,
       signals,
+      achievements,
       message,
     },
     warningCandidates,
