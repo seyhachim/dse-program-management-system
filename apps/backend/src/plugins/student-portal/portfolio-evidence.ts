@@ -11,6 +11,10 @@ import type {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { PortalAccessError, PortalNotFoundError } from "./service.ts";
+import {
+  invalidateVerifiedEvidenceAfterMaterialEdit,
+  portfolioEvidenceSnapshotHash,
+} from "./portfolio-verification.ts";
 
 const ORIGIN_TO_DB = {
   external_project: DbEvidenceOrigin.ExternalProject,
@@ -276,9 +280,7 @@ export const studentPortfolioEvidenceService = {
 
   async create(userId: string, input: StudentPortfolioEvidenceCreateInput): Promise<StudentPortfolioEvidence> {
     const studentId = await portfolioStudentId(userId);
-    let source:
-      | Awaited<ReturnType<typeof eligibleAssessmentSource>>
-      | null = null;
+    let source: Awaited<ReturnType<typeof eligibleAssessmentSource>> | null = null;
     if (input.source) {
       source = await eligibleAssessmentSource(studentId, input.source.offeringId, input.source.assessmentItemId);
     }
@@ -313,6 +315,7 @@ export const studentPortfolioEvidenceService = {
   ): Promise<StudentPortfolioEvidence> {
     const studentId = await portfolioStudentId(userId);
     await evidenceRow(evidenceId, studentId);
+    const beforeHash = await portfolioEvidenceSnapshotHash(evidenceId);
 
     await prisma.$transaction(async (tx) => {
       await tx.studentPortfolioEvidence.update({
@@ -332,6 +335,7 @@ export const studentPortfolioEvidenceService = {
       }
     });
 
+    await invalidateVerifiedEvidenceAfterMaterialEdit(evidenceId, beforeHash);
     return serializeEvidence(studentId, await evidenceRow(evidenceId, studentId));
   },
 
