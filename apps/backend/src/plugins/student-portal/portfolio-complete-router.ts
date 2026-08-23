@@ -13,6 +13,7 @@ import { studentPortfolioSoftSkillService } from "./portfolio-soft-skills.ts";
 import { studentPortfolioCompetencyService } from "./portfolio-competencies.ts";
 import { studentPortfolioOverviewService } from "./portfolio-overview.ts";
 import { studentPortfolioVerificationService } from "./portfolio-verification.ts";
+import { studentPortfolioVerificationInboxService } from "./portfolio-verification-inbox.ts";
 
 function handle(error: unknown, res: import("express").Response) {
   if (error instanceof PortalNotFoundError) return res.status(404).json({ error: error.message });
@@ -71,8 +72,11 @@ export function createStudentPortfolioCompleteRouter(): Router {
     try { res.json(await studentPortfolioVerificationService.history(req.user!.id, req.params.evidenceId!)); } catch (error) { handle(error, res); }
   });
 
-  // Staff verification deliberately does not use student-portal:read: verification
-  // authority is derived from the exact Offering/co-lecturer or approved supervisor relationship.
+  // Staff verification deliberately does not use student-portal:read. Authority
+  // is derived from the exact Offering/co-lecturer or an approved supervisor relationship.
+  router.get("/verification/inbox", async (req, res) => {
+    try { res.json(await studentPortfolioVerificationInboxService.list(req.user!)); } catch (error) { handle(error, res); }
+  });
   router.post("/evidence/:evidenceId/verification", async (req, res) => {
     const parsed = StudentPortfolioVerificationDecisionInput.safeParse(req.body);
     if (!parsed.success) return void invalid(res, "Invalid verification decision", parsed);
