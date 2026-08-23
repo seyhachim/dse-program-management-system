@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   TelegramHealthResponseSchema,
+  TelegramHomeResponseSchema,
   TelegramInitDataVerifyRequestSchema,
   TelegramInitDataVerifyResponseSchema,
   TelegramPublicConfigSchema,
@@ -54,5 +55,50 @@ describe("Telegram public contracts", () => {
         expiresAt: "2026-08-16T05:05:00.000Z",
       }).telegramUser.id,
     ).toBe("123456789");
+  });
+
+  test("validates the student today home projection", () => {
+    const parsed = TelegramHomeResponseSchema.parse({
+      user: {
+        id: "user-1",
+        name: "Student One",
+        email: "student@example.edu",
+        roles: ["student"],
+      },
+      courses: [],
+      today: {
+        date: "2026-08-23",
+        dayOfWeek: "Sunday",
+        localTime: "09:04",
+        classes: [
+          {
+            meetingId: "meeting-1",
+            offeringId: "offering-1",
+            courseCode: "PAN202",
+            courseTitle: "Predictive Analytics",
+            sectionCode: "A",
+            date: "2026-08-23",
+            dayOfWeek: "Sunday",
+            startTime: "09:00",
+            endTime: "11:00",
+            room: "Room 301",
+            activityType: "Lecture",
+            lecturerNames: ["Chim Seyha"],
+            arrivalStatus: "Present",
+            arrivalRecordedAt: "2026-08-23T02:04:00.000Z",
+            sessionStatus: "Scheduled",
+            canConfirmLecturerArrival: false,
+          },
+        ],
+        nextClass: null,
+      },
+      unreadAnnouncements: 1,
+      publishedResultCount: 2,
+      surveyActions: 1,
+    });
+
+    expect(parsed.today?.classes[0]?.courseCode).toBe("PAN202");
+    expect(parsed.today?.classes[0]?.arrivalStatus).toBe("Present");
+    expect(parsed.today?.classes[0]?.canConfirmLecturerArrival).toBe(false);
   });
 });
