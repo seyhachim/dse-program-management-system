@@ -120,14 +120,14 @@ export function TelegramAnalyticsClient() {
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard label="Mini App opens" value={data.miniApp.opens} hint={`Last ${data.periodDays} days`} />
             <MetricCard label="Unique PMS users" value={data.miniApp.uniqueUsers} hint="Distinct authenticated users" />
-            <MetricCard label="Feature views" value={data.miniApp.totalEvents} hint="Meaningful read events only" />
+            <MetricCard label="Feature views" value={data.miniApp.totalEvents} hint="Successful meaningful read views" />
             <MetricCard label="Ask DSE gaps" value={data.askDse.informationGapQuestions} hint="Low-confidence + no-match only" />
           </section>
 
           <section className="grid gap-5 lg:grid-cols-2">
             <div className="rounded-xl border bg-white p-5 shadow-sm">
-              <h3 className="font-semibold text-slate-900">Most-used Mini App areas</h3>
-              <p className="mt-1 text-xs text-slate-500">Successful read views; mutations are intentionally excluded.</p>
+              <h3 className="font-semibold text-slate-900">Most-used Mini App events</h3>
+              <p className="mt-1 text-xs text-slate-500">Includes opens and successful read views; mutations are intentionally excluded.</p>
               <div className="mt-4 space-y-3">
                 {data.miniApp.topEvents.length === 0 ? (
                   <p className="text-sm text-slate-500">No Mini App usage recorded in this period.</p>
@@ -152,7 +152,7 @@ export function TelegramAnalyticsClient() {
                       <p className="text-sm font-medium text-slate-700">{roleLabel(item.role)}</p>
                       <p className="text-xs text-slate-500">{item.uniqueUsers} unique user{item.uniqueUsers === 1 ? "" : "s"}</p>
                     </div>
-                    <span className="text-sm font-semibold text-slate-900">{item.eventCount} views</span>
+                    <span className="text-sm font-semibold text-slate-900">{item.eventCount} events</span>
                   </div>
                 ))}
               </div>
