@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - "apps/backend/src/plugins/student-portal/**"
+      - "apps/backend/prisma/**"
       - "apps/frontend/app/(shell)/portal/**"
       - "apps/frontend/lib/student-portal.ts"
+      - "apps/frontend/lib/student-portfolio.ts"
       - "packages/shared-types/src/student-portal.ts"
+      - "packages/shared-types/src/student-portfolio.ts"
       - "packages/shared-types/src/plugins.ts"
       - ".github/workflows/student-portal-mvp-integrity.yml"
 
@@ -37,6 +40,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_student_portal_ci?schema=public
       STUDENT_PORTAL_MVP_DB_TESTS: "1"
+      STUDENT_PORTFOLIO_DB_TESTS: "1"
       JWT_SECRET: issue-169-student-portal-ci-secret-at-least-32-characters
 
     steps:
@@ -61,4 +65,4 @@ jobs:
         run: bun run seed
 
       - name: Verify Student Portal authorization and publication boundaries
-        run: bun test apps/backend/src/plugins/student-portal/portal-mvp-db.test.ts
+        run: bun test apps/backend/src/plugins/student-portal/portal-mvp-db.test.ts apps/backend/src/plugins/student-portal/portfolio-evidence-db.test.ts
