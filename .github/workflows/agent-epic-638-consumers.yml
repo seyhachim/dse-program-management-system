@@ -7,6 +7,7 @@ on:
     paths:
       - scripts/agent-epic-638-backend-consumers.ts
       - scripts/agent-epic-638-consumer-fixes.ts
+      - scripts/agent-epic-638-offering-security.ts
       - .github/workflows/agent-epic-638-consumers.yml
 
 permissions:
@@ -37,6 +38,7 @@ jobs:
         run: |
           bun scripts/agent-epic-638-backend-consumers.ts
           bun scripts/agent-epic-638-consumer-fixes.ts
+          bun scripts/agent-epic-638-offering-security.ts
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Validate Prisma
@@ -45,7 +47,7 @@ jobs:
           bunx prisma validate --schema apps/backend/prisma/schema.prisma
           bun run --cwd apps/backend db:generate
       - name: Targeted calendar tests
-        run: bun test apps/backend/src/plugins/programme/academic-calendar-domain.test.ts apps/backend/src/plugins/programme/academic-calendar-router.test.ts
+        run: bun test apps/backend/src/plugins/programme/academic-calendar-domain.test.ts apps/backend/src/plugins/programme/academic-calendar-router.test.ts apps/backend/src/plugins/offerings/academic-calendar-contract.test.ts
       - name: Typecheck
         run: bun run typecheck
       - name: Lint
@@ -56,6 +58,7 @@ jobs:
         run: |
           rm scripts/agent-epic-638-backend-consumers.ts
           rm scripts/agent-epic-638-consumer-fixes.ts
+          rm scripts/agent-epic-638-offering-security.ts
           rm .github/workflows/agent-epic-638-consumers.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
