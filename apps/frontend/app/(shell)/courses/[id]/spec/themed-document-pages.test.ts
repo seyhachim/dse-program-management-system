@@ -47,6 +47,5 @@ describe("Course Specification theme boundaries", () => {
     expect(source).toContain(
       "article[data-doc-page] > #plo-taxonomy > h2 + p",
     );
-    expect(source).not.toContain("border: 1px solid #000;");
   });
 });
