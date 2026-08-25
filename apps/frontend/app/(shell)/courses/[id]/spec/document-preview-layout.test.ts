@@ -7,9 +7,16 @@ describe("Course Specification preview role parity", () => {
     const lecturer = getCourseSpecPreviewLayout(false);
 
     expect(governance.gridClassName).toBe(lecturer.gridClassName);
-    expect(governance.gridClassName).not.toContain("_280px");
+    expect(governance.gridClassName).toContain("lg:grid-cols-[250px_minmax(0,1fr)]");
     expect(governance.showDocumentStyleControl).toBe(true);
     expect(lecturer.showDocumentStyleControl).toBe(false);
+  });
+
+  test("keeps the preview grid shrinkable so the sidebar cannot force page-level horizontal overflow", () => {
+    const layout = getCourseSpecPreviewLayout(false);
+
+    expect(layout.gridClassName).toContain("min-w-0");
+    expect(layout.gridClassName).toContain("minmax(0,1fr)");
   });
 
   test("lets the document workspace grow with the page stack instead of clipping it to a viewport calculation", () => {
