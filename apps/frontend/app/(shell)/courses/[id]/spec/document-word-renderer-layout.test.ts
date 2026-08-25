@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 const SOURCE_PATH = new URL("./document-word-renderer.ts", import.meta.url);
 
-describe("Course Specification Word Part 1 layout", () => {
+describe("Course Specification Word layout", () => {
   test("matches the approved preview header typography", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
@@ -38,5 +38,35 @@ describe("Course Specification Word Part 1 layout", () => {
       "Part 1 (continued): Programme Learning Outcomes — Taxonomy",
     );
     expect(source).not.toContain("colWidths([6, 8, 38, 16, 16, 8, 8])");
+  });
+
+  test("keeps Part 2 as one Word table and lets Word paginate rows 14 through 25", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+
+    expect(source).toContain("continuationRows: TableRow[] = []");
+    expect(source).toContain("...continuationRows");
+    expect(source).toContain("function partTwoContinuationRow");
+    expect(source).toContain("function partTwoContinuationRows");
+    expect(source).toContain("columnSpan: 4");
+    expect(source).toContain("partTwoContinuationRow(cloSection(document))");
+    expect(source).toContain('sectionTitle("15"');
+    expect(source).toContain('sectionTitle("16"');
+    expect(source).toContain('sectionTitle("17"');
+    expect(source).toContain('sectionTitle("18"');
+    expect(source).toContain('sectionTitle("19"');
+    expect(source).toContain('sectionTitle("20"');
+    expect(source).toContain('sectionTitle("21"');
+    expect(source).toContain('sectionTitle("22"');
+    expect(source).toContain('sectionTitle("23"');
+    expect(source).toContain('sectionTitle("24"');
+    expect(source).toContain('sectionTitle("25"');
+    expect(source).toContain(
+      "courseInformationTable(info, partTwoContinuationRows(document))",
+    );
+
+    // Only the intentional Part 1 -> Part 2 page break remains. Word is free to
+    // carry continuation rows onto the next page based on actual rendered height.
+    expect(source.match(/new PageBreak\(\)/g)?.length).toBe(1);
+    expect(source).not.toContain("function sectionBox");
   });
 });

@@ -145,27 +145,6 @@ function table(rows: TableRow[], columnWidths?: number[]) {
   });
 }
 
-function sectionBox(children: (Paragraph | Table)[]) {
-  return new Table({
-    width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
-    columnWidths: [CONTENT_WIDTH_TWIPS],
-    layout: TableLayoutType.FIXED,
-    borders,
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
-            verticalAlign: VerticalAlign.TOP,
-            margins: { top: 70, bottom: 70, left: 75, right: 75 },
-            children,
-          }),
-        ],
-      }),
-    ],
-  });
-}
-
 function values(items: string[]) {
   return items.length ? items.join(", ") : "—";
 }
@@ -323,6 +302,7 @@ async function programmeProfileTable(document: CourseDocumentModel) {
 
 function courseInformationTable(
   info: CourseDocumentModel["courseInformation"],
+  continuationRows: TableRow[] = [],
 ) {
   const row = (...cells: TableCell[]) => new TableRow({ children: cells });
   const w = colWidths([28, 24, 16, 32]);
@@ -371,6 +351,7 @@ function courseInformationTable(
         info.programmeYear,
       ),
       labelValueRow("13. Course Description / Synopsis", info.description),
+      ...continuationRows,
     ],
     w,
   );
@@ -1740,6 +1721,114 @@ function programmePloContinuationCell(document: CourseDocumentModel) {
   });
 }
 
+function partTwoContinuationRow(children: (Paragraph | Table)[]) {
+  return new TableRow({
+    children: [
+      new TableCell({
+        columnSpan: 4,
+        width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+        verticalAlign: VerticalAlign.TOP,
+        margins: { top: 70, bottom: 70, left: 75, right: 75 },
+        children,
+      }),
+    ],
+  });
+}
+
+function partTwoContinuationRows(document: CourseDocumentModel): TableRow[] {
+  return [
+    partTwoContinuationRow(cloSection(document)),
+    partTwoContinuationRow([
+      sectionTitle(
+        "15",
+        "Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods",
+      ),
+      officialCloPloMatrixTable(document, "hours"),
+      paragraph("1 Credit = 40 Student Learning Time (SLT)", false, SMALL),
+      officialCloPloMatrixTable(document, "percent"),
+      paragraph(
+        "Fully (F) indicates a focus of more than 50% of the total SLT on this PLO, Moderate (M) indicates a focus of 31%–50% of the total SLT, and Partial (P) indicates a focus of less than 30% of the total SLT on the PLO.",
+        false,
+        SMALL,
+      ),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("16", "Distribution of Student Learning Time (SLT)"),
+      paragraph("* Lecture (L), Tutoring (T), Practice (P), Other (O)", false, SMALL),
+      courseContentSltTable(document),
+      new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }),
+      assessmentSltTable(document, "continuous"),
+      new Paragraph({ spacing: { before: 70, after: 0 }, children: [] }),
+      assessmentSltTable(document, "final"),
+      new Paragraph({ spacing: { before: 45, after: 0 }, children: [] }),
+      grandTotalSltTable(document),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("17", "Course Assessment Plan"),
+      assessmentPlanTable(document),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("18", "Course Outline/detailed lesson plan"),
+      lessonLearningOutcomesTable(document.weeklyPlan),
+      paragraph("* Active Learning Strategies (ALS)", false, SMALL),
+      centered("Detail Course Syllabus", false, SMALL),
+      detailCourseSyllabusTable(document, document.weeklyPlan),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("19", "Required Resources to Deliver the Course"),
+      ...(document.resources.length === 0
+        ? [
+            paragraph(
+              "No required resources have been confirmed.",
+              false,
+              SMALL,
+            ),
+          ]
+        : [resourcesTable(document.resources)]),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("20", "References / Textbooks"),
+      ...(document.references.length === 0
+        ? [
+            paragraph(
+              "No references have been recorded.",
+              false,
+              SMALL,
+            ),
+          ]
+        : [referencesTable(document.references)]),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("21", "Student Responsibility"),
+      ...(document.responsibilities.length === 0
+        ? [
+            paragraph(
+              "No student responsibilities have been recorded.",
+              false,
+              SMALL,
+            ),
+          ]
+        : bulletedList(document.responsibilities)),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("22", "Rubric"),
+      ...rubricSection(document),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("23", "Course Policy"),
+      ...policyParagraphs(document.policy),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("24", "Rating Scale"),
+      ratingScaleTable(document),
+    ]),
+    partTwoContinuationRow([
+      sectionTitle("25", "Date"),
+      dateTable(document.specDate),
+    ]),
+  ];
+}
+
 function dateTable(specDate: CourseDocumentModel["specDate"]) {
   const w = colWidths([50, 50]);
   const rows = [
@@ -1810,131 +1899,8 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
   children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(paragraph(document.partTitle, true));
   children.push(paragraph("Course Information", true));
-  children.push(courseInformationTable(info));
-
-  children.push(sectionBox(cloSection(document)));
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(
-    sectionBox([
-      sectionTitle(
-        "15",
-        "Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods",
-      ),
-      officialCloPloMatrixTable(document, "hours"),
-      paragraph("1 Credit = 40 Student Learning Time (SLT)", false, SMALL),
-      officialCloPloMatrixTable(document, "percent"),
-      paragraph(
-        "Fully (F) indicates a focus of more than 50% of the total SLT on this PLO, Moderate (M) indicates a focus of 31%–50% of the total SLT, and Partial (P) indicates a focus of less than 30% of the total SLT on the PLO.",
-        false,
-        SMALL,
-      ),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([
-      sectionTitle("16", "Distribution of Student Learning Time (SLT)"),
-      paragraph("* Lecture (L), Tutoring (T), Practice (P), Other (O)", false, SMALL),
-      courseContentSltTable(document),
-      new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }),
-      assessmentSltTable(document, "continuous"),
-      new Paragraph({ spacing: { before: 70, after: 0 }, children: [] }),
-      assessmentSltTable(document, "final"),
-      new Paragraph({ spacing: { before: 45, after: 0 }, children: [] }),
-      grandTotalSltTable(document),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([
-      sectionTitle("17", "Course Assessment Plan"),
-      assessmentPlanTable(document),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([
-      sectionTitle("18", "Course Outline/detailed lesson plan"),
-      lessonLearningOutcomesTable(document.weeklyPlan),
-      paragraph("* Active Learning Strategies (ALS)", false, SMALL),
-      centered("Detail Course Syllabus", false, SMALL),
-      detailCourseSyllabusTable(document, document.weeklyPlan),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([
-      sectionTitle("19", "Required Resources to Deliver the Course"),
-      ...(document.resources.length === 0
-        ? [
-            paragraph(
-              "No required resources have been confirmed.",
-              false,
-              SMALL,
-            ),
-          ]
-        : [resourcesTable(document.resources)]),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([
-      sectionTitle("20", "References / Textbooks"),
-      ...(document.references.length === 0
-        ? [
-            paragraph(
-              "No references have been recorded.",
-              false,
-              SMALL,
-            ),
-          ]
-        : [referencesTable(document.references)]),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([
-      sectionTitle("21", "Student Responsibility"),
-      ...(document.responsibilities.length === 0
-        ? [
-            paragraph(
-              "No student responsibilities have been recorded.",
-              false,
-              SMALL,
-            ),
-          ]
-        : bulletedList(document.responsibilities)),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([sectionTitle("22", "Rubric"), ...rubricSection(document)]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([
-      sectionTitle("23", "Course Policy"),
-      ...policyParagraphs(document.policy),
-    ]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([sectionTitle("24", "Rating Scale"), ratingScaleTable(document)]),
-  );
-
-  children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(
-    sectionBox([sectionTitle("25", "Date"), dateTable(document.specDate)]),
+    courseInformationTable(info, partTwoContinuationRows(document)),
   );
 
   const doc = new Document({
