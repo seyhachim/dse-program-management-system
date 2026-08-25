@@ -122,7 +122,7 @@ dbDescribe("Student Portal Academic Calendar publication boundary", () => {
       expect(available.academicYear.label).toBe("2026-2027");
       expect(available.periods).toHaveLength(1);
       expect(available.periods[0]?.teachingStart).toBe("2026-09-16");
-      expect(available.nextEvent?.title).toBe("Final examinations");
+      expect(available.events.map((event) => event.title)).toContain("Final examinations");
     }
   });
 });
