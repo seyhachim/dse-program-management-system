@@ -194,7 +194,8 @@ CREATE TRIGGER "AcademicCalendarAuditAction_append_only" BEFORE UPDATE OR DELETE
 
 -- Supabase Data API boundary: backend-owned academic calendar tables are not
 -- directly readable/writable by anon/authenticated/service_role roles. All
--- access goes through permission-checked PMS APIs.
+-- access goes through permission-checked PMS APIs. Supabase-specific roles are
+-- optional in ordinary PostgreSQL, so references to them are guarded via pg_roles.
 ALTER TABLE "AcademicYear" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AcademicCalendar" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AcademicCalendarStudyYear" ENABLE ROW LEVEL SECURITY;
@@ -202,14 +203,35 @@ ALTER TABLE "AcademicCalendarPeriod" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AcademicCalendarEvent" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AcademicCalendarAuditAction" ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE "AcademicYear" FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE "AcademicCalendar" FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE "AcademicCalendarStudyYear" FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE "AcademicCalendarPeriod" FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE "AcademicCalendarEvent" FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE "AcademicCalendarAuditAction" FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL PRIVILEGES ON TABLE "AcademicYear" FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE "AcademicCalendar" FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE "AcademicCalendarStudyYear" FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE "AcademicCalendarPeriod" FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE "AcademicCalendarEvent" FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE "AcademicCalendarAuditAction" FROM PUBLIC;
 
-REVOKE ALL ON FUNCTION guard_academic_calendar_parent_mutation() FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION guard_academic_calendar_child_mutation() FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION guard_academic_calendar_publish_conflict() FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION prevent_academic_calendar_audit_mutation() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_parent_mutation() FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_child_mutation() FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_publish_conflict() FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION prevent_academic_calendar_audit_mutation() FROM PUBLIC;
+
+DO $$
+DECLARE
+  api_role text;
+BEGIN
+  FOR api_role IN
+    SELECT rolname
+    FROM pg_roles
+    WHERE rolname = ANY (ARRAY['anon', 'authenticated', 'service_role'])
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON TABLE "AcademicYear", "AcademicCalendar", "AcademicCalendarStudyYear", "AcademicCalendarPeriod", "AcademicCalendarEvent", "AcademicCalendarAuditAction" FROM %I',
+      api_role
+    );
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_parent_mutation(), guard_academic_calendar_child_mutation(), guard_academic_calendar_publish_conflict(), prevent_academic_calendar_audit_mutation() FROM %I',
+      api_role
+    );
+  END LOOP;
+END
+$$;
