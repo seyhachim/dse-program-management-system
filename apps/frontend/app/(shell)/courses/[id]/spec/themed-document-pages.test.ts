@@ -33,7 +33,7 @@ describe("Course Specification theme boundaries", () => {
       "article[data-doc-page] > #plo-taxonomy",
     );
     expect(source).toContain("height: auto !important;");
-    expect(source).toContain("margin: 0 54px;");
+    expect(source).toContain("margin: 42px 54px 0;");
     expect(source).toContain("padding: 8px !important;");
     expect(source).toContain("border: 1px solid #000;");
     expect(source).toContain(
@@ -45,6 +45,7 @@ describe("Course Specification theme boundaries", () => {
     expect(source).not.toContain(
       "#programme-overview .grid.border.border-black::after",
     );
+    expect(source).not.toContain("margin: 0 54px;");
     expect(source).not.toContain("padding: 38px 54px !important;");
   });
 });
