@@ -1,31 +1,44 @@
 import { describe, expect, it } from "bun:test";
-import { invitationAlreadyAccepted } from "./resend-invitation.ts";
+import { invitationIsPending } from "./resend-invitation.ts";
 
-describe("invitationAlreadyAccepted", () => {
-  it("allows a still-pending invitation to be rotated", () => {
+describe("invitationIsPending", () => {
+  it("allows a still-pending Supabase invitation to be rotated", () => {
     expect(
-      invitationAlreadyAccepted({
+      invitationIsPending({
+        invited_at: "2026-08-25T02:00:00.000Z",
+        email_confirmed_at: null,
+        last_sign_in_at: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("blocks an unconfirmed identity that was not created as an invitation", () => {
+    expect(
+      invitationIsPending({
+        invited_at: null,
         email_confirmed_at: null,
         last_sign_in_at: null,
       }),
     ).toBe(false);
   });
 
-  it("blocks a confirmed account", () => {
+  it("blocks a confirmed invited account", () => {
     expect(
-      invitationAlreadyAccepted({
+      invitationIsPending({
+        invited_at: "2026-08-25T02:00:00.000Z",
         email_confirmed_at: "2026-08-25T03:00:00.000Z",
         last_sign_in_at: null,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("blocks an account that has already signed in", () => {
+  it("blocks an invited account that has already signed in", () => {
     expect(
-      invitationAlreadyAccepted({
+      invitationIsPending({
+        invited_at: "2026-08-25T02:00:00.000Z",
         email_confirmed_at: null,
         last_sign_in_at: "2026-08-25T03:01:00.000Z",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
