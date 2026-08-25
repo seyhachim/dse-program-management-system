@@ -20,6 +20,17 @@ describe("Course Specification theme boundaries", () => {
     );
   });
 
+  test("locks the Part 1 header to the approved Times New Roman sizes", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+
+    expect(source).toContain("#programme-overview header > p");
+    expect(source).toContain('font-family: "Times New Roman", Times, serif !important;');
+    expect(source).toContain("font-size: 11pt !important;");
+    expect(source).toContain("font-weight: 700 !important;");
+    expect(source).toContain("#programme-overview h1");
+    expect(source).toContain("font-size: 14pt !important;");
+  });
+
   test("does not draw a full-page outer frame", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
