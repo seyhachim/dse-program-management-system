@@ -1,0 +1,62 @@
+name: Agent Epic 638 Phase 1
+
+on:
+  push:
+    branches:
+      - agent/epic-638-academic-calendar
+    paths:
+      - scripts/agent-epic-638-phase1.ts
+      - scripts/agent-epic-638-phase1-fix.ts
+      - scripts/agent-epic-638-phase1-security-fix.ts
+      - .github/workflows/agent-epic-638-phase1.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-epic-638-phase1
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/epic-638-academic-calendar
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Apply staged implementation
+        run: |
+          bun scripts/agent-epic-638-phase1.ts
+          bun scripts/agent-epic-638-phase1-fix.ts
+          bun scripts/agent-epic-638-phase1-security-fix.ts
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Format and validate Prisma
+        run: |
+          bunx prisma format --schema apps/backend/prisma/schema.prisma
+          bunx prisma validate --schema apps/backend/prisma/schema.prisma
+          bun run --cwd apps/backend db:generate
+      - name: Targeted academic calendar tests
+        run: bun test apps/backend/src/plugins/programme/academic-calendar-domain.test.ts apps/backend/src/plugins/programme/academic-calendar-router.test.ts
+      - name: Repository typecheck
+        run: bun run typecheck
+      - name: Repository lint
+        run: bun run lint
+      - name: Production build
+        run: bun run build
+      - name: Commit verified phase 1
+        run: |
+          rm scripts/agent-epic-638-phase1.ts
+          rm scripts/agent-epic-638-phase1-fix.ts
+          rm scripts/agent-epic-638-phase1-security-fix.ts
+          rm .github/workflows/agent-epic-638-phase1.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(calendar): add canonical academic calendar domain (#638)"
+          git push origin HEAD:agent/epic-638-academic-calendar
