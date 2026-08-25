@@ -65,6 +65,20 @@ export function ThemedDocumentPages({
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
 
+        /* Part 1 continues onto the PLO page. Render that page as one full-width
+           continuation row aligned to the programme-profile table instead of as
+           a separately framed document section. The inner PLO matrix keeps its
+           own borders unchanged. */
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
+          box-sizing: border-box;
+          height: auto !important;
+          margin-top: 18px;
+          margin-left: 30px;
+          margin-right: 30px;
+          padding: 8px !important;
+          border: 1px solid #000;
+        }
+
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p,
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) li {
           font-size: var(--cs-body-size);

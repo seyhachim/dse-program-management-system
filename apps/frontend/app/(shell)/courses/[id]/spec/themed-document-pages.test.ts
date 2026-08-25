@@ -24,6 +24,17 @@ describe("Course Specification theme boundaries", () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
     expect(source).not.toContain("article[data-doc-page]::before");
-    expect(source).not.toContain("border: 1px solid #000;");
+  });
+
+  test("renders the PLO page as the full-width continuation row of Part 1", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+
+    expect(source).toContain(
+      "article[data-doc-page] > #plo-taxonomy",
+    );
+    expect(source).toContain("height: auto !important;");
+    expect(source).toContain("margin-left: 30px;");
+    expect(source).toContain("margin-right: 30px;");
+    expect(source).toContain("border: 1px solid #000;");
   });
 });
