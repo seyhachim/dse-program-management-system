@@ -18,6 +18,10 @@ function offering(
     createdAt: "2026-08-14T00:00:00.000Z",
     semester: "Second",
     programmeYear: 2,
+    // Grouping behavior is calendar-agnostic. Keep this fixture as a valid
+    // historical/unlinked offering so the compatibility path stays covered.
+    academicCalendarPeriodId: null,
+    academicCalendar: null,
     startDate: null,
     endDate: null,
     otherLecturers: null,
