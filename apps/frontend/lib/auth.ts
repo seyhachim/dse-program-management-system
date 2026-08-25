@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import type { CreateAccountInput, MeResponse } from "@dse-pms/shared-types";
+import type {
+  CreateAccountInput,
+  MeResponse,
+  ResendInvitationResponse,
+} from "@dse-pms/shared-types";
 import { api } from "./api";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
@@ -15,8 +19,11 @@ export const authApi = {
   createAccount(input: CreateAccountInput): Promise<MeResponse> {
     return api.post<MeResponse>("/api/auth/accounts", input);
   },
-  resendInvitation(userId: string): Promise<{ email: string }> {
-    return api.post<{ email: string }>(`/api/auth/accounts/${userId}/resend-invitation`, {});
+  resendInvitation(userId: string): Promise<ResendInvitationResponse> {
+    return api.post<ResendInvitationResponse>(
+      `/api/auth/accounts/${userId}/resend-invitation`,
+      {},
+    );
   },
 };
 
