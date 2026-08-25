@@ -1,10 +1,12 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { PrismaClient } from "@prisma/client";
 import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
 import { ensureCourseForCourseSpecImport } from "./course-spec-import-course.ts";
 
 const describeDb = process.env.COURSE_SPEC_IMPORT_DB_TESTS === "1" ? describe : describe.skip;
 const prisma = new PrismaClient();
+
+afterAll(() => prisma.$disconnect());
 
 describeDb("course-spec import Course catalog integrity", () => {
   test("preserves every existing Course catalog field when legacy metadata conflicts", async () => {
@@ -57,7 +59,6 @@ describeDb("course-spec import Course catalog integrity", () => {
       ).toEqual(canonical);
     } finally {
       await prisma.course.deleteMany({ where: { code } });
-      await prisma.$disconnect();
     }
   }, 30_000);
 
@@ -89,7 +90,6 @@ describeDb("course-spec import Course catalog integrity", () => {
       });
     } finally {
       await prisma.course.deleteMany({ where: { code } });
-      await prisma.$disconnect();
     }
   }, 30_000);
 });
