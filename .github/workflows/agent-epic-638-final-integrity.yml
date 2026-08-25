@@ -39,7 +39,7 @@ jobs:
       - name: Verify expected changed files only
         shell: bash
         run: |
-          git diff --name-only | sort > /tmp/actual.txt
+          { git diff --name-only; git ls-files --others --exclude-standard; } | sort -u > /tmp/actual.txt
           cat > /tmp/expected.txt <<'EOF'
           apps/backend/prisma/migrations/20260825204000_harden_academic_calendar_offering_integrity/migration.sql
           apps/backend/src/plugins/offerings/service.ts
