@@ -1,5 +1,5 @@
 import { Topbar } from "../topbar";
-import { AcademicCalendarClient } from "./academic-calendar-client";
+import { AcademicCalendarSimpleClient } from "./academic-calendar-simple-client";
 
 export default function AcademicCalendarPage() {
   return (
@@ -9,7 +9,7 @@ export default function AcademicCalendarPage() {
         subtitle="Manage official programme academic periods once and reuse them safely"
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
-        <AcademicCalendarClient />
+        <AcademicCalendarSimpleClient />
       </main>
     </>
   );
