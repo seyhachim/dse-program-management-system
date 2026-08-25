@@ -5,9 +5,15 @@ import { ProvisioningError } from "./service.ts";
 export function invitationIsPending(user: {
   invited_at?: string | null;
   email_confirmed_at?: string | null;
+  confirmed_at?: string | null;
   last_sign_in_at?: string | null;
 }): boolean {
-  return Boolean(user.invited_at && !user.email_confirmed_at && !user.last_sign_in_at);
+  return Boolean(
+    user.invited_at &&
+      !user.email_confirmed_at &&
+      !user.confirmed_at &&
+      !user.last_sign_in_at,
+  );
 }
 
 /**
@@ -48,13 +54,20 @@ export async function resendLecturerInvitation(userId: string): Promise<{ email:
     throw new ProvisioningError(getError.message);
   }
 
-  if (existingAuth?.user && !invitationIsPending(existingAuth.user)) {
-    throw new ProvisioningError(
-      "This lecturer account is not a pending invitation. Use password recovery for an active account.",
-    );
-  }
-
   if (existingAuth?.user) {
+    const authEmail = existingAuth.user.email?.trim().toLowerCase();
+    if (authEmail && authEmail !== user.email.trim().toLowerCase()) {
+      throw new ProvisioningError(
+        "The linked Supabase identity email does not match this lecturer. No auth record was changed.",
+      );
+    }
+
+    if (!invitationIsPending(existingAuth.user)) {
+      throw new ProvisioningError(
+        "This lecturer account is not a pending invitation. Use password recovery for an active account.",
+      );
+    }
+
     const { error: deleteError } = await admin.auth.admin.deleteUser(existingAuth.user.id);
     if (deleteError && deleteError.status !== 404) {
       throw new ProvisioningError(deleteError.message);
