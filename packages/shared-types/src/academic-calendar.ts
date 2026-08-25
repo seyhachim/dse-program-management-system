@@ -123,6 +123,13 @@ export type PublishedAcademicCalendarProjection =
   | { status: "available"; academicYear: AcademicYearView; studyYear: number; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; sources: AcademicCalendarSourceView[]; nextEvent: AcademicCalendarTimelineEvent | null; }
   | { status: "unavailable"; academicYear: AcademicYearView | null; studyYear: number; reason: "academic-year-unavailable" | "calendar-unpublished"; message: string; };
 
+/** Student-facing projection. Source/provenance metadata remains on the management/public
+ * contract; the portal receives only the published dates applicable to the authenticated
+ * student's authoritative progression record. */
+export type StudentAcademicCalendarView =
+  | { status: "available"; academicYear: AcademicYearView; studyYear: number; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; nextEvent: AcademicCalendarTimelineEvent | null; }
+  | { status: "unavailable"; academicYear: AcademicYearView | null; studyYear: number | null; reason: "student-context-unavailable" | "academic-year-unavailable" | "calendar-unpublished"; message: string; };
+
 export interface AcademicCalendarOfferingPeriodRef { id: string; calendarId: string; programmeId: string; academicYearId: string; academicYearLabel: string; studyYears: number[]; semester: AcademicCalendarSemester; teachingStart: string; teachingEnd: string; revision: number; }
 export interface AcademicCalendarServiceContract {
   getPublishedPeriodForOffering(periodId: string, programmeId: string, studyYear: number): Promise<AcademicCalendarOfferingPeriodRef | null>;
