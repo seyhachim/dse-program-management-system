@@ -67,10 +67,11 @@ export function ThemedDocumentPages({
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
 
-        /* Part 1's PLO heading is the next full-width row after the PEO row.
-           The matrix itself remains on page 2 because the preview uses fixed
-           physical pages; page 2 therefore contains only the continued row's
-           matrix and notes, not another independently framed section. */
+        /* Part 1's PLO content is one logical full-width row after the PEO row.
+           Page 1 starts that row with the heading and intro. Because the preview
+           uses fixed physical pages, Page 2 continues the same row with its left,
+           right, and bottom borders around the matrix and notes; there is no top
+           border on Page 2, so it does not read as a second standalone box. */
         .course-spec-theme-root #programme-overview .grid.border.border-black::after {
           content: "PROGRAM LEARNING OUTCOME (PLOs)\\A Our program has " attr(data-plo-count-label) " PLOs:";
           grid-column: 1 / -1;
@@ -90,7 +91,13 @@ export function ThemedDocumentPages({
 
         .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
           box-sizing: border-box;
-          padding: 18px 30px !important;
+          height: auto !important;
+          margin: 0 30px;
+          padding: 8px !important;
+          border-left: 1px solid #000;
+          border-right: 1px solid #000;
+          border-bottom: 1px solid #000;
+          border-top: 0;
         }
 
         .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2,
