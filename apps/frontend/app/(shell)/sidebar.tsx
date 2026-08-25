@@ -18,7 +18,6 @@ import {
   SidebarMenuSkeleton,
   SidebarTrigger,
 } from "@dse-pms/ui";
-import { findMostSpecificActivePath } from "./sidebar-active-route";
 
 function sidebarLabel(label: string, path: string): string {
   return path === "/courses" && label === "Course Management"
@@ -37,10 +36,6 @@ export function AppSidebar() {
   // & Support) instead of the main scrollable nav list.
   const footerRoutes = groups.find((g) => g.label === "footer")?.routes ?? [];
   const mainGroups = groups.filter((g) => g.label !== "footer");
-  const activePath = findMostSpecificActivePath(
-    pathname,
-    groups.flatMap((group) => group.routes.map((route) => route.path)),
-  );
 
   return (
     <SidebarPrimitive
@@ -87,7 +82,9 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {group.routes.map((route) => {
                     const Icon = route.icon ? iconMap[route.icon] : undefined;
-                    const active = activePath === route.path;
+                    const active =
+                      pathname === route.path ||
+                      pathname.startsWith(`${route.path}/`);
                     const label = sidebarLabel(route.label, route.path);
                     return (
                       <SidebarMenuItem key={`${route.path}-${route.label}`}>
@@ -116,7 +113,9 @@ export function AppSidebar() {
           <SidebarMenu>
             {footerRoutes.map((route) => {
               const Icon = route.icon ? iconMap[route.icon] : undefined;
-              const active = activePath === route.path;
+              const active =
+                pathname === route.path ||
+                pathname.startsWith(`${route.path}/`);
               const label = sidebarLabel(route.label, route.path);
               return (
                 <SidebarMenuItem key={`${route.path}-${route.label}`}>

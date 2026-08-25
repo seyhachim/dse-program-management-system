@@ -14,6 +14,7 @@ import { coursesApi, type CourseView } from "@/lib/courses";
 import { offeringsApi, offeringTone } from "@/lib/offerings";
 import { statusTone, studentsApi } from "@/lib/students";
 import { lecturersApi } from "@/lib/lecturers";
+import { buildCourseSpecProgressGroups } from "./course-spec-progress-groups";
 
 /** Maps the app's semantic status tones to their themed CSS variables (defined
  * in globals.css, adapt to light/dark) so distribution-bar colors stay in sync
@@ -43,6 +44,7 @@ const EMPTY_STATE: LoadState = { students: [], courses: [], offerings: [], lectu
 export function DashboardClient() {
   const [loading, setLoading] = useState(true);
   const [failedSources, setFailedSources] = useState<string[]>([]);
+  const [incompleteOnly, setIncompleteOnly] = useState(false);
   const [state, setState] = useState<LoadState>(EMPTY_STATE);
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export function DashboardClient() {
   const totalCompleted = specProgress.reduce((s, c) => s + c.completed, 0);
   const totalReady = specProgress.reduce((s, c) => s + c.total, 0);
   const overallSpecPercent = totalReady ? Math.round((totalCompleted / totalReady) * 100) : 0;
+  const groupedSpecProgress = buildCourseSpecProgressGroups(specProgress);
 
   const totalEnrolled = offerings.reduce((s, o) => s + o.enrolledCount, 0);
   const totalCapacity = offerings.reduce((s, o) => s + o.capacity, 0);
@@ -148,32 +151,115 @@ export function DashboardClient() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Course Specification Progress */}
         <section className="rounded-xl border border-border bg-card p-5 lg:col-span-2">
-          <h3 className="mb-4 text-sm font-semibold text-foreground">Course Specification Progress</h3>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Course Specification Progress</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Grouped by the active curriculum year and semester.
+              </p>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={incompleteOnly}
+                onChange={(event) => setIncompleteOnly(event.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              Incomplete only
+            </label>
+          </div>
           {specProgress.length === 0 ? (
             <p className="text-sm text-muted-foreground">No courses yet.</p>
           ) : (
-            <div className="flex flex-col gap-5 sm:flex-row">
-              <div className="flex shrink-0 justify-center sm:justify-start">
+            <div className="flex flex-col gap-5 xl:flex-row">
+              <div className="flex shrink-0 justify-center xl:justify-start">
                 <CompletionRing value={overallSpecPercent} size={120} label="Overall" />
               </div>
-              <ul className="flex-1 space-y-3">
-                {specProgress.map((c) => {
-                  const percent = c.total ? Math.round((c.completed / c.total) * 100) : 0;
+              <div className="min-w-0 flex-1 space-y-2">
+                {groupedSpecProgress.years.map((year, yearIndex) => {
+                  const visibleSemesters = year.semesters
+                    .map((semester) => ({
+                      ...semester,
+                      visibleCourses: incompleteOnly
+                        ? semester.courses.filter((course) => course.completed < course.total)
+                        : semester.courses,
+                    }))
+                    .filter((semester) => semester.visibleCourses.length > 0);
+                  if (visibleSemesters.length === 0) return null;
                   return (
-                    <li key={c.courseId}>
-                      <div className="mb-1 flex items-center justify-between text-xs">
-                        <span className="font-medium text-foreground">
-                          {c.code} – {c.title}
+                    <details
+                      key={year.programmeYear}
+                      open={yearIndex === 0}
+                      className="rounded-lg border border-border bg-background"
+                    >
+                      <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-foreground">
+                        <span className="flex items-center justify-between gap-3">
+                          <span>Year {year.programmeYear}</span>
+                          <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                            {year.courseCount} {year.courseCount === 1 ? "course" : "courses"} · {year.percent}%
+                          </span>
                         </span>
-                        <span className="text-muted-foreground">
-                          {c.completed}/{c.total} sections
-                        </span>
+                      </summary>
+                      <div className="space-y-2 border-t border-border p-2">
+                        {visibleSemesters.map((semester, semesterIndex) => (
+                          <details
+                            key={semester.semester}
+                            open={semesterIndex === 0}
+                            className="rounded-md bg-muted/40"
+                          >
+                            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-foreground">
+                              <span className="flex items-center justify-between gap-3">
+                                <span>Semester {semester.semester === "First" ? "1" : "2"}</span>
+                                <span className="shrink-0 font-normal text-muted-foreground">
+                                  {semester.courseCount} {semester.courseCount === 1 ? "course" : "courses"} · {semester.percent}%
+                                </span>
+                              </span>
+                            </summary>
+                            <CourseProgressList courses={semester.visibleCourses} />
+                          </details>
+                        ))}
                       </div>
-                      <Progress value={percent} />
-                    </li>
+                    </details>
                   );
                 })}
-              </ul>
+
+                {(() => {
+                  const visibleUnassigned = incompleteOnly
+                    ? groupedSpecProgress.unassigned.courses.filter((course) => course.completed < course.total)
+                    : groupedSpecProgress.unassigned.courses;
+                  if (visibleUnassigned.length === 0) return null;
+                  return (
+                    <details className="rounded-lg border border-border bg-background">
+                      <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-foreground">
+                        <span className="flex items-center justify-between gap-3">
+                          <span>Unassigned / other courses</span>
+                          <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                            {groupedSpecProgress.unassigned.courseCount} courses · {groupedSpecProgress.unassigned.percent}%
+                          </span>
+                        </span>
+                      </summary>
+                      <div className="border-t border-border">
+                        <p className="px-3 pt-2 text-xs text-muted-foreground">
+                          No active curriculum placement. Programme year is not guessed from the course code.
+                        </p>
+                        <CourseProgressList courses={visibleUnassigned} />
+                      </div>
+                    </details>
+                  );
+                })()}
+
+                {incompleteOnly &&
+                groupedSpecProgress.years.every((year) =>
+                  year.semesters.every((semester) =>
+                    semester.courses.every((course) => course.completed >= course.total),
+                  ),
+                ) &&
+                groupedSpecProgress.unassigned.courses.every((course) => course.completed >= course.total) ? (
+                  <p className="rounded-lg border border-border bg-background px-3 py-4 text-center text-sm text-muted-foreground">
+                    All course specifications are complete.
+                  </p>
+                ) : null}
+              </div>
             </div>
           )}
         </section>
@@ -216,6 +302,31 @@ export function DashboardClient() {
         />
       </div>
     </div>
+  );
+}
+
+function CourseProgressList({ courses }: { courses: CourseSpecProgress[] }) {
+  return (
+    <ul className="space-y-3 px-3 pb-3">
+      {courses.map((course) => {
+        const percent = course.total
+          ? Math.round((course.completed / course.total) * 100)
+          : 0;
+        return (
+          <li key={course.courseId}>
+            <div className="mb-1 flex items-start justify-between gap-3 text-xs">
+              <span className="min-w-0 font-medium text-foreground">
+                {course.code} – {course.title}
+              </span>
+              <span className="shrink-0 text-muted-foreground">
+                {course.completed}/{course.total} sections
+              </span>
+            </div>
+            <Progress value={percent} />
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

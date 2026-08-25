@@ -186,6 +186,16 @@ const SPEC_PROGRESS_COURSE_SELECT = {
     take: 1,
     select: { sections: { select: { sectionKey: true, status: true } } },
   },
+  curriculumPlacements: {
+    where: { curriculumVersion: { is: { status: "Active" } } },
+    orderBy: [
+      { yearLevel: "asc" },
+      { semester: "asc" },
+      { sortOrder: "asc" },
+    ],
+    take: 1,
+    select: { yearLevel: true, semester: true, sortOrder: true },
+  },
 } satisfies Prisma.CourseSelect;
 
 type SpecProgressCourse = Prisma.CourseGetPayload<{
@@ -194,6 +204,7 @@ type SpecProgressCourse = Prisma.CourseGetPayload<{
 
 function toCourseSpecProgress(course: SpecProgressCourse): CourseSpecProgress {
   const sections = course.specs[0]?.sections ?? [];
+  const curriculumPlacement = course.curriculumPlacements[0] ?? null;
 
   const completedSectionIds = new Set(
     sections
@@ -218,6 +229,13 @@ function toCourseSpecProgress(course: SpecProgressCourse): CourseSpecProgress {
     title: course.title,
     completed: completedSectionIds.size,
     total: COMPLETABLE_SECTION_IDS.length,
+    curriculumPlacement: curriculumPlacement
+      ? {
+          programmeYear: curriculumPlacement.yearLevel,
+          semester: curriculumPlacement.semester,
+          sortOrder: curriculumPlacement.sortOrder,
+        }
+      : null,
     incompleteSections,
   };
 }
