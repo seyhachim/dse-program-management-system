@@ -1,0 +1,39 @@
+name: Temporary Dashboard Grouping Patch
+
+on:
+  push:
+    branches:
+      - fix/course-spec-part1-plo-row
+    paths:
+      - .github/workflows/temp-dashboard-grouping-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-dashboard:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/course-spec-part1-plo-row
+          fetch-depth: 0
+
+      - name: Fetch main for sidebar reconciliation
+        run: git fetch origin main
+
+      - name: Apply dashboard patch
+        run: python scripts/temp_patch_dashboard_spec_progress.py
+
+      - name: Validate patch whitespace
+        run: git diff --check
+
+      - name: Commit dashboard implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(dashboard): group course spec progress by curriculum"
+          git push origin HEAD:fix/course-spec-part1-plo-row
