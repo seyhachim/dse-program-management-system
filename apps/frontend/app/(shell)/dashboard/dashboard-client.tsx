@@ -14,7 +14,7 @@ import { coursesApi, type CourseView } from "@/lib/courses";
 import { offeringsApi, offeringTone } from "@/lib/offerings";
 import { statusTone, studentsApi } from "@/lib/students";
 import { lecturersApi } from "@/lib/lecturers";
-import { buildCourseSpecProgressGroups } from "./course-spec-progress-groups";
+import { buildCourseSpecProgressGroups, visibleCourseSpecRows } from "./course-spec-progress-groups";
 
 /** Maps the app's semantic status tones to their themed CSS variables (defined
  * in globals.css, adapt to light/dark) so distribution-bar colors stay in sync
@@ -180,9 +180,7 @@ export function DashboardClient() {
                   const visibleSemesters = year.semesters
                     .map((semester) => ({
                       ...semester,
-                      visibleCourses: incompleteOnly
-                        ? semester.courses.filter((course) => course.completed < course.total)
-                        : semester.courses,
+                      visibleCourses: visibleCourseSpecRows(semester.courses, incompleteOnly),
                     }))
                     .filter((semester) => semester.visibleCourses.length > 0);
                   if (visibleSemesters.length === 0) return null;
@@ -224,9 +222,10 @@ export function DashboardClient() {
                 })}
 
                 {(() => {
-                  const visibleUnassigned = incompleteOnly
-                    ? groupedSpecProgress.unassigned.courses.filter((course) => course.completed < course.total)
-                    : groupedSpecProgress.unassigned.courses;
+                  const visibleUnassigned = visibleCourseSpecRows(
+                    groupedSpecProgress.unassigned.courses,
+                    incompleteOnly,
+                  );
                   if (visibleUnassigned.length === 0) return null;
                   return (
                     <details className="rounded-lg border border-border bg-background">

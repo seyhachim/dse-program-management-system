@@ -44,6 +44,15 @@ function sortCourses(rows: CourseSpecProgress[]): CourseSpecProgress[] {
   });
 }
 
+export function visibleCourseSpecRows(
+  rows: readonly CourseSpecProgress[],
+  incompleteOnly: boolean,
+): CourseSpecProgress[] {
+  return incompleteOnly
+    ? rows.filter((row) => row.completed < row.total)
+    : [...rows];
+}
+
 export function buildCourseSpecProgressGroups(
   rows: readonly CourseSpecProgress[],
 ): CourseSpecProgressGroups {

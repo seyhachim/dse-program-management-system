@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { CourseSpecProgress } from "@dse-pms/shared-types";
-import { buildCourseSpecProgressGroups, courseSpecRowsPercent } from "./course-spec-progress-groups";
+import { buildCourseSpecProgressGroups, courseSpecRowsPercent, visibleCourseSpecRows } from "./course-spec-progress-groups";
 
 function row(
   code: string,
@@ -52,6 +52,20 @@ describe("Course Specification dashboard grouping", () => {
 
     expect(grouped.unassigned.courses.map((course) => course.code)).toEqual(["OLD402"]);
     expect(grouped.years[0]?.courseCount).toBe(1);
+  });
+
+  test("filters only fully complete rows when incomplete-only mode is enabled", () => {
+    const rows = [row("AAA101", 10), row("BBB101", 4), row("CCC101", 0)];
+
+    expect(visibleCourseSpecRows(rows, true).map((course) => course.code)).toEqual([
+      "BBB101",
+      "CCC101",
+    ]);
+    expect(visibleCourseSpecRows(rows, false).map((course) => course.code)).toEqual([
+      "AAA101",
+      "BBB101",
+      "CCC101",
+    ]);
   });
 
   test("uses section-weighted completion percentages", () => {
