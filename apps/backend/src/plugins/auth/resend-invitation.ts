@@ -2,6 +2,13 @@ import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../../core/db/prisma.ts";
 import { ProvisioningError } from "./service.ts";
 
+export function invitationAlreadyAccepted(user: {
+  email_confirmed_at?: string | null;
+  last_sign_in_at?: string | null;
+}): boolean {
+  return Boolean(user.email_confirmed_at || user.last_sign_in_at);
+}
+
 /**
  * Re-send a lecturer invitation without touching the PMS User, role assignments,
  * course/offering links, or other academic records.
@@ -42,7 +49,7 @@ export async function resendLecturerInvitation(userId: string): Promise<{ email:
 
   // Never rotate a confirmed/active identity. This is the academic-record-safe
   // boundary between "resend an invite" and "reset an existing account".
-  if (existingAuth?.user?.email_confirmed_at || existingAuth?.user?.last_sign_in_at) {
+  if (existingAuth?.user && invitationAlreadyAccepted(existingAuth.user)) {
     throw new ProvisioningError(
       "This lecturer account is already active. Use the password recovery flow instead.",
     );
