@@ -63,7 +63,9 @@ export function academicSemesterLabel(semester: "First" | "Second"): string {
 
 export function formatAcademicDate(value: string | null | undefined): string {
   if (!value) return "Not set";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(
-    new Date(`${value.slice(0, 10)}T00:00:00.000Z`),
-  );
+  const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  return `${day}/${month}/${year}`;
 }
