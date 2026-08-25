@@ -3,11 +3,21 @@ import { PROGRAMME_TITLE } from "@dse-pms/shared-types";
 type CourseType = "Basic" | "Core" | "Elective" | "Specialization" | "MoeysHeip";
 type Semester = "First" | "Second";
 
+export type ReviewedPlacement = {
+  year: number;
+  semester: 1 | 2;
+  reason: string;
+  approvedBy: string;
+  approvedAt: string;
+  sourceIssue?: string | null;
+};
+
 export type CourseInfoImportDocument = {
   source: {
     yearFolder?: number | null;
     semesterFolder?: number | null;
   };
+  reviewedPlacement?: ReviewedPlacement | null;
   course: {
     programmeTitle?: string | null;
     code: string;
@@ -56,16 +66,25 @@ function semesterFromNumber(value?: number | null): Semester | null {
 
 /**
  * Build the immutable Course Information (§1–13) snapshot directly from the
- * canonical import document. Folder metadata wins for year/semester because it
- * is the importer placement context; any disagreement with extracted document
- * availability is surfaced separately as a warning rather than silently hidden.
+ * canonical import document. Raw legacy imports keep source-folder placement
+ * precedence. A programme-owner-reviewed relocation can explicitly override the
+ * snapshot placement while the original source folder remains unchanged as
+ * provenance in the canonical document.
  */
 export function courseInfoSnapshotFromDocument(
   doc: CourseInfoImportDocument,
   totalSltHours: number | null,
 ) {
-  const semesterNumber = doc.source.semesterFolder ?? doc.course.availability?.semester ?? null;
-  const programmeYear = doc.source.yearFolder ?? doc.course.availability?.year ?? null;
+  const semesterNumber =
+    doc.reviewedPlacement?.semester ??
+    doc.source.semesterFolder ??
+    doc.course.availability?.semester ??
+    null;
+  const programmeYear =
+    doc.reviewedPlacement?.year ??
+    doc.source.yearFolder ??
+    doc.course.availability?.year ??
+    null;
 
   return {
     programmeTitle: cleanText(doc.course.programmeTitle) || PROGRAMME_TITLE,
@@ -93,6 +112,22 @@ export function courseInfoSnapshotWarnings(doc: CourseInfoImportDocument): strin
   const documentSemester = doc.course.availability?.semester;
   const folderYear = doc.source.yearFolder;
   const documentYear = doc.course.availability?.year;
+
+  if (doc.reviewedPlacement) {
+    const review = doc.reviewedPlacement;
+    const provenance = [
+      `approved by ${cleanText(review.approvedBy)}`,
+      `at ${cleanText(review.approvedAt)}`,
+      cleanText(review.sourceIssue) ? `via ${cleanText(review.sourceIssue)}` : "",
+      cleanText(review.reason) ? `reason: ${cleanText(review.reason)}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    warnings.push(
+      `Reviewed placement override applied: Year ${review.year}, Semester ${review.semester}; legacy source placement remains preserved as provenance${provenance ? ` (${provenance})` : ""}`,
+    );
+    return warnings;
+  }
 
   if (
     folderSemester != null &&
