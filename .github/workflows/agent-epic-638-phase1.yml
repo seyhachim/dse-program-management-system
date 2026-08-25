@@ -5,6 +5,7 @@ on:
     branches:
       - agent/epic-638-academic-calendar
     paths:
+      - scripts/agent-epic-638-bootstrap-fix.ts
       - scripts/agent-epic-638-phase1.ts
       - scripts/agent-epic-638-phase1-fix.ts
       - scripts/agent-epic-638-phase1-security-fix.ts
@@ -31,6 +32,7 @@ jobs:
           bun-version: 1.2.23
       - name: Apply staged implementation
         run: |
+          bun scripts/agent-epic-638-bootstrap-fix.ts
           bun scripts/agent-epic-638-phase1.ts
           bun scripts/agent-epic-638-phase1-fix.ts
           bun scripts/agent-epic-638-phase1-security-fix.ts
@@ -51,6 +53,7 @@ jobs:
         run: bun run build
       - name: Commit verified phase 1
         run: |
+          rm scripts/agent-epic-638-bootstrap-fix.ts
           rm scripts/agent-epic-638-phase1.ts
           rm scripts/agent-epic-638-phase1-fix.ts
           rm scripts/agent-epic-638-phase1-security-fix.ts
