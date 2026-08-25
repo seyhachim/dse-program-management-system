@@ -1,0 +1,921 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "BIA301_Business Intelligence and Analytics.docx",
+    "relativePath": "Year 3/S1/BIA301_Business Intelligence and Analytics.docx",
+    "sha256": "6832d072f8af82044328001f2cdf14103a65e7255d7036b219e2e4990f51af94",
+    "yearFolder": 3,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "BIA301",
+    "title": "Business Intelligence and Analytics",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "Data Warehousing",
+    "courseType": "Core",
+    "availability": {
+      "semester": 1,
+      "year": 3
+    },
+    "description": "This course provides both theoretical understanding and practical experience in business intelligence and analytics. Students will explore data warehousing concepts, ETL processes, multidimensional modeling, and visualization techniques. Through Power BI labs, they will develop interactive dashboards, perform data-driven analysis, and deliver insights that support business strategy and operations."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Mr. Seng Vannak",
+      "qualification": "Master",
+      "email": "seng.vannak@rupp.edu.kh",
+      "phone": "081876453"
+    },
+    "coLecturers": [
+      "None"
+    ]
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Explain the fundamental concepts, architectures, and roles of Business Intelligence and Analytics in organizational decision-making.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture, Discussion, Demonstration",
+      "assessmentMethodsRaw": "Quiz, Short Assignment, Class Participation"
+    },
+    {
+      "code": "CLO2",
+      "description": "Design and develop data models and dashboards in Power BI to support data-driven business insights.",
+      "mappedPlos": [
+        "PLO2",
+        "PLO8"
+      ],
+      "level": "P4",
+      "status": "active",
+      "teachingMethodsRaw": "Lab Sessions, Guided Exercises, Live Demo",
+      "assessmentMethodsRaw": "Lab Assignments, Midterm Practical"
+    },
+    {
+      "code": "CLO3",
+      "description": "Analyze and interpret business data to derive actionable insights and communicate findings effectively through visual reports",
+      "mappedPlos": [
+        "PLO8",
+        "PLO9"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Case Study, Lab Work, Group Discussion",
+      "assessmentMethodsRaw": "Project Report, Presentation, Mini Project"
+    },
+    {
+      "code": "CLO4",
+      "description": "Demonstrate teamwork, ethical responsibility, and professional conduct in delivering BI solutions for real-world business problems.",
+      "mappedPlos": [
+        "PLO10",
+        "PLO7"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "Project-Based Learning, Group Work, Peer Collaboration",
+      "assessmentMethodsRaw": "Final Project, Presentation, Peer Evaluation"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Business Intelligence & Analytics",
+        "CLO1",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "2",
+        "Topic 2: BI Architecture and Data Ecosystem",
+        "CLO1",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "3",
+        "Topic 3: Data Warehousing Concepts",
+        "CLO1CLO2",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "4",
+        "Topic 4: ETL and Data Preparation",
+        "CLO2",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "5",
+        "Topic 5: Data Modelling in Power BI",
+        "CLO1 CLO2",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "6",
+        "Topic 6: DAX Fundamentals",
+        "CLO1 CLO2",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "7",
+        "Topic 7: Visualization Design Principles",
+        "CLO2",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "8",
+        "Topic 8: Advanced DAX and Data Analytics",
+        "CLO3",
+        "1",
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "9",
+        "Topic 9: Dashboard Design & User Interaction",
+        "CLO2CLO3",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "10",
+        "Topic 10: Storytelling with Data",
+        "CLO2CLO3",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "11",
+        "Topic 11: Business Case Analytics",
+        "CLO4",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "12",
+        "Topic 12: Team Project Development",
+        "CLO4",
+        "",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "13",
+        "Topic 13: Ethics, Privacy, and Governance in BI",
+        "CLO3",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "14",
+        "Topic 14: Final Project Presentation & Peer Evaluation",
+        "CLO4",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "Total SLT for Course Content",
+        "56"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Class participation",
+        "10",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "2",
+        "Quizzes",
+        "10",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "3",
+        "Lab Assignments",
+        "20",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "4",
+        "Midterm Exam",
+        "20",
+        "2",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "30"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Project",
+        "25",
+        "4",
+        "",
+        "12",
+        "16"
+      ],
+      [
+        "2",
+        "Final Presentation & Peer Evaluation",
+        "15",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "24"
+      ],
+      [
+        "Total SLT for Assessment",
+        "54"
+      ],
+      [
+        "Grand Total SLT",
+        "110"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Quiz",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 5.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Participation",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 0.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Lab assignments",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 5.0,
+      "capLevel": "P4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Midterm practical",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "P4"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Lab work",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Midterm",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Mini project",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 15.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final Project",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 15.0,
+      "capLevel": "P3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Presentation",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 5.0,
+      "capLevel": "P3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 4.0,
+      "capLevel": "P3"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Business Intelligence & Analytics",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Define Business Intelligence (BI) and Analytics; explain their importance in organizational decision-making. LLO2: xxx"
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: BI Architecture and Data Ecosystem",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Describe BI system components (data sources, ETL, warehouse); explain how data flows across systems"
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Data Warehousing Concepts",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "Identify fact and dimension tables; design a simple star schema for analytical databases."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: ETL and Data Preparation",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Perform data extraction, transformation, and loading (ETL) using Power Query in Power BI."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Data Modelling in Power BI",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "Build relationships between tables and manage data integrity in Power BI."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: DAX Fundamentals",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "Create calculated columns and measures using basic DAX functions (SUM, AVERAGE, IF)."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Visualization Design Principles",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Apply design principles (layout, chart types, color use) to create clear and effective visuals."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Advanced DAX and Data Analytics",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Implement advanced DAX functions (Time Intelligence, dynamic KPIs) to enhance dashboard capability."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Dashboard Design & User Interaction",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "Develop interactive dashboards using filters, slicers, and bookmarks in Power BI."
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Storytelling with Data",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "Interpret analytical results and communicate insights through narrative visualizations."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Business Case Analytics",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Apply BI techniques to a real-world business case (e.g., sales, HR, or logistics data)."
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Team Project Development",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Collaborate in groups to plan, design, and implement a BI dashboard project."
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Ethics, Privacy, and Governance in BI",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Demonstrate ethical data handling and deliver professional project presentations."
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: Final Project Presentation & Peer Evaluation",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Present final BI dashboards professionally and evaluate peers’ work constructively."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 1: Introduction to Business Intelligence & Analytics Quiz 1",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Concept Demo",
+        "activeLearningRaw": "Note-taking, Q&A participation, short reflection",
+        "assessmentRaw": "2",
+        "resourcesRaw": "Slides, BI case videos, textbook"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 2: BI Architecture and Data Ecosystem",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture, Guided Discussion",
+        "activeLearningRaw": "Diagram BI architecture, identify components",
+        "assessmentRaw": "2",
+        "resourcesRaw": "Whiteboard diagrams, PowerPoint, sample BI architecture chart"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "1/1/1/0",
+        "lectureTopic": "Topic 3: Data Warehousing Concepts",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Demonstration (Power Query), Lab",
+        "activeLearningRaw": "Draw fact/dimension schema, mini exercise",
+        "assessmentRaw": "3",
+        "resourcesRaw": "SQL Server sample DB, handout on star schema"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "1/1/1/0",
+        "lectureTopic": "Topic 4: ETL and Data Preparation",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Guided Lab, Live Demo",
+        "activeLearningRaw": "Hands-on ETL in Power BI, clean dataset",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Power BI Desktop, practice dataset"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/1/0/0",
+        "lectureTopic": "Topic 5: Data Modelling in Power BI",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Guided Lab, Live Demo",
+        "activeLearningRaw": "Build model relationships, validate data",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Power BI, AdventureWorks dataset"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/1/0",
+        "lectureTopic": "Topic 6: DAX Fundamentals",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture + Live Coding, Guided Exercises",
+        "activeLearningRaw": "Write basic DAX formulas, create measures",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Power BI, DAX cheat sheet handout"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 7: Visualization Design Principles",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture, Demo of Good/Bad Charts",
+        "activeLearningRaw": "Create visuals using proper design principles",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Power BI, Visualization guidebook"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Midterm Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "10",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 9,
+        "hoursRaw": "1/1/2/0",
+        "lectureTopic": "Topic 8: Advanced DAX and Data Analytics",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Live Coding, Guided Lab",
+        "activeLearningRaw": "Build KPIs and time-intelligence measures",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Power BI Desktop, practice data file"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "1/1/1/0",
+        "lectureTopic": "Topic 9: Dashboard Design & User Interaction",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Demo, Case Example, Lab Work",
+        "activeLearningRaw": "Add slicers, filters, bookmarks, drill-through",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Power BI, instructor demo file"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 10: Storytelling with Data",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture, Case Study, Presentation Practice",
+        "activeLearningRaw": "Interpret insights and present findings",
+        "assessmentRaw": "5",
+        "resourcesRaw": "BI Storytelling slides, Power BI report examples"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "1/1/1/0",
+        "lectureTopic": "Topic 11: Business Case Analytics",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Case Analysis, Group Discussion",
+        "activeLearningRaw": "Apply BI methods to business dataset",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Sample business case (HR or Sales) + Power BI"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "0/1/1/0",
+        "lectureTopic": "Topic 12: Team Project Development",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Project-based Coaching, Group Mentoring",
+        "activeLearningRaw": "Build and test group dashboard prototype",
+        "assessmentRaw": "8",
+        "resourcesRaw": "Power BI Desktop, group datasets, rubric"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "1/1/1/0",
+        "lectureTopic": "Topic 13: Ethics, Privacy, and Governance in BI",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture, Reflection, Discussion",
+        "activeLearningRaw": "Discuss ethical issues and data privacy in BI",
+        "assessmentRaw": "3",
+        "resourcesRaw": "Readings on data ethics & governance policy"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "1/1/0/0",
+        "lectureTopic": "Topic 14: Final Project Presentation & Peer Evaluation",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Project Showcase, Peer Feedback Session",
+        "activeLearningRaw": "Present final dashboard, evaluate peers",
+        "assessmentRaw": "22",
+        "resourcesRaw": "Classroom projector, evaluation rubric forms"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "10",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Slides, BI case videos, textbook; Whiteboard diagrams, PowerPoint, sample BI architecture chart; SQL Server sample DB, handout on star schema; Power BI Desktop, practice dataset; Power BI, AdventureWorks dataset; Power BI, DAX cheat sheet handout; Power BI, Visualization guidebook; Power BI Desktop, practice data file; Power BI, instructor demo file; BI Storytelling slides, Power BI report examples; Sample business case (HR or Sales) + Power BI; Power BI Desktop, group datasets, rubric; Readings on data ethics & governance policy; Classroom projector, evaluation rubric forms",
+    "references": {
+      "required": [
+        {
+          "title": "Microsoft Power BI For Dummies",
+          "authors": "Jack A. Hyman",
+          "publisher": "John Wiley & Sons",
+          "year": "2020",
+          "isbnOrUrl": "978-1119642695"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Business Intelligence: A Managerial Approach (4th Edition)",
+          "authors": "Ramesh Sharda, Dursun Delen, & Efraim Turban",
+          "publisher": "Pearson Education",
+          "year": "2018",
+          "isbnOrUrl": "978-0134633282"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code in DOCX table (DWA201) conflicts with filename (BIA301); canonical JSON uses filename code and requires review"
+    ],
+    "errors": []
+  }
+}

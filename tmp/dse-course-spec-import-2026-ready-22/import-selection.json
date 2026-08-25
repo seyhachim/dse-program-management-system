@@ -1,0 +1,62 @@
+{
+  "source": "improved DOCX conversion + DB dry-run on 2026-08-25",
+  "summary": {
+    "ready": 22,
+    "skipped_existing": 5,
+    "blocked_for_review": 19,
+    "failed": 0
+  },
+  "readyCourseCodes": [
+    "CRY402",
+    "DEC401",
+    "DMI301",
+    "DSA201",
+    "DSA202",
+    "ENG101",
+    "ENG102",
+    "ERD401",
+    "FTE402",
+    "IDS101",
+    "MAD302",
+    "MAT101",
+    "MAT102",
+    "NDA202",
+    "NLP401",
+    "PPR201",
+    "PPR202",
+    "PPR301",
+    "PPR302",
+    "RDM201",
+    "TSA301",
+    "WAD301"
+  ],
+  "excludedExistingCourseCodes": [
+    "APR102",
+    "BPR101",
+    "FPR401",
+    "FPR402",
+    "PAN202"
+  ],
+  "excludedBlockedCourseCodes": [
+    "AIN302",
+    "AIS401",
+    "BDA302",
+    "BIA301",
+    "CHK102",
+    "DLP101",
+    "DMA201",
+    "DSC102",
+    "DWA201",
+    "EEE102",
+    "EIN302",
+    "GPDS101",
+    "LLM402",
+    "PDT202",
+    "PML401",
+    "SCA302",
+    "STA201",
+    "STR102",
+    "TDT101"
+  ],
+  "safety": "This package intentionally excludes all blocked and existing CourseSpecs. Dry-run before --commit. Do not use --replace-existing."
+}

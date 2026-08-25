@@ -1,0 +1,905 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "WAD301-Web App Development for Data Science (with Streamlit & FastAPI_Flask).docx",
+    "relativePath": "Year 3/S1/WAD301-Web App Development for Data Science (with Streamlit & FastAPI_Flask).docx",
+    "sha256": "39299c7049a1ccf6a50ac50a8f7db731d5af77122c63c38197fc8752959d035a",
+    "yearFolder": 3,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "WAD301",
+    "title": "Web App Development for Data Science (with Streamlit & FastAPI/Flask)",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "No",
+    "courseType": "Basic",
+    "availability": {
+      "semester": 1,
+      "year": 3
+    },
+    "description": "This course introduces students to web development techniques for Data Science applications using Streamlit and FastAPI. Students learn how to build interactive data dashboards and machine learning applications using Python, without requiring traditional frontend technologies. The course covers Streamlit fundamentals for data visualization and user interaction, as well as backend API development with FastAPI for data services and model deployment. By the end of the course, students will be able to design, integrate, and present complete data‑driven web applications."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "TOEM Theara",
+      "qualification": "Master’s Degree",
+      "email": "toem.theara@rupp.edu.kh",
+      "phone": "0966 622 798"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Explain the architecture and execution model of Streamlit applications for data‑driven web development.",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lectures with guided explanation, live demonstrations, interactive discussion, and concept‑based examples on Streamlit architecture and execution model",
+      "assessmentMethodsRaw": "Written quizzes, midterm examination (theory), short answer questions, class participation"
+    },
+    {
+      "code": "CLO2",
+      "description": "Develop interactive data applications using Streamlit widgets, layouts, and visualization components.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "Hands‑on laboratory practice, guided coding sessions, problem‑based learning, instructor‑led demonstrations",
+      "assessmentMethodsRaw": "Laboratory exercises, practical assignments, Streamlit mini project, practical component of midterm exam"
+    },
+    {
+      "code": "CLO3",
+      "description": "Apply Streamlit session state and caching techniques to optimize performance of data applications.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lectures with case studies, live coding demonstrations, problem‑solving activities related to performance optimization",
+      "assessmentMethodsRaw": "Lab assignments, practical tests, evaluation of optimized applications, final project implementation"
+    },
+    {
+      "code": "CLO4",
+      "description": "Design and implement RESTful APIs using FastAPI to support data services and machine learning applications.",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "P4",
+      "status": "active",
+      "teachingMethodsRaw": "Project‑based learning, laboratory practice, independent development, system integration tasks, supervised project guidance",
+      "assessmentMethodsRaw": "Practical assignments, final examination (practical), final project and presentation"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Data Science Web Development & Streamlit Overview",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "2",
+        "Topic 2: Streamlit Architecture & Execution Model",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "3",
+        "Topic 3: Displaying Text, Data, and Layouts in Streamlit",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "4",
+        "Topic 4: Widgets and User Interaction Handling",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "5",
+        "Topic 5: Data Visualization with Streamlit and Python Libraries",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "6",
+        "Topic 6: Forms and Session State Management",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "7",
+        "Topic 7: File Upload, Data Validation, and EDA Applications",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "8",
+        "Topic 8: Caching and Performance Optimization in Streamlit",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "9"
+      ],
+      [
+        "9",
+        "Topic 9: Introduction to APIs and FastAPI Framework",
+        "CLO",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "9"
+      ],
+      [
+        "10",
+        "Topic 10: FastAPI CRUD Operations and Request Handling",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "9"
+      ],
+      [
+        "11",
+        "Topic 11: FastAPI with Databases and ORM Integration",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "9"
+      ],
+      [
+        "12",
+        "Topic 12: Security, Authentication, and Error Handling",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "9"
+      ],
+      [
+        "13",
+        "Topic 13: Machine Learning Models as REST APIs",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "14",
+        "Topic 14: Streamlit–FastAPI Integration & Project Development",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "9"
+      ],
+      [
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Assignment",
+        "20",
+        "2",
+        "",
+        "6",
+        ""
+      ],
+      [
+        "2",
+        "Quiz",
+        "20",
+        "2",
+        "",
+        "4",
+        ""
+      ],
+      [
+        "3",
+        "Project presentations",
+        "20",
+        "4",
+        "",
+        "2",
+        ""
+      ],
+      [
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "20"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "40",
+        "2",
+        "",
+        "18",
+        "20"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "20"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Quiz (Streamlit fundamentals & execution model)",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "capLevel": "C3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Assignment 1 (Streamlit layouts & widgets)",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "capLevel": "P3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Assignment 2 (Data visualization app)",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "capLevel": "P3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Practical Test (session state & caching)",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "capLevel": "C3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Midterm Exam (theory + practical)",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "capLevel": "C3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Final Project (Streamlit + FastAPI system)",
+      "mode": "group",
+      "weightPercent": 15.0,
+      "capLevel": "P4",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Project Presentation",
+      "mode": "group",
+      "weightPercent": 15.0,
+      "capLevel": "P4",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Final Exam (theory + practical)",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "capLevel": "P4",
+      "modeRaw": "I"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Data Science Web Development & Streamlit Overview",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Explain the role of web applications in Data Science. LLO2: Describe the purpose and features of Streamlit for data-driven applications."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Streamlit Architecture & Execution Model",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Explain Streamlit’s execution and rerun model. LLO2: Analyze how user interactions trigger script reruns in Streamlit."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Displaying Text, Data, and Layouts in Streamlit",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Use Streamlit functions to display text, tables, and DataFrames. LLO2: Create structured layouts using columns, containers, and sidebars."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Widgets and User Interaction Handling",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Implement input widgets to capture user interaction. LLO2: Develop interactive data applications using widget-driven logic."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Data Visualization in Streamlit",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Generate data visualizations using Streamlit built-in charts. LLO2: Integrate external visualization libraries (e.g., Matplotlib, Plotly) into Streamlit apps."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Forms and Session State Management",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Apply Streamlit forms to control user input and app execution. LLO2: Manage application state using st.session_state."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: File Upload and Exploratory Data Analysis (EDA)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Implement file upload functionality in Streamlit applications. LLO2: Perform basic exploratory data analysis on user-uploaded datasets."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Caching and Performance Optimization in Streamlit",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Differentiate between st.cache_data and st.cache_resource. LLO2: Optimize application performance using appropriate caching techniques."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Introduction to APIs and FastAPI Framework",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain RESTful API concepts and their role in data applications. LLO2: Create basic API endpoints using FastAPI."
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: FastAPI CRUD Operations and Request Handling",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Implement CRUD operations using FastAPI. LLO2: Handle HTTP requests and responses with path and query parameters."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: FastAPI with Databases and ORM Integration",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Connect FastAPI applications to a relational database. LLO2: Use ORM tools to perform database operations."
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: API Security, Authentication, and Error Handling",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Apply basic authentication and authorization techniques in APIs. LLO2: Implement proper error handling and validation mechanisms."
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Machine Learning Models as REST APIs",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Deploy trained machine learning models using FastAPI. LLO2: Handle prediction requests and responses through REST APIs."
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: Streamlit–FastAPI Integration and Project Development",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Integrate Streamlit frontend applications with FastAPI backend services. LLO2: Design and build a complete data-driven web application combining frontend and backend components."
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 1: Introduction to DS Web Development & Streamlit LLO1 LLO2",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture, concept explanation, live demo",
+        "activeLearningRaw": "Think‑Pair‑Share, guided exploration",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, Streamlit Docs"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 2: Streamlit Architecture & Execution Model LLO1 LLO2",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture + demo, discussion",
+        "activeLearningRaw": "Concept mapping, hands‑on experiment",
+        "assessmentRaw": "Quiz (5%)",
+        "resourcesRaw": "Slides, Code examples"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 3: Displaying Text, Data & Layouts LLO1 LLO2",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Demonstration, guided coding",
+        "activeLearningRaw": "Problem‑based learning",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 4: Widgets & User Interaction LLO1 LLO2",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Live coding, explanation",
+        "activeLearningRaw": "Pair programming",
+        "assessmentRaw": "Assignment 1 (5%)",
+        "resourcesRaw": "Code samples"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 5: Data Visualization in Streamlit LLO1 LLO2",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Demo, practice",
+        "activeLearningRaw": "Project‑based mini task",
+        "assessmentRaw": "Assignment 2 (10%)",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 6: Forms & Session State LLO1 LLO2",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Explanation, demo",
+        "activeLearningRaw": "Hands‑on lab",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topics 7–8: File Upload, EDA & Caching LLO1 LLO2",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Case study, demo",
+        "activeLearningRaw": "Problem solving, lab work",
+        "assessmentRaw": "Practical Test (10%)",
+        "resourcesRaw": "Slides , CSV datasets"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Midterm Exam",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "Midterm Exam (20%)",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 9: APIs & FastAPI Basics LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Lecture, API demo",
+        "activeLearningRaw": "Guided coding",
+        "assessmentRaw": "",
+        "resourcesRaw": "FastAPI Docs"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 10: FastAPI CRUD Operations LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Live coding",
+        "activeLearningRaw": "Problem‑based learning",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 11: FastAPI with Databases LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Demo, explanation",
+        "activeLearningRaw": "Practice‑oriented lab",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 12: API Security & Error Handling LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Case study, demo",
+        "activeLearningRaw": "Group discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 13: ML Models as APIs LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Demonstration",
+        "activeLearningRaw": "Project‑based learning",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 14: Streamlit–FastAPI Integration LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Project coaching",
+        "activeLearningRaw": "Collaborative project work",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Final Project Consultation / Revision",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Supervision, feedback",
+        "activeLearningRaw": "Self‑directed learning",
+        "assessmentRaw": "Project + Presentation (30%)",
+        "resourcesRaw": "Slides , GitHub"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Final Exam",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "Final Exam (20%)",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [
+      "Weekly CLO token does not match defined CLOs and will be reconciled from topic mapping: CLO44 (CLO44)",
+      "Recovered week 11 CLO mapping from topic table because weekly CLO cell was not parseable: CLO44",
+      "Recovered week 12 CLO mapping from topic table because weekly CLO cell was not parseable: CLO"
+    ],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Slides, Streamlit Docs; Slides, Code examples; Slides; Code samples; Slides , CSV datasets; FastAPI Docs; Slides , GitHub",
+    "references": {
+      "required": [
+        {
+          "title": "Streamlit for Data Science: Create Interactive Data Apps in Python (2nd Edition)",
+          "authors": "Tyler Richards",
+          "publisher": "Packt Publishing",
+          "year": "2023",
+          "isbnOrUrl": "ISBN‑13: 978‑1803248226"
+        },
+        {
+          "title": "FastAPI: Modern Python Web Development",
+          "authors": "Bill Lubanovic",
+          "publisher": "O’Reilly Media",
+          "year": "2023",
+          "isbnOrUrl": "ISBN‑13: 978‑1098135508"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "RESTful Web APIs",
+          "authors": "Leonard Richardson, Mike Amundsen",
+          "publisher": "O’Reilly Media",
+          "year": "2013",
+          "isbnOrUrl": "ISBN‑13: 978‑1449358068"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Weekly CLO token does not match defined CLOs and will be reconciled from topic mapping: CLO44 (CLO44)",
+      "Recovered week 11 CLO mapping from topic table because weekly CLO cell was not parseable: CLO44",
+      "Recovered week 12 CLO mapping from topic table because weekly CLO cell was not parseable: CLO",
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

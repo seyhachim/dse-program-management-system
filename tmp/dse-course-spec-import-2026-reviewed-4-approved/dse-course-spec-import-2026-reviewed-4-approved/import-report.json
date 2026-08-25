@@ -1,0 +1,63 @@
+{
+  "package": "dse-course-spec-import-2026-reviewed-4-approved",
+  "issue": 633,
+  "status": "reviewed-approved",
+  "approvedAt": "2026-08-25",
+  "count": 4,
+  "mappings": [
+    {
+      "sourceCode": "DSC102",
+      "targetCode": "CCS101",
+      "targetTitle": "Climate Change and Sustainable Development",
+      "targetCredits": 3.0,
+      "targetYear": 1,
+      "targetSemester": 1,
+      "sourceFile": "DSC102_Data_Science_for_Climate_Change_&_Sustainable_Development.docx",
+      "sourceSha256": "dbb5cf1ecabd3b422338060e2f4fa42d0eadd56f627e1e70446b07f6aa7e4d54",
+      "resolvedWarnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ]
+    },
+    {
+      "sourceCode": "DMA201",
+      "targetCode": "MAT202",
+      "targetTitle": "Math III: Discrete Mathematics",
+      "targetCredits": 4.0,
+      "targetYear": 2,
+      "targetSemester": 2,
+      "sourceFile": "DMA201-Math III-Discrete Mathematics.docx",
+      "sourceSha256": "29270239c0474125ebdd3943e107364f4e0f03aea02d94841cf292a1f9bb3a47",
+      "resolvedWarnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ]
+    },
+    {
+      "sourceCode": "PDT202",
+      "targetCode": "PDT102",
+      "targetTitle": "Personal Development and Teamwork",
+      "targetCredits": 3.0,
+      "targetYear": 1,
+      "targetSemester": 2,
+      "sourceFile": "PDT202- Personal Development and Teamwork.docx",
+      "sourceSha256": "15aa7309e94f10700cf5f01db130eee5397e8b48df13acecd2fb098ac00be2c1",
+      "resolvedWarnings": [
+        "Course Availability semester 1 conflicts with folder S2",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ]
+    },
+    {
+      "sourceCode": "SCA302",
+      "targetCode": "SCA402",
+      "targetTitle": "Supply Chain Analytics",
+      "targetCredits": 3.0,
+      "targetYear": 4,
+      "targetSemester": 2,
+      "sourceFile": "SCA302_Supply Chain Analytics.docx",
+      "sourceSha256": "7bd78be6a9205719c8e2b62e1764a7ccec3fad0eeff611d72a83f68850df3ec2",
+      "resolvedWarnings": [
+        "Course code in DOCX table (SCA323) conflicts with filename (SCA302); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ]
+    }
+  ]
+}

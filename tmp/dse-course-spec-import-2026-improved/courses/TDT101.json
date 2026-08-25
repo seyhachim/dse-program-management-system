@@ -1,0 +1,719 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "TDT101_Technology and Digital Transformation.docx",
+    "relativePath": "Year 1/S1/TDT101_Technology and Digital Transformation.docx",
+    "sha256": "136781ed49237c7405a294e9bf77ff03faac73a40c065fcf6d5ffd732385397a",
+    "yearFolder": 1,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "TDT101",
+    "title": "Technology and Digital Transformation",
+    "credits": {
+      "total": 2.0
+    },
+    "prerequisites": "N/A",
+    "courseType": "Basic",
+    "availability": {
+      "semester": 2,
+      "year": 1
+    },
+    "description": "This course examines the development of scientific ideas and engineering practices from early civilizations to the practice from early civilizations to the present day. Students will explore major discoveries, inventions and technological milestones. It provides students with a historical perspective to better understand modern engineering"
+  },
+  "lecturers": {
+    "primary": {
+      "name": "OUN Solida",
+      "qualification": "MSc",
+      "email": "Ounsolida77@gmail.com",
+      "phone": ""
+    },
+    "coLecturers": [
+      "N/A"
+    ]
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Analyse scientific and engineering developments through key historical discoveries and technologies.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture-based learning",
+      "assessmentMethodsRaw": "Exam, Quiz"
+    },
+    {
+      "code": "CLO2",
+      "description": "Participate in teamwork and discussion on historical scientific and engineering advancement.",
+      "mappedPlos": [
+        "PLO4"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Case-based Learning",
+      "assessmentMethodsRaw": "Reflective writing"
+    },
+    {
+      "code": "CLO3",
+      "description": "Demonstrate responsibility and active engagement in learning tasks and class activities.",
+      "mappedPlos": [
+        "PLO5"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Case-based learning",
+      "assessmentMethodsRaw": "Presentation"
+    },
+    {
+      "code": "CLO4",
+      "description": "Explain ethical issues related to scientific and technological developments and their impact.",
+      "mappedPlos": [
+        "PLO7",
+        "PLO8"
+      ],
+      "level": "C2",
+      "status": "active",
+      "teachingMethodsRaw": "Collaborative learning",
+      "assessmentMethodsRaw": "Rubric Performance"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Technology and Digital Transformation Meaning and scope of science and engineering in historical context Major stages in the development of science and engineering Importance of historical developments in shaping society and technology",
+        "CLO1",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "2",
+        "Topic 2: The Scientific Revolution Key discoveries and major contributors during the Scientific Revolution Influence of the Scientific Revolution on later science and engineering",
+        "CLO1",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "3",
+        "Topic 3: Historical Development of Modern Engineering and Technological Advancement Growth of modern engineering fields and major technologies Influence of past developments on modern engineering practices",
+        "CLO1",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "4",
+        "Topic 4: Historical Case Study Topic selection with short explanation of each case Analysis of development, impact and limitations Influence of historical innovation on current technology",
+        "CLO1 CLO2 CLO3",
+        "2",
+        "",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "11"
+      ],
+      [
+        "5",
+        "Topic 5: Ethical Issues in Historical Engineering and Technological Development Ethical principles in historical development of science and Ethical concern during major historical periods of technological growth Social and environmental impacts of past engineering and technological developments",
+        "CLO2 CLO3 CLO4",
+        "2",
+        "",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "11"
+      ],
+      [
+        "Total SLT for Course Content",
+        "46"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Quiz",
+        "15",
+        "3",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "2",
+        "Presentation",
+        "15",
+        "2",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "3",
+        "Debate",
+        "15",
+        "2",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "4",
+        "Midterm Exam",
+        "20",
+        "2",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "24"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "35",
+        "2",
+        "",
+        "8",
+        "10"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "10"
+      ],
+      [
+        "Total SLT for Assessment",
+        "34"
+      ],
+      [
+        "Grand Total SLT",
+        "80"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Quiz",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 2.0,
+      "capLevel": "C4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 4.0,
+      "capLevel": "C4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 25.0,
+      "sltHours": 4.0,
+      "capLevel": "C4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Presentation",
+      "mode": "group",
+      "weightPercent": 7.0,
+      "sltHours": 2.0,
+      "capLevel": "A3",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Debate",
+      "mode": "group",
+      "weightPercent": 2.0,
+      "sltHours": 4.0,
+      "capLevel": "A3",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Presentation",
+      "mode": "group",
+      "weightPercent": 8.0,
+      "capLevel": "A4",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Debate",
+      "mode": "group",
+      "weightPercent": 3.0,
+      "capLevel": "A4",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Debate",
+      "mode": "group",
+      "weightPercent": 10.0,
+      "sltHours": 2.0,
+      "capLevel": "C2",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final Exam",
+      "mode": "group",
+      "weightPercent": 10.0,
+      "sltHours": 8.0,
+      "capLevel": "C2",
+      "modeRaw": "G"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Technology and Digital Transformation",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain the meaning and relationship of science and engineering in historical context. LLO2: Identify the importance of studying the history of science and engineering."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: The Scientific Revolution",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Describe key discoveries and major contributors during the Scientific Revolution. LLO2: Analyse how the Scientific Revolution influenced the development of science and engineering."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Historical Development of Modern Engineering and Technology",
+        "clos": [
+          "CLO1",
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain the historical development of modern engineering and technology. LLO2: Analyse the influence of modern engineering and technological advancement on society and daily life."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Historical Case Study",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Analyse a selected historical case in science or engineering development. LLO2: Demonstrate responsibility and active contribution in group learning tasks."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Ethical Issues in Historical Engineering and Technological Development",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain ethical issues in historical engineering and technological developments. LLO2: Discuss the social and environmental impacts of past engineering and technological practices. LLO3: Demonstrate responsible and active participation in discussion of ethical issues."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 1: Introduction to Technology and Digital Transformation LLO1",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Interactive lecture Explanation with simple examples Short discussion",
+        "activeLearningRaw": "Note-taking Pair discussion Group sharing",
+        "assessmentRaw": "",
+        "resourcesRaw": "-PowerPoint slides -Introductory historical examples or images -Short video clip on the development of science and engineering"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 1: Introduction to Technology and Digital Transformation (cont.) LLO2 Quiz 1",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture with examples Review session Quiz",
+        "activeLearningRaw": "Note-taking Q&A participation Quiz attempt",
+        "assessmentRaw": "5",
+        "resourcesRaw": "-Slides -Quiz paper"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 2: The Scientific Revolution LLO1",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Interactive lecture Explanation with simple examples Short discussion",
+        "activeLearningRaw": "Note-taking Pair discussion Group sharing",
+        "assessmentRaw": "",
+        "resourcesRaw": "-slides -Short video clip on the development of science and engineering"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 2: The Scientific Revolution (cont.) LLO2 Quiz 2",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture with examples Review session Quiz",
+        "activeLearningRaw": "Note-taking Q&A participation Quiz attempt",
+        "assessmentRaw": "5",
+        "resourcesRaw": "-Slides -Quiz paper"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 3: Historical Development of Modern Engineering and Technology LLO1",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Interactive lecture Explanation with simple examples Short discussion",
+        "activeLearningRaw": "Note-taking Pair discussion Group sharing",
+        "assessmentRaw": "",
+        "resourcesRaw": "-slides -Short video clip on the development of science and engineering"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 3: Historical Development of Modern Engineering and Technology (con’t) LLO2 Quiz 3",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture with examples Review session Quiz",
+        "activeLearningRaw": "Note-taking Q&A participation Quiz attempt",
+        "assessmentRaw": "5",
+        "resourcesRaw": "-Slides -Quiz paper"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "1/0/1/0",
+        "lectureTopic": "Reflection on the key Concept (1)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Brief review lecture Guided reflection Group discussion",
+        "activeLearningRaw": "Reflection writing Pair or group sharing Class discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "-Slides -Reflection questions -worksheet"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "0/0/2/0",
+        "lectureTopic": "Midterm Exam",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Exam",
+        "activeLearningRaw": "Individual Exam",
+        "assessmentRaw": "20",
+        "resourcesRaw": "-Exam Paper"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 4: Historical Case Study -Case selection and background study LLO1",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture and guidance Case explanation",
+        "activeLearningRaw": "Group case selection Background research",
+        "assessmentRaw": "",
+        "resourcesRaw": "-Case examples -Guidelines"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "1/0/1/0",
+        "lectureTopic": "Topic 4: Historical Case Study - Case analysis and preparation LLO1",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Discussion and coaching Feedback on group work",
+        "activeLearningRaw": "Group analysis Prepare presentation",
+        "assessmentRaw": "",
+        "resourcesRaw": "-Worksheets -Slides"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "0/0/2/0",
+        "lectureTopic": "Topic 4: Historical Case Study - Presentation and reflection",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Facilitate presentations Provide feedback",
+        "activeLearningRaw": "Group presentation Peer discussion Reflection",
+        "assessmentRaw": "15",
+        "resourcesRaw": "-Rubric -Presentation tools"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 5: Ethical Issues in Historical Engineering and Technological Development -Topic focus: Introduction to ethical issues in historical engineering and technological development LLO1 LLO2",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Lecture Guided discussion",
+        "activeLearningRaw": "Group discussion Case identification",
+        "assessmentRaw": "",
+        "resourcesRaw": "-Slides -Case examples"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "1/0/1/0",
+        "lectureTopic": "Topic 5: -Analysing arguments and preparing for debate LLO2 LLO3",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Explain debate structure Guide argument building",
+        "activeLearningRaw": "Group work Argument preparation Practice debate",
+        "assessmentRaw": "",
+        "resourcesRaw": "-Debate guideline -Worksheet"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "0/0/2/0",
+        "lectureTopic": "Topic 5: -Debating ethical issues in historical engineering and technological development",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Facilitate debate Provide feedback",
+        "activeLearningRaw": "Group debate Peer evaluation",
+        "assessmentRaw": "15",
+        "resourcesRaw": "-Debate rubric -Evaluation form"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "1/0/1/0",
+        "lectureTopic": "Reflection on the key Concept (2)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Review Guided reflection",
+        "activeLearningRaw": "Reflection writing Discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "-Reflection questions -Slides"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "0/0/2/0",
+        "lectureTopic": "Final Exam",
+        "clos": [
+          "CLO1",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Exam",
+        "activeLearningRaw": "Individual Exam",
+        "assessmentRaw": "35",
+        "resourcesRaw": "Exam Paper"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "-PowerPoint slides -Introductory historical examples or images -Short video clip on the development of science and engineering; -Slides -Quiz paper; -slides -Short video clip on the development of science and engineering; -Slides -Reflection questions -worksheet; -Exam Paper; -Case examples -Guidelines; -Worksheets -Slides; -Rubric -Presentation tools; -Slides -Case examples; -Debate guideline -Worksheet; -Debate rubric -Evaluation form; -Reflection questions -Slides; Exam Paper",
+    "references": {
+      "required": [
+        {
+          "title": "HISTORY OF SCIENCE AND TECHNOLOGY",
+          "authors": "Choliy Serhiy, PhD in History Perga Iurii, PhD in History",
+          "publisher": "",
+          "year": "2023",
+          "isbnOrUrl": "ISBN 978-966-990-081-4"
+        }
+      ],
+      "recommended": []
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code is missing in DOCX table; canonical JSON uses filename code TDT101 and requires review",
+      "Course Availability semester 2 conflicts with folder S1",
+      "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+    ],
+    "errors": []
+  }
+}

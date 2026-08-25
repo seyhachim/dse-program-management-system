@@ -1,0 +1,972 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "LLM402_Large Language Model.docx",
+    "relativePath": "Year 4/S2/LLM402_Large Language Model.docx",
+    "sha256": "c1ed72d1bb4fff168f29dda28073087f830ff8663334dda282a24295487c0d9d",
+    "yearFolder": 4,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "LLM402",
+    "title": "Large Language Model (LLM)",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 2,
+      "year": 4
+    },
+    "description": "This course provides a comprehensive introduction to Large Language Models (LLMs), bridging foundational concepts in language representation with modern advances in generative AI. Students begin by exploring the core principles behind LLM architectures, tokenization strategies, and pretraining objectives, before advancing to hands-on implementation of key techniques such as prompt engineering, fine-tuning, and model alignment. The curriculum covers essential applications of LLMs, including text generation, conversational agents, code generation, reasoning tasks, and multimodal integration, with a strong focus on leveraging state-of-the-art frameworks like PyTorch, Hugging Face Transformers, and advanced inference tools. Students will gain practical experience in building, adapting, and deploying LLM-based systems for real-world tasks, while also addressing challenges such as hallucination mitigation, scalability, computational efficiency, and domain adaptation. Finally, the course emphasizes ethical and responsible AI practices covering bias, fairness, security, and interpretability, and equips students with the skills to evaluate, optimize, and reliably deploy LLM systems across diverse applications."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Mao Makara",
+      "qualification": "Ph.D.",
+      "email": "mao.makara@rupp.edu.kh",
+      "phone": "017 566 707"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Apply appropriate LLM techniques, including tokenization, prompt engineering, fine-tuning, and model adaptation, to solve real-world language and generative AI problems.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "Lab-based Leaning",
+      "assessmentMethodsRaw": "Preparing the slide, Use of AI tool, Write and execute code"
+    },
+    {
+      "code": "CLO2",
+      "description": "Analyze various LLM architectures and training methodologies (e.g., GPT-style models, encoder–decoder models, Transformer variants) to determine their suitability for different tasks.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning",
+      "assessmentMethodsRaw": "Assignment, Presentation"
+    },
+    {
+      "code": "CLO3",
+      "description": "Explain the fundamental concepts, challenges, and applications of large language models in areas such as text generation, machine translation, reasoning, and conversational systems.",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Flip classroom Collaborative learning",
+      "assessmentMethodsRaw": "Peer Assessment"
+    },
+    {
+      "code": "CLO4",
+      "description": "Evaluate the performance, limitations, and ethical implications of LLM-based systems using standard metrics, benchmarks, and case studies.",
+      "mappedPlos": [
+        "PLO7"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Role play, case-based discussion",
+      "assessmentMethodsRaw": "Reflection, participation"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Large Language Models",
+        "CLO1",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "5"
+      ],
+      [
+        "2",
+        "Topic 2: Architecture of Modern LLMs",
+        "CLO1 CLO3",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "4"
+      ],
+      [
+        "3",
+        "Topic 3: Pre-training LLMs",
+        "CLO1 CLO2 CLO3",
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "4"
+      ],
+      [
+        "4",
+        "Topic 4: Fine-tuning Techniques",
+        "CLO1 CLO2 CLO3",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "4"
+      ],
+      [
+        "5",
+        "Topic 5: Instruction Tuning",
+        "CLO1 CLO2 CLO3",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "4"
+      ],
+      [
+        "6",
+        "Topic 6: Reinforcement Learning from Human Feedback (RLHF)",
+        "CLO1 CLO2",
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "4"
+      ],
+      [
+        "7",
+        "Topic 7: Evaluation of LLMs",
+        "CLO1 CLO2",
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "4"
+      ],
+      [
+        "8",
+        "Topic 8: LLM Applications",
+        "CLO1 CLO2",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "3"
+      ],
+      [
+        "9",
+        "Topic 9: Retrieval-Augmented Generation (RAG)",
+        "CLO1 CLO2 CLO3",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "4"
+      ],
+      [
+        "10",
+        "Topic 10: Agents & Tool-Using LLMs",
+        "CLO1 CLO2 CLO3",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "3"
+      ],
+      [
+        "11",
+        "Topic 11: LLM Optimization & Deployment",
+        "CLO1 CLO2 CLO3",
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "4"
+      ],
+      [
+        "12",
+        "Topic 12: Ethical, Legal & Social Implications of LLMs",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "3"
+      ],
+      [
+        "13",
+        "Topic 13: Next-Generation LLM Research",
+        "CLO3 CLO4",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "3"
+      ],
+      [
+        "14",
+        "Topic 14: Capstone Project",
+        "CLO1 CLO3 CLO4",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "5",
+        "3"
+      ],
+      [
+        "Total SLT for Course Content",
+        "49"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Assignment",
+        "20",
+        "4",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "2",
+        "Quiz",
+        "20",
+        "4",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "3",
+        "Midterm Exam",
+        "20",
+        "4",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "24"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Project",
+        "20",
+        "3",
+        "",
+        "14",
+        "16"
+      ],
+      [
+        "2",
+        "Final Exam",
+        "20",
+        "3",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "16"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Quiz 1",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "P3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Assignment 1",
+      "mode": "group",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "P3",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Assignment 2",
+      "mode": "group",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "P3",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Quiz 2",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 8.0,
+      "capLevel": "C4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Quiz 3",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Quiz 4",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final Project",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 8.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to LLM",
+        "clos": [
+          "CLO1",
+          "CLO4"
+        ],
+        "llosRaw": "Explain the scope, challenges, and applications of Large Language Models (LLMs) in real-world contexts (Understand)."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Text Processing & Tokenization",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Apply tokenization and text preprocessing techniques used in LLM pipelines (Apply)."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Tokenization Algorithms for LLMs",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain subword tokenization methods such as BPE, WordPiece, and SentencePiece (Understand)."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Word & Contextual Embeddings",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Compare different embedding representations (static vs. contextual) used in LLMs (Analyse)."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Neural Networks & Transformer Basics",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Describe the structure of Transformer-based models for language tasks (Understand)."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: LLM Architectures",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Analyse the strengths and limitations of decoder-only, encoder-only, and encoder–decoder LLM architectures (Analyse)."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Attention Mechanisms in LLMs",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Explain the role of self-attention and multi-head attention in LLM inference (Understand)."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Pretraining & Fine-Tuning LLMs",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Describe pretraining, fine-tuning, and instruction tuning processes in large language models (Understand)."
+      },
+      {
+        "number": 9,
+        "title": "Evaluate understanding of LLM concepts from Topics 1–8 (Evaluate).",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "Midterm Exam"
+      },
+      {
+        "number": 10,
+        "title": "Topic 9: Machine Translation with LLMs",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Analyse the differences between statistical, neural, and LLM-based machine translation (Analyse)."
+      },
+      {
+        "number": 11,
+        "title": "Topic 10: Information Retrieval & RAG",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Implement retrieval-augmented generation (RAG) and basic retrieval pipelines (Apply)."
+      },
+      {
+        "number": 12,
+        "title": "Topic 11: Text Classification with LLMs",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Compare traditional ML vs. LLM-based approaches for sentiment and text classification (Analyse)."
+      },
+      {
+        "number": 13,
+        "title": "Topic 12: Dialogue Systems & Chatbots",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Differentiate between rule-based, retrieval-based, and LLM-powered generative chatbots (Analyse)."
+      },
+      {
+        "number": 14,
+        "title": "Topic 13: Ethics, Bias & Safety in LLMs",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Explain sources of bias, hallucination, and ethical risks in LLMs (Understand)."
+      },
+      {
+        "number": 15,
+        "title": "Topic 14: Advanced Topics + Project Presentation",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Discuss recent advancements in multilingual LLMs, low-resource learning, and frontier LLM capabilities (Understand)."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "(1/1/4)",
+        "lectureTopic": "Topic 1: Introduction to LLM",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Scenario-based learning, Lecture",
+        "activeLearningRaw": "Exploration & investigation",
+        "assessmentRaw": "Class participation (5%)",
+        "resourcesRaw": "Research articles, LLM overview slides"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 2: Text Processing & Tokenization",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Direct instruction, Demo",
+        "activeLearningRaw": "Collaborative, team-based practice",
+        "assessmentRaw": "Homework 1 (10%)",
+        "resourcesRaw": "Hugging Face Tokenizers, SpaCy"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 3: Tokenization Algorithms for LLMs",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Short lecture, Examples",
+        "activeLearningRaw": "Video training, Exercises",
+        "assessmentRaw": "Quiz 1 (5%)",
+        "resourcesRaw": "Python notebooks, HF docs"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 4: Word & Contextual Embeddings",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Direct instruction, Case-based learning",
+        "activeLearningRaw": "Application & transfer",
+        "assessmentRaw": "Homework 2 (10%)",
+        "resourcesRaw": "GloVe, Word2Vec, Transformer embeddings"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 5: Neural Networks & Transformer Basics",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture + Worked examples",
+        "activeLearningRaw": "Theory-practice integration",
+        "assessmentRaw": "Quiz 2 (5%)",
+        "resourcesRaw": "PyTorch, Keras"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 6: LLM Architectures",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Direct instruction, Scenario-based learning",
+        "activeLearningRaw": "Problem-solving & coding tasks",
+        "assessmentRaw": "Class participation (5%)",
+        "resourcesRaw": "GPT-style, BERT-style architecture materials"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 7: Attention Mechanisms in LLMs",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture, Theory explanation",
+        "activeLearningRaw": "Guided coding + exploration",
+        "assessmentRaw": "Homework 3 (10%)",
+        "resourcesRaw": "Attention mechanism tutorials"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 8: Pretraining & Fine-Tuning LLMs",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Direct instruction, Case examples",
+        "activeLearningRaw": "Hands-on demo, group learning",
+        "assessmentRaw": "Quiz 3 (5%)",
+        "resourcesRaw": "Hugging Face Transformers"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Evaluate understanding of LLM concepts from Topics 1–8 (Evaluate).",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Inquiry-based",
+        "activeLearningRaw": "Reflection & feedback",
+        "assessmentRaw": "Midterm (10%)",
+        "resourcesRaw": "Exam materials"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 9: Machine Translation with LLMs",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Direct instruction, Demo",
+        "activeLearningRaw": "Scenario-based exercises",
+        "assessmentRaw": "Class participation (5%)",
+        "resourcesRaw": "Google NMT, LLM MT papers"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 10: Information Retrieval & RAG",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Direct instruction, Lab",
+        "activeLearningRaw": "Collaborative approach",
+        "assessmentRaw": "Homework 4 (10%)",
+        "resourcesRaw": "BM25, RAG datasets, FAISS"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 11: Text Classification with LLMs",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Direct instruction, Case-based",
+        "activeLearningRaw": "Application & transfer",
+        "assessmentRaw": "Quiz 4 (5%)",
+        "resourcesRaw": "Sentiment140, HF pipelines"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 12: Dialogue Systems & Chatbots",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture + Demo",
+        "activeLearningRaw": "Scenario-based group activity",
+        "assessmentRaw": "Class participation (5%)",
+        "resourcesRaw": "OpenAI API, Rasa, LLaMA"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 13: Ethics, Bias & Safety in LLMs",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture + Case study",
+        "activeLearningRaw": "Reflective learning",
+        "assessmentRaw": "Reflection task (5%)",
+        "resourcesRaw": "AI Ethics & LLM Safety readings"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "(2/1/1)",
+        "lectureTopic": "Topic 14: Advanced Topics + Project Presentation",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture, Student presentations",
+        "activeLearningRaw": "Project-based, Peer review",
+        "assessmentRaw": "Final Project (20%)",
+        "resourcesRaw": "Research papers, Hugging Face Hub"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "",
+        "lectureTopic": "Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Research articles, LLM overview slides; Hugging Face Tokenizers, SpaCy; Python notebooks, HF docs; GloVe, Word2Vec, Transformer embeddings; PyTorch, Keras; GPT-style, BERT-style architecture materials; Attention mechanism tutorials; Hugging Face Transformers; Exam materials; Google NMT, LLM MT papers; BM25, RAG datasets, FAISS; Sentiment140, HF pipelines; OpenAI API, Rasa, LLaMA; AI Ethics & LLM Safety readings; Research papers, Hugging Face Hub",
+    "references": {
+      "required": [
+        {
+          "title": "Transformers: Theory and Practice of Large Language Models",
+          "authors": "Aurélien Géron (or similar modern LLM-focused text)",
+          "publisher": "O’Reilly Media",
+          "year": "2024*",
+          "isbnOrUrl": "To be updated"
+        },
+        {
+          "title": "Natural Language Processing with Transformers",
+          "authors": "Lewis Tunstall, Leandro von Werra, Thomas Wolf",
+          "publisher": "O’Reilly Media",
+          "year": "2022",
+          "isbnOrUrl": "9781098103243"
+        },
+        {
+          "title": "Deep Learning (for fundamentals used in LLMs)",
+          "authors": "Ian Goodfellow, Yoshua Bengio, Aaron Courville",
+          "publisher": "MIT Press",
+          "year": "2016",
+          "isbnOrUrl": "9780262035613"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Transformers for Natural Language Processing (2nd Edition)",
+          "authors": "Denis Rothman",
+          "publisher": "Packt Publishing",
+          "year": "2022",
+          "isbnOrUrl": "9781803247335"
+        },
+        {
+          "title": "Neural Network Methods for Natural Language Processing",
+          "authors": "Yoav Goldberg",
+          "publisher": "Morgan & Claypool",
+          "year": "2017",
+          "isbnOrUrl": "9781681730974"
+        },
+        {
+          "title": "Dive into Deep Learning (Open Source Book)",
+          "authors": "Aston Zhang, Zachary C. Lipton, Mu Li, Alexander J. Smola",
+          "publisher": "Self-published",
+          "year": "2021",
+          "isbnOrUrl": "https://d2l.ai/"
+        },
+        {
+          "title": "Dive into Deep Learning (Open Source Book)",
+          "authors": "Aston Zhang, Zachary C. Lipton, Mu Li, Alexander J. Smola",
+          "publisher": "Self-published (with MXNet, PyTorch, TensorFlow examples)",
+          "year": "2021",
+          "isbnOrUrl": "https://d2l.ai"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand, which means being ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposals on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code in DOCX table (LLM302) conflicts with filename (LLM402); canonical JSON uses filename code and requires review"
+    ],
+    "errors": []
+  }
+}

@@ -1,0 +1,803 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "BDA302_Big Data Processing.docx",
+    "relativePath": "Year 3/S2/BDA302_Big Data Processing.docx",
+    "sha256": "83a510052452adbb0575046f35a4c6f27495087688a69b4ef3a31da1ead6702c",
+    "yearFolder": 3,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "BDA302",
+    "title": "Data Processing (Hadoop and Spark)",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 2,
+      "year": 3
+    },
+    "description": "This course introduces students to the principles, technologies, and applications of Big Data analytics. It covers the evolution of Big Data, its defining characteristics, and the role of advanced analytics in solving real-world problems. Students will explore key frameworks such as Hadoop, Spark, and Flink, along with concepts of real-time data processing, machine learning, and cloud-based solutions. The course emphasizes hands-on experience through labs and projects, including data stream processing, social media analytics, text mining, and sentiment analysis. Advanced topics such as deep learning architectures and parallelization strategies for distributed environments are also included. Learners will develop technical proficiency, analytical thinking, and ethical awareness while working collaboratively on projects. By the end of the course, students will be able to design and implement scalable Big Data solutions, apply machine learning techniques, and evaluate emerging technologies for data-driven decision-making."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dr. Khim Chamroeun",
+      "qualification": "Ph.D",
+      "email": "Chamroeun.khim@gmail.com",
+      "phone": "+855 12 741 274"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Deploy a real-time data pipeline using Spark Streaming.",
+      "mappedPlos": [
+        "PLO2",
+        "PLO3"
+      ],
+      "level": "P4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO2",
+      "description": "Analyze Big Data architectures and frameworks (Hadoop, Spark, Flink) to determine their suitability for different data processing scenarios.",
+      "mappedPlos": [
+        "PLO2",
+        "PLO4"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Project Reports, Presentation, Write and execute code"
+    },
+    {
+      "code": "CLO3",
+      "description": "Implement a Big Data solution integrating machine learning and social media analytics.",
+      "mappedPlos": [
+        "PLO7",
+        "PLO8"
+      ],
+      "level": "P5",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO4",
+      "description": "Analyze deep learning architectures and parallelization strategies for Big Data applications.",
+      "mappedPlos": [
+        "PLO10",
+        "PLO7"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Project Reports, Presentation, Write and execute code"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Big Data and Historical Perspectives: Covers the evolution of Big Data and its significance.",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: Defining Big Data: From 3Vs to 32Vs: Explores the expanded definition of Big Data across domains.",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "3",
+        "Topic 3: Big Data Analytics and Machine Learning: Introduces ML concepts in the context of Big Data.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "4",
+        "Topic 4: Big Data Analytics and Cloud Computing: Discusses cloud infrastructure for scalable analytics.",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "5",
+        "Topic 5: Hadoop, HDFS, MapReduce, Spark, and Flink: Overview of key Big Data processing frameworks.",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "6",
+        "Topic 6: Real-Time Analytics Concepts and Platforms: Covers velocity aspects and real-time data processing.",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "7",
+        "Topic 7: Data Stream Processing Platforms: Introduces tools like Spark Streaming, Storm, Kafka.",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "8",
+        "Topic 8: Big Data Analytics for Social Media: Applications of Big Data in analyzing social platforms.",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "9",
+        "Topic 9: Natural Language Processing and Applications: Language detection, named entity recognition, etc.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "10",
+        "Topic 10: Text Mining and Sentiment Analysis: Techniques for extracting insights from text data.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "11",
+        "Topic 11: Trending Topics and Recommender Systems: Algorithms for identifying trends and personalizing content.",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "12",
+        "Topic 12: Anomaly Detection in Social Media: Statistical and ML methods for detecting outliers.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "13",
+        "Topic 13: Deep Learning Concepts and Architectures: Introduction to neural networks and deep learning.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "14",
+        "Topic 14: Big Data Analytics for Social Media: Applications of Big Data in analyzing social platforms.",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Lab Assignment",
+        "30",
+        "8",
+        "",
+        "8",
+        "16"
+      ],
+      [
+        "2",
+        "Simi-presentation and report submission",
+        "35",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "26"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final presentation and report submission",
+        "35",
+        "4",
+        "",
+        "10",
+        "14"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "14"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "P4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 3.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Simi-presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 10.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 3.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 14.0,
+      "capLevel": "C4"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Big Data and Historical Perspectives: Covers the evolution of Big Data and its significance.",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Explain the evolution of Big Data and its role in modern analytics. LLO2: Identify key historical milestones that shaped Big Data technologies. LLO3: Discuss the significance of Big Data in real-world applications."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Defining Big Data: From 3Vs to 32Vs: Explores the expanded definition of Big Data across domains.",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Define the original 3Vs and expanded Vs of Big Data. LLO2: Differentiate between various Vs and their impact on data processing. LLO3: Evaluate how additional Vs influence Big Data architecture design."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Big Data Analytics and Machine Learning: Introduces ML concepts in the context of Big Data.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Describe the relationship between Big Data and machine learning. LLO2: Apply ML algorithms to Big Data scenarios using sample datasets. LLO3: Analyze scalability challenges when integrating ML with Big Data."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Big Data Analytics and Cloud Computing: Discusses cloud infrastructure for scalable analytics.",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Explain the role of cloud computing in Big Data analytics. LLO2: Compare different cloud-based Big Data platforms (AWS, Azure, GCP). LLO3: Deploy a simple Big Data pipeline on a cloud-like environment."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Hadoop, HDFS, MapReduce, Spark, and Flink: Overview of key Big Data processing frameworks.",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Identify the core components of Hadoop ecosystem. LLO2: Explain differences between MapReduce, Spark, and Flink frameworks. LLO3: Execute a basic Spark job for data processing."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Real-Time Analytics Concepts and Platforms: Covers velocity aspects and real-time data processing.",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Define real-time analytics and its importance in Big Data. LLO2: Illustrate concepts like latency, windowing, and watermarking. LLO3: Implement a simple real-time data ingestion pipeline."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Data Stream Processing Platforms: Introduces tools like Spark Streaming, Storm, Kafka.",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Describe the architecture of Spark Streaming, Storm, and Kafka. LLO2: Compare stream processing vs batch processing approaches. LLO3: Build a streaming pipeline using Spark Streaming and Kafka."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Big Data Analytics for Social Media: Applications of Big Data in analyzing social platforms.",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain how Big Data techniques apply to social media analytics. LLO2: Identify key metrics for social media engagement analysis. LLO3: Develop a pipeline for extracting insights from social media data."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Natural Language Processing and Applications: Language detection, named entity recognition, etc.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: NLP concepts relevant to Big Data (tokenization, NER). LLO2: Apply NLP techniques for language detection in large datasets. LLO3: Analyze challenges of multilingual NLP in Big Data environments."
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Text Mining and Sentiment Analysis: Techniques for extracting insights from text data.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain text mining and its role in Big Data analytics. LLO2: Perform sentiment analysis on social media text streams. LLO3: Evaluate accuracy and scalability of sentiment models."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Trending Topics and Recommender Systems: Algorithms for identifying trends and personalizing content.",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Describe algorithms for detecting trending topics. LLO2: Implement a basic recommender system using Big Data tools. LLO3: Analyze personalization strategies in social media platforms."
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Anomaly Detection in Social Media: Statistical and ML methods for detecting outliers.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Define anomaly detection and its significance in social media analytics. LLO2: Apply statistical and ML methods for detecting anomalies. LLO3: Evaluate performance of anomaly detection models on real datasets."
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Deep Learning Concepts and Architectures: Introduction to neural networks and deep learning.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain deep learning architectures for Big Data applications. LLO2: Implement a simple neural network for text classification. LLO3: Analyze parallelization strategies for training deep models at scale."
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: Big Data Analytics for Social Media: Applications of Big Data in analyzing social platforms.",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Discuss ethical considerations in Big Data analytics. LLO2: Evaluate emerging trends in Big Data and AI integration. LLO3: Integrate course concepts into a capstone project design."
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 1: Introduction to Big Data and Historical Perspectives: Covers the evolution of Big Data and its significance.",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Explain the evolution of Big Data and its role in modern analytics using slides and interactive discussion. LLO2: Project-Based Learning – Assign a mini-project where students research and present a timeline of Big Data milestones. LLO3: Lecture-Based Learning – Discuss the significance of Big Data in various domains through real-world examples.",
+        "activeLearningRaw": "LLO1: Students take notes during lecture and summarize key historical milestones. LLO2: Students create a visual timeline (poster or infographic) and present findings. LLO3: Students analyze case studies and write a reflection on Big Data’s impact.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch1, P 01-17"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 2: Defining Big Data: From 3Vs to 32Vs: Explores the expanded definition of Big Data across domains.",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Define the original 3Vs and expanded Vs of Big Data. LLO2: Group Discussion – Compare different Vs and their impact on data processing. LLO3: Case-Based Learning – Evaluate how additional Vs influence architecture design.",
+        "activeLearningRaw": "LLO1: Students list and explain Vs in their notebooks. LLO2: Students debate in groups and present findings on Vs importance. LLO3: Students analyze a case study and propose architecture adjustments.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch1, P 24-25"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 3: Big Data Analytics and Machine Learning: Introduces ML concepts in the context of Big Data.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Describe the relationship between Big Data and ML. LLO2: Lab-Based Learning – Apply ML algorithms to Big Data scenarios. LLO3: Problem-Based Learning – Analyze scalability challenges in ML integration.",
+        "activeLearningRaw": "LLO1: Students answer concept questions during lecture. LLO2: Students implement a classifier on a sample dataset in lab. LLO3: Students write a short report on scalability issues.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 25-26"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 4: Big Data Analytics and Cloud Computing: Discusses cloud infrastructure for scalable analytics.",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Explain cloud computing’s role in Big Data. LLO2: Demonstration – Compare AWS, Azure, and GCP Big Data services. LLO3: Lab-Based Learning – Deploy a simple pipeline on a cloud-like environment.",
+        "activeLearningRaw": "LLO1: Students take notes and answer quiz questions. LLO2: Students observe instructor demo and document differences. LLO3: Students set up a pipeline using MinIO + Spark locally.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 28-31"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 5: Hadoop, HDFS, MapReduce, Spark, and Flink: Overview of key Big Data processing frameworks.",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Identify Hadoop ecosystem components. LLO2: Lecture-Based Learning – Explain differences between MapReduce, Spark, Flink. LLO3: Lab-Based Learning – Execute a basic Spark job.",
+        "activeLearningRaw": "LLO1: Students draw Hadoop architecture diagram. LLO2: Students complete a comparison table of frameworks. LLO3: Students run Spark job for tokenization and report results.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 34-38"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/2/1",
+        "lectureTopic": "Topic 6: Real-Time Analytics Concepts and Platforms: Covers velocity aspects and real-time data processing.",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Define real-time analytics and its importance. LLO2: Interactive Lecture – Illustrate latency, windowing, watermarking. LLO3: Lab-Based Learning – Implement a simple real-time ingestion pipeline.",
+        "activeLearningRaw": "LLO1: Students answer concept questions during lecture. LLO2: Students work through examples of windowing in class. LLO3: Students build a Kafka → Spark pipeline in lab.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 43"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/0/2/1",
+        "lectureTopic": "Topic 7: Data Stream Processing Platforms: Introduces tools like Spark Streaming, Storm, Kafka.",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Describe Spark Streaming, Storm, Kafka architecture. LLO2: Group Discussion – Compare stream vs batch processing. LLO3: Lab-Based Learning – Build a streaming pipeline using Spark Streaming.",
+        "activeLearningRaw": "LLO1: Students take notes and sketch architecture diagrams. LLO2: Students debate pros/cons of streaming vs batch. LLO3: Students implement Spark Streaming job in lab.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 44-46"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/0/2/1",
+        "lectureTopic": "Topic 8: Big Data Analytics for Social Media: Applications of Big Data in analyzing social platforms.",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Explain Big Data techniques for social media. LLO2: Case-Based Learning – Identify key metrics for engagement analysis. LLO3: Lab-Based Learning – Develop a pipeline for social media insights.",
+        "activeLearningRaw": "LLO1: Students summarize lecture concepts in notes. LLO2: Students analyze a social media dataset and identify metrics. LLO3: Students implement a Spark job for hashtag frequency analysis.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 49"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 9: Natural Language Processing and Applications: Language detection, named entity recognition, etc.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Define NLP concepts relevant to Big Data. LLO2: Lab-Based Learning – Apply NLP techniques for language detection. LLO3: Problem-Based Learning – Analyze multilingual NLP challenges.",
+        "activeLearningRaw": "LLO1: Students complete a concept map of NLP tasks. LLO2: Students run language detection on a dataset using Spark NLP. LLO3: Students write a short report on Khmer NLP challenges.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 55-62"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 10: Text Mining and Sentiment Analysis: Techniques for extracting insights from text data.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Explain text mining and its role. LLO2: Lab-Based Learning – Perform sentiment analysis on social media text. LLO3: Project-Based Learning – Evaluate accuracy and scalability of models.",
+        "activeLearningRaw": "LLO1: Students answer concept questions during lecture. LLO2: Students implement sentiment analysis pipeline in Spark. LLO3: Students compare model performance and write a report.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 63-65"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/0/2/1",
+        "lectureTopic": "Topic 11: Trending Topics and Recommender Systems: Algorithms for identifying trends and personalizing content.",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Describe algorithms for trending topics. LLO2: Lab-Based Learning – Implement a basic recommender system. LLO3: Group Discussion – Analyze personalization strategies.",
+        "activeLearningRaw": "LLO1: Students take notes and answer quiz questions. LLO2: Students build a simple collaborative filtering model. LLO3: Students discuss ethical implications of personalization.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 68-70"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 12: Anomaly Detection in Social Media: Statistical and ML methods for detecting outliers.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Define anomaly detection and its significance. LLO2: Lab-Based Learning – Apply ML methods for detecting anomalies. LLO3: Project-Based Learning – Evaluate performance of anomaly detection models.",
+        "activeLearningRaw": "LLO1: Students summarize anomaly detection concepts. LLO2: Students implement isolation forest on social media data. LLO3: Students report precision/recall metrics for anomaly detection.",
+        "assessmentRaw": "7",
+        "resourcesRaw": "Slides, textbook Ch2, P 71-72"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 13: Deep Learning Concepts and Architectures: Introduction to neural networks and deep learning.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Explain deep learning architectures. LLO2: Lab-Based Learning – Implement a simple neural network for text classification. LLO3: Problem-Based Learning – Analyze parallelization strategies.",
+        "activeLearningRaw": "LLO1: Students draw architecture diagrams for CNN/RNN. LLO2: Students train a small neural network on fake news dataset. LLO3: Students write a report on data vs model parallelism.",
+        "assessmentRaw": "8",
+        "resourcesRaw": "Slides, textbook Ch4, P 150"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 14: Big Data Analytics for Social Media: Applications of Big Data in analyzing social platforms.",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture-Based Learning – Discuss ethical considerations in Big Data. LLO2: Seminar-Based Learning – Evaluate emerging trends in Big Data and AI. LLO3: Project-Based Learning – Integrate course concepts into capstone design.",
+        "activeLearningRaw": "LLO1: Students participate in ethics debate. LLO2: Students present on future trends in Big Data. LLO3: Students finalize capstone architecture and submit design document.",
+        "assessmentRaw": "8",
+        "resourcesRaw": "Slides, textbook Ch4, P 153"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Computer lab Slide projector",
+    "references": {
+      "required": [
+        {
+          "title": "Big Data Principles and Paradigms",
+          "authors": "Rajkumar Buyya, Rodrigo N. Calheiros, Amir Vahid Dastjerdi",
+          "publisher": "Elsevier",
+          "year": "2016",
+          "isbnOrUrl": "978-0-12-805394-2"
+        }
+      ],
+      "recommended": []
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": []
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code in DOCX table (BDA401) conflicts with filename (BDA302); canonical JSON uses filename code and requires review",
+      "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+    ],
+    "errors": []
+  }
+}

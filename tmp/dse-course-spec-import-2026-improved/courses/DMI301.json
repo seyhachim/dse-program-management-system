@@ -1,0 +1,836 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "DMI301_Data Mining.docx",
+    "relativePath": "Year 3/S1/DMI301_Data Mining.docx",
+    "sha256": "7746903da7131c15d8da0856f44d5a730fd515ac201a72db4a3572ef573e46e6",
+    "yearFolder": 3,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "DMI301",
+    "title": "Data Mining",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 1,
+      "year": 3
+    },
+    "description": null
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dr. Khim Chamroeun",
+      "qualification": "Ph.D",
+      "email": "Chamroeun.khim@gmail.com",
+      "phone": "+855 12 741 274"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Analyze data characteristics and relationships using statistical measures and similarity metrics to identify patterns and anomalies.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO2",
+      "description": "Implement data preprocessing and transformation techniques (normalization, discretization, sampling) using appropriate data science tools with precision and efficiency.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P5",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Project Reports, Presentation, Write and execute code"
+    },
+    {
+      "code": "CLO3",
+      "description": "Organize tasks effectively within a team to ensure collaborative problem-solving and integration of diverse perspectives in data-driven projects.",
+      "mappedPlos": [
+        "PLO4"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO4",
+      "description": "Develop innovative data mining solutions for real-world problems by applying advanced algorithms and entrepreneurial thinking.",
+      "mappedPlos": [
+        "PLO6"
+      ],
+      "level": "C6",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Project Reports, Presentation, Write and execute code"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Data Mining",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: Data types (Nominal attributes, Binary attributes)",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "3",
+        "Topic 2: Data types (Ordinal attributes, Numeric attributes)",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "4",
+        "Topic 3: Statistics of data (Measuring the central tendency, Measuring the dispersion of data)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "5",
+        "Topic 3: Statistics of data (Covariance and correlation analysis, Graphic displays of basic statistics of data)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "6",
+        "Topic 4: Similarity and distance measures (Datamatrix, dissimilaritymatrix)",
+        "CLO2 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "7",
+        "Topic 4: Similarity and distance measures (Proximity measures for nominal, ordinal, and binary attributes)",
+        "CLO2 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "8",
+        "Topic 4: Similarity and distance measures (Cosine similarity)",
+        "CLO2 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "9",
+        "Topic 5: Data quality, data cleaning, and data integration",
+        "CLO2 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "10",
+        "Topic 6: Data transformation (Normalization, Discretization)",
+        "CLO4 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "11",
+        "Topic 6: Data transformation (Data compression, Sampling)",
+        "CLO4 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "12",
+        "Topic 7: Dimensionality reduction (Principal components analysis, Attribute subset selection)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "13",
+        "Topic 8: Frequent itemset mining methods (Apriori algorithm)",
+        "CLO4 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "14",
+        "Topic 8: Frequent itemset mining methods (Generating association rules)",
+        "CLO4 CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Lab Assignment",
+        "30",
+        "8",
+        "",
+        "8",
+        "16"
+      ],
+      [
+        "2",
+        "Simi-presentation and report submission",
+        "35",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "26"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final presentation and report submission",
+        "35",
+        "4",
+        "",
+        "10",
+        "14"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "14"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 3.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Simi-presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 10.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 5.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 3.0,
+      "capLevel": "C6"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 14.0,
+      "capLevel": "C6"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Data Mining",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain the fundamental concepts and objectives of data mining. LLO2: Identify common applications and challenges in real-world data mining. LLO3: Describe the data mining process and its role in knowledge discovery."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Data types (Nominal attributes, Binary attributes)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Differentiate between nominal and binary attributes in datasets. LLO2: Analyze the characteristics and usage of nominal and binary data in data mining. LLO3: Apply appropriate representation techniques for nominal and binary attributes."
+      },
+      {
+        "number": 3,
+        "title": "Topic 2: Data types (Ordinal attributes, Numeric attributes)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Distinguish ordinal and numeric attributes and their properties. LLO2: Interpret ordinal and numeric data in statistical analysis. LLO3: Demonstrate encoding methods for ordinal and numeric attributes."
+      },
+      {
+        "number": 4,
+        "title": "Topic 3: Statistics of data (Measuring the central tendency, Measuring the dispersion of data)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Compute measures of central tendency (mean, median, mode) for given datasets. LLO2: Calculate measures of dispersion (range, variance, standard deviation). LLO3: Interpret statistical measures to summarize data characteristics."
+      },
+      {
+        "number": 5,
+        "title": "Topic 3: Statistics of data (Covariance and correlation analysis, Graphic displays of basic statistics of data)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Calculate covariance and correlation between variables. LLO2: Interpret correlation results to identify relationships in data. LLO3: Visualize basic statistical measures using appropriate graphical tools."
+      },
+      {
+        "number": 6,
+        "title": "Topic 4: Similarity and distance measures (Datamatrix, dissimilaritymatrix)",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Construct data matrices and dissimilarity matrices for given datasets. LLO2: Apply similarity and distance measures to compare data points. LLO3: Collaborate in teams to implement similarity computations in a lab setting."
+      },
+      {
+        "number": 7,
+        "title": "Topic 4: Similarity and distance measures (Proximity measures for nominal, ordinal, and binary attributes)",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain proximity measures for nominal, ordinal, and binary attributes. LLO2: Compute proximity measures for different attribute types. LLO3: Work in teams to evaluate proximity measures on sample datasets."
+      },
+      {
+        "number": 8,
+        "title": "Topic 4: Similarity and distance measures (Cosine similarity)",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Define cosine similarity and its applications in data mining. LLO2: Calculate cosine similarity for text or numeric data. LLO3: Collaborate to implement cosine similarity in a coding exercise."
+      },
+      {
+        "number": 9,
+        "title": "Topic 5: Data quality, data cleaning, and data integration",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Identify common data quality issues and their impact on analysis. LLO2: Apply data cleaning techniques to improve dataset quality. LLO3: Work collaboratively to integrate multiple datasets for analysis."
+      },
+      {
+        "number": 10,
+        "title": "Topic 6: Data transformation (Normalization, Discretization)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain normalization and discretization techniques. LLO2: Apply normalization and discretization to transform raw data. LLO3: Collaborate to implement transformation techniques in a project setting."
+      },
+      {
+        "number": 11,
+        "title": "Topic 6: Data transformation (Data compression, Sampling)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Describe data compression and sampling methods. LLO2: Apply sampling techniques to reduce dataset size while preserving integrity. LLO3: Work in teams to implement compression and sampling in practice."
+      },
+      {
+        "number": 12,
+        "title": "Topic 7: Dimensionality reduction (Principal components analysis, Attribute subset selection)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain the concept and importance of dimensionality reduction. LLO2: Apply PCA to reduce dimensions in a dataset. LLO3: Evaluate attribute selection methods for feature reduction."
+      },
+      {
+        "number": 13,
+        "title": "Topic 8: Frequent itemset mining methods (Apriori algorithm)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain the Apriori algorithm and its role in association rule mining. LLO2: Implement the Apriori algorithm on a sample dataset. LLO3: Collaborate to analyze frequent itemsets and interpret results."
+      },
+      {
+        "number": 14,
+        "title": "Topic 8: Frequent itemset mining methods (Generating association rules)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain the process of generating association rules from frequent itemsets. LLO2: Apply rule generation techniques and interpret confidence and support. LLO3: Work in teams to implement association rule mining in a project."
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 1: Introduction to Data Mining",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Deliver lecture using slides and Q&A session. LLO2: Project-based Learning – Facilitate case study discussion on real-world applications. LLO3: Lecture Based Learning – Demonstrate data mining process using diagrams and examples.",
+        "activeLearningRaw": "LLO1: Listen actively, take notes, and ask questions during lecture. LLO2: Participate in group discussion, brainstorm ideas, and share examples. LLO3: Analyze process steps and summarize in own words during class activity.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch1, P 01-17"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 2: Data types (Nominal attributes, Binary attributes)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain nominal and binary attributes using examples and diagrams. LLO2: Lab-Based Learning – Demonstrate encoding techniques for nominal and binary data in Python. LLO3: Project-based Learning – Guide students to apply nominal/binary attributes in a mini-project dataset.",
+        "activeLearningRaw": "LLO1: Listen to lecture, take notes, and ask questions. LLO2: Perform hands-on coding exercises to represent nominal/binary data. LLO3: Collaborate in teams to encode attributes in project dataset.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook Ch1, P 24-25"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 2: Data types (Ordinal attributes, Numeric attributes)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Present ordinal and numeric attributes with real-world examples. LLO2: Lab-Based Learning – Demonstrate normalization and scaling for numeric data. LLO3: Project-based Learning – Support students in applying ordinal/numeric attributes in project work.",
+        "activeLearningRaw": "LLO1: Listen, take notes, and engage in Q&A. LLO2: Practice coding normalization and scaling techniques. LLO3: Work in groups to preprocess ordinal/numeric data for project.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook Ch2, P 25-26"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 3: Statistics of data (Measuring the central tendency, Measuring the dispersion of data)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain mean, median, mode, and dispersion measures. LLO2: Lab-Based Learning – Demonstrate calculation of statistical measures using Python libraries. LLO3: Project-based Learning – Guide students to apply these measures on project datasets.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Perform coding exercises to compute statistical measures. LLO3: Apply statistical analysis collaboratively on project data.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 28-31"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 3: Statistics of data (Covariance and correlation analysis, Graphic displays of basic statistics of data)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain covariance and correlation concepts. LLO2: Lab-Based Learning – Demonstrate correlation analysis and visualization using Python. LLO3: Project-based Learning – Assist students in interpreting correlation for project insights.",
+        "activeLearningRaw": "LLO1: Listen, take notes, and ask questions. LLO2: Practice coding correlation and plotting graphs. LLO3: Collaborate to analyze relationships in project data.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 34-38"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 4: Similarity and distance measures (Datamatrix, dissimilaritymatrix)",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain similarity and distance concepts. LLO2: Lab-Based Learning – Demonstrate constructing data and dissimilarity matrices. LLO3: Project-based Learning – Facilitate teamwork to compute similarity measures for project data.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Perform coding exercises to build matrices. LLO3: Work in teams to apply similarity measures on project datasets.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 43"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 4: Similarity and distance measures (Proximity measures for nominal, ordinal, and binary attributes)",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain proximity measures for different attribute types. LLO2: Lab-Based Learning – Demonstrate coding proximity measures in Python. LLO3: Project-based Learning – Support team-based implementation of proximity measures.",
+        "activeLearningRaw": "LLO1: Listen and engage in Q&A. LLO2: Practice coding proximity measures. LLO3: Collaborate to apply proximity measures in project.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 44-46"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 4: Similarity and distance measures (Cosine similarity)",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain cosine similarity and its applications. LLO2: Lab-Based Learning – Demonstrate coding cosine similarity for text/numeric data. LLO3: Project-based Learning – Guide teams to implement cosine similarity in project.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Perform coding exercises for cosine similarity. LLO3: Collaborate to integrate cosine similarity in project work.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 49"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 5: Data quality, data cleaning, and data integration",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain data quality issues and cleaning techniques. LLO2: Lab-Based Learning – Demonstrate cleaning and integration using Python. LLO3: Project-based Learning – Facilitate teamwork for cleaning and merging project datasets.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Practice coding data cleaning and integration. LLO3: Collaborate to clean and integrate project data.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 55-62"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 6: Data transformation (Normalization, Discretization)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain normalization and discretization concepts. LLO2: Lab-Based Learning – Demonstrate coding normalization and discretization. LLO3: Project-based Learning – Support teams in applying transformations to project data.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Perform coding exercises for normalization/discretization. LLO3: Collaborate to transform project data.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 63-65"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 6: Data transformation (Data compression, Sampling)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain compression and sampling techniques. LLO2: Lab-Based Learning – Demonstrate coding compression and sampling. LLO3: Project-based Learning – Guide teams to apply these techniques in project.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Practice coding compression and sampling. LLO3: Collaborate to implement techniques in project.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 68-70"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 7: Dimensionality reduction (Principal components analysis, Attribute subset selection)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain PCA and attribute selection concepts. LLO2: Lab-Based Learning – Demonstrate PCA implementation in Python. LLO3: Project-based Learning – Assist students in applying dimensionality reduction to project data.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Perform coding exercises for PCA. LLO3: Apply dimensionality reduction collaboratively in project.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch2, P 71-72"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 8: Frequent itemset mining methods (Apriori algorithm)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain Apriori algorithm and its steps. LLO2: Lab-Based Learning – Demonstrate coding Apriori algorithm. LLO3: Project-based Learning – Support teams in implementing Apriori for project data.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Practice coding Apriori algorithm. LLO3: Collaborate to apply Apriori in project.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch4, P 150"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 8: Frequent itemset mining methods (Generating association rules)",
+        "clos": [
+          "CLO4",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture Based Learning – Explain association rule generation and metrics (support, confidence). LLO2: Lab-Based Learning – Demonstrate coding association rule generation. LLO3: Project-based Learning – Guide teams to interpret and present association rules in project.",
+        "activeLearningRaw": "LLO1: Listen and take notes during lecture. LLO2: Perform coding exercises for rule generation. LLO3: Collaborate to generate and interpret rules in project.",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": "Slides, textbook Ch4, P 153"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Computer lab Slide projector Data mining tool",
+    "references": {
+      "required": [
+        {
+          "title": "Data Mining Concepts and Techniques",
+          "authors": "Jiawei Han, Jian Pei, Hanghang Tong",
+          "publisher": "Morgan Kaufmann",
+          "year": "2023",
+          "isbnOrUrl": "978-0-12-811760-6"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Data Science for Business",
+          "authors": "Foster Provost & Tom Fawcett",
+          "publisher": "O'Reilly Media",
+          "year": "2013",
+          "isbnOrUrl": "978-1449361327"
+        },
+        {
+          "title": "Data Mining: Practical Machine Learning Tools and Techniques",
+          "authors": "Ian H. Witten, Eibe Frank, Mark A. Hall, Christopher J. Pal",
+          "publisher": "Morgan Kaufmann",
+          "year": "2011",
+          "isbnOrUrl": "978-0128042915"
+        }
+      ]
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": []
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

@@ -1,0 +1,831 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "EEE102_Electrical Engineering and Embedded Systems.docx",
+    "relativePath": "Year 1/S2/EEE102_Electrical Engineering and Embedded Systems.docx",
+    "sha256": "726b065a053ceea64d556717d53bf238323ef321a88e0a25337d39dc267a54cf",
+    "yearFolder": 1,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "EEE102",
+    "title": "Electrical Engineering and Embedded Systems",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "N/A",
+    "courseType": "Basic",
+    "availability": {
+      "semester": 2,
+      "year": 1
+    },
+    "description": null
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Prof. Chey Chan Oeurn Krem Sona",
+      "qualification": "PhD PhD",
+      "email": "sonakrem@gmail.com",
+      "phone": "061-412151"
+    },
+    "coLecturers": [
+      "Seap Kosal"
+    ]
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Apply basic electrical and electronic principles to explain the operation of circuits, sensors, and actuators used in embedded systems.",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Flipped Classroom",
+      "assessmentMethodsRaw": "Quizzes1, Quizzes2, Midterm"
+    },
+    {
+      "code": "CLO2",
+      "description": "Demonstrate valuing of collaborative work practices through responsible participation and support of team members during in-class activities, independent group work, and project implementation.",
+      "mappedPlos": [
+        "PLO5"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Peer Teaching",
+      "assessmentMethodsRaw": "Group discussion, Group Homework,"
+    },
+    {
+      "code": "CLO3",
+      "description": "Implement and extend an embedded electronic system by following structured design guidelines and adapting existing solutions.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "Project based Learning",
+      "assessmentMethodsRaw": "Group Presentation, Group report"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Course introduction; Voltage & current divider circuits",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: Kirchhoff’s voltage & current laws",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "3",
+        "Topic 3: Network theorems: Thevenin & Norton",
+        "CLO1",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "4",
+        "Topic 4: AC circuits I: fundamentals",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "5",
+        "Topic 5: AC circuits II: applications & implications",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "6",
+        "Topic 6: PN junction fundamentals",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "7",
+        "Topic 7: PN junction applications & devices",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "8",
+        "Topic 8: Transistors & Switching concepts",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "9",
+        "Topic 9: Sensor physics & signal interpretation",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "10",
+        "Topic 10: Arduino architecture & embedded logic",
+        "CLO1 CLO2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "11",
+        "Topic 11: Project",
+        "CLO2 CLO3",
+        "12",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "12",
+        "24"
+      ],
+      [
+        "Total SLT for Course Content",
+        "84"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Quizzes 1",
+        "10",
+        "0.5",
+        "",
+        "1.5",
+        "2"
+      ],
+      [
+        "2",
+        "Quizzes 1",
+        "10",
+        "0.5",
+        "",
+        "1.5",
+        "2"
+      ],
+      [
+        "3",
+        "Group Homework",
+        "10",
+        "0",
+        "",
+        "10",
+        "10"
+      ],
+      [
+        "4",
+        "Group Discussions",
+        "10",
+        "0",
+        "",
+        "0",
+        "0"
+      ],
+      [
+        "5",
+        "Midterm Exam",
+        "30",
+        "2",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "20"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Group Presentation",
+        "15",
+        "0.5",
+        "",
+        "9.5",
+        "10"
+      ],
+      [
+        "2",
+        "Group Writing report",
+        "15",
+        "0",
+        "",
+        "10",
+        "10"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "20"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "124"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Quizzes 1",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 2.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Quizzes 2",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 2.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 30.0,
+      "sltHours": 6.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Group Homework",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 10.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Group Discussions",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 0.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Group Presentation",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 10.0,
+      "capLevel": "P3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Group writing Report",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 10.0,
+      "capLevel": "P3"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Course introduction; Voltage & current divider circuits",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able Apply voltage divider and current divider rules to calculate unknown voltages and currents in simple electrical circuits. LLO2: Students will be able demonstrate appreciation for the importance of accurate circuit analysis and safe working practices when solving and discussing voltage and current divider circuits."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Kirchhoff’s voltage & current laws",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply Kirchhoff’s Current Law (KCL) and Kirchhoff’s Voltage Law (KVL) to analyze and solve unknown currents and voltages in simple DC circuit networks. LLO2: Students will be able to demonstrate appreciation for systematic and accurate problem-solving practices by carefully applying Kirchhoff’s laws and checking results for consistency in circuit analysis."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Network theorems: Thevenin & Norton",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply Léon Charles Thévenin and Edward Lawry Norton network theorems to simplify linear electrical circuits and calculate equivalent voltage/current, resistance, and load behavior for practical circuit problems. LLO2: Students will demonstrate appreciation for the usefulness of Thevenin and Norton equivalent circuits by selecting and justifying appropriate theorem-based methods for improving efficiency in circuit analysis and design."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: AC circuits I: fundamentals",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply fundamental AC circuit principles (sinusoidal voltage/current, frequency, period, phase difference, and RMS values) to analyze simple AC circuits and calculate basic electrical quantities. LLO2: Students will demonstrate appreciation for safe and systematic analysis of AC circuits by actively participating in problem-solving activities and valuing accuracy in circuit calculations and measurements."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: AC circuits II: applications & implications",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply AC circuit principles (impedance, phase angle, power factor, and resonance) to analyze and solve practical AC circuit problems used in real-world electrical and electronic applications. LLO2: Students will demonstrate appreciation for the importance of AC circuit applications by valuing safe, efficient, and responsible use of AC power systems in engineering practice and everyday life."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: PN junction fundamentals",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply the principles of PN junction formation and charge carrier movement to explain the behavior of a PN junction under forward and reverse bias conditions. LLO2: Students will be able to demonstrate appreciation of the importance of PN junction principles in semiconductor devices by actively participating in discussions and relating the concept to real-world electronic applications."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: PN junction applications & devices",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply the operating principles of PN junction devices (such as diodes, rectifiers, LEDs, and photodiodes) to analyze and explain their functions in basic electronic circuits. LLO2: Students will demonstrate appreciation of the importance of PN junction devices in modern electronic systems by actively engaging in discussions and showing responsibility when selecting suitable devices for real-world applications."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Transistors & Switching concepts",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: By the end of the lesson, students will be able to apply transistor operating principles to analyze and design simple switching circuits using BJTs or MOSFETs for practical electronic applications. LLO2: By the end of the lesson, students will be able to demonstrate appreciation for the role of transistor switching in modern electronic devices by selecting appropriate transistor configurations with responsible and efficient design considerations."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Sensor physics & signal interpretation",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply principles of sensor physics to interpret sensor output signals and relate them to measured physical or chemical quantities in real applications. LLO2: Students will demonstrate appreciation of accurate signal interpretation by valuing careful data analysis, calibration, and ethical handling of sensor data in scientific and engineering practice."
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Arduino architecture & embedded logic",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Students will be able to apply knowledge of Arduino architecture to construct and test simple embedded logic programs using sensors and actuators. LLO2: Students will be able to demonstrate responsibility and appreciation for embedded system design by valuing safe wiring practices, accurate coding, and systematic troubleshooting when working with Arduino projects."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Project",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Students will demonstrate responsibility, collaboration, and appreciation for teamwork by actively contributing ideas, respecting group roles, and valuing project outcomes. LLO2: Students will be able to accurately apply appropriate project methods, tools, and procedures to design and develop a project according to given guidelines and technical standards."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 1: Course introduction; Voltage & current divider circuits",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 2: Kirchhoff’s voltage & current laws",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Topic 3: Network theorems: Thevenin & Norton",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 4: AC circuits I: fundamentals",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 5: AC circuits II: applications & implications",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 7: PN junction applications & devices",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 8: Transistors & Switching concepts",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 9: Sensor physics & signal interpretation",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 10: Arduino architecture & embedded logic",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "- Provide learning materials - Facilitate guiding questions and group discussions - Assign independent or follow-up tasks (homework)",
+        "activeLearningRaw": "- Study and review learning materials - Participate actively in group discussions and collaborative learning - Complete assigned independent tasks (homework)",
+        "assessmentRaw": "- Group Discussion 1% - Group Homework 1%",
+        "resourcesRaw": "Slide Relevance Websites"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Midterm Exam",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "- Provide Pretest materials -Organize and facilitate the assessment process. -Guide and monitor students during the examination",
+        "activeLearningRaw": "- Study and review pretest materials - Participate in the exam according to instructions.",
+        "assessmentRaw": "Midterm 30%",
+        "resourcesRaw": "Exam Preparing documents Work Sheet"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 11: Project: Refining Topic",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Brief explanation of project refinement criteria (scope, feasibility, relevance, objectives). - Instructor-led discussion on how to narrow or improve research/project topics. - Demonstration of good vs. weak project topic examples. - Guided questioning to help students clarify problems, objectives, and expected outcomes. - Feedback and consultation sessions with individual groups. - Facilitation of peer-review discussions",
+        "activeLearningRaw": "- Participate in brainstorming and topic discussion within groups. - Analyze and revise project ideas based on instructor guidelines. - Identify project scope, objectives, and expected results. - Present refined project topic and receive peer/instructor feedback. - Reflect and improve project title or proposal based on suggestions. - Collaborate actively with team members in decision making.",
+        "assessmentRaw": "- Group Report",
+        "resourcesRaw": "-Relevance websites"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 12: Project: Progressing",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Project supervision, progress review, mentoring, feedback sessions, mini-workshops.",
+        "activeLearningRaw": "- Collaborative group work, progress reporting, peer discussion, problem solving, reflective learning.",
+        "assessmentRaw": "- Group Report",
+        "resourcesRaw": "-Relevance websites"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 13: Project: Progressing & testing",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "-Briefing, demonstration, coaching, monitoring, feedback, group consultation.",
+        "activeLearningRaw": "-Group project work, testing practice, data recording, peer discussion, progress presentation, reflection.",
+        "assessmentRaw": "- Group Report",
+        "resourcesRaw": "-Relevance websites"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Topic 13: Project: testing & Finalize",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "-Brief instruction, demonstration, coaching, progress monitoring, feedback, and project review.",
+        "activeLearningRaw": "-Hands-on testing, data analysis, teamwork, project refinement, and final presentation preparation.",
+        "assessmentRaw": "- Group Report",
+        "resourcesRaw": "-Relevance websites"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "3/0/0/0",
+        "lectureTopic": "Final Presentation",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "-Guided instruction, presentation coaching, demonstration, facilitation of Q&A, feedback.",
+        "activeLearningRaw": "-Project presentation, collaborative discussion, peer questioning, reflective response.",
+        "assessmentRaw": "- Group Presentation 10% - Group Writing Report 10%",
+        "resourcesRaw": "-Rubric for Present - Rubric for Writing Report"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Slide Relevance Websites; Exam Preparing documents Work Sheet; -Relevance websites; -Rubric for Present - Rubric for Writing Report",
+    "references": {
+      "required": [
+        {
+          "title": "Experimental Physics: Principles and Practice for the Laboratory 1st",
+          "authors": "Smith, W.F.",
+          "publisher": "CRC Press, Taylor & Francis Group",
+          "year": "2020",
+          "isbnOrUrl": "9781498778473"
+        },
+        {
+          "title": "Electric Circuits 12th",
+          "authors": "Nilsson, J. W., & Riedel, S. A.",
+          "publisher": "Pearson",
+          "year": "2022",
+          "isbnOrUrl": "9780137648375"
+        },
+        {
+          "title": "University Physics with Modern Physics",
+          "authors": "Hugh Young, Roger Freedman",
+          "publisher": "Pearson",
+          "year": "2020",
+          "isbnOrUrl": "9780135159552"
+        },
+        {
+          "title": "Arduino Documentation. (n.d.). Arduino Language Reference.",
+          "authors": "Online",
+          "publisher": "https://docs.arduino.cc",
+          "year": "",
+          "isbnOrUrl": "Online"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Electric Circuits 12th",
+          "authors": "Nilsson, J. W., & Riedel, S. A.",
+          "publisher": "Pearson",
+          "year": "2022",
+          "isbnOrUrl": "9780137648375"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+    ],
+    "errors": []
+  }
+}

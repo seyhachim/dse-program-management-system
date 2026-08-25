@@ -1,0 +1,1034 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "DLP101_Digital Literacy and Professional Skills.docx",
+    "relativePath": "Year 1/S1/DLP101_Digital Literacy and Professional Skills.docx",
+    "sha256": "c3c786655207a79a01f9b7292d43e6aff6c50cf4e7b0f47010630b92ac7b9e16",
+    "yearFolder": 1,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "DLP101",
+    "title": "Digital Literacy and Professional Skill",
+    "credits": {
+      "total": 300.0
+    },
+    "prerequisites": null,
+    "courseType": "Basic",
+    "availability": {
+      "semester": 1,
+      "year": 1
+    },
+    "description": "Digital Literacy is designed to equip students with essential digital skills needed for academic success and modern workplace performance. The course focuses on four key areas: Microsoft Word, Microsoft Excel, Microsoft PowerPoint, and Digital Productivity Tools. Students learn to create professional documents, analyze and visualize data, design effective presentations, and use digital platforms to collaborate, communicate, and work more efficiently. Through hands-on activities, students apply formatting and document-structuring techniques in Word; perform data calculations, cleaning, and charting in Excel; design clear presentation slides in PowerPoint; and use tools such as Google Workspace, Microsoft 365, Canva, and ChatGPT to support academic tasks and creative work. By the end of the course, students will be able to produce well-formatted reports, interpret datasets through basic analytics, deliver presentations using professional visual design principles, and utilize modern digital tools for problem-solving and collaboration in academic and real-world settings."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dr. Tieng Kimseng",
+      "qualification": "Ph.D.",
+      "email": "tieng.kimseng@rupp.edu.kh",
+      "phone": "0979 10 50 80"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "To formulate professional documents using Microsoft Word. LLO 1.1: To apply formatting, page layout, and document structuring tools to produce clean and readable documents. LLO 1.2: To insert and format tables, images, styles, and headers/footers to build multi-page reports. LLO 1.3: To use advanced features, e.g., track changes, citations, and table of contents to produce academic reports.",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Inquiry-based learning Lab-based learning Problem-based learning",
+      "assessmentMethodsRaw": "Lab 1: Process to use Word Problem 1: Develop Word Midterm Exam"
+    },
+    {
+      "code": "CLO2",
+      "description": "To formulate excel file by visualizing data using Microsoft Excel. LLO 2.1: To use formulas and functions (SUM, AVERAGE, MIN/MAX, references) to calculate & summarize data. LLO 2.2: To clean, sort, filter, and validate datasets for accurate data analysis. LLO 2.3: To create charts and apply basic logic functions (IF, conditional formatting) to interpret and present data.",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Inquiry-based learning Lab-based learning Problem-based learning",
+      "assessmentMethodsRaw": "Lab 2: Process to use Excel Problem 2: Develop Excel Midterm Exam"
+    },
+    {
+      "code": "CLO3",
+      "description": "To formulate effective presentations using PowerPoint. LLO 3.1: To apply design principles (layout, color, typography) to create visually clear slides. LLO 3.2: To use images, icons, SmartArt, and charts to communicate ideas effectively. LLO 3.3: To deliver short presentations using professional slide transitions, animations, and speaking techniques.",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Inquiry-based learning Lab-based learning Problem-based learning",
+      "assessmentMethodsRaw": "Lab 3: Process to use PPT Problem 3: Develop PPT Final Exam"
+    },
+    {
+      "code": "CLO4",
+      "description": "To demonstrate modern digital tools for collaboration, communication, and content creation. LLO 4.1: To use Google Workspace/Microsoft 365 tools to collaborate, share files, and manage cloud storage. LLO 4.2: To create digital forms, surveys, and Canva designs for academic or event purposes. LLO 4.3: To use AI (ChatGPT) to enhance productivity while maintaining ethics.",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Inquiry-based learning Lab-based learning Problem-based learning",
+      "assessmentMethodsRaw": "Lab 4: Google Workspace Lab 5: Microsoft Form Lab 6: Canva Lab 7: ChatGPT Final Exam"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Introduction to Computer Literacy • Course spec • Get to know each other • Install MS Offices • Ice-breaking using Word/Forms",
+        "1,2,3,4",
+        "2",
+        "1",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "2",
+        "Word Basics • Ribbon & interface • Create/save documents • Text formatting • Paragraph alignment & spacing • Page setup",
+        "1",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "3",
+        "Professional Documents (Word) • Insert images, tables, shapes • Headers/footers • Page numbers • Themes & styles • Section breaks",
+        "1",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "4",
+        "Advanced Word • Track changes & comments • Citations & bibliography • Table of contents • Export to PDF",
+        "1",
+        "0",
+        "1",
+        "2",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "5",
+        "Excel Foundations • Interface & navigation • Data types • Basic formulas (SUM, AVG, MIN) • AutoFill • Intro to absolute/relative references",
+        "2",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "6",
+        "Excel Data Analysis • Sorting & filtering • Data validation • Remove duplicates • TRIM/CLEAN • Absolute vs relative references (practice)",
+        "2",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "7",
+        "Charts & Logic (Excel) • Charts: column, line, pie • Chart formatting • IF function • Conditional formatting",
+        "2",
+        "0",
+        "1",
+        "2",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "8",
+        "Midterm",
+        "1,2",
+        "0",
+        "0",
+        "3",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "9",
+        "PowerPoint Design Basics • Layouts & templates • Colors & fonts • Visual hierarchy • Redesign bad slides",
+        "3",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "10",
+        "Visual Storytelling (PPT) • SmartArt • Images, icons • Insert charts from Excel • Story flow design",
+        "3",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "11",
+        "Presenting Skills (PPT) • Animations & transitions • Slide master • Presentation techniques • Student mini-presentations + feedback",
+        "3",
+        "0",
+        "1",
+        "2",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "6"
+      ],
+      [
+        "12",
+        "Google Workspace • Docs, Sheets, Slides basics • Real-time collaboration • Sharing permissions • Google Drive",
+        "4",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "13",
+        "Google Form • Google Forms • Surveys • Quizzes",
+        "4",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "14",
+        "Canva • Poster templates • Infographics • Brand colors & layout • Export formats",
+        "4",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "15",
+        "AI & Productivity Tools • ChatGPT for writing • Prompting basics • Summaries & rewriting",
+        "4",
+        "1",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "16",
+        "Final Exam",
+        "3,4",
+        "0",
+        "0",
+        "3",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Course Content",
+        "66"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "79%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Problems o Problem 1: Develop Word o Problem 2: Develop Excel o Problem 3: Develop Power Point",
+        "24%",
+        "",
+        "",
+        "9",
+        "9"
+      ],
+      [
+        "2",
+        "In-class Labs o Lab 1: Process to use word o Lab 2: Process to use excel o Lab 3: Process to use power point o Lab 4: Google Workspace o Lab 5: Microsoft Form o Lab 6: Canva o Lab 7: ChatGPT",
+        "35%",
+        "",
+        "",
+        "0",
+        "0"
+      ],
+      [
+        "3",
+        "Midterm Exam",
+        "20%",
+        "",
+        "",
+        "20",
+        "20"
+      ],
+      [
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "29"
+      ],
+      [
+        "Final Assessment",
+        "21%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "21%",
+        "",
+        "",
+        "25",
+        "25"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "25"
+      ],
+      [
+        "Total SLT for Assessment",
+        "54"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 1: Process to use Word",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 7.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Problem 1: Develop Word",
+      "mode": "individual",
+      "weightPercent": 8.0,
+      "sltHours": 11.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 10.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 2: Process to use Excel",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 7.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Problem 1: Develop Excel",
+      "mode": "individual",
+      "weightPercent": 8.0,
+      "sltHours": 11.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 10.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 3: Process to use PPT",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 7.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Problem 3: Develop PPT",
+      "mode": "individual",
+      "weightPercent": 8.0,
+      "sltHours": 11.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Final Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 10.0,
+      "capLevel": "A4",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 4: Google Workspace",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 7.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 5: Microsoft Form",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 7.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 6: Canva",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 7.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 7: ChatGPT",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 7.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Final Exam",
+      "mode": "individual",
+      "weightPercent": 11.0,
+      "sltHours": 9.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Introduction to Computer Literacy • Course spec • Get to know each other • Install MS Offices • Ice-breaking using Word/Forms",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to • Speak to each other • Create new friends • Know plan for the semester • Get familiar with the course • Set up required tools (MS Office)"
+      },
+      {
+        "number": 2,
+        "title": "Word Basics • Ribbon & interface • Create/save documents • Text formatting • Paragraph alignment & spacing • Page setup",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "ILO: Students are able to • Navigate Word interface comfortably • Apply formatting (text, paragraph, space) • Adjust page setup (margins, orientation) • Produce a formatted one-page document"
+      },
+      {
+        "number": 3,
+        "title": "Professional Documents (Word) • Insert images, tables, shapes • Headers/footers • Page numbers • Themes & styles • Section breaks",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "ILO: Students are able to • Insert and format tables, images, icons • Apply consistent styles and themes • Create a document with headers/footers • Build a multi-page report using styles"
+      },
+      {
+        "number": 4,
+        "title": "Advanced Word • Track changes & comments • Citations & bibliography • Table of contents • Export to PDF",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "ILO: Students are able to • Use track change and edit comments • Insert citations and generate a bibliography • Create an automatic table of contents • Produce a professional CV • Export in PDF format"
+      },
+      {
+        "number": 5,
+        "title": "Excel Foundations • Interface & navigation • Data types • Basic formulas (SUM, AVG, MIN) • AutoFill • Intro to absolute/relative references",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to • Navigate Excel worksheets • Enter and manage basic data types • Apply formulas (SUM, AVG, MIN) • Use AutoFill and cell references"
+      },
+      {
+        "number": 6,
+        "title": "Excel Data Analysis • Sorting & filtering • Data validation • Remove duplicates • TRIM/CLEAN • Absolute vs relative references (practice)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to • Sort and filter data effectively • Apply data validation • Perform basic data cleaning • Choose correct references for calculations"
+      },
+      {
+        "number": 7,
+        "title": "Charts & Logic (Excel) • Charts: column, line, pie • Chart formatting • IF function • Conditional formatting",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to • Create & format charts (column, line, pie) • Use IF function to perform analysis • Apply conditional format based on rules • Build a dashboard using charts & formulas"
+      },
+      {
+        "number": 8,
+        "title": "Midterm",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "Midterm"
+      },
+      {
+        "number": 9,
+        "title": "PowerPoint Design Basics • Layouts & templates • Colors & fonts • Visual hierarchy • Redesign bad slides",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "ILO: Students are able to • Apply layout principles and templates • Choose appropriate fonts and color • Improve slide using visual hierarchy • Redesign slides into professional ones"
+      },
+      {
+        "number": 10,
+        "title": "Visual Storytelling (PPT) • SmartArt • Images, icons • Insert charts from Excel • Story flow design",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "ILO: Students are able to • Use SmartArt to visualize ideas • Insert and format images, icons, and charts • Create a coherent slide with logical flow • Produce a 7-slide presentation storyboard"
+      },
+      {
+        "number": 11,
+        "title": "Presenting Skills (PPT) • Animations & transitions • Slide master • Presentation techniques • Student mini-presentations + feedback",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "ILO: Students are able to • Use animations professionally • Customize slide master to control design • Deliver a short presentation confidently"
+      },
+      {
+        "number": 12,
+        "title": "Google Workspace • Docs, Sheets, Slides basics • Real-time collaboration • Sharing permissions • Google Drive",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to • Use Google spreadsheet in real-time • Use Google doc in real-time • Use Google slide in real-time • Work effectively in google spreadsheet"
+      },
+      {
+        "number": 13,
+        "title": "Google Form • Google Forms • Surveys • Quizzes",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to • Build surveys using digital forms • Configure basic analysis • Read survey results"
+      },
+      {
+        "number": 14,
+        "title": "Canva • Poster templates • Infographics • Brand colors & layout • Export formats",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to • Use Canva templates to create newsletter • Arrange layout, color, spacing • Export designs in appropriate formats • Create a slideshow video"
+      },
+      {
+        "number": 15,
+        "title": "AI & Productivity Tools • ChatGPT for writing • Prompting basics • Summaries & rewriting",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to • Use ChatGPT to support learning • Write prompts for better output"
+      },
+      {
+        "number": 16,
+        "title": "Final Exam",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Final"
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "(2/1/0/0)",
+        "lectureTopic": "Introduction to Computer Literacy • Course spec • Get to know each other • Install MS Offices • Ice-breaking using Word/Forms",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Human knot game - Microsoft offices installation",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present course specification - Share personal Profile - Get to know students (2) Human Knot Game: - Form one big group - Hold hand complexly - Solve it - Challenge on remembering name - Get to know new frient (3) Software installation - Download Microsoft Offices - Install it (Word, Excel, Power Point)",
+        "assessmentRaw": "0",
+        "resourcesRaw": "Materials - Course spec.docx - Get to know each other.docx - Microsoft Offices"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Word Basics • Ribbon & interface • Create/save documents • Text formatting • Paragraph alignment & spacing • Page setup",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished",
+        "assessmentRaw": "0",
+        "resourcesRaw": "Materials - Lab 1.docx"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Professional Documents (Word) • Insert images, tables, shapes • Headers/footers • Page numbers • Themes & styles • Section breaks",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning - Problem-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Continue lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished (3) Problem-based learning - Provide problems - Solve problem individually",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Materials - Lab 1.docx (Con't)"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "(0/1/2/0)",
+        "lectureTopic": "Advanced Word • Track changes & comments • Citations & bibliography • Table of contents • Export to PDF",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Problem-based learning - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Problem-based learning - Continue working on problems - Solve problem individually - Submit final file when finished (3) Inquiry-based learning - Conduct self-researching - Discuss with friends if do not know how - Ask question to instructor if cannot - Continue working on the problem",
+        "assessmentRaw": "8",
+        "resourcesRaw": "Materials - Problem 1.docx"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Excel Foundations • Interface & navigation • Data types • Basic formulas (SUM, AVG, MIN) • AutoFill • Intro to absolute/relative references",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished",
+        "assessmentRaw": "0",
+        "resourcesRaw": "Materials - lab 2.docx"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Excel Data Analysis • Sorting & filtering • Data validation • Remove duplicates • TRIM/CLEAN • Absolute vs relative references (practice)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning - Problem-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download/continue lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished (3) Problem-based learning - Provide problems - Solve problem individually",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Materials - Lab 2.docx (Con't)"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "(0/1/2/0)",
+        "lectureTopic": "Charts & Logic (Excel) • Charts: column, line, pie • Chart formatting • IF function • Conditional formatting",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Problem-based learning - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Problem-based learning - Provide/continue working on problems - Solve problem individually - Submit final file when finished (3) Inquiry-based learning - Conduct self-researching - Discuss with friends if do not know how - Ask question to instructor if cannot - Continue working on the problem",
+        "assessmentRaw": "8",
+        "resourcesRaw": "Materials - Problem 2.xlsx"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "(0/0/3/0)",
+        "lectureTopic": "Midterm",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Materials - Exam Paper (Answer Scheme)"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "PowerPoint Design Basics • Layouts & templates • Colors & fonts • Visual hierarchy • Redesign bad slides",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished",
+        "assessmentRaw": "0",
+        "resourcesRaw": "Materials - lab 3.docx"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Visual Storytelling (PPT) • SmartArt • Images, icons • Insert charts from Excel • Story flow design",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning - Problem-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download/continue lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished (3) Problem-based learning - Provide problems - Solve problem individually",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Materials - Lab 3.docx (Con't)"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "(0/1/2/0)",
+        "lectureTopic": "Presenting Skills (PPT) • Animations & transitions • Slide master • Presentation techniques • Student mini-presentations + feedback",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Problem-based learning - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Problem-based learning - Provide/continue working on problems - Solve problem individually - Submit final file when finished (3) Inquiry-based learning - Conduct self-researching - Discuss with friends if do not know how - Ask question to instructor if cannot - Continue working on the problem",
+        "assessmentRaw": "8",
+        "resourcesRaw": "Materials - Problem 3.pptx"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Google Workspace • Docs, Sheets, Slides basics • Real-time collaboration • Sharing permissions • Google Drive",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download/continue lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished (3) Inquiry-based learning - Conduct self-researching - Discuss with friends if do not know how - Ask question to instructor if cannot - Continue working on the problem",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Materials - Lab 4.docx"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Google Form • Google Forms • Surveys • Quizzes",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download/continue lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished (3) Inquiry-based learning - Conduct self-researching - Discuss with friends if do not know how - Ask question to instructor if cannot - Continue working on the problem",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Materials - Lab 5.docx"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "Canva • Poster templates • Infographics • Brand colors & layout • Export formats",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download/continue lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished (3) Inquiry-based learning - Conduct self-researching - Discuss with friends if do not know how - Ask question to instructor if cannot - Continue working on the problem",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Materials - Lab 6.docx"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "(1/2/0/0)",
+        "lectureTopic": "AI & Productivity Tools • ChatGPT for writing • Prompting basics • Summaries & rewriting",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present LLOs - Share content - Lecture on lesson moving step by step (2) Lab-based learning: - Download/continue lab 1 handout - Follow step by step instruction - Capture results - Put in the lab handout - Submit lab handout when finished (3) Inquiry-based learning - Conduct self-researching - Discuss with friends if do not know how - Ask question to instructor if cannot - Continue working on the problem",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Materials - Lab 7.docx"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "(0/0/3/0)",
+        "lectureTopic": "Final",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "21",
+        "resourcesRaw": "Materials - Exam Paper (Answer Scheme)"
+      }
+    ],
+    "extractionNotes": [
+      "Normalized numeric CLO references: 1,2,3,4",
+      "Normalized numeric CLO references: 1",
+      "Normalized numeric CLO references: 2",
+      "Normalized numeric CLO references: 1,2",
+      "Normalized numeric CLO references: 3",
+      "Normalized numeric CLO references: 4",
+      "Normalized numeric CLO references: 3,4"
+    ],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "No Hard resources Soft Resources Others (4M) 1 Slide Projector Microsoft office (Word, Excel & Power Point) Man: Student + Lecturer + TA 2 Computer Canva Methods: 10/20/70 3 Google Workspace (Slide, Doc, Spreadsheet) Materials: Lab handout and software 4 ChatGPT, Google Forms Money: N/A",
+    "references": {
+      "required": [
+        {
+          "title": "Microsoft Office Tools",
+          "authors": "Marri Channa Reddy",
+          "publisher": "Institute of Telangana, Hyderabad",
+          "year": "2024",
+          "isbnOrUrl": ""
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Workplace Software & Skills",
+          "authors": "Tammie Bolling, Pellissippi State Community College Angela Mitchell, Wilmington College Tanya Scott, University Of Arizona Global Campus Nyrobi Wheeler, Bellevue University",
+          "publisher": "OpenStax, Houston, Texas",
+          "year": "2023",
+          "isbnOrUrl": "978-1-711470-81-8"
+        }
+      ]
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Students are responsible for understanding how to use resources responsibly. Not knowing the rules, misunderstanding the rules, running out of time, submitting “the wrong draft,” or being overwhelmed with multiple demands are not acceptable excuses. There are no excuses for failure to uphold academic integrity. Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Form a study group and take full advantage of such an opportunity to share the understanding with classmates. Thoughtful participation in class discussions, thorough preparations for the class, and consistently well-developed responses to the assignments are expected. Students are expected to explain lessons to each other and have self-study from the other source. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned Submit assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Course policy Policy for Description Attendance Students Must attend class on-site and on-time (Three lates is counted as a one-time absence). Must do self-study and read the relevant documents in the Internet/library. Academic Integrity & Collaboration Students Must complete assigned tasks (assignments, quizzes, and exams) only by himself/herself. Questions might be asked during/after submission Must join class activities actively Must work independently on the midterm and final exam. Should discuss course material with other students Must feel guilty if they: (1) present work of others as their own, and (2) give unauthorized assistance to other students. Homework Students Must complete and submit assignment tasks on time. Must proper justifying quotations from appropriate and authorized resources. Must use APA style for in-text citation and reference list. Penalties Students Can absent (Absent + Permission) at most 5 times per course; otherwise, they will need to repeat the same course in the following year. Get one absent if they get three late (Students are considered as late, when they join class after 5 min start) Will be accused of plagiarism, if they (1) present work of others as their own, and (2) give unauthorized assistance to other, and get scored Zero. Will be deducted score if they submit classwork or homework late Will be reported to the Study Office, and handled in accordance with the university regulations if they violate the university code of conducts Note: If you are unclear whether a particular situation may violate the university code of conducts, you should ask the instructor.",
+  "extraction": {
+    "notes": [
+      "Normalized numeric CLO references: 1,2,3,4",
+      "Normalized numeric CLO references: 1",
+      "Normalized numeric CLO references: 2",
+      "Normalized numeric CLO references: 1,2",
+      "Normalized numeric CLO references: 3",
+      "Normalized numeric CLO references: 4",
+      "Normalized numeric CLO references: 3,4"
+    ]
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code in DOCX table (DLI101) conflicts with filename (DLP101); canonical JSON uses filename code and requires review"
+    ],
+    "errors": []
+  }
+}

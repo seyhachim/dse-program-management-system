@@ -1,0 +1,90 @@
+{
+  "summary": {
+    "mode": "dry-run",
+    "total": 9,
+    "ready": 9,
+    "created": 0,
+    "replaced": 0,
+    "skipped": 0,
+    "blocked": 0,
+    "failed": 0
+  },
+  "results": [
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\AAI302.json",
+      "courseCode": "AAI302",
+      "action": "ready",
+      "warnings": [
+        "Lecturer not found: Dr. Khim Chamroeun <Chamroeun.khim@gmail.com>",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\AIE401.json",
+      "courseCode": "AIE401",
+      "action": "ready",
+      "warnings": [
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\BDE302.json",
+      "courseCode": "BDE302",
+      "action": "ready",
+      "warnings": [
+        "Lecturer not found: Dr. Khim Chamroeun <Chamroeun.khim@gmail.com>",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\BIA301.json",
+      "courseCode": "BIA301",
+      "action": "ready",
+      "warnings": [
+        "Co-lecturers were preserved in source JSON but not imported because they belong to a term-specific Offering",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\DLP101.json",
+      "courseCode": "DLP101",
+      "action": "ready",
+      "warnings": [
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\DWA202.json",
+      "courseCode": "DWA202",
+      "action": "ready",
+      "warnings": [
+        "Co-lecturers were preserved in source JSON but not imported because they belong to a term-specific Offering",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\LLM402.json",
+      "courseCode": "LLM402",
+      "action": "ready",
+      "warnings": [
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\PML401.json",
+      "courseCode": "PML401",
+      "action": "ready",
+      "warnings": [
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026-reviewed-9-ready\\courses\\STA201.json",
+      "courseCode": "STA201",
+      "action": "ready",
+      "warnings": [
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,882 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "ERD401-Ethics and Responsible Data Science.docx",
+    "relativePath": "Year 4/S1/ERD401-Ethics and Responsible Data Science.docx",
+    "sha256": "529e12a5986042fc35806b1d21047188056fbd16a49eb4c37438ee13820e4e58",
+    "yearFolder": 4,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "ERD401",
+    "title": "Ethics and Responsible Data Science",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "IDS101 Introduction to Data Science and Engineering APR102 Advanced Programming (Intro. to Python and OOP) STA102 Statistics I: Statistics for Engineers PAN202 Predictive Analytics (with Python) DMM302 Data Mining and Machine Learning",
+    "courseType": "Basic",
+    "availability": {
+      "semester": 1,
+      "year": 4
+    },
+    "description": "This course aims to establish the ethical foundations essential for professional practice in computing, providing students with a comprehensive understanding of key ethical issues and professional responsibilities related to the development and utilisation of computers and information systems. This study will present a foundational overview of ethical theories and examine the function of professional organisations in upholding best practices, first in a general context and subsequently within the computing industry. The discussion will encompass legislation relevant to the computing industry, focussing on three primary ethical concerns: computer hacking, data privacy, and intellectual property. This course will also present ethical principles and practices in data science aimed at addressing public and corporate concerns regarding bias and other unintended harmful effects arising from data science models. The course provides a structured framework for implementing data science projects, along with a systematic audit process for their evaluation."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Mr. KY Soklay",
+      "qualification": "Master’s degree",
+      "email": "ky.soklay@rupp.edu.kh",
+      "phone": "085 646 386"
+    },
+    "coLecturers": [
+      "None"
+    ]
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Analyse the fundamental concepts of ethics, morality, law, and professional standards within the computing industry.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+      "assessmentMethodsRaw": "Quiz, Assignment, Participation"
+    },
+    {
+      "code": "CLO2",
+      "description": "Evaluate the characteristics of intellectual property, privacy, anonymity, and computer crimes, along with their consequences for individuals, organisations, communities, and societies.",
+      "mappedPlos": [
+        "PLO7"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+      "assessmentMethodsRaw": "Quiz, Assignment, Participation"
+    },
+    {
+      "code": "CLO3",
+      "description": "Evaluate the potential unintended harm that may emerge and the impact of predictors in black box models through interpretability methods, alongside assessing model performance using metrics to quantify bias and unfairness.",
+      "mappedPlos": [
+        "PLO7"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture, Discussion, Case studies, Demo",
+      "assessmentMethodsRaw": "Quiz, Assignment, Participation"
+    },
+    {
+      "code": "CLO4",
+      "description": "Implement a Responsible Data Science framework in sample projects.",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "P5",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based, Group work, Presentation",
+      "assessmentMethodsRaw": "Quiz, Mini project, Presentation"
+    },
+    {
+      "code": "CLO5",
+      "description": "Perform an ethical audit of a data science project to identify potential harms and areas for bias mitigation or harm reduction.",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based, Group work, Presentation",
+      "assessmentMethodsRaw": "Quiz, Mini project, Presentation"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Responsible Data Science",
+        "CLO1",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: Modelling, Blackbox Algorithm, and Legal Implications",
+        "CLO3",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "3",
+        "Topic 3: Responsible Data Science Framework",
+        "CLO3",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "4",
+        "Topic 4: Model Interpretability",
+        "CLO3",
+        "2",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "8"
+      ],
+      [
+        "5",
+        "Topic 5: Responsible Data Science Project and Audit",
+        "CLO4 CLO5",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "6",
+        "Topic 6: Ethics for the Computing Professions",
+        "CLO1",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "7",
+        "Topic 7: Privacy and Anonymity",
+        "CLO2",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "8",
+        "Topic 8: Intellectual Property",
+        "CLO2",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "9",
+        "Topic 9: Computer and Information Crimes",
+        "CLO2",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "10",
+        "Topic 10: Mini Project",
+        "CLO4 CLO5",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "12",
+        "16"
+      ],
+      [
+        "11",
+        "Topic 11: Recap on Responsible Data Science in Practice",
+        "CLO3",
+        "1",
+        "",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Quizzes",
+        "20",
+        "4",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "2",
+        "Group assignment (Mini Project)",
+        "20",
+        "4",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "3",
+        "Mid-term exam",
+        "20",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "24"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "40",
+        "2",
+        "",
+        "14",
+        "16"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "16"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Quiz 1",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Quiz 2",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Quiz 3",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Quiz 4",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Group assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO5",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Midterm Exam",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO5",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Group assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO5",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A4"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Responsible Data Science",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain the historical context and motivation for responsible data science Define Responsible Data Science (RDS) and articulate the three core themes Differentiate between the ethical problems of bias and unfairness"
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Modelling, Blackbox Algorithm, and Legal Implications",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Analyze predictive models and distinguish between intrinsically interpretable models and black-box models Evaluate model performance for classification tasks using metrics"
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Responsible Data Science Framework",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Identify how AI systems can go wrong, recognizing the difference between intentional malicious uses and unintended consequences Summarize the key elements of the legal and regulatory landscape impacting AI"
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Model Interpretability",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Analyze the primary motivations leading to the creation of harmful AI, and the resulting lack of consideration for the broader real-world context Describe the key principles underlying contemporary responsible data science frameworks Apply the stages of the Responsible Data Science (RDS) Framework Create the foundational documentation artifacts necessary for RDS"
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Responsible Data Science Project and Audit",
+        "clos": [
+          "CLO4",
+          "CLO5"
+        ],
+        "llosRaw": "Articulate why model interpretability is crucial for responsible data science Evaluate the trade-off between maximizing predictive performance and maintaining model interpretability Differentiate between local methods (explaining individual predictions) and global methods Utilize interpretability methods Establish a Four-Measure Performance Baseline to systematically benchmark model choices against one another"
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Ethics for the Computing Professions",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Define the concept of professional ethics and differentiate it from legal responsibility Analyze the essential elements and objectives of a professional code of ethics Identify and describe the eight primary professional principles that software engineers must adhere to Describe the importance of accountability, continuous evaluation, and adherence to rules and guidelines within an organization"
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Privacy and Anonymity",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Explain the ambiguous concept of privacy Analyze the economic impact of privacy violation Evaluate the ethicality of privacy violations"
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Intellectual Property",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Trace the historical progression of intellectual property protection Identify major international efforts to protect intellectual property Classify and describe the main illegal methods used for software piracy Analyze the multifaceted economic and social factors that encourage software piracy"
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Computer and Information Crimes",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Distinguish between the two dimensions of information security Characterize the major types of malicious software Analyze the three general categories that cause unethical or illegal behavior in information security"
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Mini Project",
+        "clos": [
+          "CLO4",
+          "CLO5"
+        ],
+        "llosRaw": "Identify the signs and harm caused by computer viruses Explain the concept and methods of hacking Formulate and implement prevention strategies to protect against computer crimes"
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Recap on Responsible Data Science in Practice",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Apply the Responsible Data Science (RDS) Framework end-to-end to an ethically fraught modeling task Demonstrate advanced technical rigor by fitting and comparing multiple models and architectures Conduct a comprehensive audit of the final candidate model Synthesize the project findings and audit results to justify the final model choice and propose actionable policy recommendations"
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/2/0/0",
+        "lectureTopic": "Topic 1: Introduction to Responsible Data Science",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Videos, Textbooks, Reading Articles, Online Quizzes"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/2/0/0",
+        "lectureTopic": "Topic 2: Modelling, Blackbox Algorithm, and Legal Implications",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbooks, Videos,"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/2/0/0",
+        "lectureTopic": "Topic 2: Modelling, Blackbox Algorithm, and Legal Implications (cont.) Quiz 1",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Textbooks, Reading Articles, Online Quizzes"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/2/0/0",
+        "lectureTopic": "Topic 3: Responsible Data Science Framework",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbooks, Videos,"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/2/1/0",
+        "lectureTopic": "Topic 4: Model Interpretability Quiz 2",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies, Demo",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Textbooks, Reading Articles, Online Quizzes"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 5: Responsible Data Science Project and Audit",
+        "clos": [
+          "CLO4",
+          "CLO5"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies, Demo",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbooks, Videos,"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 5: Responsible Data Science Project and Audit (cont.)",
+        "clos": [
+          "CLO4",
+          "CLO5"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies, Demo",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbooks, Reading Articles, Online Quizzes"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "",
+        "lectureTopic": "Midterm Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/2/0/0",
+        "lectureTopic": "Topic 6: Ethics for the Computing Professions",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbooks, Videos,"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/2/0/0",
+        "lectureTopic": "Topic 7: Privacy and Anonymity Quiz 3",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Textbooks, Reading Articles, Online Quizzes"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/2/0/0",
+        "lectureTopic": "Topic 8: Intellectual Property",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbooks, Videos,"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 9: Computer and Information Crimes",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbooks, Reading Articles, Online Quizzes"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 9: Computer and Information Crimes (cont.) Quiz 4",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Case studies",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion, Watch-think-talk, quiz-responding",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, Textbooks, Videos,"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "0/2/2/0",
+        "lectureTopic": "Topic 10: Capstone Project Group assignment",
+        "clos": [
+          "CLO4",
+          "CLO5"
+        ],
+        "teachingMethodsRaw": "Project-based, Group work, Presentation",
+        "activeLearningRaw": "Reading, Group discussion, Implement code and test, problem-solving",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Sample Project Manual, Code repository, Presentation slides"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "1/3/1/3",
+        "lectureTopic": "Topic 11: Recap on Responsible Data Science in Practice",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Project-based, Group work, Presentation",
+        "activeLearningRaw": "Presenting, Group discussion, Implement code and test, problem-solving",
+        "assessmentRaw": "",
+        "resourcesRaw": "Sample Project Manual, Code repository, Presentation slides"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "",
+        "lectureTopic": "Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "40",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Computer Slide Projector Online platform (e.g., Google Form, Microsoft Team, Wayground)",
+    "references": {
+      "required": [
+        {
+          "title": "Responsible data science",
+          "authors": "Fleming, G., & Bruce, P.",
+          "publisher": "John Wiley & Sons",
+          "year": "2021",
+          "isbnOrUrl": "978-1-119-74175-6"
+        },
+        {
+          "title": "Computing ethics",
+          "authors": "Karra, A., & Dahbur, K.",
+          "publisher": "Nova Science Publishers",
+          "year": "2021",
+          "isbnOrUrl": "978-1-5361-9401-2"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Hands-on ethical hacking & network defense (4th ed.)",
+          "authors": "Wilson, R. S., Simpson, M. T., & Antill, N.",
+          "publisher": "Cengage",
+          "year": "2023",
+          "isbnOrUrl": "978-0-357-50976-0"
+        }
+      ]
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": []
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

@@ -1,0 +1,902 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "PPR201-Project Practicum I-Software Engineering.docx",
+    "relativePath": "Year 2/S1/PPR201-Project Practicum I-Software Engineering.docx",
+    "sha256": "a1005f777cc6cb1b201a664d3708860307823c9b3bbfe43dcdee85038a954c0c",
+    "yearFolder": 2,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "PPR201",
+    "title": "Project Practicum I: Software Engineering",
+    "credits": {
+      "total": 2.0
+    },
+    "prerequisites": null,
+    "courseType": "Basic",
+    "availability": {
+      "semester": 1,
+      "year": 2
+    },
+    "description": "The objective of this course is to enable students to build a professional software product by applying the Software Development Life Cycle in a group project. Throughout the course, students will learn how to plan and analyze a software project, develop a project timeline and schedule, and prepare professional documents such as the Statement of Work and the Software Requirements Specification. Students will also practice estimating project cost and budget, modeling the system using Unified Modeling Language diagrams, and producing professional design and prototyping outputs such as High Level Design, Low Level Design, Data Flow Diagrams, User Interface and User Experience wireframes, and database schema designs. In addition, students will learn software architecture styles and software design principles, including Solid principles and the four plus one architectural view model. By completing and presenting these deliverables as a team, students will be able to demonstrate professional software planning, documentation, modeling, and design skills that support the development of a complete software solution."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Toem Theara",
+      "qualification": "MA in Information Technology Engineering",
+      "email": "toem.theara@rupp.edu.kh",
+      "phone": "(+855) 966 622 798"
+    },
+    "coLecturers": [
+      "No"
+    ]
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Apply the Software Development Life Cycle to plan a group software project and produce a Statement of Work and a project schedule.",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture + project-based learning + project coaching",
+      "assessmentMethodsRaw": "Statement of Work and project schedule (group) + quiz"
+    },
+    {
+      "code": "CLO2",
+      "description": "Estimate software project cost and budget using appropriate estimation methods.",
+      "mappedPlos": [
+        "PLO10"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture + project-based learning + project coaching",
+      "assessmentMethodsRaw": "Cost and budget estimation report (group) + in-class exercise"
+    },
+    {
+      "code": "CLO3",
+      "description": "Develop a Software Requirements Specification and model the system using Unified Modeling Language diagrams.",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "P4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture + demonstration + laboratory practice",
+      "assessmentMethodsRaw": "Software Requirements Specification and Unified Modeling Language diagrams (group)"
+    },
+    {
+      "code": "CLO4",
+      "description": "Design and evaluate a professional solution using design artifacts, prototyping outputs, and suitable software architecture principles.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture + design review + peer feedback",
+      "assessmentMethodsRaw": "Design package and presentation (group)"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Software Development Lifecycle (SDLC)",
+        "CLO1",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: Requirement Gathering Phase of SDLC",
+        "CLO3",
+        "4",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "12"
+      ],
+      [
+        "3",
+        "Topic 3: Analysis and Planning Phase of SDLC",
+        "CLO1",
+        "4",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "12"
+      ],
+      [
+        "4",
+        "Topic 4: Cost Estimation or Budget Estimation",
+        "CLO2",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "5",
+        "Topic 5: UML-Unified Modelling Language",
+        "CLO3",
+        "6",
+        "3",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "16"
+      ],
+      [
+        "6",
+        "Topic 6: Design and Prototyping Phase of SDLC",
+        "CLO4",
+        "6",
+        "3",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "16"
+      ],
+      [
+        "7",
+        "Topic 7: Software Design and Software Architecture",
+        "CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "8",
+        "Topic 8: Final Project Review and Presentation",
+        "CLO4",
+        "1",
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "9",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "10",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "11",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "12",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "13",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "14",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Quiz 1 (Analysis and Planning, Statement of Work, Project Schedule)",
+        "20",
+        "2",
+        "",
+        "3",
+        "5"
+      ],
+      [
+        "2",
+        "Group Assignment (Cost and Budget Estimation Report)",
+        "20",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "3",
+        "Group Project Deliverable 1 (Software Requirements Specification + Unified Modeling Language diagrams)",
+        "20",
+        "2",
+        "",
+        "3",
+        "5"
+      ],
+      [
+        "4",
+        "Project Presentation",
+        "20",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "30"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "20",
+        "2",
+        "",
+        "8",
+        "10"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "10"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Quiz 1: SDLC Fundamentals (Individual)",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Assignment 1: Requirements Pack v1 (Group)",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Quiz 2: Requirements & Elicitation (Individual)",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Case Study: Feasibility + Risk (Group)",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Review: Planning + Estimation (Individual)",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Assignment 2: Project Plan + Budget Estimation (Group)",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 8.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "UML Quiz (Use case + Activity concepts) (Individual)",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "UML Modeling Lab Test (Group)",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Architecture Quiz (patterns, layers, quality attributes) (Individual)",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Architecture Design Review (Group)",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 8.0,
+      "capLevel": "C4"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Software Development Lifecycle (SDLC)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Explain the purpose, phases, and key deliverables of SDLC. LLO2: Compare common SDLC models (Waterfall, Agile) and select a suitable model for a given case."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Requirement Gathering Phase of SDLC",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Identify stakeholders and categorize requirements (functional vs non-functional). LLO2: Apply elicitation techniques (interview, observation, questionnaire) to collect requirements for a case study. LLO3: Write clear requirements using user stories or SRS-style statements with acceptance criteria. LLO4: Validate and refine requirements to ensure they are complete, consistent, and testable."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Analysis and Planning Phase of SDLC",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Analyze system needs and define project scope, assumptions, and constraints. LLO2: Conduct feasibility analysis (technical, operational, schedule, economic) for a proposed system. LLO3: Create a basic project plan using WBS and timeline (milestones or sprint plan). LLO4: Develop a risk register with mitigation strategies and monitoring actions."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Cost Estimation or Budget Estimation",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Explain software cost estimation concepts and key cost drivers (effort, complexity, risks). LLO2: Produce a basic budget estimate using a chosen technique (top-down/bottom-up, analogy, or story points) including contingency."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: UML-Unified Modelling Language",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Describe the purpose of UML and when to use structural vs behavioral diagrams. LLO2: Create a Use Case Diagram with actors, system boundary, and use cases from requirements. LLO3: Create an Activity Diagram to represent workflow for a selected use case. LLO4: Create a Sequence Diagram to model interactions for one key scenario. LLO5: Create a Class Diagram (classes, attributes, methods, relationships) for core entities. LLO6: Check model consistency across diagrams (trace requirements → use cases → sequence/class)."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Design and Prototyping Phase of SDLC",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Differentiate low-fidelity vs high-fidelity prototypes and choose an appropriate prototyping approach. LLO2: Apply UI/UX basics (consistency, feedback, simplicity) to design screens for key user flows. LLO3: Build a prototype (paper/Figma) for core features with navigation and states. LLO4: Conduct a simple usability evaluation (task-based test) and collect user feedback. LLO5: Improve the prototype based on feedback and document changes (before/after). LLO6: Present prototype decisions linking UI design to requirements and user needs."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Software Design and Software Architecture",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Design a high-level architecture (layered/MVC/client-server) and justify choices using quality attributes (security, performance, maintainability). LLO2: Produce an architecture/design description including components, responsibilities, interfaces, and data flow."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Final Project Review and Presentation",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Compile a complete project portfolio (requirements, plan, budget, UML, prototype, architecture) with traceability. LLO2: Deliver a professional presentation and respond to Q&A by defending design and estimation decisions with evidence."
+      },
+      {
+        "number": 9,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 10,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 11,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 12,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 13,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 14,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 1: Introduction to Software Development Lifecycle (SDLC) LLO1 LLO2",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture + examples + Q&A",
+        "activeLearningRaw": "Pair talk, class discussion, short summary",
+        "assessmentRaw": "0",
+        "resourcesRaw": "Lecture slides, SDLC diagram, case handout"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 2: Requirement Gathering Phase of SDLC LLO1 LLO2",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture + Lab",
+        "activeLearningRaw": "Group role-play, write requirements",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, stakeholder template, sample SRS/user stories"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "1/1/2/0",
+        "lectureTopic": "Topic 2: Requirement Gathering Phase of SDLC LLO3 LLO4",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Group discussion + Lab",
+        "activeLearningRaw": "Group work, peer check, improve answers",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Requirement checklist, user story template, sample requirements"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 3: Analysis and Planning Phase of SDLC LLO1 LLO2",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture + guided example",
+        "activeLearningRaw": "Group discussion, solve small case",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Feasibility template, scope template, sample project charter"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "1/1/2/0",
+        "lectureTopic": "Topic 3: Analysis and Planning Phase of SDLC LLO3 LLO4",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Planning lab + coaching",
+        "activeLearningRaw": "Group practice, share work, peer comments",
+        "assessmentRaw": "10",
+        "resourcesRaw": "WBS template, risk register, rubric, sample plan"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 4: Cost Estimation or Budget Estimation LLO1 LLO2",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture + estimation demo",
+        "activeLearningRaw": "Group estimation game, make budget table",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slide, Estimation slides, Excel budget template, sample rates"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 5: UML-Unified Modelling Language LLO1 LLO2",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture + UML demo",
+        "activeLearningRaw": "Match examples, pair practice",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slide, UML cheat sheet, StarUML/draw.io, sample diagrams"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "",
+        "lectureTopic": "Midterm Exam",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Review + exam",
+        "activeLearningRaw": "Individual test",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Exam paper"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "1/1/2/0",
+        "lectureTopic": "Topic 5: UML-Unified Modelling Language LLO3 LLO4",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Use case demo + Feedback",
+        "activeLearningRaw": "Group drawing, Feedback",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Use case template, checklist"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "1/1/2/0",
+        "lectureTopic": "Topic 5: UML-Unified Modelling Language LLO5 LLO6",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lab test briefing + monitoring",
+        "activeLearningRaw": "Individual modeling test",
+        "assessmentRaw": "5",
+        "resourcesRaw": "UI checklist, sample wireframes, Figma notes, paper tools"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 6: Design and Prototyping Phase of SDLC LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Lecture + prototype demo",
+        "activeLearningRaw": "Sketch screens, group feedback",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slide Figma, test script, feedback form, rubric"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "1/1/2/0",
+        "lectureTopic": "Topic 6: Design and Prototyping Phase of SDLC LLO3 LLO4",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Prototype workshop + coaching",
+        "activeLearningRaw": "Build prototype, test with friend, record feedback",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Change log template, UI guideline sheet"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "1/1/2/0",
+        "lectureTopic": "Topic 6: Design and Prototyping Phase of SDLC LLO5 LLO6",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Improvement coaching",
+        "activeLearningRaw": "Improve prototype, short sharing",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Architecture template, ADR template, draw.io, rubric"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 7: Software Design and Software Architecture LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Lecture + design review",
+        "activeLearningRaw": "Group drawing, peer review, short quiz",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Presentation rubric, report template, projector, peer form"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "2/1/1/0",
+        "lectureTopic": "Topic 8: Final Project Review and Presentation LLO1 LLO2",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Presentation coaching + evaluation",
+        "activeLearningRaw": "Group presentation, Q&A",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Final exam paper"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Final Exam",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Exam administration",
+        "activeLearningRaw": "Individual test",
+        "assessmentRaw": "",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Lecture slides, SDLC diagram, case handout; Lecture slides, stakeholder template, sample SRS/user stories; Requirement checklist, user story template, sample requirements; Feasibility template, scope template, sample project charter; WBS template, risk register, rubric, sample plan; Lecture slide, Estimation slides, Excel budget template, sample rates; Lecture slide, UML cheat sheet, StarUML/draw.io, sample diagrams; Exam paper; Use case template, checklist; UI checklist, sample wireframes, Figma notes, paper tools; Lecture slide Figma, test script, feedback form, rubric; Change log template, UI guideline sheet; Architecture template, ADR template, draw.io, rubric; Presentation rubric, report template, projector, peer form; Final exam paper",
+    "references": {
+      "required": [
+        {
+          "title": "Software Engineering (10th Edition)",
+          "authors": "Lan Sommerville",
+          "publisher": "Pearson",
+          "year": "2019",
+          "isbnOrUrl": "978-0133943030"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "The Science of Lean Software and DevOps",
+          "authors": "Nicole Forsgren",
+          "publisher": "IT Revolution",
+          "year": "2023",
+          "isbnOrUrl": "978-1942788331"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

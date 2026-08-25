@@ -1,0 +1,937 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "DEC401-Data Engineering and Cloud Technologies.docx",
+    "relativePath": "Year 4/S1/DEC401-Data Engineering and Cloud Technologies.docx",
+    "sha256": "f19d620c5159938563bf11ca884641134091e75125eb009ea5ab8bd8c0394b6a",
+    "yearFolder": 4,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "DEC401",
+    "title": "Data Engineering and Cloud Technologies",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "Data Warehousing",
+    "courseType": "Core",
+    "availability": {
+      "semester": 1,
+      "year": 4
+    },
+    "description": "This course provides a comprehensive overview of the modern data engineering lifecycle. Students begin by analysing the foundational architectures of data systems, then gain hands-on experience building robust ETL/ELT pipelines with industry-standard tools like Dataflow Gen2, SQL analytics endpoint, Spark, and SQL. The curriculum covers essential data modelling techniques, from designing star and snowflake schemas to structuring data in NoSQL systems. Students will learn to deploy and manage these data workflows on major cloud platform like Microsoft Fabric. Finally, the course emphasizes data governance by equipping you with the skills to implement crucial data validation, lineage tracking, and security protocols to ensure data integrity and reliability."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Mr. Chanpiseth Chap",
+      "qualification": "Bachelor",
+      "email": "chap.chanpiseth@rupp.edu.kh",
+      "phone": "012876866"
+    },
+    "coLecturers": [
+      "Data Warehousing"
+    ]
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Understand the role and responsibilities of a data engineer in modern ecosystems",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C2",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture, Discussion, Demo",
+      "assessmentMethodsRaw": "Quiz, Assignment, Participation"
+    },
+    {
+      "code": "CLO2",
+      "description": "Design data pipelines using industry-standard tools",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lab sessions, Guided exercises",
+      "assessmentMethodsRaw": "Lab assignments, Midterm practical"
+    },
+    {
+      "code": "CLO3",
+      "description": "justify the adoption of ethical data governance and quality standards by advocating for robust metadata practices in a formal technical report and oral presentation to diverse stakeholders.",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Case study, Collaborative learning, Presentation",
+      "assessmentMethodsRaw": "Presentation, Peer evaluation"
+    },
+    {
+      "code": "CLO4",
+      "description": "Implement a Lakehouse utilizing cloud platforms and big data technologies for scalable data processing",
+      "mappedPlos": [
+        "PLO3",
+        "PLO9"
+      ],
+      "level": "P4",
+      "status": "active",
+      "teachingMethodsRaw": "Live coding, Final project, Group work",
+      "assessmentMethodsRaw": "Demonstrates a smooth workflow; code is optimized, well-documented, and functional."
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Data Engineering",
+        "1",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "2",
+        "Topic 2: Data Ecosystem & Architectures",
+        "1",
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "3",
+        "Topic 3: ETL vs ELT Processes",
+        "1",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "4",
+        "Topic 4: Data Modeming Techniques",
+        "2",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "5",
+        "Topic 5: Data Warehousing",
+        "2",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "6",
+        "Topic 6: Big Data Tools",
+        "2",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "7",
+        "Topic 7: Workflow Orchestration",
+        "3",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "8",
+        "Topic 8: Cloud Data Engineering",
+        "3",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "9",
+        "Topic 9: Streaming Data",
+        "3",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "10",
+        "Topic 10: Data Governance & Quality",
+        "4",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "11",
+        "Topic 11: Security & Compliance",
+        "4",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "12",
+        "Topic 12: Microsoft Fabric for Power BI users",
+        "4",
+        "1",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "13",
+        "Topic 13: Capstone Project Execution",
+        "4",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "14",
+        "Topic 14: Final Review & Future Trends",
+        "4",
+        "2",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "Total SLT for Course Content",
+        "56"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Class participation (discussion, schema design, lab attendance)",
+        "10%",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "2",
+        "Quizzes (2 quizzes on Data Modeling/ Workflow Orchestration)",
+        "10%",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "3",
+        "Lab Assignments (Create Azure Databricks, analyze data with Apache Spark, Query a data warehouse, Data modeling on Azure Databricks)",
+        "20%",
+        "4",
+        "",
+        "12",
+        "16"
+      ],
+      [
+        "4",
+        "Midterm Exam (Load data into a warehouse using T-SQL + Analyze data with Apache Spark)",
+        "20%",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "40"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Project (Implementing a Data Warehouse with Azure Databricks)",
+        "15%",
+        "3",
+        "",
+        "12",
+        "15"
+      ],
+      [
+        "2",
+        "Final Exam",
+        "20%",
+        "3",
+        "",
+        "6",
+        "9"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "24"
+      ],
+      [
+        "Total SLT for Assessment",
+        "64"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Quiz",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C2"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C2"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Practical",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 4.0,
+      "capLevel": "C2"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Lab assignments",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 6.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Midterm practical",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Lab work",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 4.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Midterm",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 4.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Mini Project",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 12.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO3",
+        "PLO9"
+      ],
+      "name": "Final Project",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 13.0,
+      "capLevel": "P4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO3",
+        "PLO9"
+      ],
+      "name": "Project Presentation & Report",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 7.0,
+      "capLevel": "P4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO3",
+        "PLO9"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 4.0,
+      "capLevel": "P4"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Data Engineering",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Describe the role of data engineers and the data lifecycle"
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Data Ecosystem & Architectures",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Explain modern data architectures and tools"
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: ETL vs ELT Processes",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Build basic ETL/ELT pipelines"
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Data modelling Techniques",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Apply relational and NoSQL modelling"
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Data Warehousing",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Design and implement a data warehouse schema"
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Big Data Tools",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Use Spark and Hadoop for data processing"
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Workflow Orchestration",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Create and manage data workflows"
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Cloud Data Engineering",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Deploy pipelines on cloud platforms"
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Streaming Data",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Process real-time data with Microsoft Fabric"
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Data Governance & Quality",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Apply data validation and governance principles"
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Security & Compliance",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Implement data security and compliance measures"
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Microsoft Fabric for Power BI users",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Create reports in the Power BI service in Microsoft Fabric and Power BI Desktop"
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Capstone Project",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Build and present a real-world data engineering solution"
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: Review & Future Trends",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Summarize course concepts and discuss the role of cloud data warehouses in BI"
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "(2/1/1)",
+        "lectureTopic": "Topic 1: Introduction to Data Engineering LLO1: Describe the role of data engineers and the data lifecycle",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture, Discussion, Schema design demo",
+        "activeLearningRaw": "Reading, Note-taking, small group discussion",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Data Engineering Mining, Information and Intelligence"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "(1/2/1)",
+        "lectureTopic": "Topic 2: Data Ecosystem & Architectures LLO1: Explain modern data architectures and tools",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture, Demo Data lakes, warehouses, Lakehouse, batch vs. streaming",
+        "activeLearningRaw": "Diagramming architectures, tool comparison",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Implement a Lakehouse with Microsoft Fabric"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 3: ETL vs ELT Processes LLO1: Build basic ETL/ELT pipelines",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "ETL/ELT workflows, staging, transformation logic",
+        "activeLearningRaw": "Practice Load data into a warehouse using T-SQL",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Load data into a Microsoft Fabric data warehouse"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 4: Data Modeling Techniques LLO1: Apply relational and NoSQL modelling",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Demo on Star/snowflake schema, normalization, denormalization, document stores",
+        "activeLearningRaw": "Hands-on Creating Data warehouse end-to-end",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Dimensional modeling in Fabric Data Warehouse"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 5: Data Warehousing LLO1: Design and implement a data warehouse schema",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Schema design lab",
+        "activeLearningRaw": "Implement Data Vault using Azure Databricks",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "SQL analytics endpoint and an end-to-end data warehousing scenario in Microsoft Fabric"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 6: Big Data Tools LLO1: Use Spark and Hadoop for data processing",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Live coding, Case study using MapReduce, RDDs, DataFrames, distributed computing",
+        "activeLearningRaw": "Analyze data with Apache Spark",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Use Apache Spark in Microsoft Fabric"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 7: Workflow Orchestration LLO1: Create and manage data workflows",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Create Dataflow solutions to ingest and transform data",
+        "activeLearningRaw": "Create and use a Dataflow Gen2 in Microsoft Fabric",
+        "assessmentRaw": "10%",
+        "resourcesRaw": "Dataflow-gen-2-fabric"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Midterm Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 9,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 8: Cloud Data Engineering LLO1: Deploy pipelines on cloud platforms",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Cloud lab on Azure Fabric",
+        "activeLearningRaw": "Deploy Dataflow Gen2",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Dataflow Gen2 with CI/CD and Git integration support"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 9: Streaming Data LLO1: Process real-time data with Microsoft Fabric",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Real-Time Intelligence in Microsoft Fabric",
+        "activeLearningRaw": "Real-Time Intelligence",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Real-Time Intelligence tutorial: Introduction"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 10: Data Governance & Quality LLO1: Apply data validation and governance principles",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Use Microsoft Purview to govern Microsoft Fabric",
+        "activeLearningRaw": "Sample setup for data governance",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Govern data in Microsoft Fabric with Purview"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 11: Security & Compliance LLO1: Implement data security and compliance measures",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Encryption, access control, GDPR, HIPAA",
+        "activeLearningRaw": "Lab on Secure data in a data warehouse",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Secure a Microsoft Fabric data warehouse"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "(1/1/2)",
+        "lectureTopic": "Topic 12: Microsoft Fabric for Power BI users LLO1: Create reports in the Power BI service in Microsoft Fabric and Power BI Desktop",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Demo on Create reports in the Power BI service in Microsoft Fabric and Power BI Desktop",
+        "activeLearningRaw": "Create Power BI report connecting to OneLake data hub",
+        "assessmentRaw": "5%",
+        "resourcesRaw": "Create and share your first Power BI report Microsoft Fabric for Power BI users"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "(2/1/1)",
+        "lectureTopic": "Topic 13: Capstone Project LLO1: Build and present a real-world data engineering solution",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Project-based, Group mentoring",
+        "activeLearningRaw": "Group brainstorming, proposal writing, project development",
+        "assessmentRaw": "10%",
+        "resourcesRaw": "Data warehousing on Azure Databricks"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "(2/1/1)",
+        "lectureTopic": "Topic 14: Review & Future Trends LLO1: Summarize course concepts and discuss the role of cloud data warehouses in BI",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Review lecture, Emerging trends (cloud DW)",
+        "activeLearningRaw": "Peer discussion, reflection",
+        "assessmentRaw": "15%",
+        "resourcesRaw": "AutomateDV: Data pipeline automation for Data Vault 2.0 Data Warehouse"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "",
+        "lectureTopic": "Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Computer lab",
+    "references": {
+      "required": [
+        {
+          "title": "Data Engineering Mining, Information and Intelligence",
+          "authors": "Yupo Chan John R. Talburt Terry M. Talley",
+          "publisher": "Springer New York, NY",
+          "year": "2010",
+          "isbnOrUrl": "978-1-4419-0175-0, 2009934450"
+        },
+        {
+          "title": "Building a Scalable Data Warehouse with Data Vault 2.0",
+          "authors": "Daniel Linstedt & Michael Olschimke",
+          "publisher": "Morgan Kaufmann",
+          "year": "2015",
+          "isbnOrUrl": "9780128026489, 0128026480"
+        },
+        {
+          "title": "The Modern Data Warehouse in Azure",
+          "authors": "Matt How",
+          "publisher": "Apress",
+          "year": "2020",
+          "isbnOrUrl": "9781484258231, 1484258231"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Data Engineering with Microsoft Azure (2nd Edition)",
+          "authors": "Vlad Vlasceanu, Andy Cutler, and Matt How",
+          "publisher": "Packt Publishing",
+          "year": "2022",
+          "isbnOrUrl": "9781803246789"
+        },
+        {
+          "title": "Get started with Microsoft Fabric (online)",
+          "authors": "Microsoft Learn",
+          "publisher": "Microsoft",
+          "year": "2025",
+          "isbnOrUrl": "https://learn.microsoft.com/en-us/training/paths/get-started-fabric/"
+        }
+      ]
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": []
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

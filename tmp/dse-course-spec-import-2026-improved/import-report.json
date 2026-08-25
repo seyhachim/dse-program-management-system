@@ -1,0 +1,604 @@
+{
+  "schemaVersion": "dse-course-spec-conversion-report-v1",
+  "sourceZip": "course spec.zip",
+  "totalDocx": 46,
+  "summary": {
+    "valid": 27,
+    "warning": 19
+  },
+  "legacyOrUnmappedCodes": [
+    "AIN302",
+    "AIS401",
+    "BDA302",
+    "CHK102",
+    "DMA201",
+    "DSC102",
+    "DWA201",
+    "EEE102",
+    "GPDS101",
+    "PDT202",
+    "SCA302",
+    "STR102",
+    "TDT101"
+  ],
+  "currentCurriculumCodesMissingFromZip": [
+    "AAI302",
+    "AIE401",
+    "BDE302",
+    "CCS101",
+    "CSE402",
+    "DSS301",
+    "DVD201",
+    "DWA202",
+    "INT402",
+    "IOT302",
+    "KCI102",
+    "KHI101",
+    "MAT202",
+    "PDT102",
+    "SCA402",
+    "STA102",
+    "THE402"
+  ],
+  "results": [
+    {
+      "file": "Year 1/S1/BPR101_Basic Programming.docx",
+      "courseCode": "BPR101",
+      "title": "Basic Programming",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 3,
+      "assessments": 7,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S1/DLP101_Digital Literacy and Professional Skills.docx",
+      "courseCode": "DLP101",
+      "title": "Digital Literacy and Professional Skill",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (DLI101) conflicts with filename (DLP101); canonical JSON uses filename code and requires review"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 14,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S1/ENG101_English I_ Academic Reading for Data Science.docx",
+      "courseCode": "ENG101",
+      "title": "English I: Academic Reading for Data Science",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 8,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S1/GPDS101_General Physics for Data Science.docx",
+      "courseCode": "GPDS101",
+      "title": "General Physics for Data Science",
+      "status": "warning",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 3,
+      "assessments": 9,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S1/IDS101_Intro. to Data Science and Engineering.docx",
+      "courseCode": "IDS101",
+      "title": "Introduction to Data Science and Engineering",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 4,
+      "weeks": 15
+    },
+    {
+      "file": "Year 1/S1/MAT101_Math I-Calculus.docx",
+      "courseCode": "MAT101",
+      "title": "Math I-Calculus",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 15
+    },
+    {
+      "file": "Year 1/S1/TDT101_Technology and Digital Transformation.docx",
+      "courseCode": "TDT101",
+      "title": "Technology and Digital Transformation",
+      "status": "warning",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code TDT101 and requires review",
+        "Course Availability semester 2 conflicts with folder S1",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 9,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S2/APR102_Advanced Programming.docx",
+      "courseCode": "APR102",
+      "title": "Advanced Programming",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 3,
+      "assessments": 6,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S2/CHK102_Civilization and History of Khmer and ASEAN .docx",
+      "courseCode": "CHK102",
+      "title": "Civilization and History of Khmer and ASEAN",
+      "status": "warning",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code CHK102 and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S2/DSC102_Data_Science_for_Climate_Change_&_Sustainable_Development.docx",
+      "courseCode": "DSC102",
+      "title": "Data Science for Climate Change & Sustainable Development",
+      "status": "warning",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 4,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S2/EEE102_Electrical Engineering and Embedded Systems.docx",
+      "courseCode": "EEE102",
+      "title": "Electrical Engineering and Embedded Systems",
+      "status": "warning",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 3,
+      "assessments": 7,
+      "weeks": 15
+    },
+    {
+      "file": "Year 1/S2/ENG102_English II_ Communication and Academic Writing for Data Science.docx",
+      "courseCode": "ENG102",
+      "title": "English II: Communication and Academic Writing for Data Science",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 10,
+      "weeks": 16
+    },
+    {
+      "file": "Year 1/S2/MAT102_Math II-Linear Algebra.docx",
+      "courseCode": "MAT102",
+      "title": "Math II-Linear Algebra",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 15
+    },
+    {
+      "file": "Year 1/S2/STR102_Statistics I.docx",
+      "courseCode": "STR102",
+      "title": "Statistics I",
+      "status": "warning",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code STR102 and requires review",
+        "Course Availability semester 1 conflicts with folder S2",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "Course Assessment Plan weights sum to 98% while the source total is expected to be 100%; requires review"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 16
+    },
+    {
+      "file": "Year 2/S1/DMA201-Math III-Discrete Mathematics.docx",
+      "courseCode": "DMA201",
+      "title": "Math III-Discrete Mathematics",
+      "status": "warning",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 15
+    },
+    {
+      "file": "Year 2/S1/DSA201_Data Structures and Algorithms I.docx",
+      "courseCode": "DSA201",
+      "title": "Data Structure and Algorithm I",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 4,
+      "weeks": 16
+    },
+    {
+      "file": "Year 2/S1/PPR201-Project Practicum I-Software Engineering.docx",
+      "courseCode": "PPR201",
+      "title": "Project Practicum I: Software Engineering",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 10,
+      "weeks": 16
+    },
+    {
+      "file": "Year 2/S1/RDM201_Relational Database Modeling and SQL.docx",
+      "courseCode": "RDM201",
+      "title": "Relational Database Modeling and SQL",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 6,
+      "weeks": 14
+    },
+    {
+      "file": "Year 2/S1/STA201_Statistics II.docx",
+      "courseCode": "STA201",
+      "title": "Statistics II",
+      "status": "warning",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code STA201 and requires review"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 16
+    },
+    {
+      "file": "Year 2/S2/DSA202_Data Structures and Algorithms II.docx",
+      "courseCode": "DSA202",
+      "title": "Data Structure and Algorithm I",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 4,
+      "weeks": 16
+    },
+    {
+      "file": "Year 2/S2/DWA201_Data Warehoursing.docx",
+      "courseCode": "DWA201",
+      "title": "Data Warehousing",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (DWA301) conflicts with filename (DWA201); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 11,
+      "weeks": 16
+    },
+    {
+      "file": "Year 2/S2/NDA202_NoSQL Databases.docx",
+      "courseCode": "NDA202",
+      "title": "NoSQL Database",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 6,
+      "weeks": 14
+    },
+    {
+      "file": "Year 2/S2/PAN202_Predictive Analytics.docx",
+      "courseCode": "PAN202",
+      "title": "Predictive Analytics",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 5,
+      "weeks": 16
+    },
+    {
+      "file": "Year 2/S2/PDT202- Personal Development and Teamwork.docx",
+      "courseCode": "PDT202",
+      "title": "Personal Development and Teamwork",
+      "status": "warning",
+      "warnings": [
+        "Course Availability semester 1 conflicts with folder S2",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 3,
+      "assessments": 3,
+      "weeks": 15
+    },
+    {
+      "file": "Year 2/S2/PPR202-Project Practicum II-Software Engineering.docx",
+      "courseCode": "PPR202",
+      "title": "Project Practicum II: Software Engineering",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 10,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S1/BIA301_Business Intelligence and Analytics.docx",
+      "courseCode": "BIA301",
+      "title": "Business Intelligence and Analytics",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (DWA201) conflicts with filename (BIA301); canonical JSON uses filename code and requires review"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 11,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S1/DMI301_Data Mining.docx",
+      "courseCode": "DMI301",
+      "title": "Data Mining",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 6,
+      "weeks": 14
+    },
+    {
+      "file": "Year 3/S1/PPR301-Project Practicum I Data Analytics & Machine Learning.docx",
+      "courseCode": "PPR301",
+      "title": "Project Practicum I: Data Analytics & Machine Learning",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 7,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S1/TSA301_Time Series Analysis.docx",
+      "courseCode": "TSA301",
+      "title": "Time Series Analysis",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 5,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S1/WAD301-Web App Development for Data Science (with Streamlit & FastAPI_Flask).docx",
+      "courseCode": "WAD301",
+      "title": "Web App Development for Data Science (with Streamlit & FastAPI/Flask)",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 8,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S2/AIN302_Applied AI and Deep Learning.docx",
+      "courseCode": "AIN302",
+      "title": "Artificial Intelligence",
+      "status": "warning",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 6,
+      "weeks": 14
+    },
+    {
+      "file": "Year 3/S2/BDA302_Big Data Processing.docx",
+      "courseCode": "BDA302",
+      "title": "Data Processing (Hadoop and Spark)",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (BDA401) conflicts with filename (BDA302); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 6,
+      "weeks": 14
+    },
+    {
+      "file": "Year 3/S2/EIN302_Entrepreneurship and Innovation.docx",
+      "courseCode": "EIN302",
+      "title": "Entrepreneurship and Innovation",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (EIN202) conflicts with filename (EIN302); canonical JSON uses filename code and requires review",
+        "Course Availability year 2 conflicts with folder Year 3",
+        "Course Assessment Plan weights sum to 105% while the source total is expected to be 100%; requires review"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S2/MAD302_Mobile App Development for Data Science (Android & ML Integration).docx",
+      "courseCode": "MAD302",
+      "title": "Mobile App Development for Data Science (Android & ML Integration)",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S2/PPR302_Project_Practicum_II_Data_Analytics.docx",
+      "courseCode": "PPR302",
+      "title": "Project Practicum II: Data Analytics & Machine Learning",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 7,
+      "weeks": 16
+    },
+    {
+      "file": "Year 3/S2/SCA302_Supply Chain Analytics.docx",
+      "courseCode": "SCA302",
+      "title": "Supply Chain Analytics",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (SCA323) conflicts with filename (SCA302); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 12,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S1/AIS401_AI Engineering for Smart Agriculture.docx",
+      "courseCode": "AIS401",
+      "title": "AI Engineering for Smart Agriculture",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (ASS401) conflicts with filename (AIS401); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 5,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S1/DEC401-Data Engineering and Cloud Technologies.docx",
+      "courseCode": "DEC401",
+      "title": "Data Engineering and Cloud Technologies",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 11,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S1/ERD401-Ethics and Responsible Data Science.docx",
+      "courseCode": "ERD401",
+      "title": "Ethics and Responsible Data Science",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 5,
+      "assessments": 15,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S1/FPR401_Final Project I.docx",
+      "courseCode": "FPR401",
+      "title": "Final Project I",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 4,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S1/NLP401_Natural Language Processing.docx",
+      "courseCode": "NLP401",
+      "title": "Natural Language Processing (NLP)",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 11,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S1/PML401_Professional_Mindset_and_Leadership_Development.docx",
+      "courseCode": "PML401",
+      "title": "Professional Mindset and Leadership Development",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (PML402) conflicts with filename (PML401); canonical JSON uses filename code and requires review",
+        "Course Availability year 3 conflicts with folder Year 4",
+        "Course Availability semester 2 conflicts with folder S1"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 4,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S2/CRY402-Cryptography.docx",
+      "courseCode": "CRY402",
+      "title": "Introduction to Cryptography",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 11,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S2/FPR402_Final Project II.docx",
+      "courseCode": "FPR402",
+      "title": "Final Project II",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 4,
+      "assessments": 4,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S2/FTE402-Financial Technology.docx",
+      "courseCode": "FTE402",
+      "title": "Financial Technology",
+      "status": "valid",
+      "warnings": [],
+      "errors": [],
+      "clos": 5,
+      "assessments": 14,
+      "weeks": 16
+    },
+    {
+      "file": "Year 4/S2/LLM402_Large Language Model.docx",
+      "courseCode": "LLM402",
+      "title": "Large Language Model (LLM)",
+      "status": "warning",
+      "warnings": [
+        "Course code in DOCX table (LLM302) conflicts with filename (LLM402); canonical JSON uses filename code and requires review"
+      ],
+      "errors": [],
+      "clos": 4,
+      "assessments": 11,
+      "weeks": 16
+    }
+  ]
+}

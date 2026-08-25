@@ -1,0 +1,978 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "ENG101_English I_ Academic Reading for Data Science.docx",
+    "relativePath": "Year 1/S1/ENG101_English I_ Academic Reading for Data Science.docx",
+    "sha256": "ec4e370d15a35833fddcce1dd88f38eda4788338cdcb18a0ea4eec850d79d4f4",
+    "yearFolder": 1,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "ENG101",
+    "title": "English I: Academic Reading for Data Science",
+    "credits": {
+      "total": 4.0
+    },
+    "prerequisites": "No",
+    "courseType": "Basic",
+    "availability": {
+      "semester": 1,
+      "year": 1
+    },
+    "description": "This course is designed for data science students to develop advanced reading, comprehension, and critical thinking skills. Through engaging texts and real-world topics, students will learn to analyze complex information, identify key ideas, and synthesize insights that are essential skills for interpreting research, technical documentation, and data-driven narratives. Emphasis will be placed on academic vocabulary, summarization, and evaluating arguments, enabling students to communicate effectively in professional and academic contexts. Activities include collaborative discussions, problem-solving tasks, and projects that connect reading strategies to data science applications."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dek Sovannthea",
+      "qualification": "MA in Educational Technology",
+      "email": "dek.sovannthea@rupp.edu.kh",
+      "phone": "012 852 240"
+    },
+    "coLecturers": [
+      "Pan Somaly"
+    ]
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Explain and apply key reading strategies such as identifying main ideas, analyzing text structure, and synthesizing information to comprehend and interpret academic and professional texts relevant to data science.",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+      "assessmentMethodsRaw": "Revision tests, Midterm exam, Final exam"
+    },
+    {
+      "code": "CLO2",
+      "description": "Collaborate actively in group discussions and projects, demonstrating active listening, respectful communication, and the ability to integrate diverse perspectives when analyzing and interpreting academic texts.",
+      "mappedPlos": [
+        "PLO4"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+      "assessmentMethodsRaw": "Project homework"
+    },
+    {
+      "code": "CLO3",
+      "description": "Demonstrate academic integrity and professional responsibility by adhering to ethical standards in collaborative work, respecting intellectual property, and applying honesty in interpreting and presenting information.",
+      "mappedPlos": [
+        "PLO7"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+      "assessmentMethodsRaw": "Project homework"
+    },
+    {
+      "code": "CLO4",
+      "description": "Convey ideas clearly and effectively through oral presentations and written summaries, using appropriate academic language and visual aids to interpret and present information from complex texts.",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+      "assessmentMethodsRaw": "Presentation, Project homework"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Starting up: Interdisciplinary",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "2",
+        "Fragile forests: Conservations",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "3",
+        "Bright ideas: Health/Innovations",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "4",
+        "Game changers: Sociology/Technology",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "5",
+        "Lessons in learning: Psychology/Education",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "6",
+        "Food for life: Food/Health",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "7",
+        "Body signs: Behavior/Psychology",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "8",
+        "Energy builders: Energy/Engineering",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "9",
+        "Changing perspectives: Engineering/Art",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "10",
+        "Data detectives: Statistics/Economics",
+        "1, 2, 3, 4",
+        "",
+        "2",
+        "2",
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "4",
+        "10"
+      ],
+      [
+        "11",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "12",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "13",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "14",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "15",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Course Content",
+        "100"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Participation",
+        "10",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "2",
+        "Project homework",
+        "10",
+        "1",
+        "2",
+        "2",
+        "5"
+      ],
+      [
+        "3",
+        "Revision tests",
+        "20",
+        "2",
+        "",
+        "",
+        "2"
+      ],
+      [
+        "4",
+        "Midterm exam",
+        "20",
+        "2",
+        "",
+        "",
+        "2"
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "9"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "30",
+        "2",
+        "",
+        "",
+        "2"
+      ],
+      [
+        "2",
+        "Presentation/reflection",
+        "10",
+        "4",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "6"
+      ],
+      [
+        "Total SLT for Assessment",
+        "15"
+      ],
+      [
+        "Grand Total SLT",
+        "160"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Revision tests",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Midterm exam",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Final exam",
+      "mode": "individual",
+      "weightPercent": 30.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO4"
+      ],
+      "name": "Project homework",
+      "mode": "individual",
+      "weightPercent": 3.0,
+      "sltHours": 6.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO4"
+      ],
+      "name": "Participation",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Project homework",
+      "mode": "individual",
+      "weightPercent": 2.0,
+      "sltHours": 6.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Presentation/reflection",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Project homework",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 6.0,
+      "capLevel": "A4"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Starting up: Interdisciplinary",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about characteristics of successful leaders Learn about the role of followers Explore how different movements start"
+      },
+      {
+        "number": 2,
+        "title": "Fragile forests: Conservations",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about the threat to the canopy layer of rain forests Learn how a forest ecologist is trying to help Explore other conservations projects"
+      },
+      {
+        "number": 3,
+        "title": "Bright ideas: Health/Innovations",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about simple inventions that make people’s lives better Learn about an invention that is saving babies’ lives Explore other simple and creative solutions that improve or save lives"
+      },
+      {
+        "number": 4,
+        "title": "Game changers: Sociology/Technology",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about the benefits of playing games online Learn about how online gamers could help save the world Explore ways to solve problems with games"
+      },
+      {
+        "number": 5,
+        "title": "Lessons in learning: Psychology/Education",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about making learning relevant for more students Learn about the importance of perseverance in learning Explore other ways to enhance learning"
+      },
+      {
+        "number": 6,
+        "title": "Food for life: Food/Health",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about how a celebrity chef wants people to eat better Learn about problems with the food served in some schools Explore ways to encourage healthy eating"
+      },
+      {
+        "number": 7,
+        "title": "Body signs: Behavior/Psychology",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about the power of nonverbal communication Learn how we can use our bodies to change our attitudes Explore low and high power poses"
+      },
+      {
+        "number": 8,
+        "title": "Energy builders: Energy/Engineering",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about a new way to get energy from the wind Learn about someone who solved an energy problem Explore other energy innovations"
+      },
+      {
+        "number": 9,
+        "title": "Changing perspectives: Engineering/Art",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about someone who things in pictures Learn about someone who challenges the way people think about her disability Explore how disabilities contributes to people’s experiences"
+      },
+      {
+        "number": 10,
+        "title": "Data detectives: Statistics/Economics",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Read about someone who works with data Learn about the benefits of visual data Explore your own social data"
+      },
+      {
+        "number": 11,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 12,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 13,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 14,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Course Introductions and study guidelines Unit 1: Starting up: Inspired leadership",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 1: How to start a movement Unit 2: Trouble for the air plants",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 2: Conserving the canopy",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 3: Big problems, simple solutions",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "Project homework 1 (2%)",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 3: Engaging learners",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "Revision test 1 (10%)",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 4: Is gaming good for you and Gaming can make a better world",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 5: Engaging learners",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 5: The keys to success",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "Project homework 2 (3%)",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 6: Food revolution",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "Midterm exam (20%)",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 6: Teach every child about food Unit 7: Power poses",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 7: Your body language shapes who you are",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 8: Kite power",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "Project homework 3 (5%)",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 8: How I harnessed the wind Unit 9: Thinking in pictures",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "Revision test 2 (10%)",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 9: Deep sea diving",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Unit 10: Data detectives, The beauty of data visualization",
+        "clos": [
+          "CLO1",
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Integrated reading, visualization, discussion, flip classroom",
+        "activeLearningRaw": "Independent learning, Peer discussion",
+        "assessmentRaw": "Presentation (Reflection) (10%)",
+        "resourcesRaw": "Textbook, Extra files, MS Teams"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "",
+        "lectureTopic": "Presentation (Part 2) Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "Final exam (30%)",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [
+      "Normalized numeric CLO references: 1, 2, 3, 4"
+    ],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Smartphones or laptops with FiWi Microsoft Teams, Microsoft Office LCD projector",
+    "references": {
+      "required": [
+        {
+          "title": "21st Century reading 2: Creative thinking and reading with TED talks",
+          "authors": "Blass, L; Vargo, M; and Yeates, E.",
+          "publisher": "National Geographic Society",
+          "year": "2016",
+          "isbnOrUrl": "978-1-305-26570-7"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Reading Explorer 3",
+          "authors": "Doulas, N. and Bohlke, D.",
+          "publisher": "National Geographic/ELT",
+          "year": "2015",
+          "isbnOrUrl": "978-1-285-84691-0"
+        },
+        {
+          "title": "Communicating with data: The art of writing for data science",
+          "authors": "Nolan, D. and Stoudt, S.",
+          "publisher": "Oxford University Press",
+          "year": "2021",
+          "isbnOrUrl": "978-0-192-60750-8"
+        }
+      ]
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Normalized numeric CLO references: 1, 2, 3, 4"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

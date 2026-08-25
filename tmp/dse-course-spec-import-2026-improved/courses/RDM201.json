@@ -1,0 +1,817 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "RDM201_Relational Database Modeling and SQL.docx",
+    "relativePath": "Year 2/S1/RDM201_Relational Database Modeling and SQL.docx",
+    "sha256": "025a66b6dffef20ca926d6f5cd0f11cf4ca833d02706af35d855cf4636e0e4a2",
+    "yearFolder": 2,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "RDM201",
+    "title": "Relational Database Modeling and SQL",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 1,
+      "year": 2
+    },
+    "description": "This course provides an in-depth introduction to the principles, design, and implementation of Database Management Systems (DBMS). It explores the fundamental concepts of data organization, data models, database architectures, and the characteristics that distinguish the database approach from traditional file-based systems. Students will learn to analyze data requirements, model data using the Entity–Relationship (ER) model, and transform conceptual designs into relational database schemas. The course also covers database languages and interfaces, with a strong emphasis on Structured Query Language (SQL) for data definition, manipulation, and retrieval. Through lectures, practical exercises, and projects, students will gain hands-on experience in creating and managing relational databases, enforcing data integrity, handling transactions, and understanding database constraints. Topics also include database system architectures, classification of DBMSs, and key operations such as INSERT, DELETE, UPDATE, and complex retrieval queries. In addition to technical proficiency, the course emphasizes teamwork, communication, and ethical considerations in data management. Students will develop problem-solving and analytical skills essential for designing efficient, secure, and scalable database systems that meet organizational and user needs. By the end of the course, learners will be prepared to apply database concepts and technologies in real-world applications and data-driven environments."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dr. Khim Chamroeun",
+      "qualification": "Ph.D",
+      "email": "khim.chamroeun@rupp.edu.kh",
+      "phone": "+855 12 741 274"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Analyze user and organizational data requirements to design and model a normalized relational database schema using the Entity–Relationship (ER) model and relational model principles.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO2",
+      "description": "Build relational databases using SQL to manage, query, and maintain data effectively.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P5",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Project Reports, Presentation, Write and execute code"
+    },
+    {
+      "code": "CLO3",
+      "description": "Collaborate effectively in teams to design and document database systems that meet user and business requirements.",
+      "mappedPlos": [
+        "PLO4"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO4",
+      "description": "Evaluate ethical, security, and privacy considerations in database design and data management practices.",
+      "mappedPlos": [
+        "PLO7"
+      ],
+      "level": "A5",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Project Reports, Presentation, Write and execute code"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction and An Example, Characteristics of the Database Approach.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: Advantages of Using the DBMS Approach, When Not to Use a DBMS.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "3",
+        "Topic 3: Data Models, Schemas, and Instances",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "4",
+        "Topic 4: Database Languages, Interfaces, and system environment.",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "5",
+        "Topic 5: Centralized and Client/Server Architectures for DBMSs",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "6",
+        "Topic 6: Classification of Database Management Systems",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "7",
+        "Topic 7: Data Modeling Using the Entity–Relationship (ER) Model",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "8",
+        "Topic 8: Entity Types, Entity Sets, Attributes, and Keys",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "9",
+        "Topic 9: Relationship Types, Relationship Sets, Roles, and Structural Constraints",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "10",
+        "Topic 10: Relational Model Concepts, Constraints and Relational Database Schemas",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "11",
+        "Topic 11: Update Operations, Transactions, and Dealing with Constraint Violations",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "12",
+        "Topic 12: Basic SQL, SQL Data Definition and Data Types",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "13",
+        "Topic 13: Basic Retrieval Queries in SQL",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "14",
+        "Topic 14: INSERT, DELETE, UPDATE Statements, Additional Features of SQL",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "Total SLT for Course Content",
+        "80",
+        "",
+        "2",
+        "",
+        "2"
+      ],
+      [
+        "",
+        "",
+        "",
+        "2",
+        "",
+        "2"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Lab Assignment",
+        "30",
+        "8",
+        "",
+        "8",
+        "16"
+      ],
+      [
+        "2",
+        "Simi-presentation and report submission",
+        "35",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "26"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final presentation and report submission",
+        "35",
+        "4",
+        "",
+        "10",
+        "14"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "14"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 12.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 6.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Simi-presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 42.0,
+      "capLevel": "P5"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO4"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 12.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 6.0,
+      "capLevel": "A5"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 42.0,
+      "capLevel": "A5"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction and An Example, Characteristics of the Database Approach.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain the purpose and importance of database systems. LLO2: Differentiate between file-based and database approaches. LLO3: Identify key characteristics of the database approach."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Advantages of Using the DBMS Approach, When Not to Use a DBMS.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Discuss the main advantages and limitations of DBMSs. LLO2: Evaluate situations where a DBMS is or is not appropriate. LLO3: Recognize ethical and organizational factors in database adoption."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Data Models, Schemas, and Instances.",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Define data models, schemas, and instances. LLO2: Distinguish among levels of data abstraction. LLO3: Explain the concept of data independence."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Database Languages, Interfaces, and system environment.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Describe different types of database languages (DDL, DML, DCL). LLO2: Explain DBMS interfaces and components. LLO3: Illustrate how users interact with the DBMS environment."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Centralized and Client/Server Architectures for DBMSs.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Describe centralized, client/server, and distributed DBMS architectures. LLO2: Compare architectural models and identify their advantages. LLO3: Compare architectural models and identify their disadvantages."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Classification of Database Management Systems.",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Classify different types of DBMSs (hierarchical, network, relational, NoSQL, etc.). LLO2: Discuss use cases for each DBMS type. LLO3: Compare their advantages and disadvantages of DBMS."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Data Modeling Using the Entity–Relationship (ER) Model.",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Identify entities, attributes, and relationships from a case study. LLO2: Construct an ER diagram representing user requirements. LLO3: Apply normalization concepts in the modeling process."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Entity Types, Entity Sets, Attributes, and Keys.",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Differentiate types of entities and attributes. LLO2: Identify and assign primary and foreign keys. LLO3: Apply key constraints in ER modeling."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Relationship Types, Relationship Sets, Roles, and Structural Constraints.",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Define relationships and their properties. LLO2: Interpret cardinality and participation constraints. LLO3: Model complex relationships using ER notation."
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Relational Model Concepts, Constraints and Relational Database Schemas.",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Explain relational model components (tables, tuples, attributes). LLO2: Convert an ER model into a relational schema. LLO3: Apply relational integrity and key constraints."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Update Operations, Transactions, and Dealing with Constraint Violations",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Perform update, insert, and delete operations. LLO2: Explain the concept of database transactions. LLO3: Identify and handle constraint violations ethically and technically."
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Basic SQL, SQL Data Definition and Data Types",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Create database structures using SQL (CREATE TABLE, ALTER, DROP). LLO2: Define appropriate Key. LLO3: Define appropriate data types and constraints."
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Basic Retrieval Queries in SQL",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Write SQL SELECT statements for data retrieval. LLO2: Use filtering, sorting, and grouping clauses. LLO3: Perform simple and nested queries."
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: INSERT, DELETE, UPDATE Statements, Additional Features of SQL",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Manipulate data using INSERT, DELETE, and UPDATE. LLO2: Apply advanced SQL features such as views and indexes. LLO3: Collaborate in a group project to design and implement a complete database solution."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 1: Introduction and An Example, Characteristics of the Database Approach.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture with real-world examples and slides. LLO2: Comparative diagrams and case examples. LLO3: Instructor-led brainstorming.",
+        "activeLearningRaw": "LLO1: Note-taking, Q&A discussion. LLO2: Group discussion and short quiz. LLO3: Students list characteristics in pairs.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 4-10"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 2: Advantages of Using the DBMS Approach, When Not to Use a DBMS.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture with case studies. LLO2: Scenario-based discussion. LLO3: Lecture + ethical dilemma examples.",
+        "activeLearningRaw": "LLO1: Think-Pair-Share activity. LLO2: Students justify choices in groups. LLO3: Reflective writing exercise.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 17-27"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 3: Data Models, Schemas, and Instances.",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture with diagrams. LLO2: Visual hierarchy explanation. LLO3: Conceptual explanation with examples.",
+        "activeLearningRaw": "LLO1: Individual classification exercise. LLO2: Students map examples to levels. LLO3: Short written summary.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 32"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 4: Database Languages, Interfaces, and system environment.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture + code snippets. LLO2: Demo of DBMS interface. LLO3: Role-play demonstration.",
+        "activeLearningRaw": "LLO1: Identify commands in examples. LLO2: Students explore interface in lab. LLO3: Students simulate DB operations.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 38-42"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 5: Centralized and Client/Server Architectures for DBMSs.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lecture with diagrams and comparisons.",
+        "activeLearningRaw": "LLO1,2,3,4: Group debate on architecture choice.",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Slides, textbook P 64"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 6: Classification of Database Management Systems.",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lecture with diagrams and comparisons.",
+        "activeLearningRaw": "LLO1,2,3,4: Group debate on architecture choice.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 51"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 7: Data Modeling Using the Entity–Relationship (ER) Model.",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Instructor explains case study. LLO2: Guided project instructions. LLO3: Lecture + example normalization.",
+        "activeLearningRaw": "LLO1: Group brainstorming. LLO2: Collaborative diagram creation. LLO3: Apply normalization in project.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 60"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 8: Entity Types, Entity Sets, Attributes, and Keys.",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lab-based demonstration.",
+        "activeLearningRaw": "LLO1,2,3: Hands-on ER diagram refinement.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 63"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 9: Relationship Types, Relationship Sets, Roles, and Structural Constraints.",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lab-based demonstration.",
+        "activeLearningRaw": "LLO1,2,3: Hands-on ER diagram refinement.",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Slides, textbook P 72"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 10: Relational Model Concepts, Constraints and Relational Database Schemas.",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lab-based coding sessions.",
+        "activeLearningRaw": "LLO1,2,3: Students write SQL scripts, run queries, and debug errors.",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Slides, textbook P 150-157"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/0/2/2",
+        "lectureTopic": "Topic 11: Update Operations, Transactions, and Dealing with Constraint Violations",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lab-based coding sessions.",
+        "activeLearningRaw": "LLO1,2,3: Students write SQL scripts, run queries, and debug errors.",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Slides, textbook P 165"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/2/6",
+        "lectureTopic": "Topic 12: Basic SQL, SQL Data Definition and Data Types",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lab-based coding sessions.",
+        "activeLearningRaw": "LLO1,2,3: Students write SQL scripts, run queries, and debug errors.",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Slides, textbook Ch5, P 239-257"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/0/2/6",
+        "lectureTopic": "Topic 13: Basic Retrieval Queries in SQL",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lab-based coding sessions.",
+        "activeLearningRaw": "LLO1,2,3: Students write SQL scripts, run queries, and debug errors.",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Slides, textbook P 177-179"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/0/2/4",
+        "lectureTopic": "Topic 14: INSERT, DELETE, UPDATE Statements, Additional Features of SQL",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1,2,3: Lab-based coding sessions.",
+        "activeLearningRaw": "LLO1,2,3: Students write SQL scripts, run queries, and debug errors.",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Slides, textbook P 187"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Computer lab Slide projector SQL Server software Diagram drawing tools",
+    "references": {
+      "required": [
+        {
+          "title": "Database System Concepts",
+          "authors": "Abraham Silberschatz, Henry F. Korth, S. Sudarshan",
+          "publisher": "Mc Graw Hill Education",
+          "year": "2020",
+          "isbnOrUrl": "978-1-260-08450-4"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Fundamentals of Database Systems (7 edition)",
+          "authors": "Ramez Elmasri, Shamkant B. Navathe",
+          "publisher": "Addison-Wesley (Pearson)",
+          "year": "2016",
+          "isbnOrUrl": "978-0-13-397077-7"
+        },
+        {
+          "title": "Fundamentals of Database Systems (6 edition)",
+          "authors": "Ramez Elmasri, Shamkant B. Navathe",
+          "publisher": "Addison-Wesley (Pearson)",
+          "year": "2011",
+          "isbnOrUrl": "978-0-136-08620-8"
+        }
+      ]
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": []
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

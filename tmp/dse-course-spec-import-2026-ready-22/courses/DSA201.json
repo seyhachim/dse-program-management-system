@@ -1,0 +1,869 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "DSA201_Data Structures and Algorithms I.docx",
+    "relativePath": "Year 2/S1/DSA201_Data Structures and Algorithms I.docx",
+    "sha256": "3b19d010540b155808b264862b837cf89c8c2d436ee5462d50844b65064d680c",
+    "yearFolder": 2,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "DSA201",
+    "title": "Data Structure and Algorithm I",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "Programming Language with C++",
+    "courseType": "Core",
+    "availability": {
+      "semester": 1,
+      "year": 2
+    },
+    "description": "This course introduces fundamental concepts of data structures and algorithms, emphasizing linear structures such as arrays, linked lists, stacks, and queues. Students learn recursion, complexity analysis, and sorting techniques, progressing toward practical applications. Through coding practice and a project, learners develop problem-solving, analytical, and teamwork skills essential for data science and engineering."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "CHHOEUM Vantha",
+      "qualification": "Ph.D",
+      "email": "vantha.chhoeum@gmail.com",
+      "phone": "012-457-016"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Apply the core algorithm for linear data structures with arrays, linked lists, stacks, and queues",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Flip classroom Collaborative learning",
+      "assessmentMethodsRaw": "Written exam questions"
+    },
+    {
+      "code": "CLO2",
+      "description": "Analyse the efficiency of sorting and searching algorithms using Big-O notation for linear data structures",
+      "mappedPlos": [
+        "PLO6"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Case study analysis",
+      "assessmentMethodsRaw": "Presentation"
+    },
+    {
+      "code": "CLO3",
+      "description": "Defend a project demonstrating the practical application of linear data structures for solving real-world problems",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning",
+      "assessmentMethodsRaw": "Assignment, Presentation"
+    },
+    {
+      "code": "CLO4",
+      "description": "Create effective solutions to real-world problems using the right data structures and algorithms in C++",
+      "mappedPlos": [
+        "PLO10"
+      ],
+      "level": "P4",
+      "status": "active",
+      "teachingMethodsRaw": "Lab-based Leaning",
+      "assessmentMethodsRaw": "Write and execute code"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Data Structure and Algorithms",
+        "CLO1CLO3",
+        "1.5",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4.5"
+      ],
+      [
+        "2",
+        "Topic 2: Review of the C++ Programming Language",
+        "CLO1CLO3",
+        "1.5",
+        "",
+        "2.5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "3",
+        "Topic 3: Algorithms Analysis for DSA",
+        "CLO1CLO3",
+        "1.5",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4.5"
+      ],
+      [
+        "4",
+        "Topic 4: Linear Data Structure – Array",
+        "CLO1CLO3",
+        "1",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4"
+      ],
+      [
+        "5",
+        "Topic 5: Linked List – Single",
+        "CLO2CLO3",
+        "1.5",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4.5"
+      ],
+      [
+        "6",
+        "Topic 6: Linked List – Double",
+        "CLO2CLO3",
+        "1.5",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4.5"
+      ],
+      [
+        "7",
+        "Topic 7: Stack",
+        "CLO2CLO3",
+        "1.5",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4.5"
+      ],
+      [
+        "8",
+        "Topic 8: Queue",
+        "CLO2CLO3",
+        "1.5",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "4.5"
+      ],
+      [
+        "9",
+        "Topic 9: Sorting Algorithm-bubble/insertion sort",
+        "CLO2CLO3",
+        "1",
+        "",
+        "2.5",
+        "",
+        "0.5",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "10",
+        "Topic 10: Sorting Algorithm-Heapsort/Shell sort",
+        "CLO2CLO3",
+        "1",
+        "",
+        "2.5",
+        "",
+        "0.5",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "11",
+        "Topic 11: Sorting Algorithm-Merge Sort/ Quicksort",
+        "CLO2CLO3",
+        "1",
+        "",
+        "2.5",
+        "",
+        "0.5",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "12",
+        "Topic 12: Priority Queues",
+        "CLO1CLO3",
+        "1.5",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "13",
+        "Topic 13: Project-Based Learning",
+        "CLO3 CLO4",
+        "1",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "14",
+        "Topic 14: Project-Based Learning",
+        "CLO3 CLO4",
+        "1",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "Total SLT for Course Content",
+        "68"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Lab-based coding assignments",
+        "40",
+        "2",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "2",
+        "Case study analysis",
+        "10",
+        "2",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "3",
+        "Project-Based Learning",
+        "25",
+        "2",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "12"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "40",
+        "2",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "6"
+      ],
+      [
+        "Total SLT for Assessment",
+        "18"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Written exam questions",
+      "mode": "individual",
+      "weightPercent": 30.0,
+      "sltHours": 2.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO6"
+      ],
+      "name": "Presentation",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 2.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Assignment, Presentation",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 2.0,
+      "capLevel": "A4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Write and execute code",
+      "mode": "individual",
+      "weightPercent": 40.0,
+      "sltHours": 2.0,
+      "capLevel": "P4"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Data Structure and Algorithms",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain core concepts of data structures and algorithms, and their role in problem-solving"
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Review of the C++ Programming Language",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO2: Apply C++ programming concepts, including structures, control statements, functions, recursion, classes, and objects effectively"
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Algorithms Analysis for DSA",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO3: Analyse algorithm efficiency using Big-O notation and compare time and space complexities effectively"
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Linear Data Structure – Array",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO4: Explain core concepts of array data structures and algorithms, and their role in problem-solving"
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Linked List – Single",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO5: Analyse the advantages of single-linked lists over arrays and implement them in solving programming problems"
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Linked List – Double",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO6: Develop programs using double-linked lists to manage dynamic data efficiently."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Stack",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "LLO7: Implement stack operations and apply them to solve computational and real-world problems."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Queue",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO8: Implement queue operations and apply them to solve computational and real-world problems."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Sorting Algorithm-bubble/insertion sort",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO9: Apply bubble and insertion sorting methods to solve computational problems involving ordered data"
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Sorting Algorithm-Heapsort/Shell sort",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO10: Analyse the performance of heapsort and shell sort in comparison with basic sorting algorithms."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Sorting Algorithm-Merge Sort/ Quicksort",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO11: Apply merge sort and quicksort algorithms to solve real-world problems requiring efficient data ordering"
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Priority Queues",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO12: Design programs using priority queues for effective task scheduling and data management"
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Project-Based Learning",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO13: Collaborate to implement a project demonstrating practical applications of linear data structures in computing"
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: Project-Based Learning",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "llosRaw": "LLO14: Collaborate to implement a project demonstrating practical applications of linear data structures in computing"
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 1: Introduction to Data Structure and Algorithms",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Direct Instruction",
+        "activeLearningRaw": "- Interactive Discussion,",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 2: Review of the C++ Programming Language",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- direct Instruction - Indirect Instruction",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 3: Algorithms Analysis for DSA",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Direct Instruction, Discussion",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 4: Linear Data Structure – Array",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Interactive Lectures",
+        "activeLearningRaw": "- independent study, research, and exploration",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 5: Linked List – Single",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Direct Instruction, Demonstration",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 6: Linked List – Double",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Instruction, Demonstration",
+        "activeLearningRaw": "- independent study, research, and exploration",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 7: Stack",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Direct Instruction, Demonstration",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 8: Queue",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Direct Instruction, Demonstration",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 9: Sorting Algorithm-bubble/insertion sort",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Interactive Lectures",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 10: Sorting Algorithm-Heapsort/Shell sort",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Interactive Lectures",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 11: Sorting Algorithm-Merge Sort/ Quicksort",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Interactive Lectures",
+        "activeLearningRaw": "- independent study, research, and exploration",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 12: Priority Queues",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Project-Based Teaching",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "5",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 13: Project-Based Learning",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Project-Based Teaching",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "1/0/3/0",
+        "lectureTopic": "Topic 14: Project-Based Learning",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "- Project-Based Teaching",
+        "activeLearningRaw": "- Collaborative Learning",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Lecture slides, Textbook, VS, IDE"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "",
+        "lectureTopic": "Review",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 16,
+        "hoursRaw": "",
+        "lectureTopic": "Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "40",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Lecture slides, Textbook, VS, IDE",
+    "references": {
+      "required": [
+        {
+          "title": "Data Structures and Algorithm Analysis in C++ 4th Edition",
+          "authors": "Mark Allen Weiss",
+          "publisher": "Pearson",
+          "year": "2014",
+          "isbnOrUrl": "978-0-13-284737-7"
+        },
+        {
+          "title": "Data Structures and Algorithms in C++, 2nd Edition,",
+          "authors": "Michael T.Goodrich, Roberto, Tamassia, David Mount",
+          "publisher": "John Wiley & Sons, Inc.",
+          "year": "2011",
+          "isbnOrUrl": "13 978-0-470-38327-8"
+        }
+      ],
+      "recommended": []
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

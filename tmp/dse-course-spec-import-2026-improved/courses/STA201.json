@@ -1,0 +1,903 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "STA201_Statistics II.docx",
+    "relativePath": "Year 2/S1/STA201_Statistics II.docx",
+    "sha256": "ede910c1c35cc6205ef30b969fadae7855495c127732c71b53fa349fe7df5bf0",
+    "yearFolder": 2,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "STA201",
+    "title": "Statistics II",
+    "credits": {
+      "total": null
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 1,
+      "year": 2
+    },
+    "description": "This course focuses on applying statistical methods in research and decision-making in data science and engineering. This course covers inferential statistics and multivariate analysis, equipping students with the skills to analyse complex datasets. Students will explore topics such as probability, hypothesis testing, regression analysis, and multivariate analysis. Emphasis is placed on practical applications, using statistical software to conduct data analysis and interpret results."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Nim Bunthoeun",
+      "qualification": "PhD",
+      "email": "nim.bunthoeun@rupp.edu.kh",
+      "phone": "071 634 5897"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Explain key concepts of hypothesis testing, p-value, and confidence interval in inferential statistics.",
+      "mappedPlos": [],
+      "level": null,
+      "status": "active",
+      "teachingMethodsRaw": "Short lectures, hands-on software practice, Demo, guided lab",
+      "assessmentMethodsRaw": "Attendance, Class participation, Practical test, Lab report, midterm"
+    },
+    {
+      "code": "CLO2",
+      "description": "Apply the normality test to evaluate the quality of data by using statistical software.",
+      "mappedPlos": [],
+      "level": null,
+      "status": "active",
+      "teachingMethodsRaw": "Short lectures, hands-on software practice, Demo, guided lab",
+      "assessmentMethodsRaw": "Attendance, Class participation, Quiz, Practical test, Lab report, midterm"
+    },
+    {
+      "code": "CLO3",
+      "description": "Conduct hypothesis tests using appropriate statistical methods using statistical software.",
+      "mappedPlos": [],
+      "level": null,
+      "status": "active",
+      "teachingMethodsRaw": "Short lecture, hands-on software practice, Demo, guided lab, Problem-based learning",
+      "assessmentMethodsRaw": "Attendance, Class participation, Practical test, Assignment, Lab report, Final"
+    },
+    {
+      "code": "CLO4",
+      "description": "Conduct regression analysis using statistical software.",
+      "mappedPlos": [],
+      "level": null,
+      "status": "active",
+      "teachingMethodsRaw": "Short lecture, hands-on software practice, Demo, guided lab, Problem-based learning",
+      "assessmentMethodsRaw": "Attendance, Class participation, Practical test, Homework, Lab report, Final"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Hypothesis Testing and p-Value Lab 1: SPSS (Insert, manage, edit, and describe data)",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "2",
+        "Topic 2: Confidence Interval and Test of Normality of Data Lab 2: SPSS (Check normality of data)",
+        "CLO1, CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "3",
+        "Topic 3: Dependent and Independent Samples Topic 3: Parametric and Non-parametric Tests Lab 3: SPSS (Data coding, creating variables by computing, and plotting the data)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "4",
+        "Topic 4: One-Sample t-Test Lab 4: SPSS (One-sample t-Test)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "5",
+        "Topic 5: Paired sample t-Test Lab 5: SPSS (Paired Sample t-Test)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "6",
+        "Topic 6: Independent sample t-Test Lab 6: SPSS (Independent Sample t-Test)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "7",
+        "Topic 7: One-way ANOVA Lab 7: SPSS (One-way ANOVA)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "8",
+        "Topic 8: One-way ANOVA with Repeated Measurement Lab 8: SPSS (One-way ANOVA with repeated Measurement)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "9",
+        "Topic 9: Two-way ANOVA Lab 9: SPSS (Two-way ANOVA)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "10",
+        "Topic 10: Two-way ANOVA with Repeated Measurement Lab 10: SPSS (Two-way ANOVA with Repeated Measurement)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "11",
+        "Topic 11: Linear regression correlation of bivariate data Lab 11: SPSS (Correlation and regression)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "12",
+        "Topic 12: Multiple regression analysis Lab 12: SPSS (Multiple regression)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "13",
+        "Topic 13: Wilcoxon and Mann-Whitney U test Lab 13: SPSS (Wilcoxon and Mann-Whitney U Test)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "14",
+        "Topic 14: Kruskal-Wallis test Lab 14: SPSS (Non-parametric test: Kruskal-Wallis test)",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Attendance/Class participation",
+        "10",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "2",
+        "Quiz/Homework/Assignment",
+        "20",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "3",
+        "Practical test/Lab report",
+        "20",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "4",
+        "Midterm exam",
+        "20",
+        "2",
+        "",
+        "8",
+        "10"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "30"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final exam",
+        "30",
+        "2",
+        "",
+        "8",
+        "10"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "10"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Attendance/Class participation",
+      "mode": "individual",
+      "weightPercent": 2.0,
+      "capLevel": "C2"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Practical test/Lab report",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C2"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Midterm exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C2"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Attendance/Class participation",
+      "mode": "individual",
+      "weightPercent": 2.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Quiz/Lab report",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Midterm exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 6.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Attendance/Class participation",
+      "mode": "individual",
+      "weightPercent": 4.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Practical test/Lab report/Assignment",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 12.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Final exam",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 6.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Attendance/Class participation",
+      "mode": "individual",
+      "weightPercent": 2.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Practical test/Lab report/Homework",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C4"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Final exam",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 4.0,
+      "capLevel": "C4"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Hypothesis Testing and p-Value Lab 1: SPSS (Insert, manage, edit, and describe data)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Apply hypothesis testing and p-value to interpret the data in the research process."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Confidence Interval and Test of Normality of Data Lab 2: SPSS (Check normality of data)",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "Apply confidence interval and normality testing to double-check the statistical data in the research process."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Dependent and Independent Samples Topic 3: Parametric and Non-parametric Tests Lab 3: SPSS (Data coding, creating variables by computing, and plotting the data)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Distinguish between dependent and independent samples for statistical data analysis. Distinguish between parametric and non-parametric tests for statistical data analysis."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: One-Sample t-Test Lab 4: SPSS (One-sample t-Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a parametric test comparison of one independent group with a specified value by a one-sample t-test and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Paired sample t-Test Lab 5: SPSS (Paired Sample t-Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a parametric test comparison between two dependent groups by a paired sample t-test and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Independent sample t-Test Lab 6: SPSS (Independent Sample t-Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a parametric test comparison between two independent groups by an independent sample t-test and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: One-way ANOVA Lab 7: SPSS (One-way ANOVA)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a parametric test comparison of three or more independent groups by the One-way ANOVA and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: One-way ANOVA with Repeated Measurement Lab 8: SPSS (One-way ANOVA with repeated Measurement)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a parametric test comparison of three or more dependent groups by the One-way ANOVA with repeated measurements and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Two-way ANOVA Lab 9: SPSS (Two-way ANOVA)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a parametric test comparison of three or more independent groups by the Two-way ANOVA and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Two-way ANOVA with Repeated Measurement Lab 10: SPSS (Two-way ANOVA with Repeated Measurement)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a parametric test comparison of three or more dependent groups by the Two-way ANOVA with repeated measurements and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Linear regression correlation of bivariate data Lab 11: SPSS (Correlation and regression)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Conduct a correlation relationship and regression line modelling between two variables by using the statistical software SPSS."
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Multiple regression analysis Lab 12: SPSS (Multiple regression)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "Conduct a multiple regression analysis between three or more variables by using the statistical software SPSS."
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Wilcoxon and Mann-Whitney U test Lab 13: SPSS (Wilcoxon and Mann-Whitney U Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a non-parametric test comparison between two groups by the Wilcoxon and Mann-Whitney U test and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: Kruskal-Wallis test Lab 14: SPSS (Non-parametric test: Kruskal-Wallis test)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "Conduct a non-parametric test comparison of three or more dependent groups by the Kruskal-Wallis test and interpret the results using statistical software SPSS."
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 1: Hypothesis Testing and p-Value Lab 1: SPSS (Insert, manage, edit, and describe data)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Concept discussion (group) Practice exercise Hands-on software practice",
+        "assessmentRaw": "2",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 2: Confidence Interval and Test of Normality of Data Lab 2: SPSS (Check normality of data)",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Concept discussion (group) Practice exercise Hands-on software practice",
+        "assessmentRaw": "3",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 3: Dependent and Independent Samples Topic 3: Parametric and Non-parametric Tests Lab 3: SPSS (Data coding, creating variables by computing, and plotting the data)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Concept discussion (group) Practice exercise Hands-on software practice",
+        "assessmentRaw": "3",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 4: One-Sample t-Test Lab 4: SPSS (One-sample t-Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "3",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 5: Paired sample t-Test Lab 5: SPSS (Paired Sample t-Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "3",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 6: Independent sample t-Test Lab 6: SPSS (Independent Sample t-Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Midterm Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 8,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 7: One-way ANOVA Lab 7: SPSS (One-way ANOVA)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 8: One-way ANOVA with Repeated Measurement Lab 8: SPSS (One-way ANOVA with repeated Measurement)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 9: Two-way ANOVA Lab 9: SPSS (Two-way ANOVA)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 10: Two-way ANOVA with Repeated Measurement Lab 10: SPSS (Two-way ANOVA with Repeated Measurement)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 11: Linear regression correlation of bivariate data Lab 11: SPSS (Correlation and regression)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 12: Multiple regression analysis Lab 12: SPSS (Multiple regression)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 13: Wilcoxon and Mann-Whitney U test Lab 13: SPSS (Wilcoxon and Mann-Whitney U Test)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "1/0/2/0",
+        "lectureTopic": "Topic 14: Kruskal-Wallis test Lab 14: SPSS (Non-parametric test: Kruskal-Wallis test)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Short lecture Hands-on software practice Demo/Guided lab",
+        "activeLearningRaw": "Practice exercise Hands-on software practice",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lecture slides Textbook SPSS software Website Online tutorial video"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "2/0/0/0",
+        "lectureTopic": "Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "30",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Lecture slides Textbook SPSS software Website; Lecture slides Textbook SPSS software Website Online tutorial video",
+    "references": {
+      "required": [
+        {
+          "title": "“Introduction to Statistics and Data Analysis,” 5th edition",
+          "authors": "Roxy Peck, Chris Olsen, Jay L. Devore",
+          "publisher": "Cengage Learning",
+          "year": "2016",
+          "isbnOrUrl": "978-1-305-11534-7"
+        },
+        {
+          "title": "“IBM SPSS Statistics 26 Step by Step: A Simple Guide and Reference” 16th edition",
+          "authors": "Darren George, Paul Mallery",
+          "publisher": "Taylor & Francis",
+          "year": "2020",
+          "isbnOrUrl": "978-1-138-49104-5 (hbk) 978-1-138-49107-6 (pbk) 978-1-351-03390-9 (ebk)"
+        }
+      ],
+      "recommended": []
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code is missing in DOCX table; canonical JSON uses filename code STA201 and requires review"
+    ],
+    "errors": []
+  }
+}

@@ -1,0 +1,868 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "DSC102_Data_Science_for_Climate_Change_&_Sustainable_Development.docx",
+    "relativePath": "Year 1/S2/DSC102_Data_Science_for_Climate_Change_&_Sustainable_Development.docx",
+    "sha256": "dbb5cf1ecabd3b422338060e2f4fa42d0eadd56f627e1e70446b07f6aa7e4d54",
+    "yearFolder": 1,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "DSC102",
+    "title": "Data Science for Climate Change & Sustainable Development",
+    "credits": {
+      "total": 2.0
+    },
+    "prerequisites": "None",
+    "courseType": "MoeysHeip",
+    "availability": {
+      "semester": 2,
+      "year": 1
+    },
+    "description": "This course introduces Year 1 students to the fundamental concepts of climate change, sustainable development, and the basic use of data to understand environmental challenges. Students will explore global and Cambodian climate issues, Sustainable Development Goals (SDGs), climate mitigation and adaptation strategies, and international climate governance. A simplified introduction to data science applications is integrated throughout the course, including interpreting climate graphs, reading SDG indicators, and analyzing basic datasets using simple visual tools (no coding). Aligned with CQF and CDIO, the course emphasizes real-world relevance, responsible decision-making, data literacy, and reflective learning. The course culminates in a Mini Project where students analyze a climate or SDG dataset and propose a practical sustainability solution."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Mr. VUTH Sireyvathanak",
+      "qualification": "MSc",
+      "email": "vuth.sireyvathanak@rupp.edu.kh",
+      "phone": "012437621"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Explain key concepts of climate change and sustainable development.",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Interactive lecture, guided discussion, case study on climate & SDG frameworks",
+      "assessmentMethodsRaw": "SDG/Climate Case Study (group), part of Mini Project (conceptual justification)"
+    },
+    {
+      "code": "CLO2",
+      "description": "Interpret simple climate and sustainability data using visual or tabular formats.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Demonstration of climate graphs, guided data reading, hands-on table/graph interpretation",
+      "assessmentMethodsRaw": "Climate Data Interpretation Task, Mini Project data section"
+    },
+    {
+      "code": "CLO3",
+      "description": "Reflect on the role of individuals and communities in climate and sustainability actions.",
+      "mappedPlos": [
+        "PLO4",
+        "PLO5"
+      ],
+      "level": "A2",
+      "status": "active",
+      "teachingMethodsRaw": "Guided reflection, small-group sharing, community/climate action discussion",
+      "assessmentMethodsRaw": "Reflection Journal (weekly), reflective section in Mini Project"
+    },
+    {
+      "code": "CLO4",
+      "description": "Demonstrate responsible behaviors that support climate action and sustainable development.",
+      "mappedPlos": [
+        "PLO4",
+        "PLO7"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Role play, scenario-based discussion, values clarification on climate ethics",
+      "assessmentMethodsRaw": "Mini Project (behavior/solution rubric), participation in class activities"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Climate Change & Environmental Data",
+        "CLO1CLO3",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "2",
+        "Topic 2: Climate Science Basics (IPCC Foundations)",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "3",
+        "Topic 3: Global & Regional Impacts of Climate Change",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "4",
+        "Topic 4: Climate Change in Cambodia & ASEAN",
+        "CLO1CLO3",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "5",
+        "Topic 5: Sustainable Development & SDGs",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "6",
+        "Topic 6: SDG 13: Climate Action",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "7",
+        "Topic 7: Mitigation Strategies",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "8",
+        "Topic 8: Adaptation Strategies",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "9",
+        "Topic 9: Climate Policy & Governance",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "10",
+        "Topic 10: Climate Change & Socioeconomic Systems",
+        "CLO1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "11",
+        "Topic 11: Climate Vulnerability & Risk Assessment",
+        "CLO1CLO2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "12",
+        "Topic 12: Introduction to Climate Data (Graphs, Indicators)",
+        "CLO2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "13",
+        "Topic 13: Data for Sustainable Development (SDG Metrics)",
+        "CLO2",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "14",
+        "Topic 14: Climate Solutions & Youth Engagement (Mini Project Prep)",
+        "CLO3CLO4",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "Total SLT for Course Content",
+        "56"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Reflection Journal (weekly, collected mid & end)",
+        "20",
+        "2",
+        "",
+        "8",
+        "10"
+      ],
+      [
+        "2",
+        "Climate Data Interpretation Task",
+        "20",
+        "2",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "3",
+        "SDG/Climate Case Study (Group)",
+        "25",
+        "2",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "22"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Mini Project (Report + Presentation)",
+        "35",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "8"
+      ],
+      [
+        "Total SLT for Assessment",
+        "30"
+      ],
+      [
+        "Grand Total SLT",
+        "80"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "SDG/Climate Case Study (Group)",
+      "mode": "individual",
+      "weightPercent": 25.0,
+      "sltHours": 6.0,
+      "capLevel": "C2"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Climate Data Interpretation Task",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 6.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO4"
+      ],
+      "name": "Reflection Journal (weekly, collected mid & end)",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 10.0,
+      "capLevel": "A2"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Mini Project (Report + Presentation)",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 8.0,
+      "capLevel": "A3"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Climate Change & Environmental Data",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "Explain the distinction between weather and climate using scientific definitions. Describe the fundamental drivers of climate change supported by scientific evidence. Interpret basic environmental datasets (e.g., global CO₂ trend graph). Reflect on the relevance of climate change to personal and community well-being."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Climate Science Basics (IPCC Foundations)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain the greenhouse effect using appropriate scientific terminology. Differentiate between natural and anthropogenic sources of greenhouse gases. Analyze temperature anomaly charts to identify long-term climate trends. Describe how scientific consensus on climate change is established."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Global & Regional Impacts of Climate Change",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Describe major global impacts of climate change on ecosystems and human systems. Explain the regional variations in climate impacts across continents. Analyze case studies that illustrate climate-induced disasters. Interpret maps or datasets showing regional climate vulnerability."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Climate Change in Cambodia & ASEAN",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "llosRaw": "Explain Cambodia’s key climate risks based on national climate reports. Interpret regional climate indicators for ASEAN member states. Analyze the socioeconomic consequences of climate impacts in Cambodia. Reflect on how climate change affects communities and livelihoods locally."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Sustainable Development & SDGs",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain the three pillars of sustainable development using real-world examples. Describe the structure and intent of the UN Sustainable Development Goals. Analyze interactions between SDG 13 (Climate Action) and other SDGs. Interpret SDG indicator dashboards to evaluate sustainability progress."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: SDG 13: Climate Action",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain the objectives and targets of SDG 13 in the context of global climate action. Interpret national climate commitments such as NDCs using provided datasets. Analyze Cambodia’s climate action strategies using policy documents. Describe the role of institutions and governments in implementing climate action."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Mitigation Strategies",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain the scientific basis of climate mitigation in reducing greenhouse gas emissions. Differentiate key mitigation strategies across energy, transport, and agriculture sectors. Analyze emissions datasets to compare mitigation potential across sectors. Evaluate the feasibility of specific mitigation actions in developing countries."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Adaptation Strategies",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Describe major adaptation strategies used to build climate resilience. Explain the difference between reactive and proactive adaptation. Analyze adaptation case studies in Southeast Asia. Interpret vulnerability and exposure indicators used in adaptation planning."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Climate Policy & Governance",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain the purpose and mechanisms of the UNFCCC and Paris Agreement. Describe how international climate negotiations influence national policy. Interpret policy progress dashboards or climate finance charts. Analyze Cambodia’s commitments based on available climate policy documents."
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Climate Change & Socioeconomic Systems",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "Explain how climate change affects health, livelihoods, and socioeconomic stability. Analyze links between climate change and poverty, migration, and food security. Interpret socioeconomic datasets illustrating climate–development interactions. Evaluate potential co-benefits of sustainability interventions."
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Climate Vulnerability & Risk Assessment",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "Explain the components of climate vulnerability (exposure, sensitivity, adaptive capacity). Interpret vulnerability assessment matrices and risk maps. Analyze climate risk scenarios using simple datasets. Evaluate factors that increase or reduce climate risk in a given context."
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Introduction to Climate Data (Graphs, Indicators)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Identify key types of climate datasets (CO₂, temperature, precipitation). Interpret common climate graphs (line, bar, anomaly charts). Analyze climate indicators from open-data platforms (UN, IPCC, NASA). Evaluate the reliability and limitations of basic climate data."
+      },
+      {
+        "number": 13,
+        "title": "Topic 13: Data for Sustainable Development (SDG Metrics)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "Explain how SDG indicators are constructed and reported. Interpret SDG metric dashboards related to climate, energy, and environment. Analyze sustainability datasets to identify progress trends. Evaluate data-driven insights that inform sustainable development decisions."
+      },
+      {
+        "number": 14,
+        "title": "Topic 14: Climate Solutions & Youth Engagement (Mini Project Prep)",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "Explain the role of youth and innovation in advancing climate solutions. Analyze examples of community-led climate actions in Cambodia or ASEAN. Interpret data relevant to the chosen mini-project theme. Demonstrate responsible decision-making in the development of a climate solution for the project."
+      },
+      {
+        "number": 15,
+        "title": "",
+        "clos": [],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 1: Introduction to Climate Change & Environmental Data",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Interactive lecture; guided discussion",
+        "activeLearningRaw": "Guided listening; reflection",
+        "assessmentRaw": "Reflection Journal (ongoing – 20%)",
+        "resourcesRaw": "Slides; IPCC intro materials"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 2: Climate Science Basics (IPCC Foundations)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; concept illustration",
+        "activeLearningRaw": "Note-taking; concept questioning",
+        "assessmentRaw": "Reflection Journal",
+        "resourcesRaw": "IPCC AR summaries"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 3: Global & Regional Impacts of Climate Change",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Case-based lecture; discussion",
+        "activeLearningRaw": "Case analysis; reflection",
+        "assessmentRaw": "Reflection Journal",
+        "resourcesRaw": "Case studies; datasets"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 4: Climate Change in Cambodia & ASEAN",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Lecture; regional case discussion",
+        "activeLearningRaw": "Contextual analysis",
+        "assessmentRaw": "Reflection Journal",
+        "resourcesRaw": "National reports"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 5: Sustainable Development & SDGs",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; SDG mapping activity",
+        "activeLearningRaw": "Concept mapping",
+        "assessmentRaw": "Reflection Journal",
+        "resourcesRaw": "UN SDG resources"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 6: SDG 13 – Climate Action",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; policy discussion",
+        "activeLearningRaw": "Guided analysis",
+        "assessmentRaw": "Reflection Journal",
+        "resourcesRaw": "NDC documents"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 7: Mitigation Strategies",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; problem-based learning",
+        "activeLearningRaw": "Scenario analysis",
+        "assessmentRaw": "SDG/Climate Case Study (25%)",
+        "resourcesRaw": "Emissions datasets"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 8: Adaptation Strategies",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; case discussion",
+        "activeLearningRaw": "Case interpretation",
+        "assessmentRaw": "SDG/Climate Case Study",
+        "resourcesRaw": "Adaptation reports"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 9: Climate Policy & Governance",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; policy analysis",
+        "activeLearningRaw": "Critical reading",
+        "assessmentRaw": "SDG/Climate Case Study",
+        "resourcesRaw": "UNFCCC materials"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 10: Climate Change & Socioeconomic Systems",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; discussion",
+        "activeLearningRaw": "Data-supported reasoning",
+        "assessmentRaw": "SDG/Climate Case Study",
+        "resourcesRaw": "Socioeconomic datasets"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 11: Climate Vulnerability & Risk Assessment",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture; data walkthrough",
+        "activeLearningRaw": "Risk analysis",
+        "assessmentRaw": "Climate Data Interpretation Task (20%)",
+        "resourcesRaw": "Risk maps; matrices"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 12: Introduction to Climate Data",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Data-focused lecture; demo",
+        "activeLearningRaw": "Graph interpretation",
+        "assessmentRaw": "Climate Data Interpretation Task",
+        "resourcesRaw": "UN / NASA data"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 13: Data for Sustainable Development (SDGs)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture; dashboard exploration",
+        "activeLearningRaw": "Data analysis",
+        "assessmentRaw": "Climate Data Interpretation Task",
+        "resourcesRaw": "SDG dashboards"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 14: Climate Solutions & Youth Engagement",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Lecture; project briefing",
+        "activeLearningRaw": "Project planning",
+        "assessmentRaw": "Mini Project (35%)",
+        "resourcesRaw": "Project guidelines"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Topic 15: Mini Project Presentation & Reflection",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Presentation; peer feedback",
+        "activeLearningRaw": "Presentation; reflection",
+        "assessmentRaw": "Mini Project",
+        "resourcesRaw": "Student projects"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "2/1/1",
+        "lectureTopic": "Course Review & Integration",
+        "clos": [
+          "CLO1",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Review session; synthesis",
+        "activeLearningRaw": "Self-evaluation",
+        "assessmentRaw": "Reflection Journal (final)",
+        "resourcesRaw": "All course materials"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Slides; IPCC intro materials; IPCC AR summaries; Case studies; datasets; National reports; UN SDG resources; NDC documents; Emissions datasets; Adaptation reports; UNFCCC materials; Socioeconomic datasets; Risk maps; matrices; UN / NASA data; SDG dashboards; Project guidelines; Student projects; All course materials",
+    "references": {
+      "required": [
+        {
+          "title": "Climate Change: The Physical Science Basis",
+          "authors": "Intergovernmental Panel on Climate Change (IPCC)",
+          "publisher": "Cambridge University Press",
+          "year": "2021",
+          "isbnOrUrl": "978-1-009-15789-6"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Introduction to Modern Climate Change",
+          "authors": "Andrew E. Dessler",
+          "publisher": "Cambridge University Press",
+          "year": "2022",
+          "isbnOrUrl": "978-1-108-74708-7"
+        },
+        {
+          "title": "Sustainable Development Goals: A Handbook",
+          "authors": "United Nations Development Programme (UNDP)",
+          "publisher": "United Nations Development Programme",
+          "year": "2018",
+          "isbnOrUrl": "not assigned"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "warning",
+    "warnings": [
+      "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+    ],
+    "errors": []
+  }
+}

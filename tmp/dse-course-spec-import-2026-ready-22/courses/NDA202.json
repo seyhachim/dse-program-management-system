@@ -1,0 +1,809 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "NDA202_NoSQL Databases.docx",
+    "relativePath": "Year 2/S2/NDA202_NoSQL Databases.docx",
+    "sha256": "6eecd02fe04dce34ff65452a23c1cf377ef42553bdaca92487ec1e5e8bed19c2",
+    "yearFolder": 2,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "NDA202",
+    "title": "NoSQL Database",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 2,
+      "year": 2
+    },
+    "description": null
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dr. Khim Chamroeun",
+      "qualification": "Ph.D",
+      "email": "Khim.chamroeun@rupp.edu.kh",
+      "phone": "+855 12 741 274"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Apply fundamental concepts of NoSQL databases to classify and differentiate Key-Value, Document, Column-Family, and Graph models for various application scenarios.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO2",
+      "description": "Demonstrate professional responsibility and ethical considerations when working with NoSQL solutions, emphasizing data integrity and collaborative practices.",
+      "mappedPlos": [
+        "PLO7"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Project Reports, Presentation, Write and execute code"
+    },
+    {
+      "code": "CLO3",
+      "description": "Explain steps to configure and execute basic NoSQL operations using tools such as MongoDB or Cassandra in a lab environment.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P2",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    },
+    {
+      "code": "CLO4",
+      "description": "Justify the choice of NoSQL database models for given case studies based on scalability, consistency, and performance requirements.",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture Based Learning, Project-based Learning, Lab-Based Learning",
+      "assessmentMethodsRaw": "Lab exercises, Write and execute code"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Introduction (Different Databases for Different Requirements)",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "2",
+        "Topic 1: Introduction (Variety of NoSQL Databases)",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "3",
+        "Topic 2: Key-Value Databases (Introduction to Key-Value Databases and Terminology)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "4",
+        "Topic 2: Key-Value Databases (Designing for Key-Value Databases)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "5",
+        "Topic 3: Document Databases (Introduction to Document Databases and Terminology)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "6",
+        "Topic 3: Document Databases (Designing for Document Databases)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "7",
+        "Topic 3: Document Databases (Designing for Document Databases)",
+        "CLO4",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "8",
+        "Topic 4: Column Family Databases (Introduction to Column Family Databases and Terminology)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "9",
+        "Topic 4: Column Family Databases (Designing for Column Family Databases)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "10",
+        "Topic 4: Column Family Databases (Designing for Column Family Databases)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "11",
+        "Topic 5: Graph Databases (Introduction to Graph Databases and Terminology)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "12",
+        "Topic 5: Graph Databases (Designing for Graph Databases)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "13",
+        "Topic 5: Graph Databases (Designing for Graph Databases)",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "14",
+        "Topic 6: Choosing a Database for Your Application",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "8"
+      ],
+      [
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Lab Assignment",
+        "30",
+        "8",
+        "",
+        "8",
+        "16"
+      ],
+      [
+        "2",
+        "Simi-presentation and report submission",
+        "35",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "24"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final presentation and report submission",
+        "35",
+        "4",
+        "",
+        "10",
+        "14"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "16"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 12.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 6.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Simi-presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 42.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 12.0,
+      "capLevel": "P2"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Lab Assignment",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 6.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO7"
+      ],
+      "name": "Final presentation and report submission",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 42.0,
+      "capLevel": "C3"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction (Different Databases for Different Requirements)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Describe differences between traditional RDBMS and NoSQL systems. LLO2: Explain why modern applications require alternative database models. LLO3: Identify the challenges in handling large‑scale, unstructured, and distributed data."
+      },
+      {
+        "number": 2,
+        "title": "Topic 1: Introduction (Variety of NoSQL Databases)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Classify NoSQL databases into Key‑Value, Document, Column‑Family, and Graph categories. LLO2: Compare strengths and limitations of each NoSQL model. LLO3: Interpret the CAP Theorem in the context of NoSQL systems."
+      },
+      {
+        "number": 3,
+        "title": "Topic 2: Key-Value Databases (Introduction to Key-Value Databases and Terminology)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain how Key‑Value databases store and retrieve data. LLO2: Define key terminologies such as bucket, item, partitioning, and TTL. LLO3: Identify real‑world systems and use cases suitable for Key‑Value stores."
+      },
+      {
+        "number": 4,
+        "title": "Topic 2: Key-Value Databases (Designing for Key-Value Databases)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Apply data modeling principles for Key‑Value structured workloads. LLO2: Illustrate how sharding and replication impact performance. LLO3: Evaluate when to choose a Key‑Value database for a given requirement."
+      },
+      {
+        "number": 5,
+        "title": "Topic 3: Document Databases (Introduction to Document Databases and Terminology)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain how Document databases store JSON/BSON structured data. LLO2: Describe document, collection, and indexing concepts. LLO3: Identify scenarios where Document models outperform relational models."
+      },
+      {
+        "number": 6,
+        "title": "Topic 3: Document Databases (Designing for Document Databases)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Differentiate between embedded and referenced document structures. LLO2: Apply indexing techniques to optimize document queries. LLO3: Justify document schema choices for specific application scenarios."
+      },
+      {
+        "number": 7,
+        "title": "Topic 3: Document Databases (Designing for Document Databases)",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Explain wide‑column storage concepts including column families and clustering. LLO2: Identify the differences between RDBMS tables and column‑family tables. LLO3: Describe use cases suited for column‑family systems such as time‑series and analytics."
+      },
+      {
+        "number": 8,
+        "title": "Topic 4: Column Family Databases (Introduction to Column Family Databases and Terminology)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Design primary key structures (partition + clustering keys) based on query needs. LLO2: Examine how consistency levels affect data integrity and availability. LLO3: Evaluate column‑family models for large‑scale distributed applications."
+      },
+      {
+        "number": 9,
+        "title": "Topic 4: Column Family Databases (Designing for Column Family Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Describe graph components such as nodes, edges, relationships, and properties. LLO2: Explain different graph models including property graph and RDF. LLO3: Identify applications where graph databases provide superior insights."
+      },
+      {
+        "number": 10,
+        "title": "Topic 4: Column Family Databases (Designing for Column Family Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Construct graph models based on entities and relationships. LLO2: Analyze traversal patterns and path queries for complex relationships. LLO3: Justify the use of graph databases for social, recommendation, or fraud‑detection scenarios."
+      },
+      {
+        "number": 11,
+        "title": "Topic 5: Graph Databases (Introduction to Graph Databases and Terminology)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Identify risks related to privacy, fairness, and bias when handling NoSQL data. LLO2: Explain professional responsibilities in maintaining data integrity. LLO3: Demonstrate appropriate collaborative practices during database design and testing."
+      },
+      {
+        "number": 12,
+        "title": "Topic 5: Graph Databases (Designing for Graph Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Compare NoSQL models based on scalability, consistency, and performance. LLO2: Evaluate trade‑offs in selecting a database for specific application needs. LLO3: Recommend an appropriate NoSQL model for a case study with justification."
+      },
+      {
+        "number": 13,
+        "title": "Topic 5: Graph Databases (Designing for Graph Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Configure a basic NoSQL environment for data storage and queries. LLO2: Execute CRUD operations and indexing using NoSQL command tools. LLO3: Document procedures and reflect on operational best practices."
+      },
+      {
+        "number": 14,
+        "title": "Topic 6: Choosing a Database for Your Application",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Summarize key differences across all NoSQL models studied. LLO2: Integrate ethical, design, and operational concepts into a unified understanding. LLO3: Present a justified NoSQL solution for a real‑world problem based on learned principles."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 1: Introduction (Different Databases for Different Requirements)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture with slides explaining evolution of databases; instructor‑led discussion. LLO2: Concept demonstration comparing RDBMS vs NoSQL examples. LLO3: Guided questioning and scenario‑based explanation of modern data challenges.",
+        "activeLearningRaw": "LLO1: Students take notes and summarize differences in class. LLO2: Students observe demonstrations and answer short reflective questions. LLO3: Students participate in discussion and share real-world examples.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 29"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 1: Introduction (Variety of NoSQL Databases)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "LLO1: Interactive lecture introducing NoSQL categories. LLO2: Instructor‑led comparison activity using sample datasets. LLO3: Visual explanation of CAP theorem using whiteboard diagrams.",
+        "activeLearningRaw": "LLO1: Students classify databases in small group activity. LLO2: Students compare strengths/weaknesses in worksheet tasks. LLO3: Students solve CAP theorem mini-scenarios.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 53"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 2: Key-Value Databases (Introduction to Key-Value Databases and Terminology)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture explaining Key‑Value data structure. LLO2: Vocabulary mini‑lecture defining KV terminology. LLO3: Instructor shows real examples (Redis, DynamoDB) via slide demos.",
+        "activeLearningRaw": "LLO1: Students outline KV storage workflow. LLO2: Students complete terminology matching exercise. LLO3: Students identify use cases in guided pair discussion.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 82"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 2: Key-Value Databases (Designing for Key-Value Databases)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Case‑based lecture on modeling KV workloads. LLO2: Instructor demonstration of sharding & replication. LLO3: Problem‑solving activity on selecting KV systems.",
+        "activeLearningRaw": "LLO1: Students model sample KV datasets. LLO2: Students analyze replication impact using guided questions. LLO3: Students justify database choice for mini-scenarios.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 127"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 3: Document Databases (Introduction to Document Databases and Terminology)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture on Document databases with JSON examples. LLO2: Instructor demonstration of collections, documents, indexing. LLO3: Case examples showing Document DB advantages.",
+        "activeLearningRaw": "LLO1: Students annotate JSON document structures. LLO2: Students answer conceptual questions on collections/indexes. LLO3: Students identify suitable scenarios in group discussion.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 153"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 3: Document Databases (Designing for Document Databases)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture on embedding vs referencing with diagrams. LLO2: Demonstration of indexing strategies using sample queries. LLO3: Case study discussion on schema choice.",
+        "activeLearningRaw": "LLO1: Students design small schemas using embed/reference. LLO2: Students review indexing examples and answer practice tasks. LLO3: Students justify design choices in groups.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 196"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 3: Document Databases (Designing for Document Databases)",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture introducing wide‑column concepts. LLO2: Explanation of column-family terminology with visuals. LLO3: Use‑case demonstration using time-series examples.",
+        "activeLearningRaw": "LLO1: Students summarize concepts in a diagram. LLO2: Students complete terminology exercises. LLO3: Students analyze time-series data example.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 196"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 4: Column Family Databases (Introduction to Column Family Databases and Terminology)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Instructor‑led schema design for partition/clustering keys. LLO2: Mini‑lecture on consistency levels in distributed systems. LLO3: Case study on large-scale applications.",
+        "activeLearningRaw": "LLO1: Students design keys for sample queries. LLO2: Students evaluate consistency trade‑offs in worksheets. LLO3: Students evaluate column-family choice for real scenarios.",
+        "assessmentRaw": "",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 4: Column Family Databases (Designing for Column Family Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture introducing graph theory elements. LLO2: Instructor explanation of graph data models. LLO3: Demonstration of graph-based use cases.",
+        "activeLearningRaw": "LLO1: Students label nodes/edges for a sample graph. LLO2: Students compare graph model types. LLO3: Students identify graph-suitable applications.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 223"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 4: Column Family Databases (Designing for Column Family Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Diagram‑based teaching on graph modeling. LLO2: Path traversal demonstration using example queries. LLO3: Case study comparing graph vs non‑graph solutions.",
+        "activeLearningRaw": "LLO1: Students construct graph models on worksheets. LLO2: Students analyze traversal patterns in exercises. LLO3: Students justify graph usage in case studies.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 261"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 5: Graph Databases (Introduction to Graph Databases and Terminology)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Lecture on data ethics, privacy, and fairness in NoSQL. LLO2: Instructor-led discussion on integrity and responsibility. LLO3: Collaborative group practice on ethical decision-making.",
+        "activeLearningRaw": "LLO1: Students identify ethical risks in given scenarios. LLO2: Students reflect on responsibilities in written activity. LLO3: Students participate in group ethical analysis tasks.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 261"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 5: Graph Databases (Designing for Graph Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Instructor-guided comparison of NoSQL models. LLO2: Lecture on trade‑off evaluation for database strategies. LLO3: Case study selection exercise with student presentations.",
+        "activeLearningRaw": "LLO1: Students compare models in matrix activity. LLO2: Students analyze trade offs in small groups. LLO3: Students recommend a model and justify choices.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 286"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 5: Graph Databases (Designing for Graph Databases)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "LLO1: Live demonstration of NoSQL setup (MongoDB/Cassandra). LLO2: Instructor-guided CRUD and indexing operations. LLO3: Hands‑on troubleshooting walk-through.",
+        "activeLearningRaw": "LLO1: Students configure their own NoSQL environment. LLO2: Students execute CRUD operations based on instructions. LLO3: Students document their workflow and reflect on errors.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 313"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 6: Choosing a Database for Your Application",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "LLO1: Course recap lecture using summary diagrams. LLO2: Integrated review exercise covering all CLOs. LLO3: Student mini-presentations on NoSQL solutions.",
+        "activeLearningRaw": "LLO1: Students summarize key points in a written outline. LLO2: Students integrate concepts to answer review tasks. LLO3: Students present and defend their NoSQL recommendations.",
+        "assessmentRaw": "",
+        "resourcesRaw": "Slides, textbook P 313"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Slides, textbook P 29; Slides, textbook P 53; Slides, textbook P 82; Slides, textbook P 127; Slides, textbook P 153; Slides, textbook P 196; Slides, textbook P 223; Slides, textbook P 261; Slides, textbook P 286; Slides, textbook P 313",
+    "references": {
+      "required": [
+        {
+          "title": "NoSQL for Mere Mortals",
+          "authors": "Dan Sullivan",
+          "publisher": "Pearson Education, Inc",
+          "year": "2015",
+          "isbnOrUrl": "978-0-13-402321-2"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "NoSQL Distilled 2013",
+          "authors": "Pramod J. Sadalage Martin Fowler",
+          "publisher": "Pearson Education, Inc",
+          "year": "2013",
+          "isbnOrUrl": "978-0-321-82662-6"
+        },
+        {
+          "title": "Seven Databases in Seven Weeks",
+          "authors": "Eric Redmond Jim R. Wilson",
+          "publisher": "Pragmatic Programmers, LLC.",
+          "year": "2012",
+          "isbnOrUrl": "978-1-93435-692-0"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

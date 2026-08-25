@@ -1,0 +1,904 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "MAT101_Math I-Calculus.docx",
+    "relativePath": "Year 1/S1/MAT101_Math I-Calculus.docx",
+    "sha256": "62352ef04f9fe8ae07a70b9cf5df884908d8de6addfcc25780ed25c2c6cf7b79",
+    "yearFolder": 1,
+    "semesterFolder": 1
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "MAT101",
+    "title": "Math I-Calculus",
+    "credits": {
+      "total": 4.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 1,
+      "year": 1
+    },
+    "description": "Calculus is a fundamental course for understanding concepts in data science, engineering, economics, computer science, and related fields. The course aims to develop a strong conceptual grasp of calculus and apply its principles to solve real-world problems, particularly in engineering and data science contexts. It equips students with essential calculus tools for modeling and analyzing engineering problems and deriving appropriate solutions. This introductory course covers functions, differentiation, and integration of single-variable functions along with their practical applications. Teaching and learning will follow a flipped-classroom and active learning approach to enhance engagement and problem-solving skills."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dr. Sotheara Veng",
+      "qualification": "PhD",
+      "email": "veng.sotheara89@rupp.edu.kh",
+      "phone": "+(855) 89788948"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Apply mathematical concepts of functions, derivatives, and optimization techniques to solve engineering and data science problems",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Flipped classroom Guided exercises Feedbacks",
+      "assessmentMethodsRaw": "Quizzes (FA), Assignment, Midterm exam"
+    },
+    {
+      "code": "CLO2",
+      "description": "Utilize definite integration to model, interpret, and evaluate engineering phenomena such as area, volume, accumulated quantities and probabilities",
+      "mappedPlos": [
+        "PLO10"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Flipped classroom Guided exercises Feedbacks",
+      "assessmentMethodsRaw": "Quizzes (FA), Assignment, Final exam"
+    },
+    {
+      "code": "CLO3",
+      "description": "Demonstrate effective communication of mathematical reasoning, solutions, and interpretations in engineering and data science contexts through oral and written presentations",
+      "mappedPlos": [
+        "PLO8"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning Group work",
+      "assessmentMethodsRaw": "Project Reports, Project Presentations, Peer evaluation (FA)"
+    },
+    {
+      "code": "CLO4",
+      "description": "Use mathematical software such as Mathematica, or GeoGebra under guidance to visualize, simulate, and interpret calculus-based models in engineering applications",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning Group work",
+      "assessmentMethodsRaw": "Project Reports, Project Presentations, Peer evaluation (FA)"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Topic 1: Function and models: Four ways to represent a function Mathematical models: A catalogue of essential",
+        "CLO1 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "2",
+        "Topic 2: Applications of mathematical models",
+        "CLO1 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "3",
+        "Topic 3: Limit and derivatives The tangent and velocity problems",
+        "CLO1 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "4",
+        "Topic 4: Derivatives and rates of changes",
+        "CLO1 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "5",
+        "Topic 5: Differentiation rule The chain rule Implicit differentiation",
+        "CLO1 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "6",
+        "Topic 6: Application of differentiation Maximum and minimum values Optimization problems",
+        "CLO1 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "7",
+        "Topic 7: Integral Areas and distances The definite integral",
+        "CLO2 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "8",
+        "Topic 8: Fundamental Theorem of Calculus The fundamental theorem of calculus The Indefinite integral",
+        "CLO2 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "9",
+        "Topic 9: Area Between Curves Area between curves Volumes",
+        "CLO2 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "10",
+        "Topic 10: Average Value and Probability",
+        "CLO2 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "11",
+        "Topic 11: Numerical Integration",
+        "CLO2 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "12",
+        "Topic 12: Application of integral to engineering",
+        "CLO2 CLO3 CLO4",
+        "2",
+        "1",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "Total SLT for Course Content",
+        "120"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Assignments (2)",
+        "20",
+        "",
+        "",
+        "8",
+        "8"
+      ],
+      [
+        "2",
+        "Project reports (2)",
+        "10",
+        "",
+        "",
+        "4",
+        "4"
+      ],
+      [
+        "3",
+        "Project presentations (2)",
+        "30",
+        "8",
+        "",
+        "4",
+        "12"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "24"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Midterm exam",
+        "20",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "2",
+        "Final exam",
+        "20",
+        "2",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "16"
+      ],
+      [
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "160"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Quizzes (6, FA)",
+      "mode": "individual",
+      "weightPercent": 0.0,
+      "sltHours": 0.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Assignment 1",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Midterm exam",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 8.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Quizzes (6, FA)",
+      "mode": "individual",
+      "weightPercent": 0.0,
+      "sltHours": 0.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Assignment 2",
+      "mode": "individual",
+      "weightPercent": 10.0,
+      "sltHours": 4.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 8.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Project Reports",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Project Presentations",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 6.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO8"
+      ],
+      "name": "Peer evaluation",
+      "mode": "individual",
+      "weightPercent": 0.0,
+      "sltHours": 0.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Project Reports",
+      "mode": "individual",
+      "weightPercent": 5.0,
+      "sltHours": 2.0,
+      "capLevel": "P3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Project Presentations",
+      "mode": "individual",
+      "weightPercent": 15.0,
+      "sltHours": 6.0,
+      "capLevel": "P3"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Peer evaluation",
+      "mode": "individual",
+      "weightPercent": 0.0,
+      "sltHours": 0.0,
+      "capLevel": "P3"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Function and models: Four ways to represent a function Mathematical models: A catalogue of essential",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "-LLO1: Describe functions in four different ways -LLO2: Apply functions to solve basic problems"
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Applications of mathematical models",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "-LLO1: Identify essential mathematical models -LLO2: Choose simple mathematical models for real-world problems - LLO3: Use GeoGebra solve to fit function with real data under guidance"
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Limit and derivatives The tangent and velocity problems",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Explain the concepts of limits and derivatives - LLO2: Solve problems involving tangent and velocity"
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: Derivatives and rates of changes",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Explain derivatives as functions - LLO2: Apply derivatives to solve rate of change problems"
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Differentiation rule The chain rule Implicit differentiation",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Apply the chain rule and implicit differentiation - LLO2: Solve complex differentiation problems using chain rule"
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: Application of differentiation Maximum and minimum values Optimization problems",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Apply differentiation to find maximum and minimum values - LLO2: Solve optimization problems using differentiation"
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Integral Areas and distances The definite integral",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Apply the concepts of areas and distances to define definite integral - LLO2: Calculate definite integrals"
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Fundamental Theorem of Calculus The fundamental theorem of calculus The Indefinite integral",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Apply the fundamental theorem of calculus to compute definite integrals - LLO1: Solve problems involving indefinite integrals"
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Area Between Curves Area between curves Volumes",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Calculate the area between curves - LLO2: Apply the concept of volumes"
+      },
+      {
+        "number": 10,
+        "title": "Topic 10: Average value and probability",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Apply integrals to compute the average of a function - LLO2: Find probability of an event using integral of density functions"
+      },
+      {
+        "number": 11,
+        "title": "Topic 11: Numerical integration",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Compute integral using appropriate numerical methods - LLO2: Apply integrals to solve real-world problems"
+      },
+      {
+        "number": 12,
+        "title": "Topic 12: Applications of integral to engineering",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "- LLO1: Apply integrals to solve engineering-related problems - LLO2: Interpret real world problems as integral related problems"
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 1: Function and models: Four ways to represent a function Mathematical models: A catalogue of essential",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Course orientation, Lecture, Discussion, Guided exercises",
+        "activeLearningRaw": "Note-taking, Discuss in small groups, Watch the recorded lecture video later to recap the concept,",
+        "assessmentRaw": "Quiz 1(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 1.1, 1.2) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 2: Applications of mathematical models",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Demonstrate function using GeoGebra",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture sides in advance, Note-taking, Discuss in small groups, Test GeoGebra simulation",
+        "assessmentRaw": "Quiz 2(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 1.4, 1.5) -Lecture slides - Recorded lecture video -GeoGebra simulation"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 3: Limit and derivatives The tangent and velocity problems",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 3(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 2.1, 2.2) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 4: Derivatives and rates of changes",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 4(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 2.7, 2.8) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 5: Differentiation rule The chain rule Implicit differentiation",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 5(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 3.4, 3.5) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Project 1 presentation",
+        "clos": [
+          "CLO1",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Facilitate the presentation, ask questions, give feedbacks",
+        "activeLearningRaw": "Propose a topic, Work in team to work on the project, Implement GeoGebra",
+        "assessmentRaw": "Project 1 presentation (15), Project 1 report (5)",
+        "resourcesRaw": "-Main textbook (Sec.1.2-1.5) -Online resources"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 6: Application of differentiation Maximum and minimum values Optimization problems",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises, Demo GeoGebra",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 6(0, FA) Assignment 1(5)",
+        "resourcesRaw": "-Main textbook (Section 4.1, 4.3 & 4.7) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Midterm exam",
+        "clos": [
+          "CLO1",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 7: Integral Areas and distances The definite integral",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom,Lecture, Discussion, Guided exercises, Demonstrate integral using GeoGebra",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, Discuss in small groups, Test GeoGebra simulation",
+        "assessmentRaw": "Quiz 7(0, FA) Assignment 2 (5)",
+        "resourcesRaw": "-Main textbook (Sec. 5.1 & 5.2) -GeoGebra simulation"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 8: Fundamental Theorem of Calculus The fundamental theorem of calculus The Indefinite integral",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 8(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 5.3& 5.4) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 9: Area Between Curves Area between curves Volumes",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 9(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 6.1 & 6.2) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/1/0.5/0.5",
+        "lectureTopic": "Topic 10: Average value and probability",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 10(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 8.5) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Topic 12: Applications of integral to engineering",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Flipped classroom, Discussion, Guided exercises",
+        "activeLearningRaw": "Watch the recorded lecture video in advance, Read lecture slides in advance, Note-taking, discuss in small groups",
+        "assessmentRaw": "Quiz 12(0, FA)",
+        "resourcesRaw": "-Main textbook (Section 8.3) -Lecture slides - Recorded lecture video"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Project 2 presentation",
+        "clos": [
+          "CLO2",
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Facilitate the presentation, ask questions, give feedbacks",
+        "activeLearningRaw": "Propose a topic, Work in team to work on the project, Implement GeoGebra",
+        "assessmentRaw": "Project 2 presentation (15), Project 2 report (5)",
+        "resourcesRaw": "-Main textbook (Section 8.3-8.5)"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "0/0/4/0",
+        "lectureTopic": "Final Exam",
+        "clos": [
+          "CLO2",
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": ""
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "-Main textbook (Section 1.1, 1.2) -Lecture slides - Recorded lecture video; -Main textbook (Section 1.4, 1.5) -Lecture slides - Recorded lecture video -GeoGebra simulation; -Main textbook (Section 2.1, 2.2) -Lecture slides - Recorded lecture video; -Main textbook (Section 2.7, 2.8) -Lecture slides - Recorded lecture video; -Main textbook (Section 3.4, 3.5) -Lecture slides - Recorded lecture video; -Main textbook (Sec.1.2-1.5) -Online resources; -Main textbook (Section 4.1, 4.3 & 4.7) -Lecture slides - Recorded lecture video; -Main textbook (Sec. 5.1 & 5.2) -GeoGebra simulation; -Main textbook (Section 5.3& 5.4) -Lecture slides - Recorded lecture video; -Main textbook (Section 6.1 & 6.2) -Lecture slides - Recorded lecture video; -Main textbook (Section 8.5) -Lecture slides - Recorded lecture video; -Main textbook (Section 8.3) -Lecture slides - Recorded lecture video; -Main textbook (Section 8.3-8.5)",
+    "references": {
+      "required": [
+        {
+          "title": "Calculus: Early Transcendental (9th Edition)",
+          "authors": "Jame Stewart",
+          "publisher": "Cengage Learning",
+          "year": "2021",
+          "isbnOrUrl": "9781337613927"
+        }
+      ],
+      "recommended": [
+        {
+          "title": "Thomas’ Calculus (14th Edition)",
+          "authors": "George B. Thomas Jr., Christopher Heil, and Joel Hass",
+          "publisher": "Pearson",
+          "year": "2017",
+          "isbnOrUrl": "1260091996"
+        }
+      ]
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

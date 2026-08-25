@@ -1,0 +1,473 @@
+{
+  "summary": {
+    "mode": "dry-run",
+    "total": 46,
+    "ready": 3,
+    "created": 0,
+    "replaced": 0,
+    "skipped": 2,
+    "blocked": 41,
+    "failed": 0
+  },
+  "results": [
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\AIN302.json",
+      "courseCode": "AIN302",
+      "action": "blocked",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\AIS401.json",
+      "courseCode": "AIS401",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (ASS401) conflicts with filename (AIS401); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\APR102.json",
+      "courseCode": "APR102",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\BDA302.json",
+      "courseCode": "BDA302",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (BDA401) conflicts with filename (BDA302); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\BIA301.json",
+      "courseCode": "BIA301",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (DWA201) conflicts with filename (BIA301); canonical JSON uses filename code and requires review",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\BPR101.json",
+      "courseCode": "BPR101",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\CHK102.json",
+      "courseCode": "CHK102",
+      "action": "blocked",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code CHK102 and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\CRY402.json",
+      "courseCode": "CRY402",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DEC401.json",
+      "courseCode": "DEC401",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DLP101.json",
+      "courseCode": "DLP101",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (DLI101) conflicts with filename (DLP101); canonical JSON uses filename code and requires review",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DMA201.json",
+      "courseCode": "DMA201",
+      "action": "blocked",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "No required course resources were extracted",
+        "No course policy text was extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DMI301.json",
+      "courseCode": "DMI301",
+      "action": "ready",
+      "warnings": [
+        "Lecturer not found: Dr. Khim Chamroeun <Chamroeun.khim@gmail.com>",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DSA201.json",
+      "courseCode": "DSA201",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DSA202.json",
+      "courseCode": "DSA202",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DSC102.json",
+      "courseCode": "DSC102",
+      "action": "blocked",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\DWA201.json",
+      "courseCode": "DWA201",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (DWA301) conflicts with filename (DWA201); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\EEE102.json",
+      "courseCode": "EEE102",
+      "action": "blocked",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\EIN302.json",
+      "courseCode": "EIN302",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (EIN202) conflicts with filename (EIN302); canonical JSON uses filename code and requires review",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\ENG101.json",
+      "courseCode": "ENG101",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\ENG102.json",
+      "courseCode": "ENG102",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\ERD401.json",
+      "courseCode": "ERD401",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\FPR401.json",
+      "courseCode": "FPR401",
+      "action": "skipped",
+      "warnings": [
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term",
+        "Existing CourseSpec found; pass --replace-existing to replace it"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\FPR402.json",
+      "courseCode": "FPR402",
+      "action": "skipped",
+      "warnings": [
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term",
+        "Existing CourseSpec found; pass --replace-existing to replace it"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\FTE402.json",
+      "courseCode": "FTE402",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\GPDS101.json",
+      "courseCode": "GPDS101",
+      "action": "blocked",
+      "warnings": [
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\IDS101.json",
+      "courseCode": "IDS101",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\LLM402.json",
+      "courseCode": "LLM402",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (LLM302) conflicts with filename (LLM402); canonical JSON uses filename code and requires review",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\MAD302.json",
+      "courseCode": "MAD302",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\MAT101.json",
+      "courseCode": "MAT101",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted",
+        "No course policy text was extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\MAT102.json",
+      "courseCode": "MAT102",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted",
+        "No course policy text was extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\NDA202.json",
+      "courseCode": "NDA202",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\NLP401.json",
+      "courseCode": "NLP401",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\PAN202.json",
+      "courseCode": "PAN202",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\PDT202.json",
+      "courseCode": "PDT202",
+      "action": "blocked",
+      "warnings": [
+        "Course Availability semester 1 conflicts with folder S2",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\PML401.json",
+      "courseCode": "PML401",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (PML402) conflicts with filename (PML401); canonical JSON uses filename code and requires review",
+        "Course Availability semester 2 conflicts with folder S1"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\PPR201.json",
+      "courseCode": "PPR201",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\PPR202.json",
+      "courseCode": "PPR202",
+      "action": "blocked",
+      "warnings": [
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\PPR301.json",
+      "courseCode": "PPR301",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\PPR302.json",
+      "courseCode": "PPR302",
+      "action": "ready",
+      "warnings": [
+        "Co-lecturers were preserved in source JSON but not imported because they belong to a term-specific Offering",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\RDM201.json",
+      "courseCode": "RDM201",
+      "action": "ready",
+      "warnings": [
+        "Lecturer not found: Dr. Khim Chamroeun <khim.chamroeun@rupp.edu.kh>",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\SCA302.json",
+      "courseCode": "SCA302",
+      "action": "blocked",
+      "warnings": [
+        "Course code in DOCX table (SCA323) conflicts with filename (SCA302); canonical JSON uses filename code and requires review",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\STA201.json",
+      "courseCode": "STA201",
+      "action": "blocked",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code STA201 and requires review",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\STR102.json",
+      "courseCode": "STR102",
+      "action": "blocked",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code STR102 and requires review",
+        "Course Availability semester 1 conflicts with folder S2",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\TDT101.json",
+      "courseCode": "TDT101",
+      "action": "blocked",
+      "warnings": [
+        "Course code is missing in DOCX table; canonical JSON uses filename code TDT101 and requires review",
+        "Course Availability semester 2 conflicts with folder S1",
+        "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\TSA301.json",
+      "courseCode": "TSA301",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    },
+    {
+      "file": "..\\..\\tmp\\dse-course-spec-import-2026\\courses\\WAD301.json",
+      "courseCode": "WAD301",
+      "action": "blocked",
+      "warnings": [
+        "Some weekly-plan rows have no recoverable CLO mapping",
+        "No required course resources were extracted"
+      ],
+      "error": "Extraction warnings require --allow-warnings after manual review"
+    }
+  ]
+}
