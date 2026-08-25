@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { getCourseSpecPreviewLayout } from "./document-preview-layout";
+import {
+  COURSE_SPEC_PREVIEW_DEFAULT_ZOOM,
+  getCourseSpecPreviewLayout,
+} from "./document-preview-layout";
 
 describe("Course Specification preview role parity", () => {
   test("keeps the official document viewport identical for governance and lecturer roles", () => {
@@ -7,6 +10,7 @@ describe("Course Specification preview role parity", () => {
     const lecturer = getCourseSpecPreviewLayout(false);
 
     expect(governance.gridClassName).toBe(lecturer.gridClassName);
+    expect(governance.viewerClassName).toBe(lecturer.viewerClassName);
     expect(governance.gridClassName).toContain("lg:grid-cols-[250px_minmax(0,1fr)]");
     expect(governance.showDocumentStyleControl).toBe(true);
     expect(lecturer.showDocumentStyleControl).toBe(false);
@@ -19,12 +23,15 @@ describe("Course Specification preview role parity", () => {
     expect(layout.gridClassName).toContain("minmax(0,1fr)");
   });
 
-  test("lets the document workspace grow with the page stack instead of clipping it to a viewport calculation", () => {
+  test("uses a contained scrollable document viewer", () => {
     const layout = getCourseSpecPreviewLayout(false);
 
-    expect(layout.gridClassName).toContain("items-start");
-    expect(layout.gridClassName).not.toContain("100vh");
-    expect(layout.gridClassName).not.toContain("100dvh");
-    expect(layout.gridClassName).not.toContain("min-h-[650px]");
+    expect(layout.viewerClassName).toContain("overflow-auto");
+    expect(layout.viewerClassName).toContain("h-[70vh]");
+    expect(layout.viewerClassName).toContain("lg:h-[72vh]");
+  });
+
+  test("defaults the browser preview to 90 percent", () => {
+    expect(COURSE_SPEC_PREVIEW_DEFAULT_ZOOM).toBe(0.9);
   });
 });

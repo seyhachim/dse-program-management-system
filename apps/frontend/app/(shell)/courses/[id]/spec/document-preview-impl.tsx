@@ -34,7 +34,10 @@ import { courseSpecDocumentThemeApi } from "@/lib/course-spec-document-theme";
 import type { CourseDocumentModel } from "./course-document-model";
 import { CourseSpecDocumentThemePanel } from "./course-spec-document-theme-panel";
 import { exportCourseSpecWord } from "./document-export";
-import { getCourseSpecPreviewLayout } from "./document-preview-layout";
+import {
+  COURSE_SPEC_PREVIEW_DEFAULT_ZOOM,
+  getCourseSpecPreviewLayout,
+} from "./document-preview-layout";
 import { exportCourseSpecPdf } from "./document-pdf-export";
 import {
   PAGE_WIDTH,
@@ -88,7 +91,7 @@ export function DocumentPreview({
   const { me } = useMe();
   const viewerRef = useRef<HTMLDivElement>(null);
   const printRootRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(COURSE_SPEC_PREVIEW_DEFAULT_ZOOM);
   const [isExporting, setIsExporting] = useState(false);
   const [gradingScaleBinding, setGradingScaleBinding] =
     useState<CourseSpecGradingScaleBinding | null>(null);
@@ -221,15 +224,6 @@ export function DocumentPreview({
       Math.max(MIN_ZOOM, Math.min(availableWidth / PAGE_WIDTH, MAX_ZOOM)),
     );
   }, []);
-
-  useEffect(() => {
-    fitWidth();
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-    const observer = new ResizeObserver(fitWidth);
-    observer.observe(viewer);
-    return () => observer.disconnect();
-  }, [fitWidth]);
 
   const handleDownloadWord = async () => {
     if (exportDisabled) return;
@@ -474,10 +468,7 @@ export function DocumentPreview({
             </div>
           </aside>
 
-          <main
-            ref={viewerRef}
-            className="relative min-h-0 overflow-auto rounded-lg border bg-muted/40"
-          >
+          <main ref={viewerRef} className={previewLayout.viewerClassName}>
             <div className="sticky top-0 z-30 flex h-11 items-center justify-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
               <button
                 type="button"
