@@ -29,6 +29,30 @@ course-spec-import/
   import-report.json
 ```
 
+### Reviewed placement overrides
+
+Raw legacy imports keep `source.yearFolder` / `source.semesterFolder` as the Course Information placement context. When a programme owner explicitly approves moving a legacy CourseSpec to a different current-curriculum year/semester, add a top-level `reviewedPlacement` object instead of changing the source provenance:
+
+```json
+{
+  "source": {
+    "fileName": "DSC102.docx",
+    "yearFolder": 1,
+    "semesterFolder": 2
+  },
+  "reviewedPlacement": {
+    "year": 1,
+    "semester": 1,
+    "reason": "Programme owner approved 2026 curriculum relocation from DSC102 to CCS101",
+    "approvedBy": "programme-owner",
+    "approvedAt": "2026-08-25",
+    "sourceIssue": "#633"
+  }
+}
+```
+
+The reviewed placement affects only the immutable Course Information snapshot. The original source-folder values remain unchanged as provenance, an audit warning is emitted, and no `Offering` is created. A malformed or incomplete `reviewedPlacement` fails closed.
+
 ## Commands
 
 Run from `apps/backend`.
@@ -80,7 +104,7 @@ bun run course-spec:import ../../course-spec-import --commit --replace-existing 
 The importer maps canonical data to the current normalized models on the Teaching & Learning redesign branch:
 
 - `Course`: when the code does not yet exist, create the missing catalog row from reviewed canonical code/title/description/prerequisites/credits/course type/total SLT/primary lecturer. When the code already exists, preserve that catalog row exactly and attach the CourseSpec to it.
-- `CourseSpecCourseInfo`: immutable snapshot of the reviewed legacy Course Information, including source title/credits/year/semester/instructor metadata, even when those values differ from the current `Course` catalog row.
+- `CourseSpecCourseInfo`: immutable snapshot of the reviewed legacy Course Information. Raw imports use source-folder year/semester placement; an explicit `reviewedPlacement` can override only the snapshot placement while preserving original source provenance.
 - `CourseSpec` / `CourseSpecSection`: specification container and per-section status.
 - `CourseSpecClo`: CLO descriptions, C/A/P level, PLO mapping and status.
 - `CourseSpecCloTeachingMethod` / `CourseSpecCloAssessmentMethod`: method links inferred conservatively from legacy text using the existing method vocabularies.
