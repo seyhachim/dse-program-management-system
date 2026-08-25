@@ -20,4 +20,16 @@ replaceOnce(
   `const conflict = await prisma.academicCalendar.findFirst({ where: { id: { notIn: [draft.id, ...(draft.supersedesCalendarId ? [draft.supersedesCalendarId] : [])] }, academicYearId: draft.academicYearId, status: "Published", studyYears: { some: { studyYear: { in: studyYears } } }, periods: { some: { semester: { in: semesters } } } }, select: { id: true } });`,
 );
 
+replaceOnce(
+  "apps/backend/src/plugins/programme/academic-calendar-service.ts",
+  `...sourceData({ ...input, revisionReason: "", academicYearId: existing.academicYearId }),`,
+  `...sourceData(input),`,
+);
+
+replaceOnce(
+  "apps/backend/prisma/migrations/20260825162500_academic_calendar_epic_638/migration.sql",
+  `BEGIN\n  target_id := COALESCE(NEW."calendarId", OLD."calendarId");\n  SELECT "status" INTO parent_status FROM "AcademicCalendar" WHERE "id" = target_id;`,
+  `BEGIN\n  IF TG_OP = 'DELETE' THEN\n    target_id := OLD."calendarId";\n  ELSE\n    target_id := NEW."calendarId";\n  END IF;\n  SELECT "status" INTO parent_status FROM "AcademicCalendar" WHERE "id" = target_id;`,
+);
+
 console.log("Epic #638 phase 1 staged-output fixes applied");
