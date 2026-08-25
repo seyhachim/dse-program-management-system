@@ -56,15 +56,32 @@ export function ThemedDocumentPages({
         /* Page 1 is an approved fixed-composition programme overview. Its 34/66
            grid, compact typography and internal spacing are template-controlled
            so the full Vision/Mission/Goals/Philosophy/PEO content fits one
-           landscape page. The saved font family still inherits from the article.
-           The PLO continuation is excluded because it is a Part 1 table row, not
-           a normal document page body, and therefore owns its compact cell padding. */
+           landscape page. The PLO continuation is excluded because it is a
+           Part 1 table row, not a normal document page body, and therefore owns
+           its compact cell padding. */
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview):not(#plo-taxonomy) {
           box-sizing: border-box;
           padding-top: calc(var(--cs-margin-top) + var(--cs-frame-gap)) !important;
           padding-bottom: calc(var(--cs-margin-bottom) + var(--cs-frame-gap)) !important;
           padding-left: calc(var(--cs-margin-left) + var(--cs-frame-gap)) !important;
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
+        }
+
+        /* Part 1 has fixed approved typography independent of the saved body
+           theme: institution/programme header is 11pt bold Times New Roman and
+           the Part 1 title is 14pt bold Times New Roman. */
+        .course-spec-theme-root #programme-overview header > p {
+          font-family: "Times New Roman", Times, serif !important;
+          font-size: 11pt !important;
+          font-weight: 700 !important;
+          line-height: 1.1 !important;
+        }
+
+        .course-spec-theme-root #programme-overview h1 {
+          font-family: "Times New Roman", Times, serif !important;
+          font-size: 14pt !important;
+          font-weight: 700 !important;
+          line-height: 1.1 !important;
         }
 
         /* The fixed-page preview cannot physically keep one CSS grid across a
