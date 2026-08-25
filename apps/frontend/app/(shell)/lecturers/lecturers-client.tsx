@@ -18,11 +18,12 @@ export function LecturersClient() {
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   // Creating/editing/deleting a lecturer record needs `lecturers:write`
-  // (admin, program_coordinator); provisioning a login needs `accounts:create`
-  // (admin only). The unified form keeps those permission boundaries intact.
+  // (admin, program_coordinator); provisioning/resending login access needs
+  // `accounts:create` (admin only).
   const { me } = useMe();
   const canWrite = me?.permissions.includes("lecturers:write") ?? false;
   const canCreateAccount = me?.permissions.includes("accounts:create") ?? false;
@@ -92,6 +93,20 @@ export function LecturersClient() {
     }
   };
 
+  const handleResendInvitation = async (lecturer: Lecturer) => {
+    setResendingId(lecturer.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await authApi.resendInvitation(lecturer.id);
+      setNotice(`A fresh invitation was sent to ${lecturer.email}.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to resend invitation");
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   const handleDelete = async (lecturer: Lecturer) => {
     if (!confirm(`Delete ${lecturer.name}?`)) return;
     setError(null);
@@ -134,7 +149,20 @@ export function LecturersClient() {
       header: "Account",
       render: (l) =>
         l.accountAccess === "has_access" ? (
-          <StatusBadge tone="live" label="Has access" icon={false} />
+          <div className="flex items-center gap-2">
+            <StatusBadge tone="live" label="Has access" icon={false} />
+            {canCreateAccount ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={resendingId === l.id}
+                onClick={() => handleResendInvitation(l)}
+              >
+                {resendingId === l.id ? "Resending…" : "Resend invitation"}
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <div className="flex items-center gap-2">
             <StatusBadge tone="upcoming" label="No access" icon={false} />
