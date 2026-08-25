@@ -53,20 +53,6 @@ export function ThemedDocumentPages({
           position: absolute;
         }
 
-        /* Official Course Specification frame. Keep this structural rather than
-           user-editable so exported academic documents retain one controlled layout. */
-        .course-spec-theme-root article[data-doc-page]::before {
-          content: "";
-          position: absolute;
-          z-index: 20;
-          pointer-events: none;
-          top: var(--cs-margin-top);
-          bottom: var(--cs-margin-bottom);
-          left: var(--cs-margin-left);
-          right: var(--cs-margin-right);
-          border: 1px solid #000;
-        }
-
         /* Page 1 is an approved fixed-composition programme overview. Its 34/66
            grid, compact typography and internal spacing are template-controlled
            so the full Vision/Mission/Goals/Philosophy/PEO content fits one
