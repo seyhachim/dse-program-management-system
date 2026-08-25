@@ -2,11 +2,12 @@ import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../../core/db/prisma.ts";
 import { ProvisioningError } from "./service.ts";
 
-export function invitationAlreadyAccepted(user: {
+export function invitationIsPending(user: {
+  invited_at?: string | null;
   email_confirmed_at?: string | null;
   last_sign_in_at?: string | null;
 }): boolean {
-  return Boolean(user.email_confirmed_at || user.last_sign_in_at);
+  return Boolean(user.invited_at && !user.email_confirmed_at && !user.last_sign_in_at);
 }
 
 /**
@@ -14,9 +15,9 @@ export function invitationAlreadyAccepted(user: {
  * course/offering links, or other academic records.
  *
  * Supabase does not expose an invite-specific resend mail method. For a still
- * unconfirmed invited identity we therefore rotate only the pending Supabase
- * Auth identity, then link the existing PMS User to the new identity. Confirmed
- * users are never deleted or re-invited.
+ * pending invited identity we therefore rotate only the Supabase Auth identity,
+ * then link the existing PMS User to the new identity. Confirmed, signed-in, or
+ * non-invite identities are never deleted by this action.
  */
 export async function resendLecturerInvitation(userId: string): Promise<{ email: string }> {
   const user = await prisma.user.findFirst({
@@ -47,11 +48,9 @@ export async function resendLecturerInvitation(userId: string): Promise<{ email:
     throw new ProvisioningError(getError.message);
   }
 
-  // Never rotate a confirmed/active identity. This is the academic-record-safe
-  // boundary between "resend an invite" and "reset an existing account".
-  if (existingAuth?.user && invitationAlreadyAccepted(existingAuth.user)) {
+  if (existingAuth?.user && !invitationIsPending(existingAuth.user)) {
     throw new ProvisioningError(
-      "This lecturer account is already active. Use the password recovery flow instead.",
+      "This lecturer account is not a pending invitation. Use password recovery for an active account.",
     );
   }
 
