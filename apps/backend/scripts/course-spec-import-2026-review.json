@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "dse-course-spec-conflict-review-v1",
+  "source": "course spec.zip",
+  "curriculumAuthority": "DSE Curriculum - 2026.docx",
+  "summary": {
+    "totalBlockedReviewed": 19,
+    "approvedMappingsSamePlacement": 9,
+    "blockedAssessmentInconsistency": 2,
+    "blockedRelocatedCourseOwnerReview": 4,
+    "archiveOnlyNoOneToOneMapping": 4
+  },
+  "entries": [
+    {
+      "legacyCode": "AIN302",
+      "targetCode": "AAI302",
+      "decision": "approved_mapping",
+      "reason": "Filename is 'AIN302_Applied AI and Deep Learning'; same Year 3 Semester 2 placement as current AAI302.",
+      "currentCurriculum": { "title": "Applied AI and Deep Learning", "year": 3, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "AIS401",
+      "targetCode": "AIE401",
+      "decision": "approved_mapping",
+      "reason": "Source title is exactly 'AI Engineering for Smart Agriculture'; same Year 4 Semester 1 placement as current AIE401.",
+      "currentCurriculum": { "title": "AI Engineering for Smart Agriculture", "year": 4, "semester": 1, "credits": 3 }
+    },
+    {
+      "legacyCode": "BDA302",
+      "targetCode": "BDE302",
+      "decision": "approved_mapping",
+      "reason": "Source is Big Data Processing using Hadoop/Spark; same Year 3 Semester 2 placement as current BDE302.",
+      "currentCurriculum": { "title": "Big Data Engineering: Acquisition and Processing (Hadoop and Spark)", "year": 3, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "BIA301",
+      "targetCode": "BIA301",
+      "decision": "approved_mapping",
+      "reason": "Filename/code/title and Year 3 Semester 1 placement match current BIA301; internal DWA201 is stale copied metadata.",
+      "currentCurriculum": { "title": "Business Intelligence and Analytics (Excel, Power BI and Tableau, Grafana)", "year": 3, "semester": 1, "credits": 3 }
+    },
+    {
+      "legacyCode": "CHK102",
+      "targetCode": null,
+      "decision": "archive_only_no_one_to_one_current_mapping",
+      "reason": "Legacy combined 'Civilization and History of Khmer and ASEAN' does not map one-to-one because the 2026 curriculum has separate KHI101 Khmer History and KCI102 Khmer Civilization."
+    },
+    {
+      "legacyCode": "DLP101",
+      "targetCode": "DLP101",
+      "decision": "approved_mapping",
+      "reason": "Filename/code and Year 1 Semester 1 placement match current DLP101; internal DLI101 is stale/typo metadata. Credit tuple '(3,0,0)' is 3 credits.",
+      "currentCurriculum": { "title": "Digital Literacy", "year": 1, "semester": 1, "credits": 3 }
+    },
+    {
+      "legacyCode": "DMA201",
+      "targetCode": "MAT202",
+      "decision": "blocked_relocated_course_owner_review",
+      "reason": "Exact course title Math III: Discrete Mathematics, but legacy source is Year 2 Semester 1 while current MAT202 is Year 2 Semester 2.",
+      "currentCurriculum": { "title": "Math III: Discrete Mathematics", "year": 2, "semester": 2, "credits": 4 }
+    },
+    {
+      "legacyCode": "DSC102",
+      "targetCode": "CCS101",
+      "decision": "blocked_relocated_course_owner_review",
+      "reason": "Strong thematic/title overlap with Climate Change and Sustainable Development, but legacy source is Year 1 Semester 2 while current CCS101 is Year 1 Semester 1.",
+      "currentCurriculum": { "title": "Climate Change and Sustainable Development", "year": 1, "semester": 1, "credits": 3 }
+    },
+    {
+      "legacyCode": "DWA201",
+      "targetCode": "DWA202",
+      "decision": "approved_mapping",
+      "reason": "Source title is Data Warehousing and source folder is Year 2 Semester 2, matching current DWA202 placement.",
+      "currentCurriculum": { "title": "Data Warehousing", "year": 2, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "EEE102",
+      "targetCode": null,
+      "decision": "archive_only_no_one_to_one_current_mapping",
+      "reason": "Electrical Engineering and Embedded Systems has no one-to-one course in the uploaded 2026 curriculum."
+    },
+    {
+      "legacyCode": "EIN302",
+      "targetCode": "EIN302",
+      "decision": "blocked_assessment_inconsistency",
+      "reason": "Same current course/placement after ignoring stale internal EIN202/Year 2 metadata, but source assessment weights sum to 105% while its total row says 100%.",
+      "currentCurriculum": { "title": "Entrepreneurship and Innovation", "year": 3, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "GPDS101",
+      "targetCode": null,
+      "decision": "archive_only_no_one_to_one_current_mapping",
+      "reason": "General Physics for Data Science has no one-to-one course in the uploaded 2026 curriculum."
+    },
+    {
+      "legacyCode": "LLM402",
+      "targetCode": "LLM402",
+      "decision": "approved_mapping",
+      "reason": "Filename/code and Year 4 Semester 2 placement match current LLM402; internal LLM302 is stale metadata.",
+      "currentCurriculum": { "title": "Large Language Models", "year": 4, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "PDT202",
+      "targetCode": "PDT102",
+      "decision": "blocked_relocated_course_owner_review",
+      "reason": "Exact title Personal Development and Teamwork, but legacy source is Year 2 Semester 2 while current PDT102 is Year 1 Semester 2.",
+      "currentCurriculum": { "title": "Personal Development and Teamwork", "year": 1, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "PML401",
+      "targetCode": "PML401",
+      "decision": "approved_mapping",
+      "reason": "Filename/title and source folder Year 4 Semester 1 match current PML401; internal PML402 and extracted Year 3/S2 availability are stale metadata.",
+      "currentCurriculum": { "title": "Professional Mindset and Leadership Development", "year": 4, "semester": 1, "credits": 3 }
+    },
+    {
+      "legacyCode": "SCA302",
+      "targetCode": "SCA402",
+      "decision": "blocked_relocated_course_owner_review",
+      "reason": "Exact title Supply Chain Analytics, but legacy source is Year 3 Semester 2 while current SCA402 is Year 4 Semester 2.",
+      "currentCurriculum": { "title": "Supply Chain Analytics", "year": 4, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "STA201",
+      "targetCode": "STA201",
+      "decision": "approved_mapping",
+      "reason": "Filename/code/title and Year 2 Semester 1 placement match current STA201; internal course code is simply missing.",
+      "currentCurriculum": { "title": "Statistics II: Inferential Statistics and Statistical Modeling", "year": 2, "semester": 1, "credits": 3 }
+    },
+    {
+      "legacyCode": "STR102",
+      "targetCode": "STA102",
+      "decision": "blocked_assessment_inconsistency",
+      "reason": "Statistics I maps strongly to current STA102 in Year 1 Semester 2, but source assessment weights sum to 98% while its total row says 100%.",
+      "currentCurriculum": { "title": "Statistics I: Probability and Descriptive Statistics", "year": 1, "semester": 2, "credits": 3 }
+    },
+    {
+      "legacyCode": "TDT101",
+      "targetCode": null,
+      "decision": "archive_only_no_one_to_one_current_mapping",
+      "reason": "Technology and Digital Transformation has no one-to-one course in the uploaded 2026 curriculum."
+    }
+  ]
+}
