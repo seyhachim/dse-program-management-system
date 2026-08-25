@@ -5,8 +5,11 @@ on:
     branches:
       - agent/epic-638-academic-calendar
     paths:
-      - scripts/agent-epic-638-ui-polish.ts
+      - scripts/agent-epic-638-backend-consumers.ts
+      - scripts/agent-epic-638-consumer-fixes.ts
+      - scripts/agent-epic-638-offering-security.ts
       - scripts/agent-epic-638-student-consumers.ts
+      - scripts/agent-epic-638-ui-polish.ts
       - .github/workflows/agent-epic-638-ui-polish.yml
 
 permissions:
@@ -33,8 +36,36 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.23
-      - name: Apply student calendar consumer fixes
-        run: bun scripts/agent-epic-638-student-consumers.ts
+      - name: Prepare canonical consumer patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('packages/shared-types/src/academic-calendar.ts')
+          source = path.read_text()
+          block = 'export type StudentAcademicCalendarView =\n  | { status: "available"; academicYear: AcademicYearView; studyYear: number; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; nextEvent: AcademicCalendarTimelineEvent | null; }\n  | { status: "unavailable"; academicYear: AcademicYearView | null; studyYear: number | null; reason: "student-context-unavailable" | "academic-year-unavailable" | "calendar-unpublished"; message: string; };\n\n'
+          if block not in source:
+              raise SystemExit('StudentAcademicCalendarView preparation block not found')
+          path.write_text(source.replace(block, '', 1))
+          PY
+      - name: Apply full Academic Calendar consumers
+        run: |
+          bun scripts/agent-epic-638-backend-consumers.ts
+          bun scripts/agent-epic-638-consumer-fixes.ts
+          bun scripts/agent-epic-638-offering-security.ts
+      - name: Fix portal calendar narrowing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/frontend/app/(shell)/portal/portal-home.tsx')
+          source = path.read_text()
+          before = '  const firstCalendarPeriod = calendar.status === "available" ? calendar.periods[0] ?? null : null;\n'
+          after = before + '  const unavailableCalendarMessage = calendar.status === "unavailable" ? calendar.message : "No semester period is currently published.";\n'
+          if before not in source:
+              raise SystemExit('portal-home calendar setup marker not found')
+          source = source.replace(before, after, 1)
+          source = source.replace('{calendar.message}</p></>}', '{unavailableCalendarMessage}</p></>}', 1)
+          path.write_text(source)
+          PY
       - name: Repair generated UI patch literals
         run: |
           python3 - <<'PY'
@@ -55,6 +86,13 @@ jobs:
         run: bun scripts/agent-epic-638-ui-polish.ts
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Validate Prisma
+        run: |
+          bunx prisma format --schema apps/backend/prisma/schema.prisma
+          bunx prisma validate --schema apps/backend/prisma/schema.prisma
+          bun run --cwd apps/backend db:generate
+      - name: Targeted calendar tests
+        run: bun test apps/backend/src/plugins/programme/academic-calendar-domain.test.ts apps/backend/src/plugins/programme/academic-calendar-router.test.ts
       - name: Typecheck
         run: bun run typecheck
       - name: Lint
@@ -63,8 +101,11 @@ jobs:
         run: bun run build
       - name: Commit verified UI polish
         run: |
-          rm scripts/agent-epic-638-ui-polish.ts
+          rm scripts/agent-epic-638-backend-consumers.ts
+          rm scripts/agent-epic-638-consumer-fixes.ts
+          rm scripts/agent-epic-638-offering-security.ts
           rm scripts/agent-epic-638-student-consumers.ts
+          rm scripts/agent-epic-638-ui-polish.ts
           rm .github/workflows/agent-epic-638-ui-polish.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
