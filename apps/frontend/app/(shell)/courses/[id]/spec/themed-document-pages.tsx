@@ -67,8 +67,11 @@ export function ThemedDocumentPages({
           border: 1px solid #000;
         }
 
-        .course-spec-theme-root article[data-doc-page] > div,
-        .course-spec-theme-root article[data-doc-page] #programme-overview > div {
+        /* Page 1 is an approved fixed-composition programme overview. Its 34/66
+           grid, compact typography and internal spacing are template-controlled
+           so the full Vision/Mission/Goals/Philosophy/PEO content fits one
+           landscape page. The saved font family still inherits from the article. */
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) {
           box-sizing: border-box;
           padding-top: calc(var(--cs-margin-top) + var(--cs-frame-gap)) !important;
           padding-bottom: calc(var(--cs-margin-bottom) + var(--cs-frame-gap)) !important;
@@ -76,59 +79,59 @@ export function ThemedDocumentPages({
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] p,
-        .course-spec-theme-root article[data-doc-page] li {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) li {
           font-size: var(--cs-body-size);
           line-height: var(--cs-line-height);
           text-align: var(--cs-align);
         }
 
-        .course-spec-theme-root article[data-doc-page] p {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p {
           margin-top: 0 !important;
           margin-bottom: 0 !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] p + p {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p + p {
           margin-top: var(--cs-paragraph-gap) !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] ul,
-        .course-spec-theme-root article[data-doc-page] ol {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) ul,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) ol {
           margin-top: 2pt !important;
           margin-bottom: 2pt !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] li + li {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) li + li {
           margin-top: 1pt;
         }
 
-        .course-spec-theme-root article[data-doc-page] h1,
-        .course-spec-theme-root article[data-doc-page] h2,
-        .course-spec-theme-root article[data-doc-page] h3,
-        .course-spec-theme-root article[data-doc-page] h4,
-        .course-spec-theme-root article[data-doc-page] h5,
-        .course-spec-theme-root article[data-doc-page] h6 {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h1,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h2,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h3,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h4,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h5,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h6 {
           line-height: 1.1 !important;
           margin-top: 0 !important;
           margin-bottom: 4pt !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] h1 {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h1 {
           font-size: var(--cs-title-size) !important;
         }
-        .course-spec-theme-root article[data-doc-page] h2 {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h2 {
           font-size: var(--cs-h1-size) !important;
         }
-        .course-spec-theme-root article[data-doc-page] h3 {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h3 {
           font-size: var(--cs-h2-size) !important;
         }
-        .course-spec-theme-root article[data-doc-page] h4,
-        .course-spec-theme-root article[data-doc-page] h5,
-        .course-spec-theme-root article[data-doc-page] h6 {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h4,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h5,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) h6 {
           font-size: var(--cs-h3-size) !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] table {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) table {
           width: 100% !important;
           border-collapse: collapse !important;
           font-size: var(--cs-table-size) !important;
@@ -137,24 +140,24 @@ export function ThemedDocumentPages({
           margin-bottom: 2pt !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] th,
-        .course-spec-theme-root article[data-doc-page] td {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) th,
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) td {
           padding: var(--cs-cell-padding) !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] th {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) th {
           vertical-align: middle;
         }
 
-        .course-spec-theme-root article[data-doc-page] td {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) td {
           vertical-align: top;
         }
 
-        .course-spec-theme-root article[data-doc-page] header {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) header {
           margin-bottom: 6pt !important;
         }
 
-        .course-spec-theme-root article[data-doc-page] header p {
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) header p {
           font-size: var(--cs-header-size) !important;
           text-align: center;
         }
