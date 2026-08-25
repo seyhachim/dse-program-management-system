@@ -65,16 +65,15 @@ export function ThemedDocumentPages({
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
 
-        /* Part 1 continues on page 2 with one complete full-width PLO row.
-           Keep the heading, intro, matrix and notes together inside that row,
-           aligned to the same 54px programme-profile table inset. The row sizes
-           to its content instead of stretching to the full physical page. */
+        /* Match the Word export's page-break composition used for Part 2:
+           normal document margins, then heading/content/table. The PLO matrix
+           keeps its own borders; there is no extra outer section frame. */
         .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
           box-sizing: border-box;
           height: auto !important;
-          margin: 18px 54px 0;
-          padding: 8px !important;
-          border: 1px solid #000;
+          margin: 0;
+          padding: 38px 54px !important;
+          border: 0;
         }
 
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p,
