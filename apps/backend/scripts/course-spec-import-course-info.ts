@@ -17,7 +17,7 @@ export type CourseInfoImportDocument = {
     yearFolder?: number | null;
     semesterFolder?: number | null;
   };
-  reviewedPlacement?: ReviewedPlacement | null;
+  reviewedPlacement?: unknown;
   course: {
     programmeTitle?: string | null;
     code: string;
@@ -64,6 +64,49 @@ function semesterFromNumber(value?: number | null): Semester | null {
   return null;
 }
 
+function reviewedPlacementFromDocument(doc: CourseInfoImportDocument): ReviewedPlacement | null {
+  const value = doc.reviewedPlacement;
+  if (value == null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("reviewedPlacement must be an object when provided");
+  }
+
+  const record = value as Record<string, unknown>;
+  const year = record.year;
+  const semester = record.semester;
+  const reason = typeof record.reason === "string" ? cleanText(record.reason) : "";
+  const approvedBy = typeof record.approvedBy === "string" ? cleanText(record.approvedBy) : "";
+  const approvedAt = typeof record.approvedAt === "string" ? cleanText(record.approvedAt) : "";
+  const sourceIssue =
+    record.sourceIssue == null
+      ? null
+      : typeof record.sourceIssue === "string"
+        ? cleanText(record.sourceIssue)
+        : "";
+
+  if (!Number.isInteger(year) || (year as number) < 1) {
+    throw new Error("reviewedPlacement.year must be a positive integer");
+  }
+  if (semester !== 1 && semester !== 2) {
+    throw new Error("reviewedPlacement.semester must be 1 or 2");
+  }
+  if (!reason) throw new Error("reviewedPlacement.reason is required");
+  if (!approvedBy) throw new Error("reviewedPlacement.approvedBy is required");
+  if (!approvedAt) throw new Error("reviewedPlacement.approvedAt is required");
+  if (record.sourceIssue != null && !sourceIssue) {
+    throw new Error("reviewedPlacement.sourceIssue must be a non-empty string when provided");
+  }
+
+  return {
+    year: year as number,
+    semester,
+    reason,
+    approvedBy,
+    approvedAt,
+    sourceIssue,
+  };
+}
+
 /**
  * Build the immutable Course Information (§1–13) snapshot directly from the
  * canonical import document. Raw legacy imports keep source-folder placement
@@ -75,13 +118,14 @@ export function courseInfoSnapshotFromDocument(
   doc: CourseInfoImportDocument,
   totalSltHours: number | null,
 ) {
+  const reviewedPlacement = reviewedPlacementFromDocument(doc);
   const semesterNumber =
-    doc.reviewedPlacement?.semester ??
+    reviewedPlacement?.semester ??
     doc.source.semesterFolder ??
     doc.course.availability?.semester ??
     null;
   const programmeYear =
-    doc.reviewedPlacement?.year ??
+    reviewedPlacement?.year ??
     doc.source.yearFolder ??
     doc.course.availability?.year ??
     null;
@@ -112,19 +156,19 @@ export function courseInfoSnapshotWarnings(doc: CourseInfoImportDocument): strin
   const documentSemester = doc.course.availability?.semester;
   const folderYear = doc.source.yearFolder;
   const documentYear = doc.course.availability?.year;
+  const reviewedPlacement = reviewedPlacementFromDocument(doc);
 
-  if (doc.reviewedPlacement) {
-    const review = doc.reviewedPlacement;
+  if (reviewedPlacement) {
     const provenance = [
-      `approved by ${cleanText(review.approvedBy)}`,
-      `at ${cleanText(review.approvedAt)}`,
-      cleanText(review.sourceIssue) ? `via ${cleanText(review.sourceIssue)}` : "",
-      cleanText(review.reason) ? `reason: ${cleanText(review.reason)}` : "",
+      `approved by ${reviewedPlacement.approvedBy}`,
+      `at ${reviewedPlacement.approvedAt}`,
+      reviewedPlacement.sourceIssue ? `via ${reviewedPlacement.sourceIssue}` : "",
+      `reason: ${reviewedPlacement.reason}`,
     ]
       .filter(Boolean)
       .join(", ");
     warnings.push(
-      `Reviewed placement override applied: Year ${review.year}, Semester ${review.semester}; legacy source placement remains preserved as provenance${provenance ? ` (${provenance})` : ""}`,
+      `Reviewed placement override applied: Year ${reviewedPlacement.year}, Semester ${reviewedPlacement.semester}; legacy source placement remains preserved as provenance (${provenance})`,
     );
     return warnings;
   }
