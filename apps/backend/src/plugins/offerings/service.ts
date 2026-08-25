@@ -1,6 +1,7 @@
 import {
   coLecturerViolation,
   teachingPeriodViolation,
+  type AcademicCalendarServiceContract,
   type CoursesServiceContract,
   type CourseWeeklyContactHoursRef,
   type CreateOfferingInput,
@@ -33,6 +34,7 @@ export class CapacityError extends Error {}
 const courses = () => registry.get<CoursesServiceContract>("courses").service;
 const lecturers = () => registry.get<LecturersServiceContract>("lecturers").service;
 const students = () => registry.get<StudentsServiceContract>("students").service;
+const academicCalendars = () => registry.get<{ academicCalendar: AcademicCalendarServiceContract }>("programme").service.academicCalendar;
 
 async function assertApprovedCourseSpec(courseId: string, courseSpecId: string): Promise<void> {
   const spec = await courses().getCourseSpecVersion(courseSpecId);
@@ -56,6 +58,11 @@ const withRelations = {
   enrollments: { select: { studentId: true } },
   coLecturers: { select: { lecturerId: true } },
   meetings: true,
+  academicCalendarPeriod: {
+    include: {
+      calendar: { include: { academicYear: true, studyYears: true } },
+    },
+  },
 } as const;
 
 function meetingDurationHours(startTime: string, endTime: string): number {
@@ -91,6 +98,20 @@ async function toView(
     programmeYear: number | null;
     startDate: Date | null;
     endDate: Date | null;
+    academicCalendarPeriodId: string | null;
+    academicCalendarPeriod: {
+      id: string;
+      calendarId: string;
+      semester: "First" | "Second";
+      teachingStart: Date;
+      teachingEnd: Date;
+      calendar: {
+        revision: number;
+        academicYearId: string;
+        academicYear: { id: string; label: string };
+        studyYears: { studyYear: number }[];
+      };
+    } | null;
     otherLecturers: string | null;
     createdAt: Date;
     enrollments: { studentId: string }[];
@@ -124,8 +145,22 @@ async function toView(
     capacity: offering.capacity,
     semester: offering.semester,
     programmeYear: offering.programmeYear,
-    startDate: dateOnly(offering.startDate),
-    endDate: dateOnly(offering.endDate),
+    academicCalendarPeriodId: offering.academicCalendarPeriodId,
+    academicCalendar: offering.academicCalendarPeriod
+      ? {
+          periodId: offering.academicCalendarPeriod.id,
+          calendarId: offering.academicCalendarPeriod.calendarId,
+          academicYearId: offering.academicCalendarPeriod.calendar.academicYearId,
+          academicYearLabel: offering.academicCalendarPeriod.calendar.academicYear.label,
+          revision: offering.academicCalendarPeriod.calendar.revision,
+          studyYears: offering.academicCalendarPeriod.calendar.studyYears.map((item) => item.studyYear).sort((a, b) => a - b),
+          semester: offering.academicCalendarPeriod.semester,
+          teachingStart: dateOnly(offering.academicCalendarPeriod.teachingStart)!,
+          teachingEnd: dateOnly(offering.academicCalendarPeriod.teachingEnd)!,
+        }
+      : null,
+    startDate: dateOnly(offering.academicCalendarPeriod?.teachingStart ?? offering.startDate),
+    endDate: dateOnly(offering.academicCalendarPeriod?.teachingEnd ?? offering.endDate),
     otherLecturers: offering.otherLecturers,
     meetings: offering.meetings.map((meeting) => ({
       ...meeting,
@@ -183,17 +218,41 @@ export const offeringService = {
     return offering ? toView(offering, await lecturerLookup()) : null;
   },
 
+  async programmeIdForCourse(courseId: string): Promise<string | null> {
+    return (await courses().getById(courseId))?.programmeId ?? null;
+  },
+
   async create(input: CreateOfferingInput): Promise<OfferingView> {
     const { coLecturerIds, meetings, ...offeringInput } = input;
-    // Validate cross-plugin references through the registry.
-    if (!(await courses().getById(offeringInput.courseId))) {
-      throw new ReferenceError("Course does not exist");
-    }
+    const course = await courses().getById(offeringInput.courseId);
+    if (!course) throw new ReferenceError("Course does not exist");
     await assertApprovedCourseSpec(offeringInput.courseId, offeringInput.courseSpecId);
     if (offeringInput.lecturerId && !(await lecturers().getById(offeringInput.lecturerId))) {
       throw new ReferenceError("Assigned lecturer does not exist");
     }
     if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
+    if (!offeringInput.academicCalendarPeriodId || !offeringInput.programmeYear || !offeringInput.semester) {
+      throw new ReferenceError("A published Academic Calendar period, study year, and semester are required");
+    }
+    const period = await academicCalendars().getPublishedPeriodForOffering(
+      offeringInput.academicCalendarPeriodId,
+      course.programmeId,
+      offeringInput.programmeYear,
+    );
+    if (!period) throw new ReferenceError("The selected Academic Calendar period is not published for this programme and study year");
+    if (period.semester !== offeringInput.semester) throw new ReferenceError("The selected semester does not match the published Academic Calendar period");
+    try {
+      await academicCalendars().assertCoursePlacement(
+        course.programmeId,
+        period.academicYearId,
+        offeringInput.programmeYear,
+        period.semester,
+        offeringInput.courseId,
+      );
+    } catch (error) {
+      throw new ReferenceError(error instanceof Error ? error.message : "The selected course is not in the applicable curriculum");
+    }
+
     const offering = await prisma.offering.create({
       data: {
         courseId: offeringInput.courseId,
@@ -203,21 +262,17 @@ export const offeringService = {
         lecturerId: offeringInput.lecturerId ?? null,
         capacity: offeringInput.capacity,
         status: offeringInput.status,
-        semester: offeringInput.semester ?? null,
-        programmeYear: offeringInput.programmeYear ?? null,
-        startDate: toDate(offeringInput.startDate),
-        endDate: toDate(offeringInput.endDate),
+        semester: period.semester,
+        programmeYear: offeringInput.programmeYear,
+        academicCalendarPeriodId: period.id,
+        startDate: null,
+        endDate: null,
         otherLecturers: offeringInput.otherLecturers ?? null,
         coLecturers: coLecturerIds?.length
           ? { create: coLecturerIds.map((lecturerId) => ({ lecturerId })) }
           : undefined,
         meetings: meetings.length
-          ? {
-              create: meetings.map((meeting) => ({
-                ...meeting,
-                room: meeting.room || null,
-              })),
-            }
+          ? { create: meetings.map((meeting) => ({ ...meeting, room: meeting.room || null })) }
           : undefined,
       },
       include: withRelations,
@@ -231,17 +286,13 @@ export const offeringService = {
       throw new ReferenceError("Assigned lecturer does not exist");
     }
 
-    // Zod's superRefine only sees the fields in *this* request, so PATCHes need
-    // co-lecturer and teaching-period invariants re-checked against final state.
     const existing = await prisma.offering.findUnique({
       where: { id },
       include: { coLecturers: { select: { lecturerId: true } } },
     });
     if (!existing) throw new ReferenceError("Offering not found");
     if (!existing.courseSpecId && offeringInput.courseSpecId === undefined) {
-      throw new ReferenceError(
-        "Offering must be bound to an Approved CourseSpec version before it can be updated",
-      );
+      throw new ReferenceError("Offering must be bound to an Approved CourseSpec version before it can be updated");
     }
     if (offeringInput.courseSpecId !== undefined) {
       await assertApprovedCourseSpec(existing.courseId, offeringInput.courseSpecId);
@@ -255,71 +306,87 @@ export const offeringService = {
         }
       }
     }
+
     const nextLecturerId = offeringInput.lecturerId !== undefined ? offeringInput.lecturerId : existing.lecturerId;
-    const nextCoLecturerIds =
-      coLecturerIds !== undefined ? coLecturerIds : existing.coLecturers.map((c) => c.lecturerId);
+    const nextCoLecturerIds = coLecturerIds !== undefined ? coLecturerIds : existing.coLecturers.map((item) => item.lecturerId);
     if (coLecturerViolation({ lecturerId: nextLecturerId, coLecturerIds: nextCoLecturerIds })) {
       throw new ReferenceError("The primary lecturer cannot also be a co-lecturer");
     }
-
-    const nextStartDate =
-      offeringInput.startDate !== undefined ? offeringInput.startDate : dateOnly(existing.startDate);
-    const nextEndDate =
-      offeringInput.endDate !== undefined ? offeringInput.endDate : dateOnly(existing.endDate);
-    const periodViolation = teachingPeriodViolation({
-      startDate: nextStartDate,
-      endDate: nextEndDate,
-    });
-    if (periodViolation === "missingStart" || periodViolation === "missingEnd") {
-      throw new ReferenceError("Teaching start and end dates must be set together");
-    }
-    if (periodViolation === "endBeforeStart") {
-      throw new ReferenceError("Teaching end date must be on or after start date");
-    }
-
     if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
+
+    const calendarContextChanging =
+      offeringInput.academicCalendarPeriodId !== undefined ||
+      offeringInput.programmeYear !== undefined ||
+      offeringInput.semester !== undefined;
+    if (existing.status === "Completed" && calendarContextChanging) {
+      throw new ReferenceError("Completed offering academic-calendar context is historical and cannot be changed");
+    }
+    if (existing.academicCalendarPeriodId && (offeringInput.startDate !== undefined || offeringInput.endDate !== undefined)) {
+      throw new ReferenceError("Teaching dates for calendar-linked offerings come from the Academic Calendar");
+    }
+
+    const requestedPeriodId =
+      offeringInput.academicCalendarPeriodId !== undefined
+        ? offeringInput.academicCalendarPeriodId
+        : existing.academicCalendarPeriodId;
+    const nextProgrammeYear =
+      offeringInput.programmeYear !== undefined ? offeringInput.programmeYear : existing.programmeYear;
+    let resolvedPeriod: Awaited<ReturnType<AcademicCalendarServiceContract["getPublishedPeriodForOffering"]>> = null;
+
+    if (requestedPeriodId && existing.status !== "Completed") {
+      if (!nextProgrammeYear || nextProgrammeYear < 1 || nextProgrammeYear > 4) {
+        throw new ReferenceError("A study year between 1 and 4 is required for the Academic Calendar period");
+      }
+      const course = await courses().getById(existing.courseId);
+      if (!course) throw new ReferenceError("Course does not exist");
+      resolvedPeriod = await academicCalendars().getPublishedPeriodForOffering(requestedPeriodId, course.programmeId, nextProgrammeYear);
+      if (!resolvedPeriod) throw new ReferenceError("The selected Academic Calendar period is not currently published for this programme and study year");
+      if (offeringInput.semester !== undefined && offeringInput.semester !== resolvedPeriod.semester) {
+        throw new ReferenceError("The selected semester does not match the Academic Calendar period");
+      }
+      try {
+        await academicCalendars().assertCoursePlacement(
+          course.programmeId,
+          resolvedPeriod.academicYearId,
+          nextProgrammeYear,
+          resolvedPeriod.semester,
+          existing.courseId,
+        );
+      } catch (error) {
+        throw new ReferenceError(error instanceof Error ? error.message : "The course is not in the applicable curriculum");
+      }
+    } else if (!requestedPeriodId) {
+      const nextStartDate = offeringInput.startDate !== undefined ? offeringInput.startDate : dateOnly(existing.startDate);
+      const nextEndDate = offeringInput.endDate !== undefined ? offeringInput.endDate : dateOnly(existing.endDate);
+      const violation = teachingPeriodViolation({ startDate: nextStartDate, endDate: nextEndDate });
+      if (violation === "missingStart" || violation === "missingEnd") throw new ReferenceError("Teaching start and end dates must be set together");
+      if (violation === "endBeforeStart") throw new ReferenceError("Teaching end date must be on or after start date");
+    }
 
     const offering = await prisma.$transaction(async (tx) => {
       if (coLecturerIds !== undefined) {
         await tx.offeringCoLecturer.deleteMany({ where: { offeringId: id } });
-        if (coLecturerIds.length) {
-          await tx.offeringCoLecturer.createMany({
-            data: coLecturerIds.map((lecturerId) => ({ offeringId: id, lecturerId })),
-          });
-        }
+        if (coLecturerIds.length) await tx.offeringCoLecturer.createMany({ data: coLecturerIds.map((lecturerId) => ({ offeringId: id, lecturerId })) });
       }
       if (meetings !== undefined) {
         await tx.offeringMeeting.deleteMany({ where: { offeringId: id } });
-        if (meetings.length) {
-          await tx.offeringMeeting.createMany({
-            data: meetings.map((meeting) => ({
-              offeringId: id,
-              ...meeting,
-              room: meeting.room || null,
-            })),
-          });
-        }
+        if (meetings.length) await tx.offeringMeeting.createMany({ data: meetings.map((meeting) => ({ offeringId: id, ...meeting, room: meeting.room || null })) });
       }
       return tx.offering.update({
         where: { id },
         data: {
           ...(offeringInput.courseSpecId !== undefined ? { courseSpecId: offeringInput.courseSpecId } : {}),
           ...(offeringInput.term !== undefined ? { term: offeringInput.term } : {}),
-          ...(offeringInput.sectionCode !== undefined
-            ? { sectionCode: offeringInput.sectionCode }
-            : {}),
+          ...(offeringInput.sectionCode !== undefined ? { sectionCode: offeringInput.sectionCode } : {}),
           ...(offeringInput.lecturerId !== undefined ? { lecturerId: offeringInput.lecturerId } : {}),
           ...(offeringInput.capacity !== undefined ? { capacity: offeringInput.capacity } : {}),
           ...(offeringInput.status !== undefined ? { status: offeringInput.status } : {}),
-          ...(offeringInput.semester !== undefined ? { semester: offeringInput.semester } : {}),
-          ...(offeringInput.programmeYear !== undefined
-            ? { programmeYear: offeringInput.programmeYear }
-            : {}),
-          ...(offeringInput.startDate !== undefined ? { startDate: toDate(offeringInput.startDate) } : {}),
-          ...(offeringInput.endDate !== undefined ? { endDate: toDate(offeringInput.endDate) } : {}),
-          ...(offeringInput.otherLecturers !== undefined
-            ? { otherLecturers: offeringInput.otherLecturers }
-            : {}),
+          ...(resolvedPeriod ? { academicCalendarPeriodId: resolvedPeriod.id, semester: resolvedPeriod.semester, programmeYear: nextProgrammeYear, startDate: null, endDate: null } : {}),
+          ...(!requestedPeriodId && offeringInput.semester !== undefined ? { semester: offeringInput.semester } : {}),
+          ...(!requestedPeriodId && offeringInput.programmeYear !== undefined ? { programmeYear: offeringInput.programmeYear } : {}),
+          ...(!requestedPeriodId && offeringInput.startDate !== undefined ? { startDate: toDate(offeringInput.startDate) } : {}),
+          ...(!requestedPeriodId && offeringInput.endDate !== undefined ? { endDate: toDate(offeringInput.endDate) } : {}),
+          ...(offeringInput.otherLecturers !== undefined ? { otherLecturers: offeringInput.otherLecturers } : {}),
         },
         include: withRelations,
       });

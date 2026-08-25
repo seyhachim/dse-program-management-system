@@ -100,9 +100,9 @@ export function OfferingFormFields({
 
   return (
     <div className="space-y-5">
-      <fieldset className="space-y-4 rounded-xl border border-border p-4">
+      <fieldset className="space-y-4 rounded-2xl border border-border bg-muted/10 p-4 md:p-5">
         <div>
-          <legend className="text-sm font-semibold text-foreground">Academic context</legend>
+          <legend className="text-sm font-semibold text-foreground"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">1</span>Academic context</legend>
           <p className="text-xs text-muted-foreground">
             Teaching dates come from the published Academic Calendar. Course choices come from the applicable curriculum.
           </p>
@@ -183,7 +183,7 @@ export function OfferingFormFields({
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Published Calendar</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Calendar resolved automatically</p>
                     <p className="mt-1 font-semibold">{formatAcademicDate(calendarContext.period.teachingStart)} – {formatAcademicDate(calendarContext.period.teachingEnd)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Years {calendarContext.calendar.studyYears.join("–")} · {academicSemesterLabel(calendarContext.semester)} · Revision {calendarContext.calendar.revision}</p>
                   </div>
@@ -197,8 +197,10 @@ export function OfferingFormFields({
         )}
       </fieldset>
 
+      <SectionHeading number="2" title="Course & specification" description="Only courses placed in the applicable active curriculum are available." />
       <Field label="Course" error={errors.courseId?.message} required>
         <CoursePickerField control={control} courses={courses} disabled={courseLocked || (!legacyTeachingPeriod && !calendarContext)} />
+        {!legacyTeachingPeriod && calendarContext ? <p className="mt-1 text-xs text-muted-foreground">{courses.length} curriculum course{courses.length === 1 ? "" : "s"} available for this period.</p> : null}
         {!legacyTeachingPeriod && calendarContext && courses.length === 0 ? (
           <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">No course is available in the applicable active curriculum for this study year and semester.</p>
         ) : null}
@@ -225,7 +227,7 @@ export function OfferingFormFields({
         {!courseSpecLoading && courses.length > 0 && courseSpecVersions.length === 0 ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">This course has no Approved CourseSpec version yet.</p> : null}
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Term" error={errors.term?.message} required>
           <Input readOnly className="bg-muted/30" placeholder="Resolved from Academic Calendar" {...register("term")} />
         </Field>
@@ -234,9 +236,9 @@ export function OfferingFormFields({
         </Field>
       </div>
 
-      <fieldset className="space-y-3 rounded-lg border border-border p-4">
+      <fieldset className="space-y-3 rounded-2xl border border-border p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
-          <div><legend className="text-sm font-semibold text-foreground">Weekly Class Schedule <span className="ml-1 text-status-live" aria-label="required">*</span></legend><p className="text-xs text-muted-foreground">Academic Calendar defines the semester boundary; these rows define the recurring class timetable.</p></div>
+          <div><legend className="text-sm font-semibold text-foreground"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">3</span>Weekly class schedule <span className="ml-1 text-status-live" aria-label="required">*</span></legend><p className="text-xs text-muted-foreground">Academic Calendar defines the semester boundary; these rows define the recurring class timetable.</p></div>
           <Button type="button" variant="outline" size="sm" onClick={() => appendMeeting({ dayOfWeek: "Monday", startTime: "08:00", endTime: "09:00", room: "", activityType: "Lecture" })}>Add session</Button>
         </div>
         {meetingFields.length === 0 ? <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Add at least one weekly session before saving this offering.</p> : null}
@@ -255,7 +257,8 @@ export function OfferingFormFields({
         ))}
       </fieldset>
 
-      <div className="grid grid-cols-2 gap-3">
+      <SectionHeading number="4" title="Teaching team & delivery status" description="Assign the lecturer responsible for this section and confirm operational details." />
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Capacity" error={errors.capacity?.message}><Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} /></Field>
         <Field label="Status" error={errors.status?.message}><Controller control={control} name="status" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{OFFERING_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select>} /></Field>
       </div>
@@ -266,6 +269,18 @@ export function OfferingFormFields({
 
       <Controller control={control} name="coLecturerIds" render={({ field }) => <LecturerChecklist label="Co-Lecturers" options={coLecturerOptions} selectedIds={field.value ?? []} onChange={field.onChange} />} />
       {errors.coLecturerIds?.message ? <p className="text-xs text-status-live">{errors.coLecturerIds.message}</p> : null}
+    </div>
+  );
+}
+
+function SectionHeading({ number, title, description }: { number: string; title: string; description: string }) {
+  return (
+    <div className="border-t border-border pt-5 first:border-t-0 first:pt-0">
+      <h3 className="text-sm font-semibold text-foreground">
+        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">{number}</span>
+        {title}
+      </h3>
+      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }

@@ -214,8 +214,9 @@ function CalendarEditor({
 
   return (
     <div className="space-y-6">
-      <fieldset>
-        <legend className="text-sm font-semibold">Applies to Study Year(s)</legend>
+      <fieldset className="rounded-2xl border border-border bg-muted/10 p-4">
+        <legend className="px-1 text-sm font-semibold"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">1</span>Study year coverage</legend>
+        <p className="mt-1 text-xs text-muted-foreground">Select one year or intentionally share one calendar across multiple study years.</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {STUDY_YEARS.map((year) => (
             <label key={year} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
@@ -235,6 +236,8 @@ function CalendarEditor({
         </div>
       </fieldset>
 
+      <section>
+        <div className="mb-3"><h4 className="text-sm font-semibold"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">2</span>Semester dates</h4><p className="mt-1 text-xs text-muted-foreground">Teaching dates are canonical. Exam and break windows stay optional until officially issued.</p></div>
       <div className="grid gap-4 xl:grid-cols-2">
         {draft.periods.map((period) => (
           <fieldset key={period.semester} className="rounded-xl border border-border p-4">
@@ -264,10 +267,11 @@ function CalendarEditor({
           </fieldset>
         ))}
       </div>
+      </section>
 
-      <section className="rounded-xl border border-border p-4">
+      <section className="rounded-2xl border border-border p-4">
         <div className="flex items-center justify-between gap-3">
-          <div><h4 className="font-semibold">Additional events</h4><p className="text-sm text-muted-foreground">Registration, orientation, holidays, midterms, or other official dates.</p></div>
+          <div><h4 className="font-semibold"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">3</span>Academic events</h4><p className="text-sm text-muted-foreground">Registration, orientation, holidays, midterms, or other official dates.</p></div>
           <Button type="button" variant="outline" onClick={() => setDraft({
             ...draft,
             events: [...draft.events, { key: crypto.randomUUID(), title: "", type: "Other", semester: "", startDate: "", endDate: "", note: "" }],
@@ -288,8 +292,8 @@ function CalendarEditor({
         </div>
       </section>
 
-      <section className="rounded-xl border border-border p-4">
-        <h4 className="font-semibold">Official source / provenance</h4>
+      <section className="rounded-2xl border border-primary/20 bg-primary/[0.025] p-4">
+        <h4 className="font-semibold"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">4</span>Official source / provenance</h4>
         <p className="mt-1 text-sm text-muted-foreground">A source is required before publication. Use a URL, managed file reference, or explanatory source note.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="space-y-1.5 md:col-span-2"><Label htmlFor="source-title">Source title</Label><Input id="source-title" value={draft.sourceTitle} onChange={(e) => setDraft({ ...draft, sourceTitle: e.target.value })} placeholder="RUPP Academic Calendar 2026–2027" /></div>
@@ -332,6 +336,17 @@ export function AcademicCalendarClient() {
       ?? null;
   }, [calendars, selectedStudyYear]);
   const selectedCalendar = calendars.find((calendar) => calendar.id === selectedCalendarId) ?? calendarForStudyYear;
+  const yearCoverage = STUDY_YEARS.map((year) => {
+    const matches = calendars.filter((calendar) => calendar.studyYears.includes(year));
+    const calendar = matches.find((item) => item.status === "Published")
+      ?? matches.find((item) => item.status === "Draft")
+      ?? matches[0]
+      ?? null;
+    return { year, calendar };
+  });
+  const publishedCoverage = yearCoverage.filter((item) => item.calendar?.status === "Published").length;
+  const draftCoverage = yearCoverage.filter((item) => item.calendar?.status === "Draft").length;
+  const missingCoverage = yearCoverage.filter((item) => !item.calendar).length;
 
   const loadCalendars = useCallback(async (programme: string, academicYearId: string) => {
     const data = await academicCalendarApi.calendars(programme, academicYearId);
@@ -448,8 +463,8 @@ export function AcademicCalendarClient() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">{programmeName || "Programme"}</p>
-            <h2 className="mt-1 text-xl font-semibold">Official academic periods</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Published revisions are immutable. Corrections use a new auditable revision.</p>
+            <h2 className="mt-1 text-xl font-semibold">Academic Calendar workspace</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Manage one official source of semester dates. Draft safely, review coverage by study year, then publish an immutable revision.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-56 space-y-1.5"><Label htmlFor="academic-year">Academic Year</Label><select id="academic-year" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={selectedYearId} onChange={(e) => void changeAcademicYear(e.target.value)}><option value="">Select year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.label}{year.isCurrent ? " · Current" : ""}</option>)}</select></div>
@@ -457,6 +472,22 @@ export function AcademicCalendarClient() {
             {selectedYear && !selectedYear.isCurrent ? <Button variant="outline" onClick={() => void academicCalendarApi.setCurrentYear(programmeId, selectedYear.id).then(load)}><RefreshCw className="h-4 w-4" /> Set current</Button> : null}
           </div>
         </div>
+        {selectedYear ? (
+          <div className="mt-5 grid gap-3 border-t border-border pt-4 sm:grid-cols-3">
+            <div className="rounded-xl bg-emerald-500/8 px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">Published coverage</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">{publishedCoverage}<span className="text-sm font-medium text-muted-foreground"> / 4 years</span></p>
+            </div>
+            <div className="rounded-xl bg-amber-500/8 px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">Draft coverage</p>
+              <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-300">{draftCoverage}</p>
+            </div>
+            <div className="rounded-xl bg-muted/50 px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">Not available</p>
+              <p className="mt-1 text-2xl font-bold">{missingCoverage}</p>
+            </div>
+          </div>
+        ) : null}
         {showNewYear ? <div className="mt-4 grid gap-3 rounded-xl bg-muted/30 p-4 sm:grid-cols-4"><div><Label htmlFor="new-year-label">Label</Label><Input id="new-year-label" className="mt-1" value={newYear.label} onChange={(e) => setNewYear({ ...newYear, label: e.target.value })} placeholder="2026–2027" /></div><div><Label htmlFor="new-year-start">Start year</Label><Input id="new-year-start" className="mt-1" inputMode="numeric" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value })} /></div><div><Label htmlFor="new-year-end">End year</Label><Input id="new-year-end" className="mt-1" inputMode="numeric" value={newYear.endYear} onChange={(e) => setNewYear({ ...newYear, endYear: e.target.value })} /></div><div className="flex items-end"><Button disabled={saving} onClick={() => void createAcademicYear()}>Create year</Button></div></div> : null}
       </section>
 
@@ -471,20 +502,20 @@ export function AcademicCalendarClient() {
             {STUDY_YEARS.map((year) => {
               const candidates = calendars.filter((calendar) => calendar.studyYears.includes(year));
               const calendar = candidates.find((item) => item.status === "Published") ?? candidates.find((item) => item.status === "Draft") ?? candidates[0];
-              return <button key={year} type="button" onClick={() => { setSelectedStudyYear(year); setSelectedCalendarId(calendar?.id ?? ""); setCreating(false); setEditing(false); }} className={`rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedStudyYear === year ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/40"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study Year</p><p className="mt-1 text-2xl font-bold">Year {year}</p></div>{calendar ? <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${statusClasses(calendar.status)}`}>{calendar.status}</span> : <span className="rounded-full border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">Not available</span>}</div><p className="mt-3 text-xs text-muted-foreground">{calendar ? (calendar.studyYears.length > 1 ? `Shared official record · Years ${calendar.studyYears.join("–")}` : `${calendar.periods.length} semester period${calendar.periods.length === 1 ? "" : "s"}`) : `No official ${selectedYear.label} calendar has been issued for Year ${year}.`}</p></button>;
+              return <button key={year} type="button" onClick={() => { setSelectedStudyYear(year); setSelectedCalendarId(calendar?.id ?? ""); setCreating(false); setEditing(false); }} className={`group relative overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedStudyYear === year ? "border-primary bg-primary/5 ring-1 ring-primary/15" : "border-border bg-card hover:border-primary/40"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study year</p><div className="mt-2 flex items-center gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">{year}</span><p className="text-base font-semibold">Year {year} calendar</p></div></div>{calendar ? <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${statusClasses(calendar.status)}`}>{calendar.status}</span> : <span className="rounded-full border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">Not available</span>}</div><p className="mt-3 text-xs text-muted-foreground">{calendar ? (calendar.studyYears.length > 1 ? `Shared official record · Years ${calendar.studyYears.join("–")}` : `${calendar.periods.length} semester period${calendar.periods.length === 1 ? "" : "s"}`) : `No official ${selectedYear.label} calendar has been issued for Year ${year}.`}</p></button>;
             })}
           </section>
 
           <section className="rounded-2xl border border-border bg-card p-4 md:p-6">
             {creating || (editing && selectedCalendar?.status === "Draft") ? (
               <>
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="text-lg font-semibold">{creating ? "Add Academic Calendar" : `Edit Draft · Revision ${selectedCalendar?.revision ?? 1}`}</h3><p className="text-sm text-muted-foreground">Dates are not student-visible until publication.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => { setCreating(false); setEditing(false); if (selectedCalendar) setDraft(fromCalendar(selectedCalendar)); }}>Cancel</Button><Button disabled={saving} onClick={() => void saveDraft()}>{saving ? "Saving…" : "Save Draft"}</Button></div></div>
+                <div className="sticky top-0 z-10 -mx-4 mb-6 flex flex-col gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between md:-mx-6 md:px-6"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold">{creating ? "Add Academic Calendar" : `Edit Draft · Revision ${selectedCalendar?.revision ?? 1}`}</h3><span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">DRAFT · NOT STUDENT-VISIBLE</span></div><p className="mt-1 text-sm text-muted-foreground">Complete the official dates and provenance, then save for review before publishing.</p></div><div className="flex shrink-0 gap-2"><Button variant="outline" onClick={() => { setCreating(false); setEditing(false); if (selectedCalendar) setDraft(fromCalendar(selectedCalendar)); }}>Cancel</Button><Button disabled={saving} onClick={() => void saveDraft()}>{saving ? "Saving…" : "Save Draft"}</Button></div></div>
                 <CalendarEditor draft={draft} setDraft={setDraft} />
                 {!creating && selectedCalendar?.status === "Draft" ? <div className="mt-6 flex justify-end"><Button disabled={saving} onClick={() => void publish()}><CheckCircle2 className="h-4 w-4" /> Publish official calendar</Button></div> : null}
               </>
             ) : selectedCalendar ? (
               <>
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-lg font-semibold">Year {selectedStudyYear} · {selectedYear.label}</h3><p className="text-sm text-muted-foreground">{selectedCalendar.studyYears.length > 1 ? `This is one shared calendar for Years ${selectedCalendar.studyYears.join(" and ")}.` : "Official programme calendar record."}</p></div><div className="flex flex-wrap gap-2">{selectedCalendar.status === "Draft" ? <Button onClick={() => { setDraft(fromCalendar(selectedCalendar)); setEditing(true); }}>Edit draft</Button> : null}</div></div>
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-lg font-semibold">Year {selectedStudyYear} · {selectedYear.label}</h3><p className="text-sm text-muted-foreground">{selectedCalendar.studyYears.length > 1 ? `This is one shared calendar for Years ${selectedCalendar.studyYears.join(" and ")}.` : "Official programme calendar record."}</p></div><div className="flex flex-wrap gap-2">{selectedCalendar.status === "Draft" ? <><Button variant="outline" onClick={() => { setDraft(fromCalendar(selectedCalendar)); setEditing(true); }}>Edit draft</Button><Button disabled={saving} onClick={() => void publish()}><CheckCircle2 className="h-4 w-4" /> Publish official calendar</Button></> : null}</div></div>
                 <CalendarSummary calendar={selectedCalendar} />
                 {selectedCalendar.status === "Published" ? <section className="mt-6 rounded-xl border border-border p-4"><h4 className="font-semibold">Correct a published calendar</h4><p className="mt-1 text-sm text-muted-foreground">Published records are never edited in place. Create a correction revision; the existing revision remains the official source until the replacement is published.</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input aria-label="Correction reason" value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} placeholder="Reason for correction" /><Button disabled={saving} onClick={() => void createRevision()}><RefreshCw className="h-4 w-4" /> Create correction revision</Button></div></section> : null}
                 <section className="mt-6"><div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h4 className="font-semibold">Audit history</h4></div><div className="mt-2 divide-y divide-border rounded-xl border border-border">{auditRows.length ? auditRows.map((row) => <div key={row.id} className="p-3"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-medium">{row.action} · {row.actorName}</p><time className="text-xs text-muted-foreground">{new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(row.createdAt))}</time></div>{row.reason ? <p className="mt-1 text-sm text-muted-foreground">{row.reason}</p> : null}</div>) : <p className="p-4 text-sm text-muted-foreground">No audit actions recorded yet.</p>}</div></section>

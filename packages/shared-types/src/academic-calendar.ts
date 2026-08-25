@@ -112,7 +112,9 @@ export const PublicAcademicCalendarQuerySchema = z.object({
 export type PublicAcademicCalendarQuery = z.infer<typeof PublicAcademicCalendarQuerySchema>;
 
 export interface AcademicYearView { id: string; programmeId: string; label: string; startYear: number; endYear: number; isCurrent: boolean; createdAt: string; updatedAt: string; }
+export interface AcademicCalendarProgrammeRef { id: string; code: string; name: string; }
 export interface AcademicCalendarSourceView { title: string; publishedAt: string | null; url: string | null; fileRef: string | null; note: string; }
+export interface AcademicCalendarAuditView { id: string; calendarId: string; actorId: string; actorName: string; action: string; reason: string; beforeSnapshot: unknown; afterSnapshot: unknown; details: unknown; createdAt: string; }
 export interface AcademicCalendarPeriodView { id: string; calendarId: string; semester: AcademicCalendarSemester; teachingStart: string; teachingEnd: string; examStart: string | null; examEnd: string | null; breakStart: string | null; breakEnd: string | null; }
 export interface AcademicCalendarEventView { id: string; calendarId: string; title: string; type: AcademicCalendarEventType; semester: AcademicCalendarSemester | null; startDate: string; endDate: string | null; note: string; sortOrder: number; }
 export interface AcademicCalendarView { id: string; academicYear: AcademicYearView; seriesKey: string; revision: number; status: AcademicCalendarStatus; studyYears: number[]; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; source: AcademicCalendarSourceView; revisionReason: string; supersedesCalendarId: string | null; publishedAt: string | null; createdAt: string; updatedAt: string; }

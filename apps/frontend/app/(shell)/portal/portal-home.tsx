@@ -16,6 +16,7 @@ export function PortalHome() {
   const nextMeeting = data.courses.flatMap((course) => course.meetings.map((meeting) => ({ course, meeting })))[0];
   const calendar = data.academicCalendar;
   const firstCalendarPeriod = calendar.status === "available" ? calendar.periods[0] ?? null : null;
+  const unavailableCalendarMessage = calendar.status === "unavailable" ? calendar.message : "No semester period is currently published.";
 
   return <div className="mx-auto max-w-7xl space-y-6">
     <section className="rounded-2xl bg-gradient-to-br from-primary to-primary/80 p-6 text-primary-foreground shadow-sm">
@@ -37,7 +38,7 @@ export function PortalHome() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /><h3 className="font-semibold">Academic Calendar</h3></div>
-          {calendar.status === "available" && firstCalendarPeriod ? <><p className="mt-2 text-sm font-medium">{academicSemesterLabel(firstCalendarPeriod.semester)} · {formatAcademicDate(firstCalendarPeriod.teachingStart)} – {formatAcademicDate(firstCalendarPeriod.teachingEnd)}</p><p className="mt-1 text-xs text-muted-foreground">{calendar.nextEvent ? `Next: ${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}` : "No upcoming event is currently published."}</p></> : <><p className="mt-2 text-sm font-medium">Calendar not available yet</p><p className="mt-1 text-xs text-muted-foreground">{calendar.message}</p></>}
+          {calendar.status === "available" && firstCalendarPeriod ? <><p className="mt-2 text-sm font-medium">{academicSemesterLabel(firstCalendarPeriod.semester)} · {formatAcademicDate(firstCalendarPeriod.teachingStart)} – {formatAcademicDate(firstCalendarPeriod.teachingEnd)}</p><p className="mt-1 text-xs text-muted-foreground">{calendar.nextEvent ? `Next: ${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}` : "No upcoming event is currently published."}</p></> : <><p className="mt-2 text-sm font-medium">Calendar not available yet</p><p className="mt-1 text-xs text-muted-foreground">{unavailableCalendarMessage}</p></>}
         </div>
         <span className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary">View full calendar <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
       </div>

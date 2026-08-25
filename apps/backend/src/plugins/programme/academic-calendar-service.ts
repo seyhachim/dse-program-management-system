@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   AcademicCalendarContextQuery, AcademicCalendarContextView, AcademicCalendarOfferingPeriodRef,
   AcademicCalendarPeriodInput, AcademicCalendarPeriodView, AcademicCalendarEventInput, AcademicCalendarEventView,
-  AcademicCalendarView, AcademicYearView, CreateAcademicCalendarInput, CreateAcademicYearInput,
+  AcademicCalendarView, AcademicYearView, AcademicCalendarAuditView, AcademicCalendarProgrammeRef, CreateAcademicCalendarInput, CreateAcademicYearInput,
   PublishedAcademicCalendarProjection, UpdateAcademicCalendarDraftInput, AcademicCalendarTimelineEvent,
 } from "@dse-pms/shared-types";
 import { Prisma, type AcademicCalendarEventType, type Semester } from "@prisma/client";
@@ -77,6 +77,39 @@ export function buildAcademicCalendarTimeline(periods: AcademicCalendarPeriodVie
 }
 
 export const academicCalendarService = {
+  async programmeContext(): Promise<AcademicCalendarProgrammeRef> {
+    const programme = await prisma.programme.findFirst({
+      where: { status: "active" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, code: true, name: true },
+    });
+    if (!programme) throw new AcademicCalendarNotFoundError("No active programme is configured");
+    return programme;
+  },
+  async currentAcademicYear(programmeId: string): Promise<AcademicYearView | null> {
+    const row = await prisma.academicYear.findFirst({ where: { programmeId, isCurrent: true } });
+    return row ? yearView(row) : null;
+  },
+  async auditHistory(programmeId: string, calendarId: string): Promise<AcademicCalendarAuditView[]> {
+    await requireCalendar(programmeId, calendarId);
+    const rows = await prisma.academicCalendarAuditAction.findMany({
+      where: { calendarId },
+      include: { actor: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      calendarId: row.calendarId,
+      actorId: row.actorId,
+      actorName: row.actor.name,
+      action: row.action,
+      reason: row.reason,
+      beforeSnapshot: row.beforeSnapshot,
+      afterSnapshot: row.afterSnapshot,
+      details: row.details,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  },
   async listAcademicYears(programmeId: string): Promise<AcademicYearView[]> {
     const rows = await prisma.academicYear.findMany({ where: { programmeId }, orderBy: [{ startYear: "desc" }, { label: "desc" }] });
     return rows.map(yearView);

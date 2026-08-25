@@ -85,6 +85,8 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const lecturerId = useWatch({ control, name: "lecturerId" }) ?? null;
   const studyYear = useWatch({ control, name: "programmeYear" }) ?? null;
   const semester = useWatch({ control, name: "semester" }) ?? null;
+  const courseSpecId = useWatch({ control, name: "courseSpecId" }) ?? "";
+  const meetings = useWatch({ control, name: "meetings" }) ?? [];
 
   const legacyOffering = Boolean(loadedOffering && !loadedOffering.academicCalendarPeriodId);
   const calendarLocked = loadedOffering?.status === "Completed";
@@ -244,18 +246,36 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
 
   const pageTitle = editing ? "Edit offering" : "Add offering";
   const createBlocked = !editing && (!calendarContext || calendarLoading || courses.length === 0);
+  const setupSteps = [
+    { label: "Academic period", complete: legacyOffering || Boolean(calendarContext) },
+    { label: "Course & spec", complete: Boolean(courseId && courseSpecId) },
+    { label: "Weekly schedule", complete: meetings.length > 0 },
+    { label: "Teaching team", complete: Boolean(lecturerId) },
+  ];
 
   return (
     <>
       <Topbar title={pageTitle} subtitle="Course delivery is bound to the official Academic Calendar and applicable curriculum." />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="mx-auto max-w-3xl space-y-4">
+        <div className="mx-auto max-w-5xl space-y-4">
           <Breadcrumb><BreadcrumbList><BreadcrumbItem><BreadcrumbLink render={<Link href={BACK_HREF}>Course Offerings</Link>} /></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{pageTitle}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
 
           {error ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div> : null}
 
           {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : notFound ? <p className="text-sm text-muted-foreground">That offering could not be found. <Link href={BACK_HREF} className="underline">Back to Course Offerings</Link></p> : (
-            <form onSubmit={onSubmit} className="space-y-6 rounded-xl border border-border bg-card p-4 md:p-6">
+            <form onSubmit={onSubmit} className="space-y-6 rounded-2xl border border-border bg-card p-4 shadow-sm md:p-6">
+              <section aria-label="Offering setup progress" className="rounded-xl border border-border bg-muted/20 p-3">
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {setupSteps.map((step, index) => (
+                    <div key={step.label} className={"flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium " + (step.complete ? "bg-primary/10 text-primary" : "bg-background text-muted-foreground")}>
+                      <span className={"flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold " + (step.complete ? "bg-primary text-primary-foreground" : "border border-border bg-card")}>
+                        {step.complete ? "✓" : index + 1}
+                      </span>
+                      {step.label}
+                    </div>
+                  ))}
+                </div>
+              </section>
               <OfferingFormFields
                 control={control}
                 register={register}
@@ -276,12 +296,12 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 courseLocked={editing}
               />
 
-              <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+              <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-border bg-card/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6"><p className="hidden text-xs text-muted-foreground sm:block">Teaching dates are locked to the resolved published calendar.</p><div className="ml-auto flex items-center gap-2">
                 <Button type="button" variant="outline" nativeButton={false} render={<Link href={BACK_HREF}>Cancel</Link>} />
                 <Button type="submit" disabled={saving || createBlocked}>
                   {saving ? "Saving…" : editing ? "Save changes" : calendarContext ? `Create · ${academicSemesterLabel(calendarContext.semester)}` : "Add offering"}
                 </Button>
-              </div>
+              </div></div>
             </form>
           )}
         </div>
