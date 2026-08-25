@@ -68,12 +68,13 @@ export function ThemedDocumentPages({
         /* The fixed-page preview cannot physically keep one CSS grid across a
            page break. Page 2 therefore resumes Part 1 with exactly one full-width
            continuation row. Its outer border aligns to the 54px programme table
-           edges, and every PLO element stays inside that row. */
+           edges, and every PLO element stays inside that row. The 42px top gap
+           matches the programme-page vertical inset used by the document style. */
         .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
           box-sizing: border-box;
           height: auto !important;
           width: auto;
-          margin: 0 54px;
+          margin: 42px 54px 0;
           padding: 8px !important;
           border: 1px solid #000;
         }
