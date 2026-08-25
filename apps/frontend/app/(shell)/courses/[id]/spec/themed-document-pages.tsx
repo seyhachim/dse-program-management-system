@@ -68,8 +68,9 @@ export function ThemedDocumentPages({
         }
 
         /* Part 1 has fixed approved typography independent of the saved body
-           theme: institution/programme header is 11pt bold Times New Roman and
-           the Part 1 title is 14pt bold Times New Roman. */
+           theme: the institution, faculty, department, programme and Course
+           Specification header lines are 11pt bold Times New Roman; the Part 1
+           title is 14pt bold Times New Roman. */
         .course-spec-theme-root #programme-overview header > p {
           font-family: "Times New Roman", Times, serif !important;
           font-size: 11pt !important;
