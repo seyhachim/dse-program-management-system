@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import Link from "next/link";
 import { Bell, BookOpen, CalendarDays, ChevronRight, Clock3, MapPin, Target } from "lucide-react";
 import { Progress } from "@dse-pms/ui";
+import { formatAcademicDate, academicSemesterLabel } from "@/lib/academic-calendar";
 import { assessmentDeadline, meetingLabel, studentPortalApi } from "@/lib/student-portal";
 import { EmptyState, PortalError, PortalLoading, usePortalData } from "./portal-state";
 
@@ -13,6 +14,8 @@ export function PortalHome() {
   if (loading) return <PortalLoading />;
   if (error || !data) return <PortalError message={error ?? "Could not load your portal"} />;
   const nextMeeting = data.courses.flatMap((course) => course.meetings.map((meeting) => ({ course, meeting })))[0];
+  const calendar = data.academicCalendar;
+  const firstCalendarPeriod = calendar.status === "available" ? calendar.periods[0] ?? null : null;
 
   return <div className="mx-auto max-w-7xl space-y-6">
     <section className="rounded-2xl bg-gradient-to-br from-primary to-primary/80 p-6 text-primary-foreground shadow-sm">
@@ -29,6 +32,17 @@ export function PortalHome() {
         <p className="mt-5 text-3xl font-bold">{data.overallAchievement === null ? "—" : `${data.overallAchievement}%`}</p><Progress className="mt-3" value={data.overallAchievement ?? 0} /><p className="mt-2 text-xs text-muted-foreground">Calculated from published assessment evidence.</p>
       </section>
     </div>
+
+    <Link href="/portal/academic-calendar" className="group block rounded-2xl border border-border bg-card p-5 transition hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /><h3 className="font-semibold">Academic Calendar</h3></div>
+          {calendar.status === "available" && firstCalendarPeriod ? <><p className="mt-2 text-sm font-medium">{academicSemesterLabel(firstCalendarPeriod.semester)} · {formatAcademicDate(firstCalendarPeriod.teachingStart)} – {formatAcademicDate(firstCalendarPeriod.teachingEnd)}</p><p className="mt-1 text-xs text-muted-foreground">{calendar.nextEvent ? `Next: ${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}` : "No upcoming event is currently published."}</p></> : <><p className="mt-2 text-sm font-medium">Calendar not available yet</p><p className="mt-1 text-xs text-muted-foreground">{calendar.message}</p></>}
+        </div>
+        <span className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary">View full calendar <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
+      </div>
+    </Link>
+
     <div className="grid gap-6 lg:grid-cols-5">
       <section className="space-y-3 lg:col-span-3"><div className="flex items-center justify-between"><h3 className="text-lg font-semibold">My courses</h3><Link className="text-sm font-medium text-primary" href="/portal/courses">View all</Link></div>
         {data.courses.length ? <div className="grid gap-3 sm:grid-cols-2">{data.courses.slice(0,4).map((course) => <Link key={course.offeringId} href={`/portal/courses/${course.offeringId}`} className="group rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"><div className="flex items-start justify-between"><span className="rounded-lg bg-primary/10 p-2 text-primary"><BookOpen className="h-5 w-5" /></span><ChevronRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-1" /></div><p className="mt-4 text-xs font-semibold uppercase tracking-wide text-primary">{course.code} · Section {course.sectionCode}</p><h4 className="mt-1 font-semibold">{course.title}</h4><p className="mt-2 text-sm text-muted-foreground">{course.lecturer?.name ?? "Lecturer TBA"}</p></Link>)}</div> : <EmptyState title="No enrolled courses" description="Your courses will appear after enrollment." />}
