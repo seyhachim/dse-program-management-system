@@ -126,7 +126,7 @@ function EventTimeline({ events, nextEventKey }: { events: CalendarEvent[]; next
     <div className="relative ml-2 space-y-1 before:absolute before:bottom-4 before:left-[4.5rem] before:top-4 before:w-px before:bg-border sm:before:left-[7.5rem]">
       {events.map((event) => {
         const state = eventState(event);
-        const isNext = event.id === nextEventKey;
+        const isNext = nextEventKey === `event:${event.id}`;
         return (
           <div key={event.id} className="relative grid grid-cols-[4rem_1fr] gap-4 py-3 sm:grid-cols-[7rem_1fr]">
             <div className="text-right">
