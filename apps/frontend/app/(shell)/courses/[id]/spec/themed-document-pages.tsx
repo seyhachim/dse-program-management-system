@@ -4,7 +4,6 @@ import type { CSSProperties } from "react";
 import type { CourseSpecDocumentTheme } from "@dse-pms/shared-types";
 import type { CourseDocumentModel } from "./course-document-model";
 import { DocumentPages } from "./document-preview-pages";
-import { programmePloCountLabel } from "./plo-preview-format";
 
 export function ThemedDocumentPages({
   document,
@@ -44,7 +43,6 @@ export function ThemedDocumentPages({
       data-show-header={String(theme.showHeader)}
       data-show-footer={String(theme.showFooter)}
       data-show-page-numbers={String(theme.showPageNumbers)}
-      data-plo-count-label={programmePloCountLabel(document.plos.length)}
     >
       <DocumentPages document={document} zoom={zoom} />
       <style jsx global>{`
@@ -67,42 +65,16 @@ export function ThemedDocumentPages({
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
 
-        /* Part 1's PLO content is one logical full-width row after the PEO row.
-           Page 1 starts that row with the heading and intro. Because the preview
-           uses fixed physical pages, Page 2 continues the same row with its left,
-           right, and bottom borders around the matrix and notes; there is no top
-           border on Page 2, so it does not read as a second standalone box. */
-        .course-spec-theme-root #programme-overview .grid.border.border-black::after {
-          content: "PROGRAM LEARNING OUTCOME (PLOs)\\A Our program has " attr(data-plo-count-label) " PLOs:";
-          grid-column: 1 / -1;
-          display: block;
-          box-sizing: border-box;
-          padding: 8px;
-          border-top: 1px solid #000;
-          white-space: pre-line;
-          font-size: 10px;
-          line-height: 1.2;
-          font-weight: 400;
-        }
-
-        .course-spec-theme-root #programme-overview .grid.border.border-black::after::first-line {
-          font-weight: 700;
-        }
-
+        /* Part 1 continues on page 2 with one complete full-width PLO row.
+           Keep the heading, intro, matrix and notes together inside that row,
+           aligned to the same 54px programme-profile table inset. The row sizes
+           to its content instead of stretching to the full physical page. */
         .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
           box-sizing: border-box;
           height: auto !important;
-          margin: 0 30px;
+          margin: 18px 54px 0;
           padding: 8px !important;
-          border-left: 1px solid #000;
-          border-right: 1px solid #000;
-          border-bottom: 1px solid #000;
-          border-top: 0;
-        }
-
-        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2,
-        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2 + p {
-          display: none !important;
+          border: 1px solid #000;
         }
 
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p,
