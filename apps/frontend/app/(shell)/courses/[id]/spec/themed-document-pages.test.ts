@@ -26,7 +26,7 @@ describe("Course Specification theme boundaries", () => {
     expect(source).not.toContain("article[data-doc-page]::before");
   });
 
-  test("continues Part 1 with a PLO heading row and leaves page 2 unframed", async () => {
+  test("keeps the complete PLO block inside the Part 1 continuation row", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
     expect(source).toContain("data-plo-count-label");
@@ -37,11 +37,16 @@ describe("Course Specification theme boundaries", () => {
     expect(source).toContain("grid-column: 1 / -1;");
     expect(source).toContain("border-top: 1px solid #000;");
     expect(source).toContain(
+      "article[data-doc-page] > #plo-taxonomy",
+    );
+    expect(source).toContain("margin: 0 30px;");
+    expect(source).toContain("border-left: 1px solid #000;");
+    expect(source).toContain("border-right: 1px solid #000;");
+    expect(source).toContain("border-bottom: 1px solid #000;");
+    expect(source).toContain("border-top: 0;");
+    expect(source).toContain(
       "article[data-doc-page] > #plo-taxonomy > h2 + p",
     );
-    expect(source).toContain("padding: 18px 30px !important;");
-    expect(source).not.toContain("margin-left: 30px;");
-    expect(source).not.toContain("margin-right: 30px;");
-    expect(source).not.toContain("#plo-taxonomy {\n          box-sizing: border-box;\n          height: auto !important;");
+    expect(source).not.toContain("border: 1px solid #000;");
   });
 });
