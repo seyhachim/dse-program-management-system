@@ -1,0 +1,67 @@
+name: CourseSpec Import Catalog Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/scripts/course-spec-import.ts"
+      - "apps/backend/scripts/course-spec-import-course.ts"
+      - "apps/backend/scripts/course-spec-import-course-db.test.ts"
+      - ".github/workflows/course-spec-import-catalog-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/backend/scripts/course-spec-import.ts"
+      - "apps/backend/scripts/course-spec-import-course.ts"
+      - "apps/backend/scripts/course-spec-import-course-db.test.ts"
+      - ".github/workflows/course-spec-import-catalog-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-integrity:
+    name: Existing Course catalog remains immutable
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_ci?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+      - name: Seed clean database
+        run: bun run seed
+
+      - name: Verify CourseSpec import preserves existing Course catalog
+        run: bun test apps/backend/scripts/course-spec-import-course-db.test.ts
+        env:
+          COURSE_SPEC_IMPORT_DB_TESTS: "1"
