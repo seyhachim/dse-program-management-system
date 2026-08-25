@@ -49,17 +49,23 @@ describe("Course Specification Word layout", () => {
     expect(source).toContain("function partTwoContinuationRows");
     expect(source).toContain("columnSpan: 4");
     expect(source).toContain("partTwoContinuationRow(cloSection(document))");
-    expect(source).toContain('sectionTitle("15"');
-    expect(source).toContain('sectionTitle("16"');
-    expect(source).toContain('sectionTitle("17"');
-    expect(source).toContain('sectionTitle("18"');
-    expect(source).toContain('sectionTitle("19"');
-    expect(source).toContain('sectionTitle("20"');
-    expect(source).toContain('sectionTitle("21"');
-    expect(source).toContain('sectionTitle("22"');
-    expect(source).toContain('sectionTitle("23"');
-    expect(source).toContain('sectionTitle("24"');
-    expect(source).toContain('sectionTitle("25"');
+
+    for (const title of [
+      "Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods",
+      "Distribution of Student Learning Time (SLT)",
+      "Course Assessment Plan",
+      "Course Outline/detailed lesson plan",
+      "Required Resources to Deliver the Course",
+      "References / Textbooks",
+      "Student Responsibility",
+      "Rubric",
+      "Course Policy",
+      "Rating Scale",
+      "Date",
+    ]) {
+      expect(source).toContain(title);
+    }
+
     expect(source).toContain(
       "courseInformationTable(info, partTwoContinuationRows(document))",
     );
