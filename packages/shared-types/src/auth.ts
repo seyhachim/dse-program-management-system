@@ -20,6 +20,12 @@ export const CreateAccountInput = z.object({
 });
 export type CreateAccountInput = z.infer<typeof CreateAccountInput>;
 
+/** Result of rotating and sending a fresh pending lecturer invitation. */
+export const ResendInvitationResponse = z.object({
+  email: z.string().email(),
+});
+export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
+
 /**
  * Application roles. `qa_contributor` is intentionally additive: a lecturer or
  * other staff member can hold it alongside their existing role to work on an
