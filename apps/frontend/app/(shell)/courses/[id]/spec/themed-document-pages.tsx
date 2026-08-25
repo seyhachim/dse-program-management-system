@@ -65,15 +65,31 @@ export function ThemedDocumentPages({
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
 
-        /* Match the Word export's page-break composition used for Part 2:
-           normal document margins, then heading/content/table. The PLO matrix
-           keeps its own borders; there is no extra outer section frame. */
+        /* The fixed-page preview cannot physically keep one CSS grid across a
+           page break. Page 2 therefore resumes Part 1 with exactly one full-width
+           continuation row. Its outer border aligns to the 54px programme table
+           edges, and every PLO element stays inside that row. */
         .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
           box-sizing: border-box;
           height: auto !important;
-          margin: 0;
-          padding: 38px 54px !important;
-          border: 0;
+          width: auto;
+          margin: 0 54px;
+          padding: 8px !important;
+          border: 1px solid #000;
+        }
+
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2 {
+          margin: 0 !important;
+          font-size: 10px !important;
+          line-height: 1.2 !important;
+          text-transform: uppercase;
+        }
+
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2 + p {
+          margin-top: 4px !important;
+          margin-bottom: 6px !important;
+          font-size: 10px !important;
+          line-height: 1.2 !important;
         }
 
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p,
