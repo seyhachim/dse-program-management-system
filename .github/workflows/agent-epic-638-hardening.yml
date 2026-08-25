@@ -38,9 +38,11 @@ jobs:
       - run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
       - run: bun test packages/shared-types/src/offerings.test.ts apps/backend/src/plugins/offerings/academic-calendar-contract.test.ts apps/backend/src/plugins/programme/academic-calendar-domain.test.ts apps/backend/src/plugins/programme/academic-calendar-router.test.ts
       - run: bun run typecheck
-      - name: Commit hardened implementation and remove bootstrap files
+      - name: Commit verified code hardening
         run: |
-          rm scripts/agent-epic-638-hardening.ts .github/workflows/agent-epic-638-hardening.yml
+          # The repository token may write source files but not workflow files. Keep CI/bootstrap
+          # changes out of this bot-authored commit; they are applied through the GitHub connector.
+          git restore -- .github/workflows/ci.yml scripts/agent-epic-638-hardening.ts .github/workflows/agent-epic-638-hardening.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
