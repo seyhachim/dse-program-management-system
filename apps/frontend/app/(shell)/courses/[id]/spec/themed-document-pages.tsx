@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import type { CourseSpecDocumentTheme } from "@dse-pms/shared-types";
 import type { CourseDocumentModel } from "./course-document-model";
 import { DocumentPages } from "./document-preview-pages";
+import { programmePloCountLabel } from "./plo-preview-format";
 
 export function ThemedDocumentPages({
   document,
@@ -43,6 +44,7 @@ export function ThemedDocumentPages({
       data-show-header={String(theme.showHeader)}
       data-show-footer={String(theme.showFooter)}
       data-show-page-numbers={String(theme.showPageNumbers)}
+      data-plo-count-label={programmePloCountLabel(document.plos.length)}
     >
       <DocumentPages document={document} zoom={zoom} />
       <style jsx global>{`
@@ -65,18 +67,35 @@ export function ThemedDocumentPages({
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
         }
 
-        /* Part 1 continues onto the PLO page. Render that page as one full-width
-           continuation row aligned to the programme-profile table instead of as
-           a separately framed document section. The inner PLO matrix keeps its
-           own borders unchanged. */
+        /* Part 1's PLO heading is the next full-width row after the PEO row.
+           The matrix itself remains on page 2 because the preview uses fixed
+           physical pages; page 2 therefore contains only the continued row's
+           matrix and notes, not another independently framed section. */
+        .course-spec-theme-root #programme-overview .grid.border.border-black::after {
+          content: "PROGRAM LEARNING OUTCOME (PLOs)\\A Our program has " attr(data-plo-count-label) " PLOs:";
+          grid-column: 1 / -1;
+          display: block;
+          box-sizing: border-box;
+          padding: 8px;
+          border-top: 1px solid #000;
+          white-space: pre-line;
+          font-size: 10px;
+          line-height: 1.2;
+          font-weight: 400;
+        }
+
+        .course-spec-theme-root #programme-overview .grid.border.border-black::after::first-line {
+          font-weight: 700;
+        }
+
         .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
           box-sizing: border-box;
-          height: auto !important;
-          margin-top: 18px;
-          margin-left: 30px;
-          margin-right: 30px;
-          padding: 8px !important;
-          border: 1px solid #000;
+          padding: 18px 30px !important;
+        }
+
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2,
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2 + p {
+          display: none !important;
         }
 
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p,
