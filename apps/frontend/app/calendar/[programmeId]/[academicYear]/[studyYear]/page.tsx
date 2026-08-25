@@ -32,7 +32,7 @@ export default function PublicAcademicCalendarPage({ params }: { params: { progr
   const endpoint = useMemo(() => {
     if (!studyYear) return null;
     const query = new URLSearchParams({ studyYear: String(studyYear), academicYear });
-    return `${API_URL}/api/public/programmes/${encodeURIComponent(programmeId)}/academic-calendar?${query.toString()}`;
+    return `${API_URL}/api/programme/public/programmes/${encodeURIComponent(programmeId)}/academic-calendar?${query.toString()}`;
   }, [programmeId, academicYear, studyYear]);
 
   useEffect(() => {
