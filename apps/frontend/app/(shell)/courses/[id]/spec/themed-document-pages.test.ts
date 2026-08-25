@@ -26,22 +26,25 @@ describe("Course Specification theme boundaries", () => {
     expect(source).not.toContain("article[data-doc-page]::before");
   });
 
-  test("uses the Word-style page composition for the PLO continuation", async () => {
+  test("renders the complete PLO block as the full-width Part 1 continuation row", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
     expect(source).toContain(
       "article[data-doc-page] > #plo-taxonomy",
     );
     expect(source).toContain("height: auto !important;");
-    expect(source).toContain("margin: 0;");
-    expect(source).toContain("padding: 38px 54px !important;");
-    expect(source).toContain("border: 0;");
+    expect(source).toContain("margin: 0 54px;");
+    expect(source).toContain("padding: 8px !important;");
+    expect(source).toContain("border: 1px solid #000;");
+    expect(source).toContain(
+      "article[data-doc-page] > #plo-taxonomy > h2",
+    );
+    expect(source).toContain("font-size: 10px !important;");
 
     expect(source).not.toContain("data-plo-count-label");
     expect(source).not.toContain(
       "#programme-overview .grid.border.border-black::after",
     );
-    expect(source).not.toContain("margin: 18px 54px 0;");
-    expect(source).not.toContain("border: 1px solid #000;");
+    expect(source).not.toContain("padding: 38px 54px !important;");
   });
 });
