@@ -1,0 +1,36 @@
+name: Temporary Part 1 DOCX Patch
+
+on:
+  push:
+    branches:
+      - fix/course-spec-part1-plo-row
+    paths:
+      - .github/workflows/temp-part1-docx-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-docx-renderer:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/course-spec-part1-plo-row
+          fetch-depth: 0
+
+      - name: Apply scoped Part 1 DOCX patch
+        run: python scripts/temp_patch_course_spec_docx_part1.py
+
+      - name: Validate patch whitespace
+        run: git diff --check
+
+      - name: Commit patched renderer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'apps/frontend/app/(shell)/courses/[id]/spec/document-word-renderer.ts'
+          git commit -m 'fix(course-spec): align DOCX Part 1 with preview'
+          git push origin HEAD:fix/course-spec-part1-plo-row
