@@ -1,0 +1,23 @@
+{
+  "package": "reviewed-2-blank-assessment-weights",
+  "issue": "#652",
+  "courses": [
+    {
+      "legacyCode": "EIN302",
+      "courseCode": "EIN302",
+      "assessmentItems": 12,
+      "weights": "blank/null",
+      "legacySourceTotalPercent": 105.0,
+      "reviewRequired": true
+    },
+    {
+      "legacyCode": "STR102",
+      "courseCode": "STA102",
+      "assessmentItems": 12,
+      "weights": "blank/null",
+      "legacySourceTotalPercent": 98.0,
+      "reviewRequired": true
+    }
+  ],
+  "note": "Use only after issue #652 importer change is merged; assessmentPlan must remain Draft when any imported weight is null."
+}

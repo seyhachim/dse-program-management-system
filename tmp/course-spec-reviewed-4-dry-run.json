@@ -1,0 +1,50 @@
+{
+  "summary": {
+    "mode": "dry-run",
+    "total": 4,
+    "ready": 4,
+    "created": 0,
+    "replaced": 0,
+    "skipped": 0,
+    "blocked": 0,
+    "failed": 0
+  },
+  "results": [
+    {
+      "file": "D:\\Projects\\rupp\\dse\\dse-program-management-system\\tmp\\dse-course-spec-import-2026-reviewed-4-approved\\courses\\CCS101.json",
+      "courseCode": "CCS101",
+      "action": "ready",
+      "warnings": [
+        "Semester metadata conflict: source folder=2, extracted document=1; Course Information snapshot uses source folder",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "D:\\Projects\\rupp\\dse\\dse-program-management-system\\tmp\\dse-course-spec-import-2026-reviewed-4-approved\\courses\\MAT202.json",
+      "courseCode": "MAT202",
+      "action": "ready",
+      "warnings": [
+        "Semester metadata conflict: source folder=1, extracted document=2; Course Information snapshot uses source folder",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "D:\\Projects\\rupp\\dse\\dse-program-management-system\\tmp\\dse-course-spec-import-2026-reviewed-4-approved\\courses\\PDT102.json",
+      "courseCode": "PDT102",
+      "action": "ready",
+      "warnings": [
+        "Programme year metadata conflict: source folder=2, extracted document=1; Course Information snapshot uses source folder",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    },
+    {
+      "file": "D:\\Projects\\rupp\\dse\\dse-program-management-system\\tmp\\dse-course-spec-import-2026-reviewed-4-approved\\courses\\SCA402.json",
+      "courseCode": "SCA402",
+      "action": "ready",
+      "warnings": [
+        "Programme year metadata conflict: source folder=3, extracted document=4; Course Information snapshot uses source folder",
+        "Semester/programme year were snapshotted on the CourseSpec; no Offering was created because Offering requires a real term"
+      ]
+    }
+  ]
+}

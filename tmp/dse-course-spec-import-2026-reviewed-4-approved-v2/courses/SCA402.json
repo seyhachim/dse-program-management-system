@@ -1,0 +1,1044 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "SCA302_Supply Chain Analytics.docx",
+    "relativePath": "Year 3/S2/SCA302_Supply Chain Analytics.docx",
+    "sha256": "7bd78be6a9205719c8e2b62e1764a7ccec3fad0eeff611d72a83f68850df3ec2",
+    "yearFolder": 3,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "SCA402",
+    "title": "Supply Chain Analytics",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 2,
+      "year": 4
+    },
+    "description": "This course provides students with a comprehensive foundation in simulating business processes to analyze performance, improve efficiency, and support decision-making. Students will explore the principles of discrete-event simulation, system variability, and process flow logic through hands-on experience with industry-standard tools Arena. The course covers the full simulation lifecycle, including process mapping, data input collection, model building, experimentation, and result interpretation. Emphasis is placed on identifying operational bottlenecks, testing what-if scenarios, and developing optimization strategies. By the end of the course, students will be able to construct realistic simulation models and use them to evaluate and improve real-world systems in manufacturing, logistics, and service operations."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Dr. Tieng Kimseng",
+      "qualification": "Ph.D.",
+      "email": "tieng.kimseng@rupp.edu.kh",
+      "phone": "0979 10 50 80"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "CLO 1: To explain fundamental concepts of simulation in the context of real-world business and supply chain operation. - LLO 1.1: To explain components of Module entities including create, process, dispose, decide, record. - LLO 1.2: To explain components of Spreadsheet entities including entities, resource, queue, variable, attribute, and statistics. - LLO 1.3: To explain others components including waiting time, number of waiting, resource utilization, capacity, and run set up.",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C2",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture-based learning",
+      "assessmentMethodsRaw": "MCQ on Kahoot"
+    },
+    {
+      "code": "CLO2",
+      "description": "CLO 2: To study features of ARENA software by solving simple problems in business and supply chain context. - LLO 2.1: To explore features of ARENA and use it to solve problems. - LLO 2.2: To modify model based on instruction and visualize through graph. - LLO 2.3: To create different scenarios for cross- case comparison and propose a practical solution based on real world context",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture-based learning Lab-based learning",
+      "assessmentMethodsRaw": "Lab 1 Report Lab 2 Report Lab 3 Report Midterm Exam"
+    },
+    {
+      "code": "CLO3",
+      "description": "CLO 3: To construct simulation model in ARENA Software to solve complex problems in business and supply chain context. - LLO 3.1: To define type of distribution using Input Analyzer tool to input data in ARENA. - LLO 3.2: To fasten optimization process by using Process Analyzer tool. - LLO 3.3: To define possible solutions and select the best one using Opt-Quest Tool.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture-based learning Lab-based learning",
+      "assessmentMethodsRaw": "Lab 4 Report Lab 5 Report Lab 6 Report Final Exam"
+    },
+    {
+      "code": "CLO4",
+      "description": "CLO 4: To solve a real-world project using ARENA and communicate finding with stakeholders based on local business context. - LLO 4.1: To build a power point to share research finding and its practical solution to class - LLO 4.2: To present research finding by convincing and sell solutions to the stakeholders. - LLO 4.3: To draft research article using format provided",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C6",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based learning",
+      "assessmentMethodsRaw": "Proposal presentation Final report Final presentation"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Introduction - Course Syallabus - Get to know each others - Get to know Simulation - Software installation",
+        "1",
+        "2",
+        "2",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "0",
+        "4"
+      ],
+      [
+        "2",
+        "Introduction - Fundamental Simulation Concept - Build a simple model to learn basic features, e.g., create, process, dispose. - Learn how arena work",
+        "1, 2",
+        "2",
+        "1",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "0",
+        "3"
+      ],
+      [
+        "3",
+        "Lab 1 - Load an existing model - Learn flowchart, spreadsheet, entity, queue, resource, - Change run configuration - Run a model - Interpret ARENA statistical outputs - Modify graphics and animation",
+        "2",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "4",
+        "Lab 2 - Build a model from scratch - Examine Arena Outputs - Modify the model based on a series of embellishments",
+        "2",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "5",
+        "Lab 2 (Con't) - Plot Graph on ARENA model - Add animation to the model - Test with different replication - Calculate Cconfidence interval - Cross-check output from software with hand calculation",
+        "2",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "6",
+        "Lab 3 - Build a more comprehensive problem by simulating for the \"Printed Circuit Boards Manufacturing\" - Modify the model based on a series of embellishments - Explore more features, i.e., assign, attribute, half-width, cycle time",
+        "2",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "7",
+        "Lab 3 (Con't) - Build a more comprehensive problem by simulating for the \"Printed Circuit Boards Manufacturing\" - Modify the model based on a series of embellishments - Explore more features, i.e., assign, attribute, half-width, cycle time",
+        "2",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "8",
+        "Midterm",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "9",
+        "Midterm Correction - Ask students to correct problems - Give feedback and critical points Term project Introduction - Project Proposal Guideline - Power point Template - Final Report Template - Data Input Template",
+        "4",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "0",
+        "4"
+      ],
+      [
+        "10",
+        "Lab 4 - Apply Input analyzer to define distribution for the data set - Update proposal",
+        "3, 4",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "11",
+        "Proposal Presentation - Submit proposal power point - Submit proposal report - Submit related documents - Get feedback for improvement",
+        "3, 4",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "0",
+        "4"
+      ],
+      [
+        "12",
+        "Lab 5 - Explore more advanced concepts, i.g., set schedule, assign schedule, create tally set, resource set, and arrival schedules - Create sub-model - Modify the model based on a series of embellishments - Update term project",
+        "3, 4",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "13",
+        "Lab 5 (Con't) - Explore more advanced concepts, i.g., set schedule, assign schedule, create tally set, resource set, and arrival schedules - Create sub-model - Modify the model based on a series of embellishments - Update term project",
+        "3, 4",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "14",
+        "Lab 6 - Process Analyzer - OptQuest for optimization - Update term project",
+        "3, 4",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "1",
+        "5"
+      ],
+      [
+        "15",
+        "Final presentation - Submit final report - Submit final power point - Submit evidence on project implementation - Final Presentation",
+        "3, 4",
+        "1",
+        "3",
+        "0",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "0",
+        "4"
+      ],
+      [
+        "16",
+        "Final Exam",
+        "",
+        "0",
+        "0",
+        "3",
+        "0",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Course Content",
+        "64"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "80%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Quizs o Kahoot",
+        "6%",
+        "1",
+        "",
+        "",
+        "1"
+      ],
+      [
+        "2",
+        "In-class Labs o Lab 1: Explore Arena model o Lab 2: Build Model and Plot Graph o Lab 3: Printed Circuit Boards Manufacturing o Lab 4: Input Analyzer o Lab 5: Advanced Model in Arena o Lab 6: Process Analyzer & Opt Quest",
+        "24%",
+        "",
+        "",
+        "6",
+        "6"
+      ],
+      [
+        "3",
+        "Term Project o Proposal Presentation o Final Presentation o Final Report (Research Article Format)",
+        "30%",
+        "",
+        "",
+        "20",
+        "20"
+      ],
+      [
+        "4",
+        "Midterm exam",
+        "20%",
+        "3",
+        "",
+        "9",
+        "12"
+      ],
+      [
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "39"
+      ],
+      [
+        "Final Assessment",
+        "20%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "20%",
+        "3",
+        "",
+        "14",
+        "17"
+      ],
+      [
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "17"
+      ],
+      [
+        "Total SLT for Assessment",
+        "56"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "o Kahoot (Explain more on wrong Ans)",
+      "mode": "individual",
+      "weightPercent": 6.0,
+      "sltHours": 7.0,
+      "capLevel": "C2",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 1: Explore Arena model",
+      "mode": "individual",
+      "weightPercent": 4.0,
+      "sltHours": 5.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 2: Build Model and Plot Graph",
+      "mode": "individual",
+      "weightPercent": 4.0,
+      "sltHours": 5.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Lab 3: Printed Circuit Boards Manufacturing",
+      "mode": "individual",
+      "weightPercent": 4.0,
+      "sltHours": 5.0,
+      "capLevel": "A3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "o Midterm",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 23.0,
+      "capLevel": "A3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "o Lab 4: Input Analyzer",
+      "mode": "individual",
+      "weightPercent": 4.0,
+      "sltHours": 5.0,
+      "capLevel": "P3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "o Lab 5: Advanced Model in Arena",
+      "mode": "individual",
+      "weightPercent": 4.0,
+      "sltHours": 5.0,
+      "capLevel": "P3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "o Lab 6: Process Analyzer & Opt Quest",
+      "mode": "individual",
+      "weightPercent": 4.0,
+      "sltHours": 5.0,
+      "capLevel": "P3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "o Final Exam",
+      "mode": "individual",
+      "weightPercent": 20.0,
+      "sltHours": 23.0,
+      "capLevel": "P3",
+      "modeRaw": "I"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "o Proposal Presentation",
+      "mode": "group",
+      "weightPercent": 10.0,
+      "sltHours": 13.0,
+      "capLevel": "C6",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "o Final Report (Research Article Format)",
+      "mode": "group",
+      "weightPercent": 10.0,
+      "sltHours": 13.0,
+      "capLevel": "C6",
+      "modeRaw": "G"
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "o Final Presentation",
+      "mode": "group",
+      "weightPercent": 10.0,
+      "sltHours": 13.0,
+      "capLevel": "C6",
+      "modeRaw": "G"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Introduction - Course Syallabus - Get to know each others - Get to know Simulation - Software installation",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "ILO: Students are able to - Speak to each other - Create new friends - Know plan for the semester - Get familiar with the course"
+      },
+      {
+        "number": 2,
+        "title": "Introduction - Fundamental Simulation Concept - Build a simple model to learn basic features, e.g., create, process, dispose. - Learn how arena work",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to - Use create, process, dispose - Construct a simple ARENA model - Read outcomes"
+      },
+      {
+        "number": 3,
+        "title": "Lab 1 - Load an existing model - Learn flowchart, spreadsheet, entity, queue, resource, - Change run configuration - Run a model - Interpret ARENA statistical outputs - Modify graphics and animation",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to - Upload existing model - Know flowchart, spreadsheet, entity - Use queue, resource - Modify and run model"
+      },
+      {
+        "number": 4,
+        "title": "Lab 2 - Build a model from scratch - Examine Arena Outputs - Modify the model based on a series of embellishments",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to - Build a model from scratch - Read Arena outputs - Modify and rund more complex model"
+      },
+      {
+        "number": 5,
+        "title": "Lab 2 (Con't) - Plot Graph on ARENA model - Add animation to the model - Test with different replication - Calculate Cconfidence interval - Cross-check output from software with hand calculation",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to - Draw graph - Plot graph - Add animation - Run in different replication - Compare results from hand calculation and software calculation"
+      },
+      {
+        "number": 6,
+        "title": "Lab 3 - Build a more comprehensive problem by simulating for the \"Printed Circuit Boards Manufacturing\" - Modify the model based on a series of embellishments - Explore more features, i.e., assign, attribute, half-width, cycle time",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to - Use Assign module - Knowledge attribute, half-width, cycle time - Build a complex model"
+      },
+      {
+        "number": 7,
+        "title": "Lab 3 (Con't) - Build a more comprehensive problem by simulating for the \"Printed Circuit Boards Manufacturing\" - Modify the model based on a series of embellishments - Explore more features, i.e., assign, attribute, half-width, cycle time",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "ILO: Students are able to - Use Assign module - Knowledge attribute, half-width, cycle time - Build a complex model"
+      },
+      {
+        "number": 8,
+        "title": "",
+        "clos": [],
+        "llosRaw": "Midterm"
+      },
+      {
+        "number": 9,
+        "title": "Midterm Correction - Ask students to correct problems - Give feedback and critical points Term project Introduction - Project Proposal Guideline - Power point Template - Final Report Template - Data Input Template",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to - Define flaw points in exam - Avoid simple mistake - Realize what to do in their project - Realize how to input data - Realize flow of power point to produce"
+      },
+      {
+        "number": 10,
+        "title": "Lab 4 - Apply Input analyzer to define distribution for the data set - Update proposal",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to - Use data to define type of distribution - Realize how to use distribution in arena - Create data to define distribution types"
+      },
+      {
+        "number": 11,
+        "title": "Proposal Presentation - Submit proposal power point - Submit proposal report - Submit related documents - Get feedback for improvement",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to - Present their proposal - Draft their additional plan - Share their challeages"
+      },
+      {
+        "number": 12,
+        "title": "Lab 5 - Explore more advanced concepts, i.g., set schedule, assign schedule, create tally set, resource set, and arrival schedules - Create sub-model - Modify the model based on a series of embellishments - Update term project",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to - Set schedule - Assign schedule - Create tally set & resource set - Update their project progress"
+      },
+      {
+        "number": 13,
+        "title": "Lab 5 (Con't) - Explore more advanced concepts, i.g., set schedule, assign schedule, create tally set, resource set, and arrival schedules - Create sub-model - Modify the model based on a series of embellishments - Update term project",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to - Set schedule - Assign schedule - Create tally set & resource set - Update their project progress"
+      },
+      {
+        "number": 14,
+        "title": "Lab 6 - Process Analyzer - OptQuest for optimization - Update term project",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to - Use Process Analyzer tool - Use optQuest to optimize simulation - Update their term project"
+      },
+      {
+        "number": 15,
+        "title": "Final presentation - Submit final report - Submit final power point - Submit evidence on project implementation - Final Presentation",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": "ILO: Students are able to - Produce a comprehensive PPT - Produce a complete report - Present in a convincing way"
+      },
+      {
+        "number": 16,
+        "title": "Final Exam",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "llosRaw": ""
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "(2/2/0/0)",
+        "lectureTopic": "Introduction - Course Syallabus - Get to know each others - Get to know Simulation - Software installation",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Human Knot Game - Software installation",
+        "activeLearningRaw": "Teaching-Learning Activities (1) Lecture-based learning - Present course syllabus - Share personal Profile - Get to know students (2) Human Knot Game: - Form one big group - Hold hand complexly - Solve it - Challenge on remembering name (3) Software installation - Download Software - Install Software",
+        "assessmentRaw": "",
+        "resourcesRaw": "> PPT > Course Spec"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Introduction - Fundamental Simulation Concept - Build a simple model to learn basic features, e.g., create, process, dispose. - Learn how arena work",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - What's is Simulation? - Basic Arena Navigation (2) Lab-based learning - Build a simple model on ARENA - Run and test with different scenarios",
+        "assessmentRaw": "6",
+        "resourcesRaw": "> PPT > ARENA > Kahoot"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 1 - Load an existing model - Learn flowchart, spreadsheet, entity, queue, resource, - Change run configuration - Run a model - Interpret ARENA statistical outputs - Modify graphics and animation",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - Explain existing model - Explain flowchart, spreadsheet, entity - Explain queue and resource - Go step by step with the lab (2) Lab-based learning - Upload model - Add queue and resource - Modify model based on instruction - Run the model - Read outcomes - Record answers on student handouts",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lab 1: Handout & Submission"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 2 - Build a model from scratch - Examine Arena Outputs - Modify the model based on a series of embellishments",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - Explain purpose of problem - Explain how to read outputs from arena (2) Lab-based learning - Read problems - Build model on ARENA - Debug problems - Run the model - Read outcomes - Record answers on student handouts",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lab 2: Handout"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 2 (Con't) - Plot Graph on ARENA model - Add animation to the model - Test with different replication - Calculate Cconfidence interval - Cross-check output from software with hand calculation",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - Show how build graph - Show how to add animation - Show how CI is calculated (2) Lab-based learning - Build graph on ARENA - Add animation to the model - Compare outcomes of CI from hand calculation and software output",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lab 2: Submission"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 3 - Build a more comprehensive problem by simulating for the \"Printed Circuit Boards Manufacturing\" - Modify the model based on a series of embellishments - Explore more features, i.e., assign, attribute, half-width, cycle time",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - Define how assign model is used - Define what is half-width - Define how cycle time is used (2) Lab-based learning - Read problem description and build a more complex problem - Apply new features, i.e., assign, attributes, cycle time, to the model. - Read outcomes - Record answers to student handouts",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lab 3: Handout"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 3 (Con't) - Build a more comprehensive problem by simulating for the \"Printed Circuit Boards Manufacturing\" - Modify the model based on a series of embellishments - Explore more features, i.e., assign, attribute, half-width, cycle time",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - Define how assign model is used - Define what is half-width - Define how cycle time is used (2) Lab-based learning - Read problem description and build a more complex problem - Apply new features, i.e., assign, attributes, cycle time, to the model. - Read outcomes - Record answers to student handouts",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lab 3: Submission"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "(0/0/3/0)",
+        "lectureTopic": "",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Exam Paper > Answer Scheme > Computer"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Midterm Correction - Ask students to correct problems - Give feedback and critical points Term project Introduction - Project Proposal Guideline - Power point Template - Final Report Template - Data Input Template",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Problem solving - Lecture-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Problem solving - Share one problem to one students - Solve one, feedback one - Ask for Muddiest points to students - Repeat until all problem solve (2) Lecture-based learning - Present the project guideline - Present flow of project in power point - Present how data is collected - Present expected outcomes from students",
+        "assessmentRaw": "",
+        "resourcesRaw": "Midterm Correction - Guideline PPT - Proposal PPT - Report Template - Rubric for Proposal Presentation"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 4 - Apply Input analyzer to define distribution for the data set - Update proposal",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - How to collect data? - How to use data to define type of distribution? (2) Lab-based learning - Understand existing dataset - Define types of distribution - Create randoms dataset - Understand why we need a large dataset",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lab 4: Handout & Submission"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Proposal Presentation - Submit proposal power point - Submit proposal report - Submit related documents - Get feedback for improvement",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Group presentation - Inquiry-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Group presentation - Rehearse in their team - Give oral presentation or other forms - Get feedback from instructor (2) Inquiry-based learning - Share their excitings - Share their challenges - Ask for support if needed",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Submit PPT"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 5 - Explore more advanced concepts, i.g., set schedule, assign schedule, create tally set, resource set, and arrival schedules - Create sub-model - Modify the model based on a series of embellishments - Update term project",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - What is set? and how to apply it in arena? - How to create the sub-model (2) Lab-based learning - Solve more advance model using a new lab handouts - Modify models based on instruction - Appy set for schedue and resources - Read outcomes - Record answers in lab handout - Update their projects",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lab 5: Handout"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 5 (Con't) - Explore more advanced concepts, i.g., set schedule, assign schedule, create tally set, resource set, and arrival schedules - Create sub-model - Modify the model based on a series of embellishments - Update term project",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - What is set? and how to apply it in arena? - How to create the sub-model (2) Lab-based learning - Solve more advance model using a new lab handouts - Modify models based on instruction - Appy set for schedue and resources - Read outcomes - Record answers in lab handout - Update their projects",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lab 5: Submission"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Lab 6 - Process Analyzer - OptQuest for optimization - Update term project",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Lecture-based learning - Lab-based learning",
+        "activeLearningRaw": "Teaching-learning Activities (1) Lecture-based learning - What is Process Analyzer? - What is OptQuest? - How to apply them? (2) Lab-based learning - Apply Process Analyzer Tools to solve problems - Apply OptQuestion Tools to solve problem - Record outputs in student handouts - Address way to integrate to their term-project",
+        "assessmentRaw": "4",
+        "resourcesRaw": "Lab 6: Handout & Submission"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "(1/0/3/0)",
+        "lectureTopic": "Final presentation - Submit final report - Submit final power point - Submit evidence on project implementation - Final Presentation",
+        "clos": [
+          "CLO3",
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Delivery Modes: - Group presentation - Project outcomes",
+        "activeLearningRaw": "Teaching-learning Activities (1) Group presentation - Rehearse in their team - Give oral presentation or other forms - Get feedback from instructor for improvement (2) Project outcomes - Submit final report - Submit final power point - Submit evidence on project implementation",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Submission - Final Report - Final Present Assessment - Rubric for Present - Rubric for Report"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "(0/0/3/0)",
+        "lectureTopic": "Final",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "20",
+        "resourcesRaw": "Exam Paper > Answer Scheme"
+      }
+    ],
+    "extractionNotes": [
+      "Normalized numeric CLO references: 1",
+      "Normalized numeric CLO references: 1, 2",
+      "Normalized numeric CLO references: 2",
+      "Treated zero CLO placeholder as no mapping: 0",
+      "Normalized numeric CLO references: 4",
+      "Normalized numeric CLO references: 3, 4",
+      "Normalized numeric CLO references: 3,4"
+    ],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "No Hard resources Soft Resources Others (4M) 1 Slide Projector ARENA Existing templates 2 Computer Power point Existing flow of power point 3 Word Existing flow of report 4 Canva Project Guideline",
+    "references": {
+      "required": [
+        {
+          "title": "Simulation with Arena (7th Edition)",
+          "authors": "Randall P. Sadowski Nancy B. Zupick W. David Kelton",
+          "publisher": "McGraw-Hill Science",
+          "year": "2024",
+          "isbnOrUrl": ""
+        }
+      ],
+      "recommended": [
+        {
+          "title": "01 - Getting Started with Arena.pdf 02 - OptQuest for Arena User's Guide 03 - Packaging Template User's Guide 04 - Variables and Functions Guide",
+          "authors": "Arena",
+          "publisher": "",
+          "year": "",
+          "isbnOrUrl": ""
+        }
+      ]
+    },
+    "extractionNotes": []
+  },
+  "studentResponsibilitiesRaw": "Students are responsible for understanding how to use resources responsibly. Not knowing the rules, misunderstanding the rules, running out of time, submitting “the wrong draft,” or being overwhelmed with multiple demands are not acceptable excuses. There are no excuses for failure to uphold academic integrity. Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Form a study group and take full advantage of such an opportunity to share the understanding with classmates. Thoughtful participation in class discussions, thorough preparations for the class, and consistently well-developed responses to the assignments are expected. Students are expected to explain lessons to each other and have self-study from the other source. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned Submit assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Course policy Policy for Description Attendance Students Must attend class on-site and on-time (Three lates is counted as a one-time absence). Must do self-study and read the relevant documents in the Internet/library. Academic Integrity & Collaboration Students Must complete assigned tasks (assignments, quizzes, and exams) only by himself/herself. Questions might be asked during/after submission Must join class activities actively Must work independently on the midterm and final exam. Should discuss course material with other students Must feel guilty if they: (1) present work of others as their own, and (2) give unauthorized assistance to other students. Homework Students Must complete and submit assignment tasks on time. Must proper justifying quotations from appropriate and authorized resources. Must use APA style for in-text citation and reference list. Penalties Students Can absent (Absent + Permission) at most 5 times per course; otherwise, they will need to repeat the same course in the following year. Get one absent if they get three late (Students are considered as late, when they join class after 5 min start) Will be accused of plagiarism, if they (1) present work of others as their own, and (2) give unauthorized assistance to other, and get scored Zero. Will be deducted score if they submit classwork or homework late Will be reported to the Study Office, and handled in accordance with the university regulations if they violate the university code of conducts Note: If you are unclear whether a particular situation may violate the university code of conducts, you should ask the instructor.",
+  "extraction": {
+    "notes": [
+      "Normalized numeric CLO references: 1",
+      "Normalized numeric CLO references: 1, 2",
+      "Normalized numeric CLO references: 2",
+      "Treated zero CLO placeholder as no mapping: 0",
+      "Normalized numeric CLO references: 4",
+      "Normalized numeric CLO references: 3, 4",
+      "Normalized numeric CLO references: 3,4"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  },
+  "migrationReview": {
+    "issue": 633,
+    "approvedAt": "2026-08-25",
+    "decision": "approved-explicit-mapping",
+    "sourceCourseCode": "SCA302",
+    "targetCourseCode": "SCA402",
+    "targetCurriculum": "DSE Curriculum - 2026",
+    "targetYear": 4,
+    "targetSemester": 2,
+    "rationale": "Programme-level approval: legacy SCA302 is mapped to 2026 curriculum SCA402 and moves from Year 3 to Year 4 Semester 2; stale internal DOCX code SCA323 remains recorded in resolved warnings.",
+    "resolvedWarnings": [
+      "Course code in DOCX table (SCA323) conflicts with filename (SCA302); canonical JSON uses filename code and requires review",
+      "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+    ],
+    "legacyCourseInformation": {
+      "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+      "code": "SCA302",
+      "title": "Supply Chain Analytics",
+      "credits": {
+        "total": 3.0
+      },
+      "prerequisites": null,
+      "courseType": "Core",
+      "availability": {
+        "semester": 2,
+        "year": 3
+      },
+      "description": "This course provides students with a comprehensive foundation in simulating business processes to analyze performance, improve efficiency, and support decision-making. Students will explore the principles of discrete-event simulation, system variability, and process flow logic through hands-on experience with industry-standard tools Arena. The course covers the full simulation lifecycle, including process mapping, data input collection, model building, experimentation, and result interpretation. Emphasis is placed on identifying operational bottlenecks, testing what-if scenarios, and developing optimization strategies. By the end of the course, students will be able to construct realistic simulation models and use them to evaluate and improve real-world systems in manufacturing, logistics, and service operations."
+    },
+    "note": "Original DOCX provenance remains under source. This reviewed artifact intentionally maps the legacy document to the approved 2026 curriculum identity; no --allow-warnings is required."
+  },
+  "reviewedPlacement": {
+    "year": 4,
+    "semester": 2,
+    "reason": "Programme-level approval: legacy SCA302 is mapped to 2026 curriculum SCA402 and moves from Year 3 to Year 4 Semester 2; stale internal DOCX code SCA323 remains recorded in resolved warnings.",
+    "approvedBy": "programme-owner",
+    "approvedAt": "2026-08-25",
+    "sourceIssue": "#633"
+  }
+}

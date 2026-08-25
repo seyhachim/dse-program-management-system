@@ -1,0 +1,810 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "PDT202- Personal Development and Teamwork.docx",
+    "relativePath": "Year 2/S2/PDT202- Personal Development and Teamwork.docx",
+    "sha256": "15aa7309e94f10700cf5f01db130eee5397e8b48df13acecd2fb098ac00be2c1",
+    "yearFolder": 2,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "PDT102",
+    "title": "Personal Development and Teamwork",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "None",
+    "courseType": "Basic",
+    "availability": {
+      "semester": 2,
+      "year": 1
+    },
+    "description": "This course develops students’ personal and professional competencies with a strong emphasis on health and well-being, self-management, and teamwork. Students explore physical, mental, and workplace well-being, along with stress management strategies to enhance academic performance and quality of life. Through experiential learning, reflective practices, and collaborative activities aligned with CDIO and OBE principles, students build self-awareness, manage stress effectively, and work productively in teams. The course integrates health knowledge with practical personal development skills, preparing students to maintain well-being while performing effectively in academic and professional environments."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Mr. VUTH Sireyvathanak",
+      "qualification": "MSc",
+      "email": "vuth.sireyvathanak@rupp.edu.kh",
+      "phone": "012437621"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Explain key concepts of health, stress management, and workplace well-being",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "- Interactive lectures (health concepts, stress theory, workplace well-being) - Case-based discussion (real-life health and lifestyle scenarios) - Video-based learning (mental health, lifestyle habits) - Guided reading and concept summarization - Instructor questioning and concept checking",
+      "assessmentMethodsRaw": "- Reflection Journal (20%) → assess understanding of health concepts - Final Personal Development & Wellness Portfolio (30%) → evaluate conceptual integration and understanding"
+    },
+    {
+      "code": "CLO2",
+      "description": "Apply personal management and stress-management strategies to improve well-being and performance",
+      "mappedPlos": [
+        "PLO5"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "- Demonstration of stress-management techniques (breathing, mindfulness, time management) - Guided practice sessions (in-class exercises) - Habit tracking and self-monitoring activities - Instructor coaching and feedback - Scenario-based application tasks",
+      "assessmentMethodsRaw": "- Stress/Well-being Practice Log (25%) → assess application and consistency - Final Personal Development & Wellness Portfolio (30%) → evaluate application and personal improvement plan"
+    },
+    {
+      "code": "CLO3",
+      "description": "Demonstrate effective teamwork and communication skills in health and well-being related activities",
+      "mappedPlos": [
+        "PLO4"
+      ],
+      "level": "A3",
+      "status": "active",
+      "teachingMethodsRaw": "- Role-play activities (communication, conflict handling) - Group discussions and collaborative problem-solving - Team-based project work - Peer feedback and reflection activities - Instructor facilitation and observation of teamwork behavior",
+      "assessmentMethodsRaw": "- Group Teamwork Project & Presentation (25%) → assess teamwork, communication, collaboration - Peer evaluation (embedded in project)"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "",
+        "",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Introduction to Health, Personal Development & Well-being",
+        "CLO1",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3"
+      ],
+      [
+        "2",
+        "Dimensions of Health (Physical, Mental, Social)",
+        "CLO1",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "3",
+        "Mental Health & Academic Stress",
+        "CLO1",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "4",
+        "Stress Management Techniques",
+        "CLO2",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "5",
+        "Mindfulness & Emotional Control",
+        "CLO2",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "6",
+        "Sleep, Energy & Productivity",
+        "CLO2",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "7",
+        "Nutrition for Performance & Health",
+        "CLO1",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "8",
+        "Digital Wellness & Lifestyle Balance",
+        "CLO2",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "9",
+        "Healthy Habits & Behavior Change",
+        "CLO2",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "10",
+        "Workplace Well-being & Professional Behavior",
+        "CLO1",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "11",
+        "Communication Skills for Teamwork",
+        "CLO3",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "12",
+        "Teamwork & Collaboration Skills",
+        "CLO3",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "13",
+        "Conflict Management & Group Dynamics",
+        "CLO3",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "14",
+        "Team Project Presentation",
+        "CLO3",
+        "2",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "5"
+      ],
+      [
+        "Total SLT for Course Content",
+        "68"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Reflection Journal",
+        "20",
+        "",
+        "",
+        "10",
+        "10"
+      ],
+      [
+        "2",
+        "Stress/Well-being Practice Log",
+        "25",
+        "",
+        "",
+        "13",
+        "13"
+      ],
+      [
+        "3",
+        "Group Teamwork Project and Presentation",
+        "25",
+        "",
+        "",
+        "13",
+        "13"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "36"
+      ],
+      [
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "",
+        "",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "",
+        ""
+      ],
+      [
+        "1",
+        "Final Personal Development & Wellness Portfolio",
+        "30",
+        "2",
+        "0",
+        "14",
+        "16"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "16"
+      ],
+      [
+        "Total SLT for Assessment",
+        "52"
+      ],
+      [
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Reflection Journal Final Personal Development & Wellness Portfolio",
+      "mode": "individual",
+      "weightPercent": 35.0,
+      "sltHours": 18.0,
+      "capLevel": "C3"
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO5"
+      ],
+      "name": "Stress/Well-being Practice Log Final Personal Development & Wellness Portfolio",
+      "mode": "individual",
+      "weightPercent": 40.0,
+      "sltHours": 21.0,
+      "capLevel": "P3"
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO4"
+      ],
+      "name": "Group Teamwork Project & Presentation",
+      "mode": "individual",
+      "weightPercent": 25.0,
+      "sltHours": 13.0,
+      "capLevel": "A3"
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Introduction to Health, Personal Development & Well-being",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Define key concepts of health, personal development, and well-being. LLO2: Explain the relationship between well-being and academic performance. LLO3: Identify personal strengths and areas for improvement. LLO4: Reflect on individual goals for personal development."
+      },
+      {
+        "number": 2,
+        "title": "Dimensions of Health (Physical, Mental, Social)",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Describe the three main dimensions of health. LLO2: Explain how different dimensions of health influence each other. LLO3: Identify behaviors that support each dimension. LLO4: Assess personal health status across dimensions."
+      },
+      {
+        "number": 3,
+        "title": "Mental Health & Academic Stress",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Explain the concept of mental health. LLO2: Identify common sources of academic stress. LLO3: Describe the effects of stress on performance. LLO4: Recognize early signs of stress and burnout."
+      },
+      {
+        "number": 4,
+        "title": "Stress Management Techniques",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Demonstrate basic stress-management techniques. LLO2: Apply strategies to manage academic stress. LLO3: Practice time management techniques. LLO4: Select appropriate coping strategies."
+      },
+      {
+        "number": 5,
+        "title": "Mindfulness & Emotional Control",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Describe mindfulness and emotional control. LLO2: Practice guided mindfulness exercises. LLO3: Apply emotional regulation strategies. LLO4: Demonstrate awareness of emotional responses."
+      },
+      {
+        "number": 6,
+        "title": "Sleep, Energy & Productivity",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Explain the role of sleep in performance. LLO2: Identify factors affecting sleep quality. LLO3: Monitor personal sleep habits. LLO4: Develop strategies to improve energy levels."
+      },
+      {
+        "number": 7,
+        "title": "Nutrition for Performance & Health",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Explain the relationship between nutrition and performance. LLO2: Identify healthy and unhealthy eating habits. LLO3: Describe basic nutritional needs. LLO4: Evaluate personal dietary habits."
+      },
+      {
+        "number": 8,
+        "title": "Digital Wellness & Lifestyle Balance",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Explain the impact of digital technology on health. LLO2: Analyze personal digital usage patterns. LLO3: Apply strategies to reduce digital fatigue. LLO4: Demonstrate healthy technology practices."
+      },
+      {
+        "number": 9,
+        "title": "Healthy Habits & Behavior Change",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Explain principles of habit formation. LLO2: Identify unhealthy habits. LLO3: Apply behavior change strategies. LLO4: Develop a habit improvement plan."
+      },
+      {
+        "number": 10,
+        "title": "Workplace Well-being & Professional Behavior",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Describe workplace well-being concepts. LLO2: Explain professional behavior expectations. LLO3: Identify factors affecting productivity. LLO4: Recognize importance of health in workplace."
+      },
+      {
+        "number": 11,
+        "title": "Communication Skills for Teamwork",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Explain principles of effective communication. LLO2: Demonstrate verbal and non-verbal communication. LLO3: Practice active listening. LLO4: Provide constructive feedback."
+      },
+      {
+        "number": 12,
+        "title": "Teamwork & Collaboration Skills",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Describe characteristics of effective teamwork. LLO2: Identify team roles and responsibilities. LLO3: Demonstrate collaboration in tasks. LLO4: Reflect on team contribution."
+      },
+      {
+        "number": 13,
+        "title": "Conflict Management & Group Dynamics",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Identify causes of conflict in teams. LLO2: Explain conflict resolution strategies. LLO3: Demonstrate respectful communication. LLO4: Apply problem-solving in conflicts."
+      },
+      {
+        "number": 14,
+        "title": "Team Project Presentation",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Organize and present group work effectively. LLO2: Demonstrate teamwork during presentation. LLO3: Respond to questions appropriately. LLO4: Evaluate team performance."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Introduction to Health, Personal Development & Well-being",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Interactive lecture; guided discussion; self-assessment activity",
+        "activeLearningRaw": "Self-reflection; think-pair-share; goal setting",
+        "assessmentRaw": "Reflection Journal (20%)",
+        "resourcesRaw": "Slides, self-assessment tools"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Dimensions of Health (Physical, Mental, Social)",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; case examples; discussion",
+        "activeLearningRaw": "Health self-evaluation; group discussion",
+        "assessmentRaw": "Reflection Journal (20%)",
+        "resourcesRaw": "Slides, diagrams"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Mental Health & Academic Stress",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; case-based learning; video",
+        "activeLearningRaw": "Stress identification activity; reflection",
+        "assessmentRaw": "Reflection Journal (20%)",
+        "resourcesRaw": "Videos, case scenarios"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Stress Management Techniques",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Demonstration; guided practice",
+        "activeLearningRaw": "Breathing exercise; time management practice",
+        "assessmentRaw": "Start Practice Log (25%)",
+        "resourcesRaw": "Audio guide, worksheets"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Mindfulness & Emotional Control",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Guided mindfulness session; coaching",
+        "activeLearningRaw": "Mindfulness practice; emotional awareness exercise",
+        "assessmentRaw": "Continue Practice Log (25%)",
+        "resourcesRaw": "Audio, meditation guide"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Sleep, Energy & Productivity",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture; discussion; feedback",
+        "activeLearningRaw": "Sleep tracking; habit reflection",
+        "assessmentRaw": "Practice Log (25%)",
+        "resourcesRaw": "Sleep tracker template"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Nutrition for Performance & Health",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; case analysis",
+        "activeLearningRaw": "Food habit reflection; group sharing",
+        "assessmentRaw": "Reflection Journal (20%)",
+        "resourcesRaw": "Nutrition charts"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Digital Wellness & Lifestyle Balance",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Demonstration; discussion",
+        "activeLearningRaw": "Digital usage audit; posture correction",
+        "assessmentRaw": "Practice Log (25%)",
+        "resourcesRaw": "Device settings guide"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Healthy Habits & Behavior Change",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Lecture; coaching; case discussion",
+        "activeLearningRaw": "Habit planning; behavior tracking",
+        "assessmentRaw": "Practice Log (25%)",
+        "resourcesRaw": "Habit tracker"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Workplace Well-being & Professional Behavior",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Lecture; scenario discussion",
+        "activeLearningRaw": "Case analysis; reflection",
+        "assessmentRaw": "Reflection Journal (20%)",
+        "resourcesRaw": "Case studies"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Communication Skills for Teamwork",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Role-play; instructor demonstration",
+        "activeLearningRaw": "Communication practice; peer feedback",
+        "assessmentRaw": "Group Project (25%)",
+        "resourcesRaw": "Communication models"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Teamwork & Collaboration Skills",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Group work; facilitation",
+        "activeLearningRaw": "Team task; peer evaluation",
+        "assessmentRaw": "Group Project (25%)",
+        "resourcesRaw": "Teamwork tools"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Conflict Management & Group Dynamics",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Role-play; discussion",
+        "activeLearningRaw": "Conflict simulation; group reflection",
+        "assessmentRaw": "Group Project (25%)",
+        "resourcesRaw": "Scenario cards"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Team Project Presentation",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Student presentation; feedback",
+        "activeLearningRaw": "Presentation; peer evaluation",
+        "assessmentRaw": "Group Project (25%)",
+        "resourcesRaw": "Projector, rubric"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "(3/0/0)",
+        "lectureTopic": "Personal Development & Wellness Portfolio",
+        "clos": [
+          "CLO1",
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Consultation; feedback session",
+        "activeLearningRaw": "Portfolio completion; self-reflection",
+        "assessmentRaw": "Final Portfolio (30%)",
+        "resourcesRaw": "Portfolio guideline"
+      }
+    ],
+    "extractionNotes": [],
+    "extractionIssues": []
+  },
+  "resources": {
+    "requiredResourcesRaw": "Slides, self-assessment tools; Slides, diagrams; Videos, case scenarios; Audio guide, worksheets; Audio, meditation guide; Sleep tracker template; Nutrition charts; Device settings guide; Habit tracker; Case studies; Communication models; Teamwork tools; Scenario cards; Projector, rubric; Portfolio guideline",
+    "references": {
+      "required": [
+        {
+          "title": "Health and Wellness",
+          "authors": "Oak Meadow",
+          "publisher": "Oak Meadow, Inc.",
+          "year": "2024",
+          "isbnOrUrl": "N/A"
+        },
+        {
+          "title": "Atomic Hait",
+          "authors": "James Clear",
+          "publisher": "Avery",
+          "year": "2018",
+          "isbnOrUrl": "N/A"
+        }
+      ],
+      "recommended": []
+    },
+    "extractionNotes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "extraction": {
+    "notes": [
+      "Required resources recovered from weekly T&L Resources cells because the dedicated resource section was empty"
+    ]
+  },
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  },
+  "migrationReview": {
+    "issue": 633,
+    "approvedAt": "2026-08-25",
+    "decision": "approved-explicit-mapping",
+    "sourceCourseCode": "PDT202",
+    "targetCourseCode": "PDT102",
+    "targetCurriculum": "DSE Curriculum - 2026",
+    "targetYear": 1,
+    "targetSemester": 2,
+    "rationale": "Programme-level approval: legacy PDT202 is mapped to 2026 curriculum PDT102 and moves from Year 2 to Year 1 Semester 2.",
+    "resolvedWarnings": [
+      "Course Availability semester 1 conflicts with folder S2",
+      "Course code is not present in the uploaded 2026 DSE curriculum; do not commit until curriculum mapping is reviewed"
+    ],
+    "legacyCourseInformation": {
+      "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+      "code": "PDT202",
+      "title": "Personal Development and Teamwork",
+      "credits": {
+        "total": 3.0
+      },
+      "prerequisites": "None",
+      "courseType": "Basic",
+      "availability": {
+        "semester": 1,
+        "year": 2
+      },
+      "description": "This course develops students’ personal and professional competencies with a strong emphasis on health and well-being, self-management, and teamwork. Students explore physical, mental, and workplace well-being, along with stress management strategies to enhance academic performance and quality of life. Through experiential learning, reflective practices, and collaborative activities aligned with CDIO and OBE principles, students build self-awareness, manage stress effectively, and work productively in teams. The course integrates health knowledge with practical personal development skills, preparing students to maintain well-being while performing effectively in academic and professional environments."
+    },
+    "note": "Original DOCX provenance remains under source. This reviewed artifact intentionally maps the legacy document to the approved 2026 curriculum identity; no --allow-warnings is required."
+  }
+}
