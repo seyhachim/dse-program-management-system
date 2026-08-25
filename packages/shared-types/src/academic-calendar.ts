@@ -114,6 +114,7 @@ export type PublicAcademicCalendarQuery = z.infer<typeof PublicAcademicCalendarQ
 export interface AcademicYearView { id: string; programmeId: string; label: string; startYear: number; endYear: number; isCurrent: boolean; createdAt: string; updatedAt: string; }
 export interface AcademicCalendarProgrammeRef { id: string; code: string; name: string; }
 export interface AcademicCalendarSourceView { title: string; publishedAt: string | null; url: string | null; fileRef: string | null; note: string; }
+export interface PublicAcademicCalendarSourceView { title: string; publishedAt: string | null; url: string | null; note: string; }
 export interface AcademicCalendarAuditView { id: string; calendarId: string; actorId: string; actorName: string; action: string; reason: string; beforeSnapshot: unknown; afterSnapshot: unknown; details: unknown; createdAt: string; }
 export interface AcademicCalendarPeriodView { id: string; calendarId: string; semester: AcademicCalendarSemester; teachingStart: string; teachingEnd: string; examStart: string | null; examEnd: string | null; breakStart: string | null; breakEnd: string | null; }
 export interface AcademicCalendarEventView { id: string; calendarId: string; title: string; type: AcademicCalendarEventType; semester: AcademicCalendarSemester | null; startDate: string; endDate: string | null; note: string; sortOrder: number; }
@@ -122,7 +123,7 @@ export interface AcademicCalendarCourseOption { id: string; code: string; title:
 export interface AcademicCalendarContextView { academicYear: AcademicYearView; studyYear: number; semester: AcademicCalendarSemester; calendar: AcademicCalendarView; period: AcademicCalendarPeriodView; courses: AcademicCalendarCourseOption[]; }
 export interface AcademicCalendarTimelineEvent { key: string; title: string; type: AcademicCalendarEventType; semester: AcademicCalendarSemester | null; startDate: string; endDate: string | null; note: string; }
 export type PublishedAcademicCalendarProjection =
-  | { status: "available"; academicYear: AcademicYearView; studyYear: number; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; sources: AcademicCalendarSourceView[]; nextEvent: AcademicCalendarTimelineEvent | null; }
+  | { status: "available"; academicYear: AcademicYearView; studyYear: number; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; sources: PublicAcademicCalendarSourceView[]; nextEvent: AcademicCalendarTimelineEvent | null; }
   | { status: "unavailable"; academicYear: AcademicYearView | null; studyYear: number; reason: "academic-year-unavailable" | "calendar-unpublished"; message: string; };
 
 /** Student-facing projection. Source/provenance metadata remains on the management/public

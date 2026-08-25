@@ -34,6 +34,26 @@ dbDescribe("Academic Calendar revision integrity", () => {
     const original = await academicCalendarService.publishCalendar(course.programmeId, originalDraft.id, actor.id);
     const originalPeriod = original.periods[0]!;
 
+    const moveTarget = await academicCalendarService.createCalendar(course.programmeId, actor.id, {
+      academicYearId: academicYear.id,
+      revisionReason: "Integrity move target",
+      studyYears: [3],
+      periods: [{ semester: "Second", teachingStart: "2199-02-01", teachingEnd: "2199-05-30" }],
+      events: [],
+      sourceTitle: "Draft move target",
+      sourcePublishedAt: null,
+      sourceUrl: null,
+      sourceFileRef: null,
+      sourceNote: "Draft only",
+    });
+    let publishedChildMoveRejected = false;
+    try {
+      await prisma.academicCalendarPeriod.update({ where: { id: originalPeriod.id }, data: { calendarId: moveTarget.id } });
+    } catch {
+      publishedChildMoveRejected = true;
+    }
+    expect(publishedChildMoveRejected).toBe(true);
+
     const active = await prisma.offering.create({
       data: {
         courseId: course.id,
@@ -72,7 +92,7 @@ dbDescribe("Academic Calendar revision integrity", () => {
       sourceTitle: "Official calendar correction",
       sourcePublishedAt: "2198-08-15",
       sourceUrl: null,
-      sourceFileRef: null,
+      sourceFileRef: `internal/calendar/${suffix}.pdf`,
       sourceNote: "Corrected official test source",
     });
     const publishedCorrection = await academicCalendarService.publishCalendar(course.programmeId, correction.id, actor.id);
@@ -91,5 +111,36 @@ dbDescribe("Academic Calendar revision integrity", () => {
     expect(completedAfter.academicCalendarPeriodId).toBe(originalPeriod.id);
     expect(oldCalendar.status).toBe("Superseded");
     expect(audit.some((row) => row.action === "OfferingRebound")).toBe(true);
+
+    let completedRebindRejected = false;
+    try {
+      await prisma.offering.update({ where: { id: completed.id }, data: { academicCalendarPeriodId: replacementPeriod.id } });
+    } catch {
+      completedRebindRejected = true;
+    }
+    expect(completedRebindRejected).toBe(true);
+
+    let shadowDatesRejected = false;
+    try {
+      await prisma.offering.update({ where: { id: active.id }, data: { startDate: new Date("2198-09-09T00:00:00.000Z") } });
+    } catch {
+      shadowDatesRejected = true;
+    }
+    expect(shadowDatesRejected).toBe(true);
+
+    let auditRewriteRejected = false;
+    try {
+      await prisma.academicCalendarAuditAction.update({ where: { id: audit[0]!.id }, data: { reason: "rewritten" } });
+    } catch {
+      auditRewriteRejected = true;
+    }
+    expect(auditRewriteRejected).toBe(true);
+
+    const projection = await academicCalendarService.publishedProjection(course.programmeId, 3, academicYear.label);
+    expect(projection.status).toBe("available");
+    if (projection.status === "available") {
+      expect(projection.sources.length).toBeGreaterThan(0);
+      expect("fileRef" in projection.sources[0]!).toBe(false);
+    }
   });
 });

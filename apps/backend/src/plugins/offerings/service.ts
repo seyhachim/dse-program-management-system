@@ -257,7 +257,8 @@ export const offeringService = {
       data: {
         courseId: offeringInput.courseId,
         courseSpecId: offeringInput.courseSpecId,
-        term: offeringInput.term,
+        // Term is a canonical display key derived from the published calendar, never trusted from the client.
+        term: `${period.academicYearLabel}-${period.semester === "First" ? "S1" : "S2"}`,
         sectionCode: offeringInput.sectionCode,
         lecturerId: offeringInput.lecturerId ?? null,
         capacity: offeringInput.capacity,
@@ -317,7 +318,8 @@ export const offeringService = {
     const calendarContextChanging =
       offeringInput.academicCalendarPeriodId !== undefined ||
       offeringInput.programmeYear !== undefined ||
-      offeringInput.semester !== undefined;
+      offeringInput.semester !== undefined ||
+      (existing.academicCalendarPeriodId !== null && offeringInput.term !== undefined);
     if (existing.status === "Completed" && calendarContextChanging) {
       throw new ReferenceError("Completed offering academic-calendar context is historical and cannot be changed");
     }
@@ -376,7 +378,9 @@ export const offeringService = {
         where: { id },
         data: {
           ...(offeringInput.courseSpecId !== undefined ? { courseSpecId: offeringInput.courseSpecId } : {}),
-          ...(offeringInput.term !== undefined ? { term: offeringInput.term } : {}),
+          ...(resolvedPeriod
+            ? { term: `${resolvedPeriod.academicYearLabel}-${resolvedPeriod.semester === "First" ? "S1" : "S2"}` }
+            : offeringInput.term !== undefined ? { term: offeringInput.term } : {}),
           ...(offeringInput.sectionCode !== undefined ? { sectionCode: offeringInput.sectionCode } : {}),
           ...(offeringInput.lecturerId !== undefined ? { lecturerId: offeringInput.lecturerId } : {}),
           ...(offeringInput.capacity !== undefined ? { capacity: offeringInput.capacity } : {}),

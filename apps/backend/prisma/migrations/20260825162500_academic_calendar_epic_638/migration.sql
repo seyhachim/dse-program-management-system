@@ -37,7 +37,7 @@ CREATE TABLE "AcademicCalendar" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "AcademicCalendar_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "AcademicCalendar_revision_check" CHECK ("revision" >= 1),
-  CONSTRAINT "AcademicCalendar_published_source_check" CHECK ("status" <> 'Published' OR length(btrim("sourceTitle")) > 0)
+  CONSTRAINT "AcademicCalendar_published_source_check" CHECK ("status" NOT IN ('Published', 'Superseded') OR (length(btrim("sourceTitle")) > 0 AND "publishedAt" IS NOT NULL AND "publishedById" IS NOT NULL AND (NULLIF(btrim("sourceUrl"), '') IS NOT NULL OR NULLIF(btrim("sourceFileRef"), '') IS NOT NULL OR length(btrim("sourceNote")) > 0)))
 );
 
 CREATE TABLE "AcademicCalendarStudyYear" (
@@ -146,18 +146,28 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER "AcademicCalendar_guard_published_mutation" BEFORE UPDATE OR DELETE ON "AcademicCalendar" FOR EACH ROW EXECUTE FUNCTION guard_academic_calendar_parent_mutation();
 
 CREATE OR REPLACE FUNCTION guard_academic_calendar_child_mutation() RETURNS trigger AS $$
-DECLARE parent_status "AcademicCalendarStatus"; target_id TEXT;
+DECLARE old_status "AcademicCalendarStatus"; new_status "AcademicCalendarStatus";
 BEGIN
-  IF TG_OP = 'DELETE' THEN
-    target_id := OLD."calendarId";
-  ELSE
-    target_id := NEW."calendarId";
+  IF TG_OP = 'INSERT' THEN
+    SELECT "status" INTO new_status FROM "AcademicCalendar" WHERE "id" = NEW."calendarId";
+    IF new_status <> 'Draft' THEN
+      RAISE EXCEPTION 'Only Draft academic calendar content may be changed';
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    SELECT "status" INTO old_status FROM "AcademicCalendar" WHERE "id" = OLD."calendarId";
+    IF old_status <> 'Draft' THEN
+      RAISE EXCEPTION 'Only Draft academic calendar content may be changed';
+    END IF;
+    RETURN OLD;
   END IF;
-  SELECT "status" INTO parent_status FROM "AcademicCalendar" WHERE "id" = target_id;
-  IF parent_status <> 'Draft' THEN
+
+  SELECT "status" INTO old_status FROM "AcademicCalendar" WHERE "id" = OLD."calendarId";
+  SELECT "status" INTO new_status FROM "AcademicCalendar" WHERE "id" = NEW."calendarId";
+  IF old_status <> 'Draft' OR new_status <> 'Draft' THEN
     RAISE EXCEPTION 'Only Draft academic calendar content may be changed';
   END IF;
-  RETURN COALESCE(NEW, OLD);
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -192,6 +202,27 @@ END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER "AcademicCalendarAuditAction_append_only" BEFORE UPDATE OR DELETE ON "AcademicCalendarAuditAction" FOR EACH ROW EXECUTE FUNCTION prevent_academic_calendar_audit_mutation();
 
+-- Calendar-linked offerings cannot carry shadow teaching dates. Completed offerings
+-- preserve their exact calendar/term context even if backend code attempts a direct update.
+CREATE OR REPLACE FUNCTION guard_offering_academic_calendar_integrity() RETURNS trigger AS $$
+BEGIN
+  IF NEW."academicCalendarPeriodId" IS NOT NULL AND (NEW."startDate" IS NOT NULL OR NEW."endDate" IS NOT NULL) THEN
+    RAISE EXCEPTION 'Calendar-linked offerings cannot store independent teaching dates';
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND OLD."status" = 'Completed' AND (
+    NEW."academicCalendarPeriodId" IS DISTINCT FROM OLD."academicCalendarPeriodId" OR
+    NEW."semester" IS DISTINCT FROM OLD."semester" OR
+    NEW."programmeYear" IS DISTINCT FROM OLD."programmeYear" OR
+    NEW."term" IS DISTINCT FROM OLD."term"
+  ) THEN
+    RAISE EXCEPTION 'Completed offering academic-calendar context is historical and cannot be changed';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER "Offering_guard_academic_calendar_integrity" BEFORE INSERT OR UPDATE ON "Offering" FOR EACH ROW EXECUTE FUNCTION guard_offering_academic_calendar_integrity();
+
 -- Supabase Data API boundary: backend-owned academic calendar tables are not
 -- directly readable/writable by anon/authenticated/service_role roles. All
 -- access goes through permission-checked PMS APIs. Supabase-specific roles are
@@ -214,6 +245,7 @@ REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_parent_mutation() FROM
 REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_child_mutation() FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_publish_conflict() FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON FUNCTION prevent_academic_calendar_audit_mutation() FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION guard_offering_academic_calendar_integrity() FROM PUBLIC;
 
 DO $$
 DECLARE
@@ -229,7 +261,7 @@ BEGIN
       api_role
     );
     EXECUTE format(
-      'REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_parent_mutation(), guard_academic_calendar_child_mutation(), guard_academic_calendar_publish_conflict(), prevent_academic_calendar_audit_mutation() FROM %I',
+      'REVOKE ALL PRIVILEGES ON FUNCTION guard_academic_calendar_parent_mutation(), guard_academic_calendar_child_mutation(), guard_academic_calendar_publish_conflict(), prevent_academic_calendar_audit_mutation(), guard_offering_academic_calendar_integrity() FROM %I',
       api_role
     );
   END LOOP;
