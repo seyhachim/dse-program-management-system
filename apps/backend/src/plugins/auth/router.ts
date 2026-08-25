@@ -9,6 +9,7 @@ import {
   ProgrammeRoleAssignmentError,
   ProvisioningError,
 } from "./service.ts";
+import { resendLecturerInvitation } from "./resend-invitation.ts";
 
 const ProgrammeRoleListQuery = z.object({
   programmeId: z.string().trim().min(1),
@@ -20,17 +21,22 @@ const ProgrammeRoleDeleteRequest = z.object({
   role: z.literal("qa_contributor"),
 });
 
+const AccountUserIdParam = z.object({
+  userId: z.string().uuid(),
+});
+
 function canManageProgrammeRoles(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, ["admin", "program_coordinator"], programmeId);
 }
 
 /**
  * Auth router:
- * - GET    /me                         — the resolved caller.
- * - POST   /accounts                   — admin-only account provisioning.
- * - GET    /programme-roles            — programme leadership lists additive QA grants.
- * - POST   /programme-roles            — add an allowed programme role without replacing existing roles.
- * - DELETE /programme-roles/:userId    — remove only the requested additive programme role.
+ * - GET    /me                                 — the resolved caller.
+ * - POST   /accounts                           — admin-only account provisioning.
+ * - POST   /accounts/:userId/resend-invitation — admin-only pending lecturer invite resend.
+ * - GET    /programme-roles                    — programme leadership lists additive QA grants.
+ * - POST   /programme-roles                    — add an allowed programme role without replacing existing roles.
+ * - DELETE /programme-roles/:userId            — remove only the requested additive programme role.
  */
 export function createAuthRouter(): Router {
   const router = Router();
@@ -61,6 +67,27 @@ export function createAuthRouter(): Router {
       res.status(500).json({ error: "Could not create account" });
     }
   });
+
+  router.post(
+    "/accounts/:userId/resend-invitation",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = AccountUserIdParam.safeParse(req.params);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid lecturer account id" });
+        return;
+      }
+      try {
+        res.json(await resendLecturerInvitation(parsed.data.userId));
+      } catch (err) {
+        if (err instanceof ProvisioningError) {
+          res.status(409).json({ error: err.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not resend invitation" });
+      }
+    },
+  );
 
   router.get("/programme-roles", requirePermission("qa:manage"), async (req, res) => {
     const parsed = ProgrammeRoleListQuery.safeParse(req.query);
