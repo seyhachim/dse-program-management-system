@@ -12,15 +12,22 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source).toContain('<col className="w-[24%]" />');
     expect(source).toContain('<col className="w-[16%]" />');
     expect(source).toContain('<col className="w-[32%]" />');
-    expect(source).toContain('<ValueCell colSpan={4} className="part-two-continuation-cell">');
+    expect(source).toContain(
+      '<ValueCell colSpan={4} className="part-two-continuation-cell">',
+    );
 
     // One source wrapper covers each fixed section/page group: 14, both 15 pages,
     // 16, 17, repeated 18 pages, 19, 20, 21, repeated 22 pages, 23, 24, 25.
     expect(source.match(/<PartTwoRow>/g)?.length).toBe(13);
     expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(13);
 
+    // Section 14 intentionally keeps its compact official CLO heading markup,
+    // while Sections 15-25 use the shared SectionTitle component.
+    expect(source).toContain(
+      '<span>14.</span><span className="font-bold">Course Learning Outcomes</span>',
+    );
+
     for (const section of [
-      'number="14">Course Learning Outcomes',
       'number="15">Mapping of the Course Learning Outcomes',
       'number="16">Distribution of Student Learning Time (SLT)',
       'number="17">Course Assessment Plan',
