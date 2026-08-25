@@ -1,0 +1,36 @@
+name: Temporary Part 2 Preview Row Patch
+
+on:
+  push:
+    branches:
+      - fix/course-spec-part1-plo-row
+    paths:
+      - .github/workflows/temp-part2-preview-row-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-preview:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/course-spec-part1-plo-row
+          fetch-depth: 0
+
+      - name: Apply scoped Part 2 preview row patch
+        run: python scripts/temp_patch_part2_preview_rows.py
+
+      - name: Validate patch whitespace
+        run: git diff --check
+
+      - name: Commit Course Spec preview changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'apps/frontend/app/(shell)/courses/[id]/spec/document-preview-pages.tsx' 'apps/frontend/app/(shell)/courses/[id]/spec/document-preview-pages-layout.test.ts'
+          git commit -m 'fix(course-spec): continue Part 2 sections as table rows'
+          git push origin HEAD:fix/course-spec-part1-plo-row
