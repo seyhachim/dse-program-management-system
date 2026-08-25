@@ -100,6 +100,9 @@ export function DashboardClient() {
   const totalReady = specProgress.reduce((s, c) => s + c.total, 0);
   const overallSpecPercent = totalReady ? Math.round((totalCompleted / totalReady) * 100) : 0;
   const groupedSpecProgress = buildCourseSpecProgressGroups(specProgress);
+  const visibleGroupedSpecProgress = buildCourseSpecProgressGroups(
+    visibleCourseSpecRows(specProgress, incompleteOnly),
+  );
 
   const totalEnrolled = offerings.reduce((s, o) => s + o.enrolledCount, 0);
   const totalCapacity = offerings.reduce((s, o) => s + o.capacity, 0);
@@ -176,14 +179,11 @@ export function DashboardClient() {
                 <CompletionRing value={overallSpecPercent} size={120} label="Overall" />
               </div>
               <div className="min-w-0 flex-1 space-y-2">
-                {groupedSpecProgress.years.map((year, yearIndex) => {
-                  const visibleSemesters = year.semesters
-                    .map((semester) => ({
-                      ...semester,
-                      visibleCourses: visibleCourseSpecRows(semester.courses, incompleteOnly),
-                    }))
-                    .filter((semester) => semester.visibleCourses.length > 0);
-                  if (visibleSemesters.length === 0) return null;
+                {visibleGroupedSpecProgress.years.map((year, yearIndex) => {
+                  const visibleSemesters = year.semesters.map((semester) => ({
+                    ...semester,
+                    visibleCourses: semester.courses,
+                  }));
                   return (
                     <details
                       key={year.programmeYear}
@@ -223,8 +223,8 @@ export function DashboardClient() {
 
                 {(() => {
                   const visibleUnassigned = visibleCourseSpecRows(
-                    groupedSpecProgress.unassigned.courses,
-                    incompleteOnly,
+                    visibleGroupedSpecProgress.unassigned.courses,
+                    false,
                   );
                   if (visibleUnassigned.length === 0) return null;
                   return (
@@ -233,7 +233,7 @@ export function DashboardClient() {
                         <span className="flex items-center justify-between gap-3">
                           <span>Unassigned / other courses</span>
                           <span className="shrink-0 text-xs font-normal text-muted-foreground">
-                            {groupedSpecProgress.unassigned.courseCount} courses · {groupedSpecProgress.unassigned.percent}%
+                            {visibleGroupedSpecProgress.unassigned.courseCount} courses · {visibleGroupedSpecProgress.unassigned.percent}%
                           </span>
                         </span>
                       </summary>

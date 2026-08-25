@@ -68,6 +68,18 @@ describe("Course Specification dashboard grouping", () => {
     ]);
   });
 
+  test("recalculates visible group counts and percentages after incomplete filtering", () => {
+    const rows = [
+      row("AAA101", 10, { programmeYear: 1, semester: "First", sortOrder: 0 }),
+      row("BBB101", 4, { programmeYear: 1, semester: "First", sortOrder: 1 }),
+    ];
+    const visible = buildCourseSpecProgressGroups(visibleCourseSpecRows(rows, true));
+    expect(visible.years[0]?.courseCount).toBe(1);
+    expect(visible.years[0]?.percent).toBe(40);
+    expect(visible.years[0]?.semesters[0]?.courseCount).toBe(1);
+    expect(visible.years[0]?.semesters[0]?.percent).toBe(40);
+  });
+
   test("uses section-weighted completion percentages", () => {
     expect(courseSpecRowsPercent([row("AAA101", 5), row("BBB101", 10)])).toBe(75);
   });
