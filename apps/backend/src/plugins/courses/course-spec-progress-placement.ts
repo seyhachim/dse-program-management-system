@@ -7,7 +7,7 @@ export interface ActiveCurriculumPlacementCandidate {
 /**
  * A dashboard without an explicit curriculum selector must never guess between
  * multiple active curriculum roots. Ambiguous placement is surfaced as null so
- * the course remains visible in the Unassigned / other group.
+ * the course remains visible in the Unassigned / other group for explicit review.
  */
 export function uniqueActiveCurriculumPlacement<T extends ActiveCurriculumPlacementCandidate>(
   placements: readonly T[],
