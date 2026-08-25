@@ -10,6 +10,7 @@ Imports the canonical `dse-course-spec-import-v1` JSON files generated from the 
 - Existing `Course` catalog metadata is never rewritten by a CourseSpec import. Legacy title/credits/description/prerequisites/course type/SLT/lecturer values remain evidence in the immutable Course Information snapshot; only a missing `Course` may be created from reviewed canonical JSON.
 - `--replace-existing` replaces only the latest CourseSpec and still preserves the existing `Course` catalog row.
 - Extraction errors always block a course.
+- Imported assessment items may intentionally carry `weightPercent: null` when the legacy source weights are unresolved. The items are preserved with blank DB weights, the `assessmentPlan` section is persisted as `Draft`, and the importer never normalizes or invents percentages. An explicit `0` remains a supplied weight.
 - No term-specific `Offering` is invented. Semester/programme-year/co-lecturer values remain in the canonical source JSON and are reported as warnings because an Offering requires a real term.
 - Unsupported/unfinished wizard sections are not fabricated. In particular, no CLO alignment strength is invented for the mapping section, and no Project-Based Learning progress is invented for weekly plans.
 
@@ -52,6 +53,10 @@ Raw legacy imports keep `source.yearFolder` / `source.semesterFolder` as the Cou
 ```
 
 The reviewed placement affects only the immutable Course Information snapshot. The original source-folder values remain unchanged as provenance, an audit warning is emitted, and no `Offering` is created. A malformed or incomplete `reviewedPlacement` fails closed.
+
+### Unresolved assessment weights
+
+When the legacy assessment rows are real but their percentages cannot be trusted, keep the assessment items and set each unresolved `weightPercent` to `null` rather than guessing, redistributing, or forcing a 100% total. The importer writes those assessment items with blank weights and persists the `assessmentPlan` section as `Draft`, making lecturer review explicit. Once every imported assessment item has a non-null weight, the section can be imported as complete. A literal `0` is considered an explicitly supplied value, not a missing weight.
 
 ## Commands
 
@@ -105,11 +110,11 @@ The importer maps canonical data to the current normalized models on the Teachin
 
 - `Course`: when the code does not yet exist, create the missing catalog row from reviewed canonical code/title/description/prerequisites/credits/course type/total SLT/primary lecturer. When the code already exists, preserve that catalog row exactly and attach the CourseSpec to it.
 - `CourseSpecCourseInfo`: immutable snapshot of the reviewed legacy Course Information. Raw imports use source-folder year/semester placement; an explicit `reviewedPlacement` can override only the snapshot placement while preserving original source provenance.
-- `CourseSpec` / `CourseSpecSection`: specification container and per-section status.
+- `CourseSpec` / `CourseSpecSection`: specification container and per-section status. Imported Assessment Plans with one or more null weights are retained as `Draft` for lecturer review.
 - `CourseSpecClo`: CLO descriptions, C/A/P level, PLO mapping and status.
 - `CourseSpecCloTeachingMethod` / `CourseSpecCloAssessmentMethod`: method links inferred conservatively from legacy text using the existing method vocabularies.
 - `CourseSpecWeek`: weekly topic, CLOs, LLOs, contact hours, self-study where recoverable, methods, resources and assessment text.
-- `CourseSpecAssessmentItem`: assessment name/type/mode/weight/CLO/PLO and due week where a weekly-plan match is found.
+- `CourseSpecAssessmentItem`: assessment name/type/mode/weight/CLO/PLO and due week where a weekly-plan match is found. Null weights are preserved as blank rather than normalized.
 - `CourseSpecResource`: weekly resources plus required/recommended reference metadata retained from the DOCX.
 - `CourseSpecStudentResponsibility`: ordered responsibility statements when recoverable.
 - `CourseSpecPolicy`: the five normalized policy areas when headings can be parsed.
