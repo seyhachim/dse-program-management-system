@@ -7,7 +7,7 @@ describe("Course Specification theme boundaries", () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
     expect(source).toContain(
-      "article[data-doc-page] > div:not(#programme-overview)",
+      "article[data-doc-page] > div:not(#programme-overview):not(#plo-taxonomy)",
     );
     expect(source).toContain(
       "> div:not(#programme-overview) p",
@@ -26,7 +26,7 @@ describe("Course Specification theme boundaries", () => {
     expect(source).not.toContain("article[data-doc-page]::before");
   });
 
-  test("renders the complete PLO block as the full-width Part 1 continuation row", async () => {
+  test("renders the complete PLO block as a compact full-width Part 1 continuation row", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
     expect(source).toContain(
@@ -40,6 +40,7 @@ describe("Course Specification theme boundaries", () => {
       "article[data-doc-page] > #plo-taxonomy > h2",
     );
     expect(source).toContain("font-size: 10px !important;");
+    expect(source).toContain(":not(#programme-overview):not(#plo-taxonomy)");
 
     expect(source).not.toContain("data-plo-count-label");
     expect(source).not.toContain(
