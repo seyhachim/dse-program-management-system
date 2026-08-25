@@ -318,8 +318,7 @@ export const offeringService = {
     const calendarContextChanging =
       offeringInput.academicCalendarPeriodId !== undefined ||
       offeringInput.programmeYear !== undefined ||
-      offeringInput.semester !== undefined ||
-      (existing.academicCalendarPeriodId !== null && offeringInput.term !== undefined);
+      offeringInput.semester !== undefined;
     if (existing.status === "Completed" && calendarContextChanging) {
       throw new ReferenceError("Completed offering academic-calendar context is historical and cannot be changed");
     }
@@ -380,7 +379,9 @@ export const offeringService = {
           ...(offeringInput.courseSpecId !== undefined ? { courseSpecId: offeringInput.courseSpecId } : {}),
           ...(resolvedPeriod
             ? { term: `${resolvedPeriod.academicYearLabel}-${resolvedPeriod.semester === "First" ? "S1" : "S2"}` }
-            : offeringInput.term !== undefined ? { term: offeringInput.term } : {}),
+            : existing.academicCalendarPeriodId === null && offeringInput.term !== undefined
+              ? { term: offeringInput.term }
+              : {}),
           ...(offeringInput.sectionCode !== undefined ? { sectionCode: offeringInput.sectionCode } : {}),
           ...(offeringInput.lecturerId !== undefined ? { lecturerId: offeringInput.lecturerId } : {}),
           ...(offeringInput.capacity !== undefined ? { capacity: offeringInput.capacity } : {}),

@@ -457,10 +457,14 @@ export function AcademicCalendarSimpleClient() {
 
   useEffect(() => {
     if (!selectedCalendar) { setSelectedCalendarId(""); setAuditRows([]); return; }
+    let cancelled = false;
     setSelectedCalendarId(selectedCalendar.id);
     if (!editing && !creating) setDraft(fromCalendar(selectedCalendar));
-    void academicCalendarApi.audit(programmeId, selectedCalendar.id).then(setAuditRows).catch(() => setAuditRows([]));
-  }, [selectedCalendar?.id, programmeId, editing, creating]);
+    void academicCalendarApi.audit(programmeId, selectedCalendar.id)
+      .then((rows) => { if (!cancelled) setAuditRows(rows); })
+      .catch(() => { if (!cancelled) setAuditRows([]); });
+    return () => { cancelled = true; };
+  }, [selectedCalendar?.id, selectedCalendar?.status, programmeId, editing, creating]);
 
   const changeAcademicYear = async (academicYearId: string) => {
     setSelectedYearId(academicYearId); setSelectedCalendarId(""); setCreating(false); setEditing(false); setError(null); setNotice(null);

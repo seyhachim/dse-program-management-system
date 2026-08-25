@@ -9,6 +9,13 @@ const READ_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"]
 const WRITE_ROLES: Role[] = ["admin", "program_coordinator"];
 export function canReadAcademicCalendar(user: AuthUser | undefined, programmeId: string) { return Boolean(user && hasAnyRoleInProgramme(user, READ_ROLES, programmeId)); }
 export function canWriteAcademicCalendar(user: AuthUser | undefined, programmeId: string) { return Boolean(user && hasAnyRoleInProgramme(user, WRITE_ROLES, programmeId)); }
+/** null means a global readable grant; otherwise only these programme ids may be selected. */
+export function academicCalendarProgrammeScope(user: AuthUser | undefined): string[] | null {
+  if (!user) return [];
+  const readable = user.programmeRoles.filter((assignment) => READ_ROLES.includes(assignment.role));
+  if (readable.some((assignment) => assignment.programmeId === null)) return null;
+  return [...new Set(readable.flatMap((assignment) => assignment.programmeId ? [assignment.programmeId] : []))];
+}
 function sendError(res: Response, error: unknown) {
   if (error instanceof AcademicCalendarNotFoundError) return void res.status(404).json({ error: error.message });
   if (error instanceof AcademicCalendarConflictError) return void res.status(409).json({ error: error.message });
@@ -20,8 +27,11 @@ function programmeId(req: import("express").Request, res: Response) { const id =
 export function createAcademicCalendarRouter(): Router {
   const router = Router(); router.use(requireAuth);
   router.get("/academic-calendar/programme", requirePermission("programme:read"), async (req, res) => {
+    if (!req.user) return;
+    const scope = academicCalendarProgrammeScope(req.user);
+    if (scope !== null && scope.length === 0) return void res.status(403).json({ error: "No academic calendar access for an active programme" });
     try {
-      const programme = await academicCalendarService.programmeContext();
+      const programme = await academicCalendarService.programmeContext(scope);
       if (!canReadAcademicCalendar(req.user, programme.id)) return void res.status(403).json({ error: "No academic calendar access for this programme" });
       res.json(programme);
     } catch (error) { sendError(res, error); }

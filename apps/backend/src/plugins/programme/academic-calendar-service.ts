@@ -77,13 +77,13 @@ export function buildAcademicCalendarTimeline(periods: AcademicCalendarPeriodVie
 }
 
 export const academicCalendarService = {
-  async programmeContext(): Promise<AcademicCalendarProgrammeRef> {
+  async programmeContext(programmeIds: string[] | null = null): Promise<AcademicCalendarProgrammeRef> {
     const programme = await prisma.programme.findFirst({
-      where: { status: "active" },
+      where: { status: "active", ...(programmeIds === null ? {} : { id: { in: programmeIds } }) },
       orderBy: { createdAt: "asc" },
       select: { id: true, code: true, name: true },
     });
-    if (!programme) throw new AcademicCalendarNotFoundError("No active programme is configured");
+    if (!programme) throw new AcademicCalendarNotFoundError("No accessible active programme is configured");
     return programme;
   },
   async currentAcademicYear(programmeId: string): Promise<AcademicYearView | null> {
@@ -178,19 +178,33 @@ export const academicCalendarService = {
     if (conflict) throw new AcademicCalendarConflictError("A published calendar already covers one of these study-year and semester combinations");
     const row = await prisma.$transaction(async (tx) => {
       let reboundCount = 0;
+      let predecessorPeriods: CalendarRow["periods"] = [];
       if (draft.supersedesCalendarId) {
         const predecessor = await tx.academicCalendar.findUnique({ where: { id: draft.supersedesCalendarId }, include: { periods: true } });
         if (!predecessor || predecessor.status !== "Published") throw new AcademicCalendarConflictError("The calendar being revised is no longer the published revision");
+        const dependentOfferings = await tx.offering.findMany({
+          where: { academicCalendarPeriodId: { in: predecessor.periods.map((period) => period.id) }, status: { in: ["Planned", "Active"] } },
+          select: { academicCalendarPeriodId: true, programmeYear: true },
+        });
+        for (const offering of dependentOfferings) {
+          const oldPeriod = predecessor.periods.find((period) => period.id === offering.academicCalendarPeriodId);
+          const replacement = oldPeriod ? draft.periods.find((period) => period.semester === oldPeriod.semester) : null;
+          const studyYearStillCovered = offering.programmeYear !== null && draft.studyYears.some((item) => item.studyYear === offering.programmeYear);
+          if (!replacement || !studyYearStillCovered) {
+            throw new AcademicCalendarConflictError("A correction revision cannot remove the semester or study-year coverage of a planned/active Offering");
+          }
+        }
+        predecessorPeriods = predecessor.periods;
         await tx.academicCalendar.update({ where: { id: predecessor.id }, data: { status: "Superseded" } });
         await tx.academicCalendarAuditAction.create({ data: { calendarId: predecessor.id, actorId, action: "Superseded", reason: draft.revisionReason, details: { supersededByCalendarId: draft.id } } });
-        for (const oldPeriod of predecessor.periods) {
-          const newPeriod = draft.periods.find((period) => period.semester === oldPeriod.semester);
-          if (!newPeriod) continue;
-          const result = await tx.offering.updateMany({ where: { academicCalendarPeriodId: oldPeriod.id, status: { in: ["Planned", "Active"] } }, data: { academicCalendarPeriodId: newPeriod.id, semester: newPeriod.semester, startDate: null, endDate: null } });
-          reboundCount += result.count;
-        }
       }
       const published = await tx.academicCalendar.update({ where: { id: draft.id }, data: { status: "Published", publishedById: actorId, publishedAt: new Date() }, include: calendarInclude });
+      for (const oldPeriod of predecessorPeriods) {
+        const newPeriod = draft.periods.find((period) => period.semester === oldPeriod.semester);
+        if (!newPeriod) continue;
+        const result = await tx.offering.updateMany({ where: { academicCalendarPeriodId: oldPeriod.id, status: { in: ["Planned", "Active"] } }, data: { academicCalendarPeriodId: newPeriod.id, semester: newPeriod.semester, startDate: null, endDate: null } });
+        reboundCount += result.count;
+      }
       await tx.academicCalendarAuditAction.create({ data: { calendarId: draft.id, actorId, action: "Published", reason: draft.revisionReason, afterSnapshot: calendarView(published) as unknown as Prisma.InputJsonValue, details: { reboundOfferingCount: reboundCount } } });
       if (reboundCount > 0) await tx.academicCalendarAuditAction.create({ data: { calendarId: draft.id, actorId, action: "OfferingRebound", reason: "Active/planned offerings follow the newly published canonical revision", details: { count: reboundCount } } });
       return published;

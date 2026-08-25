@@ -33,6 +33,7 @@ dbDescribe("Academic Calendar revision integrity", () => {
     });
     const original = await academicCalendarService.publishCalendar(course.programmeId, originalDraft.id, actor.id);
     const originalPeriod = original.periods[0]!;
+    const canonicalTerm = `${academicYear.label}-S1`;
 
     const moveTarget = await academicCalendarService.createCalendar(course.programmeId, actor.id, {
       academicYearId: academicYear.id,
@@ -57,7 +58,7 @@ dbDescribe("Academic Calendar revision integrity", () => {
     const active = await prisma.offering.create({
       data: {
         courseId: course.id,
-        term: `cal-active-${suffix}`,
+        term: canonicalTerm,
         sectionCode: "A",
         capacity: 30,
         status: "Active",
@@ -69,8 +70,8 @@ dbDescribe("Academic Calendar revision integrity", () => {
     const completed = await prisma.offering.create({
       data: {
         courseId: course.id,
-        term: `cal-completed-${suffix}`,
-        sectionCode: "A",
+        term: canonicalTerm,
+        sectionCode: "B",
         capacity: 30,
         status: "Completed",
         semester: "First",
@@ -78,6 +79,71 @@ dbDescribe("Academic Calendar revision integrity", () => {
         academicCalendarPeriodId: originalPeriod.id,
       },
     });
+
+    let semesterMismatchRejected = false;
+    try {
+      await prisma.offering.update({ where: { id: active.id }, data: { semester: "Second" } });
+    } catch {
+      semesterMismatchRejected = true;
+    }
+    expect(semesterMismatchRejected).toBe(true);
+
+    let studyYearMismatchRejected = false;
+    try {
+      await prisma.offering.update({ where: { id: active.id }, data: { programmeYear: 2 } });
+    } catch {
+      studyYearMismatchRejected = true;
+    }
+    expect(studyYearMismatchRejected).toBe(true);
+
+    let detachRejected = false;
+    try {
+      await prisma.offering.update({ where: { id: active.id }, data: { academicCalendarPeriodId: null } });
+    } catch {
+      detachRejected = true;
+    }
+    expect(detachRejected).toBe(true);
+
+    let termTamperRejected = false;
+    try {
+      await prisma.offering.update({ where: { id: active.id }, data: { term: "tampered-term" } });
+    } catch {
+      termTamperRejected = true;
+    }
+    expect(termTamperRejected).toBe(true);
+
+    let draftPeriodLinkRejected = false;
+    try {
+      await prisma.offering.update({
+        where: { id: active.id },
+        data: { academicCalendarPeriodId: moveTarget.periods[0]!.id, semester: "Second", term: `${academicYear.label}-S2` },
+      });
+    } catch {
+      draftPeriodLinkRejected = true;
+    }
+    expect(draftPeriodLinkRejected).toBe(true);
+
+    const foreignProgrammeId = `calendar-foreign-${suffix}`;
+    await prisma.programme.create({ data: { id: foreignProgrammeId, code: `FC-${suffix.slice(0, 8)}`, name: "Foreign Calendar Programme", status: "active" } });
+    const foreignYear = await academicCalendarService.createAcademicYear(foreignProgrammeId, {
+      label: `2198-2199-foreign-${suffix.slice(0, 8)}`, startYear: 2198, endYear: 2199, isCurrent: false,
+    });
+    const foreignDraft = await academicCalendarService.createCalendar(foreignProgrammeId, actor.id, {
+      academicYearId: foreignYear.id, revisionReason: "Foreign official issue", studyYears: [3],
+      periods: [{ semester: "First", teachingStart: "2198-09-01", teachingEnd: "2199-01-15" }], events: [],
+      sourceTitle: "Foreign official calendar", sourcePublishedAt: "2198-08-01", sourceUrl: null, sourceFileRef: null, sourceNote: "Official test source",
+    });
+    const foreignPublished = await academicCalendarService.publishCalendar(foreignProgrammeId, foreignDraft.id, actor.id);
+    let crossProgrammeLinkRejected = false;
+    try {
+      await prisma.offering.update({
+        where: { id: active.id },
+        data: { academicCalendarPeriodId: foreignPublished.periods[0]!.id, term: `${foreignYear.label}-S1` },
+      });
+    } catch {
+      crossProgrammeLinkRejected = true;
+    }
+    expect(crossProgrammeLinkRejected).toBe(true);
 
     const correction = await academicCalendarService.createRevision(
       course.programmeId,

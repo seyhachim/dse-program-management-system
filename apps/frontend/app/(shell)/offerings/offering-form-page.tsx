@@ -204,7 +204,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     setSaving(true); setError(null);
     try {
       if (offeringId) {
-        const { courseId: _courseId, ...candidate } = values;
+        const { courseId: _courseId, term: _term, ...candidate } = values;
         const payload: Record<string, unknown> = {
           ...candidate,
           lecturerId: values.lecturerId || null,
