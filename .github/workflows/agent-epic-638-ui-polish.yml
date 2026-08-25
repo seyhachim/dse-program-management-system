@@ -32,6 +32,22 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.23
+      - name: Repair generated patch-script literals
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/agent-epic-638-ui-polish.ts')
+          source = path.read_text()
+          source = source.replace(
+              'className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${step.complete ? "bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}',
+              'className={"flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium " + (step.complete ? "bg-primary/10 text-primary" : "bg-background text-muted-foreground")}',
+          )
+          source = source.replace(
+              'className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${step.complete ? "bg-primary text-primary-foreground" : "border border-border bg-card"}`}',
+              'className={"flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold " + (step.complete ? "bg-primary text-primary-foreground" : "border border-border bg-card")}',
+          )
+          path.write_text(source)
+          PY
       - name: Apply UI polish
         run: bun scripts/agent-epic-638-ui-polish.ts
       - name: Install dependencies
