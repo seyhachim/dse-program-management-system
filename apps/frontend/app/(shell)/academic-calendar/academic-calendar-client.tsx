@@ -53,6 +53,22 @@ type CalendarDraft = {
   sourceNote: string;
 };
 
+type AcademicYearDraft = {
+  label: string;
+  startYear: string;
+  endYear: string;
+};
+
+function initialAcademicYearDraft(): AcademicYearDraft {
+  const startYear = new Date().getFullYear();
+  const endYear = startYear + 1;
+  return {
+    label: `${startYear}–${endYear}`,
+    startYear: String(startYear),
+    endYear: String(endYear),
+  };
+}
+
 function emptyPeriod(semester: "First" | "Second", enabled = semester === "First"): PeriodDraft {
   return {
     semester,
@@ -324,7 +340,7 @@ export function AcademicCalendarClient() {
   const [notice, setNotice] = useState<string | null>(null);
   const [revisionReason, setRevisionReason] = useState("");
   const [auditRows, setAuditRows] = useState<Array<{ id: string; action: string; actorName: string; reason: string; createdAt: string }>>([]);
-  const [newYear, setNewYear] = useState({ label: "", startYear: "", endYear: "" });
+  const [newYear, setNewYear] = useState<AcademicYearDraft>(() => initialAcademicYearDraft());
   const [showNewYear, setShowNewYear] = useState(false);
 
   const selectedYear = years.find((year) => year.id === selectedYearId) ?? null;
@@ -450,9 +466,20 @@ export function AcademicCalendarClient() {
     setSaving(true); setError(null);
     try {
       const created = await academicCalendarApi.createYear(programmeId, { label: newYear.label.trim(), startYear, endYear, isCurrent: years.length === 0 });
-      const nextYears = await academicCalendarApi.years(programmeId); setYears(nextYears); setSelectedYearId(created.id); setCalendars([]); setShowNewYear(false); setNewYear({ label: "", startYear: "", endYear: "" }); setNotice("Academic year created.");
+      const nextYears = await academicCalendarApi.years(programmeId); setYears(nextYears); setSelectedYearId(created.id); setCalendars([]); setShowNewYear(false); setNewYear(initialAcademicYearDraft()); setNotice("Academic year created.");
     } catch (reason) { setError(message(reason, "Could not create academic year.")); }
     finally { setSaving(false); }
+  };
+
+  const toggleAcademicYearForm = () => {
+    setShowNewYear((visible) => {
+      if (!visible) {
+        setNewYear(initialAcademicYearDraft());
+        setError(null);
+        setNotice(null);
+      }
+      return !visible;
+    });
   };
 
   if (loading) return <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading Academic Calendar…</div>;
@@ -468,7 +495,7 @@ export function AcademicCalendarClient() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-56 space-y-1.5"><Label htmlFor="academic-year">Academic Year</Label><select id="academic-year" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={selectedYearId} onChange={(e) => void changeAcademicYear(e.target.value)}><option value="">Select year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.label}{year.isCurrent ? " · Current" : ""}</option>)}</select></div>
-            <Button variant="outline" onClick={() => setShowNewYear((value) => !value)}><Plus className="h-4 w-4" /> Academic Year</Button>
+            <Button variant="outline" onClick={toggleAcademicYearForm}><Plus className="h-4 w-4" /> Academic Year</Button>
             {selectedYear && !selectedYear.isCurrent ? <Button variant="outline" onClick={() => void academicCalendarApi.setCurrentYear(programmeId, selectedYear.id).then(load)}><RefreshCw className="h-4 w-4" /> Set current</Button> : null}
           </div>
         </div>
