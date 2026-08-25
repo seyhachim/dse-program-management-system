@@ -1,4 +1,0 @@
-{
-  "schemaVersion": "dse-course-spec-import-v1",
-  "description": "Canonical JSON structure consumed by apps/backend/scripts/course-spec-import.ts. Generated from legacy DOCX source; extraction warnings require review."
-}
