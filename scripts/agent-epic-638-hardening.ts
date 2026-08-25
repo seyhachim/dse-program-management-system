@@ -12,28 +12,6 @@ function insertAfter(path: string, anchor: string, addition: string): void {
   replaceOnce(path, anchor, anchor + addition);
 }
 
-const offeringsTest = "packages/shared-types/src/offerings.test.ts";
-replaceOnce(
-  offeringsTest,
-  'const COURSE_SPEC = "44444444-4444-4444-4444-444444444444";\n',
-  'const COURSE_SPEC = "44444444-4444-4444-4444-444444444444";\nconst CALENDAR_PERIOD = "55555555-5555-5555-5555-555555555555";\n',
-);
-replaceOnce(
-  offeringsTest,
-  '    term: "2026-Fall",\n    lecturerId: A,\n    meetings: [VALID_MEETING],\n    startDate: "2026-08-10",\n    endDate: "2026-11-28",\n',
-  '    term: "2026-2027-S1",\n    lecturerId: A,\n    meetings: [VALID_MEETING],\n    academicCalendarPeriodId: CALENDAR_PERIOD,\n    programmeYear: 3,\n    semester: "First",\n',
-);
-replaceOnce(
-  offeringsTest,
-  'test("CreateOfferingInput requires both teaching-period dates", () => {\n  expect(CreateOfferingInput.safeParse(validCreate({ startDate: null })).success).toBe(false);\n  expect(CreateOfferingInput.safeParse(validCreate({ endDate: null })).success).toBe(false);\n  expect(CreateOfferingInput.safeParse(validCreate({ startDate: undefined, endDate: undefined })).success).toBe(false);\n});\n',
-  'test("CreateOfferingInput rejects legacy teaching-period snapshots", () => {\n  expect(CreateOfferingInput.safeParse(validCreate({ startDate: "2026-08-10", endDate: "2026-11-28" })).success).toBe(false);\n  expect(CreateOfferingInput.safeParse(validCreate({ startDate: null, endDate: null })).success).toBe(false);\n});\n',
-);
-replaceOnce(
-  offeringsTest,
-  'test("CreateOfferingInput rejects a reversed teaching period", () => {\n  expect(CreateOfferingInput.safeParse(validCreate({\n    startDate: "2026-11-28",\n    endDate: "2026-08-10",\n  })).success).toBe(false);\n});\n',
-  'test("CreateOfferingInput requires canonical Academic Calendar context", () => {\n  expect(CreateOfferingInput.safeParse(validCreate({ academicCalendarPeriodId: null })).success).toBe(false);\n  expect(CreateOfferingInput.safeParse(validCreate({ programmeYear: null })).success).toBe(false);\n  expect(CreateOfferingInput.safeParse(validCreate({ semester: null })).success).toBe(false);\n});\n',
-);
-
 const offeringService = "apps/backend/src/plugins/offerings/service.ts";
 replaceOnce(
   offeringService,
@@ -71,8 +49,8 @@ replaceOnce(
 );
 replaceOnce(
   calendarService,
-  'for (const event of view.events) eventById.set(event.id, event); sources.set(row.id, view.source); }\n',
-  'for (const event of view.events) eventById.set(event.id, event); const { fileRef: _internalFileRef, ...publicSource } = view.source; sources.set(row.id, publicSource); }\n',
+  '    for (const row of rows) { const view = calendarView(row); for (const period of view.periods) { if (bySemester.has(period.semester)) throw new AcademicCalendarConflictError("Published calendar data contains conflicting semester periods"); bySemester.set(period.semester, period); } for (const event of view.events) eventById.set(event.id, event); sources.set(row.id, view.source); }\n',
+  '    for (const row of rows) { const view = calendarView(row); for (const period of view.periods) { if (bySemester.has(period.semester)) throw new AcademicCalendarConflictError("Published calendar data contains conflicting semester periods"); bySemester.set(period.semester, period); } for (const event of view.events) eventById.set(event.id, event); const { fileRef: _internalFileRef, ...publicSource } = view.source; sources.set(row.id, publicSource); }\n',
 );
 
 const migration = "apps/backend/prisma/migrations/20260825162500_academic_calendar_epic_638/migration.sql";
@@ -119,11 +97,4 @@ replaceOnce(
   '    expect(completedAfter.academicCalendarPeriodId).toBe(originalPeriod.id);\n    expect(oldCalendar.status).toBe("Superseded");\n    expect(audit.some((row) => row.action === "OfferingRebound")).toBe(true);\n\n    let completedRebindRejected = false;\n    try {\n      await prisma.offering.update({ where: { id: completed.id }, data: { academicCalendarPeriodId: replacementPeriod.id } });\n    } catch {\n      completedRebindRejected = true;\n    }\n    expect(completedRebindRejected).toBe(true);\n\n    let shadowDatesRejected = false;\n    try {\n      await prisma.offering.update({ where: { id: active.id }, data: { startDate: new Date("2198-09-09T00:00:00.000Z") } });\n    } catch {\n      shadowDatesRejected = true;\n    }\n    expect(shadowDatesRejected).toBe(true);\n\n    let auditRewriteRejected = false;\n    try {\n      await prisma.academicCalendarAuditAction.update({ where: { id: audit[0]!.id }, data: { reason: "rewritten" } });\n    } catch {\n      auditRewriteRejected = true;\n    }\n    expect(auditRewriteRejected).toBe(true);\n\n    const projection = await academicCalendarService.publishedProjection(course.programmeId, 3, academicYear.label);\n    expect(projection.status).toBe("available");\n    if (projection.status === "available") {\n      expect(projection.sources.length).toBeGreaterThan(0);\n      expect("fileRef" in projection.sources[0]!).toBe(false);\n    }\n',
 );
 
-const ci = ".github/workflows/ci.yml";
-insertAfter(
-  ci,
-  `      - name: Verify Offering CourseSpec binding and historical result stability\n        run: bun test apps/backend/src/plugins/offerings/course-spec-binding-db.test.ts\n        env:\n          OFFERING_COURSE_SPEC_DB_TESTS: "1"\n          JWT_SECRET: issue-211-course-spec-binding-ci-secret-at-least-32-characters\n`,
-  `\n      - name: Verify Academic Calendar revision and Offering history integrity\n        run: bun test apps/backend/src/plugins/programme/academic-calendar-integrity-db.test.ts\n        env:\n          ACADEMIC_CALENDAR_DB_TESTS: "1"\n\n      - name: Verify Student Portal Academic Calendar publication boundary\n        run: bun test apps/backend/src/plugins/student-portal/academic-calendar-db.test.ts\n        env:\n          ACADEMIC_CALENDAR_DB_TESTS: "1"\n`,
-);
-
-console.log("Epic #638 hardening patch applied.");
+console.log("Epic #638 hardening source patch applied.");
