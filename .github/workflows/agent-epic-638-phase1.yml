@@ -22,6 +22,8 @@ jobs:
   apply-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/dse_pms
     steps:
       - uses: actions/checkout@v4
         with:
