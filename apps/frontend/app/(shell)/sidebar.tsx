@@ -130,7 +130,7 @@ export function AppSidebar() {
                       </Link>
                     }
                   />
-                </SidebarMenuButton>
+                </SidebarMenuItem>
               );
             })}
           </SidebarMenu>
