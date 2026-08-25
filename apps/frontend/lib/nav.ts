@@ -106,30 +106,12 @@ const frontendManifests = [
 ];
 
 const SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS: Role[] = ["admin", "program_coordinator"];
-const AUN_QA_INTERNAL_PATHS = new Set([
-  "/aun-qa/review",
-  "/aun-qa/sar-preview",
-  "/qa-dashboard",
-]);
-
-function hideInternalAunQaRoutes(manifest: PluginManifest): PluginManifest {
-  if (!manifest.routes?.some((route) => AUN_QA_INTERNAL_PATHS.has(route.path))) {
-    return manifest;
-  }
-
-  return {
-    ...manifest,
-    routes: manifest.routes.filter((route) => !AUN_QA_INTERNAL_PATHS.has(route.path)),
-  };
-}
 
 function sidebarManifestsForRoles(roles: Role[]): PluginManifest[] {
   const hidePlaceholders = roles.some((role) => SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS.includes(role));
-  const manifests = hidePlaceholders
+  return hidePlaceholders
     ? frontendManifests.filter((manifest) => manifest.id !== "placeholders")
     : frontendManifests;
-
-  return manifests.map(hideInternalAunQaRoutes);
 }
 
 export const iconMap: Record<string, LucideIcon> = {
