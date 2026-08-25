@@ -50,7 +50,7 @@ type CalendarDraft = {
   sourceNote: string;
 };
 
-type AcademicYearDraft = { label: string; startYear: string; endYear: string };
+type AcademicYearDraft = { startYear: string; setCurrent: boolean };
 
 type CoveragePreset = "1" | "2" | "3" | "4" | "3-4" | "all" | "custom";
 
@@ -59,10 +59,17 @@ function message(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function initialAcademicYearDraft(): AcademicYearDraft {
-  const startYear = new Date().getFullYear();
+function suggestedAcademicYearDraft(years: AcademicYearView[] = []): AcademicYearDraft {
+  const currentYear = new Date().getFullYear();
+  const latestEndYear = years.reduce((latest, year) => Math.max(latest, year.endYear), currentYear);
+  return { startYear: String(latestEndYear), setCurrent: years.length === 0 };
+}
+
+function academicYearValues(startYearText: string): { startYear: number; endYear: number; label: string } | null {
+  const startYear = Number(startYearText);
+  if (!Number.isInteger(startYear) || startYear < 1900 || startYear > 2200) return null;
   const endYear = startYear + 1;
-  return { label: `${startYear}–${endYear}`, startYear: String(startYear), endYear: String(endYear) };
+  return { startYear, endYear, label: `${startYear}–${endYear}` };
 }
 
 function emptyPeriod(semester: "First" | "Second"): PeriodDraft {
@@ -423,10 +430,11 @@ export function AcademicCalendarSimpleClient() {
   const [notice, setNotice] = useState<string | null>(null);
   const [revisionReason, setRevisionReason] = useState("");
   const [auditRows, setAuditRows] = useState<AcademicCalendarAuditView[]>([]);
-  const [newYear, setNewYear] = useState<AcademicYearDraft>(() => initialAcademicYearDraft());
+  const [newYear, setNewYear] = useState<AcademicYearDraft>(() => suggestedAcademicYearDraft());
   const [showNewYear, setShowNewYear] = useState(false);
 
   const selectedYear = years.find((year) => year.id === selectedYearId) ?? null;
+  const newYearValues = academicYearValues(newYear.startYear);
   const calendarForStudyYear = useMemo(() => {
     const candidates = calendars.filter((calendar) => calendar.studyYears.includes(selectedStudyYear));
     return candidates.find((calendar) => calendar.status === "Published") ?? candidates.find((calendar) => calendar.status === "Draft") ?? candidates[0] ?? null;
@@ -475,13 +483,17 @@ export function AcademicCalendarSimpleClient() {
 
   const createAcademicYear = async () => {
     if (!programmeId) return;
-    const startYear = Number(newYear.startYear); const endYear = Number(newYear.endYear);
-    if (!newYear.label.trim() || !Number.isInteger(startYear) || !Number.isInteger(endYear)) { setError("Enter a label, start year, and end year."); return; }
+    const values = academicYearValues(newYear.startYear);
+    if (!values) { setError("Enter a valid four-digit start year, for example 2027."); return; }
+    if (years.some((year) => year.startYear === values.startYear && year.endYear === values.endYear)) {
+      setError(`Academic year ${values.label} already exists.`);
+      return;
+    }
     setSaving(true); setError(null);
     try {
-      const created = await academicCalendarApi.createYear(programmeId, { label: newYear.label.trim(), startYear, endYear, isCurrent: years.length === 0 });
+      const created = await academicCalendarApi.createYear(programmeId, { ...values, isCurrent: newYear.setCurrent });
       const nextYears = await academicCalendarApi.years(programmeId);
-      setYears(nextYears); setSelectedYearId(created.id); setCalendars([]); setShowNewYear(false); setNewYear(initialAcademicYearDraft()); setNotice("Academic year created.");
+      setYears(nextYears); setSelectedYearId(created.id); setCalendars([]); setShowNewYear(false); setNewYear(suggestedAcademicYearDraft(nextYears)); setNotice(`Academic year ${values.label} created.`);
     } catch (reason) { setError(message(reason, "Could not create academic year.")); }
     finally { setSaving(false); }
   };
@@ -569,11 +581,37 @@ export function AcademicCalendarSimpleClient() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-56 space-y-1.5"><Label htmlFor="academic-year">Academic Year</Label><select id="academic-year" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={selectedYearId} onChange={(e) => void changeAcademicYear(e.target.value)}><option value="">Select year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.label}{year.isCurrent ? " · Current" : ""}</option>)}</select></div>
-            <Button variant="outline" onClick={() => { setShowNewYear((value) => !value); setNewYear(initialAcademicYearDraft()); }}><Plus className="h-4 w-4" /> Academic Year</Button>
+            <Button variant="outline" onClick={() => { const opening = !showNewYear; setShowNewYear(opening); if (opening) { setNewYear(suggestedAcademicYearDraft(years)); setError(null); } }}><Plus className="h-4 w-4" /> Academic Year</Button>
             {selectedYear && !selectedYear.isCurrent ? <Button variant="outline" onClick={() => void academicCalendarApi.setCurrentYear(programmeId, selectedYear.id).then(load)}><RefreshCw className="h-4 w-4" /> Set current</Button> : null}
           </div>
         </div>
-        {showNewYear ? <div className="mt-4 grid gap-3 rounded-xl bg-muted/30 p-4 sm:grid-cols-4"><div><Label htmlFor="new-year-label">Label</Label><Input id="new-year-label" className="mt-1" value={newYear.label} onChange={(e) => setNewYear({ ...newYear, label: e.target.value })} /></div><div><Label htmlFor="new-year-start">Start year</Label><Input id="new-year-start" className="mt-1" inputMode="numeric" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value })} /></div><div><Label htmlFor="new-year-end">End year</Label><Input id="new-year-end" className="mt-1" inputMode="numeric" value={newYear.endYear} onChange={(e) => setNewYear({ ...newYear, endYear: e.target.value })} /></div><div className="flex items-end"><Button disabled={saving} onClick={() => void createAcademicYear()}>Create year</Button></div></div> : null}
+        {showNewYear ? (
+          <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-xl flex-1">
+                <h3 className="font-semibold">Add Academic Year</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Enter only the first year. PMS automatically creates the next year and academic-year label.</p>
+                <div className="mt-4 max-w-xs space-y-1.5">
+                  <Label htmlFor="new-year-start">Start year</Label>
+                  <Input id="new-year-start" inputMode="numeric" autoComplete="off" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="2027" />
+                </div>
+                <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
+                  <span className="text-muted-foreground">Academic Year</span>
+                  <span className="ml-2 font-semibold">{newYearValues?.label ?? "—"}</span>
+                  {newYearValues ? <span className="ml-2 text-muted-foreground">({newYearValues.startYear} → {newYearValues.endYear})</span> : null}
+                </div>
+                <label className="mt-3 flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-0.5" checked={newYear.setCurrent} onChange={(e) => setNewYear({ ...newYear, setCurrent: e.target.checked })} />
+                  <span><span className="font-medium">Set as current academic year</span><span className="block text-xs text-muted-foreground">Use this only when this is the active academic year for the programme.</span></span>
+                </label>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button variant="outline" onClick={() => { setShowNewYear(false); setError(null); }}>Cancel</Button>
+                <Button disabled={saving || !newYearValues} onClick={() => void createAcademicYear()}>{saving ? "Creating…" : `Create ${newYearValues?.label ?? "Academic Year"}`}</Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {error ? <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
