@@ -11,4 +11,13 @@ describe("Course Specification preview role parity", () => {
     expect(governance.showDocumentStyleControl).toBe(true);
     expect(lecturer.showDocumentStyleControl).toBe(false);
   });
+
+  test("lets the document workspace grow with the page stack instead of clipping it to a viewport calculation", () => {
+    const layout = getCourseSpecPreviewLayout(false);
+
+    expect(layout.gridClassName).toContain("items-start");
+    expect(layout.gridClassName).not.toContain("100vh");
+    expect(layout.gridClassName).not.toContain("100dvh");
+    expect(layout.gridClassName).not.toContain("min-h-[650px]");
+  });
 });
