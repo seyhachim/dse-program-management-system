@@ -31,8 +31,11 @@ import {
   qaSarEditorBlocksToDocument,
   type QaSarEditorBlock,
 } from "@/lib/qa-sar-rich-content";
+import { SarSourceContextPanel } from "./source-context-panel";
 
 const PROGRAMME_ID = "dse";
+
+type ContextTab = "evidence" | "pms";
 
 function newId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -59,6 +62,7 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
   const [editorBlocks, setEditorBlocks] = useState<QaSarEditorBlock[]>([]);
   const [evidence, setEvidence] = useState<QaEvidenceItemView[]>([]);
   const [knowledge, setKnowledge] = useState<QaKnowledgeView | null>(null);
+  const [contextTab, setContextTab] = useState<ContextTab>("evidence");
   const [readiness, setReadiness] = useState({
     practiceDescribed: false,
     resultsAnalysed: false,
@@ -148,9 +152,14 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
       ["notStarted", "drafting", "changesRequested"].includes(section.status),
   );
 
-  function updateRichText(id: string, document: Extract<QaSarEditorBlock, { type: "richText" }>["document"]) {
+  function updateRichText(
+    id: string,
+    document: Extract<QaSarEditorBlock, { type: "richText" }>["document"],
+  ) {
     setEditorBlocks((current) =>
-      current.map((block) => (block.id === id && block.type === "richText" ? { ...block, document } : block)),
+      current.map((block) =>
+        block.id === id && block.type === "richText" ? { ...block, document } : block,
+      ),
     );
   }
 
@@ -245,28 +254,57 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
   }
 
   if (meLoading || loading) {
-    return <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">Loading SAR editor…</div>;
+    return (
+      <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">
+        Loading SAR editor…
+      </div>
+    );
   }
 
   if (!cycleId || !section) {
-    return <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">No accessible assessment cycle or SAR assignment was found.</div>;
+    return (
+      <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">
+        No accessible assessment cycle or SAR assignment was found.
+      </div>
+    );
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+    <div className="mx-auto w-full max-w-[1600px] space-y-4">
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
 
       {latestReview ? (
-        <div className={`rounded-xl border p-4 text-sm ${latestReview.decision === "approved" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-          <div className="flex items-center gap-2 font-semibold"><MessageSquare className="h-4 w-4" /> Latest reviewer decision</div>
-          <p className="mt-1">{latestReview.decision === "approved" ? "Approved" : latestReview.decision === "moreEvidenceRequested" ? "More evidence requested" : "Changes requested"} by {latestReview.reviewer.name}.</p>
+        <div
+          className={`rounded-xl border p-4 text-sm ${
+            latestReview.decision === "approved"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
+        >
+          <div className="flex items-center gap-2 font-semibold">
+            <MessageSquare className="h-4 w-4" /> Latest reviewer decision
+          </div>
+          <p className="mt-1">
+            {latestReview.decision === "approved"
+              ? "Approved"
+              : latestReview.decision === "moreEvidenceRequested"
+                ? "More evidence requested"
+                : "Changes requested"}{" "}
+            by {latestReview.reviewer.name}.
+          </p>
           {latestReview.comment ? <p className="mt-2">{latestReview.comment}</p> : null}
         </div>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4">
         <div>
-          <div className="text-sm font-semibold text-primary">{section.requirementCode} · Criterion {section.criterionCode}</div>
+          <div className="text-sm font-semibold text-primary">
+            {section.requirementCode} · Criterion {section.criterionCode}
+          </div>
           <h2 className="text-lg font-semibold">{section.requirementTitle}</h2>
           <div className="mt-1 text-xs text-muted-foreground">
             {statusLabel(section.status)}
@@ -275,33 +313,86 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/aun-qa" className="rounded-md border px-3 py-2 text-sm">Workspace</Link>
-          {me?.permissions.includes("qa:review") ? <Link href="/aun-qa/review" className="rounded-md border px-3 py-2 text-sm">Review queue</Link> : null}
+          <Link href="/aun-qa" className="rounded-md border px-3 py-2 text-sm">
+            Workspace
+          </Link>
+          {me?.permissions.includes("qa:review") ? (
+            <Link href="/aun-qa/review" className="rounded-md border px-3 py-2 text-sm">
+              Review queue
+            </Link>
+          ) : null}
           {editable ? (
             <>
-              <button onClick={() => void saveDraft()} disabled={saving || submitting} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save draft"}</button>
-              <button onClick={() => void submitForReview()} disabled={saving || submitting} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"><Send className="h-4 w-4" />{submitting ? "Submitting…" : "Submit for review"}</button>
+              <button
+                onClick={() => void saveDraft()}
+                disabled={saving || submitting}
+                className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? "Saving…" : "Save draft"}
+              </button>
+              <button
+                onClick={() => void submitForReview()}
+                disabled={saving || submitting}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+                {submitting ? "Submitting…" : "Submit for review"}
+              </button>
             </>
           ) : null}
           {roleCanEdit && section.status === "approved" ? (
-            <button onClick={() => void createRevision()} disabled={submitting} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium"><RotateCcw className="h-4 w-4" />Create revision</button>
+            <button
+              onClick={() => void createRevision()}
+              disabled={submitting}
+              className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium"
+            >
+              <RotateCcw className="h-4 w-4" /> Create revision
+            </button>
           ) : null}
         </div>
       </div>
 
-      {section.status === "underReview" ? <div className="rounded-xl border bg-slate-50 p-3 text-sm text-slate-700">This snapshot is under human review. The working section is read-only until the reviewer approves it or requests changes.</div> : null}
-      {section.status === "approved" ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">This approved snapshot is frozen for official SAR assembly. Create a revision to continue editing without changing the approved version.</div> : null}
+      {section.status === "underReview" ? (
+        <div className="rounded-xl border bg-slate-50 p-3 text-sm text-slate-700">
+          This snapshot is under human review. The working section is read-only until the reviewer
+          approves it or requests changes.
+        </div>
+      ) : null}
+      {section.status === "approved" ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          This approved snapshot is frozen for official SAR assembly. Create a revision to continue
+          editing without changing the approved version.
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[270px_minmax(0,1fr)_320px]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[250px_minmax(0,1fr)_340px]">
         <aside className="rounded-xl border bg-white p-4 xl:sticky xl:top-4 xl:self-start">
-          <div className="flex items-center gap-2 font-semibold"><BookOpen className="h-4 w-4" /> Guidance</div>
+          <div className="flex items-center gap-2 font-semibold">
+            <BookOpen className="h-4 w-4" /> Guidance
+          </div>
           <div className="mt-4 space-y-4 text-sm">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Expectation</div>
-              {expectations.length ? expectations.map((item) => <p key={item.id} className="mt-2 text-muted-foreground">{item.statement}</p>) : <p className="mt-2 text-muted-foreground">Address the requirement using current programme practice, evidence, interpretation, and improvement actions.</p>}
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Expectation
+              </div>
+              {expectations.length ? (
+                expectations.map((item) => (
+                  <p key={item.id} className="mt-2 text-muted-foreground">
+                    {item.statement}
+                  </p>
+                ))
+              ) : (
+                <p className="mt-2 text-muted-foreground">
+                  Address the requirement using current programme practice, evidence, interpretation,
+                  and improvement actions.
+                </p>
+              )}
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Questions to consider</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Questions to consider
+              </div>
               <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
                 <li>What is the current practice or process?</li>
                 <li>Who is involved and how is it implemented?</li>
@@ -311,24 +402,51 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
               </ul>
             </div>
             <div className="space-y-2 border-t pt-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Author readiness</div>
-              {([
-                ["practiceDescribed", "Practice/process described"],
-                ["resultsAnalysed", "Results/findings analysed"],
-                ["improvementExplained", "Improvement/action explained"],
-              ] as const).map(([key, label]) => (
-                <label key={key} className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readiness[key]} disabled={!editable} onChange={(event) => setReadiness((current) => ({ ...current, [key]: event.target.checked }))} className="mt-1" /><span>{label}</span></label>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Author readiness
+              </div>
+              {(
+                [
+                  ["practiceDescribed", "Practice/process described"],
+                  ["resultsAnalysed", "Results/findings analysed"],
+                  ["improvementExplained", "Improvement/action explained"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={readiness[key]}
+                    disabled={!editable}
+                    onChange={(event) =>
+                      setReadiness((current) => ({ ...current, [key]: event.target.checked }))
+                    }
+                    className="mt-1"
+                  />
+                  <span>{label}</span>
+                </label>
               ))}
             </div>
           </div>
         </aside>
 
-        <section className="rounded-xl border bg-white shadow-sm">
+        <section className="min-w-0 rounded-xl border bg-white shadow-sm">
           <div className="flex flex-wrap items-center gap-2 border-b p-3">
             <span className="text-xs font-medium text-muted-foreground">DSE Content Editor</span>
             <div className="mx-1 h-5 border-l" />
-            <button disabled={!editable} onClick={() => insertPmsData("cloAttainment", "CLO attainment summary")} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><Database className="h-3 w-3" /> CLO attainment</button>
-            <button disabled={!editable} onClick={() => insertPmsData("assessmentSummary", "Assessment results summary")} className="rounded-md border px-2.5 py-1.5 text-xs">Assessment data</button>
+            <button
+              disabled={!editable}
+              onClick={() => insertPmsData("cloAttainment", "CLO attainment summary")}
+              className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"
+            >
+              <Database className="h-3 w-3" /> CLO attainment
+            </button>
+            <button
+              disabled={!editable}
+              onClick={() => insertPmsData("assessmentSummary", "Assessment results summary")}
+              className="rounded-md border px-2.5 py-1.5 text-xs"
+            >
+              Assessment data
+            </button>
           </div>
 
           <div className="min-h-[650px] space-y-3 p-5 md:p-8">
@@ -347,45 +465,129 @@ export function SarEditorClient({ requirementCode }: { requirementCode: string }
                     </div>
                   )
                 ) : block.type === "evidenceReference" ? (
-                  <div className="my-2 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800"><FileCheck2 className="h-4 w-4" /> Evidence: {block.label}</div>
+                  <div className="my-2 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                    <FileCheck2 className="h-4 w-4" /> Evidence: {block.label}
+                  </div>
                 ) : (
-                  <div className="my-2 inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800"><Database className="h-4 w-4" /> PMS data: {block.label}</div>
+                  <div className="my-2 inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800">
+                    <Database className="h-4 w-4" /> PMS data: {block.label}
+                  </div>
                 )}
-                {editable && block.type !== "richText" ? <button onClick={() => removeBlock(block.id)} className="absolute right-1 top-1 hidden rounded p-1 text-muted-foreground hover:bg-white group-hover:block" aria-label="Remove block"><Trash2 className="h-3.5 w-3.5" /></button> : null}
+                {editable && block.type !== "richText" ? (
+                  <button
+                    onClick={() => removeBlock(block.id)}
+                    className="absolute right-1 top-1 hidden rounded p-1 text-muted-foreground hover:bg-white group-hover:block"
+                    aria-label="Remove block"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
               </div>
             ))}
-            {editable ? <button onClick={continueWriting} className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><Plus className="h-3 w-3" /> Continue writing</button> : null}
+            {editable ? (
+              <button
+                onClick={continueWriting}
+                className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Plus className="h-3 w-3" /> Continue writing
+              </button>
+            ) : null}
           </div>
         </section>
 
-        <aside className="rounded-xl border bg-white p-4 xl:sticky xl:top-4 xl:self-start">
-          <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 font-semibold"><FileCheck2 className="h-4 w-4" /> Evidence</div><Link href="/aun-qa/evidence" className="text-xs font-medium text-primary hover:underline">Library</Link></div>
-          <p className="mt-2 text-xs text-muted-foreground">Only evidence already mapped to {requirementCode} can be inserted.</p>
-          <div className="mt-4 space-y-2">
-            {mappedEvidence.map((item) => (
-              <div key={item.id} className="rounded-lg border p-3">
-                <div className="text-sm font-medium">{item.title}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{item.reportingPeriod || item.kind} · {item.status}</div>
-                {editable ? <button onClick={() => insertEvidence(item)} className="mt-2 w-full rounded-md border px-2 py-1.5 text-xs font-medium hover:bg-muted">Insert evidence reference</button> : null}
-              </div>
-            ))}
-            {mappedEvidence.length === 0 ? <div className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">No evidence mapped yet. Add or reuse evidence from the Evidence Library first.</div> : null}
+        <aside className="min-w-0 overflow-hidden rounded-xl border bg-white xl:sticky xl:top-4 xl:self-start">
+          <div className="grid grid-cols-2 border-b bg-muted/30 p-1">
+            <button
+              type="button"
+              onClick={() => setContextTab("evidence")}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                contextTab === "evidence"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Evidence
+            </button>
+            <button
+              type="button"
+              onClick={() => setContextTab("pms")}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                contextTab === "pms"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              PMS Sources
+            </button>
           </div>
 
-          {submissions.length > 0 ? (
-            <div className="mt-5 border-t pt-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Submission history</div>
-              <div className="mt-2 space-y-2">
-                {submissions.map((submission) => (
-                  <div key={submission.id} className="rounded-lg bg-slate-50 p-2 text-xs">
-                    <div className="font-medium">Version {submission.version}</div>
-                    <div className="text-muted-foreground">Submitted by {submission.submittedBy.name}</div>
-                    <div className="text-muted-foreground">{submission.reviews.length} review decision{submission.reviews.length === 1 ? "" : "s"}</div>
+          {contextTab === "evidence" ? (
+            <div className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-semibold">
+                  <FileCheck2 className="h-4 w-4" /> Evidence
+                </div>
+                <Link
+                  href="/aun-qa/evidence"
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Library
+                </Link>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Only evidence already mapped to {requirementCode} can be inserted.
+              </p>
+              <div className="mt-4 space-y-2">
+                {mappedEvidence.map((item) => (
+                  <div key={item.id} className="rounded-lg border p-3">
+                    <div className="text-sm font-medium">{item.title}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {item.reportingPeriod || item.kind} · {item.status}
+                    </div>
+                    {editable ? (
+                      <button
+                        onClick={() => insertEvidence(item)}
+                        className="mt-2 w-full rounded-md border px-2 py-1.5 text-xs font-medium hover:bg-muted"
+                      >
+                        Insert evidence reference
+                      </button>
+                    ) : null}
                   </div>
                 ))}
+                {mappedEvidence.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">
+                    No evidence mapped yet. Add or reuse evidence from the Evidence Library first.
+                  </div>
+                ) : null}
               </div>
+
+              {submissions.length > 0 ? (
+                <div className="mt-5 border-t pt-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Submission history
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {submissions.map((submission) => (
+                      <div key={submission.id} className="rounded-lg bg-slate-50 p-2 text-xs">
+                        <div className="font-medium">Version {submission.version}</div>
+                        <div className="text-muted-foreground">
+                          Submitted by {submission.submittedBy.name}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {submission.reviews.length} review decision
+                          {submission.reviews.length === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          ) : (
+            <div className="p-4 [&>aside]:border-0 [&>aside]:bg-transparent [&>aside]:p-0 [&>aside]:shadow-none">
+              <SarSourceContextPanel requirementCode={requirementCode} />
+            </div>
+          )}
         </aside>
       </div>
     </div>
