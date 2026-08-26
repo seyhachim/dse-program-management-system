@@ -229,7 +229,7 @@ function errorSourceBlock(
   };
 }
 
-function filterSupportingCandidates(
+export function filterQaSarSupportingCandidates(
   programmeId: string,
   expectation: QaQualityExpectationView,
   definition: QaExpectedEvidenceDefinitionView,
@@ -270,7 +270,7 @@ async function sourceBlockFor(
   const generatedAt = new Date().toISOString();
   try {
     const result = await getQaEvidenceCandidates(programmeId, definition.id);
-    const filtered = filterSupportingCandidates(
+    const filtered = filterQaSarSupportingCandidates(
       programmeId,
       expectation,
       definition,
