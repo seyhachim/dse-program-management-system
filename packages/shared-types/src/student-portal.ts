@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { StudentAcademicCalendarView } from "./academic-calendar.ts";
 import type { MeetingActivityType, MeetingDay } from "./offerings.ts";
 
 export interface PortalLecturer {
@@ -189,6 +190,7 @@ export interface StudentPortalHome {
     weight: number | null;
   }>;
   announcements: PortalAnnouncement[];
+  academicCalendar: StudentAcademicCalendarView;
   overallAchievement: number | null;
 }
 

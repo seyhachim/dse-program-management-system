@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { programmeManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import { createAcademicCalendarRouter } from "./academic-calendar-router.ts";
+import { academicCalendarService } from "./academic-calendar-service.ts";
 import { createCurriculumCourseSpecRouter } from "./curriculum-course-spec-router.ts";
 import { createCurriculumDraftRouter } from "./curriculum-draft-router.ts";
 import { createCurriculumHistoryRouter } from "./curriculum-history-router.ts";
@@ -26,6 +28,7 @@ programmeRouter.use("/public", createPublicProgrammeReadRouter());
 
 const authenticatedProgrammeRouter = createProgrammeRouter();
 authenticatedProgrammeRouter.use(createGradingScaleRouter());
+authenticatedProgrammeRouter.use(createAcademicCalendarRouter());
 authenticatedProgrammeRouter.use(createCurriculumDraftRouter());
 authenticatedProgrammeRouter.use(createCurriculumWorkflowRouter());
 authenticatedProgrammeRouter.use(createCurriculumHistoryRouter());
@@ -41,6 +44,7 @@ export const programmeBackendService = {
   publicCurriculumRead: publicCurriculumReadService,
   publicSearch: publicProgrammeSearchService,
   publicQuestionAnalytics: publicQuestionAnalyticsService,
+  academicCalendar: academicCalendarService,
 };
 
 export type ProgrammeBackendService = typeof programmeBackendService;

@@ -185,10 +185,11 @@ const OfferingInputShape = z.object({
   coLecturerIds: z.array(z.string().uuid()).optional(),
   capacity: z.coerce.number().int().min(1).max(1000).default(30),
   status: OfferingStatusSchema.default("Planned"),
-  // §12 Course Availability — optional. Year is the programme/study year (1–6).
+  // Academic context. New offerings require a published canonical period; nullability remains only for historical PATCH compatibility.
   semester: SemesterSchema.nullable().optional(),
   programmeYear: z.coerce.number().int().min(1).max(6).nullable().optional(),
-  // Historical/PATCH compatibility keeps these nullable; CreateOfferingInput below requires both.
+  academicCalendarPeriodId: z.string().uuid().nullable().optional(),
+  // Legacy delivery-date snapshots are retained for historical rows only. New creates must not send them.
   startDate: DateOnlySchema.nullable().optional(),
   endDate: DateOnlySchema.nullable().optional(),
   // §10 Other Course Lecturer(s) — optional free text, co-teachers this term.
@@ -199,34 +200,27 @@ export const CreateOfferingInput = OfferingInputShape.superRefine((data, ctx) =>
   refineCoLecturers(data, ctx);
 
   if (!data.lecturerId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "A primary lecturer is required",
-      path: ["lecturerId"],
-    });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A primary lecturer is required", path: ["lecturerId"] });
   }
   if (!data.meetings || data.meetings.length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Add at least one weekly class session", path: ["meetings"] });
+  }
+  if (!data.academicCalendarPeriodId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A published Academic Calendar period is required", path: ["academicCalendarPeriodId"] });
+  }
+  if (!data.programmeYear || data.programmeYear < 1 || data.programmeYear > 4) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Study year must be between 1 and 4", path: ["programmeYear"] });
+  }
+  if (!data.semester) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Semester is required", path: ["semester"] });
+  }
+  if (data.startDate !== undefined || data.endDate !== undefined) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Add at least one weekly class session",
-      path: ["meetings"],
+      message: "Teaching dates come from the published Academic Calendar and must not be entered on the offering",
+      path: ["academicCalendarPeriodId"],
     });
   }
-  if (!data.startDate) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Teaching start date is required",
-      path: ["startDate"],
-    });
-  }
-  if (!data.endDate) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Teaching end date is required",
-      path: ["endDate"],
-    });
-  }
-  refineTeachingPeriod(data, ctx, true);
 });
 export type CreateOfferingInput = z.infer<typeof CreateOfferingInput>;
 
@@ -268,6 +262,9 @@ export interface OfferingView {
   createdAt: string;
   semester: Semester | null;
   programmeYear: number | null;
+  academicCalendarPeriodId: string | null;
+  academicCalendar: { periodId: string; calendarId: string; academicYearId: string; academicYearLabel: string; revision: number; studyYears: number[]; semester: Semester; teachingStart: string; teachingEnd: string } | null;
+  /** Effective teaching dates: derived from Academic Calendar for linked offerings, legacy snapshots otherwise. */
   startDate: string | null;
   endDate: string | null;
   otherLecturers: string | null;

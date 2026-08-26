@@ -1,0 +1,56 @@
+import { Router, type Response } from "express";
+import { AcademicCalendarContextQuerySchema, CreateAcademicCalendarRevisionSchema, CreateAcademicCalendarSchema, CreateAcademicYearSchema, UpdateAcademicCalendarDraftSchema } from "@dse-pms/shared-types";
+import { requireAuth } from "../../core/auth/middleware.ts";
+import { hasAnyRoleInProgramme, type AuthUser, type Role } from "../../core/auth/token.ts";
+import { requirePermission } from "../../core/permissions/index.ts";
+import { AcademicCalendarConflictError, AcademicCalendarImmutableError, AcademicCalendarNotFoundError, AcademicCalendarValidationError, academicCalendarService } from "./academic-calendar-service.ts";
+
+const READ_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"];
+const WRITE_ROLES: Role[] = ["admin", "program_coordinator"];
+export function canReadAcademicCalendar(user: AuthUser | undefined, programmeId: string) { return Boolean(user && hasAnyRoleInProgramme(user, READ_ROLES, programmeId)); }
+export function canWriteAcademicCalendar(user: AuthUser | undefined, programmeId: string) { return Boolean(user && hasAnyRoleInProgramme(user, WRITE_ROLES, programmeId)); }
+/** null means a global readable grant; otherwise only these programme ids may be selected. */
+export function academicCalendarProgrammeScope(user: AuthUser | undefined): string[] | null {
+  if (!user) return [];
+  const readable = user.programmeRoles.filter((assignment) => READ_ROLES.includes(assignment.role));
+  if (readable.some((assignment) => assignment.programmeId === null)) return null;
+  return [...new Set(readable.flatMap((assignment) => assignment.programmeId ? [assignment.programmeId] : []))];
+}
+function sendError(res: Response, error: unknown) {
+  if (error instanceof AcademicCalendarNotFoundError) return void res.status(404).json({ error: error.message });
+  if (error instanceof AcademicCalendarConflictError) return void res.status(409).json({ error: error.message });
+  if (error instanceof AcademicCalendarValidationError || error instanceof AcademicCalendarImmutableError) return void res.status(400).json({ error: error.message });
+  console.error("Academic calendar request failed", error); return void res.status(500).json({ error: "Could not process academic calendar request" });
+}
+function programmeId(req: import("express").Request, res: Response) { const id = req.params.programmeId?.trim(); if (!id) { res.status(400).json({ error: "Programme id is required" }); return null; } return id; }
+
+export function createAcademicCalendarRouter(): Router {
+  const router = Router(); router.use(requireAuth);
+  router.get("/academic-calendar/programme", requirePermission("programme:read"), async (req, res) => {
+    if (!req.user) return;
+    const scope = academicCalendarProgrammeScope(req.user);
+    if (scope !== null && scope.length === 0) return void res.status(403).json({ error: "No academic calendar access for an active programme" });
+    try {
+      const programme = await academicCalendarService.programmeContext(scope);
+      if (!canReadAcademicCalendar(req.user, programme.id)) return void res.status(403).json({ error: "No academic calendar access for this programme" });
+      res.json(programme);
+    } catch (error) { sendError(res, error); }
+  });
+  router.get("/programmes/:programmeId/academic-calendar/years", requirePermission("programme:read"), async (req, res) => { const id = programmeId(req, res); if (!id) return; if (!canReadAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar access for this programme" }); try { res.json(await academicCalendarService.listAcademicYears(id)); } catch (error) { sendError(res, error); } });
+  router.post("/programmes/:programmeId/academic-calendar/years", requirePermission("programme:write"), async (req, res) => { const id = programmeId(req, res); if (!id || !req.user) return; if (!canWriteAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar write access for this programme" }); const parsed = CreateAcademicYearSchema.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid academic year", details: parsed.error.flatten() }); try { res.status(201).json(await academicCalendarService.createAcademicYear(id, parsed.data)); } catch (error) { sendError(res, error); } });
+  router.put("/programmes/:programmeId/academic-calendar/years/:academicYearId/current", requirePermission("programme:write"), async (req, res) => { const id = programmeId(req, res); if (!id || !req.user) return; if (!canWriteAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar write access for this programme" }); try { res.json(await academicCalendarService.setCurrentAcademicYear(id, req.params.academicYearId!)); } catch (error) { sendError(res, error); } });
+  router.get("/programmes/:programmeId/academic-calendar/calendars", requirePermission("programme:read"), async (req, res) => { const id = programmeId(req, res); if (!id) return; if (!canReadAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar access for this programme" }); const academicYearId = typeof req.query.academicYearId === "string" ? req.query.academicYearId : ""; if (!academicYearId) return void res.status(400).json({ error: "academicYearId is required" }); try { res.json(await academicCalendarService.listCalendars(id, academicYearId)); } catch (error) { sendError(res, error); } });
+  router.post("/programmes/:programmeId/academic-calendar/calendars", requirePermission("programme:write"), async (req, res) => { const id = programmeId(req, res); if (!id || !req.user) return; if (!canWriteAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar write access for this programme" }); const parsed = CreateAcademicCalendarSchema.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid academic calendar", details: parsed.error.flatten() }); try { res.status(201).json(await academicCalendarService.createCalendar(id, req.user.id, parsed.data)); } catch (error) { sendError(res, error); } });
+  router.get("/programmes/:programmeId/academic-calendar/calendars/:calendarId", requirePermission("programme:read"), async (req, res) => { const id = programmeId(req, res); if (!id) return; if (!canReadAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar access for this programme" }); try { res.json(await academicCalendarService.getCalendar(id, req.params.calendarId!)); } catch (error) { sendError(res, error); } });
+  router.put("/programmes/:programmeId/academic-calendar/calendars/:calendarId", requirePermission("programme:write"), async (req, res) => { const id = programmeId(req, res); if (!id || !req.user) return; if (!canWriteAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar write access for this programme" }); const parsed = UpdateAcademicCalendarDraftSchema.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "Invalid academic calendar", details: parsed.error.flatten() }); try { res.json(await academicCalendarService.updateDraft(id, req.params.calendarId!, req.user.id, parsed.data)); } catch (error) { sendError(res, error); } });
+  router.post("/programmes/:programmeId/academic-calendar/calendars/:calendarId/publish", requirePermission("programme:write"), async (req, res) => { const id = programmeId(req, res); if (!id || !req.user) return; if (!canWriteAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar write access for this programme" }); try { res.json(await academicCalendarService.publishCalendar(id, req.params.calendarId!, req.user.id)); } catch (error) { sendError(res, error); } });
+  router.post("/programmes/:programmeId/academic-calendar/calendars/:calendarId/revisions", requirePermission("programme:write"), async (req, res) => { const id = programmeId(req, res); if (!id || !req.user) return; if (!canWriteAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar write access for this programme" }); const parsed = CreateAcademicCalendarRevisionSchema.safeParse(req.body); if (!parsed.success) return void res.status(400).json({ error: "A revision reason is required", details: parsed.error.flatten() }); try { res.status(201).json(await academicCalendarService.createRevision(id, req.params.calendarId!, req.user.id, parsed.data.reason)); } catch (error) { sendError(res, error); } });
+  router.get("/programmes/:programmeId/academic-calendar/calendars/:calendarId/audit", requirePermission("programme:read"), async (req, res) => {
+    const id = programmeId(req, res); if (!id) return;
+    if (!canReadAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar access for this programme" });
+    try { res.json(await academicCalendarService.auditHistory(id, req.params.calendarId!)); } catch (error) { sendError(res, error); }
+  });
+  router.post("/programmes/:programmeId/academic-calendar/calendars/:calendarId/archive", requirePermission("programme:write"), async (req, res) => { const id = programmeId(req, res); if (!id || !req.user) return; if (!canWriteAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar write access for this programme" }); try { res.json(await academicCalendarService.archiveDraft(id, req.params.calendarId!, req.user.id)); } catch (error) { sendError(res, error); } });
+  router.get("/programmes/:programmeId/academic-calendar/context", requirePermission("programme:read"), async (req, res) => { const id = programmeId(req, res); if (!id) return; if (!canReadAcademicCalendar(req.user, id)) return void res.status(403).json({ error: "No academic calendar access for this programme" }); const parsed = AcademicCalendarContextQuerySchema.safeParse(req.query); if (!parsed.success) return void res.status(400).json({ error: "Invalid academic calendar context", details: parsed.error.flatten() }); try { res.json(await academicCalendarService.context(id, parsed.data)); } catch (error) { sendError(res, error); } });
+  return router;
+}

@@ -203,6 +203,16 @@ jobs:
           OFFERING_COURSE_SPEC_DB_TESTS: "1"
           JWT_SECRET: issue-211-course-spec-binding-ci-secret-at-least-32-characters
 
+      - name: Verify Academic Calendar revision and Offering history integrity
+        run: bun test apps/backend/src/plugins/programme/academic-calendar-integrity-db.test.ts
+        env:
+          ACADEMIC_CALENDAR_DB_TESTS: "1"
+
+      - name: Verify Student Portal Academic Calendar publication boundary
+        run: bun test apps/backend/src/plugins/student-portal/academic-calendar-db.test.ts
+        env:
+          ACADEMIC_CALENDAR_DB_TESTS: "1"
+
       - name: Verify CourseSpec Course Information snapshot stability
         run: bun test apps/backend/src/plugins/courses/course-info-snapshot-db.test.ts
         env:
