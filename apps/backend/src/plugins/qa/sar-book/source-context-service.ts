@@ -1,6 +1,7 @@
 import {
   QaSarRequirementSourceContextSchema,
   type QaEvidenceAnalysisState,
+  type QaEvidenceCandidateResultView,
   type QaSarRequirementSourceContext,
   type QaSarSourceBlock,
 } from "@dse-pms/shared-types";
@@ -15,11 +16,20 @@ const dbAnalysisState: Record<string, QaEvidenceAnalysisState> = {
   ExpertReviewRequired: "expertReviewRequired",
 };
 
-function snapshotKey(expectedEvidenceId: string, keys: string[]): string {
+type SourceDefinition = {
+  id: string;
+  evidenceType: string;
+  description: string;
+  sourceDomain: string;
+};
+
+type Candidate = QaEvidenceCandidateResultView["candidates"][number];
+
+export function qaSarSourceSnapshotKey(expectedEvidenceId: string, keys: string[]): string {
   return `${expectedEvidenceId}:${[...keys].sort().join("|") || "unavailable"}`;
 }
 
-function provenanceFor(candidate: Awaited<ReturnType<typeof getQaEvidenceCandidates>>["candidates"][number]) {
+function provenanceFor(candidate: Candidate) {
   const provenance = candidate.provenance ?? {
     authority: "unknown" as const,
     ownerUnit: null,
@@ -39,65 +49,88 @@ function provenanceFor(candidate: Awaited<ReturnType<typeof getQaEvidenceCandida
   };
 }
 
+export function buildQaSarSourceRecordBlock(
+  definition: SourceDefinition,
+  result: QaEvidenceCandidateResultView,
+  reportingStart: Date,
+  reportingEnd: Date,
+  generatedAt: string,
+): QaSarSourceBlock {
+  const structured = result.candidates.filter((candidate) => candidate.sourceKind !== "documentChunk");
+  const usable = structured.length > 0 ? structured : result.candidates;
+  return {
+    id: `sar-source:${definition.id}`,
+    registryKey: `expected-evidence:${definition.id}`,
+    kind: "recordList",
+    title: definition.evidenceType.replace(/-/g, " "),
+    description: definition.description,
+    availability: usable.length > 0 ? "available" : "unavailable",
+    reportingPeriod: {
+      start: reportingStart.toISOString(),
+      end: reportingEnd.toISOString(),
+      label: `${reportingStart.getUTCFullYear()}–${reportingEnd.getUTCFullYear()}`,
+    },
+    generatedAt,
+    snapshotKey: qaSarSourceSnapshotKey(definition.id, usable.map((candidate) => candidate.key)),
+    provenance: usable.map(provenanceFor),
+    message:
+      usable.length > 0
+        ? result.reason ?? null
+        : result.reason || "No canonical PMS source is currently available for this expected evidence.",
+    records: usable.map((candidate) => ({
+      key: candidate.key,
+      title: candidate.title,
+      summary: candidate.summary,
+      periodKey: candidate.periodKey ?? null,
+    })),
+  };
+}
+
+function errorSourceBlock(
+  definition: SourceDefinition,
+  reportingStart: Date,
+  reportingEnd: Date,
+  generatedAt: string,
+  error: unknown,
+): QaSarSourceBlock {
+  return {
+    id: `sar-source:${definition.id}`,
+    registryKey: `expected-evidence:${definition.id}`,
+    kind: "recordList",
+    title: definition.evidenceType.replace(/-/g, " "),
+    description: definition.description,
+    availability: "error",
+    reportingPeriod: {
+      start: reportingStart.toISOString(),
+      end: reportingEnd.toISOString(),
+      label: `${reportingStart.getUTCFullYear()}–${reportingEnd.getUTCFullYear()}`,
+    },
+    generatedAt,
+    snapshotKey: qaSarSourceSnapshotKey(definition.id, []),
+    provenance: [],
+    message: error instanceof Error ? error.message : "Could not resolve this PMS source block.",
+    records: [],
+  };
+}
+
 async function sourceBlockFor(
   programmeId: string,
   reportingStart: Date,
   reportingEnd: Date,
-  definition: {
-    id: string;
-    evidenceType: string;
-    description: string;
-    sourceDomain: string;
-  },
+  definition: SourceDefinition,
 ): Promise<QaSarSourceBlock> {
   const generatedAt = new Date().toISOString();
   try {
     const result = await getQaEvidenceCandidates(programmeId, definition.id);
-    const candidates = result.candidates;
-    const structured = candidates.filter((candidate) => candidate.sourceKind !== "documentChunk");
-    const usable = structured.length > 0 ? structured : candidates;
-    return {
-      id: `sar-source:${definition.id}`,
-      registryKey: `expected-evidence:${definition.id}`,
-      kind: "recordList",
-      title: definition.evidenceType.replace(/-/g, " "),
-      description: definition.description,
-      availability: usable.length > 0 ? "available" : "unavailable",
-      reportingPeriod: {
-        start: reportingStart.toISOString(),
-        end: reportingEnd.toISOString(),
-        label: `${reportingStart.getUTCFullYear()}–${reportingEnd.getUTCFullYear()}`,
-      },
+    return buildQaSarSourceRecordBlock(
+      definition,
+      result,
+      reportingStart,
+      reportingEnd,
       generatedAt,
-      snapshotKey: snapshotKey(definition.id, usable.map((candidate) => candidate.key)),
-      provenance: usable.map(provenanceFor),
-      message: usable.length > 0 ? result.reason ?? null : result.reason || "No canonical PMS source is currently available for this expected evidence.",
-      records: usable.map((candidate) => ({
-        key: candidate.key,
-        title: candidate.title,
-        summary: candidate.summary,
-        periodKey: candidate.periodKey ?? null,
-      })),
-    };
+    );
   } catch (error) {
-    return {
-      id: `sar-source:${definition.id}`,
-      registryKey: `expected-evidence:${definition.id}`,
-      kind: "recordList",
-      title: definition.evidenceType.replace(/-/g, " "),
-      description: definition.description,
-      availability: "error",
-      reportingPeriod: {
-        start: reportingStart.toISOString(),
-        end: reportingEnd.toISOString(),
-        label: `${reportingStart.getUTCFullYear()}–${reportingEnd.getUTCFullYear()}`,
-      },
-      generatedAt,
-      snapshotKey: snapshotKey(definition.id, []),
-      provenance: [],
-      message: error instanceof Error ? error.message : "Could not resolve this PMS source block.",
-      records: [],
-    };
+    return errorSourceBlock(definition, reportingStart, reportingEnd, generatedAt, error);
   }
 }
 
@@ -143,7 +176,7 @@ export async function getQaSarRequirementSourceContext(
     .filter((expectation) => expectation.requirementCode === requirementCode)
     .sort((a, b) => a.order - b.order);
 
-  const definitions = expectations.flatMap((expectation) =>
+  const definitions: SourceDefinition[] = expectations.flatMap((expectation) =>
     expectation.expectedEvidence.map((definition) => ({
       id: definition.id,
       evidenceType: definition.evidenceType,
@@ -178,10 +211,9 @@ export async function getQaSarRequirementSourceContext(
     requirementCode,
     requirementTitle: requirement.title,
     requirementText: requirement.title,
-    diagnosticPrompts: expectations.flatMap((expectation) => [
-      expectation.statement,
-      expectation.purpose,
-    ]).filter((value, index, all) => Boolean(value) && all.indexOf(value) === index),
+    diagnosticPrompts: expectations
+      .flatMap((expectation) => [expectation.statement, expectation.purpose])
+      .filter((value, index, all) => Boolean(value) && all.indexOf(value) === index),
     evidenceGapState,
     evidenceGapExplanation: latestAnalysis?.explanation ?? null,
     sourceBlocks,
