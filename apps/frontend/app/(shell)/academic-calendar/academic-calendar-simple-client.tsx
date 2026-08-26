@@ -59,6 +59,14 @@ function message(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function RequiredMark({ publishing = false }: { publishing?: boolean }) {
+  return (
+    <span className="ml-1 font-normal text-destructive">
+      {publishing ? "* required to publish" : "* required"}
+    </span>
+  );
+}
+
 function suggestedAcademicYearDraft(years: AcademicYearView[] = []): AcademicYearDraft {
   const currentYear = new Date().getFullYear();
   const latestEndYear = years.reduce((latest, year) => Math.max(latest, year.endYear), currentYear);
@@ -191,13 +199,14 @@ function dmyToIso(value: string): string | null {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function DateField({ id, label, value, onChange, disabled = false, optional = false }: {
+function DateField({ id, label, value, onChange, disabled = false, optional = false, required = false }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   optional?: boolean;
+  required?: boolean;
 }) {
   const [text, setText] = useState(() => isoToDmy(value));
   const [invalid, setInvalid] = useState(false);
@@ -222,12 +231,16 @@ function DateField({ id, label, value, onChange, disabled = false, optional = fa
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}{optional ? <span className="ml-1 font-normal text-muted-foreground">(optional)</span> : null}</Label>
+      <Label htmlFor={id}>
+        {label}
+        {required ? <RequiredMark /> : optional ? <span className="ml-1 font-normal text-muted-foreground">(optional)</span> : null}
+      </Label>
       <Input
         id={id}
         inputMode="numeric"
         autoComplete="off"
         disabled={disabled}
+        required={required}
         value={text}
         placeholder="DD/MM/YYYY"
         aria-invalid={invalid || undefined}
@@ -266,9 +279,10 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
       <section className="rounded-2xl border border-border bg-muted/10 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-64 flex-1 space-y-1.5">
-            <Label htmlFor="calendar-coverage">Applies to</Label>
+            <Label htmlFor="calendar-coverage">Applies to<RequiredMark /></Label>
             <select
               id="calendar-coverage"
+              required
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={preset}
               onChange={(event) => {
@@ -332,8 +346,8 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
               {period.enabled ? (
                 <div className="mt-4 space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <DateField id={`${period.semester}-teaching-start`} label="Teaching start" value={period.teachingStart} onChange={(value) => updatePeriod(period.semester, { teachingStart: value })} />
-                    <DateField id={`${period.semester}-teaching-end`} label="Teaching end" value={period.teachingEnd} onChange={(value) => updatePeriod(period.semester, { teachingEnd: value })} />
+                    <DateField required id={`${period.semester}-teaching-start`} label="Teaching start" value={period.teachingStart} onChange={(value) => updatePeriod(period.semester, { teachingStart: value })} />
+                    <DateField required id={`${period.semester}-teaching-end`} label="Teaching end" value={period.teachingEnd} onChange={(value) => updatePeriod(period.semester, { teachingEnd: value })} />
                   </div>
                   <Button type="button" variant="outline" onClick={() => setShowOptional((current) => ({ ...current, [period.semester]: !current[period.semester] }))}>
                     {showOptional[period.semester] ? "Hide optional dates" : "+ Add exam / break dates"}
@@ -363,10 +377,10 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
         </div>
         {draft.events.length ? <div className="mt-4 space-y-3">{draft.events.map((event) => (
           <div key={event.key} className="grid gap-3 rounded-xl bg-muted/30 p-3 md:grid-cols-6">
-            <div className="md:col-span-2"><Label htmlFor={`${event.key}-title`}>Title</Label><Input id={`${event.key}-title`} className="mt-1" value={event.title} onChange={(e) => updateEvent(event.key, { title: e.target.value })} /></div>
+            <div className="md:col-span-2"><Label htmlFor={`${event.key}-title`}>Title<RequiredMark /></Label><Input required id={`${event.key}-title`} className="mt-1" value={event.title} onChange={(e) => updateEvent(event.key, { title: e.target.value })} /></div>
             <div><Label htmlFor={`${event.key}-type`}>Type</Label><select id={`${event.key}-type`} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.type} onChange={(e) => updateEvent(event.key, { type: e.target.value as AcademicCalendarEventType })}>{ACADEMIC_CALENDAR_EVENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
             <div><Label htmlFor={`${event.key}-semester`}>Semester</Label><select id={`${event.key}-semester`} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.semester} onChange={(e) => updateEvent(event.key, { semester: e.target.value as EventDraft["semester"] })}><option value="">Any</option><option value="First">Semester 1</option><option value="Second">Semester 2</option></select></div>
-            <DateField id={`${event.key}-start`} label="Start" value={event.startDate} onChange={(value) => updateEvent(event.key, { startDate: value })} />
+            <DateField required id={`${event.key}-start`} label="Start" value={event.startDate} onChange={(value) => updateEvent(event.key, { startDate: value })} />
             <DateField id={`${event.key}-end`} label="End" optional value={event.endDate} onChange={(value) => updateEvent(event.key, { endDate: value })} />
             <div className="md:col-span-5"><Label htmlFor={`${event.key}-note`}>Note</Label><Input id={`${event.key}-note`} className="mt-1" value={event.note} onChange={(e) => updateEvent(event.key, { note: e.target.value })} /></div>
             <div className="flex items-end"><Button type="button" variant="ghost" onClick={() => setDraft({ ...draft, events: draft.events.filter((item) => item.key !== event.key) })}><Trash2 className="h-4 w-4" /> Remove</Button></div>
@@ -378,7 +392,7 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
         <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><h4 className="font-semibold">Official source</h4></div>
         <p className="mt-1 text-sm text-muted-foreground">You can save a draft without this. Add provenance before publishing the official calendar.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="space-y-1.5 md:col-span-2"><Label htmlFor="source-title">Source title</Label><Input id="source-title" value={draft.sourceTitle} onChange={(e) => setDraft({ ...draft, sourceTitle: e.target.value })} placeholder="RUPP Academic Calendar 2026–2027" /></div>
+          <div className="space-y-1.5 md:col-span-2"><Label htmlFor="source-title">Source title<RequiredMark publishing /></Label><Input id="source-title" value={draft.sourceTitle} onChange={(e) => setDraft({ ...draft, sourceTitle: e.target.value })} placeholder="RUPP Academic Calendar 2026–2027" /></div>
           <DateField id="source-date" label="Issue / published date" optional value={draft.sourcePublishedAt} onChange={(value) => setDraft({ ...draft, sourcePublishedAt: value })} />
           <div className="space-y-1.5"><Label htmlFor="source-url">Source URL</Label><Input id="source-url" type="url" value={draft.sourceUrl} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://…" /></div>
           <div className="space-y-1.5 md:col-span-2"><Label htmlFor="source-file">Managed file reference (optional)</Label><Input id="source-file" value={draft.sourceFileRef} onChange={(e) => setDraft({ ...draft, sourceFileRef: e.target.value })} /></div>
@@ -592,8 +606,8 @@ export function AcademicCalendarSimpleClient() {
                 <h3 className="font-semibold">Add Academic Year</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Enter only the first year. PMS automatically creates the next year and academic-year label.</p>
                 <div className="mt-4 max-w-xs space-y-1.5">
-                  <Label htmlFor="new-year-start">Start year</Label>
-                  <Input id="new-year-start" inputMode="numeric" autoComplete="off" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="2027" />
+                  <Label htmlFor="new-year-start">Start year<RequiredMark /></Label>
+                  <Input required id="new-year-start" inputMode="numeric" autoComplete="off" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="2027" />
                 </div>
                 <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
                   <span className="text-muted-foreground">Academic Year</span>
@@ -625,7 +639,7 @@ export function AcademicCalendarSimpleClient() {
             {STUDY_YEARS.map((year) => {
               const candidates = calendars.filter((calendar) => calendar.studyYears.includes(year));
               const calendar = candidates.find((item) => item.status === "Published") ?? candidates.find((item) => item.status === "Draft") ?? candidates[0];
-              return <button key={year} type="button" onClick={() => { setSelectedStudyYear(year); setSelectedCalendarId(calendar?.id ?? ""); setCreating(false); setEditing(false); }} className={`rounded-2xl border p-4 text-left shadow-sm transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedStudyYear === year ? "border-primary bg-primary/5" : "border-border bg-card"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study year</p><p className="mt-2 text-lg font-semibold">Year {year}</p></div>{calendar ? <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${statusClasses(calendar.status)}`}>{calendar.status}</span> : <span className="rounded-full border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">Not available</span>}</div><p className="mt-3 text-xs text-muted-foreground">{calendar ? (calendar.studyYears.length > 1 ? `Shared record · Years ${calendar.studyYears.join("–")}` : `${calendar.periods.length} semester period${calendar.periods.length === 1 ? "" : "s"}`) : `No ${selectedYear.label} calendar issued for Year ${year}.`}</p></button>;
+              return <button key={year} type="button" onClick={() => { setSelectedStudyYear(year); setSelectedCalendarId(calendar?.id ?? ""); setCreating(false); setEditing(false); setError(null); setNotice(null); }} className={`rounded-2xl border p-4 text-left shadow-sm transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedStudyYear === year ? "border-primary bg-primary/5" : "border-border bg-card"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study year</p><p className="mt-2 text-lg font-semibold">Year {year}</p></div>{calendar ? <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${statusClasses(calendar.status)}`}>{calendar.status}</span> : <span className="rounded-full border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">Not available</span>}</div><p className="mt-3 text-xs text-muted-foreground">{calendar ? (calendar.studyYears.length > 1 ? `Shared record · Years ${calendar.studyYears.join("–")}` : `${calendar.periods.length} semester period${calendar.periods.length === 1 ? "" : "s"}`) : `No ${selectedYear.label} calendar issued for Year ${year}.`}</p></button>;
             })}
           </section>
 
@@ -633,7 +647,7 @@ export function AcademicCalendarSimpleClient() {
             {creating || (editing && selectedCalendar?.status === "Draft") ? (
               <>
                 <div className="sticky top-0 z-10 -mx-4 mb-6 flex flex-col gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between md:-mx-6 md:px-6">
-                  <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold">{creating ? "Add Academic Calendar" : `Edit Draft · Revision ${selectedCalendar?.revision ?? 1}`}</h3><span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">DRAFT · NOT STUDENT-VISIBLE</span></div><p className="mt-1 text-sm text-muted-foreground">Common fields are shown first. Optional dates stay out of the way until you need them.</p></div>
+                  <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold">{creating ? "Add Academic Calendar" : `Edit Draft · Revision ${selectedCalendar?.revision ?? 1}`}</h3><span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">DRAFT · NOT STUDENT-VISIBLE</span></div><p className="mt-1 text-sm text-muted-foreground">Fields marked <span className="text-destructive">* required</span> must be filled before saving. Source title is required only when publishing.</p></div>
                   <div className="flex shrink-0 gap-2"><Button variant="outline" onClick={() => { setCreating(false); setEditing(false); if (selectedCalendar) setDraft(fromCalendar(selectedCalendar)); }}>Cancel</Button><Button disabled={saving} onClick={() => void saveDraft()}>{saving ? "Saving…" : "Save Draft"}</Button></div>
                 </div>
                 <CalendarEditor draft={draft} setDraft={setDraft} />
@@ -641,7 +655,7 @@ export function AcademicCalendarSimpleClient() {
               </>
             ) : selectedCalendar ? (
               <>
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-lg font-semibold">Year {selectedStudyYear} · {selectedYear.label}</h3><p className="text-sm text-muted-foreground">{selectedCalendar.studyYears.length > 1 ? `Shared calendar for Years ${selectedCalendar.studyYears.join(" and ")}.` : "Official programme calendar record."}</p></div><div className="flex flex-wrap gap-2">{selectedCalendar.status === "Draft" ? <><Button variant="outline" onClick={() => { setDraft(fromCalendar(selectedCalendar)); setEditing(true); }}>Edit draft</Button><Button disabled={saving} onClick={() => void publish()}><CheckCircle2 className="h-4 w-4" /> Publish official calendar</Button></> : null}</div></div>
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-lg font-semibold">Year {selectedStudyYear} · {selectedYear.label}</h3><p className="text-sm text-muted-foreground">{selectedCalendar.studyYears.length > 1 ? `Shared calendar for Years ${selectedCalendar.studyYears.join(" and ")}.` : "Official programme calendar record."}</p></div><div className="flex flex-wrap gap-2">{selectedCalendar.status === "Draft" ? <><Button variant="outline" onClick={() => { setDraft(fromCalendar(selectedCalendar)); setEditing(true); setError(null); }}>Edit draft</Button><Button disabled={saving} onClick={() => void publish()}><CheckCircle2 className="h-4 w-4" /> Publish official calendar</Button></> : null}</div></div>
                 <CalendarSummary calendar={selectedCalendar} />
                 {selectedCalendar.status === "Published" ? <section className="mt-6 rounded-xl border border-border p-4"><h4 className="font-semibold">Correct a published calendar</h4><p className="mt-1 text-sm text-muted-foreground">Published records are never edited in place. Create a correction revision to preserve history.</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input aria-label="Correction reason" value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} placeholder="Reason for correction" /><Button disabled={saving} onClick={() => void createRevision()}><RefreshCw className="h-4 w-4" /> Create correction revision</Button></div></section> : null}
                 <section className="mt-6"><div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h4 className="font-semibold">Audit history</h4></div><div className="mt-2 divide-y divide-border rounded-xl border border-border">{auditRows.length ? auditRows.map((row) => <div key={row.id} className="p-3"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-medium">{row.action} · {row.actorName}</p><time className="text-xs text-muted-foreground">{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(row.createdAt))}</time></div>{row.reason ? <p className="mt-1 text-sm text-muted-foreground">{row.reason}</p> : null}</div>) : <p className="p-4 text-sm text-muted-foreground">No audit actions recorded yet.</p>}</div></section>
