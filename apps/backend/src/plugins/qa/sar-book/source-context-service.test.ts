@@ -25,15 +25,15 @@ function result(keys: string[]): QaEvidenceCandidateResultView {
     sourceDomain: "outcomes",
     status: keys.length ? "supported" : "unsupported",
     reason: keys.length ? "Canonical outcomes found" : "No canonical outcomes found",
-    candidates: keys.map((key, index) => ({
+    candidates: keys.map((key) => ({
       key,
       sourceKind: "structuredCandidate",
       evidenceType: definition.evidenceType,
       sourceDomain: "outcomes",
-      title: `Outcome ${index + 1}`,
+      title: `Outcome ${key}`,
       summary: `Canonical outcome ${key}`,
       entityType: "ProgrammeLearningOutcome",
-      entityId: `plo-${index + 1}`,
+      entityId: `plo-${key}`,
       route: "/curriculum",
       reportingDate: "2026-01-15T00:00:00.000Z",
       periodKey: "2026",
@@ -100,7 +100,7 @@ describe("SAR PMS source context projection", () => {
     expect(block.provenance[0]).toEqual({
       sourceDomain: "outcomes",
       entityType: "ProgrammeLearningOutcome",
-      entityId: "plo-1",
+      entityId: "plo-candidate-a",
       route: "/curriculum",
       authority: "approvedDocument",
       ownerUnit: "DSE",
