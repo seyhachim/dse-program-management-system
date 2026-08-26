@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, ChevronDown, FileCheck2, History, Save, UserRoundCheck } from "lucide-react";
 import type {
   ProgrammeRoleAssignmentView,
@@ -37,6 +37,7 @@ export function SarBookClient() {
   const [saving, setSaving] = useState(false);
   const [assignmentSaving, setAssignmentSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sectionRequestIdRef = useRef(0);
 
   const leadershipOrReviewer =
     me?.roles.some((role) => ["admin", "program_coordinator", "qa_reviewer"].includes(role)) ?? false;
@@ -80,9 +81,11 @@ export function SarBookClient() {
   }, [loadBook, me, meLoading]);
 
   const loadSelectedSection = useCallback(async () => {
+    const requestId = ++sectionRequestIdRef.current;
     if (!book || !selection || selection.section.source === "generated") {
       setNarrative(null);
       setDocument(null);
+      setSectionLoading(false);
       return;
     }
 
@@ -93,12 +96,14 @@ export function SarBookClient() {
       const loaded = await api.get<QaSarBookNarrativeSectionView>(
         `/api/qa/cycles/${book.cycleId}/sar-book/sections/${encodeURIComponent(selection.section.key)}?${params}`,
       );
+      if (requestId !== sectionRequestIdRef.current) return;
       setNarrative(loaded);
       setDocument(parseStoredDocumentContent(loaded.content));
     } catch (caught) {
+      if (requestId !== sectionRequestIdRef.current) return;
       setError(caught instanceof ApiError ? caught.message : "Could not load SAR book section");
     } finally {
-      setSectionLoading(false);
+      if (requestId === sectionRequestIdRef.current) setSectionLoading(false);
     }
   }, [book, selection]);
 
