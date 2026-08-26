@@ -1,10 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ExternalLink, ShieldCheck } from "lucide-react";
 import type { PublishedAcademicCalendarProjection } from "@dse-pms/shared-types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+type PublicAcademicCalendarPageProps = {
+  params: Promise<{
+    programmeId: string;
+    academicYear: string;
+    studyYear: string;
+  }>;
+};
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "Not set";
@@ -21,10 +29,11 @@ function studyYearFromSegment(value: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-export default function PublicAcademicCalendarPage({ params }: { params: { programmeId: string; academicYear: string; studyYear: string } }) {
-  const programmeId = decodeURIComponent(params.programmeId);
-  const academicYear = decodeURIComponent(params.academicYear).replace(/-/g, "–");
-  const studyYear = studyYearFromSegment(params.studyYear);
+export default function PublicAcademicCalendarPage({ params }: PublicAcademicCalendarPageProps) {
+  const routeParams = use(params);
+  const programmeId = decodeURIComponent(routeParams.programmeId);
+  const academicYear = decodeURIComponent(routeParams.academicYear).replace(/-/g, "–");
+  const studyYear = studyYearFromSegment(routeParams.studyYear);
   const [data, setData] = useState<PublishedAcademicCalendarProjection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
