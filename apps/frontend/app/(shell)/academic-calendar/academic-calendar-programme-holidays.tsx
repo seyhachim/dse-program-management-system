@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, Plus } from "lucide-react";
 import type { AcademicCalendarView, AcademicYearView, UpdateAcademicCalendarDraftInput } from "@dse-pms/shared-types";
 import { Button, Input, Label } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
