@@ -6,6 +6,7 @@ import {
   PublicProgrammeLocaleQuerySchema,
   PublicAcademicCalendarQuerySchema,
 } from "@dse-pms/shared-types";
+import { prisma } from "../../core/db/prisma.ts";
 import {
   getPublicAbuseProtectionConfig,
   publicAbuseRateLimiter,
@@ -74,6 +75,21 @@ function programmeId(req: Request, res: Response): string | null {
     return null;
   }
   return id;
+}
+
+async function resolvePublicProgrammeId(identifier: string): Promise<string> {
+  const programme = await prisma.programme.findFirst({
+    where: {
+      status: "active",
+      OR: [
+        { id: identifier },
+        { code: { equals: identifier, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (!programme) throw new PublicProgrammeReadNotFoundError("Programme not found");
+  return programme.id;
 }
 
 export function createPublicProgrammeReadRouter(): Router {
@@ -241,11 +257,14 @@ export function createPublicProgrammeReadRouter(): Router {
   });
 
   router.get("/programmes/:programmeId/academic-calendar", async (req, res) => {
-    const id = programmeId(req, res);
-    if (!id) return;
+    const identifier = programmeId(req, res);
+    if (!identifier) return;
     const parsed = PublicAcademicCalendarQuerySchema.safeParse(req.query);
     if (!parsed.success) { res.status(400).json({ error: "Academic calendar requires studyYear=1..4" }); return; }
-    try { sendPublicJson(req, res, await academicCalendarService.publishedProjection(id, parsed.data.studyYear, parsed.data.academicYear)); } catch (error) { sendReadError(res, error); }
+    try {
+      const resolvedProgrammeId = await resolvePublicProgrammeId(identifier);
+      sendPublicJson(req, res, await academicCalendarService.publishedProjection(resolvedProgrammeId, parsed.data.studyYear, parsed.data.academicYear));
+    } catch (error) { sendReadError(res, error); }
   });
 
   router.get("/programmes/:programmeId/contact", async (req, res) => {
