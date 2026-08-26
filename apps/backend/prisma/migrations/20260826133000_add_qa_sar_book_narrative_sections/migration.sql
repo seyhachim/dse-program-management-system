@@ -21,6 +21,7 @@ CREATE INDEX "QaSarBookNarrativeSection_programmeId_cycleId_idx"
 CREATE INDEX "QaSarBookNarrativeSection_updatedById_idx"
   ON "QaSarBookNarrativeSection"("updatedById");
 
+ALTER TABLE "QaSarBookNarrativeSection" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE "QaSarBookNarrativeSection" FROM PUBLIC;
 DO $$
 BEGIN
@@ -29,5 +30,8 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     EXECUTE 'REVOKE ALL ON TABLE "QaSarBookNarrativeSection" FROM authenticated';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    EXECUTE 'REVOKE ALL ON TABLE "QaSarBookNarrativeSection" FROM service_role';
   END IF;
 END $$;
