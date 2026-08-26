@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
+import { AUN_QA_V4_ID } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import { saveQaSarSection } from "../sar/service.ts";
 import {
@@ -25,10 +26,10 @@ const READY = {
 };
 
 dbDescribe("SAR book Part 2 database projection", () => {
-  test("pins the approved submission while a later mutable draft remains separate", async () => {
+  test("assembles AUN-QA v4 8/53 and pins approved content across later drafts", async () => {
     const programme = await prisma.programme.findFirstOrThrow({ select: { id: true } });
-    const framework = await prisma.qaFramework.findFirstOrThrow({
-      where: { criteria: { some: { requirements: { some: {} } } } },
+    const framework = await prisma.qaFramework.findUniqueOrThrow({
+      where: { id: AUN_QA_V4_ID },
       select: {
         id: true,
         criteria: {
@@ -45,7 +46,7 @@ dbDescribe("SAR book Part 2 database projection", () => {
       },
     });
     const requirementCode = framework.criteria[0]?.requirements[0]?.code;
-    if (!requirementCode) throw new Error("Seeded QA framework has no requirement");
+    if (!requirementCode) throw new Error("Seeded AUN-QA v4 framework has no requirement");
 
     const [author, reviewer] = await Promise.all([
       prisma.user.create({
@@ -72,6 +73,14 @@ dbDescribe("SAR book Part 2 database projection", () => {
         createdById: author.id,
       },
     });
+
+    const initialProjection = await getQaSarBookPart2(programme.id, cycle.id);
+    expect(initialProjection.criteria).toHaveLength(8);
+    expect(initialProjection.totals.total).toBe(53);
+    expect(initialProjection.criteria.map((criterion) => criterion.criterionCode)).toEqual([
+      "1", "2", "3", "4", "5", "6", "7", "8",
+    ]);
+    expect(initialProjection.totals.notStarted).toBe(53);
 
     await saveQaSarSection(
       cycle.id,
