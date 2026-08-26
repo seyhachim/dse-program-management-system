@@ -55,7 +55,7 @@ const end = new Date("2026-12-31T00:00:00.000Z");
 const generatedAt = "2026-08-26T00:00:00.000Z";
 
 describe("SAR PMS source context projection", () => {
-  test("uses a stable snapshot key regardless of candidate retrieval order", () => {
+  test("uses a stable snapshot key and projection regardless of candidate retrieval order", () => {
     expect(qaSarSourceSnapshotKey(definition.id, ["b", "a"])).toBe(
       qaSarSourceSnapshotKey(definition.id, ["a", "b"]),
     );
@@ -75,6 +75,7 @@ describe("SAR PMS source context projection", () => {
       generatedAt,
     );
     expect(first.snapshotKey).toBe(second.snapshotKey);
+    expect(first).toEqual(second);
   });
 
   test("snapshot identity changes when an existing source revision changes", () => {
