@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, ChevronDown, FileCheck2, Save } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BookOpen, ChevronDown, FileCheck2, History, Save, UserRoundCheck } from "lucide-react";
 import type {
+  ProgrammeRoleAssignmentView,
   QaContributorWorkspaceView,
   QaDashboardView,
   QaSarBookNarrativeSectionView,
@@ -30,13 +31,17 @@ export function SarBookClient() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [narrative, setNarrative] = useState<QaSarBookNarrativeSectionView | null>(null);
   const [document, setDocument] = useState<DseDocumentContent | null>(null);
+  const [contributors, setContributors] = useState<ProgrammeRoleAssignmentView[]>([]);
   const [loading, setLoading] = useState(true);
   const [sectionLoading, setSectionLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sectionRequestIdRef = useRef(0);
 
   const leadershipOrReviewer =
     me?.roles.some((role) => ["admin", "program_coordinator", "qa_reviewer"].includes(role)) ?? false;
+  const canManage = me?.permissions.includes("qa:manage") ?? false;
 
   const loadBook = useCallback(async () => {
     if (!me) return;
@@ -50,60 +55,61 @@ export function SarBookClient() {
 
       if (!cycleId) {
         setBook(null);
+        setContributors([]);
         return;
       }
 
-      const loaded = await api.get<QaSarBookView>(`/api/qa/cycles/${cycleId}/sar-book?${params}`);
-      setBook(loaded);
-      const first = loaded.parts[0]?.sections[0];
+      const [loadedBook, programmeRoles] = await Promise.all([
+        api.get<QaSarBookView>(`/api/qa/cycles/${cycleId}/sar-book?${params}`),
+        canManage
+          ? api.get<ProgrammeRoleAssignmentView[]>(`/api/auth/programme-roles?${params}`)
+          : Promise.resolve([]),
+      ]);
+      setBook(loadedBook);
+      setContributors(programmeRoles.filter((item) => item.role === "qa_contributor"));
+      const first = loadedBook.parts[0]?.sections[0];
       if (first) setSelection({ section: first });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load the SAR book");
     } finally {
       setLoading(false);
     }
-  }, [leadershipOrReviewer, me]);
+  }, [canManage, leadershipOrReviewer, me]);
 
   useEffect(() => {
     if (!meLoading && me) void loadBook();
   }, [loadBook, me, meLoading]);
 
-  useEffect(() => {
-    if (!book || !selection) {
+  const loadSelectedSection = useCallback(async () => {
+    const requestId = ++sectionRequestIdRef.current;
+    if (!book || !selection || selection.section.source === "generated") {
       setNarrative(null);
       setDocument(null);
-      return;
-    }
-    if (selection.section.source === "generated") {
-      setNarrative(null);
-      setDocument(null);
+      setSectionLoading(false);
       return;
     }
 
-    let cancelled = false;
     setSectionLoading(true);
     setError(null);
     const params = new URLSearchParams({ programmeId: PROGRAMME_ID });
-    void api
-      .get<QaSarBookNarrativeSectionView>(
+    try {
+      const loaded = await api.get<QaSarBookNarrativeSectionView>(
         `/api/qa/cycles/${book.cycleId}/sar-book/sections/${encodeURIComponent(selection.section.key)}?${params}`,
-      )
-      .then((loaded) => {
-        if (cancelled) return;
-        setNarrative(loaded);
-        setDocument(parseStoredDocumentContent(loaded.content));
-      })
-      .catch((caught) => {
-        if (!cancelled) setError(caught instanceof ApiError ? caught.message : "Could not load SAR book section");
-      })
-      .finally(() => {
-        if (!cancelled) setSectionLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      );
+      if (requestId !== sectionRequestIdRef.current) return;
+      setNarrative(loaded);
+      setDocument(parseStoredDocumentContent(loaded.content));
+    } catch (caught) {
+      if (requestId !== sectionRequestIdRef.current) return;
+      setError(caught instanceof ApiError ? caught.message : "Could not load SAR book section");
+    } finally {
+      if (requestId === sectionRequestIdRef.current) setSectionLoading(false);
+    }
   }, [book, selection]);
+
+  useEffect(() => {
+    void loadSelectedSection();
+  }, [loadSelectedSection]);
 
   const selectedPartTitle = useMemo(() => {
     if (!book || !selection) return "";
@@ -119,7 +125,11 @@ export function SarBookClient() {
     try {
       const saved = await api.put<QaSarBookNarrativeSectionView>(
         `/api/qa/cycles/${book.cycleId}/sar-book/sections/${encodeURIComponent(selection.section.key)}`,
-        { programmeId: PROGRAMME_ID, content: serializeDocumentContent(document) },
+        {
+          programmeId: PROGRAMME_ID,
+          content: serializeDocumentContent(document),
+          baseRevisionId: narrative.revisionId,
+        },
       );
       setNarrative(saved);
       setDocument(parseStoredDocumentContent(saved.content));
@@ -130,6 +140,27 @@ export function SarBookClient() {
     }
   }
 
+  async function changeAssignment(assigneeId: string) {
+    if (!book || !selection || selection.section.source === "generated" || !canManage) return;
+    setAssignmentSaving(true);
+    setError(null);
+    const sectionKey = encodeURIComponent(selection.section.key);
+    const path = `/api/qa/cycles/${book.cycleId}/sar-book/sections/${sectionKey}/assignment`;
+    try {
+      if (assigneeId) {
+        await api.put(path, { programmeId: PROGRAMME_ID, assigneeId });
+      } else {
+        const params = new URLSearchParams({ programmeId: PROGRAMME_ID });
+        await api.delete(`${path}?${params}`);
+      }
+      await loadSelectedSection();
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Could not update the section owner");
+    } finally {
+      setAssignmentSaving(false);
+    }
+  }
+
   if (meLoading || loading) {
     return <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">Loading complete SAR book…</div>;
   }
@@ -137,6 +168,17 @@ export function SarBookClient() {
   if (!book) {
     return <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">No accessible AUN-QA assessment cycle was found.</div>;
   }
+
+  const context = selection ? (
+    <SectionContext
+      section={selection.section}
+      narrative={narrative}
+      contributors={contributors}
+      canManage={canManage}
+      assignmentSaving={assignmentSaving}
+      onChangeAssignment={changeAssignment}
+    />
+  ) : null;
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-4">
@@ -165,7 +207,7 @@ export function SarBookClient() {
 
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
 
-      <div className="grid gap-4 lg:grid-cols-[330px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)_280px]">
+      <div className="grid gap-4 lg:grid-cols-[330px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)_300px]">
         <aside className="rounded-xl border bg-white p-3 lg:sticky lg:top-4 lg:self-start">
           <div className="mb-3 flex items-center gap-2 px-2 font-semibold"><BookOpen className="h-4 w-4" /> SAR Book</div>
           <div className="space-y-2">
@@ -217,7 +259,11 @@ export function SarBookClient() {
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{selectedPartTitle}</div>
                   <h2 className="text-lg font-semibold">{selection.section.title}</h2>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {selection.section.source === "generated" ? "Generated from canonical PMS evidence" : narrative?.updatedByName ? `Last edited by ${narrative.updatedByName}` : "Not written yet"}
+                    {selection.section.source === "generated"
+                      ? "Generated from canonical PMS evidence"
+                      : narrative?.revisionNumber
+                        ? `Revision ${narrative.revisionNumber}${narrative.updatedByName ? ` · ${narrative.updatedByName}` : ""}`
+                        : "Not written yet"}
                   </div>
                 </div>
                 {narrative?.editable && selection.section.source !== "generated" ? (
@@ -227,7 +273,7 @@ export function SarBookClient() {
                     disabled={saving || sectionLoading}
                     className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                   >
-                    <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save section"}
+                    <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save new revision"}
                   </button>
                 ) : null}
               </div>
@@ -247,7 +293,18 @@ export function SarBookClient() {
                       ariaLabel={`SAR book section: ${selection.section.title}`}
                     />
                   ) : (
-                    <div className="rounded-lg border p-4"><DocumentRenderer value={document} /></div>
+                    <div className="space-y-3">
+                      {!canManage && narrative.assignment ? (
+                        <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">
+                          This section is assigned to {narrative.assignment.assignee.name} and is read-only for you.
+                        </div>
+                      ) : !canManage ? (
+                        <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">
+                          This shared section is read-only until programme leadership assigns it to you.
+                        </div>
+                      ) : null}
+                      <div className="rounded-lg border p-4"><DocumentRenderer value={document} /></div>
+                    </div>
                   )
                 ) : (
                   <div className="text-sm text-muted-foreground">This structured section is prepared here and receives its dedicated fields in the later Part 3/evidence phases.</div>
@@ -257,16 +314,88 @@ export function SarBookClient() {
           )}
         </main>
 
-        <aside className="hidden rounded-xl border bg-white p-4 xl:block xl:sticky xl:top-4 xl:self-start">
-          <div className="text-sm font-semibold">Section context</div>
-          {selection ? (
-            <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-              <p>{selection.section.required ? "Required SAR section" : "Optional SAR section"}</p>
-              <p>Source: {selection.section.source === "generated" ? "Generated PMS data" : "SAR book content"}</p>
-              <p>Workflow/readiness indicators are not AUN-QA compliance scores.</p>
+        <aside className="hidden xl:block xl:sticky xl:top-4 xl:self-start">{context}</aside>
+      </div>
+
+      <div className="xl:hidden">{context}</div>
+    </div>
+  );
+}
+
+function SectionContext({
+  section,
+  narrative,
+  contributors,
+  canManage,
+  assignmentSaving,
+  onChangeAssignment,
+}: {
+  section: QaSarBookSection;
+  narrative: QaSarBookNarrativeSectionView | null;
+  contributors: ProgrammeRoleAssignmentView[];
+  canManage: boolean;
+  assignmentSaving: boolean;
+  onChangeAssignment: (assigneeId: string) => Promise<void>;
+}) {
+  const generated = section.source === "generated";
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <div className="text-sm font-semibold">Section context</div>
+      <div className="mt-3 space-y-4 text-sm text-muted-foreground">
+        <p>{section.required ? "Required SAR section" : "Optional SAR section"}</p>
+        <p>Source: {generated ? "Generated PMS data" : "SAR book content"}</p>
+
+        {!generated ? (
+          <div className="space-y-2 border-t pt-3">
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              <UserRoundCheck className="h-4 w-4" /> Section owner
             </div>
-          ) : null}
-        </aside>
+            {canManage ? (
+              <select
+                aria-label={`Owner for ${section.title}`}
+                value={narrative?.assignment?.assignee.id ?? ""}
+                disabled={assignmentSaving}
+                onChange={(event) => void onChangeAssignment(event.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground disabled:opacity-50"
+              >
+                <option value="">Unassigned</option>
+                {contributors.map((person) => (
+                  <option key={person.userId} value={person.userId}>{person.userName}</option>
+                ))}
+              </select>
+            ) : (
+              <p>{narrative?.assignment?.assignee.name ?? "Unassigned"}</p>
+            )}
+            {narrative?.assignment ? (
+              <p className="text-xs">
+                Assigned by {narrative.assignment.assignedBy.name} · {new Date(narrative.assignment.assignedAt).toLocaleString()}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!generated ? (
+          <div className="space-y-2 border-t pt-3">
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              <History className="h-4 w-4" /> Revision history
+            </div>
+            {narrative?.recentRevisions.length ? (
+              <ol className="space-y-2">
+                {narrative.recentRevisions.map((revision) => (
+                  <li key={revision.id} className="rounded-md bg-slate-50 p-2 text-xs">
+                    <div className="font-medium text-foreground">Revision {revision.revisionNumber}</div>
+                    <div>{revision.createdBy?.name ?? "Unknown editor"}</div>
+                    <div>{new Date(revision.createdAt).toLocaleString()}</div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-xs">No saved revisions yet.</p>
+            )}
+          </div>
+        ) : null}
+
+        <p className="border-t pt-3 text-xs">Workflow/readiness indicators are not AUN-QA compliance scores.</p>
       </div>
     </div>
   );
