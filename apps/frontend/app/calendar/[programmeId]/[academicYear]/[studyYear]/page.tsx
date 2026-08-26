@@ -32,7 +32,8 @@ function studyYearFromSegment(value: string): number | null {
 export default function PublicAcademicCalendarPage({ params }: PublicAcademicCalendarPageProps) {
   const resolvedParams = use(params);
   const programmeId = decodeURIComponent(resolvedParams.programmeId);
-  const academicYear = decodeURIComponent(resolvedParams.academicYear).replace(/-/g, "–");
+  const academicYear = decodeURIComponent(resolvedParams.academicYear);
+  const academicYearDisplay = academicYear.replace(/-/g, "–");
   const studyYear = studyYearFromSegment(resolvedParams.studyYear);
   const [data, setData] = useState<PublishedAcademicCalendarProjection | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,7 +74,7 @@ export default function PublicAcademicCalendarPage({ params }: PublicAcademicCal
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">DSE Programme</p>
               <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Academic Calendar</h1>
-              <p className="mt-2 text-sm text-muted-foreground sm:text-base">{academicYear} · {studyYear ? `Year ${studyYear}` : "Study year"}</p>
+              <p className="mt-2 text-sm text-muted-foreground sm:text-base">{academicYearDisplay} · {studyYear ? `Year ${studyYear}` : "Study year"}</p>
               <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                 <ShieldCheck className="h-3.5 w-3.5" /> Official published calendar only
               </div>
@@ -89,7 +90,7 @@ export default function PublicAcademicCalendarPage({ params }: PublicAcademicCal
             <CalendarDays className="mx-auto h-10 w-10 text-muted-foreground" />
             <h2 className="mt-4 text-xl font-semibold">Calendar not issued yet</h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              The official academic calendar for Year {studyYear} in {data.academicYear?.label ?? academicYear} has not yet been published.
+              The official academic calendar for Year {studyYear} in {data.academicYear?.label ?? academicYearDisplay} has not yet been published.
               Please check this same link again later or follow DSE announcements.
             </p>
             <p className="mt-4 text-xs text-muted-foreground">No other study year is substituted, and draft dates are never shown here.</p>
