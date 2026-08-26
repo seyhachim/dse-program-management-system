@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  FormFieldLabel,
   Input,
   Select,
   SelectContent,
@@ -74,19 +75,19 @@ export function CreateAccountForm({ open, onOpenChange, onSubmit, submitting }: 
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Field label="Name" error={errors.name?.message}>
-            <Input placeholder="Chim Seyha" {...register("name")} />
+          <Field label="Name" error={errors.name?.message} required>
+            <Input placeholder="Chim Seyha" {...register("name")} required />
           </Field>
-          <Field label="Email" error={errors.email?.message}>
-            <Input placeholder="chim.seyha@rupp.edu.kh" {...register("email")} />
+          <Field label="Email" error={errors.email?.message} required>
+            <Input type="email" placeholder="chim.seyha@rupp.edu.kh" {...register("email")} required />
           </Field>
-          <Field label="Role" error={errors.role?.message}>
+          <Field label="Role" error={errors.role?.message} required>
             <Controller
               control={control}
               name="role"
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-required="true">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -118,15 +119,17 @@ export function CreateAccountForm({ open, onOpenChange, onSubmit, submitting }: 
 function Field({
   label,
   error,
+  required = false,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
+      <FormFieldLabel required={required}>{label}</FormFieldLabel>
       {children}
       {error ? <span className="block text-xs text-status-live">{error}</span> : null}
     </label>

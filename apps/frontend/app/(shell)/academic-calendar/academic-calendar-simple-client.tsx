@@ -11,7 +11,7 @@ import type {
   AcademicYearView,
 } from "@dse-pms/shared-types";
 import { ACADEMIC_CALENDAR_EVENT_TYPES } from "@dse-pms/shared-types";
-import { Button, Input, Label } from "@dse-pms/ui";
+import { Button, FormFieldLabel, Input, Label } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { academicCalendarApi, academicSemesterLabel, formatAcademicDate } from "@/lib/academic-calendar";
 
@@ -222,12 +222,15 @@ function DateField({ id, label, value, onChange, disabled = false, optional = fa
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}{optional ? <span className="ml-1 font-normal text-muted-foreground">(optional)</span> : null}</Label>
+      <Label htmlFor={id}>
+        <FormFieldLabel required={!optional} optional={optional}>{label}</FormFieldLabel>
+      </Label>
       <Input
         id={id}
         inputMode="numeric"
         autoComplete="off"
         disabled={disabled}
+        required={!optional}
         value={text}
         placeholder="DD/MM/YYYY"
         aria-invalid={invalid || undefined}
@@ -266,9 +269,11 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
       <section className="rounded-2xl border border-border bg-muted/10 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-64 flex-1 space-y-1.5">
-            <Label htmlFor="calendar-coverage">Applies to</Label>
+            <Label htmlFor="calendar-coverage"><FormFieldLabel required>Applies to</FormFieldLabel></Label>
             <select
               id="calendar-coverage"
+              required
+              aria-required="true"
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={preset}
               onChange={(event) => {
@@ -363,8 +368,8 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
         </div>
         {draft.events.length ? <div className="mt-4 space-y-3">{draft.events.map((event) => (
           <div key={event.key} className="grid gap-3 rounded-xl bg-muted/30 p-3 md:grid-cols-6">
-            <div className="md:col-span-2"><Label htmlFor={`${event.key}-title`}>Title</Label><Input id={`${event.key}-title`} className="mt-1" value={event.title} onChange={(e) => updateEvent(event.key, { title: e.target.value })} /></div>
-            <div><Label htmlFor={`${event.key}-type`}>Type</Label><select id={`${event.key}-type`} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.type} onChange={(e) => updateEvent(event.key, { type: e.target.value as AcademicCalendarEventType })}>{ACADEMIC_CALENDAR_EVENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
+            <div className="md:col-span-2"><Label htmlFor={`${event.key}-title`}><FormFieldLabel required>Title</FormFieldLabel></Label><Input required id={`${event.key}-title`} className="mt-1" value={event.title} onChange={(e) => updateEvent(event.key, { title: e.target.value })} /></div>
+            <div><Label htmlFor={`${event.key}-type`}><FormFieldLabel required>Type</FormFieldLabel></Label><select required aria-required="true" id={`${event.key}-type`} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.type} onChange={(e) => updateEvent(event.key, { type: e.target.value as AcademicCalendarEventType })}>{ACADEMIC_CALENDAR_EVENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
             <div><Label htmlFor={`${event.key}-semester`}>Semester</Label><select id={`${event.key}-semester`} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.semester} onChange={(e) => updateEvent(event.key, { semester: e.target.value as EventDraft["semester"] })}><option value="">Any</option><option value="First">Semester 1</option><option value="Second">Semester 2</option></select></div>
             <DateField id={`${event.key}-start`} label="Start" value={event.startDate} onChange={(value) => updateEvent(event.key, { startDate: value })} />
             <DateField id={`${event.key}-end`} label="End" optional value={event.endDate} onChange={(value) => updateEvent(event.key, { endDate: value })} />
@@ -592,8 +597,8 @@ export function AcademicCalendarSimpleClient() {
                 <h3 className="font-semibold">Add Academic Year</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Enter only the first year. PMS automatically creates the next year and academic-year label.</p>
                 <div className="mt-4 max-w-xs space-y-1.5">
-                  <Label htmlFor="new-year-start">Start year</Label>
-                  <Input id="new-year-start" inputMode="numeric" autoComplete="off" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="2027" />
+                  <Label htmlFor="new-year-start"><FormFieldLabel required>Start year</FormFieldLabel></Label>
+                  <Input required id="new-year-start" inputMode="numeric" autoComplete="off" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="2027" />
                 </div>
                 <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
                   <span className="text-muted-foreground">Academic Year</span>
@@ -643,7 +648,7 @@ export function AcademicCalendarSimpleClient() {
               <>
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-lg font-semibold">Year {selectedStudyYear} · {selectedYear.label}</h3><p className="text-sm text-muted-foreground">{selectedCalendar.studyYears.length > 1 ? `Shared calendar for Years ${selectedCalendar.studyYears.join(" and ")}.` : "Official programme calendar record."}</p></div><div className="flex flex-wrap gap-2">{selectedCalendar.status === "Draft" ? <><Button variant="outline" onClick={() => { setDraft(fromCalendar(selectedCalendar)); setEditing(true); }}>Edit draft</Button><Button disabled={saving} onClick={() => void publish()}><CheckCircle2 className="h-4 w-4" /> Publish official calendar</Button></> : null}</div></div>
                 <CalendarSummary calendar={selectedCalendar} />
-                {selectedCalendar.status === "Published" ? <section className="mt-6 rounded-xl border border-border p-4"><h4 className="font-semibold">Correct a published calendar</h4><p className="mt-1 text-sm text-muted-foreground">Published records are never edited in place. Create a correction revision to preserve history.</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input aria-label="Correction reason" value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} placeholder="Reason for correction" /><Button disabled={saving} onClick={() => void createRevision()}><RefreshCw className="h-4 w-4" /> Create correction revision</Button></div></section> : null}
+                {selectedCalendar.status === "Published" ? <section className="mt-6 rounded-xl border border-border p-4"><h4 className="font-semibold">Correct a published calendar</h4><p className="mt-1 text-sm text-muted-foreground">Published records are never edited in place. Create a correction revision to preserve history.</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><div className="min-w-0 flex-1 space-y-1.5"><FormFieldLabel required>Correction reason</FormFieldLabel><Input required aria-required="true" aria-label="Correction reason" value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} placeholder="Reason for correction" /></div><Button className="self-end" disabled={saving} onClick={() => void createRevision()}><RefreshCw className="h-4 w-4" /> Create correction revision</Button></div></section> : null}
                 <section className="mt-6"><div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h4 className="font-semibold">Audit history</h4></div><div className="mt-2 divide-y divide-border rounded-xl border border-border">{auditRows.length ? auditRows.map((row) => <div key={row.id} className="p-3"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-medium">{row.action} · {row.actorName}</p><time className="text-xs text-muted-foreground">{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(row.createdAt))}</time></div>{row.reason ? <p className="mt-1 text-sm text-muted-foreground">{row.reason}</p> : null}</div>) : <p className="p-4 text-sm text-muted-foreground">No audit actions recorded yet.</p>}</div></section>
               </>
             ) : (
