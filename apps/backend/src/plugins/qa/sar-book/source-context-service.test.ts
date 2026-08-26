@@ -199,7 +199,7 @@ describe("SAR PMS source context projection", () => {
       order: 1,
       scopeRequirement: { requiredDimensions: ["programme"] },
       temporalRule: { kind: "withinCycle" },
-      authorityRequirement: { allowedAuthorities: ["approvedDocument"] },
+      authorityRequirement: { minimumAuthority: "controlledInternalRecord" },
     };
     const expectation: QaQualityExpectationView = {
       id: "expectation-1",
