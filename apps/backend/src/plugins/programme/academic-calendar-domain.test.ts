@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { AcademicCalendarPeriodInputSchema, CreateAcademicCalendarSchema } from "@dse-pms/shared-types";
-import { buildAcademicCalendarTimeline } from "./academic-calendar-service.ts";
+import { buildAcademicCalendarTimeline, mergeAcademicCalendarEventsForStudyYear } from "./academic-calendar-service.ts";
 describe("academic calendar domain", () => {
   test("rejects reversed teaching periods and half-defined exam ranges", () => {
     expect(AcademicCalendarPeriodInputSchema.safeParse({ semester: "First", teachingStart: "2026-09-20", teachingEnd: "2026-09-01" }).success).toBe(false);
@@ -15,5 +15,16 @@ describe("academic calendar domain", () => {
     const events = buildAcademicCalendarTimeline([{ id: "p1", calendarId: "c1", semester: "First", teachingStart: "2026-09-01", teachingEnd: "2027-01-10", examStart: "2027-01-15", examEnd: "2027-01-20", breakStart: null, breakEnd: null }], [{ id: "e1", calendarId: "c1", title: "Orientation", type: "Orientation", semester: "First", startDate: "2026-08-20", endDate: "2026-08-20", note: "", sortOrder: 0 }], "2026-08-25");
     expect(events[0]?.title).toBe("Semester 1 teaching");
     expect(events.some((event) => event.title === "Orientation")).toBe(false);
+  });
+  test("reuses published holidays programme-wide while keeping other events study-year scoped", () => {
+    const scoped = [{ id: "orientation-y1", calendarId: "c1", title: "Year 1 Orientation", type: "Orientation" as const, semester: "First" as const, startDate: "2026-09-01", endDate: null, note: "", sortOrder: 0 }];
+    const published = [
+      { id: "kh-new-year-y1", calendarId: "c1", title: "Khmer New Year", type: "Holiday" as const, semester: null, startDate: "2027-04-14", endDate: "2027-04-16", note: "", sortOrder: 0 },
+      { id: "kh-new-year-y3", calendarId: "c34", title: "Khmer New Year", type: "Holiday" as const, semester: null, startDate: "2027-04-14", endDate: "2027-04-16", note: "duplicate historical entry", sortOrder: 1 },
+      { id: "orientation-y3", calendarId: "c34", title: "Year 3 Orientation", type: "Orientation" as const, semester: "First" as const, startDate: "2026-09-02", endDate: null, note: "", sortOrder: 0 },
+    ];
+    const merged = mergeAcademicCalendarEventsForStudyYear(scoped, published);
+    expect(merged.map((event) => event.title)).toEqual(["Year 1 Orientation", "Khmer New Year"]);
+    expect(merged.filter((event) => event.type === "Holiday")).toHaveLength(1);
   });
 });
