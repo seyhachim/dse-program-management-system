@@ -124,7 +124,7 @@ export interface AcademicCalendarContextView { academicYear: AcademicYearView; s
 export interface AcademicCalendarTimelineEvent { key: string; title: string; type: AcademicCalendarEventType; semester: AcademicCalendarSemester | null; startDate: string; endDate: string | null; note: string; }
 export type PublishedAcademicCalendarProjection =
   | { status: "available"; academicYear: AcademicYearView; studyYear: number; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; sources: PublicAcademicCalendarSourceView[]; nextEvent: AcademicCalendarTimelineEvent | null; }
-  | { status: "unavailable"; academicYear: AcademicYearView | null; studyYear: number; reason: "academic-year-unavailable" | "calendar-unpublished"; message: string; };
+  | { status: "unavailable"; academicYear: AcademicYearView | null; studyYear: number; reason: "academic-year-unavailable" | "calendar-unpublished"; message: string; events?: AcademicCalendarEventView[]; sources?: PublicAcademicCalendarSourceView[]; };
 
 /** Student-facing projection. Source/provenance metadata remains on the management/public
  * contract; the portal receives only the published dates applicable to the authenticated
