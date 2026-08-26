@@ -51,10 +51,7 @@ export default async function ProgrammePage() {
   const hasContact = Boolean(content.contact);
   const hasUtilityContent = hasFaqs || hasDates || hasContact;
 
-  const snapshot =
-    content.sectionSources.snapshot === "curated-fallback"
-      ? content.snapshot.filter((item) => item.label !== "Curriculum snapshot").slice(0, 4)
-      : content.snapshot.slice(0, 4);
+  const snapshot = content.snapshot.slice(0, 4);
 
   const curriculumHighlights = content.curriculumPreview.semesters
     .flatMap((semester) => semester.courses)
