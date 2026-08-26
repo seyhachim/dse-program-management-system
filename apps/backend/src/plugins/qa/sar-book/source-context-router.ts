@@ -1,10 +1,33 @@
 import { Router } from "express";
 import { QaSarBookQuerySchema } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
+import { hasAnyRoleInProgramme } from "../../../core/auth/token.ts";
 import { requirePermission } from "../../../core/permissions/index.ts";
-import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
-import { canReadSarBook } from "./router.ts";
+import {
+  QaSarResourceNotFoundError,
+  QaSarScopeMismatchError,
+  isSarRequirementAssignedToUser,
+} from "../sar/service.ts";
 import { getQaSarRequirementSourceContext } from "./source-context-service.ts";
+
+export async function canReadSarSourceContext(
+  user: Parameters<typeof hasAnyRoleInProgramme>[0],
+  programmeId: string,
+  cycleId: string,
+  requirementCode: string,
+): Promise<boolean> {
+  if (
+    hasAnyRoleInProgramme(
+      user,
+      ["admin", "program_coordinator", "qa_reviewer"],
+      programmeId,
+    )
+  ) {
+    return true;
+  }
+  if (!hasAnyRoleInProgramme(user, ["qa_contributor"], programmeId)) return false;
+  return isSarRequirementAssignedToUser(programmeId, cycleId, requirementCode, user.id);
+}
 
 export function createQaSarSourceContextRouter(): Router {
   const router = Router();
@@ -17,12 +40,24 @@ export function createQaSarSourceContextRouter(): Router {
       const cycleId = req.params.cycleId;
       const requirementCode = req.params.requirementCode;
       const parsed = QaSarBookQuerySchema.safeParse(req.query);
-      if (!cycleId || !requirementCode || !parsed.success) {
+      if (
+        !cycleId ||
+        !requirementCode ||
+        !/^\d\.\d$/.test(requirementCode) ||
+        !parsed.success
+      ) {
         res.status(400).json({ error: "Invalid SAR requirement source-context query" });
         return;
       }
-      if (!canReadSarBook(req.user!, parsed.data.programmeId)) {
-        res.status(403).json({ error: "You do not have access to this programme SAR context" });
+      if (
+        !(await canReadSarSourceContext(
+          req.user!,
+          parsed.data.programmeId,
+          cycleId,
+          requirementCode,
+        ))
+      ) {
+        res.status(403).json({ error: "You do not have access to this SAR requirement context" });
         return;
       }
       try {
