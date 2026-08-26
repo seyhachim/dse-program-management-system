@@ -68,6 +68,47 @@ export const QaSarBookNarrativeContentSchema = z
 export const SaveQaSarBookSectionSchema = z.object({
   programmeId: z.string().trim().min(1),
   content: QaSarBookNarrativeContentSchema,
+  baseRevisionId: z.string().uuid().nullable().optional(),
+});
+
+const QaSarBookUserSummarySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1),
+});
+
+export const QaSarBookSectionAssignmentViewSchema = z.object({
+  id: z.string().uuid(),
+  programmeId: z.string().trim().min(1),
+  cycleId: z.string().trim().min(1),
+  sectionKey: z.string().trim().min(1),
+  sectionTitle: z.string().trim().min(1),
+  assignee: QaSarBookUserSummarySchema.extend({
+    email: z.string().email(),
+  }),
+  assignedBy: QaSarBookUserSummarySchema,
+  assignedAt: z.string().datetime(),
+  endedAt: z.string().datetime().nullable(),
+});
+
+export const UpsertQaSarBookSectionAssignmentSchema = z.object({
+  programmeId: z.string().trim().min(1),
+  assigneeId: z.string().uuid(),
+});
+
+export const QaSarBookSectionRevisionSummarySchema = z.object({
+  id: z.string().uuid(),
+  revisionNumber: z.number().int().positive(),
+  createdBy: QaSarBookUserSummarySchema.nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export const QaSarBookSectionRevisionViewSchema = QaSarBookSectionRevisionSummarySchema.extend({
+  programmeId: z.string().trim().min(1),
+  cycleId: z.string().trim().min(1),
+  sectionKey: z.string().trim().min(1),
+  sectionTitle: z.string().trim().min(1),
+  content: QaSarBookNarrativeContentSchema,
+  plainText: z.string(),
 });
 
 export const QaSarBookNarrativeSectionViewSchema = z.object({
@@ -80,6 +121,10 @@ export const QaSarBookNarrativeSectionViewSchema = z.object({
   editable: z.boolean(),
   updatedByName: z.string().nullable(),
   updatedAt: z.string().datetime().nullable(),
+  revisionId: z.string().uuid().nullable(),
+  revisionNumber: z.number().int().positive().nullable(),
+  assignment: QaSarBookSectionAssignmentViewSchema.nullable(),
+  recentRevisions: z.array(QaSarBookSectionRevisionSummarySchema),
 });
 
 export const QaSarBookViewSchema = z.object({
@@ -112,7 +157,13 @@ export type QaSarBookPart = z.infer<typeof QaSarBookPartSchema>;
 export type QaSarBookRequirementPin = z.infer<typeof QaSarBookRequirementPinSchema>;
 export type QaSarBookReleaseLineageEntry = z.infer<typeof QaSarBookReleaseLineageEntrySchema>;
 export type QaSarBookNarrativeSectionView = z.infer<typeof QaSarBookNarrativeSectionViewSchema>;
+export type QaSarBookSectionRevisionSummary = z.infer<typeof QaSarBookSectionRevisionSummarySchema>;
+export type QaSarBookSectionRevisionView = z.infer<typeof QaSarBookSectionRevisionViewSchema>;
+export type QaSarBookSectionAssignmentView = z.infer<typeof QaSarBookSectionAssignmentViewSchema>;
 export type SaveQaSarBookSectionInput = z.infer<typeof SaveQaSarBookSectionSchema>;
+export type UpsertQaSarBookSectionAssignmentInput = z.infer<
+  typeof UpsertQaSarBookSectionAssignmentSchema
+>;
 export type QaSarBookView = z.infer<typeof QaSarBookViewSchema>;
 
 export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
