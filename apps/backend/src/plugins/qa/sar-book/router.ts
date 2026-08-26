@@ -6,7 +6,7 @@ import {
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme } from "../../../core/auth/token.ts";
-import { requirePermission } from "../../../core/permissions/index.ts";
+import { requirePermission, roleHasPermission } from "../../../core/permissions/index.ts";
 import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
 import {
   QaSarBookRevisionConflictError,
@@ -198,6 +198,13 @@ export function createQaSarBookRouter(): Router {
       }
       if (!canReadSarBook(req.user!, parsed.data.programmeId)) {
         res.status(403).json({ error: "You do not have access to this programme SAR book" });
+        return;
+      }
+      const hasWritePermission =
+        (await roleHasPermission(req.user!.roles, "qa:manage")) ||
+        (await roleHasPermission(req.user!.roles, "qa:contribute"));
+      if (!hasWritePermission) {
+        res.status(403).json({ error: "Missing permission to edit SAR book content" });
         return;
       }
       try {
