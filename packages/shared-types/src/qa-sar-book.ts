@@ -54,7 +54,9 @@ export const QaSarBookReleaseLineageEntrySchema = z.object({
   requirementPins: z.array(QaSarBookRequirementPinSchema),
 });
 
-export const QaSarBookQuerySchema = z.object({ programmeId: z.string().trim().min(1) });
+export const QaSarBookQuerySchema = z.object({
+  programmeId: z.string().trim().min(1),
+});
 
 export const QaSarBookNarrativeContentSchema = z
   .string()
@@ -129,9 +131,24 @@ export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
     title: "Part 1 — Introduction",
     order: 1,
     sections: [
-      { key: "part1.executive-summary", title: "Executive Summary", source: "bookNarrative", required: true },
-      { key: "part1.self-assessment-organisation", title: "Organisation of the Self-Assessment", source: "bookNarrative", required: true },
-      { key: "part1.programme-background", title: "University / Faculty / Department / Programme Background", source: "bookNarrative", required: true },
+      {
+        key: "part1.executive-summary",
+        title: "Executive Summary",
+        source: "bookNarrative",
+        required: true,
+      },
+      {
+        key: "part1.self-assessment-organisation",
+        title: "Organisation of the Self-Assessment",
+        source: "bookNarrative",
+        required: true,
+      },
+      {
+        key: "part1.programme-background",
+        title: "University / Faculty / Department / Programme Background",
+        source: "bookNarrative",
+        required: true,
+      },
     ],
   },
   {
@@ -139,10 +156,30 @@ export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
     title: "Part 3 — Strengths and Weaknesses Analysis",
     order: 3,
     sections: [
-      { key: "part3.strengths", title: "Summary of Strengths", source: "bookNarrative", required: true },
-      { key: "part3.weaknesses", title: "Summary of Weaknesses / Areas for Improvement", source: "bookNarrative", required: true },
-      { key: "part3.self-ratings", title: "Self-Ratings", source: "structured", required: true },
-      { key: "part3.improvement-plan", title: "Improvement Plan", source: "structured", required: true },
+      {
+        key: "part3.strengths",
+        title: "Summary of Strengths",
+        source: "bookNarrative",
+        required: true,
+      },
+      {
+        key: "part3.weaknesses",
+        title: "Summary of Weaknesses / Areas for Improvement",
+        source: "bookNarrative",
+        required: true,
+      },
+      {
+        key: "part3.self-ratings",
+        title: "Self-Ratings",
+        source: "structured",
+        required: true,
+      },
+      {
+        key: "part3.improvement-plan",
+        title: "Improvement Plan",
+        source: "structured",
+        required: true,
+      },
     ],
   },
   {
@@ -150,9 +187,24 @@ export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
     title: "Part 4 — Appendices",
     order: 4,
     sections: [
-      { key: "part4.glossary", title: "Glossary", source: "bookNarrative", required: true },
-      { key: "part4.evidence-register", title: "Evidence Register", source: "generated", required: true },
-      { key: "part4.supporting-documents", title: "Supporting Documents", source: "structured", required: true },
+      {
+        key: "part4.glossary",
+        title: "Glossary",
+        source: "bookNarrative",
+        required: true,
+      },
+      {
+        key: "part4.evidence-register",
+        title: "Evidence Register",
+        source: "generated",
+        required: true,
+      },
+      {
+        key: "part4.supporting-documents",
+        title: "Supporting Documents",
+        source: "structured",
+        required: true,
+      },
     ],
   },
 ] as const;
