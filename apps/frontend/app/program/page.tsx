@@ -30,6 +30,12 @@ const benefitItems = [
   { label: "Professional practice", icon: BriefcaseBusiness },
 ] as const;
 
+const finalPathways = [
+  "Coursework pathway with advanced Year 4 subjects and Final Project II",
+  "Research pathway through an 18-credit thesis",
+  "Industry pathway through an 18-credit industrial internship/project",
+] as const;
+
 function formatPublicDate(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
@@ -50,14 +56,10 @@ export default async function ProgrammePage() {
       ? content.snapshot.filter((item) => item.label !== "Curriculum snapshot").slice(0, 4)
       : content.snapshot.slice(0, 4);
 
-  const officialCourses = content.curriculumPreview.isOfficialPublishedCurriculum
-    ? content.curriculumPreview.semesters.flatMap((semester) => semester.courses).slice(0, 4)
-    : [];
-
-  const curriculumHighlights =
-    officialCourses.length > 0
-      ? officialCourses.map((course) => `${course.code} · ${course.title}`)
-      : content.learningThemes.slice(0, 4).map((theme) => theme.title);
+  const curriculumHighlights = content.curriculumPreview.semesters
+    .flatMap((semester) => semester.courses)
+    .slice(0, 6)
+    .map((course) => `${course.code} · ${course.title}`);
 
   return (
     <main className={styles.page}>
@@ -82,6 +84,7 @@ export default async function ProgrammePage() {
 
           <nav className={styles.navLinks} aria-label="Public programme navigation">
             <a href="#programme">Programme</a>
+            <a href="#journey">Journey</a>
             <a href="#curriculum">Curriculum</a>
             {hasFaqs && <a href="#faq">FAQ</a>}
             {hasDates && <a href="#dates">Dates</a>}
@@ -99,6 +102,7 @@ export default async function ProgrammePage() {
               </summary>
               <nav aria-label="Mobile programme navigation">
                 <a href="#programme">Programme</a>
+                <a href="#journey">Journey</a>
                 <a href="#curriculum">Curriculum</a>
                 {hasFaqs && <a href="#faq">FAQ</a>}
                 {hasDates && <a href="#dates">Dates</a>}
@@ -180,8 +184,8 @@ export default async function ProgrammePage() {
             </div>
             <h2>
               {content.curriculumPreview.isOfficialPublishedCurriculum
-                ? "A concise view of the published curriculum."
-                : "Core learning areas at a glance."}
+                ? "A concise view of the published Year 1 curriculum."
+                : "A sample of the Year 1 study plan."}
             </h2>
             <ul className={styles.checkList}>
               {curriculumHighlights.map((item) => (
@@ -191,9 +195,7 @@ export default async function ProgrammePage() {
                 </li>
               ))}
             </ul>
-            {content.curriculumPreview.isOfficialPublishedCurriculum && (
-              <p className={styles.dataNote}>{content.curriculumPreview.note}</p>
-            )}
+            <p className={styles.dataNote}>{content.curriculumPreview.note}</p>
           </div>
         </article>
 
@@ -205,13 +207,79 @@ export default async function ProgrammePage() {
             <p className={styles.cardLabel}>Learning Experience</p>
             <h2>Learn through practice, not just theory.</h2>
             <ul className={styles.checkList}>
-              {content.practice.slice(0, 4).map((item) => (
+              {content.practice.map((item) => (
                 <li key={item.title}>
                   <Check aria-hidden="true" />
-                  <span>{item.title}</span>
+                  <span>
+                    <strong>{item.title}</strong> — {item.description}
+                  </span>
                 </li>
               ))}
             </ul>
+          </div>
+        </article>
+      </section>
+
+      <section
+        className={`${styles.mainCards} ${styles.shell}`}
+        id="journey"
+        aria-label="Study journey and future directions"
+      >
+        <article className={styles.infoCard}>
+          <div className={styles.cardIcon}>
+            <GraduationCap aria-hidden="true" />
+          </div>
+          <div>
+            <p className={styles.cardLabel}>Four-Year Learning Journey</p>
+            <h2>Progress from foundations to advanced applied study.</h2>
+            <ul className={styles.checkList}>
+              {content.journey.map((item) => (
+                <li key={item.year}>
+                  <Check aria-hidden="true" />
+                  <span>
+                    <strong>{item.year}</strong> — {item.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </article>
+
+        <article className={styles.infoCard}>
+          <div className={styles.cardIcon}>
+            <Target aria-hidden="true" />
+          </div>
+          <div>
+            <p className={styles.cardLabel}>Year 4 Pathways</p>
+            <h2>Choose a final pathway that matches your direction.</h2>
+            <ul className={styles.checkList}>
+              {finalPathways.map((item) => (
+                <li key={item}>
+                  <Check aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className={styles.dataNote}>Students follow one applicable Semester 2 pathway in the curriculum.</p>
+          </div>
+        </article>
+
+        <article className={styles.infoCard}>
+          <div className={styles.cardIcon}>
+            <BriefcaseBusiness aria-hidden="true" />
+          </div>
+          <div>
+            <p className={styles.cardLabel}>Possible Directions</p>
+            <h2>Build toward data, AI, software or further study.</h2>
+            <ul className={styles.checkList}>
+              {content.careers.map((career) => (
+                <li key={career}>
+                  <Check aria-hidden="true" />
+                  <span>{career}</span>
+                </li>
+              ))}
+            </ul>
+            <p className={styles.dataNote}>These are illustrative career and study directions, not employment outcome claims.</p>
           </div>
         </article>
       </section>
@@ -287,6 +355,7 @@ export default async function ProgrammePage() {
           </div>
           <nav aria-label="Footer navigation">
             <a href="#programme">Programme</a>
+            <a href="#journey">Journey</a>
             <a href="#curriculum">Curriculum</a>
             {hasFaqs && <a href="#faq">FAQ</a>}
             <Link href="/login">PMS Login</Link>
