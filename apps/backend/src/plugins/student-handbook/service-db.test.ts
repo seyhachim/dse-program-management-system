@@ -1,6 +1,8 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { DEFAULT_STUDENT_HANDBOOK_DOCUMENT_THEME } from "@dse-pms/shared-types";
+import { registry } from "../../core/plugins/registry.ts";
+import { programmePlugin } from "../programme/index.ts";
 import {
   approveHandbook,
   createHandbook,
@@ -36,6 +38,10 @@ async function fixture() {
   });
   return { token, programme, creator, lecturer };
 }
+
+beforeAll(() => {
+  if (!registry.has("programme")) registry.register(programmePlugin);
+});
 
 describeDb("student handbook service", () => {
   test("creates one-owner handbook and saves narrative plus read-only source reference", async () => {
