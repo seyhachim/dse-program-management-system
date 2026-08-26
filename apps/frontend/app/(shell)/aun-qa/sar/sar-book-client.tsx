@@ -18,12 +18,11 @@ import {
   serializeDocumentContent,
   type DseDocumentContent,
 } from "@/lib/document-content";
+import { SAR_BOOK_MODE_HREFS, sarBookRequirementHref } from "./sar-book-navigation";
 
 const PROGRAMME_ID = "dse";
 
-type Selection =
-  | { kind: "static"; section: QaSarBookSection }
-  | { kind: "requirement"; section: QaSarBookSection };
+type Selection = { section: QaSarBookSection };
 
 export function SarBookClient() {
   const { me, loading: meLoading } = useMe();
@@ -57,7 +56,7 @@ export function SarBookClient() {
       const loaded = await api.get<QaSarBookView>(`/api/qa/cycles/${cycleId}/sar-book?${params}`);
       setBook(loaded);
       const first = loaded.parts[0]?.sections[0];
-      if (first) setSelection({ kind: "static", section: first });
+      if (first) setSelection({ section: first });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load the SAR book");
     } finally {
@@ -70,7 +69,7 @@ export function SarBookClient() {
   }, [loadBook, me, meLoading]);
 
   useEffect(() => {
-    if (!book || !selection || selection.kind !== "static") {
+    if (!book || !selection) {
       setNarrative(null);
       setDocument(null);
       return;
@@ -109,13 +108,12 @@ export function SarBookClient() {
   const selectedPartTitle = useMemo(() => {
     if (!book || !selection) return "";
     return book.parts.find((part) =>
-      part.sections.some((section) => section.key === selection.section.key) ||
-      part.criteria.some((criterion) => criterion.sections.some((section) => section.key === selection.section.key)),
+      part.sections.some((section) => section.key === selection.section.key),
     )?.title ?? "";
   }, [book, selection]);
 
   async function save() {
-    if (!book || !selection || selection.kind !== "static" || !narrative?.editable || !document) return;
+    if (!book || !selection || !narrative?.editable || !document) return;
     setSaving(true);
     setError(null);
     try {
@@ -153,9 +151,9 @@ export function SarBookClient() {
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
             <span className="rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground">Content</span>
-            <Link href="/aun-qa/evidence" className="rounded-md border px-3 py-2">Evidence</Link>
-            <Link href="/aun-qa/review" className="rounded-md border px-3 py-2">Review</Link>
-            <Link href="/aun-qa/sar-preview" className="rounded-md border px-3 py-2">Preview</Link>
+            <Link href={SAR_BOOK_MODE_HREFS.evidence} className="rounded-md border px-3 py-2">Evidence</Link>
+            <Link href={SAR_BOOK_MODE_HREFS.review} className="rounded-md border px-3 py-2">Review</Link>
+            <Link href={SAR_BOOK_MODE_HREFS.preview} className="rounded-md border px-3 py-2">Preview</Link>
           </div>
         </div>
         <div className="mt-4 grid gap-2 text-xs sm:grid-cols-3">
@@ -181,7 +179,7 @@ export function SarBookClient() {
                     <button
                       key={section.key}
                       type="button"
-                      onClick={() => setSelection({ kind: "static", section })}
+                      onClick={() => setSelection({ section })}
                       className={`w-full rounded-md px-2 py-2 text-left text-sm ${selection?.section.key === section.key ? "bg-primary text-primary-foreground" : "hover:bg-white"}`}
                     >
                       {section.title}
@@ -194,7 +192,7 @@ export function SarBookClient() {
                         {criterion.sections.map((section) => (
                           <Link
                             key={section.key}
-                            href={`/aun-qa/sar/${section.requirementCode}`}
+                            href={sarBookRequirementHref(section.requirementCode ?? "")}
                             className="block rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-slate-50 hover:text-foreground"
                           >
                             {section.requirementCode} · {section.title}
@@ -212,7 +210,7 @@ export function SarBookClient() {
         <main className="min-w-0 rounded-xl border bg-white shadow-sm">
           {!selection ? (
             <div className="p-8 text-sm text-muted-foreground">Choose a SAR book section.</div>
-          ) : selection.kind === "requirement" ? null : (
+          ) : (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
                 <div>
@@ -264,9 +262,8 @@ export function SarBookClient() {
           {selection ? (
             <div className="mt-3 space-y-3 text-sm text-muted-foreground">
               <p>{selection.section.required ? "Required SAR section" : "Optional SAR section"}</p>
-              <p>Source: {selection.section.source === "requirementSar" ? "Requirement SAR workflow" : selection.section.source === "generated" ? "Generated PMS data" : "SAR book content"}</p>
+              <p>Source: {selection.section.source === "generated" ? "Generated PMS data" : "SAR book content"}</p>
               <p>Workflow/readiness indicators are not AUN-QA compliance scores.</p>
-              {selection.section.requirementCode ? <Link href={`/aun-qa/sar/${selection.section.requirementCode}`} className="font-medium text-primary hover:underline">Open requirement editor</Link> : null}
             </div>
           ) : null}
         </aside>
