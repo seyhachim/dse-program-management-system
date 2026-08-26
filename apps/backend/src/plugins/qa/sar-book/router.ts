@@ -24,7 +24,7 @@ export function canReadSarBook(
   );
 }
 
-function canWriteSarBookNarrative(
+export function canWriteSarBookNarrative(
   user: Parameters<typeof hasAnyRoleInProgramme>[0],
   programmeId: string,
 ): boolean {
