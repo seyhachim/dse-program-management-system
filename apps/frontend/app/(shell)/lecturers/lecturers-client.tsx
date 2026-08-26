@@ -19,8 +19,12 @@ export function LecturersClient() {
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Creating/editing/deleting a lecturer record needs `lecturers:write`
+  // (admin, program_coordinator); provisioning/resending login access needs
+  // `accounts:create` (admin only).
   const { me } = useMe();
   const canWrite = me?.permissions.includes("lecturers:write") ?? false;
   const canCreateAccount = me?.permissions.includes("accounts:create") ?? false;
@@ -51,6 +55,9 @@ export function LecturersClient() {
         await lecturersApi.update(editing.id, values);
         setNotice(`${values.name} updated.`);
       } else if (giveDseAccess) {
+        // Account provisioning is admin-only on the backend. It upserts the
+        // lecturer User by email and assigns the lecturer role; then we persist
+        // the syllabus/contact fields on that same User row.
         const account = await authApi.createAccount({
           name: values.name,
           email: values.email,
@@ -84,6 +91,20 @@ export function LecturersClient() {
       setError(err instanceof ApiError ? err.message : "Failed to invite lecturer");
     } finally {
       setInvitingId(null);
+    }
+  };
+
+  const handleResendInvitation = async (lecturer: Lecturer) => {
+    setResendingId(lecturer.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await authApi.resendInvitation(lecturer.id);
+      setNotice(`A fresh invitation was sent to ${lecturer.email}.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to resend invitation");
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -138,7 +159,20 @@ export function LecturersClient() {
       header: "Account",
       render: (l) =>
         l.accountAccess === "has_access" ? (
-          <StatusBadge tone="live" label="Has access" icon={false} />
+          <div className="flex items-center gap-2">
+            <StatusBadge tone="live" label="Has access" icon={false} />
+            {canCreateAccount ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={resendingId === l.id}
+                onClick={() => handleResendInvitation(l)}
+              >
+                {resendingId === l.id ? "Resending…" : "Resend invitation"}
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <div className="flex items-center gap-2">
             <StatusBadge tone="upcoming" label="No access" icon={false} />

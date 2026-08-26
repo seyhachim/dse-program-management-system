@@ -2,7 +2,7 @@
 
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import { COURSE_TYPES, courseTypeLabel, type CourseType } from "@dse-pms/shared-types";
-import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dse-pms/ui";
+import { FormFieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dse-pms/ui";
 
 export type CourseFormValues = {
   code: string;
@@ -49,11 +49,11 @@ export function CourseFormFields({
 }: CourseFormFieldsProps) {
   return (
     <div className="space-y-4">
-      <Field label="Code" error={errors.code?.message}>
-        <Input placeholder="CS101" {...register("code")} />
+      <Field label="Code" error={errors.code?.message} required>
+        <Input placeholder="CS101" {...register("code")} required />
       </Field>
-      <Field label="Title" error={errors.title?.message}>
-        <Input placeholder="Introduction to Programming" {...register("title")} />
+      <Field label="Title" error={errors.title?.message} required>
+        <Input placeholder="Introduction to Programming" {...register("title")} required />
       </Field>
       <Field label="Description" error={errors.description?.message}>
         <Input placeholder="Optional" {...register("description")} />
@@ -111,15 +111,17 @@ export function CourseFormFields({
 function Field({
   label,
   error,
+  required = false,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
+      <FormFieldLabel required={required}>{label}</FormFieldLabel>
       {children}
       {error ? <span className="block text-xs text-status-live">{error}</span> : null}
     </label>

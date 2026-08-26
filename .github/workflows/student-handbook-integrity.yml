@@ -1,0 +1,77 @@
+name: Student Handbook Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/student-handbook/**"
+      - "apps/frontend/app/(shell)/student-handbook/**"
+      - "apps/frontend/lib/student-handbook.ts"
+      - "packages/shared-types/src/student-handbook*"
+      - ".github/workflows/student-handbook-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/student-handbook/**"
+      - "apps/frontend/app/(shell)/student-handbook/**"
+      - "apps/frontend/lib/student-handbook.ts"
+      - "packages/shared-types/src/student-handbook*"
+      - ".github/workflows/student-handbook-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    name: Student handbook persistence and immutability
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_handbook
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_handbook"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_handbook?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: bun run db:generate
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+      - name: Seed database
+        run: bun run seed
+
+      - name: Verify Student Handbook contracts
+        run: bun test packages/shared-types/src/student-handbook.test.ts
+
+      - name: Verify Student Handbook database invariants
+        run: bun test apps/backend/src/plugins/student-handbook/service-db.test.ts
+        env:
+          STUDENT_HANDBOOK_DB_TESTS: "1"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Save, ShieldCheck, UserRound } from "lucide-react";
+import { ExternalLink, Save, ShieldCheck, UserRound } from "lucide-react";
 import { normalizeCareerInterests, studentPortfolioApi } from "@/lib/student-portfolio";
 import { PortalError, PortalLoading, usePortalData } from "../portal-state";
 
@@ -11,6 +11,8 @@ export function PortfolioProfileEditor() {
   const [headline, setHeadline] = useState("");
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState("");
+  const [visibility, setVisibility] = useState<"private" | "public">("private");
+  const [publicSlug, setPublicSlug] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -20,6 +22,8 @@ export function PortfolioProfileEditor() {
     setHeadline(data.headline);
     setBio(data.bio);
     setInterests(data.careerInterests.join(", "));
+    setVisibility(data.visibility);
+    setPublicSlug(data.publicSlug ?? "");
   }, [data]);
 
   if (loading) return <PortalLoading />;
@@ -35,8 +39,8 @@ export function PortfolioProfileEditor() {
         headline,
         bio,
         careerInterests: normalizeCareerInterests(interests),
-        visibility: currentProfile.visibility,
-        publicSlug: currentProfile.publicSlug,
+        visibility,
+        publicSlug: publicSlug.trim() || null,
       });
       setData(updated);
       setSaved(true);
@@ -65,8 +69,8 @@ export function PortfolioProfileEditor() {
 
     <section className="rounded-2xl border border-border bg-card p-5 md:p-6">
       <div className="mb-5 flex items-start justify-between gap-4">
-        <div><h3 className="font-semibold">Professional profile</h3><p className="mt-1 text-sm text-muted-foreground">Add a short introduction for your future portfolio.</p></div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5" />Private</span>
+        <div><h3 className="font-semibold">Professional profile</h3><p className="mt-1 text-sm text-muted-foreground">This is the introduction shown inside PMS and, only when you publish, on your privacy-filtered public portfolio.</p></div>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5" />{visibility === "public" ? "Published" : "Private"}</span>
       </div>
 
       <div className="space-y-5">
@@ -82,8 +86,14 @@ export function PortfolioProfileEditor() {
       </div>
     </section>
 
-    <section className="rounded-2xl border border-dashed border-border bg-muted/30 p-5">
-      <div className="flex gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div><h3 className="text-sm font-semibold">Private by default</h3><p className="mt-1 text-sm text-muted-foreground">This foundation does not publish an anonymous portfolio. Public sharing will use a separate privacy-filtered surface so authenticated PMS data is never exposed by simply changing this profile.</p></div></div>
+    <section className="rounded-2xl border border-border bg-card p-5 md:p-6">
+      <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div className="flex-1"><h3 className="font-semibold">Public sharing</h3><p className="mt-1 text-sm text-muted-foreground">Publishing exposes only the separate public portfolio DTO: public profile fields, links/items you marked public, and privacy-safe evidence/verification summaries. Student ID, email, marks/results, reviewer notes and internal PMS identifiers are never included.</p></div></div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <label className="block"><span className="text-sm font-medium">Portfolio visibility</span><select value={visibility} onChange={(event) => setVisibility(event.target.value as "private" | "public")} className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"><option value="private">Private — no public access</option><option value="public">Published — public URL enabled</option></select></label>
+        <label className="block"><span className="text-sm font-medium">Public URL slug</span><input value={publicSlug} onChange={(event) => setPublicSlug(event.target.value.toLowerCase())} maxLength={48} placeholder="sok-dara" className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm" /><span className="mt-1 block text-xs text-muted-foreground">Lowercase letters, numbers and single hyphens only. Required when published.</span></label>
+      </div>
+      {currentProfile.visibility === "public" && currentProfile.publicSlug ? <a href={`/portfolio/${currentProfile.publicSlug}`} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary"><ExternalLink className="h-4 w-4" />Open current public portfolio</a> : null}
+      <p className="mt-4 text-xs text-muted-foreground">To unpublish immediately, choose Private and save. Public responses use no-store caching so a private portfolio is not intentionally served from application cache after unpublishing.</p>
     </section>
   </div>;
 }

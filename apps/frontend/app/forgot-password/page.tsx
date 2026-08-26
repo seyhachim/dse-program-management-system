@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button, Input } from "@dse-pms/ui";
+import { Button, FormFieldLabel, Input } from "@dse-pms/ui";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
 export default function ForgotPasswordPage() {
@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
         {!sent ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-foreground">Email</span>
+              <FormFieldLabel required>Email</FormFieldLabel>
               <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </label>
             {error ? <p className="text-sm text-status-live">{error}</p> : null}

@@ -13,6 +13,7 @@ const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
 const COURSE = "33333333-3333-3333-3333-333333333333";
 const COURSE_SPEC = "44444444-4444-4444-4444-444444444444";
+const ACADEMIC_CALENDAR_PERIOD = "55555555-5555-5555-5555-555555555555";
 
 const VALID_MEETING = {
   dayOfWeek: "Monday" as const,
@@ -29,8 +30,9 @@ function validCreate(overrides: Record<string, unknown> = {}) {
     term: "2026-Fall",
     lecturerId: A,
     meetings: [VALID_MEETING],
-    startDate: "2026-08-10",
-    endDate: "2026-11-28",
+    academicCalendarPeriodId: ACADEMIC_CALENDAR_PERIOD,
+    programmeYear: 3,
+    semester: "First",
     ...overrides,
   };
 }
@@ -68,10 +70,18 @@ test("CreateOfferingInput requires at least one weekly class session", () => {
   expect(CreateOfferingInput.safeParse(validCreate({ meetings: [] })).success).toBe(false);
 });
 
-test("CreateOfferingInput requires both teaching-period dates", () => {
-  expect(CreateOfferingInput.safeParse(validCreate({ startDate: null })).success).toBe(false);
-  expect(CreateOfferingInput.safeParse(validCreate({ endDate: null })).success).toBe(false);
-  expect(CreateOfferingInput.safeParse(validCreate({ startDate: undefined, endDate: undefined })).success).toBe(false);
+test("CreateOfferingInput requires canonical academic calendar context", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({ academicCalendarPeriodId: null })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ programmeYear: null })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ programmeYear: 5 })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ semester: null })).success).toBe(false);
+});
+
+test("CreateOfferingInput rejects manually entered canonical teaching dates", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({
+    startDate: "2026-08-10",
+    endDate: "2026-11-28",
+  })).success).toBe(false);
 });
 
 test("CreateOfferingInput rejects duplicate co-lecturers", () => {
@@ -145,13 +155,6 @@ test("teaching-period invariant requires a complete ordered range", () => {
   expect(teachingPeriodViolation({ startDate: null, endDate: "2026-11-28" })).toBe("missingStart");
   expect(teachingPeriodViolation({ startDate: "2026-11-28", endDate: "2026-08-10" })).toBe("endBeforeStart");
   expect(teachingPeriodViolation({ startDate: "2026-08-10", endDate: "2026-11-28" })).toBeNull();
-});
-
-test("CreateOfferingInput rejects a reversed teaching period", () => {
-  expect(CreateOfferingInput.safeParse(validCreate({
-    startDate: "2026-11-28",
-    endDate: "2026-08-10",
-  })).success).toBe(false);
 });
 
 test("UpdateOfferingInput validates ordering when both teaching-period dates are supplied", () => {

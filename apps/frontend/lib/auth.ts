@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
-import type { CreateAccountInput, MeResponse } from "@dse-pms/shared-types";
+import type {
+  CreateAccountInput,
+  MeResponse,
+  ResendInvitationResponse,
+} from "@dse-pms/shared-types";
 import { api } from "./api";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
 /**
  * Auth plugin calls. `me` resolves the current caller (email + role, from the
- * backend's `User` row). `createAccount` is the admin-only lecturer-provisioning
- * action — it invites the email via Supabase and links the app profile.
+ * backend's `User` row). `createAccount` provisions an invited account;
+ * `resendInvitation` rotates only a still-pending lecturer invitation.
  */
 export const authApi = {
   me(): Promise<MeResponse> {
@@ -15,13 +19,20 @@ export const authApi = {
   createAccount(input: CreateAccountInput): Promise<MeResponse> {
     return api.post<MeResponse>("/api/auth/accounts", input);
   },
+  resendInvitation(userId: string): Promise<ResendInvitationResponse> {
+    return api.post<ResendInvitationResponse>(
+      `/api/auth/accounts/${userId}/resend-invitation`,
+      {},
+    );
+  },
 };
 
 /**
  * Cached in-flight `/me` request, shared across all `useMe()` callers so the
  * sidebar, the page guard and the topbar don't each fire their own request.
  * Invalidated below whenever the Supabase session changes so switching accounts
- * doesn't leave every consumer showing the previous user's role.
+ * doesn't leave every consumer showing the previous user's role until a full
+ * page refresh reloads this module.
  */
 let mePromise: Promise<MeResponse> | null = null;
 const meListeners = new Set<() => void>();

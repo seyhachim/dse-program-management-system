@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { CreateAccountInput, ManageProgrammeRoleInput, Role } from "./auth.ts";
+import {
+  CreateAccountInput,
+  ManageProgrammeRoleInput,
+  ResendInvitationResponse,
+  Role,
+} from "./auth.ts";
 
 test("Role supports the additive QA contributor role", () => {
   expect(Role.options).toEqual([
@@ -70,4 +75,9 @@ test("CreateAccountInput accepts the programme/QA account roles", () => {
     const result = CreateAccountInput.safeParse({ name: "Ada", email: "ada@dse.dev", role });
     expect(result.success).toBe(true);
   }
+});
+
+test("ResendInvitationResponse accepts the invited email and rejects invalid email", () => {
+  expect(ResendInvitationResponse.safeParse({ email: "ada@dse.dev" }).success).toBe(true);
+  expect(ResendInvitationResponse.safeParse({ email: "not-an-email" }).success).toBe(false);
 });

@@ -99,6 +99,7 @@ export {
 } from "./components/ui/sidebar.tsx";
 
 // Composed components
+export { FormFieldLabel, type FormFieldLabelProps } from "./components/form-field-label.tsx";
 export {
   StatusBadge,
   statusToneClass,

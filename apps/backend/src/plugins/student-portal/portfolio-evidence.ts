@@ -11,6 +11,10 @@ import type {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { PortalAccessError, PortalNotFoundError } from "./service.ts";
+import {
+  invalidateVerifiedEvidenceAfterMaterialEdit,
+  portfolioEvidenceSnapshotHash,
+} from "./portfolio-verification.ts";
 
 const ORIGIN_TO_DB = {
   external_project: DbEvidenceOrigin.ExternalProject,
@@ -61,6 +65,23 @@ async function portfolioStudentId(userId: string): Promise<string> {
     throw new PortalAccessError("No active student portal profile is linked to this account");
   }
   return student.id;
+}
+
+async function archivedEvidenceIds(studentId: string): Promise<Set<string>> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "StudentPortfolioEvidence"
+    WHERE "studentId" = ${studentId} AND "archivedAt" IS NOT NULL
+  `;
+  return new Set(rows.map((row) => row.id));
+}
+
+async function assertEvidenceActive(evidenceId: string, studentId: string): Promise<void> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "StudentPortfolioEvidence"
+    WHERE "id" = ${evidenceId} AND "studentId" = ${studentId} AND "archivedAt" IS NULL
+    LIMIT 1
+  `;
+  if (!rows[0]) throw new PortalNotFoundError("Portfolio evidence was not found");
 }
 
 async function eligibleAssessmentSource(
@@ -196,6 +217,7 @@ function evidenceInclude() {
 }
 
 async function evidenceRow(id: string, studentId?: string) {
+  if (studentId) await assertEvidenceActive(id, studentId);
   const row = await prisma.studentPortfolioEvidence.findFirst({
     where: { id, ...(studentId ? { studentId } : {}) },
     include: evidenceInclude(),
@@ -266,19 +288,18 @@ export const studentPortfolioEvidenceService = {
 
   async list(userId: string): Promise<StudentPortfolioEvidence[]> {
     const studentId = await portfolioStudentId(userId);
+    const archived = await archivedEvidenceIds(studentId);
     const rows = await prisma.studentPortfolioEvidence.findMany({
       where: { studentId },
       orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
       include: evidenceInclude(),
     });
-    return Promise.all(rows.map((row) => serializeEvidence(studentId, row)));
+    return Promise.all(rows.filter((row) => !archived.has(row.id)).map((row) => serializeEvidence(studentId, row)));
   },
 
   async create(userId: string, input: StudentPortfolioEvidenceCreateInput): Promise<StudentPortfolioEvidence> {
     const studentId = await portfolioStudentId(userId);
-    let source:
-      | Awaited<ReturnType<typeof eligibleAssessmentSource>>
-      | null = null;
+    let source: Awaited<ReturnType<typeof eligibleAssessmentSource>> | null = null;
     if (input.source) {
       source = await eligibleAssessmentSource(studentId, input.source.offeringId, input.source.assessmentItemId);
     }
@@ -313,6 +334,7 @@ export const studentPortfolioEvidenceService = {
   ): Promise<StudentPortfolioEvidence> {
     const studentId = await portfolioStudentId(userId);
     await evidenceRow(evidenceId, studentId);
+    const beforeHash = await portfolioEvidenceSnapshotHash(evidenceId);
 
     await prisma.$transaction(async (tx) => {
       await tx.studentPortfolioEvidence.update({
@@ -332,11 +354,24 @@ export const studentPortfolioEvidenceService = {
       }
     });
 
+    await invalidateVerifiedEvidenceAfterMaterialEdit(evidenceId, beforeHash);
     return serializeEvidence(studentId, await evidenceRow(evidenceId, studentId));
   },
 
   async remove(userId: string, evidenceId: string): Promise<void> {
     const studentId = await portfolioStudentId(userId);
+    await assertEvidenceActive(evidenceId, studentId);
+    const history = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS "count" FROM "StudentPortfolioVerificationEvent" WHERE "evidenceId" = ${evidenceId}
+    `;
+    if ((history[0]?.count ?? 0n) > 0n) {
+      await prisma.$executeRaw`
+        UPDATE "StudentPortfolioEvidence"
+        SET "archivedAt" = CURRENT_TIMESTAMP, "isPublic" = false, "isFeatured" = false, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${evidenceId} AND "studentId" = ${studentId} AND "archivedAt" IS NULL
+      `;
+      return;
+    }
     const deleted = await prisma.studentPortfolioEvidence.deleteMany({
       where: { id: evidenceId, studentId },
     });

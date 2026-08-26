@@ -8,6 +8,11 @@ import {
   courseInfoSnapshotFromDocument,
   courseInfoSnapshotWarnings,
 } from "./course-spec-import-course-info.ts";
+import { ensureCourseForCourseSpecImport } from "./course-spec-import-course.ts";
+import {
+  isImportedAssessmentPlanComplete,
+  shouldPersistImportedSection,
+} from "./course-spec-import-section-status.ts";
 
 const prisma = new PrismaClient();
 
@@ -247,9 +252,7 @@ function parseArgs(argv: string[]): CliOptions {
   };
 }
 
-async function walkJsonFiles(path: string): 
-
- Promise<string[]> {
+async function walkJsonFiles(path: string): Promise<string[]> {
   const out: string[] = [];
   for (const entry of await readdir(path, { withFileTypes: true })) {
     const full = join(path, entry.name);
@@ -460,28 +463,16 @@ async function importOne(doc: CanonicalCourse, file: string, options: CliOptions
 
   await prisma.$transaction(
     async (tx) => {
-      const course = await tx.course.upsert({
-        where: { code: courseCode },
-        create: {
-          code: courseCode,
-          title: doc.course.title,
-          description: cleanText(doc.course.description) || null,
-          prerequisites: cleanText(doc.course.prerequisites) || null,
-          credits: doc.course.credits?.total ?? null,
-          courseType: prismaCourseType(doc.course.courseType),
-          totalSltHours: grandTotalSlt(doc),
-          lecturerId: lecturer.id,
-          programmeId: DEFAULT_PROGRAMME_ID,
-        },
-        update: {
-          title: doc.course.title,
-          description: cleanText(doc.course.description) || null,
-          prerequisites: cleanText(doc.course.prerequisites) || null,
-          credits: doc.course.credits?.total ?? null,
-          courseType: prismaCourseType(doc.course.courseType),
-          totalSltHours: grandTotalSlt(doc),
-          ...(lecturer.id ? { lecturerId: lecturer.id } : {}),
-        },
+      const course = await ensureCourseForCourseSpecImport(tx, {
+        programmeId: DEFAULT_PROGRAMME_ID,
+        code: courseCode,
+        title: doc.course.title,
+        description: cleanText(doc.course.description) || null,
+        prerequisites: cleanText(doc.course.prerequisites) || null,
+        credits: doc.course.credits?.total ?? null,
+        courseType: prismaCourseType(doc.course.courseType),
+        totalSltHours: grandTotalSlt(doc),
+        lecturerId: lecturer.id,
       });
 
       const oldSpec = await tx.courseSpec.findFirst({
@@ -698,7 +689,7 @@ async function importOne(doc: CanonicalCourse, file: string, options: CliOptions
       const sections: Array<{ key: string; complete: boolean }> = [
         { key: "courseInfo", complete: true },
         { key: "clos", complete: cloRows.length > 0 },
-        { key: "assessmentPlan", complete: assessmentRows.length > 0 },
+        { key: "assessmentPlan", complete: isImportedAssessmentPlanComplete(assessmentRows) },
         { key: "slt", complete: weekRows.length > 0 },
         { key: "resources", complete: resourceRows.length > 0 },
         { key: "responsibility", complete: responsibilities.length > 0 },
@@ -707,7 +698,7 @@ async function importOne(doc: CanonicalCourse, file: string, options: CliOptions
       ];
       await tx.courseSpecSection.createMany({
         data: sections
-          .filter((s) => s.complete || s.key === "teachingLearning")
+          .filter((s) => shouldPersistImportedSection(s.key, s.complete))
           .map((s) => ({
             courseSpecId: spec.id,
             sectionKey: s.key,
