@@ -1,0 +1,800 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "APR102_Advanced Programming.docx",
+    "relativePath": "Year 1/S2/APR102_Advanced Programming.docx",
+    "sha256": "5dfbe083eafe177ea24988e7ef7a393ac4640b953670b956ab24a9f65c81b071",
+    "yearFolder": 1,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "APR102",
+    "title": "Advanced Programming",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": "BPR101",
+    "courseType": "Core",
+    "availability": {
+      "semester": 2,
+      "year": 1
+    },
+    "description": "This course introduces advanced programming concepts using Python for data science and engineering applications. Students will develop programming skills through the use of Python data structures, user-defined functions, and interactive programming environments such as Jupyter Notebook. The course also covers scientific computing and data analysis libraries including NumPy and Pandas, as well as data visualization techniques using Matplotlib and Seaborn. Through practical exercises and problem-solving activities, students will learn to manipulate, analyze, and visualize data."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Ms. Chea Daly",
+      "title": "Ms",
+      "qualification": "Master",
+      "email": null,
+      "phone": "097 588 2929"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Develop Python programs using lists, dictionaries, and user-defined functions to solve practical data-related problems.",
+      "mappedPlos": [
+        "PLO1"
+      ],
+      "level": "C3",
+      "status": "active",
+      "teachingMethodsRaw": "Lecture-Based Learning Problem-Based Learning",
+      "assessmentMethodsRaw": "Group Assignment Final Exam"
+    },
+    {
+      "code": "CLO2",
+      "description": "Analyze and process datasets using NumPy and Pandas to perform data manipulation and basic analytical tasks.",
+      "mappedPlos": [
+        "PLO2"
+      ],
+      "level": "C4",
+      "status": "active",
+      "teachingMethodsRaw": "Problem-Based Learning Inquiry-Based Learning",
+      "assessmentMethodsRaw": "Group Assignment Final Exam"
+    },
+    {
+      "code": "CLO3",
+      "description": "Utilize Jupyter Notebook, Matplotlib, and Seaborn to develop and present data visualizations for technical and practical applications.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P3",
+      "status": "active",
+      "teachingMethodsRaw": "Problem-Based Learning Collaborative Learning",
+      "assessmentMethodsRaw": "Group Report Demonstration"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        "Total SLT"
+      ],
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Physical",
+        "Physical",
+        "Physical",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "Online/Technology-mediated (Synchronous)",
+        "Online/Technology-mediated (Synchronous)",
+        "Online/Technology-mediated (Synchronous)",
+        "NF2F Independent Learning (Asynchronous)",
+        "Total SLT"
+      ],
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "NF2F Independent Learning (Asynchronous)",
+        "Total SLT"
+      ],
+      [
+        "1",
+        "Topic 1: Introduction to Python",
+        "CLO1",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: List",
+        "CLO1",
+        "4",
+        "",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "12"
+      ],
+      [
+        "3",
+        "Topic 3: Dictionary",
+        "CLO1",
+        "2",
+        "",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "8"
+      ],
+      [
+        "4",
+        "Topic 4: User-defined Function",
+        "CLO1",
+        "4",
+        "",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "14"
+      ],
+      [
+        "5",
+        "Topic 5: Jupyter Notebook",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "6",
+        "Topic 6: NumPy",
+        "CLO2",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "7",
+        "Topic 7: Pandas",
+        "CLO2",
+        "3",
+        "",
+        "5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "14"
+      ],
+      [
+        "8",
+        "Topic 8: Matplotlib",
+        "CLO3",
+        "2",
+        "",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "3",
+        "8"
+      ],
+      [
+        "9",
+        "Topic 9: Seaborn",
+        "CLO3",
+        "2",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "2",
+        "6"
+      ],
+      [
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "80"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "Continuous Assessment",
+        "Continuous Assessment",
+        "%",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "1",
+        "Group Assignment",
+        "40",
+        "10",
+        "",
+        "10",
+        "20"
+      ],
+      [
+        "2",
+        "Group Report",
+        "10",
+        "2",
+        "",
+        "3",
+        "5"
+      ],
+      [
+        "3",
+        "Demonstration",
+        "10",
+        "2",
+        "",
+        "3",
+        "5"
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "30"
+      ],
+      [
+        "Final Assessment",
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "Final Assessment",
+        "Final Assessment",
+        "%",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "1",
+        "Final Exam",
+        "40",
+        "2",
+        "",
+        "8",
+        "10"
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "10"
+      ],
+      [
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "40"
+      ],
+      [
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "120"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO",
+      "plos": [],
+      "name": "Assessment",
+      "mode": "group",
+      "weightPercent": null
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Group Assignment",
+      "mode": "group",
+      "weightPercent": 20.0
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO1"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 20.0
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Group Assignment",
+      "mode": "group",
+      "weightPercent": 20.0
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO2"
+      ],
+      "name": "Final Exam",
+      "mode": "individual",
+      "weightPercent": 20.0
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Group Report",
+      "mode": "group",
+      "weightPercent": 10.0
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "Demonstration",
+      "mode": "group",
+      "weightPercent": 10.0
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Introduction to Python",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Develop simple Python programs using variables, operators, and input/output statements. LLO2: Apply Python programming structures to solve basic computational problems."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: List",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Use 1D lists to store and process data-related tasks. LLO2: Use 2D lists to store and process data-related tasks."
+      },
+      {
+        "number": 3,
+        "title": "Topic 3: Dictionary",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Develop Python programs using dictionary operations and methods. LLO2: Apply dictionaries to organize and manage structured data efficiently."
+      },
+      {
+        "number": 4,
+        "title": "Topic 4: User-defined Function",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Develop user-defined functions with parameters and return values. LLO2: Apply functions to create modular and reusable Python programs."
+      },
+      {
+        "number": 5,
+        "title": "Topic 5: Jupyter Notebook",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Utilize Jupyter Notebook to write and execute Python programs interactively. LLO2: Apply notebook tools and markdown features to document programming tasks effectively."
+      },
+      {
+        "number": 6,
+        "title": "Topic 6: NumPy",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Analyze datasets using NumPy arrays and mathematical operations. LLO2: Apply NumPy functions for numerical computation and data manipulation."
+      },
+      {
+        "number": 7,
+        "title": "Topic 7: Pandas",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Analyze datasets using Pandas DataFrames and query operations. LLO2: Apply Pandas merging techniques to combine multiple DataFrames effectively. LLO3: Analyze datasets using aggregation functions and GroupBy operations. LLO4: Apply Pandas functions to read from and write data to CSV files."
+      },
+      {
+        "number": 8,
+        "title": "Topic 8: Matplotlib",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Develop data visualizations using Matplotlib charting techniques. LLO2: Apply Matplotlib to present data findings effectively through graphical representations."
+      },
+      {
+        "number": 9,
+        "title": "Topic 9: Seaborn",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Develop statistical visualizations using Seaborn plotting functions. LLO2: Apply Seaborn to communicate data insights clearly and professionally."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 1: Introduction to Python",
+        "clos": [],
+        "teachingMethodsRaw": "Lecture-Based Learning Problem-Based Learning",
+        "activeLearningRaw": "Coding practice, guided exercises, problem-solving tasks",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 2,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 2: List",
+        "clos": [],
+        "teachingMethodsRaw": "Lecture-Based Learning Problem-Based Learning",
+        "activeLearningRaw": "Hands-on coding exercises, list manipulation tasks",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 3,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 2: List (cont.)",
+        "clos": [],
+        "teachingMethodsRaw": "Lecture-Based Learning Problem-Based Learning",
+        "activeLearningRaw": "Hands-on coding exercises, list manipulation tasks",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 4,
+        "hoursRaw": "1/0/2/1",
+        "lectureTopic": "Group Assignment on Topic 1 and Topic 2 Topic 3: Dictionary",
+        "clos": [],
+        "teachingMethodsRaw": "Lecture-Based Learning Problem-Based Learning",
+        "activeLearningRaw": "Data structuring exercises, mini coding tasks",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 5,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 4: User-defined Function",
+        "clos": [],
+        "teachingMethodsRaw": "Lecture-Based Learning Problem-Based Learning",
+        "activeLearningRaw": "Function writing exercises, modular programming tasks",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 6,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 4: User-defined Function (cont.)",
+        "clos": [],
+        "teachingMethodsRaw": "Lecture-Based Learning Problem-Based Learning",
+        "activeLearningRaw": "Function-based problem solving, reusable code design",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 7,
+        "hoursRaw": "1/0/2/1",
+        "lectureTopic": "Group Assignment on Topic 3 and Topic 4 Topic 5: Jupyter Notebook",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Collaborative Learning",
+        "activeLearningRaw": "Notebook practice, documentation using Markdown, lab tasks",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 8,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 6: NumPy",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Inquiry-Based Learning",
+        "activeLearningRaw": "Array operations, numerical computation exercises",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 9,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 7: Pandas - DataFrame",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Inquiry-Based Learning",
+        "activeLearningRaw": "DataFrame operations, querying datasets",
+        "assessmentRaw": "",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 10,
+        "hoursRaw": "1/0/2/1",
+        "lectureTopic": "Group Assignment on Topic 5, Topic 6 and Topic 7 Topic 7: Pandas - Merging DataFrames",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Inquiry-Based Learning",
+        "activeLearningRaw": "Data merging and integration tasks",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 11,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 7: Pandas - Aggregation & GroupBy",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Inquiry-Based Learning",
+        "activeLearningRaw": "GroupBy analysis, aggregation tasks",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 12,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 7: Pandas - CSV Files Read & Write",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Inquiry-Based Learning",
+        "activeLearningRaw": "CSV read/write operations, dataset handling",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 13,
+        "hoursRaw": "1/0/2/1",
+        "lectureTopic": "Group Assignment on Topic 7 Topic 8: Matplotlib",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Collaborative Learning",
+        "activeLearningRaw": "Chart creation, visualization of datasets",
+        "assessmentRaw": "10",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 14,
+        "hoursRaw": "2/0/2/0",
+        "lectureTopic": "Topic 9: Seaborn",
+        "clos": [],
+        "teachingMethodsRaw": "Problem-Based Learning Collaborative Learning",
+        "activeLearningRaw": "Statistical visualization, data storytelling",
+        "assessmentRaw": "-",
+        "resourcesRaw": "Lecture Slides"
+      },
+      {
+        "week": 15,
+        "hoursRaw": "0/0/0/4",
+        "lectureTopic": "Group Report Demonstration",
+        "clos": [],
+        "teachingMethodsRaw": "Collaborative Learning Project-Based Learning",
+        "activeLearningRaw": "Group project presentation and practical demonstration",
+        "assessmentRaw": "20",
+        "resourcesRaw": "-"
+      },
+      {
+        "week": 16,
+        "hoursRaw": "0/0/0/2",
+        "lectureTopic": "Final Exam",
+        "clos": [],
+        "teachingMethodsRaw": "",
+        "activeLearningRaw": "",
+        "assessmentRaw": "40",
+        "resourcesRaw": "Lecture Slides"
+      }
+    ]
+  },
+  "resources": {
+    "requiredResourcesRaw": "",
+    "references": {
+      "required": [
+        {
+          "Title": "Introduction to Programming Using Python",
+          "Author(s)": "Y. Daniel Liang",
+          "Publisher": "",
+          "Year": "2013",
+          "ISBN": ""
+        }
+      ],
+      "recommended": []
+    }
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Students must abide by the following policies: Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "ratingScaleRows": [
+    [
+      "Letter Grade",
+      "Grade Point",
+      "Score",
+      "Explanation"
+    ],
+    [
+      "A",
+      "4.00",
+      "85-100",
+      "Excellent"
+    ],
+    [
+      "B+",
+      "3.50",
+      "80-84",
+      "Very Good"
+    ],
+    [
+      "B",
+      "3.00",
+      "75-79",
+      "Good"
+    ],
+    [
+      "C+",
+      "2.50",
+      "70-74",
+      "Fairly Good"
+    ],
+    [
+      "C",
+      "2.00",
+      "65-69",
+      "Fair"
+    ],
+    [
+      "D+",
+      "1.50",
+      "60-64",
+      "Poor"
+    ],
+    [
+      "D",
+      "1.00",
+      "50-59",
+      "Very Poor"
+    ],
+    [
+      "F",
+      "0.00",
+      "<50",
+      "Fail"
+    ]
+  ],
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

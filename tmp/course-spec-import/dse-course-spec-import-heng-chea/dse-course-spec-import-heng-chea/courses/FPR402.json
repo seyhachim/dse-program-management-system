@@ -1,0 +1,949 @@
+{
+  "schemaVersion": "dse-course-spec-import-v1",
+  "source": {
+    "fileName": "FPR402_Final Project II.docx",
+    "relativePath": "Year 4/S2/FPR402_Final Project II.docx",
+    "sha256": "4c29f7612f253ee69482156187c12486ec64af4d6b463047c26bfa04a98e0346",
+    "yearFolder": 4,
+    "semesterFolder": 2
+  },
+  "course": {
+    "programmeTitle": "Bachelor of Engineering in Data Science and Engineering",
+    "code": "FPR402",
+    "title": "Final Project II",
+    "credits": {
+      "total": 3.0
+    },
+    "prerequisites": null,
+    "courseType": "Core",
+    "availability": {
+      "semester": 2,
+      "year": 4
+    },
+    "description": "Final Project II is the culminating capstone experience in which students complete the full development, deployment, and evaluation of their data‑driven system initiated in Project I. Over 16 weeks, students refine and optimize machine learning models, integrate backend, frontend, and ML components, and build a functional end‑to‑end application. Emphasis is placed on modern engineering practices such as containerization, cloud deployment, API development, testing, logging, monitoring, and system scalability. Students conduct pilot testing with real users, incorporate feedback through iterative improvements, and assess ethical impacts related to fairness, privacy, and societal implications. The course concludes with a professional final defense and comprehensive report that demonstrates technical competence, ethical responsibility, teamwork, and communication skills necessary for real‑world data science and engineering practice."
+  },
+  "lecturers": {
+    "primary": {
+      "name": "Mr. Heng Chanarin",
+      "title": "Mr",
+      "qualification": "Master",
+      "email": "heng.chanarin@rupp.edu.kh",
+      "phone": "+855 10 94 34 37"
+    },
+    "coLecturers": []
+  },
+  "clos": [
+    {
+      "code": "CLO1",
+      "description": "Evaluation techniques and optimize machine learning models using appropriate feature engineering, hyperparameter tuning.",
+      "mappedPlos": [
+        "PLO10"
+      ],
+      "level": "C5",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning",
+      "assessmentMethodsRaw": "Model Optimization Portfolio + Technical Briefing"
+    },
+    {
+      "code": "CLO2",
+      "description": "Integrate backend, frontend, and machine learning components to develop a functional end‑to‑end system ready for deployment.",
+      "mappedPlos": [
+        "PLO3"
+      ],
+      "level": "P6",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning",
+      "assessmentMethodsRaw": "System Integration Build Review (Backend + Frontend + ML)"
+    },
+    {
+      "code": "CLO3",
+      "description": "Deploy, test, monitor, and refine the system using cloud services, APIs, CI/CD, logging, and user‑driven pilot testing.",
+      "mappedPlos": [
+        "PLO9"
+      ],
+      "level": "P6",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning",
+      "assessmentMethodsRaw": "Deployment & Operations Dossier + Demo (DevOps + Pilot Feedback)"
+    },
+    {
+      "code": "CLO4",
+      "description": "Demonstrate ethical responsibility, professional communication, and organized teamwork in evaluating system impact and delivering the final project defense.",
+      "mappedPlos": [
+        "PLO4"
+      ],
+      "level": "A4",
+      "status": "active",
+      "teachingMethodsRaw": "Project-based Learning",
+      "assessmentMethodsRaw": "Ethics & Professionalism Bundle + Final Defense"
+    }
+  ],
+  "studentLearningTime": {
+    "contentRows": [
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Learning and Teaching Activities",
+        "Total SLT"
+      ],
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        "Total SLT"
+      ],
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "Physical",
+        "Physical",
+        "Physical",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "Online/Technology-mediated (Synchronous)",
+        "Online/Technology-mediated (Synchronous)",
+        "Online/Technology-mediated (Synchronous)",
+        "NF2F Independent Learning (Asynchronous)",
+        "Total SLT"
+      ],
+      [
+        "Course Content Outline and subtopics",
+        "Course Content Outline and subtopics",
+        "CLOs",
+        "L",
+        "T",
+        "P",
+        "O",
+        "L",
+        "T",
+        "P",
+        "O",
+        "NF2F Independent Learning (Asynchronous)",
+        "Total SLT"
+      ],
+      [
+        "1",
+        "Topic 1: Review of Phase 1 & Planning Sprint",
+        "CLO4",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "2",
+        "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "CLO1",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "3",
+        "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "CLO1",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "4",
+        "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "CLO1",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "5",
+        "Topic 3: System Integration (Backend + Frontend + ML Model)",
+        "CLO2",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "6",
+        "Topic 3: System Integration (Backend + Frontend + ML Model)",
+        "CLO2",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "7",
+        "Topic 4: Deployment (Cloud, Docker, APIs, Streamlit/FastAPI)",
+        "CLO3",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "8",
+        "Topic 5: Testing, Logging & Monitoring",
+        "CLO3",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "9",
+        "Topic 5: Testing, Logging & Monitoring",
+        "CLO3",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "10",
+        "Topic 6: Ethical Impact Assessment & Scalability",
+        "CLO4",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "11",
+        "Topic 6: Ethical Impact Assessment & Scalability",
+        "CLO4",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "12",
+        "Topic 7: Pilot Testing with Users",
+        "CLO3",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "13",
+        "Topic 7: Pilot Testing with Users",
+        "CLO3",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "14",
+        "Topic 8: Final Revision & Peer Review",
+        "CLO4",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "15",
+        "Topic 8: Final Revision & Peer Review",
+        "CLO4",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "6",
+        "8"
+      ],
+      [
+        "16",
+        "Topic 9: Final Defense & Report Submission",
+        "CLO4",
+        "",
+        "",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "4",
+        "6"
+      ],
+      [
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "Total SLT for Course Content",
+        "120"
+      ]
+    ],
+    "continuousAssessmentRows": [
+      [
+        "Continuous Assessment",
+        "Continuous Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "Continuous Assessment",
+        "Continuous Assessment",
+        "%",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "1",
+        "Weekly Progress Report submission",
+        "50%",
+        "2",
+        "",
+        "2",
+        "4"
+      ],
+      [
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "Total SLT for Continuous Assessment:",
+        "4"
+      ],
+      [
+        "Final Assessment",
+        "Final Assessment",
+        "%",
+        "Face to Face (F2F)",
+        "Face to Face (F2F)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "Final Assessment",
+        "Final Assessment",
+        "%",
+        "Physical",
+        "Online/Technology-mediated (Synchronous)",
+        "NF2F Independent Learning (Asynchronous)",
+        ""
+      ],
+      [
+        "1",
+        "Final Defense and Report submission",
+        "50%",
+        "4",
+        "",
+        "6",
+        "10"
+      ],
+      [
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "Total SLT for Final Assessment:",
+        "10"
+      ],
+      [
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "Total SLT for Assessment",
+        "14"
+      ],
+      [
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "Grand Total SLT",
+        "134"
+      ]
+    ]
+  },
+  "assessments": [
+    {
+      "clo": "CLO",
+      "plos": [],
+      "name": "Assessment",
+      "mode": "individual",
+      "weightPercent": null
+    },
+    {
+      "clo": "CLO1",
+      "plos": [
+        "PLO10"
+      ],
+      "name": "Model Optimization Portfolio + Technical Briefing",
+      "mode": "individual",
+      "weightPercent": 20.0
+    },
+    {
+      "clo": "CLO2",
+      "plos": [
+        "PLO3"
+      ],
+      "name": "System Integration Build Review",
+      "mode": "individual",
+      "weightPercent": 13.33
+    },
+    {
+      "clo": "CLO3",
+      "plos": [
+        "PLO9"
+      ],
+      "name": "Deployment & Operations Dossier + Demo",
+      "mode": "individual",
+      "weightPercent": 33.33
+    },
+    {
+      "clo": "CLO4",
+      "plos": [
+        "PLO4"
+      ],
+      "name": "Ethics & Professionalism Bundle + Final Defense",
+      "mode": "individual",
+      "weightPercent": 33.33
+    }
+  ],
+  "lessonPlan": {
+    "topics": [
+      {
+        "number": 1,
+        "title": "Topic 1: Review of Phase 1 & Planning Sprint",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Review and analyze the Phase I project outputs to identify improvement areas for implementation. LLO2: Develop a sprint plan outlining tasks, responsibilities, and timelines for Project II. LLO3: Coordinate team roles and expectations to prepare for the integration and deployment phases."
+      },
+      {
+        "number": 2,
+        "title": "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Apply feature engineering techniques to improve model inputs. LLO2: Perform hyperparameter tuning using systematic search strategies. LLO3: Evaluate performance improvements between baseline and optimized models."
+      },
+      {
+        "number": 3,
+        "title": "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Experiment with advanced optimization techniques (e.g., Bayesian search, ensemble improvements). LLO2: Analyze trade‑offs between performance, complexity, and computational cost. LLO3: Document optimization results with reproducible experiment logs."
+      },
+      {
+        "number": 4,
+        "title": "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "clos": [
+          "CLO1"
+        ],
+        "llosRaw": "LLO1: Compare multiple optimized models using appropriate evaluation metrics. LLO2: Select the best‑fit model for system integration based on evidence. LLO3: Present model‑related decisions and justifications to team members."
+      },
+      {
+        "number": 5,
+        "title": "Topic 3: System Integration (Backend + Frontend + ML Model)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Integrate the ML model into backend services using appropriate interfaces or APIs. LLO2: Connect backend components with frontend elements to enable full data flow. LLO3: Conduct initial end‑to‑end integration tests to ensure system functionality."
+      },
+      {
+        "number": 6,
+        "title": "Topic 3: System Integration (Backend + Frontend + ML Model)",
+        "clos": [
+          "CLO2"
+        ],
+        "llosRaw": "LLO1: Refine system architecture to improve modularity and maintainability. LLO2: Evaluate potential data sources for accessibility and suitability. LLO3: Construct a complete requirements specification document."
+      },
+      {
+        "number": 7,
+        "title": "Topic 4: Deployment (Cloud, Docker, APIs, Streamlit/FastAPI)",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Containerize the system using Docker or similar tools for consistent deployment. LLO2: Deploy the application to a cloud or local environment using appropriate deployment pipelines. LLO3: Configure APIs or endpoints for external access and system interaction."
+      },
+      {
+        "number": 8,
+        "title": "Topic 5: Testing, Logging & Monitoring",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Implement structured logging for traceability and failure diagnosis. LLO2: Configure monitoring tools or dashboards to track system behavior. LLO3: Perform systematic functional testing to validate system operations."
+      },
+      {
+        "number": 9,
+        "title": "Topic 5: Testing, Logging & Monitoring",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Conduct performance and load testing to assess system scalability. LLO2: Analyze monitoring data to identify errors, bottlenecks, or anomalies. LLO3: Apply refinements to address issues identified during testing and monitoring."
+      },
+      {
+        "number": 10,
+        "title": "Topic 6: Ethical Impact Assessment & Scalability",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Identify ethical risks related to bias, fairness, privacy, or unintended consequences. LLO2: Assess system scalability in terms of performance, infrastructure, and resource demands. LLO3: Propose mitigation strategies to address ethical and scalability concerns."
+      },
+      {
+        "number": 11,
+        "title": "Topic 6: Ethical Impact Assessment & Scalability",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Analyze user impact and societal implications of the deployed system. LLO2: Review ethical trade-offs in model and engineering decisions. LLO3: Develop a formal ethical impact report summarizing findings and recommendations."
+      },
+      {
+        "number": 12,
+        "title": "Topic 7: Pilot Testing with Users",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Design a pilot-testing protocol including user tasks and evaluation metrics. LLO2: Collect user feedback through structured observation or interviews. LLO3: Analyze pilot test data to derive insights for system improvement."
+      },
+      {
+        "number": 13,
+        "title": "Topic 7: Pilot Testing with Users",
+        "clos": [
+          "CLO3"
+        ],
+        "llosRaw": "LLO1: Prioritize system improvements based on user feedback and pilot results. LLO2: Implement refinements to enhance system usability and reliability. LLO3: Validate updated system changes through rapid re-testing."
+      },
+      {
+        "number": 14,
+        "title": "Topic 8: Final Revision & Peer Review",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Conduct peer reviews of system features, documentation, and code quality. LLO2: Integrate peer feedback into the final version of the project. LLO3: Prepare polished materials (slides, scripts, demo flow) for final defense."
+      },
+      {
+        "number": 15,
+        "title": "Topic 8: Final Revision & Peer Review",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Finalize all project documentation including architecture, testing, and ethical reports. LLO2: Conduct internal team rehearsals for final defense sessions. LLO3: Produce the release candidate version of the project ready for submission and demo."
+      },
+      {
+        "number": 16,
+        "title": "Topic 9: Final Defense & Report Submission",
+        "clos": [
+          "CLO4"
+        ],
+        "llosRaw": "LLO1: Deliver a professional final presentation demonstrating system functionality and project outcomes. LLO2: Defend technical and ethical decisions during Q&A with instructors and panelists. LLO3: Submit the final project report including full documentation, results, and reflections."
+      }
+    ],
+    "weeks": [
+      {
+        "week": 1,
+        "hoursRaw": "0/0/2/4",
+        "lectureTopic": "Topic 1: Review of Phase 1 & Planning Sprint",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Instructor‑facilitated sprint planning workshop Review session of Phase I deliverables with guided critique Demonstration of project backlog creation and sprint scoping",
+        "activeLearningRaw": "Team collaborative backlog creation Student-led task decomposition and role assignment Reflection on Phase I strengths and weaknesses",
+        "assessmentRaw": "6",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 2,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Live coding demonstration of hyperparameter tuning methods Mini-case showing effects of feature engineering Guided walkthrough of experiment tracking tools (MLflow, WandB, etc.)",
+        "activeLearningRaw": "Hands-on implementation of tuning strategies Peer discussion on performance trade-offs Logging experiments and sharing results within team channels",
+        "assessmentRaw": "6",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 3,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Instructor critique of student optimization attempts Feature importance analysis demonstration Showcase of advanced optimization (Bayesian, ensemble)",
+        "activeLearningRaw": "Running multiple optimization runs Group comparison of experimental results Iterative refinement based on instructor feedback",
+        "assessmentRaw": "7",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 4,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 2: Model Optimization, Hyperparameter Tuning, Feature Engineering",
+        "clos": [
+          "CLO1"
+        ],
+        "teachingMethodsRaw": "Instructor-led evaluation session on comparing models Presentation practice & feedback loop Model selection justification workshop",
+        "activeLearningRaw": "Create comparison tables and plots Present model decisions to peers for critique Update experiment documentation",
+        "assessmentRaw": "7",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 5,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 3: System Integration (Backend + Frontend + ML Model)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Demonstration of backend–ML–frontend integration flow Instructor modeling of API creation and data pipelines Architecture review mini‑session",
+        "activeLearningRaw": "Implementing integration tasks in teams Running integration tests Team debugging sessions",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 6,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 3: System Integration (Backend + Frontend + ML Model)",
+        "clos": [
+          "CLO2"
+        ],
+        "teachingMethodsRaw": "Instructor code review of integration commits Guided refactoring session to ensure modularity Demonstration of documentation standards (OpenAPI, diagrams)",
+        "activeLearningRaw": "Collaborative refactoring and restructuring of system modules Updating system diagrams and documentation Incorporating instructor code review feedback",
+        "assessmentRaw": "6.66",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 7,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 4: Deployment (Cloud, Docker, APIs, Streamlit/FastAPI)",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Live demonstration of Dockerizing applications Instructor-led walkthrough of cloud deployment steps API deployment case study",
+        "activeLearningRaw": "Containerizing project components Configuring deployment environment Testing deployed endpoints with team members",
+        "assessmentRaw": "7",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 8,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 5: Testing, Logging & Monitoring",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Demonstration of logging formats and monitoring dashboards Instructor modeling of systematic testing workflows Guided debugging session",
+        "activeLearningRaw": "Implementing loggers in code Creating monitoring alerts or dashboards Conducting functional and performance tests",
+        "assessmentRaw": "6",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 9,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 5: Testing, Logging & Monitoring",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Performance testing scenario simulation Instructor feedback on testing scripts and logs Demo of bottleneck detection tools",
+        "activeLearningRaw": "Executing load/performance tests Analyzing logs and monitoring data Refining system based on discovered issues",
+        "assessmentRaw": "6",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 10,
+        "hoursRaw": "0/0/2/4",
+        "lectureTopic": "Topic 6: Ethical Impact Assessment & Scalability",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Ethical AI case studies and guided discussions Instructor modeling of risk assessment frameworks Scalability scenario demonstration",
+        "activeLearningRaw": "Group ethical risk identification exercises Drafting impact analysis and mitigation strategies Comparing scalability trade-offs through team debate",
+        "assessmentRaw": "5",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 11,
+        "hoursRaw": "0/0/2/4",
+        "lectureTopic": "Topic 6: Ethical Impact Assessment & Scalability",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Instructor critique of ethical impact drafts Peer review workshop on ethical decisions Scalability planning session",
+        "activeLearningRaw": "Refining ethical impact reports Team discussion on long-term system implications Updating scalability assessments",
+        "assessmentRaw": "5",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 12,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 7: Pilot Testing with Users",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Instructor modeling of user testing protocol design Mock user testing simulation Guided reflection on user experience evaluation",
+        "activeLearningRaw": "Designing pilot test tasks & questionnaires Conducting real/simulated user tests Collecting and coding user feedback",
+        "assessmentRaw": "7",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 13,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 7: Pilot Testing with Users",
+        "clos": [
+          "CLO3"
+        ],
+        "teachingMethodsRaw": "Instructor-led improvement planning workshop Demo of UX-based refinement Feedback clinic on pilot test findings",
+        "activeLearningRaw": "Prioritizing fixes using MoSCoW or Kanban Implementing iterative changes Running re-tests on updated system",
+        "assessmentRaw": "7",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 14,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 8: Final Revision & Peer Review",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Guided peer-review session (documentation, code, UX) Instructor demonstration of slide and demo structuring Improvement checklist walkthrough",
+        "activeLearningRaw": "Performing structured peer reviews Revising system and documentation Preparing defense materials collaboratively",
+        "assessmentRaw": "6",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 15,
+        "hoursRaw": "0/0/2/6",
+        "lectureTopic": "Topic 8: Final Revision & Peer Review",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Instructor rehearsal feedback Mock defense session Quality assurance checklist session",
+        "activeLearningRaw": "Practicing final presentation Finalizing all deliverables Preparing release candidate build",
+        "assessmentRaw": "6",
+        "resourcesRaw": ""
+      },
+      {
+        "week": 16,
+        "hoursRaw": "0/0/2/4",
+        "lectureTopic": "Topic 9: Final Defense & Report Submission",
+        "clos": [
+          "CLO4"
+        ],
+        "teachingMethodsRaw": "Panel-style defense evaluation Instructor facilitation of Q&A Final quality assurance verification",
+        "activeLearningRaw": "Delivering the final demo and defense Responding to technical and ethical questions Submitting final report and reflecting on project learning",
+        "assessmentRaw": "6",
+        "resourcesRaw": ""
+      }
+    ]
+  },
+  "resources": {
+    "requiredResourcesRaw": "Computer lab Slide projector",
+    "references": {
+      "required": [
+        {
+          "Title": "Writing Your Dissertation or Capstone",
+          "Author(s)": "Karen Roush, PhD, APN",
+          "Publisher": "Sigma Theta Tau International",
+          "Year": "2015",
+          "ISBN": "9781940446080"
+        }
+      ],
+      "recommended": [
+        {
+          "Tools and Resources for Capstone": "Student Guide to Capstone Project",
+          "Amanda McEachern Gaudet": "University of Technology Sydney",
+          "Open Library": "University of Technology Sydney",
+          "2024": "2017",
+          "https://ecampusontario.pressbooks.pub/capstoneresources/": ""
+        }
+      ]
+    }
+  },
+  "studentResponsibilitiesRaw": "Read the learning materials beforehand which means to be ready for the next session. Be completely engaged in class, active, take notes, and ask questions in class. Students are required to participate in various activities in and out of the classroom, such as group work, and individual homework for assignments and reports assigned by the subject teacher. Submit the assigned tasks such as homework, assignments, or research proposal on time.",
+  "coursePolicyRaw": "Students must abide by the following policies: Attendance & Preparation Students are expected to attend all classes (online/on-site). Assigned readings and preparation outlines must be completed before class if any. Active participation in group discussions and post-chapter evaluations is required. Academic Integrity All assignments, quizzes, and exams must be done individually. Academic misconduct includes: - Presenting others’ work as one’s own. - Engaging in plagiarism or cheating. Homework & Assignments Preparation outlines must be submitted on time; late submissions incur penalties. Peer discussion is encouraged, but midterm and final exams must be independent. Examinations Midterm and final exams are closed-book. Penalties Violations of academic integrity may result in a failing grade and referral to the Office of Student Affairs. Students uncertain about potential violations should consult the instructor in advance.",
+  "ratingScaleRows": [
+    [
+      "Letter Grade",
+      "Grade Point",
+      "Score",
+      "Explanation"
+    ],
+    [
+      "A",
+      "4.00",
+      "85-100",
+      "Excellent"
+    ],
+    [
+      "B+",
+      "3.50",
+      "80-84",
+      "Very Good"
+    ],
+    [
+      "B",
+      "3.00",
+      "75-79",
+      "Good"
+    ],
+    [
+      "C+",
+      "2.50",
+      "70-74",
+      "Fairly Good"
+    ],
+    [
+      "C",
+      "2.00",
+      "65-69",
+      "Fair"
+    ],
+    [
+      "D+",
+      "1.50",
+      "60-64",
+      "Poor"
+    ],
+    [
+      "D",
+      "1.00",
+      "50-59",
+      "Very Poor"
+    ],
+    [
+      "F",
+      "0.00",
+      "<50",
+      "Fail"
+    ]
+  ],
+  "validation": {
+    "status": "valid",
+    "warnings": [],
+    "errors": []
+  }
+}

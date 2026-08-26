@@ -12,7 +12,8 @@ import {
 } from "./narrative-service.ts";
 
 const runDbTests =
-  process.env.QA_SAR_BOOK_DB_TESTS === "1" || process.env.BACKEND_INTEGRATION_TESTS === "1";
+  process.env.QA_SAR_BOOK_DB_TESTS === "1" ||
+  process.env.BACKEND_INTEGRATION_TESTS === "1";
 const dbDescribe = runDbTests ? describe : describe.skip;
 
 function documentWithText(text: string) {
@@ -26,8 +27,12 @@ function documentWithText(text: string) {
 dbDescribe("SAR book static-section revision and assignment integrity", () => {
   test("appends immutable revisions, rejects stale saves, and preserves reassignment history", async () => {
     const suffix = randomUUID();
-    const programme = await prisma.programme.findFirstOrThrow({ select: { id: true } });
-    const framework = await prisma.qaFramework.findFirstOrThrow({ select: { id: true } });
+    const programme = await prisma.programme.findFirstOrThrow({
+      select: { id: true },
+    });
+    const framework = await prisma.qaFramework.findFirstOrThrow({
+      select: { id: true },
+    });
     const qaContributorRole = await prisma.role.findUniqueOrThrow({
       where: { slug: "qa_contributor" },
       select: { id: true },
@@ -87,13 +92,19 @@ dbDescribe("SAR book static-section revision and assignment integrity", () => {
     const first = await saveQaSarBookNarrativeSection(
       cycle.id,
       sectionKey,
-      { programmeId: programme.id, content: firstContent, baseRevisionId: null },
+      {
+        programmeId: programme.id,
+        content: firstContent,
+        baseRevisionId: null,
+      },
       contributorA.id,
     );
     expect(first.revisionNumber).toBe(1);
     expect(first.revisionId).toBeTruthy();
 
-    const secondContent = documentWithText("Second SAR revision after review preparation");
+    const secondContent = documentWithText(
+      "Second SAR revision after review preparation",
+    );
     const second = await saveQaSarBookNarrativeSection(
       cycle.id,
       sectionKey,
@@ -129,8 +140,17 @@ dbDescribe("SAR book static-section revision and assignment integrity", () => {
       cycle.id,
       sectionKey,
     );
-    expect(revisions.map((revision) => revision.revisionNumber)).toEqual([2, 1]);
-    expect(revisions[1]?.id).toBe(first.revisionId);
+    const firstRevisionId = first.revisionId;
+
+    if (!firstRevisionId) {
+      throw new Error("Expected first SAR revision ID");
+    }
+
+    expect(firstRevisionId).toBeTruthy();
+    expect(revisions.map((revision) => revision.revisionNumber)).toEqual([
+      2, 1,
+    ]);
+    expect(revisions[1]?.id).toBe(firstRevisionId);
     expect(revisions[1]?.content).toBe(firstContent);
     expect(revisions[0]?.content).toBe(secondContent);
 
@@ -156,7 +176,9 @@ dbDescribe("SAR book static-section revision and assignment integrity", () => {
       sectionKey,
     );
     expect(active?.assignee.id).toBe(contributorB.id);
-    expect((await listQaSarBookSectionAssignments(programme.id, cycle.id))).toHaveLength(1);
+    expect(
+      await listQaSarBookSectionAssignments(programme.id, cycle.id),
+    ).toHaveLength(1);
 
     const assignmentHistory = await prisma.$queryRaw<
       Array<{ assigneeId: string; endedAt: Date | null }>

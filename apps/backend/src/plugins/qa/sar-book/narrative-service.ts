@@ -16,7 +16,10 @@ import {
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../core/db/prisma.ts";
-import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
+import {
+  QaSarResourceNotFoundError,
+  QaSarScopeMismatchError,
+} from "../sar/service.ts";
 
 export class QaSarBookRevisionConflictError extends Error {}
 export class QaSarBookSectionAssigneeError extends Error {}
@@ -65,18 +68,27 @@ function resolveStaticSection(sectionKey: string) {
   return section;
 }
 
-async function assertScope(programmeId: string, cycleId: string): Promise<void> {
+async function assertScope(
+  programmeId: string,
+  cycleId: string,
+): Promise<void> {
   const cycle = await prisma.qaAssessmentCycle.findUnique({
     where: { id: cycleId },
     select: { programmeId: true },
   });
-  if (!cycle) throw new QaSarResourceNotFoundError("QA assessment cycle not found");
+  if (!cycle)
+    throw new QaSarResourceNotFoundError("QA assessment cycle not found");
   if (cycle.programmeId !== programmeId) {
-    throw new QaSarScopeMismatchError("SAR book section belongs to a different programme");
+    throw new QaSarScopeMismatchError(
+      "SAR book section belongs to a different programme",
+    );
   }
 }
 
-async function ensureQaContributor(userId: string, programmeId: string): Promise<void> {
+async function ensureQaContributor(
+  userId: string,
+  programmeId: string,
+): Promise<void> {
   const assignment = await prisma.userRoleAssignment.findFirst({
     where: {
       userId,
@@ -185,7 +197,10 @@ async function findActiveAssignment(
   return rows[0] ?? null;
 }
 
-function assignmentToView(row: AssignmentRow, sectionTitle: string): QaSarBookSectionAssignmentView {
+function assignmentToView(
+  row: AssignmentRow,
+  sectionTitle: string,
+): QaSarBookSectionAssignmentView {
   return QaSarBookSectionAssignmentViewSchema.parse({
     id: row.id,
     programmeId: row.programmeId,
@@ -206,7 +221,10 @@ function assignmentToView(row: AssignmentRow, sectionTitle: string): QaSarBookSe
   });
 }
 
-function revisionToView(row: RevisionRow, sectionTitle: string): QaSarBookSectionRevisionView {
+function revisionToView(
+  row: RevisionRow,
+  sectionTitle: string,
+): QaSarBookSectionRevisionView {
   return QaSarBookSectionRevisionViewSchema.parse({
     id: row.id,
     programmeId: row.programmeId,
@@ -216,9 +234,10 @@ function revisionToView(row: RevisionRow, sectionTitle: string): QaSarBookSectio
     revisionNumber: row.revisionNumber,
     content: row.content,
     plainText: row.plainText,
-    createdBy: row.createdById && row.createdByName
-      ? { id: row.createdById, name: row.createdByName }
-      : null,
+    createdBy:
+      row.createdById && row.createdByName
+        ? { id: row.createdById, name: row.createdByName }
+        : null,
     createdAt: row.createdAt.toISOString(),
   });
 }
@@ -241,14 +260,19 @@ export async function getQaSarBookNarrativeSection(
 ): Promise<QaSarBookNarrativeSectionView> {
   const section = resolveStaticSection(sectionKey);
   await assertScope(programmeId, cycleId);
-  const [narrative, latestRevision, assignment, recentRows] = await Promise.all([
-    findNarrativeRow(programmeId, cycleId, sectionKey),
-    findLatestRevision(programmeId, cycleId, sectionKey),
-    findActiveAssignment(programmeId, cycleId, sectionKey),
-    listRevisionRows(programmeId, cycleId, sectionKey, 5),
-  ]);
+  const [narrative, latestRevision, assignment, recentRows] = await Promise.all(
+    [
+      findNarrativeRow(programmeId, cycleId, sectionKey),
+      findLatestRevision(programmeId, cycleId, sectionKey),
+      findActiveAssignment(programmeId, cycleId, sectionKey),
+      listRevisionRows(programmeId, cycleId, sectionKey, 5),
+    ],
+  );
 
-  const content = latestRevision?.content ?? narrative?.content ?? serializeDocumentContent(EMPTY_DSE_DOCUMENT);
+  const content =
+    latestRevision?.content ??
+    narrative?.content ??
+    serializeDocumentContent(EMPTY_DSE_DOCUMENT);
   const plainText = latestRevision?.plainText ?? narrative?.plainText ?? "";
 
   return QaSarBookNarrativeSectionViewSchema.parse({
@@ -259,17 +283,22 @@ export async function getQaSarBookNarrativeSection(
     content,
     plainText,
     editable: false,
-    updatedByName: latestRevision?.createdByName ?? narrative?.updatedByName ?? null,
-    updatedAt: latestRevision?.createdAt.toISOString() ?? narrative?.updatedAt.toISOString() ?? null,
+    updatedByName:
+      latestRevision?.createdByName ?? narrative?.updatedByName ?? null,
+    updatedAt:
+      latestRevision?.createdAt.toISOString() ??
+      narrative?.updatedAt.toISOString() ??
+      null,
     revisionId: latestRevision?.id ?? null,
     revisionNumber: latestRevision?.revisionNumber ?? null,
     assignment: assignment ? assignmentToView(assignment, section.title) : null,
     recentRevisions: recentRows.map((row) => ({
       id: row.id,
       revisionNumber: row.revisionNumber,
-      createdBy: row.createdById && row.createdByName
-        ? { id: row.createdById, name: row.createdByName }
-        : null,
+      createdBy:
+        row.createdById && row.createdByName
+          ? { id: row.createdById, name: row.createdByName }
+          : null,
       createdAt: row.createdAt.toISOString(),
     })),
   });
@@ -289,7 +318,9 @@ export async function saveQaSarBookNarrativeSection(
 
   await prisma.$transaction(async (tx) => {
     const lockKey = `qa-sar-book:${cycleId}:${sectionKey}`;
-    await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`);
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`,
+    );
 
     const latestRows = await tx.$queryRaw<RevisionRow[]>(Prisma.sql`
       SELECT r."id", r."programmeId", r."cycleId", r."sectionKey", r."revisionNumber",
@@ -305,7 +336,10 @@ export async function saveQaSarBookNarrativeSection(
     `);
     const latest = latestRows[0] ?? null;
     const currentRevisionId = latest?.id ?? null;
-    if (input.baseRevisionId !== undefined && input.baseRevisionId !== currentRevisionId) {
+    if (
+      input.baseRevisionId !== undefined &&
+      input.baseRevisionId !== currentRevisionId
+    ) {
       throw new QaSarBookRevisionConflictError(
         "This SAR section changed after you opened it. Reload the latest revision before saving.",
       );
@@ -389,9 +423,13 @@ export async function upsertQaSarBookSectionAssignment(
 
   await prisma.$transaction(async (tx) => {
     const lockKey = `qa-sar-book-assignment:${cycleId}:${sectionKey}`;
-    await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`);
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`,
+    );
 
-    const currentRows = await tx.$queryRaw<Array<{ id: string; assigneeId: string }>>(Prisma.sql`
+    const currentRows = await tx.$queryRaw<
+      Array<{ id: string; assigneeId: string }>
+    >(Prisma.sql`
       SELECT "id", "assigneeId"
       FROM "QaSarBookSectionAssignment"
       WHERE "programmeId" = ${input.programmeId}
@@ -422,8 +460,15 @@ export async function upsertQaSarBookSectionAssignment(
     `);
   });
 
-  const saved = await findActiveAssignment(input.programmeId, cycleId, sectionKey);
-  if (!saved) throw new QaSarResourceNotFoundError("SAR book section assignment was not saved");
+  const saved = await findActiveAssignment(
+    input.programmeId,
+    cycleId,
+    sectionKey,
+  );
+  if (!saved)
+    throw new QaSarResourceNotFoundError(
+      "SAR book section assignment was not saved",
+    );
   return assignmentToView(saved, section.title);
 }
 
