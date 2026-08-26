@@ -105,7 +105,7 @@ export const publicProgrammeContent: PublicProgrammeContent = {
   ],
   curriculumPreview: {
     heading: "Curriculum preview",
-    note: "Curated fallback based on the 2026 DSE curriculum. The public page prefers the currently published PMS curriculum whenever it is available.",
+    note: "Curated fallback based on the 2026 DSE curriculum. The public page prefers the currently approved, active PMS curriculum whenever it is available.",
     semesters: [
       {
         title: "Year 1 · Semester 1",
