@@ -140,12 +140,23 @@ export const iconMap: Record<string, LucideIcon> = {
   megaphone: Megaphone,
 };
 
+function sidebarRouteLabel(route: PluginRoute): string {
+  if (route.path === "/aun-qa") return "AUN-QA Overview";
+  if (route.path === "/aun-qa/review") return "Review & Approval";
+  if (route.path === "/qa-dashboard") return "Evidence Analysis";
+  return route.label;
+}
+
 /** All nav routes, or — when roles are given — only those the caller's roles may see. */
 export function getNavRoutes(roles?: Role[]): PluginRoute[] {
-  return roles ? navForRole(frontendManifests, roles) : navFromManifests(frontendManifests);
+  const routes = roles ? navForRole(frontendManifests, roles) : navFromManifests(frontendManifests);
+  return routes.map((route) => ({ ...route, label: sidebarRouteLabel(route) }));
 }
 
 /** Nav routes for `roles` (union across all of them), grouped into sidebar sections. */
 export function getNavGroups(roles: Role[]): NavGroup[] {
-  return navGroupsForRole(sidebarManifestsForRoles(roles), roles);
+  return navGroupsForRole(sidebarManifestsForRoles(roles), roles).map((group) => ({
+    ...group,
+    routes: group.routes.map((route) => ({ ...route, label: sidebarRouteLabel(route) })),
+  }));
 }
