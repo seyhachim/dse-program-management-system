@@ -72,6 +72,72 @@ describeDb("student handbook service", () => {
     expect(section?.blocks.map((row) => row.type)).toEqual(["NARRATIVE", "SOURCE_DATA"]);
   });
 
+  test("uses the current Academic Year for stable calendar links and freezes them on publication", async () => {
+    const f = await fixture();
+    await prisma.academicYear.create({
+      data: {
+        programmeId: f.programme.id,
+        label: "2026–2027",
+        startYear: 2026,
+        endYear: 2027,
+        isCurrent: true,
+      },
+    });
+    const handbook = await createHandbook(
+      {
+        programmeId: f.programme.id,
+        assignedLecturerId: f.lecturer.id,
+        version: "calendar-links-2026",
+        title: "Student Handbook",
+      },
+      f.creator.id,
+    );
+
+    let saved = await replaceSectionBlocks(
+      handbook.id,
+      "study-plan",
+      { blocks: [{ type: "SOURCE_DATA", sourceKind: "ACADEMIC_CALENDAR_LINKS" }] },
+      f.lecturer.id,
+    );
+    let calendarBlock = saved.sections
+      .find((section) => section.key === "study-plan")
+      ?.blocks.find((block) => block.sourceKind === "ACADEMIC_CALENDAR_LINKS");
+    expect(calendarBlock?.sourcePreview?.data).toMatchObject({
+      "Academic Year": "2026–2027",
+      "Year 1": `/calendar/${f.programme.id}/2026-2027/year-1`,
+      "Year 2": `/calendar/${f.programme.id}/2026-2027/year-2`,
+      "Year 3": `/calendar/${f.programme.id}/2026-2027/year-3`,
+      "Year 4": `/calendar/${f.programme.id}/2026-2027/year-4`,
+    });
+
+    await submitHandbook(handbook.id, f.lecturer.id);
+    await approveHandbook(handbook.id, f.creator.id, "Approved");
+    await publishHandbook(handbook.id, f.creator.id, "Publish");
+    await prisma.academicYear.updateMany({
+      where: { programmeId: f.programme.id },
+      data: { isCurrent: false },
+    });
+    await prisma.academicYear.create({
+      data: {
+        programmeId: f.programme.id,
+        label: "2027–2028",
+        startYear: 2027,
+        endYear: 2028,
+        isCurrent: true,
+      },
+    });
+
+    saved = await getHandbook(handbook.id);
+    calendarBlock = saved.sections
+      .find((section) => section.key === "study-plan")
+      ?.blocks.find((block) => block.sourceKind === "ACADEMIC_CALENDAR_LINKS");
+    expect(calendarBlock?.sourcePreview?.snapshot).toBe(true);
+    expect(calendarBlock?.sourcePreview?.data).toMatchObject({
+      "Academic Year": "2026–2027",
+      "Year 2": `/calendar/${f.programme.id}/2026-2027/year-2`,
+    });
+  });
+
   test("supports custom section add, rename, reorder and delete while protecting core sections", async () => {
     const f = await fixture();
     let handbook = await createHandbook(
