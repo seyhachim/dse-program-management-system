@@ -1,6 +1,5 @@
 import { Topbar } from "../../../topbar";
 import { SarEditorClient } from "./sar-editor-client";
-import { SarSourceContextPanel } from "./source-context-panel";
 
 export default async function SarEditorPage({
   params,
@@ -14,11 +13,8 @@ export default async function SarEditorPage({
         title={`SAR ${requirementCode}`}
         subtitle="Write the narrative, ground claims in evidence, and keep formatting out of the way"
       />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
-          <SarEditorClient requirementCode={requirementCode} />
-          <SarSourceContextPanel requirementCode={requirementCode} />
-        </div>
+      <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
+        <SarEditorClient requirementCode={requirementCode} />
       </main>
     </>
   );
