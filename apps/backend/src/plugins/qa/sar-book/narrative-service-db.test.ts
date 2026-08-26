@@ -11,7 +11,8 @@ import {
   upsertQaSarBookSectionAssignment,
 } from "./narrative-service.ts";
 
-const runDbTests = process.env.QA_SAR_BOOK_DB_TESTS === "1";
+const runDbTests =
+  process.env.QA_SAR_BOOK_DB_TESTS === "1" || process.env.BACKEND_INTEGRATION_TESTS === "1";
 const dbDescribe = runDbTests ? describe : describe.skip;
 
 function documentWithText(text: string) {
@@ -167,8 +168,16 @@ dbDescribe("SAR book static-section revision and assignment integrity", () => {
       ORDER BY "assignedAt", "id"
     `;
     expect(assignmentHistory).toHaveLength(2);
-    expect(assignmentHistory.some((row) => row.assigneeId === contributorA.id && row.endedAt !== null)).toBe(true);
-    expect(assignmentHistory.some((row) => row.assigneeId === contributorB.id && row.endedAt === null)).toBe(true);
+    expect(
+      assignmentHistory.some(
+        (row) => row.assigneeId === contributorA.id && row.endedAt !== null,
+      ),
+    ).toBe(true);
+    expect(
+      assignmentHistory.some(
+        (row) => row.assigneeId === contributorB.id && row.endedAt === null,
+      ),
+    ).toBe(true);
 
     const revisionsAfterReassignment = await listQaSarBookSectionRevisions(
       programme.id,
