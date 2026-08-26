@@ -6,7 +6,7 @@ import { requirePermission } from "../../../core/permissions/index.ts";
 import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
 import { getQaSarBook } from "./service.ts";
 
-function canReadSarBook(
+export function canReadSarBook(
   user: Parameters<typeof hasAnyRoleInProgramme>[0],
   programmeId: string,
 ): boolean {
