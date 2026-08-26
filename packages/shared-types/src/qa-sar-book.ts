@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DSE_DOCUMENT_PREFIX } from "./document-content.ts";
 
 export const QA_SAR_BOOK_TEMPLATE_VERSION = "aun-qa-v4-sar-book-v1" as const;
 
@@ -53,8 +54,30 @@ export const QaSarBookReleaseLineageEntrySchema = z.object({
   requirementPins: z.array(QaSarBookRequirementPinSchema),
 });
 
-export const QaSarBookQuerySchema = z.object({
+export const QaSarBookQuerySchema = z.object({ programmeId: z.string().trim().min(1) });
+
+export const QaSarBookNarrativeContentSchema = z
+  .string()
+  .max(120000)
+  .refine((value) => value.startsWith(DSE_DOCUMENT_PREFIX), {
+    message: "SAR book narrative must use the shared DSE document format",
+  });
+
+export const SaveQaSarBookSectionSchema = z.object({
   programmeId: z.string().trim().min(1),
+  content: QaSarBookNarrativeContentSchema,
+});
+
+export const QaSarBookNarrativeSectionViewSchema = z.object({
+  cycleId: z.string().trim().min(1),
+  sectionKey: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  source: z.enum(["bookNarrative", "structured"]),
+  content: QaSarBookNarrativeContentSchema,
+  plainText: z.string(),
+  editable: z.boolean(),
+  updatedByName: z.string().nullable(),
+  updatedAt: z.string().datetime().nullable(),
 });
 
 export const QaSarBookViewSchema = z.object({
@@ -86,6 +109,8 @@ export type QaSarBookCriterion = z.infer<typeof QaSarBookCriterionSchema>;
 export type QaSarBookPart = z.infer<typeof QaSarBookPartSchema>;
 export type QaSarBookRequirementPin = z.infer<typeof QaSarBookRequirementPinSchema>;
 export type QaSarBookReleaseLineageEntry = z.infer<typeof QaSarBookReleaseLineageEntrySchema>;
+export type QaSarBookNarrativeSectionView = z.infer<typeof QaSarBookNarrativeSectionViewSchema>;
+export type SaveQaSarBookSectionInput = z.infer<typeof SaveQaSarBookSectionSchema>;
 export type QaSarBookView = z.infer<typeof QaSarBookViewSchema>;
 
 export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
@@ -104,24 +129,9 @@ export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
     title: "Part 1 — Introduction",
     order: 1,
     sections: [
-      {
-        key: "part1.executive-summary",
-        title: "Executive Summary",
-        source: "bookNarrative",
-        required: true,
-      },
-      {
-        key: "part1.self-assessment-organisation",
-        title: "Organisation of the Self-Assessment",
-        source: "bookNarrative",
-        required: true,
-      },
-      {
-        key: "part1.programme-background",
-        title: "University / Faculty / Department / Programme Background",
-        source: "bookNarrative",
-        required: true,
-      },
+      { key: "part1.executive-summary", title: "Executive Summary", source: "bookNarrative", required: true },
+      { key: "part1.self-assessment-organisation", title: "Organisation of the Self-Assessment", source: "bookNarrative", required: true },
+      { key: "part1.programme-background", title: "University / Faculty / Department / Programme Background", source: "bookNarrative", required: true },
     ],
   },
   {
@@ -129,30 +139,10 @@ export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
     title: "Part 3 — Strengths and Weaknesses Analysis",
     order: 3,
     sections: [
-      {
-        key: "part3.strengths",
-        title: "Summary of Strengths",
-        source: "bookNarrative",
-        required: true,
-      },
-      {
-        key: "part3.weaknesses",
-        title: "Summary of Weaknesses / Areas for Improvement",
-        source: "bookNarrative",
-        required: true,
-      },
-      {
-        key: "part3.self-ratings",
-        title: "Self-Ratings",
-        source: "structured",
-        required: true,
-      },
-      {
-        key: "part3.improvement-plan",
-        title: "Improvement Plan",
-        source: "structured",
-        required: true,
-      },
+      { key: "part3.strengths", title: "Summary of Strengths", source: "bookNarrative", required: true },
+      { key: "part3.weaknesses", title: "Summary of Weaknesses / Areas for Improvement", source: "bookNarrative", required: true },
+      { key: "part3.self-ratings", title: "Self-Ratings", source: "structured", required: true },
+      { key: "part3.improvement-plan", title: "Improvement Plan", source: "structured", required: true },
     ],
   },
   {
@@ -160,24 +150,17 @@ export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
     title: "Part 4 — Appendices",
     order: 4,
     sections: [
-      {
-        key: "part4.glossary",
-        title: "Glossary",
-        source: "bookNarrative",
-        required: true,
-      },
-      {
-        key: "part4.evidence-register",
-        title: "Evidence Register",
-        source: "generated",
-        required: true,
-      },
-      {
-        key: "part4.supporting-documents",
-        title: "Supporting Documents",
-        source: "structured",
-        required: true,
-      },
+      { key: "part4.glossary", title: "Glossary", source: "bookNarrative", required: true },
+      { key: "part4.evidence-register", title: "Evidence Register", source: "generated", required: true },
+      { key: "part4.supporting-documents", title: "Supporting Documents", source: "structured", required: true },
     ],
   },
 ] as const;
+
+export function findQaSarBookStaticSection(sectionKey: string) {
+  for (const part of QA_SAR_BOOK_STATIC_PARTS) {
+    const section = part.sections.find((candidate) => candidate.key === sectionKey);
+    if (section) return section;
+  }
+  return null;
+}
