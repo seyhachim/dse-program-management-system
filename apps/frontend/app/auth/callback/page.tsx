@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input } from "@dse-pms/ui";
+import { Button, FormFieldLabel, Input } from "@dse-pms/ui";
 import { getSupabase } from "@/lib/supabase";
 
 /**
@@ -73,7 +73,7 @@ export default function AuthCallbackPage() {
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-foreground">New password</span>
+                <FormFieldLabel required>New password</FormFieldLabel>
                 <Input
                   type="password"
                   autoComplete="new-password"
@@ -84,7 +84,7 @@ export default function AuthCallbackPage() {
                 />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-foreground">Confirm new password</span>
+                <FormFieldLabel required>Confirm new password</FormFieldLabel>
                 <Input
                   type="password"
                   autoComplete="new-password"
