@@ -67,6 +67,12 @@ function candidateFingerprint(candidate: Candidate): string {
   );
 }
 
+function canonicalCandidateOrder(candidates: Candidate[]): Candidate[] {
+  return [...candidates].sort((a, b) =>
+    candidateFingerprint(a).localeCompare(candidateFingerprint(b)),
+  );
+}
+
 export function qaSarSourceSnapshotKey(
   expectedEvidenceId: string,
   candidateFingerprints: string[],
@@ -149,7 +155,7 @@ export function buildQaSarSourceRecordBlock(
   generatedAt: string,
 ): QaSarSourceBlock {
   const structured = result.candidates.filter((candidate) => candidate.sourceKind !== "documentChunk");
-  const usable = structured.length > 0 ? structured : result.candidates;
+  const usable = canonicalCandidateOrder(structured.length > 0 ? structured : result.candidates);
   const base = {
     id: `sar-source:${definition.id}`,
     registryKey: `expected-evidence:${definition.id}`,
