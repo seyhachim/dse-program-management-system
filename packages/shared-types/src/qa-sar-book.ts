@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DSE_DOCUMENT_PREFIX } from "./document-content.ts";
 
 export const QA_SAR_BOOK_TEMPLATE_VERSION = "aun-qa-v4-sar-book-v1" as const;
 
@@ -57,6 +58,30 @@ export const QaSarBookQuerySchema = z.object({
   programmeId: z.string().trim().min(1),
 });
 
+export const QaSarBookNarrativeContentSchema = z
+  .string()
+  .max(120000)
+  .refine((value) => value.startsWith(DSE_DOCUMENT_PREFIX), {
+    message: "SAR book narrative must use the shared DSE document format",
+  });
+
+export const SaveQaSarBookSectionSchema = z.object({
+  programmeId: z.string().trim().min(1),
+  content: QaSarBookNarrativeContentSchema,
+});
+
+export const QaSarBookNarrativeSectionViewSchema = z.object({
+  cycleId: z.string().trim().min(1),
+  sectionKey: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  source: z.enum(["bookNarrative", "structured"]),
+  content: QaSarBookNarrativeContentSchema,
+  plainText: z.string(),
+  editable: z.boolean(),
+  updatedByName: z.string().nullable(),
+  updatedAt: z.string().datetime().nullable(),
+});
+
 export const QaSarBookViewSchema = z.object({
   bookId: z.string().trim().min(1),
   templateVersion: z.literal(QA_SAR_BOOK_TEMPLATE_VERSION),
@@ -86,6 +111,8 @@ export type QaSarBookCriterion = z.infer<typeof QaSarBookCriterionSchema>;
 export type QaSarBookPart = z.infer<typeof QaSarBookPartSchema>;
 export type QaSarBookRequirementPin = z.infer<typeof QaSarBookRequirementPinSchema>;
 export type QaSarBookReleaseLineageEntry = z.infer<typeof QaSarBookReleaseLineageEntrySchema>;
+export type QaSarBookNarrativeSectionView = z.infer<typeof QaSarBookNarrativeSectionViewSchema>;
+export type SaveQaSarBookSectionInput = z.infer<typeof SaveQaSarBookSectionSchema>;
 export type QaSarBookView = z.infer<typeof QaSarBookViewSchema>;
 
 export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
@@ -181,3 +208,11 @@ export const QA_SAR_BOOK_STATIC_PARTS: ReadonlyArray<{
     ],
   },
 ] as const;
+
+export function findQaSarBookStaticSection(sectionKey: string) {
+  for (const part of QA_SAR_BOOK_STATIC_PARTS) {
+    const section = part.sections.find((candidate) => candidate.key === sectionKey);
+    if (section) return section;
+  }
+  return null;
+}
