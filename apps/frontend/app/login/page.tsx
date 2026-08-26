@@ -17,7 +17,7 @@ import {
   MessageCircle,
   ShieldCheck,
 } from "lucide-react";
-import { Button, Input } from "@dse-pms/ui";
+import { Button, FormFieldLabel, Input } from "@dse-pms/ui";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
 function safeReturnPath(value: string | null): string {
@@ -178,8 +178,8 @@ function LoginForm() {
 
             <form onSubmit={handleSubmit} className="mt-7 space-y-5">
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">
-                  Email
+                <label htmlFor="email">
+                  <FormFieldLabel required>Email</FormFieldLabel>
                 </label>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -202,8 +202,8 @@ function LoginForm() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-4">
-                  <label htmlFor="password" className="text-sm font-medium text-foreground">
-                    Password
+                  <label htmlFor="password">
+                    <FormFieldLabel required>Password</FormFieldLabel>
                   </label>
                   <Link className="text-sm font-medium text-primary transition-colors hover:text-primary-hover hover:underline" href="/forgot-password">
                     Forgot password?
