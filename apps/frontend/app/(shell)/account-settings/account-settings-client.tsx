@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Input } from "@dse-pms/ui";
+import { Button, FormFieldLabel, Input } from "@dse-pms/ui";
 import { invalidateMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { lecturersApi } from "@/lib/lecturers";
@@ -91,7 +91,7 @@ export function AccountSettingsClient() {
       <section className="space-y-4 rounded-xl border border-border bg-card p-6">
         <div><h2 className="font-semibold text-foreground">Lecturer profile</h2><p className="text-sm text-muted-foreground">These details are used in Course Specifications.</p></div>
         <form onSubmit={saveProfile} className="space-y-4">
-          <Field label="Name"><Input value={form.name} onChange={(e) => setField("name", e.target.value)} required /></Field>
+          <Field label="Name" required><Input value={form.name} onChange={(e) => setField("name", e.target.value)} required /></Field>
           <Field label="Email"><Input type="email" value={form.email} disabled aria-describedby="email-help" /><span id="email-help" className="text-xs text-muted-foreground">Contact an administrator to change your email.</span></Field>
           <Field label="Title"><Input value={form.title} onChange={(e) => setField("title", e.target.value)} placeholder="Dr., Mr., Ms." /></Field>
           <Field label="Qualification"><Input value={form.qualification} onChange={(e) => setField("qualification", e.target.value)} placeholder="PhD, MSc, …" /></Field>
@@ -104,8 +104,8 @@ export function AccountSettingsClient() {
         <div><h2 className="font-semibold text-foreground">Change password</h2><p className="text-sm text-muted-foreground">Use at least 8 characters.</p></div>
         {AUTH_MODE === "supabase" ? (
           <form onSubmit={changePassword} className="space-y-4">
-            <Field label="New password"><Input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
-            <Field label="Confirm new password"><Input type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></Field>
+            <Field label="New password" required><Input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
+            <Field label="Confirm new password" required><Input type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></Field>
             <Button type="submit" disabled={changingPassword}>{changingPassword ? "Changing…" : "Change password"}</Button>
           </form>
         ) : <p className="text-sm text-muted-foreground">Password management is unavailable in development-token mode.</p>}
@@ -114,6 +114,6 @@ export function AccountSettingsClient() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block space-y-1.5"><span className="text-sm font-medium text-foreground">{label}</span>{children}</label>;
+function Field({ label, required = false, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return <label className="block space-y-1.5"><FormFieldLabel required={required}>{label}</FormFieldLabel>{children}</label>;
 }
