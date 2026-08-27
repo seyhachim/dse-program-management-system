@@ -209,4 +209,63 @@ dbDescribe("Academic Calendar revision integrity", () => {
       expect("fileRef" in projection.sources[0]!).toBe(false);
     }
   });
+
+  test("persists Graduate Defense compatibly and exposes it only to Year 4", async () => {
+    const suffix = randomUUID();
+    const course = await prisma.course.findFirstOrThrow({ select: { programmeId: true } });
+    const actor = await prisma.user.create({
+      data: { email: `graduate-defense-${suffix}@dse.invalid`, name: "Graduate Defense Coordinator" },
+    });
+    const academicYear = await academicCalendarService.createAcademicYear(course.programmeId, {
+      label: `2196-2197-defense-${suffix.slice(0, 8)}`,
+      startYear: 2196,
+      endYear: 2197,
+      isCurrent: false,
+    });
+    const draft = await academicCalendarService.createCalendar(course.programmeId, actor.id, {
+      academicYearId: academicYear.id,
+      revisionReason: "Graduate defense test",
+      studyYears: [3, 4],
+      periods: [
+        { semester: "First", teachingStart: "2196-09-01", teachingEnd: "2197-01-15" },
+        { semester: "Second", teachingStart: "2197-02-01", teachingEnd: "2197-06-12" },
+      ],
+      events: [{
+        title: "Graduate Defense",
+        type: "GraduateDefense",
+        semester: "Second",
+        startDate: "2197-06-14",
+        endDate: "2197-06-18",
+        note: "Final project and thesis defense.",
+        sortOrder: 0,
+      }],
+      sourceTitle: "Official graduate defense calendar",
+      sourcePublishedAt: "2196-08-01",
+      sourceUrl: null,
+      sourceFileRef: null,
+      sourceNote: "Official test source",
+    });
+    const published = await academicCalendarService.publishCalendar(course.programmeId, draft.id, actor.id);
+
+    expect(published.events[0]?.type).toBe("GraduateDefense");
+    expect(published.events[0]?.semester).toBe("Second");
+
+    const stored = await prisma.academicCalendarEvent.findFirstOrThrow({ where: { calendarId: published.id } });
+    expect(stored.type).toBe("Other");
+    expect(stored.title).toBe("Graduate Defense");
+    expect(stored.semester).toBe("Second");
+
+    const [year3, year4] = await Promise.all([
+      academicCalendarService.publishedProjection(course.programmeId, 3, academicYear.label),
+      academicCalendarService.publishedProjection(course.programmeId, 4, academicYear.label),
+    ]);
+    expect(year3.status).toBe("available");
+    expect(year4.status).toBe("available");
+    if (year3.status === "available" && year4.status === "available") {
+      expect(year3.events.some((event) => event.type === "GraduateDefense")).toBe(false);
+      const defense = year4.events.find((event) => event.type === "GraduateDefense");
+      expect(defense?.title).toBe("Graduate Defense");
+      expect(defense?.semester).toBe("Second");
+    }
+  });
 });
