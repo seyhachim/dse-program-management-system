@@ -44,6 +44,12 @@ test("Programme Holidays is a leadership-only child route of Academic Calendar",
   expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === path)?.label).toBe("Programme Holidays");
   expect(getNavRoutes(["lecturer"]).find((route) => route.path === path)).toBeUndefined();
   expect(getNavRoutes(["program_secretary"]).find((route) => route.path === path)).toBeUndefined();
+
+  const academicRoutes = getNavGroups(["admin"])
+    .find((group) => group.label === "Academic")?.routes ?? [];
+  const calendarIndex = academicRoutes.findIndex((route) => route.path === "/academic-calendar");
+  expect(calendarIndex).toBeGreaterThanOrEqual(0);
+  expect(academicRoutes[calendarIndex + 1]?.path).toBe(path);
 });
 
 test("Admin and Programme Coordinator sidebars omit placeholder-only routes", () => {
