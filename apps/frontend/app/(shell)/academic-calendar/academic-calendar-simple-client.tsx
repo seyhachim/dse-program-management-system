@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, Copy, FileText, History, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, Copy, FileText, History, Plus, RefreshCw } from "lucide-react";
 import type {
   AcademicCalendarAuditView,
   AcademicCalendarEventInput,
@@ -10,7 +10,6 @@ import type {
   AcademicCalendarView,
   AcademicYearView,
 } from "@dse-pms/shared-types";
-import { ACADEMIC_CALENDAR_EVENT_TYPES } from "@dse-pms/shared-types";
 import { Button, Input, Label } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { academicCalendarApi, academicSemesterLabel, formatAcademicDate } from "@/lib/academic-calendar";
@@ -199,6 +198,30 @@ function dmyToIso(value: string): string | null {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function CalendarDateField({ id, label, value, onChange, required = false }: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>
+        {label}
+        {required ? <RequiredMark /> : null}
+      </Label>
+      <Input
+        id={id}
+        type="date"
+        required={required}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
 function DateField({ id, label, value, onChange, disabled = false, optional = false, required = false }: {
   id: string;
   label: string;
@@ -270,10 +293,6 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
     setDraft({ ...draft, periods: draft.periods.map((period) => period.semester === semester ? { ...period, ...patch } : period) });
   };
 
-  const updateEvent = (key: string, patch: Partial<EventDraft>) => {
-    setDraft({ ...draft, events: draft.events.map((event) => event.key === key ? { ...event, ...patch } : event) });
-  };
-
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border bg-muted/10 p-4">
@@ -325,7 +344,7 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
       <section>
         <div className="mb-3">
           <h4 className="font-semibold">Semester dates</h4>
-          <p className="mt-1 text-sm text-muted-foreground">Both semesters are ready by default. Enter dates as DD/MM/YYYY. Exam and break dates stay hidden until needed.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Choose teaching dates from the calendar. Exam and break dates stay hidden until needed.</p>
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
           {draft.periods.map((period) => (
@@ -346,8 +365,8 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
               {period.enabled ? (
                 <div className="mt-4 space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <DateField required id={`${period.semester}-teaching-start`} label="Teaching start" value={period.teachingStart} onChange={(value) => updatePeriod(period.semester, { teachingStart: value })} />
-                    <DateField required id={`${period.semester}-teaching-end`} label="Teaching end" value={period.teachingEnd} onChange={(value) => updatePeriod(period.semester, { teachingEnd: value })} />
+                    <CalendarDateField required id={`${period.semester}-teaching-start`} label="Teaching start" value={period.teachingStart} onChange={(value) => updatePeriod(period.semester, { teachingStart: value })} />
+                    <CalendarDateField required id={`${period.semester}-teaching-end`} label="Teaching end" value={period.teachingEnd} onChange={(value) => updatePeriod(period.semester, { teachingEnd: value })} />
                   </div>
                   <Button type="button" variant="outline" onClick={() => setShowOptional((current) => ({ ...current, [period.semester]: !current[period.semester] }))}>
                     {showOptional[period.semester] ? "Hide optional dates" : "+ Add exam / break dates"}
@@ -365,27 +384,6 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
             </section>
           ))}
         </div>
-      </section>
-
-      <section className="rounded-2xl border border-border p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><h4 className="font-semibold">Academic events</h4><p className="text-sm text-muted-foreground">Only add registration, orientation, holidays, midterms, or other dates when needed.</p></div>
-          <Button type="button" variant="outline" onClick={() => setDraft({
-            ...draft,
-            events: [...draft.events, { key: crypto.randomUUID(), title: "", type: "Other", semester: "", startDate: "", endDate: "", note: "" }],
-          })}><Plus className="h-4 w-4" /> Add event</Button>
-        </div>
-        {draft.events.length ? <div className="mt-4 space-y-3">{draft.events.map((event) => (
-          <div key={event.key} className="grid gap-3 rounded-xl bg-muted/30 p-3 md:grid-cols-6">
-            <div className="md:col-span-2"><Label htmlFor={`${event.key}-title`}>Title<RequiredMark /></Label><Input required id={`${event.key}-title`} className="mt-1" value={event.title} onChange={(e) => updateEvent(event.key, { title: e.target.value })} /></div>
-            <div><Label htmlFor={`${event.key}-type`}>Type</Label><select id={`${event.key}-type`} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.type} onChange={(e) => updateEvent(event.key, { type: e.target.value as AcademicCalendarEventType })}>{ACADEMIC_CALENDAR_EVENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
-            <div><Label htmlFor={`${event.key}-semester`}>Semester</Label><select id={`${event.key}-semester`} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.semester} onChange={(e) => updateEvent(event.key, { semester: e.target.value as EventDraft["semester"] })}><option value="">Any</option><option value="First">Semester 1</option><option value="Second">Semester 2</option></select></div>
-            <DateField required id={`${event.key}-start`} label="Start" value={event.startDate} onChange={(value) => updateEvent(event.key, { startDate: value })} />
-            <DateField id={`${event.key}-end`} label="End" optional value={event.endDate} onChange={(value) => updateEvent(event.key, { endDate: value })} />
-            <div className="md:col-span-5"><Label htmlFor={`${event.key}-note`}>Note</Label><Input id={`${event.key}-note`} className="mt-1" value={event.note} onChange={(e) => updateEvent(event.key, { note: e.target.value })} /></div>
-            <div className="flex items-end"><Button type="button" variant="ghost" onClick={() => setDraft({ ...draft, events: draft.events.filter((item) => item.key !== event.key) })}><Trash2 className="h-4 w-4" /> Remove</Button></div>
-          </div>
-        ))}</div> : null}
       </section>
 
       <section className="rounded-2xl border border-primary/20 bg-primary/[0.025] p-4">
