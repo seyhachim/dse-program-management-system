@@ -14,6 +14,7 @@ import { academicCalendarApi, formatAcademicDate } from "@/lib/academic-calendar
 import {
   ACADEMIC_CALENDAR_JSON_TEMPLATE,
   holidaysToEvents,
+  mergeImportedRevisionEvents,
   normalizeAcademicYearLabel,
   parseAcademicCalendarJson,
   sameSemesterCoverage,
@@ -269,7 +270,13 @@ export function AcademicCalendarJsonImportClient() {
           continue;
         }
         const revision = await academicCalendarApi.revision(programmeId, calendarPlan.publishedCalendarId!, reason);
-        await academicCalendarApi.update(programmeId, revision.id, createPayloadToUpdate(payload));
+        const updatePayload = createPayloadToUpdate(payload);
+        updatePayload.events = mergeImportedRevisionEvents(
+          imported.events,
+          viewToUpdate(revision).events,
+          extraEvents,
+        );
+        await academicCalendarApi.update(programmeId, revision.id, updatePayload);
       }
 
       if (plan.separateHolidayAnchorId && plan.newHolidayEvents.length) {
