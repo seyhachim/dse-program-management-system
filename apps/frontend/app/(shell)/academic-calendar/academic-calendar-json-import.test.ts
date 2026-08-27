@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   holidaysToEvents,
+  isCurrentCorrectionDraft,
   mergeImportedRevisionEvents,
   normalizeAcademicYearLabel,
   parseAcademicCalendarJson,
@@ -88,6 +89,25 @@ test("compares coverage independent of array ordering", () => {
     [{ semester: "Second", teachingStart: "2027-01-01", teachingEnd: "2027-01-02" }, { semester: "First", teachingStart: "2026-01-01", teachingEnd: "2026-01-02" }],
     [{ semester: "First" }, { semester: "Second" }],
   )).toBe(true);
+});
+
+test("only treats a draft targeting the current published revision as an active correction", () => {
+  const currentPublished = { id: "calendar-r2", status: "Published" as const, seriesKey: "series-1" };
+
+  expect(isCurrentCorrectionDraft(
+    { status: "Draft", seriesKey: "series-1", supersedesCalendarId: "calendar-r2" },
+    currentPublished,
+  )).toBe(true);
+
+  expect(isCurrentCorrectionDraft(
+    { status: "Draft", seriesKey: "series-1", supersedesCalendarId: "calendar-r1" },
+    currentPublished,
+  )).toBe(false);
+
+  expect(isCurrentCorrectionDraft(
+    { status: "Draft", seriesKey: "other-series", supersedesCalendarId: "calendar-r2" },
+    currentPublished,
+  )).toBe(false);
 });
 
 test("converts programme-wide holidays to canonical Holiday events", () => {
