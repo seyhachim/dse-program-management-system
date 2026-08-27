@@ -6,6 +6,10 @@ import {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import {
+  MISSING_RESUBMISSION_SPECIFICATION_DATE_ERROR,
+  specificationDateForSubmission,
+} from "./automatic-specification-date.ts";
 import { attachLatestCourseSpecReviewStatus } from "./course-list-review-status.ts";
 import { createCourseRouter } from "./router.ts";
 import { createCourseSectionPresenceRouter } from "./section-presence-router.ts";
@@ -25,11 +29,7 @@ import {
   ReferenceError,
   type CourseService,
 } from "./service.ts";
-import {
-  hasSpecificationDate,
-  isSpecificationDateReady,
-  SPECIFICATION_DATE_REQUIRED_ERROR,
-} from "./specification-date-readiness.ts";
+import { hasSpecificationDate } from "./specification-date-readiness.ts";
 
 // Extend the existing Offering-based access boundary instead of creating a
 // second Course Spec authorization path. Teaching & Learning already consumes
@@ -38,7 +38,6 @@ const offeringScopedList = courseService.list.bind(courseService);
 const offeringScopedSpecProgress = courseService.listSpecProgress.bind(courseService);
 const offeringScopedAccess = courseService.lecturerCanAccess.bind(courseService);
 const canonicalSaveSection = courseService.saveSection.bind(courseService);
-const canonicalSubmitSpec = courseService.submitSpec.bind(courseService);
 
 const CURRENT_SPEC_ORDER = [
   { versionMajor: "desc" as const },
@@ -113,14 +112,21 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
     where: { courseId },
     orderBy: CURRENT_SPEC_ORDER,
     select: {
+      id: true,
+      reviewStatus: true,
+      submissionVersion: true,
       specDate: true,
       sections: {
-        where: { sectionKey: "date" },
-        select: { status: true },
+        select: { sectionKey: true, status: true },
       },
       clos: {
         orderBy: { order: "asc" },
-        select: { order: true, status: true },
+        select: {
+          order: true,
+          status: true,
+          mappedPlos: true,
+          teachingMethods: { select: { teachingMethodId: true } },
+        },
       },
       weeks: {
         select: { cloCodes: true },
@@ -131,18 +137,49 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
     },
   });
 
+  if (!currentSpec) {
+    throw new ReferenceError("Course specification has not been started");
+  }
+  if (!["Draft", "ChangesRequested"].includes(currentSpec.reviewStatus)) {
+    throw new ReferenceError(
+      "This course specification is not ready for submission",
+    );
+  }
+
+  const savedComplete = (sectionId: string) =>
+    currentSpec.sections.some(
+      (saved) =>
+        saved.sectionKey === sectionId && saved.status === "Complete",
+    );
+  const activeClos = currentSpec.clos.filter((clo) => clo.status === "Active");
+  const readinessGaps: string[] = [];
+
+  if (!savedComplete("courseInfo")) readinessGaps.push("Course Information");
   if (
-    currentSpec &&
-    !isSpecificationDateReady(
-      currentSpec.sections[0]?.status === "Complete" ? "complete" : "draft",
-      currentSpec.specDate?.toISOString().slice(0, 10) ?? null,
-    )
+    !savedComplete("clos") ||
+    activeClos.length === 0 ||
+    activeClos.some((clo) => clo.mappedPlos.length === 0)
   ) {
-    throw new ReferenceError(SPECIFICATION_DATE_REQUIRED_ERROR);
+    readinessGaps.push("Course Learning Outcomes");
+  }
+  if (
+    activeClos.length === 0 ||
+    activeClos.some((clo) => clo.teachingMethods.length === 0)
+  ) {
+    readinessGaps.push("Teaching & Learning");
+  }
+  if (!savedComplete("assessmentPlan")) readinessGaps.push("Assessment");
+  if (!savedComplete("slt")) readinessGaps.push("Weekly Plan");
+
+  // Review & Submit intentionally excludes the older backend-only Student
+  // Responsibility gate. Keep the authoritative backend set aligned with the UI.
+  if (readinessGaps.length > 0) {
+    throw new ReferenceError(
+      `Complete all required sections before submitting: ${readinessGaps.join(", ")}`,
+    );
   }
 
   if (
-    currentSpec &&
     !isConstructiveAlignmentReady(
       currentSpec.clos.map((clo) => ({
         code: `CLO${clo.order + 1}`,
@@ -158,44 +195,52 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
     throw new ReferenceError(CONSTRUCTIVE_ALIGNMENT_REQUIRED_ERROR);
   }
 
+  const submittedAt = new Date();
+  let specificationDate: Date;
   try {
-    return await canonicalSubmitSpec(courseId, submittedById, note);
-  } catch (error) {
-    // The Review & Submit contract intentionally excludes the older backend-only
-    // Student Responsibility gate. Preserve canonical validation and bypass only
-    // when that legacy gate is the sole remaining gap.
-    if (
-      !(error instanceof ReferenceError) ||
-      error.message !==
-        "Complete all required sections before submitting: Student Responsibility"
-    ) {
-      throw error;
-    }
-
-    const spec = await prisma.courseSpec.findFirst({
-      where: { courseId },
-      orderBy: CURRENT_SPEC_ORDER,
-      select: { id: true, reviewStatus: true, submissionVersion: true },
+    specificationDate = specificationDateForSubmission({
+      reviewStatus: currentSpec.reviewStatus as "Draft" | "ChangesRequested",
+      existingDate: currentSpec.specDate,
+      now: submittedAt,
     });
-    if (!spec) throw error;
-    if (!["Draft", "ChangesRequested"].includes(spec.reviewStatus)) {
-      throw new ReferenceError(
-        "This course specification is not ready for submission",
-      );
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === MISSING_RESUBMISSION_SPECIFICATION_DATE_ERROR
+    ) {
+      throw new ReferenceError(error.message);
     }
+    throw error;
+  }
 
-    const nextVersion = spec.submissionVersion + 1;
-    const nextStatus =
-      spec.reviewStatus === "ChangesRequested"
-        ? ("Resubmitted" as const)
-        : ("Submitted" as const);
+  const nextVersion = currentSpec.submissionVersion + 1;
+  const nextStatus =
+    currentSpec.reviewStatus === "ChangesRequested"
+      ? ("Resubmitted" as const)
+      : ("Submitted" as const);
 
-    await prisma.courseSpec.update({
-      where: { id: spec.id },
+  await prisma.$transaction([
+    prisma.courseSpecSection.upsert({
+      where: {
+        courseSpecId_sectionKey: {
+          courseSpecId: currentSpec.id,
+          sectionKey: "date",
+        },
+      },
+      create: {
+        courseSpecId: currentSpec.id,
+        sectionKey: "date",
+        status: "Complete",
+      },
+      update: { status: "Complete" },
+    }),
+    prisma.courseSpec.update({
+      where: { id: currentSpec.id },
       data: {
+        specDate: specificationDate,
         reviewStatus: nextStatus,
         submissionVersion: nextVersion,
-        submittedAt: new Date(),
+        submittedAt,
         submittedById,
         submissionNote: note.trim(),
         reviewActions: {
@@ -208,14 +253,54 @@ courseService.submitSpec = async (courseId, submittedById, note) => {
           },
         },
       },
-    });
+    }),
+  ]);
 
-    const updated = await courseService.getSpec(courseId);
-    if (!updated) {
-      throw new ReferenceError("Course specification has not been started");
-    }
-    return updated;
+  const updated = await courseService.getSpec(courseId);
+  if (!updated) {
+    throw new ReferenceError("Course specification has not been started");
   }
+  return updated;
+};
+
+// Approval has its own timestamp and must never rewrite the submitted document's
+// Specification Date. Keep both mutations in one authoritative database write.
+courseService.approveSpec = async (courseId, reviewerId, note) => {
+  const spec = await prisma.courseSpec.findFirst({
+    where: { courseId },
+    orderBy: CURRENT_SPEC_ORDER,
+    select: { id: true, reviewStatus: true, submissionVersion: true },
+  });
+  if (!spec) {
+    throw new ReferenceError("Course specification has not been started");
+  }
+  if (!["Submitted", "Resubmitted", "UnderReview"].includes(spec.reviewStatus)) {
+    throw new ReferenceError(
+      "This course specification is not awaiting review",
+    );
+  }
+
+  await prisma.courseSpec.update({
+    where: { id: spec.id },
+    data: {
+      reviewStatus: "Approved",
+      approvedAt: new Date(),
+      reviewActions: {
+        create: {
+          submissionVersion: spec.submissionVersion,
+          action: "Approved",
+          actorId: reviewerId,
+          note: note.trim(),
+        },
+      },
+    },
+  });
+
+  const updated = await courseService.getSpec(courseId);
+  if (!updated) {
+    throw new ReferenceError("Course specification has not been started");
+  }
+  return updated;
 };
 
 const router = Router();
