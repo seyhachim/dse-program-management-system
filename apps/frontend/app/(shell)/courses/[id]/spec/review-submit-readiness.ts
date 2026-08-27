@@ -6,6 +6,7 @@ export type ReviewReadinessItemId =
   | "teachingLearning"
   | "assessmentPlan"
   | "slt"
+  | "date"
   | "mapping";
 
 export type ReviewReadinessItem = {
@@ -18,13 +19,17 @@ export function buildReviewReadinessItems({
   status,
   cloReady,
   teachingLearningReady,
+  specificationDateReady,
   constructiveAlignmentReady,
 }: {
   status: Record<string, SpecSectionStatus>;
   cloReady: boolean;
   teachingLearningReady: boolean;
+  /** Retained for call-site compatibility; Specification Date is now system-assigned. */
+  specificationDateReady?: boolean;
   constructiveAlignmentReady: boolean;
 }): ReviewReadinessItem[] {
+  void specificationDateReady;
   return [
     {
       id: "courseInfo",
