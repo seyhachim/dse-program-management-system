@@ -129,6 +129,11 @@ function holidayEventKey(event: Pick<AcademicCalendarEventInput, "title" | "star
   return `${event.title.trim().toLocaleLowerCase()}|${event.startDate}|${event.endDate ?? ""}`;
 }
 
+/**
+ * A JSON correction replaces calendar-scoped events, but published Holiday events are
+ * programme-wide official closures and must survive when the correction file omits them.
+ * Additional imported holidays are appended without creating semantic duplicates.
+ */
 export function mergeImportedRevisionEvents(
   importedEvents: readonly AcademicCalendarEventInput[],
   publishedEvents: readonly AcademicCalendarEventInput[],
