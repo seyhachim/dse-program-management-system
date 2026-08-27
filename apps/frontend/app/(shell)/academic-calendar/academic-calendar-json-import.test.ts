@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   holidaysToEvents,
+  mergeImportedRevisionEvents,
   normalizeAcademicYearLabel,
   parseAcademicCalendarJson,
   sameSemesterCoverage,
@@ -101,4 +102,72 @@ test("converts programme-wide holidays to canonical Holiday events", () => {
       sortOrder: 3,
     },
   ]);
+});
+
+test("preserves published holidays when a correction JSON omits them", () => {
+  const imported = [
+    {
+      title: "Orientation",
+      type: "Orientation" as const,
+      semester: "First" as const,
+      startDate: "2026-11-20",
+      endDate: null,
+      note: "Imported event",
+      sortOrder: 7,
+    },
+  ];
+  const published = [
+    {
+      title: "Old non-holiday event",
+      type: "Other" as const,
+      semester: null,
+      startDate: "2026-11-01",
+      endDate: null,
+      note: "Should be replaced by imported calendar content",
+      sortOrder: 0,
+    },
+    {
+      title: "Khmer New Year",
+      type: "Holiday" as const,
+      semester: null,
+      startDate: "2027-04-14",
+      endDate: "2027-04-16",
+      note: "Official public holiday",
+      sortOrder: 1,
+    },
+  ];
+
+  const merged = mergeImportedRevisionEvents(imported, published);
+  expect(merged.map((event) => event.title)).toEqual(["Orientation", "Khmer New Year"]);
+  expect(merged.map((event) => event.sortOrder)).toEqual([0, 1]);
+});
+
+test("deduplicates published and newly imported programme-wide holidays", () => {
+  const existingHoliday = {
+    title: "Khmer New Year",
+    type: "Holiday" as const,
+    semester: null,
+    startDate: "2027-04-14",
+    endDate: "2027-04-16",
+    note: "Existing",
+    sortOrder: 4,
+  };
+  const newHoliday = {
+    title: "Constitution Day",
+    type: "Holiday" as const,
+    semester: null,
+    startDate: "2026-09-24",
+    endDate: null,
+    note: "New",
+    sortOrder: 9,
+  };
+
+  const merged = mergeImportedRevisionEvents(
+    [{ ...existingHoliday, note: "Imported duplicate", sortOrder: 0 }],
+    [existingHoliday],
+    [existingHoliday, newHoliday],
+  );
+
+  expect(merged.map((event) => event.title)).toEqual(["Khmer New Year", "Constitution Day"]);
+  expect(merged.map((event) => event.sortOrder)).toEqual([0, 1]);
 });
