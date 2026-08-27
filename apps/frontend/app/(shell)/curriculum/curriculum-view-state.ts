@@ -10,6 +10,11 @@ export const CURRICULUM_WORKSPACE_TABS = [
 export type CurriculumWorkspaceTab = (typeof CURRICULUM_WORKSPACE_TABS)[number];
 export type StudyYear = 1 | 2 | 3 | 4;
 
+type VersionPreferenceCandidate = Pick<
+  CurriculumVersionSummary,
+  "id" | "version" | "status"
+>;
+
 const VERSION_STATUS_PRIORITY: Record<CurriculumVersionSummary["status"], number> = {
   Active: 4,
   Approved: 3,
@@ -17,9 +22,9 @@ const VERSION_STATUS_PRIORITY: Record<CurriculumVersionSummary["status"], number
   Superseded: 1,
 };
 
-export function pickPreferredCurriculumVersion(
-  versions: CurriculumVersionSummary[],
-): CurriculumVersionSummary | null {
+export function pickPreferredCurriculumVersion<T extends VersionPreferenceCandidate>(
+  versions: T[],
+): T | null {
   if (versions.length === 0) return null;
 
   return [...versions].sort((left, right) => {
