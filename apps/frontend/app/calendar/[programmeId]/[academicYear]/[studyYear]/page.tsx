@@ -137,8 +137,10 @@ export default function PublicAcademicCalendarPage({ params }: PublicAcademicCal
                 <h2 className="text-lg font-semibold">{semesterLabel(period.semester)}</h2>
                 <dl className="mt-4 space-y-3 text-sm">
                   <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Teaching</dt><dd className="text-right font-medium">{formatDate(period.teachingStart)} – {formatDate(period.teachingEnd)}</dd></div>
-                  <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Exams</dt><dd className="text-right">{period.examStart ? `${formatDate(period.examStart)} – ${formatDate(period.examEnd)}` : "Not issued"}</dd></div>
-                  <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Break</dt><dd className="text-right">{period.breakStart ? `${formatDate(period.breakStart)} – ${formatDate(period.breakEnd)}` : "Not issued"}</dd></div>
+                  <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Final Exam week</dt><dd className="text-right">{period.examStart ? `${formatDate(period.examStart)} – ${formatDate(period.examEnd)}` : "Not issued"}</dd></div>
+                  {period.breakStart ? (
+                    <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Break</dt><dd className="text-right">{formatDate(period.breakStart)} – {formatDate(period.breakEnd)}</dd></div>
+                  ) : null}
                 </dl>
               </article>
             ))}
@@ -161,8 +163,6 @@ export default function PublicAcademicCalendarPage({ params }: PublicAcademicCal
             </div>
           </section>
         ) : null}
-
-        <footer className="pb-4 text-center text-xs text-muted-foreground">This page reads only the current published Academic Calendar from DSE PMS. Keep this link in the handbook; it will update when an authorized calendar revision is published.</footer>
       </div>
     </main>
   );
