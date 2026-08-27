@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import {
+  GRADUATE_DEFENSE_EVENT_TITLE,
+  GRADUATE_DEFENSE_SEMESTER,
+  academicCalendarEventAppliesToStudyYear,
+} from "@dse-pms/shared-types";
 import type {
   AcademicCalendarContextQuery, AcademicCalendarContextView, AcademicCalendarOfferingPeriodRef,
   AcademicCalendarPeriodInput, AcademicCalendarPeriodView, AcademicCalendarEventInput, AcademicCalendarEventView,
@@ -27,7 +32,8 @@ function periodView(row: CalendarRow["periods"][number]): AcademicCalendarPeriod
   return { id: row.id, calendarId: row.calendarId, semester: row.semester, teachingStart: dateOnly(row.teachingStart)!, teachingEnd: dateOnly(row.teachingEnd)!, examStart: dateOnly(row.examStart), examEnd: dateOnly(row.examEnd), breakStart: dateOnly(row.breakStart), breakEnd: dateOnly(row.breakEnd) };
 }
 function eventView(row: CalendarRow["events"][number]): AcademicCalendarEventView {
-  return { id: row.id, calendarId: row.calendarId, title: row.title, type: row.type, semester: row.semester, startDate: dateOnly(row.startDate)!, endDate: dateOnly(row.endDate), note: row.note, sortOrder: row.sortOrder };
+  const isGraduateDefense = row.type === "Other" && row.title === GRADUATE_DEFENSE_EVENT_TITLE && row.semester === GRADUATE_DEFENSE_SEMESTER;
+  return { id: row.id, calendarId: row.calendarId, title: row.title, type: isGraduateDefense ? "GraduateDefense" : row.type, semester: row.semester, startDate: dateOnly(row.startDate)!, endDate: dateOnly(row.endDate), note: row.note, sortOrder: row.sortOrder };
 }
 function calendarView(row: CalendarRow): AcademicCalendarView {
   return {
@@ -42,7 +48,16 @@ function periodCreate(period: AcademicCalendarPeriodInput) {
   return { semester: period.semester as Semester, teachingStart: dbDate(period.teachingStart)!, teachingEnd: dbDate(period.teachingEnd)!, examStart: dbDate(period.examStart), examEnd: dbDate(period.examEnd), breakStart: dbDate(period.breakStart), breakEnd: dbDate(period.breakEnd) };
 }
 function eventCreate(event: AcademicCalendarEventInput) {
-  return { title: event.title, type: event.type as AcademicCalendarEventType, semester: (event.semester ?? null) as Semester | null, startDate: dbDate(event.startDate)!, endDate: dbDate(event.endDate), note: event.note, sortOrder: event.sortOrder };
+  const isGraduateDefense = event.type === "GraduateDefense";
+  return {
+    title: isGraduateDefense ? GRADUATE_DEFENSE_EVENT_TITLE : event.title,
+    type: (isGraduateDefense ? "Other" : event.type) as AcademicCalendarEventType,
+    semester: (isGraduateDefense ? GRADUATE_DEFENSE_SEMESTER : (event.semester ?? null)) as Semester | null,
+    startDate: dbDate(event.startDate)!,
+    endDate: dbDate(event.endDate),
+    note: event.note,
+    sortOrder: event.sortOrder,
+  };
 }
 function sourceData(input: Pick<CreateAcademicCalendarInput, "sourceTitle" | "sourcePublishedAt" | "sourceUrl" | "sourceFileRef" | "sourceNote">) {
   return { sourceTitle: input.sourceTitle, sourcePublishedAt: dbDate(input.sourcePublishedAt), sourceUrl: input.sourceUrl || null, sourceFileRef: input.sourceFileRef || null, sourceNote: input.sourceNote };
@@ -324,7 +339,7 @@ export const academicCalendarService = {
         if (bySemester.has(period.semester)) throw new AcademicCalendarConflictError("Published calendar data contains conflicting semester periods");
         bySemester.set(period.semester, period);
       }
-      scopedEvents.push(...view.events);
+      scopedEvents.push(...view.events.filter((event) => academicCalendarEventAppliesToStudyYear(event, studyYear)));
       const { fileRef: _internalFileRef, ...publicSource } = view.source;
       sources.set(row.id, publicSource);
     }
