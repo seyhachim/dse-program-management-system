@@ -38,6 +38,14 @@ test("Rating Scales management is visible only to Admin and Programme Coordinato
   expect(getNavRoutes(["qa_reviewer"]).find((route) => route.path === path)).toBeUndefined();
 });
 
+test("Programme Holidays is a leadership-only child route of Academic Calendar", () => {
+  const path = "/academic-calendar/holidays";
+  expect(getNavRoutes(["admin"]).find((route) => route.path === path)?.label).toBe("Programme Holidays");
+  expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === path)?.label).toBe("Programme Holidays");
+  expect(getNavRoutes(["lecturer"]).find((route) => route.path === path)).toBeUndefined();
+  expect(getNavRoutes(["program_secretary"]).find((route) => route.path === path)).toBeUndefined();
+});
+
 test("Admin and Programme Coordinator sidebars omit placeholder-only routes", () => {
   const adminPaths = sidebarPaths(["admin"]);
   const coordinatorPaths = sidebarPaths(["program_coordinator"]);
@@ -53,6 +61,8 @@ test("Admin and Programme Coordinator sidebars omit placeholder-only routes", ()
     "/offerings",
     "/lecturers",
     "/programme-management",
+    "/academic-calendar",
+    "/academic-calendar/holidays",
     "/rubric-bank",
     "/programme-settings/rating-scales",
     "/public-information",
