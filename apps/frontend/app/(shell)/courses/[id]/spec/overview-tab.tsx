@@ -21,6 +21,7 @@ import {
   assessmentTypeChip,
   type AssessmentForm,
 } from "./assessment-model";
+import { deriveOverviewReadinessStatus } from "./overview-readiness";
 import { ProgrammeSection } from "./programme-section";
 
 export function OverviewTab({
@@ -45,14 +46,20 @@ export function OverviewTab({
   onGoToTab: (id: SpecSectionId) => void;
   readOnly?: boolean;
 }) {
+  const readinessStatus = deriveOverviewReadinessStatus(
+    status,
+    clos,
+    weeklyPlan,
+    assessments,
+  );
   const fillable = COMPLETABLE_SPEC_SECTIONS;
-  const completed = fillable.filter((s) => status[s.id] === "complete").length;
-  const inProgress = fillable.filter((s) => status[s.id] === "draft").length;
+  const completed = fillable.filter((s) => readinessStatus[s.id] === "complete").length;
+  const inProgress = fillable.filter((s) => readinessStatus[s.id] === "draft").length;
   const missing = fillable.length - completed - inProgress;
   const percent = fillable.length
     ? Math.round((completed / fillable.length) * 100)
     : 0;
-  const unfinished = fillable.filter((s) => status[s.id] !== "complete");
+  const unfinished = fillable.filter((s) => readinessStatus[s.id] !== "complete");
   const nextSection = unfinished[0];
 
   const deliverables = weeklyPlan.filter((w) => w.assessment.trim());
@@ -400,7 +407,7 @@ export function OverviewTab({
                     {nextSection.title}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {status[nextSection.id] === "draft"
+                    {readinessStatus[nextSection.id] === "draft"
                       ? "Continue this section and mark it complete."
                       : "Add the required information to start this section."}
                   </p>
@@ -409,7 +416,7 @@ export function OverviewTab({
                     onClick={() => onGoToTab(nextSection.id as SpecSectionId)}
                     className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-foreground hover:underline"
                   >
-                    {status[nextSection.id] === "draft" ? "Continue" : "Start section"}
+                    {readinessStatus[nextSection.id] === "draft" ? "Continue" : "Start section"}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -444,7 +451,7 @@ export function OverviewTab({
                     >
                       <span className="truncate text-foreground">{section.title}</span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {status[section.id] === "draft" ? "In progress" : "Not started"}
+                        {readinessStatus[section.id] === "draft" ? "In progress" : "Not started"}
                       </span>
                     </button>
                   </li>
