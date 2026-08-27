@@ -113,10 +113,11 @@ const programmeHolidaysManifest: PluginManifest = {
   ],
 };
 
+const baseFrontendManifests = pluginManifests.filter((manifest) => manifest.id !== "rubrics");
 const frontendManifests = [
-  ...pluginManifests.flatMap((manifest) =>
+  ...baseFrontendManifests.flatMap((manifest) =>
     manifest.id === "programme" ? [manifest, programmeHolidaysManifest] : [manifest],
-  ).filter((manifest) => manifest.id !== "rubrics"),
+  ),
   rubricBankManifest,
   gradingScaleManagementManifest,
   curriculumWorkspaceManifest,
