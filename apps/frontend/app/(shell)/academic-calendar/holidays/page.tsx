@@ -14,11 +14,11 @@ export default function ProgrammeHolidaysPage() {
           <div className="mx-auto max-w-7xl rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm">
             <p className="font-medium">Holiday workflow</p>
             <p className="mt-1 text-muted-foreground">
-              Upload holiday-only JSON or add holidays manually. Imported holidays stay in the current correction draft so you can edit or remove them before publishing. Official published holidays remain unchanged until you publish the correction.
+              Review the current holiday correction draft below. You can add, edit, or remove pending holidays before publishing. Use the JSON importer for bulk holiday entry; official published holidays remain unchanged until the correction is published.
             </p>
           </div>
-          <AcademicCalendarJsonImportClient />
           <AcademicCalendarProgrammeHolidays />
+          <AcademicCalendarJsonImportClient />
         </div>
       </main>
     </>
