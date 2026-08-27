@@ -81,8 +81,8 @@ test("rejects overlapping study-year and semester coverage inside one import", (
 
 test("rejects duplicate holidays and reversed holiday ranges", () => {
   const input = structuredClone(validImport);
-  input.holidays.push(structuredClone(input.holidays[0]!));
   input.holidays[0]!.endDate = "2027-04-13";
+  input.holidays.push(structuredClone(input.holidays[0]!));
   const result = parseAcademicCalendarJson(JSON.stringify(input));
   expect(result.ok).toBe(false);
   if (result.ok) return;
