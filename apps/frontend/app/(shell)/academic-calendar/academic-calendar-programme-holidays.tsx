@@ -6,6 +6,7 @@ import type { AcademicCalendarView, AcademicYearView, UpdateAcademicCalendarDraf
 import { Button, Input, Label } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { academicCalendarApi, formatAcademicDate } from "@/lib/academic-calendar";
+import { ACADEMIC_CALENDAR_REFRESH_EVENT } from "./academic-calendar-refresh-bridge";
 
 type HolidayDraft = {
   title: string;
@@ -85,6 +86,14 @@ export function AcademicCalendarProgrammeHolidays() {
 
   useEffect(() => {
     void load().catch((reason) => setError(errorMessage(reason, "Could not load programme-wide holidays.")));
+  }, [load]);
+
+  useEffect(() => {
+    const refresh = () => {
+      void load().catch((reason) => setError(errorMessage(reason, "Could not refresh programme-wide holidays.")));
+    };
+    window.addEventListener(ACADEMIC_CALENDAR_REFRESH_EVENT, refresh);
+    return () => window.removeEventListener(ACADEMIC_CALENDAR_REFRESH_EVENT, refresh);
   }, [load]);
 
   const publishedCalendars = useMemo(
