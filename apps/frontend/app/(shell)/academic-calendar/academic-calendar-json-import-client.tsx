@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api";
 import { academicCalendarApi, formatAcademicDate } from "@/lib/academic-calendar";
 import {
   ACADEMIC_CALENDAR_JSON_TEMPLATE,
+  canReuseCorrectionDraftForHolidayOnly,
   holidaysToEvents,
   isCurrentCorrectionDraft,
   mergeImportedRevisionEvents,
@@ -38,6 +39,7 @@ type ImportPlan = {
   calendars: AcademicCalendarView[];
   calendarPlans: CalendarPlan[];
   separateHolidayAnchorId: string | null;
+  existingHolidayDraftId: string | null;
   newHolidayEvents: AcademicCalendarEventInput[];
   skippedHolidayCount: number;
   blockers: string[];
@@ -104,6 +106,17 @@ function coverageLabel(calendar: AcademicCalendarJsonImport["calendars"][number]
   return `Year${calendar.studyYears.length > 1 ? "s" : ""} ${years}`;
 }
 
+function appendHolidayEventsToDraft(
+  draft: AcademicCalendarView,
+  newHolidayEvents: readonly AcademicCalendarEventInput[],
+): UpdateAcademicCalendarDraftInput {
+  const payload = viewToUpdate(draft);
+  const existingKeys = new Set(payload.events.filter((event) => event.type === "Holiday").map(holidayKey));
+  const additions = newHolidayEvents.filter((event) => !existingKeys.has(holidayKey(event)));
+  payload.events.push(...additions.map((event, index) => ({ ...event, sortOrder: payload.events.length + index })));
+  return payload;
+}
+
 function buildPlan(
   academicYear: AcademicYearView,
   sourceFileName: string,
@@ -160,6 +173,7 @@ function buildPlan(
   const newHolidays = input.holidays.filter((holiday) => !existingHolidayKeys.has(holidayKey(holiday)));
   const newHolidayEvents = holidaysToEvents(newHolidays);
   let separateHolidayAnchorId: string | null = null;
+  let existingHolidayDraftId: string | null = null;
 
   if (newHolidayEvents.length) {
     const anchor = [...published].sort((a, b) => firstCoveredYear(a) - firstCoveredYear(b))[0] ?? null;
@@ -168,7 +182,11 @@ function buildPlan(
     } else {
       const anchorDraft = activeDrafts.find((calendar) => isCurrentCorrectionDraft(calendar, anchor));
       if (anchorDraft) {
-        blockers.push(`Year ${firstCoveredYear(anchor)} already has a correction draft in progress, so programme-wide holidays cannot be imported safely.`);
+        if (canReuseCorrectionDraftForHolidayOnly(input.calendars.length, anchorDraft, anchor)) {
+          existingHolidayDraftId = anchorDraft.id;
+        } else {
+          blockers.push(`Year ${firstCoveredYear(anchor)} already has a correction draft in progress. Holiday-only imports can reuse it, but calendar-data imports remain blocked to avoid overwriting draft work.`);
+        }
       } else {
         const anchorPlan = calendarPlans.find((item) => item.action === "revision" && item.publishedCalendarId === anchor.id);
         if (anchorPlan) anchorPlan.appendProgrammeHolidays = true;
@@ -184,6 +202,7 @@ function buildPlan(
     calendars,
     calendarPlans,
     separateHolidayAnchorId,
+    existingHolidayDraftId,
     newHolidayEvents,
     skippedHolidayCount: input.holidays.length - newHolidays.length,
     blockers,
@@ -219,7 +238,9 @@ export function AcademicCalendarJsonImportClient() {
   const importSummary = useMemo(() => {
     if (!plan) return null;
     const createCount = plan.calendarPlans.filter((item) => item.action === "create").length;
-    const revisionCount = plan.calendarPlans.filter((item) => item.action === "revision").length;
+    const revisionCount = plan.calendarPlans.filter((item) => item.action === "revision").length
+      + (plan.separateHolidayAnchorId ? 1 : 0)
+      + (plan.existingHolidayDraftId ? 1 : 0);
     return { createCount, revisionCount };
   }, [plan]);
 
@@ -284,7 +305,11 @@ export function AcademicCalendarJsonImportClient() {
         await academicCalendarApi.update(programmeId, revision.id, updatePayload);
       }
 
-      if (plan.separateHolidayAnchorId && plan.newHolidayEvents.length) {
+      if (plan.existingHolidayDraftId && plan.newHolidayEvents.length) {
+        const draft = plan.calendars.find((calendar) => calendar.id === plan.existingHolidayDraftId);
+        if (!draft) throw new Error("The existing correction draft is no longer available.");
+        await academicCalendarApi.update(programmeId, draft.id, appendHolidayEventsToDraft(draft, plan.newHolidayEvents));
+      } else if (plan.separateHolidayAnchorId && plan.newHolidayEvents.length) {
         const anchor = plan.calendars.find((calendar) => calendar.id === plan.separateHolidayAnchorId);
         if (!anchor) throw new Error("Programme-wide holiday anchor is no longer available.");
         const revision = await academicCalendarApi.revision(
@@ -292,11 +317,7 @@ export function AcademicCalendarJsonImportClient() {
           anchor.id,
           `JSON import programme-wide holidays from ${plan.sourceFileName}`,
         );
-        const payload = viewToUpdate(revision);
-        const existingKeys = new Set(payload.events.filter((event) => event.type === "Holiday").map(holidayKey));
-        const additions = plan.newHolidayEvents.filter((event) => !existingKeys.has(holidayKey(event)));
-        payload.events.push(...additions.map((event, index) => ({ ...event, sortOrder: payload.events.length + index })));
-        await academicCalendarApi.update(programmeId, revision.id, payload);
+        await academicCalendarApi.update(programmeId, revision.id, appendHolidayEventsToDraft(revision, plan.newHolidayEvents));
       }
 
       window.location.reload();
@@ -402,7 +423,9 @@ export function AcademicCalendarJsonImportClient() {
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
-              Import creates only Draft or correction-Draft records. It does not publish them. Review each draft in Academic Calendar before publishing it as official.
+              {plan.existingHolidayDraftId
+                ? "This holiday-only import will add the new holidays to the existing current correction draft. Its semester dates and other draft work are preserved. Nothing is published automatically."
+                : "Import creates only Draft or correction-Draft records. It does not publish them. Review each draft in Academic Calendar before publishing it as official."}
             </div>
           )}
 
