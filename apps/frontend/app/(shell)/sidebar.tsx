@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { getNavGroups, iconMap } from "@/lib/nav";
 import { useMe } from "@/lib/auth";
 import {
@@ -29,6 +31,17 @@ function sidebarLabel(label: string, path: string): string {
 export function AppSidebar() {
   const pathname = usePathname();
   const { me, loading } = useMe();
+  const [openParents, setOpenParents] = useState<Record<string, boolean>>(() => ({
+    "/academic-calendar": pathname.startsWith("/academic-calendar/"),
+  }));
+
+  useEffect(() => {
+    if (!pathname.startsWith("/academic-calendar/")) return;
+    setOpenParents((current) => current["/academic-calendar"]
+      ? current
+      : { ...current, "/academic-calendar": true });
+  }, [pathname]);
+
   // Only show nav the caller's roles are allowed to see. While `me` loads we show
   // skeletons rather than the full list, so restricted items never flash in.
   const groups = me ? getNavGroups(me.roles) : [];
@@ -81,34 +94,79 @@ export function AppSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {group.routes.map((route) => {
-                    const Icon = route.icon ? iconMap[route.icon] : undefined;
                     const parentRoute = group.routes.find(
                       (candidate) => candidate.path !== route.path && route.path.startsWith(`${candidate.path}/`),
                     );
-                    const isChildRoute = Boolean(parentRoute);
-                    const hasActiveChild = group.routes.some(
-                      (candidate) => candidate.path !== route.path
-                        && candidate.path.startsWith(`${route.path}/`)
-                        && (pathname === candidate.path || pathname.startsWith(`${candidate.path}/`)),
+                    if (parentRoute) return null;
+
+                    const childRoutes = group.routes.filter(
+                      (candidate) => candidate.path !== route.path && candidate.path.startsWith(`${route.path}/`),
                     );
-                    const active = !hasActiveChild && (
-                      pathname === route.path ||
-                      pathname.startsWith(`${route.path}/`)
+                    const hasChildren = childRoutes.length > 0;
+                    const childIsActive = childRoutes.some(
+                      (candidate) => pathname === candidate.path || pathname.startsWith(`${candidate.path}/`),
+                    );
+                    const active = !childIsActive && (
+                      pathname === route.path || pathname.startsWith(`${route.path}/`)
                     );
                     const label = sidebarLabel(route.label, route.path);
+                    const Icon = route.icon ? iconMap[route.icon] : undefined;
+                    const submenuOpen = childIsActive || Boolean(openParents[route.path]);
+
                     return (
                       <SidebarMenuItem key={`${route.path}-${route.label}`}>
-                        <SidebarMenuButton
-                          isActive={active}
-                          tooltip={label}
-                          className={isChildRoute ? "ml-5 w-[calc(100%-1.25rem)] text-xs text-sidebar-muted" : undefined}
-                          render={
-                            <Link href={route.path}>
-                              {Icon ? <Icon className={isChildRoute ? "h-3.5 w-3.5" : undefined} /> : null}
-                              <span>{label}</span>
-                            </Link>
-                          }
-                        />
+                        <div className="relative">
+                          <SidebarMenuButton
+                            isActive={active}
+                            tooltip={label}
+                            className={hasChildren ? "pr-8" : undefined}
+                            render={
+                              <Link href={route.path}>
+                                {Icon ? <Icon /> : null}
+                                <span>{label}</span>
+                              </Link>
+                            }
+                          />
+                          {hasChildren ? (
+                            <button
+                              type="button"
+                              aria-label={`${submenuOpen ? "Collapse" : "Expand"} ${label} submenu`}
+                              aria-expanded={submenuOpen}
+                              onClick={() => setOpenParents((current) => ({
+                                ...current,
+                                [route.path]: !submenuOpen,
+                              }))}
+                              className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-active hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden"
+                            >
+                              <ChevronRight className={`h-3.5 w-3.5 transition-transform ${submenuOpen ? "rotate-90" : ""}`} />
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {hasChildren && submenuOpen ? (
+                          <ul className="mt-0.5 space-y-px pl-7 group-data-[collapsible=icon]:hidden">
+                            {childRoutes.map((child) => {
+                              const ChildIcon = child.icon ? iconMap[child.icon] : undefined;
+                              const childActive = pathname === child.path || pathname.startsWith(`${child.path}/`);
+                              const childLabel = sidebarLabel(child.label, child.path);
+                              return (
+                                <li key={`${child.path}-${child.label}`}>
+                                  <SidebarMenuButton
+                                    isActive={childActive}
+                                    tooltip={childLabel}
+                                    className="h-8 text-xs text-sidebar-muted"
+                                    render={
+                                      <Link href={child.path}>
+                                        {ChildIcon ? <ChildIcon className="h-3.5 w-3.5" /> : null}
+                                        <span>{childLabel}</span>
+                                      </Link>
+                                    }
+                                  />
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
                       </SidebarMenuItem>
                     );
                   })}
