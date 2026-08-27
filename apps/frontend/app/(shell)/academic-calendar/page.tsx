@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@dse-pms/ui";
+import { buttonVariants } from "@dse-pms/ui";
 import { Topbar } from "../topbar";
 import { AcademicCalendarJsonImportClient } from "./academic-calendar-json-import-client";
 import { AcademicCalendarSharePanel } from "./academic-calendar-share-panel";
@@ -22,7 +22,9 @@ export default function AcademicCalendarPage() {
                 Holiday import, draft review, editing, removal, and publishing now live in a focused workspace.
               </p>
             </div>
-            <Button type="button" variant="outline" render={<Link href="/academic-calendar/holidays">Manage holidays</Link>} />
+            <Link className={buttonVariants({ variant: "outline" })} href="/academic-calendar/holidays">
+              Manage holidays
+            </Link>
           </div>
           <div className="mx-auto max-w-7xl rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm">
             <p className="font-medium">JSON import scope</p>
