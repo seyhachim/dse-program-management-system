@@ -7,24 +7,17 @@ import {
   studyYearSessionKey,
 } from "./curriculum-view-state";
 
+type VersionCandidate = Pick<
+  CurriculumVersionSummary,
+  "id" | "version" | "status"
+>;
+
 function version(
   id: string,
   value: number,
   status: CurriculumVersionSummary["status"],
-): CurriculumVersionSummary {
-  return {
-    id,
-    version: value,
-    status,
-    revisionType: "Minor",
-    revisionReason: null,
-    changeSummary: null,
-    cohortLabel: null,
-    academicYear: null,
-    revisionTriggers: [],
-    createdAt: "2026-08-27T00:00:00.000Z",
-    updatedAt: "2026-08-27T00:00:00.000Z",
-  } as CurriculumVersionSummary;
+): VersionCandidate {
+  return { id, version: String(value), status };
 }
 
 describe("curriculum view state", () => {
