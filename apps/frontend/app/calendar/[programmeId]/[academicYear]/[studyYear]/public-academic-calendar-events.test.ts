@@ -9,6 +9,7 @@ function event(
 ): AcademicCalendarEventView {
   return {
     id,
+    calendarId: "calendar-1",
     title,
     type: "Other",
     semester,
@@ -16,7 +17,7 @@ function event(
     endDate: "2027-06-18",
     note: "",
     sortOrder: 0,
-  } as AcademicCalendarEventView;
+  };
 }
 
 describe("groupPublicAcademicCalendarEvents", () => {
