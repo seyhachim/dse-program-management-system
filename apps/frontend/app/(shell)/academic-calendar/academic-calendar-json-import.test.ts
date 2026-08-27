@@ -1,0 +1,104 @@
+import { expect, test } from "bun:test";
+import {
+  holidaysToEvents,
+  normalizeAcademicYearLabel,
+  parseAcademicCalendarJson,
+  sameSemesterCoverage,
+  sameStudyYearCoverage,
+} from "./academic-calendar-json-import";
+
+const validImport = {
+  academicYear: "2026-2027",
+  calendars: [
+    {
+      studyYears: [1],
+      periods: [
+        {
+          semester: "First",
+          teachingStart: "2026-11-26",
+          teachingEnd: "2027-03-05",
+          examStart: "2027-03-08",
+          examEnd: "2027-03-12",
+        },
+      ],
+      events: [],
+      source: { title: "Official calendar", note: "Approved notice" },
+    },
+  ],
+  holidays: [
+    { title: "Khmer New Year", startDate: "2027-04-14", endDate: "2027-04-16", note: "Official public holiday" },
+  ],
+};
+
+test("parses a valid calendar import and keeps optional break dates omitted", () => {
+  const result = parseAcademicCalendarJson(JSON.stringify(validImport));
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.value.calendars[0]?.periods[0]?.breakStart).toBeUndefined();
+  expect(result.value.holidays).toHaveLength(1);
+});
+
+test("rejects malformed JSON", () => {
+  const result = parseAcademicCalendarJson("{not json}");
+  expect(result).toEqual({ ok: false, errors: ["The selected file is not valid JSON."] });
+});
+
+test("rejects reversed teaching dates and half-defined final exam week", () => {
+  const input = structuredClone(validImport);
+  input.calendars[0]!.periods[0]!.teachingStart = "2027-03-06";
+  input.calendars[0]!.periods[0]!.teachingEnd = "2027-03-05";
+  delete (input.calendars[0]!.periods[0] as { examEnd?: string }).examEnd;
+  const result = parseAcademicCalendarJson(JSON.stringify(input));
+  expect(result.ok).toBe(false);
+  if (result.ok) return;
+  expect(result.errors.some((error) => error.includes("Teaching end cannot precede teaching start"))).toBe(true);
+  expect(result.errors.some((error) => error.includes("Exam start and end must be set together"))).toBe(true);
+});
+
+test("rejects overlapping study-year and semester coverage inside one import", () => {
+  const input = structuredClone(validImport);
+  input.calendars.push(structuredClone(input.calendars[0]!));
+  const result = parseAcademicCalendarJson(JSON.stringify(input));
+  expect(result.ok).toBe(false);
+  if (result.ok) return;
+  expect(result.errors.some((error) => error.includes("covered more than once"))).toBe(true);
+});
+
+test("rejects duplicate holidays and reversed holiday ranges", () => {
+  const input = structuredClone(validImport);
+  input.holidays.push(structuredClone(input.holidays[0]!));
+  input.holidays[0]!.endDate = "2027-04-13";
+  const result = parseAcademicCalendarJson(JSON.stringify(input));
+  expect(result.ok).toBe(false);
+  if (result.ok) return;
+  expect(result.errors.some((error) => error.includes("Holiday end cannot precede start"))).toBe(true);
+  expect(result.errors.some((error) => error.includes("Duplicate holiday"))).toBe(true);
+});
+
+test("normalizes academic year dash variants without changing identity", () => {
+  expect(normalizeAcademicYearLabel("2026–2027")).toBe("2026-2027");
+  expect(normalizeAcademicYearLabel(" 2026 - 2027 ")).toBe("2026-2027");
+});
+
+test("compares coverage independent of array ordering", () => {
+  expect(sameStudyYearCoverage([4, 3], [3, 4])).toBe(true);
+  expect(sameStudyYearCoverage([3], [3, 4])).toBe(false);
+  expect(sameSemesterCoverage(
+    [{ semester: "Second", teachingStart: "2027-01-01", teachingEnd: "2027-01-02" }, { semester: "First", teachingStart: "2026-01-01", teachingEnd: "2026-01-02" }],
+    [{ semester: "First" }, { semester: "Second" }],
+  )).toBe(true);
+});
+
+test("converts programme-wide holidays to canonical Holiday events", () => {
+  expect(holidaysToEvents(validImport.holidays, 3)).toEqual([
+    {
+      title: "Khmer New Year",
+      type: "Holiday",
+      semester: null,
+      startDate: "2027-04-14",
+      endDate: "2027-04-16",
+      note: "Official public holiday",
+      sortOrder: 3,
+    },
+  ]);
+});
