@@ -17,7 +17,7 @@ export default function ProgrammeHolidaysPage() {
               Upload holiday-only JSON or add holidays manually. Imported holidays stay in the current correction draft so you can edit or remove them before publishing. Official published holidays remain unchanged until you publish the correction.
             </p>
           </div>
-          <AcademicCalendarJsonImportClient mode="holidays" />
+          <AcademicCalendarJsonImportClient />
           <AcademicCalendarProgrammeHolidays />
         </div>
       </main>
