@@ -6,10 +6,14 @@ export type AcademicCalendarStatus = z.infer<typeof AcademicCalendarStatusSchema
 
 export const ACADEMIC_CALENDAR_EVENT_TYPES = [
   "Registration", "Enrollment", "Orientation", "EntranceExam", "SemesterStart",
-  "Teaching", "Midterm", "FinalExam", "SemesterBreak", "Holiday", "Other",
+  "Teaching", "Midterm", "FinalExam", "SemesterBreak", "Holiday", "GraduateDefense", "Other",
 ] as const;
 export const AcademicCalendarEventTypeSchema = z.enum(ACADEMIC_CALENDAR_EVENT_TYPES);
 export type AcademicCalendarEventType = z.infer<typeof AcademicCalendarEventTypeSchema>;
+
+export const GRADUATE_DEFENSE_EVENT_TITLE = "Graduate Defense";
+export const GRADUATE_DEFENSE_STUDY_YEAR = 4 as const;
+export const GRADUATE_DEFENSE_SEMESTER = "Second" as const;
 
 export const AcademicCalendarStudyYearSchema = z.coerce.number().int().min(1).max(4);
 export type AcademicCalendarStudyYear = z.infer<typeof AcademicCalendarStudyYearSchema>;
@@ -60,8 +64,16 @@ export const AcademicCalendarEventInputSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).max(10000).default(0),
 }).superRefine((value, ctx) => {
   if (value.endDate && value.endDate < value.startDate) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endDate"], message: "End date cannot precede start date" });
+  if (value.type === "GraduateDefense") {
+    if (value.title !== GRADUATE_DEFENSE_EVENT_TITLE) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: `Graduate Defense events must use the title ${GRADUATE_DEFENSE_EVENT_TITLE}` });
+    if (value.semester !== GRADUATE_DEFENSE_SEMESTER) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["semester"], message: "Graduate Defense is fixed to Semester 2" });
+  }
 });
 export type AcademicCalendarEventInput = z.infer<typeof AcademicCalendarEventInputSchema>;
+
+export function academicCalendarEventAppliesToStudyYear(event: Pick<AcademicCalendarEventView, "type">, studyYear: number): boolean {
+  return event.type !== "GraduateDefense" || studyYear === GRADUATE_DEFENSE_STUDY_YEAR;
+}
 
 const SourceFields = {
   sourceTitle: z.string().trim().max(300).default(""),
