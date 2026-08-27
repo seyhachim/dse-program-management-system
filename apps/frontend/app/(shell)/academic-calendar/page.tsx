@@ -13,21 +13,12 @@ export default function AcademicCalendarPage() {
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="space-y-6">
-          <div className="academic-calendar-page space-y-6">
-            <AcademicCalendarSimpleClient />
-            <AcademicCalendarProgrammeHolidays />
-          </div>
+          <AcademicCalendarSimpleClient />
+          <AcademicCalendarProgrammeHolidays />
           <AcademicCalendarJsonImportClient />
-          <div className="academic-calendar-page">
-            <AcademicCalendarSharePanel />
-          </div>
+          <AcademicCalendarSharePanel />
         </div>
       </main>
-      <style>{`
-        .academic-calendar-page section.rounded-2xl.border.border-border.p-4 {
-          display: none;
-        }
-      `}</style>
     </>
   );
 }
