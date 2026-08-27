@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, CheckCircle2, Clock3, Copy, FilePenLine, Link2 } from "lucide-react";
 import type { AcademicCalendarView, AcademicYearView } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
+import { ApiError } from "@/lib/api";
 import { academicCalendarApi, formatAcademicDate } from "@/lib/academic-calendar";
 
 const STUDY_YEARS = [1, 2, 3, 4] as const;
@@ -30,12 +31,21 @@ function resolveYearState(calendars: AcademicCalendarView[], studyYear: number):
   return { calendar: null, status: "NotIssued" };
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Your session is invalid or expired. Sign in again, then reload this page.";
+    return error.message || "Could not load public calendar links.";
+  }
+  return "Could not load public calendar links.";
+}
+
 export function AcademicCalendarSharePanel() {
   const [programmeId, setProgrammeId] = useState("");
   const [years, setYears] = useState<AcademicYearView[]>([]);
   const [selectedYearId, setSelectedYearId] = useState("");
   const [calendars, setCalendars] = useState<AcademicCalendarView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [copiedYear, setCopiedYear] = useState<number | null>(null);
 
   const selectedYear = useMemo(
@@ -47,6 +57,7 @@ export function AcademicCalendarSharePanel() {
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setError(null);
       try {
         const programme = await academicCalendarApi.programme();
         const academicYears = await academicCalendarApi.years(programme.id);
@@ -57,6 +68,8 @@ export function AcademicCalendarSharePanel() {
         setYears(academicYears);
         setSelectedYearId(preferred?.id ?? "");
         setCalendars(calendarRows);
+      } catch (reason) {
+        if (!cancelled) setError(errorMessage(reason));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -67,11 +80,16 @@ export function AcademicCalendarSharePanel() {
   const changeYear = async (academicYearId: string) => {
     setSelectedYearId(academicYearId);
     setCopiedYear(null);
+    setError(null);
     if (!programmeId || !academicYearId) {
       setCalendars([]);
       return;
     }
-    setCalendars(await academicCalendarApi.calendars(programmeId, academicYearId));
+    try {
+      setCalendars(await academicCalendarApi.calendars(programmeId, academicYearId));
+    } catch (reason) {
+      setError(errorMessage(reason));
+    }
   };
 
   const copyLink = async (studyYear: number) => {
@@ -83,7 +101,23 @@ export function AcademicCalendarSharePanel() {
     window.setTimeout(() => setCopiedYear((current) => current === studyYear ? null : current), 1800);
   };
 
-  if (loading || !selectedYear) return null;
+  if (loading) return null;
+
+  if (error && !selectedYear) {
+    return (
+      <section className="rounded-2xl border border-border bg-card p-4 md:p-5">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">Public calendar links</h2>
+        </div>
+        <div role="alert" className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      </section>
+    );
+  }
+
+  if (!selectedYear) return null;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 md:p-5">
@@ -109,6 +143,8 @@ export function AcademicCalendarSharePanel() {
           </select>
         </div>
       </div>
+
+      {error ? <div role="alert" className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {STUDY_YEARS.map((year) => {
