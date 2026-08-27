@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ExternalLink, ShieldCheck } from "lucide-react";
 import type { AcademicCalendarEventView, PublishedAcademicCalendarProjection } from "@dse-pms/shared-types";
+import { groupPublicAcademicCalendarEvents } from "./public-academic-calendar-events";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -29,30 +30,39 @@ function studyYearFromSegment(value: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
+function EventRows({ events }: { events: AcademicCalendarEventView[] }) {
+  if (!events.length) return null;
+  return (
+    <div className="divide-y divide-border">
+      {events.map((event) => (
+        <div key={event.id} className="py-3 first:pt-0 last:pb-0">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">{event.title}</p>
+                {event.type === "Holiday" ? (
+                  <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                    Official holiday · All study years
+                  </span>
+                ) : null}
+              </div>
+              {event.note ? <p className="mt-1 text-sm text-muted-foreground">{event.note}</p> : null}
+            </div>
+            <p className="shrink-0 text-sm text-muted-foreground">{formatDate(event.startDate)}{event.endDate ? ` – ${formatDate(event.endDate)}` : ""}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EventList({ events, title = "Academic events" }: { events: AcademicCalendarEventView[]; title?: string }) {
   if (!events.length) return null;
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="mt-4 divide-y divide-border">
-        {events.map((event) => (
-          <div key={event.id} className="py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">{event.title}</p>
-                  {event.type === "Holiday" ? (
-                    <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                      Official holiday · All study years
-                    </span>
-                  ) : null}
-                </div>
-                {event.note ? <p className="mt-1 text-sm text-muted-foreground">{event.note}</p> : null}
-              </div>
-              <p className="shrink-0 text-sm text-muted-foreground">{formatDate(event.startDate)}{event.endDate ? ` – ${formatDate(event.endDate)}` : ""}</p>
-            </div>
-          </div>
-        ))}
+      <div className="mt-4">
+        <EventRows events={events} />
       </div>
     </section>
   );
@@ -97,6 +107,7 @@ export default function PublicAcademicCalendarPage({ params }: PublicAcademicCal
 
   const events = data?.status === "available" ? data.events : data?.events ?? [];
   const sources = data?.status === "available" ? data.sources : data?.sources ?? [];
+  const groupedEvents = useMemo(() => groupPublicAcademicCalendarEvents(events), [events]);
 
   return (
     <main className="min-h-screen bg-muted/20 px-4 py-8 sm:px-6 lg:px-8">
@@ -132,22 +143,30 @@ export default function PublicAcademicCalendarPage({ params }: PublicAcademicCal
 
         {!loading && !error && data?.status === "available" ? (
           <section className="grid gap-4 md:grid-cols-2">
-            {data.periods.map((period) => (
-              <article key={period.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="text-lg font-semibold">{semesterLabel(period.semester)}</h2>
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Teaching</dt><dd className="text-right font-medium">{formatDate(period.teachingStart)} – {formatDate(period.teachingEnd)}</dd></div>
-                  <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Final Exam week</dt><dd className="text-right">{period.examStart ? `${formatDate(period.examStart)} – ${formatDate(period.examEnd)}` : "Not issued"}</dd></div>
-                  {period.breakStart ? (
-                    <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Break</dt><dd className="text-right">{formatDate(period.breakStart)} – {formatDate(period.breakEnd)}</dd></div>
+            {data.periods.map((period) => {
+              const semesterEvents = groupedEvents[period.semester];
+              return (
+                <article key={period.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                  <h2 className="text-lg font-semibold">{semesterLabel(period.semester)}</h2>
+                  <dl className="mt-4 space-y-3 text-sm">
+                    <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Teaching</dt><dd className="text-right font-medium">{formatDate(period.teachingStart)} – {formatDate(period.teachingEnd)}</dd></div>
+                    <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Final Exam week</dt><dd className="text-right">{period.examStart ? `${formatDate(period.examStart)} – ${formatDate(period.examEnd)}` : "Not issued"}</dd></div>
+                    {period.breakStart ? (
+                      <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">Break</dt><dd className="text-right">{formatDate(period.breakStart)} – {formatDate(period.breakEnd)}</dd></div>
+                    ) : null}
+                  </dl>
+                  {semesterEvents.length ? (
+                    <div className="mt-4 border-t border-border pt-4 text-sm">
+                      <EventRows events={semesterEvents} />
+                    </div>
                   ) : null}
-                </dl>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </section>
         ) : null}
 
-        {!loading && !error ? <EventList events={events} title={data?.status === "unavailable" ? "Published official holidays" : "Academic events"} /> : null}
+        {!loading && !error ? <EventList events={groupedEvents.unscoped} title={data?.status === "unavailable" ? "Published official holidays" : "Academic events"} /> : null}
 
         {!loading && !error && sources.length ? (
           <section className="rounded-2xl border border-border bg-card p-5 text-sm shadow-sm">
