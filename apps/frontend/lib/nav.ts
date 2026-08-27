@@ -95,8 +95,28 @@ const publicInformationManifest: PluginManifest = {
   ],
 };
 
+/** Frontend-only child route for the focused holiday workflow. It reuses the
+ * Academic Calendar API and permission boundary rather than introducing a new
+ * backend plugin/domain. */
+const programmeHolidaysManifest: PluginManifest = {
+  id: "programme-holidays-workspace",
+  name: "Programme Holidays Workspace",
+  version: "0.1.0",
+  routes: [
+    {
+      label: "Programme Holidays",
+      path: "/academic-calendar/holidays",
+      icon: "calendar",
+      roles: ["admin", "program_coordinator"],
+      group: "Academic",
+    },
+  ],
+};
+
 const frontendManifests = [
-  ...pluginManifests.filter((manifest) => manifest.id !== "rubrics"),
+  ...pluginManifests.flatMap((manifest) =>
+    manifest.id === "programme" ? [manifest, programmeHolidaysManifest] : [manifest],
+  ).filter((manifest) => manifest.id !== "rubrics"),
   rubricBankManifest,
   gradingScaleManagementManifest,
   curriculumWorkspaceManifest,
