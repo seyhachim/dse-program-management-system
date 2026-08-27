@@ -5,6 +5,7 @@ import {
   AcademicCalendarStudyYearSchema,
   type AcademicCalendarEventInput,
   type AcademicCalendarPeriodInput,
+  type AcademicCalendarView,
   type CreateAcademicCalendarInput,
 } from "@dse-pms/shared-types";
 
@@ -123,6 +124,16 @@ export function sameStudyYearCoverage(left: readonly number[], right: readonly n
 
 export function sameSemesterCoverage(left: readonly AcademicCalendarPeriodInput[], right: readonly { semester: "First" | "Second" }[]): boolean {
   return [...left].map((item) => item.semester).sort().join(",") === [...right].map((item) => item.semester).sort().join(",");
+}
+
+export function isCurrentCorrectionDraft(
+  draft: Pick<AcademicCalendarView, "status" | "seriesKey" | "supersedesCalendarId">,
+  published: Pick<AcademicCalendarView, "id" | "status" | "seriesKey">,
+): boolean {
+  return draft.status === "Draft"
+    && published.status === "Published"
+    && draft.seriesKey === published.seriesKey
+    && draft.supersedesCalendarId === published.id;
 }
 
 function holidayEventKey(event: Pick<AcademicCalendarEventInput, "title" | "startDate" | "endDate">): string {
