@@ -8,10 +8,10 @@ import {
 import type { WeekForm } from "./weekly-plan-model";
 
 /**
- * Overview readiness must reflect the same source-data semantics used by the
- * Constructive Alignment audit and Review & Submit guard. The persisted
- * `mapping` section status only records whether the optional advanced matrix
- * has been saved; it is not authoritative for alignment readiness.
+ * Overview readiness must reflect source-data semantics used by the actual
+ * submission workflow. Constructive Alignment is derived from CLO coverage, and
+ * Specification Date is system-assigned on first submission rather than lecturer
+ * work, so neither should be driven by a stale/manual section flag here.
  */
 export function deriveOverviewReadinessStatus(
   status: Record<string, SpecSectionStatus>,
@@ -19,10 +19,12 @@ export function deriveOverviewReadinessStatus(
   weeklyPlan: WeekForm[],
   assessments: AssessmentForm[],
 ): Record<string, SpecSectionStatus> {
-  return applyDerivedAlignmentStatus(
+  const effective = applyDerivedAlignmentStatus(
     status,
     deriveConstructiveAlignmentAudit(clos, weeklyPlan, assessments),
   );
+  effective.date = "complete";
+  return effective;
 }
 
 export function applyDerivedAlignmentStatus(
