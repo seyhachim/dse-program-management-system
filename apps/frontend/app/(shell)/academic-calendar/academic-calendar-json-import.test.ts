@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  canReuseCorrectionDraftForHolidayOnly,
   holidaysToEvents,
   isCurrentCorrectionDraft,
   mergeImportedRevisionEvents,
@@ -106,6 +107,19 @@ test("only treats a draft targeting the current published revision as an active 
 
   expect(isCurrentCorrectionDraft(
     { status: "Draft", seriesKey: "other-series", supersedesCalendarId: "calendar-r2" },
+    currentPublished,
+  )).toBe(false);
+});
+
+test("reuses the current correction draft only for holiday-only imports", () => {
+  const currentPublished = { id: "calendar-r2", status: "Published" as const, seriesKey: "series-1" };
+  const currentDraft = { status: "Draft" as const, seriesKey: "series-1", supersedesCalendarId: "calendar-r2" };
+
+  expect(canReuseCorrectionDraftForHolidayOnly(0, currentDraft, currentPublished)).toBe(true);
+  expect(canReuseCorrectionDraftForHolidayOnly(1, currentDraft, currentPublished)).toBe(false);
+  expect(canReuseCorrectionDraftForHolidayOnly(
+    0,
+    { ...currentDraft, supersedesCalendarId: "calendar-r1" },
     currentPublished,
   )).toBe(false);
 });
