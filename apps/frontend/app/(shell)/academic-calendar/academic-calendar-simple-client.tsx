@@ -59,6 +59,14 @@ function message(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function publicYearSlug(label: string): string {
+  return label.replace(/–/g, "-").replace(/\s+/g, "");
+}
+
+function publicPath(programmeId: string, academicYear: string, studyYear: number): string {
+  return `/calendar/${encodeURIComponent(programmeId)}/${encodeURIComponent(publicYearSlug(academicYear))}/year-${studyYear}`;
+}
+
 function RequiredMark({ publishing = false }: { publishing?: boolean }) {
   return (
     <span className="ml-1 font-normal text-destructive">
@@ -446,6 +454,7 @@ export function AcademicCalendarSimpleClient() {
   const [auditRows, setAuditRows] = useState<AcademicCalendarAuditView[]>([]);
   const [newYear, setNewYear] = useState<AcademicYearDraft>(() => suggestedAcademicYearDraft());
   const [showNewYear, setShowNewYear] = useState(false);
+  const [copiedStudyYear, setCopiedStudyYear] = useState<number | null>(null);
 
   const selectedYear = years.find((year) => year.id === selectedYearId) ?? null;
   const newYearValues = academicYearValues(newYear.startYear);
@@ -489,10 +498,23 @@ export function AcademicCalendarSimpleClient() {
   }, [selectedCalendar?.id, selectedCalendar?.status, programmeId, editing, creating]);
 
   const changeAcademicYear = async (academicYearId: string) => {
-    setSelectedYearId(academicYearId); setSelectedCalendarId(""); setCreating(false); setEditing(false); setError(null); setNotice(null);
+    setSelectedYearId(academicYearId); setSelectedCalendarId(""); setCreating(false); setEditing(false); setError(null); setNotice(null); setCopiedStudyYear(null);
     if (!programmeId || !academicYearId) { setCalendars([]); return; }
     try { await loadCalendars(programmeId, academicYearId); }
     catch (reason) { setError(message(reason, "Could not load calendars for this academic year.")); }
+  };
+
+  const copyPublicLink = async (studyYear: number) => {
+    if (!selectedYear || !programmeId) return;
+    const path = publicPath(programmeId, selectedYear.label, studyYear);
+    const url = typeof window === "undefined" ? path : new URL(path, window.location.origin).toString();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedStudyYear(studyYear);
+      window.setTimeout(() => setCopiedStudyYear((current) => current === studyYear ? null : current), 1800);
+    } catch {
+      setError("Could not copy the public calendar link.");
+    }
   };
 
   const createAcademicYear = async () => {
@@ -639,7 +661,25 @@ export function AcademicCalendarSimpleClient() {
             {STUDY_YEARS.map((year) => {
               const candidates = calendars.filter((calendar) => calendar.studyYears.includes(year));
               const calendar = candidates.find((item) => item.status === "Published") ?? candidates.find((item) => item.status === "Draft") ?? candidates[0];
-              return <button key={year} type="button" onClick={() => { setSelectedStudyYear(year); setSelectedCalendarId(calendar?.id ?? ""); setCreating(false); setEditing(false); setError(null); setNotice(null); }} className={`rounded-2xl border p-4 text-left shadow-sm transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedStudyYear === year ? "border-primary bg-primary/5" : "border-border bg-card"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study year</p><p className="mt-2 text-lg font-semibold">Year {year}</p></div>{calendar ? <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${statusClasses(calendar.status)}`}>{calendar.status}</span> : <span className="rounded-full border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">Not available</span>}</div><p className="mt-3 text-xs text-muted-foreground">{calendar ? (calendar.studyYears.length > 1 ? `Shared record · Years ${calendar.studyYears.join("–")}` : `${calendar.periods.length} semester period${calendar.periods.length === 1 ? "" : "s"}`) : `No ${selectedYear.label} calendar issued for Year ${year}.`}</p></button>;
+              return (
+                <article key={year} className={`rounded-2xl border p-4 shadow-sm transition hover:border-primary/40 ${selectedStudyYear === year ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
+                  <button
+                    type="button"
+                    aria-pressed={selectedStudyYear === year}
+                    onClick={() => { setSelectedStudyYear(year); setSelectedCalendarId(calendar?.id ?? ""); setCreating(false); setEditing(false); setError(null); setNotice(null); }}
+                    className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study year</p><p className="mt-2 text-lg font-semibold">Year {year}</p></div>
+                      {calendar ? <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${statusClasses(calendar.status)}`}>{calendar.status}</span> : <span className="rounded-full border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">Not available</span>}
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">{calendar ? (calendar.studyYears.length > 1 ? `Shared record · Years ${calendar.studyYears.join("–")}` : `${calendar.periods.length} semester period${calendar.periods.length === 1 ? "" : "s"}`) : `No ${selectedYear.label} calendar issued for Year ${year}.`}</p>
+                  </button>
+                  <Button type="button" variant="outline" size="sm" className="mt-3 w-full" onClick={() => void copyPublicLink(year)}>
+                    <Copy className="h-3.5 w-3.5" /> {copiedStudyYear === year ? "Link copied" : "Copy public link"}
+                  </Button>
+                </article>
+              );
             })}
           </section>
 
