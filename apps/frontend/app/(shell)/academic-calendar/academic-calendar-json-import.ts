@@ -136,6 +136,14 @@ export function isCurrentCorrectionDraft(
     && draft.supersedesCalendarId === published.id;
 }
 
+export function canReuseCorrectionDraftForHolidayOnly(
+  importedCalendarCount: number,
+  draft: Pick<AcademicCalendarView, "status" | "seriesKey" | "supersedesCalendarId">,
+  published: Pick<AcademicCalendarView, "id" | "status" | "seriesKey">,
+): boolean {
+  return importedCalendarCount === 0 && isCurrentCorrectionDraft(draft, published);
+}
+
 function holidayEventKey(event: Pick<AcademicCalendarEventInput, "title" | "startDate" | "endDate">): string {
   return `${event.title.trim().toLocaleLowerCase()}|${event.startDate}|${event.endDate ?? ""}`;
 }
