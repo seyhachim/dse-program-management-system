@@ -82,9 +82,10 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {group.routes.map((route) => {
                     const Icon = route.icon ? iconMap[route.icon] : undefined;
-                    const isChildRoute = group.routes.some(
+                    const parentRoute = group.routes.find(
                       (candidate) => candidate.path !== route.path && route.path.startsWith(`${candidate.path}/`),
                     );
+                    const isChildRoute = Boolean(parentRoute);
                     const hasActiveChild = group.routes.some(
                       (candidate) => candidate.path !== route.path
                         && candidate.path.startsWith(`${route.path}/`)
