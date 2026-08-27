@@ -41,6 +41,18 @@ test("parses a valid calendar import and keeps optional break dates omitted", ()
   expect(result.value.holidays).toHaveLength(1);
 });
 
+test("parses holiday-only JSON with an empty calendars array", () => {
+  const result = parseAcademicCalendarJson(JSON.stringify({
+    academicYear: "2026-2027",
+    calendars: [],
+    holidays: validImport.holidays,
+  }));
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.value.calendars).toEqual([]);
+  expect(result.value.holidays).toHaveLength(1);
+});
+
 test("rejects malformed JSON", () => {
   const result = parseAcademicCalendarJson("{not json}");
   expect(result).toEqual({ ok: false, errors: ["The selected file is not valid JSON."] });
@@ -111,17 +123,11 @@ test("only treats a draft targeting the current published revision as an active 
   )).toBe(false);
 });
 
-test("reuses the current correction draft only for holiday-only imports", () => {
-  const currentPublished = { id: "calendar-r2", status: "Published" as const, seriesKey: "series-1" };
-  const currentDraft = { status: "Draft" as const, seriesKey: "series-1", supersedesCalendarId: "calendar-r2" };
-
-  expect(canReuseCorrectionDraftForHolidayOnly(0, currentDraft, currentPublished)).toBe(true);
-  expect(canReuseCorrectionDraftForHolidayOnly(1, currentDraft, currentPublished)).toBe(false);
-  expect(canReuseCorrectionDraftForHolidayOnly(
-    0,
-    { ...currentDraft, supersedesCalendarId: "calendar-r1" },
-    currentPublished,
-  )).toBe(false);
+test("holiday-only imports may reuse the current correction draft", () => {
+  const published = { id: "calendar-r2", status: "Published" as const, seriesKey: "series-1" };
+  const draft = { status: "Draft" as const, seriesKey: "series-1", supersedesCalendarId: "calendar-r2" };
+  expect(canReuseCorrectionDraftForHolidayOnly(0, draft, published)).toBe(true);
+  expect(canReuseCorrectionDraftForHolidayOnly(1, draft, published)).toBe(false);
 });
 
 test("converts programme-wide holidays to canonical Holiday events", () => {
