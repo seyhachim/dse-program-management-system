@@ -125,6 +125,40 @@ export function sameSemesterCoverage(left: readonly AcademicCalendarPeriodInput[
   return [...left].map((item) => item.semester).sort().join(",") === [...right].map((item) => item.semester).sort().join(",");
 }
 
+function holidayEventKey(event: Pick<AcademicCalendarEventInput, "title" | "startDate" | "endDate">): string {
+  return `${event.title.trim().toLocaleLowerCase()}|${event.startDate}|${event.endDate ?? ""}`;
+}
+
+export function mergeImportedRevisionEvents(
+  importedEvents: readonly AcademicCalendarEventInput[],
+  publishedEvents: readonly AcademicCalendarEventInput[],
+  additionalEvents: readonly AcademicCalendarEventInput[] = [],
+): AcademicCalendarEventInput[] {
+  const merged = importedEvents.map((event) => ({ ...event }));
+  const seenHolidayKeys = new Set(
+    merged.filter((event) => event.type === "Holiday").map(holidayEventKey),
+  );
+
+  for (const event of publishedEvents) {
+    if (event.type !== "Holiday") continue;
+    const key = holidayEventKey(event);
+    if (seenHolidayKeys.has(key)) continue;
+    merged.push({ ...event });
+    seenHolidayKeys.add(key);
+  }
+
+  for (const event of additionalEvents) {
+    if (event.type === "Holiday") {
+      const key = holidayEventKey(event);
+      if (seenHolidayKeys.has(key)) continue;
+      seenHolidayKeys.add(key);
+    }
+    merged.push({ ...event });
+  }
+
+  return merged.map((event, index) => ({ ...event, sortOrder: index }));
+}
+
 export function toCreateCalendarInput(
   academicYearId: string,
   calendar: AcademicCalendarJsonImportCalendar,
