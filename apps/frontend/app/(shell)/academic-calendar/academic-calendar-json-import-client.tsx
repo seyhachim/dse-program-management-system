@@ -14,6 +14,7 @@ import { academicCalendarApi, formatAcademicDate } from "@/lib/academic-calendar
 import {
   ACADEMIC_CALENDAR_JSON_TEMPLATE,
   holidaysToEvents,
+  isCurrentCorrectionDraft,
   mergeImportedRevisionEvents,
   normalizeAcademicYearLabel,
   parseAcademicCalendarJson,
@@ -113,10 +114,14 @@ function buildPlan(
   const calendarPlans: CalendarPlan[] = [];
   const published = calendars.filter((calendar) => calendar.status === "Published");
   const drafts = calendars.filter((calendar) => calendar.status === "Draft");
+  const activeDrafts = drafts.filter((draft) =>
+    draft.supersedesCalendarId === null
+    || published.some((current) => isCurrentCorrectionDraft(draft, current)),
+  );
 
   for (const [index, imported] of input.calendars.entries()) {
     const importedSemesters = imported.periods.map((period) => period.semester);
-    const overlappingDrafts = drafts.filter((calendar) =>
+    const overlappingDrafts = activeDrafts.filter((calendar) =>
       calendar.studyYears.some((year) => imported.studyYears.includes(year))
       && calendar.periods.some((period) => importedSemesters.includes(period.semester)),
     );
@@ -161,7 +166,7 @@ function buildPlan(
     if (!anchor) {
       blockers.push("Programme-wide holidays require at least one published calendar for this academic year. Publish a study-year calendar first.");
     } else {
-      const anchorDraft = drafts.find((calendar) => calendar.seriesKey === anchor.seriesKey);
+      const anchorDraft = activeDrafts.find((calendar) => isCurrentCorrectionDraft(calendar, anchor));
       if (anchorDraft) {
         blockers.push(`Year ${firstCoveredYear(anchor)} already has a correction draft in progress, so programme-wide holidays cannot be imported safely.`);
       } else {
