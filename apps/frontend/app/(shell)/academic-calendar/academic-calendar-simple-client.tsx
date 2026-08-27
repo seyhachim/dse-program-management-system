@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, Copy, FileText, History, Plus, RefreshCw } from "lucide-react";
+import { CalendarDays, CheckCircle2, Copy, FileText, History, Plus, RefreshCw, Trash2 } from "lucide-react";
 import type {
   AcademicCalendarAuditView,
   AcademicCalendarEventInput,
@@ -10,6 +10,7 @@ import type {
   AcademicCalendarView,
   AcademicYearView,
 } from "@dse-pms/shared-types";
+import { ACADEMIC_CALENDAR_EVENT_TYPES } from "@dse-pms/shared-types";
 import { Button, Input, Label } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { academicCalendarApi, academicSemesterLabel, formatAcademicDate } from "@/lib/academic-calendar";
@@ -89,6 +90,18 @@ function emptyPeriod(semester: "First" | "Second"): PeriodDraft {
     examEnd: "",
     breakStart: "",
     breakEnd: "",
+  };
+}
+
+function emptyEvent(index: number): EventDraft {
+  return {
+    key: `event-${Date.now()}-${index}`,
+    title: "",
+    type: "Other",
+    semester: "Second",
+    startDate: "",
+    endDate: "",
+    note: "",
   };
 }
 
@@ -293,6 +306,10 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
     setDraft({ ...draft, periods: draft.periods.map((period) => period.semester === semester ? { ...period, ...patch } : period) });
   };
 
+  const updateEvent = (key: string, patch: Partial<EventDraft>) => {
+    setDraft({ ...draft, events: draft.events.map((event) => event.key === key ? { ...event, ...patch } : event) });
+  };
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border bg-muted/10 p-4">
@@ -384,6 +401,64 @@ function CalendarEditor({ draft, setDraft }: { draft: CalendarDraft; setDraft: (
             </section>
           ))}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-muted/10 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h4 className="font-semibold">Academic events</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Add special academic periods such as defense week, orientation, or presentations. Set the semester so the event appears inside the matching public semester card.</p>
+          </div>
+          <Button type="button" variant="outline" onClick={() => setDraft({ ...draft, events: [...draft.events, emptyEvent(draft.events.length)] })}>
+            <Plus className="h-4 w-4" /> Add event
+          </Button>
+        </div>
+
+        {draft.events.length ? (
+          <div className="mt-4 space-y-4">
+            {draft.events.map((event, index) => (
+              <section key={event.key} className="rounded-xl border border-border bg-background p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h5 className="font-medium">Event {index + 1}{event.title ? ` · ${event.title}` : ""}</h5>
+                    <p className="mt-1 text-xs text-muted-foreground">Use Programme-wide only for a non-semester event. Official holidays should continue to use the Programme-wide holidays panel.</p>
+                  </div>
+                  <Button type="button" variant="ghost" aria-label={`Remove event ${index + 1}`} onClick={() => setDraft({ ...draft, events: draft.events.filter((item) => item.key !== event.key) })}>
+                    <Trash2 className="h-4 w-4" /> Remove
+                  </Button>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label htmlFor={`event-title-${event.key}`}>Title<RequiredMark /></Label>
+                    <Input id={`event-title-${event.key}`} required value={event.title} onChange={(e) => updateEvent(event.key, { title: e.target.value })} placeholder="Defense week" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`event-type-${event.key}`}>Type<RequiredMark /></Label>
+                    <select id={`event-type-${event.key}`} required className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.type} onChange={(e) => updateEvent(event.key, { type: e.target.value as AcademicCalendarEventType })}>
+                      {ACADEMIC_CALENDAR_EVENT_TYPES.filter((type) => type !== "Holiday").map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`event-semester-${event.key}`}>Semester</Label>
+                    <select id={`event-semester-${event.key}`} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={event.semester} onChange={(e) => updateEvent(event.key, { semester: e.target.value as EventDraft["semester"] })}>
+                      <option value="">Programme-wide / no semester</option>
+                      <option value="First">Semester 1</option>
+                      <option value="Second">Semester 2</option>
+                    </select>
+                  </div>
+                  <CalendarDateField required id={`event-start-${event.key}`} label="Start date" value={event.startDate} onChange={(value) => updateEvent(event.key, { startDate: value })} />
+                  <CalendarDateField id={`event-end-${event.key}`} label="End date" value={event.endDate} onChange={(value) => updateEvent(event.key, { endDate: value })} />
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label htmlFor={`event-note-${event.key}`}>Note <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                    <textarea id={`event-note-${event.key}`} className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={event.note} onChange={(e) => updateEvent(event.key, { note: e.target.value })} placeholder="Final project / thesis defense and presentation for graduating students." />
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">No academic events added. Add an event only when the official calendar issues a special academic period.</p>
+        )}
       </section>
 
       <section className="rounded-2xl border border-primary/20 bg-primary/[0.025] p-4">
@@ -536,6 +611,8 @@ export function AcademicCalendarSimpleClient() {
     if (draft.studyYears.length === 0) { setError("Select at least one study year."); return; }
     const periods = enabledPeriods(draft);
     if (!periods.length || periods.some((period) => !period.teachingStart || !period.teachingEnd)) { setError("Enter teaching start and end dates for each semester that has dates."); return; }
+    if (draft.events.some((event) => !event.title.trim() || !event.startDate)) { setError("Each academic event needs a title and start date."); return; }
+    if (draft.events.some((event) => event.endDate && event.endDate < event.startDate)) { setError("An academic event end date cannot be before its start date."); return; }
     setSaving(true); setError(null); setNotice(null);
     const payload = {
       studyYears: draft.studyYears,
