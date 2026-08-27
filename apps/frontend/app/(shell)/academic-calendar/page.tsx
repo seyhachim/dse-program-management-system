@@ -1,4 +1,5 @@
 import { Topbar } from "../topbar";
+import { AcademicCalendarJsonImportClient } from "./academic-calendar-json-import-client";
 import { AcademicCalendarProgrammeHolidays } from "./academic-calendar-programme-holidays";
 import { AcademicCalendarSharePanel } from "./academic-calendar-share-panel";
 import { AcademicCalendarSimpleClient } from "./academic-calendar-simple-client";
@@ -14,6 +15,7 @@ export default function AcademicCalendarPage() {
         <div className="academic-calendar-page space-y-6">
           <AcademicCalendarSimpleClient />
           <AcademicCalendarProgrammeHolidays />
+          <AcademicCalendarJsonImportClient />
           <AcademicCalendarSharePanel />
         </div>
       </main>
