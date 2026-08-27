@@ -6,7 +6,6 @@ export type ReviewReadinessItemId =
   | "teachingLearning"
   | "assessmentPlan"
   | "slt"
-  | "date"
   | "mapping";
 
 export type ReviewReadinessItem = {
@@ -19,13 +18,11 @@ export function buildReviewReadinessItems({
   status,
   cloReady,
   teachingLearningReady,
-  specificationDateReady,
   constructiveAlignmentReady,
 }: {
   status: Record<string, SpecSectionStatus>;
   cloReady: boolean;
   teachingLearningReady: boolean;
-  specificationDateReady: boolean;
   constructiveAlignmentReady: boolean;
 }): ReviewReadinessItem[] {
   return [
@@ -53,11 +50,6 @@ export function buildReviewReadinessItems({
       id: "slt",
       title: "Weekly Plan",
       complete: status.slt === "complete",
-    },
-    {
-      id: "date",
-      title: "Specification Date",
-      complete: specificationDateReady,
     },
     {
       id: "mapping",
