@@ -82,18 +82,28 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {group.routes.map((route) => {
                     const Icon = route.icon ? iconMap[route.icon] : undefined;
-                    const active =
+                    const isChildRoute = group.routes.some(
+                      (candidate) => candidate.path !== route.path && route.path.startsWith(`${candidate.path}/`),
+                    );
+                    const hasActiveChild = group.routes.some(
+                      (candidate) => candidate.path !== route.path
+                        && candidate.path.startsWith(`${route.path}/`)
+                        && (pathname === candidate.path || pathname.startsWith(`${candidate.path}/`)),
+                    );
+                    const active = !hasActiveChild && (
                       pathname === route.path ||
-                      pathname.startsWith(`${route.path}/`);
+                      pathname.startsWith(`${route.path}/`)
+                    );
                     const label = sidebarLabel(route.label, route.path);
                     return (
                       <SidebarMenuItem key={`${route.path}-${route.label}`}>
                         <SidebarMenuButton
                           isActive={active}
                           tooltip={label}
+                          className={isChildRoute ? "ml-5 w-[calc(100%-1.25rem)] text-xs text-sidebar-muted" : undefined}
                           render={
                             <Link href={route.path}>
-                              {Icon ? <Icon /> : null}
+                              {Icon ? <Icon className={isChildRoute ? "h-3.5 w-3.5" : undefined} /> : null}
                               <span>{label}</span>
                             </Link>
                           }
