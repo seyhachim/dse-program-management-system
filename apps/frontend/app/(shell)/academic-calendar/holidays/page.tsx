@@ -14,7 +14,7 @@ export default function ProgrammeHolidaysPage() {
           <div className="mx-auto max-w-7xl rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm">
             <p className="font-medium">Holiday workflow</p>
             <p className="mt-1 text-muted-foreground">
-              Review the current holiday correction draft below. You can add, edit, or remove pending holidays before publishing. Use the holiday-only JSON importer for bulk entry; official published holidays remain unchanged until the correction is published.
+              Review the current holiday correction draft below. You can add, edit, or remove pending holidays before publishing. The importer on this page accepts holiday-only JSON ("calendars": []); full academic-calendar JSON stays on Academic Calendar.
             </p>
           </div>
           <AcademicCalendarProgrammeHolidays />
