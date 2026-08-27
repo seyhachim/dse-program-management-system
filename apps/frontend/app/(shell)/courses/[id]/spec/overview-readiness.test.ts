@@ -83,6 +83,17 @@ const baseStatus: Record<string, SpecSectionStatus> = {
 };
 
 describe("overview readiness", () => {
+  test("treats Specification Date as automatic rather than lecturer work", () => {
+    const status = deriveOverviewReadinessStatus(
+      baseStatus,
+      [clo("CLO1")],
+      [week("w1", ["CLO1"])],
+      [assessment("a1", ["CLO1"])],
+    );
+
+    expect(status.date).toBe("complete");
+  });
+
   test("overrides stale missing mapping status when source data is fully aligned", () => {
     const status = deriveOverviewReadinessStatus(
       baseStatus,
