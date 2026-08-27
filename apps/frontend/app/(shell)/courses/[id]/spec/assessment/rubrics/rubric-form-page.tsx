@@ -23,8 +23,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
+  FormFieldLabel,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -220,13 +220,13 @@ export function RubricFormPage({
               <section className="space-y-4 rounded-xl border border-border bg-card p-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block space-y-1.5 sm:col-span-2">
-                    <span className="text-sm font-medium text-foreground">Rubric name</span>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Assignment Rubric – Written Report" />
+                    <FormFieldLabel required>Rubric name</FormFieldLabel>
+                    <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Assignment Rubric – Written Report" />
                   </label>
                   <label className="block space-y-1.5">
-                    <span className="text-sm font-medium text-foreground">Type</span>
+                    <FormFieldLabel required>Type</FormFieldLabel>
                     <Select value={type} onValueChange={(v) => setType(v as RubricType)}>
-                      <SelectTrigger>
+                      <SelectTrigger aria-required="true">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -239,9 +239,9 @@ export function RubricFormPage({
                     </Select>
                   </label>
                   <label className="block space-y-1.5">
-                    <span className="text-sm font-medium text-foreground">Status</span>
+                    <FormFieldLabel required>Status</FormFieldLabel>
                     <Select value={status} onValueChange={(v) => setStatus(v as RubricStatus)}>
-                      <SelectTrigger>
+                      <SelectTrigger aria-required="true">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -254,7 +254,7 @@ export function RubricFormPage({
                     </Select>
                   </label>
                   <label className="block space-y-1.5 sm:col-span-2">
-                    <span className="text-sm font-medium text-foreground">Description</span>
+                    <FormFieldLabel>Description</FormFieldLabel>
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
@@ -284,16 +284,18 @@ export function RubricFormPage({
                   {levels.map((lvl, i) => (
                     <div key={i} className="flex items-end gap-2 rounded-lg border border-border p-3">
                       <label className="space-y-1">
-                        <Label className="text-xs">Label</Label>
+                        <FormFieldLabel required className="text-xs">Label</FormFieldLabel>
                         <Input
+                          required
                           value={lvl.label}
                           onChange={(e) => updateLevel(i, { label: e.target.value })}
                           className="h-8 w-32"
                         />
                       </label>
                       <label className="space-y-1">
-                        <Label className="text-xs">Points</Label>
+                        <FormFieldLabel required className="text-xs">Points</FormFieldLabel>
                         <Input
+                          required
                           type="number"
                           min={0}
                           value={lvl.points}
@@ -334,7 +336,9 @@ export function RubricFormPage({
                   <table className="w-full min-w-[640px] border-collapse text-sm">
                     <thead>
                       <tr className="bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                        <th className="w-48 px-3 py-2">Criterion</th>
+                        <th className="w-48 px-3 py-2">
+                          <FormFieldLabel required className="text-xs">Criterion</FormFieldLabel>
+                        </th>
                         {levels.map((lvl, i) => (
                           <th key={i} className="px-3 py-2 text-center">
                             <div className="font-semibold text-foreground">{lvl.points}</div>
@@ -349,6 +353,8 @@ export function RubricFormPage({
                         <tr key={c.id} className="border-t border-border align-top">
                           <td className="px-3 py-2">
                             <Input
+                              required
+                              aria-label="Criterion name"
                               value={c.name}
                               onChange={(e) => updateCriterion(c.id, { name: e.target.value })}
                               placeholder="e.g. Content Quality"

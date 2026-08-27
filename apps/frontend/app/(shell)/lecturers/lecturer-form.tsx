@@ -18,6 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  FormFieldLabel,
   Input,
   Switch,
 } from "@dse-pms/ui";
@@ -100,7 +101,6 @@ export function LecturerForm({
 
         <form
           onSubmit={handleSubmit(async (values) => {
-            // Send undefined for blank optionals so they store as null/defaults, not "".
             await onSubmit(
               {
                 ...values,
@@ -114,11 +114,11 @@ export function LecturerForm({
           })}
           className="space-y-4"
         >
-          <Field label="Name" error={errors.name?.message}>
-            <Input placeholder="Chim Seyha" {...register("name")} />
+          <Field label="Name" error={errors.name?.message} required>
+            <Input placeholder="Chim Seyha" {...register("name")} required />
           </Field>
-          <Field label="Email" error={errors.email?.message}>
-            <Input placeholder="chim.seyha@rupp.edu.kh" {...register("email")} />
+          <Field label="Email" error={errors.email?.message} required>
+            <Input type="email" placeholder="chim.seyha@rupp.edu.kh" {...register("email")} required />
           </Field>
           <Field label="Honorific" error={errors.honorific?.message}>
             <select
@@ -184,15 +184,17 @@ export function LecturerForm({
 function Field({
   label,
   error,
+  required = false,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
+      <FormFieldLabel required={required}>{label}</FormFieldLabel>
       {children}
       {error ? <span className="block text-xs text-status-live">{error}</span> : null}
     </label>

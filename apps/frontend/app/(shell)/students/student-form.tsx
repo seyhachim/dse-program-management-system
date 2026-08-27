@@ -16,6 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  FormFieldLabel,
   Input,
   Select,
   SelectContent,
@@ -68,7 +69,6 @@ export function StudentForm({
     },
   });
 
-  // Sync form values whenever the dialog opens or the editing target changes.
   useEffect(() => {
     if (!open) return;
     reset(
@@ -115,22 +115,22 @@ export function StudentForm({
           className="space-y-5"
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Display name" error={errors.name?.message}>
-              <Input placeholder="Seng Kimhour" {...register("name")} />
+            <Field label="Display name" error={errors.name?.message} required>
+              <Input placeholder="Seng Kimhour" {...register("name")} required />
             </Field>
-            <Field label="Student ID" error={errors.studentId?.message}>
-              <Input placeholder="Official student ID" {...register("studentId")} />
+            <Field label="Student ID" error={errors.studentId?.message} required>
+              <Input placeholder="Official student ID" {...register("studentId")} required />
             </Field>
             <Field label="Email (optional)" error={errors.email?.message}>
               <Input type="email" placeholder="Add when officially available" {...register("email")} />
             </Field>
-            <Field label="Status" error={errors.status?.message}>
+            <Field label="Status" error={errors.status?.message} required>
               <Controller
                 control={control}
                 name="status"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-required="true">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -189,15 +189,17 @@ export function StudentForm({
 function Field({
   label,
   error,
+  required = false,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
+      <FormFieldLabel required={required}>{label}</FormFieldLabel>
       {children}
       {error ? <span className="block text-xs text-status-live">{error}</span> : null}
     </label>

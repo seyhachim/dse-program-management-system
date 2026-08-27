@@ -5,7 +5,6 @@ import { Check, CheckCircle2, Clock3, Copy, FilePenLine, Link2 } from "lucide-re
 import type { AcademicCalendarView, AcademicYearView } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { academicCalendarApi, formatAcademicDate } from "@/lib/academic-calendar";
-import { ACADEMIC_CALENDAR_REFRESH_EVENT } from "./academic-calendar-refresh-bridge";
 
 const STUDY_YEARS = [1, 2, 3, 4] as const;
 
@@ -74,15 +73,6 @@ export function AcademicCalendarSharePanel() {
     }
     setCalendars(await academicCalendarApi.calendars(programmeId, academicYearId));
   };
-
-  useEffect(() => {
-    const refresh = () => {
-      if (!programmeId || !selectedYearId) return;
-      void academicCalendarApi.calendars(programmeId, selectedYearId).then(setCalendars);
-    };
-    window.addEventListener(ACADEMIC_CALENDAR_REFRESH_EVENT, refresh);
-    return () => window.removeEventListener(ACADEMIC_CALENDAR_REFRESH_EVENT, refresh);
-  }, [programmeId, selectedYearId]);
 
   const copyLink = async (studyYear: number) => {
     if (!selectedYear || !programmeId) return;

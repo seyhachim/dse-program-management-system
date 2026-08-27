@@ -1,13 +1,20 @@
 import type { PolicySection } from "@dse-pms/shared-types";
 
 export const POLICIES_RESPONSIBILITIES_TAB = "policy" as const;
+export const SPECIFICATION_DATE_TAB = "reviewSubmit" as const;
 
+/**
+ * Normalize legacy/section-level Course Specification targets to the current
+ * combined tabs. Student Responsibility lives inside Policies & Responsibilities,
+ * while issue #481 moved Specification Date into Review & Submit and removed the
+ * standalone Date tab.
+ */
 export function normalizePoliciesResponsibilitiesTab(
   requested: string | null,
 ): string | null {
-  return requested === "responsibility"
-    ? POLICIES_RESPONSIBILITIES_TAB
-    : requested;
+  if (requested === "responsibility") return POLICIES_RESPONSIBILITIES_TAB;
+  if (requested === "date") return SPECIFICATION_DATE_TAB;
+  return requested;
 }
 
 export function mergePolicyFieldForSave(

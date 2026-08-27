@@ -64,29 +64,6 @@ function requirePublishable(row: CalendarRow) {
   if (row.studyYears.length === 0 || row.periods.length === 0) throw new AcademicCalendarValidationError("A published calendar needs at least one study year and semester period");
 }
 
-function holidayKey(event: AcademicCalendarEventView): string {
-  return [event.type, event.title.trim().toLocaleLowerCase(), event.startDate, event.endDate ?? ""].join("|");
-}
-
-/**
- * Holidays are programme-wide official closures. A published Holiday entered on any calendar
- * for an academic year is therefore reused by Years 1-4. Other event types remain scoped to
- * the calendar's own study-year coverage. Semantic de-duplication prevents the same official
- * holiday from appearing twice when historical data contains copies on multiple calendars.
- */
-export function mergeAcademicCalendarEventsForStudyYear(
-  scopedEvents: AcademicCalendarEventView[],
-  publishedProgrammeEvents: AcademicCalendarEventView[],
-): AcademicCalendarEventView[] {
-  const merged = new Map<string, AcademicCalendarEventView>();
-  for (const event of scopedEvents.filter((item) => item.type !== "Holiday")) merged.set(`id:${event.id}`, event);
-  for (const event of publishedProgrammeEvents.filter((item) => item.type === "Holiday")) {
-    const key = `holiday:${holidayKey(event)}`;
-    if (!merged.has(key)) merged.set(key, event);
-  }
-  return [...merged.values()].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
-}
-
 export function buildAcademicCalendarTimeline(periods: AcademicCalendarPeriodView[], events: AcademicCalendarEventView[], today = new Date().toISOString().slice(0, 10)): AcademicCalendarTimelineEvent[] {
   const synthesized = periods.flatMap((period): AcademicCalendarTimelineEvent[] => {
     const semesterLabel = period.semester === "First" ? "Semester 1" : "Semester 2";
@@ -282,61 +259,12 @@ export const academicCalendarService = {
   },
   async publishedProjection(programmeId: string, studyYear: number, academicYearLabel?: string): Promise<PublishedAcademicCalendarProjection> {
     const year = academicYearLabel ? await prisma.academicYear.findFirst({ where: { programmeId, label: academicYearLabel } }) : await prisma.academicYear.findFirst({ where: { programmeId, isCurrent: true } });
-    if (!year) return { status: "unavailable", academicYear: null, studyYear, reason: "academic-year-unavailable", message: "No current academic year is configured for this programme.", events: [], sources: [] };
-
-    const publishedRows = await prisma.academicCalendar.findMany({
-      where: { academicYearId: year.id, status: "Published" },
-      include: calendarInclude,
-      orderBy: [{ publishedAt: "desc" }],
-    });
-    const rows = publishedRows.filter((row) => row.studyYears.some((item) => item.studyYear === studyYear));
-
-    const programmeHolidayEvents = mergeAcademicCalendarEventsForStudyYear(
-      [],
-      publishedRows.flatMap((row) => calendarView(row).events),
-    );
-    const holidaySourceRows = new Set(programmeHolidayEvents.map((event) => event.calendarId));
-    const programmeHolidaySources = publishedRows
-      .filter((row) => holidaySourceRows.has(row.id))
-      .map((row) => {
-        const { fileRef: _internalFileRef, ...source } = calendarView(row).source;
-        return source;
-      });
-
-    if (!rows.length) {
-      return {
-        status: "unavailable",
-        academicYear: yearView(year),
-        studyYear,
-        reason: "calendar-unpublished",
-        message: `The official academic calendar for Year ${studyYear} has not yet been published.`,
-        events: programmeHolidayEvents,
-        sources: programmeHolidaySources,
-      };
-    }
-
-    const bySemester = new Map<string, AcademicCalendarPeriodView>();
-    const scopedEvents: AcademicCalendarEventView[] = [];
-    const sources = new Map<string, Omit<AcademicCalendarView["source"], "fileRef">>();
-    for (const row of rows) {
-      const view = calendarView(row);
-      for (const period of view.periods) {
-        if (bySemester.has(period.semester)) throw new AcademicCalendarConflictError("Published calendar data contains conflicting semester periods");
-        bySemester.set(period.semester, period);
-      }
-      scopedEvents.push(...view.events);
-      const { fileRef: _internalFileRef, ...publicSource } = view.source;
-      sources.set(row.id, publicSource);
-    }
-    for (const row of publishedRows) {
-      if (!holidaySourceRows.has(row.id)) continue;
-      const { fileRef: _internalFileRef, ...publicSource } = calendarView(row).source;
-      sources.set(row.id, publicSource);
-    }
-
-    const periods = [...bySemester.values()].sort((a, b) => a.semester.localeCompare(b.semester));
-    const events = mergeAcademicCalendarEventsForStudyYear(scopedEvents, programmeHolidayEvents);
-    const timeline = buildAcademicCalendarTimeline(periods, events);
+    if (!year) return { status: "unavailable", academicYear: null, studyYear, reason: "academic-year-unavailable", message: "No current academic year is configured for this programme." };
+    const rows = await prisma.academicCalendar.findMany({ where: { academicYearId: year.id, status: "Published", studyYears: { some: { studyYear } } }, include: calendarInclude, orderBy: [{ publishedAt: "desc" }] });
+    if (!rows.length) return { status: "unavailable", academicYear: yearView(year), studyYear, reason: "calendar-unpublished", message: `The official academic calendar for Year ${studyYear} has not yet been published.` };
+    const bySemester = new Map<string, AcademicCalendarPeriodView>(); const eventById = new Map<string, AcademicCalendarEventView>(); const sources = new Map<string, Omit<AcademicCalendarView["source"], "fileRef">>();
+    for (const row of rows) { const view = calendarView(row); for (const period of view.periods) { if (bySemester.has(period.semester)) throw new AcademicCalendarConflictError("Published calendar data contains conflicting semester periods"); bySemester.set(period.semester, period); } for (const event of view.events) eventById.set(event.id, event); const { fileRef: _internalFileRef, ...publicSource } = view.source; sources.set(row.id, publicSource); }
+    const periods = [...bySemester.values()].sort((a, b) => a.semester.localeCompare(b.semester)); const events = [...eventById.values()].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.sortOrder - b.sortOrder); const timeline = buildAcademicCalendarTimeline(periods, events);
     return { status: "available", academicYear: yearView(year), studyYear, periods, events, sources: [...sources.values()], nextEvent: timeline[0] ?? null };
   },
 };

@@ -25,6 +25,10 @@ function sidebarLabel(label: string, path: string): string {
     : label;
 }
 
+function matchesRoute(pathname: string, routePath: string): boolean {
+  return pathname === routePath || pathname.startsWith(`${routePath}/`);
+}
+
 /** Sidebar follows the canvas theme (white in light mode, near-black in dark), collapsible to icons. Nav items come from the plugin manifest, grouped into sections. */
 export function AppSidebar() {
   const pathname = usePathname();
@@ -36,6 +40,10 @@ export function AppSidebar() {
   // & Support) instead of the main scrollable nav list.
   const footerRoutes = groups.find((g) => g.label === "footer")?.routes ?? [];
   const mainGroups = groups.filter((g) => g.label !== "footer");
+  const allRoutes = [...mainGroups.flatMap((group) => group.routes), ...footerRoutes];
+  const activeRoutePath = allRoutes
+    .filter((route) => matchesRoute(pathname, route.path))
+    .sort((a, b) => b.path.length - a.path.length)[0]?.path;
 
   return (
     <SidebarPrimitive
@@ -82,9 +90,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {group.routes.map((route) => {
                     const Icon = route.icon ? iconMap[route.icon] : undefined;
-                    const active =
-                      pathname === route.path ||
-                      pathname.startsWith(`${route.path}/`);
+                    const active = route.path === activeRoutePath;
                     const label = sidebarLabel(route.label, route.path);
                     return (
                       <SidebarMenuItem key={`${route.path}-${route.label}`}>
@@ -113,9 +119,7 @@ export function AppSidebar() {
           <SidebarMenu>
             {footerRoutes.map((route) => {
               const Icon = route.icon ? iconMap[route.icon] : undefined;
-              const active =
-                pathname === route.path ||
-                pathname.startsWith(`${route.path}/`);
+              const active = route.path === activeRoutePath;
               const label = sidebarLabel(route.label, route.path);
               return (
                 <SidebarMenuItem key={`${route.path}-${route.label}`}>
