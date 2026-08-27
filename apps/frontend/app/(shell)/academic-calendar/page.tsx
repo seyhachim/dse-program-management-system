@@ -12,11 +12,15 @@ export default function AcademicCalendarPage() {
         subtitle="Manage official programme academic periods once and reuse them safely"
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="academic-calendar-page space-y-6">
-          <AcademicCalendarSimpleClient />
-          <AcademicCalendarProgrammeHolidays />
+        <div className="space-y-6">
+          <div className="academic-calendar-page space-y-6">
+            <AcademicCalendarSimpleClient />
+            <AcademicCalendarProgrammeHolidays />
+          </div>
           <AcademicCalendarJsonImportClient />
-          <AcademicCalendarSharePanel />
+          <div className="academic-calendar-page">
+            <AcademicCalendarSharePanel />
+          </div>
         </div>
       </main>
       <style>{`
