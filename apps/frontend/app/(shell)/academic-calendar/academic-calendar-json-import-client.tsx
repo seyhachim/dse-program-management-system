@@ -45,6 +45,8 @@ type ImportPlan = {
   blockers: string[];
 };
 
+type ImportMode = "calendar" | "holidays";
+
 function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) return error.message || fallback;
   if (error instanceof Error) return error.message || fallback;
@@ -209,7 +211,8 @@ function buildPlan(
   };
 }
 
-export function AcademicCalendarJsonImportClient() {
+export function AcademicCalendarJsonImportClient({ mode = "calendar" }: { mode?: ImportMode }) {
+  const holidayOnly = mode === "holidays";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [programmeId, setProgrammeId] = useState("");
   const [years, setYears] = useState<AcademicYearView[]>([]);
@@ -227,11 +230,11 @@ export function AcademicCalendarJsonImportClient() {
       setProgrammeId(programme.id);
       setYears(academicYears);
     } catch (reason) {
-      setError(errorMessage(reason, "Could not prepare calendar JSON import."));
+      setError(errorMessage(reason, holidayOnly ? "Could not prepare holiday JSON import." : "Could not prepare calendar JSON import."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [holidayOnly]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -266,6 +269,14 @@ export function AcademicCalendarJsonImportClient() {
         setError(parsed.errors.join("\n"));
         return;
       }
+      if (holidayOnly && parsed.value.calendars.length > 0) {
+        setError("Programme Holidays accepts holiday-only JSON. Remove calendar entries (use \"calendars\": []) or import the full file from Academic Calendar.");
+        return;
+      }
+      if (holidayOnly && parsed.value.holidays.length === 0) {
+        setError("This file does not contain any holidays to import.");
+        return;
+      }
       const normalized = normalizeAcademicYearLabel(parsed.value.academicYear);
       const academicYear = years.find((year) => normalizeAcademicYearLabel(year.label) === normalized) ?? null;
       if (!academicYear) {
@@ -275,7 +286,7 @@ export function AcademicCalendarJsonImportClient() {
       const calendars = await academicCalendarApi.calendars(programmeId, academicYear.id);
       setPlan(buildPlan(academicYear, file.name, parsed.value, calendars));
     } catch (reason) {
-      setError(errorMessage(reason, "Could not read the calendar JSON file."));
+      setError(errorMessage(reason, holidayOnly ? "Could not read the holiday JSON file." : "Could not read the calendar JSON file."));
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -322,18 +333,21 @@ export function AcademicCalendarJsonImportClient() {
 
       window.location.reload();
     } catch (reason) {
-      setError(`${errorMessage(reason, "Calendar JSON import failed.")} Published calendars were not changed. Any draft created before the failure remains a draft and should be reviewed before retrying.`);
+      setError(`${errorMessage(reason, holidayOnly ? "Holiday JSON import failed." : "Calendar JSON import failed.")} Published calendars were not changed. Any draft created before the failure remains a draft and should be reviewed before retrying.`);
     } finally {
       setSaving(false);
     }
   };
 
   const downloadTemplate = () => {
-    const blob = new Blob([`${JSON.stringify(ACADEMIC_CALENDAR_JSON_TEMPLATE, null, 2)}\n`], { type: "application/json" });
+    const template = holidayOnly
+      ? { academicYear: ACADEMIC_CALENDAR_JSON_TEMPLATE.academicYear, calendars: [], holidays: ACADEMIC_CALENDAR_JSON_TEMPLATE.holidays }
+      : ACADEMIC_CALENDAR_JSON_TEMPLATE;
+    const blob = new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "academic-calendar-import-template.json";
+    anchor.download = holidayOnly ? "programme-holidays-import-template.json" : "academic-calendar-import-template.json";
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -344,15 +358,17 @@ export function AcademicCalendarJsonImportClient() {
         <div>
           <div className="flex items-center gap-2">
             <FileJson className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Import calendar JSON</h2>
+            <h2 className="text-lg font-semibold">{holidayOnly ? "Import holiday JSON" : "Import calendar JSON"}</h2>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Upload a structured Academic Calendar file, review the changes first, then create drafts. Published calendars are never edited in place.
+            {holidayOnly
+              ? "Upload a holiday-only Academic Year JSON file and review it before adding the holidays to the current correction draft. Published holidays are never edited in place."
+              : "Upload a structured Academic Calendar file, review the changes first, then create drafts. Published calendars are never edited in place."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="ghost" disabled={loading} onClick={downloadTemplate}>
-            <Download className="h-4 w-4" /> JSON template
+            <Download className="h-4 w-4" /> {holidayOnly ? "Holiday template" : "JSON template"}
           </Button>
           <Button type="button" variant="outline" disabled={loading || !programmeId || saving} onClick={() => fileInputRef.current?.click()}>
             <Upload className="h-4 w-4" /> Upload JSON
@@ -362,7 +378,7 @@ export function AcademicCalendarJsonImportClient() {
             type="file"
             accept="application/json,.json"
             className="sr-only"
-            aria-label="Upload Academic Calendar JSON"
+            aria-label={holidayOnly ? "Upload Programme Holidays JSON" : "Upload Academic Calendar JSON"}
             onChange={(event) => { const file = event.target.files?.[0]; if (file) void chooseFile(file); }}
           />
         </div>
@@ -425,13 +441,15 @@ export function AcademicCalendarJsonImportClient() {
             <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
               {plan.existingHolidayDraftId
                 ? "This holiday-only import will add the new holidays to the existing current correction draft. Its semester dates and other draft work are preserved. Nothing is published automatically."
-                : "Import creates only Draft or correction-Draft records. It does not publish them. Review each draft in Academic Calendar before publishing it as official."}
+                : holidayOnly
+                  ? "The holidays will be added to a correction draft only. Review, edit, or remove them in Programme Holidays before publishing."
+                  : "Import creates only Draft or correction-Draft records. It does not publish them. Review each draft in Academic Calendar before publishing it as official."}
             </div>
           )}
 
           <div className="mt-4 flex justify-end gap-2">
             <Button type="button" variant="ghost" disabled={saving} onClick={() => setPlan(null)}>Cancel</Button>
-            <Button type="button" disabled={saving || plan.blockers.length > 0} onClick={() => void executeImport()}>{saving ? "Importing…" : "Import as drafts"}</Button>
+            <Button type="button" disabled={saving || plan.blockers.length > 0} onClick={() => void executeImport()}>{saving ? "Importing…" : holidayOnly ? "Import holidays to draft" : "Import as drafts"}</Button>
           </div>
         </div>
       ) : null}
