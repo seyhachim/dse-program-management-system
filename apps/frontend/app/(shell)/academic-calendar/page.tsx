@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { buttonVariants } from "@dse-pms/ui";
 import { Topbar } from "../topbar";
-import { AcademicCalendarSharePanel } from "./academic-calendar-share-panel";
 import { AcademicCalendarSimpleClient } from "./academic-calendar-simple-client";
 
 export default function AcademicCalendarPage() {
@@ -34,7 +33,6 @@ export default function AcademicCalendarPage() {
               </Link>
             </div>
           </div>
-          <AcademicCalendarSharePanel />
         </div>
       </main>
     </>
