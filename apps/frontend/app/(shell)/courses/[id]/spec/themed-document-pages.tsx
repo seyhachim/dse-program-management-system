@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import type { CourseSpecDocumentTheme } from "@dse-pms/shared-types";
 import type { CourseDocumentModel } from "./course-document-model";
+import { courseTypeCheckboxText } from "./course-information-checkboxes";
 import { presentCourseDocumentResources } from "./course-document-resources";
 import { DocumentPages } from "./document-preview-pages";
 
@@ -38,6 +39,10 @@ export function ThemedDocumentPages({
   } as CSSProperties;
   const presentationDocument: CourseDocumentModel = {
     ...document,
+    courseInformation: {
+      ...document.courseInformation,
+      courseType: courseTypeCheckboxText(document.courseInformation.courseType),
+    },
     resources: presentCourseDocumentResources(document.resources),
   };
 
