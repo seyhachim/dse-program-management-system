@@ -26,6 +26,7 @@ import { assessmentSltHours, type AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 import type { ResourcesForm } from "./resources-model";
 import type { ReferencesForm } from "./references-model";
+import { normalizeCourseDocumentTopic } from "./course-document-topic";
 
 export type CourseDocumentModel = {
   title: string;
@@ -373,7 +374,7 @@ export function buildCourseDocument({
     return {
       id: week.id,
       week: week.week,
-      topic: week.topic,
+      topic: normalizeCourseDocumentTopic(week.week, week.topic),
       cloCodes: week.cloCodes,
       lloItems,
       learningActivities:
