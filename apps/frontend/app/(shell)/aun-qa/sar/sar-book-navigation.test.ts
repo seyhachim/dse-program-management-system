@@ -7,11 +7,11 @@ describe("SAR book navigation", () => {
     expect(sarBookRequirementHref("8.5")).toBe("/aun-qa/sar/8.5");
   });
 
-  test("keeps complete-book modes on existing QA surfaces", () => {
+  test("keeps complete-book modes inside the SAR workspace", () => {
     expect(SAR_BOOK_MODE_HREFS).toEqual({
       content: "/aun-qa/sar",
       evidence: "/aun-qa/sar/evidence",
-      review: "/aun-qa/review",
+      review: "/aun-qa/sar/review",
       preview: "/aun-qa/sar-preview",
     });
   });
