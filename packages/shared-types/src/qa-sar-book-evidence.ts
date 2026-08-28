@@ -13,6 +13,11 @@ export const QaSarBookAppendixGroupSchema = z.enum([
   "other",
 ]);
 
+export const QaSarBookEvidenceRegisterQuerySchema = z.object({
+  programmeId: z.string().trim().min(1),
+  mode: z.enum(["working", "official"]).default("working"),
+});
+
 export const QaSarBookTerminologySchema = z.object({
   evidenceCitationLabel: z.string().trim().min(1).max(40).default("Exhibit"),
   evidenceRegisterTitle: z.string().trim().min(1).max(120).default("List of Exhibits"),
@@ -93,6 +98,7 @@ export const QaSarBookSectionEvidenceReferenceViewSchema = z.object({
 });
 
 export type QaSarBookAppendixGroup = z.infer<typeof QaSarBookAppendixGroupSchema>;
+export type QaSarBookEvidenceRegisterQuery = z.infer<typeof QaSarBookEvidenceRegisterQuerySchema>;
 export type QaSarBookTerminology = z.infer<typeof QaSarBookTerminologySchema>;
 export type UpdateQaSarBookTerminologyInput = z.infer<typeof UpdateQaSarBookTerminologySchema>;
 export type QaSarBookEvidenceUsage = z.infer<typeof QaSarBookEvidenceUsageSchema>;
