@@ -41,6 +41,33 @@ describe("Course Specification saved-theme DOCX wiring", () => {
     expect(source).toContain("PageNumber.CURRENT");
   });
 
+  test("preserves the seven assessment SLT data columns in their canonical order", async () => {
+    const source = await Bun.file(RENDERER_SOURCE).text();
+    const start = source.indexOf("function assessmentSltTable");
+    const end = source.indexOf("function grandTotalSltTable", start);
+    const assessmentSltSource = source.slice(start, end);
+
+    const orderedCells = [
+      "compactWordCell(String(index + 1), w[0]!, AlignmentType.CENTER)",
+      "compactWordCell(assessment.name, w[1]!)",
+      "compactWordCell(cleanSltValue(assessment.weight), w[2]!, AlignmentType.CENTER)",
+      "compactWordCell(cleanSltValue(assessment.physicalSltHours), w[3]!, AlignmentType.CENTER)",
+      "compactWordCell(cleanSltValue(assessment.onlineSltHours), w[4]!, AlignmentType.CENTER)",
+      "compactWordCell(cleanSltValue(assessment.independentSltHours), w[5]!, AlignmentType.CENTER)",
+      "compactWordCell(cleanSltValue(assessment.totalSltHours), w[6]!, AlignmentType.CENTER)",
+    ];
+
+    let cursor = -1;
+    for (const cell of orderedCells) {
+      const next = assessmentSltSource.indexOf(cell, cursor + 1);
+      expect(next).toBeGreaterThan(cursor);
+      cursor = next;
+    }
+    expect(
+      assessmentSltSource.match(/assessment\.totalSltHours/g)?.length,
+    ).toBe(1);
+  });
+
   test("serializes renderer calls so one version theme cannot leak into another export", async () => {
     const source = await Bun.file(RENDERER_SOURCE).text();
 
