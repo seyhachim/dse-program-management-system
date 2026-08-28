@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import type { CourseSpecDocumentTheme } from "@dse-pms/shared-types";
 import type { CourseDocumentModel } from "./course-document-model";
+import { presentCourseDocumentResources } from "./course-document-resources";
 import { DocumentPages } from "./document-preview-pages";
 
 export function ThemedDocumentPages({
@@ -35,6 +36,10 @@ export function ThemedDocumentPages({
     "--cs-footer-size": `${theme.footerFontSizePt}pt`,
     "--cs-frame-gap": "3mm",
   } as CSSProperties;
+  const presentationDocument: CourseDocumentModel = {
+    ...document,
+    resources: presentCourseDocumentResources(document.resources),
+  };
 
   return (
     <div
@@ -44,7 +49,7 @@ export function ThemedDocumentPages({
       data-show-footer={String(theme.showFooter)}
       data-show-page-numbers={String(theme.showPageNumbers)}
     >
-      <DocumentPages document={document} zoom={zoom} />
+      <DocumentPages document={presentationDocument} zoom={zoom} />
       <style jsx global>{`
         .course-spec-theme-root article[data-doc-page] {
           font-family: var(--cs-font-family) !important;
