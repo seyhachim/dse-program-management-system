@@ -26,6 +26,7 @@ import { assessmentSltHours, type AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 import type { ResourcesForm } from "./resources-model";
 import type { ReferencesForm } from "./references-model";
+import { courseDocumentCloSltHours } from "./course-document-mapping";
 import { normalizeCourseDocumentTopic } from "./course-document-topic";
 
 export type CourseDocumentModel = {
@@ -472,8 +473,13 @@ export function buildCourseDocument({
       courseInfo.totalSltHours === undefined
         ? courseTotalSlt
         : courseInfo.totalSltHours;
+    const sltHours = courseDocumentCloSltHours(
+      clo.code,
+      documentWeeks,
+      clo.sltHours,
+    );
     const focusPercent = cloFocusPercent(
-      clo.sltHours ? Number(clo.sltHours) : null,
+      sltHours ? Number(sltHours) : null,
       snapshotTotalSlt,
     );
     return {
@@ -485,7 +491,7 @@ export function buildCourseDocument({
         clo.assessmentMethodIds,
         assessmentMethods,
       ),
-      sltHours: clo.sltHours,
+      sltHours,
       focusPercent,
       focusCode: cloFocusCode(focusPercent) ?? "",
     };
