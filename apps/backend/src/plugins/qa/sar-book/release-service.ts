@@ -82,15 +82,18 @@ export async function buildQaSarBookDocument(
   mode: "working" | "official",
 ): Promise<QaSarBookDocument> {
   const { programme, cycle, book } = await resolveContext(programmeId, cycleId);
-  const [part2, part3, evidenceRegister, readiness, ...narratives] = await Promise.all([
+  const [part2, part3, evidenceRegister, readiness] = await Promise.all([
     getQaSarBookPart2(programmeId, cycleId),
     buildQaSarBookPart3Snapshot(programmeId, cycleId),
     getQaSarBookEvidenceRegister(programmeId, cycleId, mode),
     getQaSarBookReviewReadinessWithPart3(programmeId, cycleId),
-    ...[...PART1_KEYS, ...PART3_NARRATIVE_KEYS, PART4_GLOSSARY_KEY].map((sectionKey) =>
+  ]);
+  const narrativeKeys = [...PART1_KEYS, ...PART3_NARRATIVE_KEYS, PART4_GLOSSARY_KEY];
+  const narratives = await Promise.all(
+    narrativeKeys.map((sectionKey) =>
       getQaSarBookNarrativeSection(programmeId, cycleId, sectionKey),
     ),
-  ]);
+  );
 
   const narrativeByKey = new Map(narratives.map((section) => [section.sectionKey, section]));
   const requiredNarrative = (sectionKey: string) => {
@@ -172,32 +175,29 @@ export async function buildQaSarBookDocument(
     tocEntry("part4.supporting-documents", "4.3", "Supporting Documents", 2, "part4"),
   ];
 
-  const narrativePins = [
-    ...part1Sections,
-    strengths,
-    weaknesses,
-    glossary,
-  ]
-    .filter((section): section is typeof section & { revisionId: string; revisionNumber: number } =>
-      Boolean(section.revisionId && section.revisionNumber),
+  const narrativePins = [...part1Sections, strengths, weaknesses, glossary]
+    .flatMap((section) =>
+      section.revisionId && section.revisionNumber
+        ? [{
+            sectionKey: section.sectionKey,
+            revisionId: section.revisionId,
+            revisionNumber: section.revisionNumber,
+          }]
+        : [],
     )
-    .map((section) => ({
-      sectionKey: section.sectionKey,
-      revisionId: section.revisionId,
-      revisionNumber: section.revisionNumber,
-    }))
     .sort((a, b) => a.sectionKey.localeCompare(b.sectionKey));
 
   const requirementPins = criteria
     .flatMap((criterion) => criterion.requirements)
-    .filter((requirement): requirement is typeof requirement & { submissionId: string; submissionVersion: number } =>
-      Boolean(requirement.submissionId && requirement.submissionVersion),
+    .flatMap((requirement) =>
+      requirement.submissionId && requirement.submissionVersion
+        ? [{
+            requirementCode: requirement.requirementCode,
+            submissionId: requirement.submissionId,
+            submissionVersion: requirement.submissionVersion,
+          }]
+        : [],
     )
-    .map((requirement) => ({
-      requirementCode: requirement.requirementCode,
-      submissionId: requirement.submissionId,
-      submissionVersion: requirement.submissionVersion,
-    }))
     .sort((a, b) => a.requirementCode.localeCompare(b.requirementCode, undefined, { numeric: true }));
 
   return QaSarBookDocumentSchema.parse({
