@@ -16,13 +16,9 @@ describe("Course Specification Part 2 continuation rows", () => {
       '<ValueCell colSpan={4} className="part-two-continuation-cell">',
     );
 
-    // One source wrapper covers each fixed section/page group: 14, both 15 pages,
-    // 16, 17, repeated 18 pages, 19, 20, 21, repeated 22 pages, 23, 24, 25.
     expect(source.match(/<PartTwoRow>/g)?.length).toBe(13);
     expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(13);
 
-    // Section 14 intentionally keeps its compact official CLO heading markup,
-    // while Sections 15-25 use the shared SectionTitle component.
     expect(source).toContain(
       '<span>14.</span><span className="font-bold">Course Learning Outcomes</span>',
     );
@@ -42,5 +38,35 @@ describe("Course Specification Part 2 continuation rows", () => {
     ]) {
       expect(source).toContain(section);
     }
+  });
+
+  test("matches the official Course Information and CLO presentation", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+    expect(source).toContain("COURSE_DOCUMENT_STYLE.courseInfoTitle");
+    expect(source).toContain('text-[9px]">Here are the CLOs of this course:');
+    expect(source).toContain('className="bg-[#E2EEDB] text-left font-normal"');
+    expect(source).toContain('className="text-left align-middle">{clo.outcome}');
+    expect(source).toContain('className="border border-black px-1.5 py-[2px] text-left"');
+  });
+
+  test("renders Section 15 hours before percentages with assessment-inclusive wording", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+    const hours = '<CloPloMatrix mapping={document.mapping} mode="hours" />';
+    const percent = '<CloPloMatrix mapping={document.mapping} mode="percent" />';
+    expect(source.indexOf(hours)).toBeGreaterThan(-1);
+    expect(source.indexOf(percent)).toBeGreaterThan(source.indexOf(hours));
+    expect(source).toContain("including learning and assessment");
+    expect(source).toContain("function BlankTD");
+    expect(source).not.toContain(
+      "The mapping shown here is generated from the current CLO, PLO, teaching-method and assessment-method records stored in the PMS.",
+    );
+  });
+
+  test("shows persisted assessment SLT in Sections 16 and 17", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+    expect(source).toContain("document.totals.continuousAssessmentSlt");
+    expect(source).toContain("document.totals.finalAssessmentSlt");
+    expect(source).toContain("document.totals.grandSlt");
+    expect(source).toContain("assessment.totalSltHours");
   });
 });
