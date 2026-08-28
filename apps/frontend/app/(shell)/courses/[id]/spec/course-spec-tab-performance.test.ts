@@ -42,11 +42,11 @@ describe("Course Specification tab data reuse", () => {
     expect(methodsApi).toContain("if (methodsListCache) return methodsListCache");
   });
 
-  test("Overview consumes the already-loaded Teaching & Learning cache instead of starting a tab-entry request", async () => {
+  test("Overview consumes already-loaded Teaching & Learning state without starting a tab-entry request", async () => {
     const source = await Bun.file(overviewPath).text();
 
     expect(source).toContain("teachingLearningApi.getCached(courseId)");
-    expect(source).not.toContain("teachingLearningApi\n      .get(courseId)");
+    expect(source).not.toContain("teachingLearningApi.get(courseId)");
     expect(source).not.toContain("useEffect(() =>");
   });
 
