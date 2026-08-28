@@ -31,3 +31,7 @@ FOREIGN KEY ("actorUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE
 ALTER TABLE "UserSecurityAuditEvent"
 ADD CONSTRAINT "UserSecurityAuditEvent_targetUserId_fkey"
 FOREIGN KEY ("targetUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- This is server-only security metadata. It must never become readable through
+-- Supabase Data API roles; RLS is the database-level fail-closed boundary.
+ALTER TABLE "UserSecurityAuditEvent" ENABLE ROW LEVEL SECURITY;
