@@ -118,6 +118,18 @@ The backend health endpoint is:
 GET /health
 ```
 
+## Performance and response time
+
+DSE-PMS includes a small first-stage response-time optimization that keeps authoritative academic data fresh:
+
+- Identical **concurrent** frontend `GET` requests are coalesced into one in-flight network request. Once that request finishes, its result is discarded rather than retained as a stale application cache, so a later `GET` reaches the backend again.
+- `POST`, `PATCH`, `PUT`, and `DELETE` requests are never coalesced.
+- Backend `/api/*` responses expose a standard `Server-Timing` header (`app;dur=...`) so browser/network tooling can show application processing time without changing API response bodies.
+- Optional slow-request logging can be enabled on the backend with a positive millisecond threshold, for example `PERF_SLOW_REQUEST_MS=400`. Logs contain only HTTP method, path without query values, response status, and duration; they do not include tokens, request bodies, user identifiers, or academic payloads.
+- Broad TTL caching is deliberately not enabled for results, approvals, attendance, permissions, Course Specification workflow state, QA/SAR workflow state, or other authoritative records. Performance work must preserve current authorization and academic-integrity boundaries.
+
+This instrumentation is intended to identify the endpoints that deserve the next round of query/index/payload optimization before adding infrastructure such as Redis or moving hosting.
+
 ## Prerequisites
 
 Install:
