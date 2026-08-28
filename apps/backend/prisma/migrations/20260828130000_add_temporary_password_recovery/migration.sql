@@ -9,7 +9,7 @@ CREATE TYPE "UserSecurityAuditAction" AS ENUM (
 );
 
 CREATE TABLE "UserSecurityAuditEvent" (
-  "id" TEXT NOT NULL,
+  "id" UUID NOT NULL,
   "action" "UserSecurityAuditAction" NOT NULL,
   "actorUserId" TEXT NOT NULL,
   "targetUserId" TEXT NOT NULL,
