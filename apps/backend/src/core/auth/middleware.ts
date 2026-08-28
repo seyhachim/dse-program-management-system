@@ -18,14 +18,29 @@ declare global {
   }
 }
 
+class UnprovisionedAccountError extends Error {}
+
+async function mustChangePassword(userId: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ mustChangePassword: boolean }>>`
+    SELECT "mustChangePassword"
+    FROM "User"
+    WHERE "id" = ${userId}
+    LIMIT 1
+  `;
+  return rows[0]?.mustChangePassword ?? false;
+}
+
+function isPasswordRecoveryRoute(req: Request): boolean {
+  // The caller must still be able to inspect /me so the frontend can route to
+  // the recovery screen, and must be able to submit that one recovery action.
+  return req.baseUrl === "/api/auth" && (req.path === "/me" || req.path === "/change-password");
+}
+
 /**
- * Verifies the Bearer token and attaches `req.user`. This is the only place the
- * app reads the raw token. In `dev` mode it verifies a local HS256 token whole.
- * In `supabase` mode it verifies the Supabase JWT for identity only, then
- * resolves the caller to an app `User` row (by authId, falling back to email and
- * backfilling authId on first login) — the `UserRoleAssignment` join table
- * (issue #77 phase B) is the authorization source of truth. A valid Supabase
- * login with no provisioned `User` is 403.
+ * Verifies the Bearer token and attaches `req.user`. After authentication it
+ * enforces the PMS-owned forced-password-change gate for every protected API.
+ * A gated user may call only /api/auth/me and /api/auth/change-password until
+ * the credential has been replaced successfully.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization ?? "";
@@ -38,6 +53,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   try {
     req.user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
+
+    if (await mustChangePassword(req.user.id) && !isPasswordRecoveryRoute(req)) {
+      res.status(403).json({
+        error: "Password change required before using DSE PMS",
+        code: "PASSWORD_CHANGE_REQUIRED",
+      });
+      return;
+    }
+
     next();
   } catch (err) {
     if (err instanceof UnprovisionedAccountError) {
@@ -47,8 +71,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     res.status(401).json({ error: "Invalid or expired token" });
   }
 }
-
-class UnprovisionedAccountError extends Error {}
 
 async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   const { authId, email } = await verifySupabaseToken(token);
@@ -77,7 +99,6 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
 
   // UserRoleAssignment is the authorization source of truth (issue #77).
   const roles = user.roleAssignments.map((a) => a.role.slug as Role);
-  // programmeId is already a scalar column on the loaded join row (issue #147).
   const programmeRoles = user.roleAssignments.map((a) => ({
     role: a.role.slug as Role,
     programmeId: a.programmeId,
