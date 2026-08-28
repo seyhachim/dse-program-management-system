@@ -37,7 +37,7 @@ export const QaSarBookPart3EvidenceReferenceSchema = z.object({
 });
 
 export const QaSarBookPart3RequirementRatingSchema = z.object({
-  requirementId: z.string().uuid(),
+  requirementId: z.string().trim().min(1),
   requirementCode: z.string().trim().min(1),
   requirementTitle: z.string().trim().min(1),
   rating: QaSarSelfRatingSchema.nullable(),
@@ -50,7 +50,7 @@ export const QaSarBookPart3RequirementRatingSchema = z.object({
 });
 
 export const QaSarBookPart3CriterionRatingSchema = z.object({
-  criterionId: z.string().uuid(),
+  criterionId: z.string().trim().min(1),
   criterionCode: z.string().trim().min(1),
   criterionTitle: z.string().trim().min(1),
   rating: QaSarSelfRatingSchema.nullable(),
