@@ -27,6 +27,33 @@ export const ResendInvitationResponse = z.object({
 export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
 
 /**
+ * New passwords are deliberately validated in the shared API contract rather
+ * than only in the UI. Supabase may accept weaker values, but DSE PMS recovery
+ * should not create them. We require 12+ characters plus upper/lower/digit and
+ * symbol categories; the server-generated temporary password satisfies this.
+ */
+export const ChangePasswordInput = z.object({
+  password: z.string()
+    .min(12, "Password must be at least 12 characters")
+    .regex(/[a-z]/, "Password must include a lowercase letter")
+    .regex(/[A-Z]/, "Password must include an uppercase letter")
+    .regex(/[0-9]/, "Password must include a number")
+    .regex(/[^A-Za-z0-9]/, "Password must include a symbol"),
+});
+export type ChangePasswordInput = z.infer<typeof ChangePasswordInput>;
+
+/**
+ * Admin-only one-time response after a temporary password has been installed.
+ * The password must never be persisted, logged, cached or returned again.
+ */
+export const TemporaryPasswordResponse = z.object({
+  userId: z.string().uuid(),
+  email: z.string().email(),
+  temporaryPassword: z.string().min(12),
+});
+export type TemporaryPasswordResponse = z.infer<typeof TemporaryPasswordResponse>;
+
+/**
  * Application roles. `qa_contributor` is intentionally additive: a lecturer or
  * other staff member can hold it alongside their existing role to work on an
  * assigned AUN-QA/SAR scope without receiving programme-management authority.
@@ -83,5 +110,6 @@ export const MeResponse = z.object({
   roles: z.array(Role),
   permissions: z.array(z.string()),
   name: z.string(),
+  mustChangePassword: z.boolean().default(false),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
