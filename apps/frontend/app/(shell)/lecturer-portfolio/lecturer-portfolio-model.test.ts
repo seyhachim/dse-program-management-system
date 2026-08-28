@@ -26,6 +26,8 @@ function offering(
     createdAt: "2026-08-01T00:00:00.000Z",
     semester: "First",
     programmeYear: 3,
+    academicCalendarPeriodId: null,
+    academicCalendar: null,
     startDate: "2026-08-01",
     endDate: "2026-12-01",
     otherLecturers: null,
