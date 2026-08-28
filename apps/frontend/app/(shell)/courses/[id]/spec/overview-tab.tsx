@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, CircleAlert, Pencil } from "lucide-react";
 import {
@@ -21,7 +20,11 @@ import {
 import type { CourseInfoForm } from "./course-info-section";
 import { focusCodeOf, focusPercentOf, type CloForm } from "./clo-model";
 import type { WeeklyPlanForm } from "./weekly-plan-section";
-import { weekSltForm, weeklyPlanFormTotals } from "./weekly-plan-model";
+import {
+  instructionalWeeklyPlan,
+  weekSltForm,
+  weeklyPlanFormTotals,
+} from "./weekly-plan-model";
 import {
   assessmentTotalWeight,
   assessmentTypeChip,
@@ -58,26 +61,9 @@ export function OverviewTab({
 }) {
   const params = useParams<{ id: string }>();
   const courseId = params.id;
-  const [teachingLearningProfile, setTeachingLearningProfile] = useState(
-    EMPTY_TEACHING_LEARNING_PROFILE,
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    teachingLearningApi
-      .get(courseId)
-      .then((profile) => {
-        if (!cancelled) setTeachingLearningProfile(profile);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setTeachingLearningProfile(EMPTY_TEACHING_LEARNING_PROFILE);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [courseId]);
+  const teachingLearningProfile =
+    teachingLearningApi.getCached(courseId) ?? EMPTY_TEACHING_LEARNING_PROFILE;
+  const instructionalPlan = instructionalWeeklyPlan(weeklyPlan);
 
   const activeClos = clos.filter((clo) => clo.status === "active");
   const cloReady =
@@ -92,7 +78,7 @@ export function OverviewTab({
   const readinessStatus = deriveOverviewReadinessStatus(
     status,
     clos,
-    weeklyPlan,
+    instructionalPlan,
     assessments,
     { cloReady, teachingLearningReady },
   );
@@ -109,13 +95,12 @@ export function OverviewTab({
     ? sectionDisplayTitle(nextSection.id, nextSection.title)
     : null;
 
-  const deliverables = weeklyPlan.filter((w) => w.assessment.trim());
-  const planTotals = weeklyPlanFormTotals(weeklyPlan);
+  const deliverables = instructionalPlan.filter((w) => w.assessment.trim());
+  const planTotals = weeklyPlanFormTotals(instructionalPlan);
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
-        {/* Course Information */}
         <Card>
           <CardHeader
             title="Course Information"
@@ -181,7 +166,6 @@ export function OverviewTab({
           )}
         </Card>
 
-        {/* CLOs */}
         <Card>
           <CardHeader
             title="Course Learning Outcomes (CLOs)"
@@ -217,7 +201,6 @@ export function OverviewTab({
           )}
         </Card>
 
-        {/* Weekly Plan */}
         <Card>
           <CardHeader
             title="Weekly Plan"
@@ -231,7 +214,7 @@ export function OverviewTab({
               </button>
             }
           />
-          {weeklyPlan.length === 0 ? (
+          {instructionalPlan.length === 0 ? (
             <EmptyHint
               text="No weeks planned yet."
               action="Go to Weekly Plan"
@@ -249,10 +232,10 @@ export function OverviewTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {weeklyPlan.slice(0, 6).map((w) => (
+                  {instructionalPlan.slice(0, 6).map((w, index) => (
                     <tr key={w.id} className="border-t border-border">
                       <td className="py-1.5 pr-2 text-muted-foreground">
-                        {w.week || "—"}
+                        {index + 1}
                       </td>
                       <td className="py-1.5 pr-2 text-foreground">
                         {w.topic || "Untitled"}
@@ -269,8 +252,8 @@ export function OverviewTab({
                 <tfoot>
                   <tr className="border-t border-border text-xs font-medium text-muted-foreground">
                     <td className="py-1.5 pr-2" colSpan={3}>
-                      Total SLT ({weeklyPlan.length}{" "}
-                      {weeklyPlan.length === 1 ? "week" : "weeks"})
+                      Total SLT ({instructionalPlan.length}{" "}
+                      {instructionalPlan.length === 1 ? "week" : "weeks"})
                     </td>
                     <td className="py-1.5 text-right">{planTotals.slt} h</td>
                   </tr>
@@ -280,7 +263,6 @@ export function OverviewTab({
           )}
         </Card>
 
-        {/* Assessment */}
         <Card>
           <CardHeader
             title="Assessment"
@@ -349,7 +331,6 @@ export function OverviewTab({
           )}
         </Card>
 
-        {/* Deliverables */}
         <Card>
           <CardHeader
             title="Deliverables"
@@ -374,7 +355,9 @@ export function OverviewTab({
               {deliverables.slice(0, 6).map((w) => (
                 <div key={w.id} className="flex items-center justify-between">
                   <span className="text-foreground">{w.assessment}</span>
-                  <span className="text-muted-foreground">Week {w.week}</span>
+                  <span className="text-muted-foreground">
+                    Week {instructionalPlan.findIndex((item) => item.id === w.id) + 1}
+                  </span>
                 </div>
               ))}
             </div>
@@ -429,7 +412,6 @@ export function OverviewTab({
       </div>
 
       <div className="space-y-4">
-        {/* Specification readiness */}
         <Card>
           <CardHeader title="Specification Readiness" />
           <div className="flex items-center gap-4">
@@ -521,7 +503,6 @@ export function OverviewTab({
           ) : null}
         </Card>
 
-        {/* Quick actions */}
         <Card>
           <CardHeader title="Quick Actions" />
           <ul className="divide-y divide-border text-sm">
@@ -531,7 +512,6 @@ export function OverviewTab({
           </ul>
         </Card>
 
-        {/* Mapping preview */}
         <Card>
           <CardHeader
             title="Mapping Preview"

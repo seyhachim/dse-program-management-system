@@ -5,7 +5,10 @@ import {
   deriveConstructiveAlignmentAudit,
   type ConstructiveAlignmentAudit,
 } from "./constructive-alignment-model";
-import type { WeekForm } from "./weekly-plan-model";
+import {
+  instructionalWeeklyPlan,
+  type WeekForm,
+} from "./weekly-plan-model";
 import { weeklyPlanIsReady } from "./weekly-plan-readiness";
 
 export type OverviewDerivedReadiness = {
@@ -17,8 +20,10 @@ export type OverviewDerivedReadiness = {
  * Overview readiness must reflect source-data semantics used by the actual
  * authoring workflow. Constructive Alignment, CLO validity, Teaching & Learning,
  * and Weekly Plan readiness are derived from current source data rather than
- * stale persisted completion flags. Specification Date is system-assigned on
- * first submission and is therefore not lecturer work.
+ * stale persisted completion flags. Legacy assessment-only Midterm/Final rows
+ * remain preserved in storage but are excluded from instructional-week readiness.
+ * Specification Date is system-assigned on first submission and is therefore not
+ * lecturer work.
  */
 export function deriveOverviewReadinessStatus(
   status: Record<string, SpecSectionStatus>,
@@ -27,9 +32,10 @@ export function deriveOverviewReadinessStatus(
   assessments: AssessmentForm[],
   derived: OverviewDerivedReadiness = {},
 ): Record<string, SpecSectionStatus> {
+  const instructionalPlan = instructionalWeeklyPlan(weeklyPlan);
   const effective = applyDerivedAlignmentStatus(
     status,
-    deriveConstructiveAlignmentAudit(clos, weeklyPlan, assessments),
+    deriveConstructiveAlignmentAudit(clos, instructionalPlan, assessments),
   );
 
   if (derived.cloReady !== undefined) {
@@ -41,7 +47,7 @@ export function deriveOverviewReadinessStatus(
       : "draft";
   }
 
-  effective.slt = weeklyPlanIsReady(weeklyPlan) ? "complete" : "draft";
+  effective.slt = weeklyPlanIsReady(instructionalPlan) ? "complete" : "draft";
 
   // Kept complete for compatibility with other completion consumers. Overview's
   // lecturer-work list excludes Date and includes Teaching & Learning instead.
