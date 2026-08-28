@@ -348,24 +348,24 @@ export function AssessmentFormFields({
             Topics assessed (1–15)
           </p>
           <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 15 }, (_, index) => index + 1).map((topic) => (
-              <label
-                key={topic}
-                className={`flex h-9 min-w-9 cursor-pointer items-center justify-center rounded-md border px-2 text-xs ${
-                  draft.topicNumbers.includes(topic)
-                    ? "border-primary bg-primary/10 font-semibold text-primary"
-                    : "border-border bg-background"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={draft.topicNumbers.includes(topic)}
-                  onChange={() => toggleTopic(topic)}
-                  className="sr-only"
-                />
-                {topic}
-              </label>
-            ))}
+            {Array.from({ length: 15 }, (_, index) => index + 1).map((topic) => {
+              const selected = draft.topicNumbers.includes(topic);
+              return (
+                <button
+                  key={topic}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => toggleTopic(topic)}
+                  className={`flex h-9 min-w-9 cursor-pointer items-center justify-center rounded-md border px-2 text-xs ${
+                    selected
+                      ? "border-primary bg-primary/10 font-semibold text-primary"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  {topic}
+                </button>
+              );
+            })}
           </div>
         </div>
 
