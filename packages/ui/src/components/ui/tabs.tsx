@@ -69,11 +69,17 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
   )
 }
 
-function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
+type TabsContentProps = TabsPrimitive.Panel.Props & {
+  /** Keep the panel mounted while inactive so expensive content can preload. */
+  forceMount?: boolean
+}
+
+function TabsContent({ className, forceMount, ...props }: TabsContentProps) {
   return (
     <TabsPrimitive.Panel
       data-slot="tabs-content"
       className={cn("flex-1 text-xs/relaxed outline-none", className)}
+      keepMounted={forceMount || props.keepMounted}
       {...props}
     />
   )
