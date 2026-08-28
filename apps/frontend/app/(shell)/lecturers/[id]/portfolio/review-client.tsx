@@ -12,6 +12,7 @@ import {
 import { Button } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { lecturersApi } from "@/lib/lecturers";
+import { LecturerAvatar } from "@/components/lecturer-avatar";
 
 export function LecturerPortfolioReviewClient({ lecturerId }: { lecturerId: string }) {
   const [lecturer, setLecturer] = useState<Lecturer | null>(null);
@@ -69,7 +70,7 @@ export function LecturerPortfolioReviewClient({ lecturerId }: { lecturerId: stri
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-primary/10 p-2 text-primary"><ShieldCheck className="h-5 w-5" /></div>
+          {lecturer ? <LecturerAvatar name={lecturer.name} imageUrl={lecturer.profileImageUrl} size="md" /> : <div className="rounded-lg bg-primary/10 p-2 text-primary"><ShieldCheck className="h-5 w-5" /></div>}
           <div>
             <h2 className="font-semibold text-foreground">
               {lecturer ? formatLecturerDisplayName(lecturer.name, lecturer.honorific) : "Lecturer portfolio"}
