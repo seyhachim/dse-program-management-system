@@ -347,11 +347,11 @@ export function AssessmentFormFields({
           <p className="mb-2 text-xs font-semibold text-foreground">
             Topics assessed (1–15)
           </p>
-          <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-[repeat(15,minmax(0,1fr))]">
+          <div className="flex flex-wrap gap-2">
             {Array.from({ length: 15 }, (_, index) => index + 1).map((topic) => (
               <label
                 key={topic}
-                className={`flex cursor-pointer items-center justify-center rounded-md border px-2 py-2 text-xs ${
+                className={`flex h-9 min-w-9 cursor-pointer items-center justify-center rounded-md border px-2 text-xs ${
                   draft.topicNumbers.includes(topic)
                     ? "border-primary bg-primary/10 font-semibold text-primary"
                     : "border-border bg-background"
