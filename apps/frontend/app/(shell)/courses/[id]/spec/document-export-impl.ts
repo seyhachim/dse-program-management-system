@@ -1,3 +1,6 @@
+import type {
+  CourseSpecDocumentTheme,
+} from "@dse-pms/shared-types";
 import type { CourseDocumentModel } from "./course-document-model";
 import {
   courseAvailabilityCheckboxText,
@@ -6,7 +9,10 @@ import {
 import { presentCourseDocumentResources } from "./course-document-resources";
 import { exportCourseSpecWord as exportCourseSpecWordRenderer } from "./document-word-renderer";
 
-export async function exportCourseSpecWord(document: CourseDocumentModel) {
+export async function exportCourseSpecWord(
+  document: CourseDocumentModel,
+  theme: CourseSpecDocumentTheme,
+) {
   const presentationDocument: CourseDocumentModel = {
     ...document,
     courseInformation: {
@@ -16,5 +22,5 @@ export async function exportCourseSpecWord(document: CourseDocumentModel) {
     },
     resources: presentCourseDocumentResources(document.resources),
   };
-  return exportCourseSpecWordRenderer(presentationDocument);
+  return exportCourseSpecWordRenderer(presentationDocument, theme);
 }

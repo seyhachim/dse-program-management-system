@@ -240,7 +240,7 @@ export function DocumentPreview({
     if (exportDisabled) return;
     try {
       setIsExporting(true);
-      await exportCourseSpecWord(resolvedDocument);
+      await exportCourseSpecWord(resolvedDocument, savedTheme);
     } catch (error) {
       console.error("Failed to export Course Specification:", error);
     } finally {
