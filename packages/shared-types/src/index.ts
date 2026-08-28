@@ -60,6 +60,8 @@ export * from "./qa-sar-book.ts";
 export * from "./qa-sar-book-evidence.ts";
 export * from "./qa-sar-book-review.ts";
 export * from "./qa-sar-book-part2.ts";
+export * from "./qa-sar-book-part3.ts";
+export * from "./qa-sar-book-part3-snapshot.ts";
 export * from "./qa-sar-source-context.ts";
 export * from "./qa-evaluation.ts";
 export * from "./qa-research-metrics.ts";
