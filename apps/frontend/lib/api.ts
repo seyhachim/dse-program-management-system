@@ -4,10 +4,12 @@
  * session access token; in `dev` it falls back to the static NEXT_PUBLIC_DEV_TOKEN
  * minted by `bun run gen-token`.
  */
+import { createInflightGetDeduper } from "./inflight-get";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
+const runInflightGet = createInflightGetDeduper();
 
 async function authHeader(): Promise<Record<string, string>> {
   if (AUTH_MODE === "supabase") {
@@ -71,7 +73,7 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
+  get: <T>(path: string) => runInflightGet(path, () => request<T>(path)),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
