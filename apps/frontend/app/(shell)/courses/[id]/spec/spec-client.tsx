@@ -841,7 +841,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               />
             </TabsContent>
 
-            <TabsContent value="documentPreview" className="mt-4">
+            <TabsContent value="documentPreview" className="mt-4" forceMount>
               {course ? (
                 <DocumentPreview document={courseDocument} />
               ) : (

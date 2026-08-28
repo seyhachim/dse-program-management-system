@@ -576,7 +576,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
               />
             </TabsContent>
 
-            <TabsContent value="documentPreview" className="mt-4">
+            <TabsContent value="documentPreview" className="mt-4" forceMount>
               <DocumentPreview document={courseDocument} />
             </TabsContent>
 
