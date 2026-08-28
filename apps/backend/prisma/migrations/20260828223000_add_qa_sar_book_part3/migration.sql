@@ -74,6 +74,56 @@ CREATE INDEX "QaSarBookPart3Association_programme_cycle_idx"
 CREATE INDEX "QaSarBookPart3Association_revision_idx"
   ON "QaSarBookPart3Association"("revisionId");
 
+-- Preserve backward compatibility with the existing self-assessment endpoint:
+-- any direct insert/update of QaRequirementAssessment receives an append-only
+-- Part 3 revision. The new Part 3 service writes its richer revision first; the
+-- trigger detects that same-transaction revision and avoids duplicating it.
+CREATE OR REPLACE FUNCTION "qa_sar_part3_audit_requirement_assessment"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  next_revision INTEGER;
+  latest_row "QaSarBookRequirementRatingRevision"%ROWTYPE;
+  lock_key TEXT;
+BEGIN
+  lock_key := 'qa-sar-part3-rating:' || NEW."cycleId" || ':' || NEW."requirementId";
+  PERFORM pg_advisory_xact_lock(hashtext(lock_key)::bigint);
+
+  SELECT * INTO latest_row
+  FROM "QaSarBookRequirementRatingRevision"
+  WHERE "cycleId" = NEW."cycleId"
+    AND "requirementId" = NEW."requirementId"
+  ORDER BY "revisionNumber" DESC
+  LIMIT 1;
+
+  IF latest_row."id" IS NOT NULL
+     AND latest_row."rating" IS NOT DISTINCT FROM NEW."rating"
+     AND latest_row."justification" = NEW."narrative"
+     AND latest_row."enteredById" IS NOT DISTINCT FROM NEW."reviewerId"
+     AND latest_row."createdAt" >= transaction_timestamp() THEN
+    RETURN NEW;
+  END IF;
+
+  next_revision := COALESCE(latest_row."revisionNumber", 0) + 1;
+  INSERT INTO "QaSarBookRequirementRatingRevision" (
+    "id", "programmeId", "cycleId", "requirementId", "revisionNumber",
+    "rating", "justification", "evidenceIds", "enteredById", "createdAt"
+  ) VALUES (
+    gen_random_uuid()::text, NEW."programmeId", NEW."cycleId", NEW."requirementId",
+    next_revision, NEW."rating", NEW."narrative", ARRAY[]::TEXT[], NEW."reviewerId",
+    CURRENT_TIMESTAMP
+  );
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "QaRequirementAssessment_part3_audit"
+AFTER INSERT OR UPDATE OF "rating", "narrative", "reviewerId", "programmeId"
+ON "QaRequirementAssessment"
+FOR EACH ROW
+EXECUTE FUNCTION "qa_sar_part3_audit_requirement_assessment"();
+
 ALTER TABLE "QaSarBookRequirementRatingRevision" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "QaSarBookCriterionRatingRevision" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "QaSarBookPart3Association" ENABLE ROW LEVEL SECURITY;
