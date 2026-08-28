@@ -27,4 +27,13 @@ describe("Course Specification preview role parity", () => {
     expect(layout.gridClassName).not.toContain("100dvh");
     expect(layout.gridClassName).not.toContain("min-h-[650px]");
   });
+
+  test("re-runs Fit Width setup when the async official preview becomes ready", async () => {
+    const source = await Bun.file(
+      new URL("./document-preview-impl.tsx", import.meta.url),
+    ).text();
+
+    expect(source).toContain("if (!officialThemeReady) return;");
+    expect(source).toContain("[fitWidth, officialThemeReady]");
+  });
 });
