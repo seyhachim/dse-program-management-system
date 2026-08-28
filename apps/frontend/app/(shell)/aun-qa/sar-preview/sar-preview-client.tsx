@@ -7,12 +7,14 @@ import type {
   QaDashboardView,
   QaSarBookDocument,
   QaSarBookReleaseView,
+  QaSarReleaseView,
 } from "@dse-pms/shared-types";
 import { DocumentRenderer } from "@/components/document-editor";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { parseStoredDocumentContent } from "@/lib/document-content";
 import { exportSarBookDocx, exportSarBookPdf } from "./sar-book-export";
+import { exportSarDocx as exportLegacySarDocx, exportSarPdf as exportLegacySarPdf } from "./sar-export";
 
 const PROGRAMME_ID = "dse";
 type PreviewMode = "working" | "official";
@@ -23,6 +25,7 @@ export function SarPreviewClient() {
   const [mode, setMode] = useState<PreviewMode>("working");
   const [model, setModel] = useState<QaSarBookDocument | null>(null);
   const [releases, setReleases] = useState<QaSarBookReleaseView[]>([]);
+  const [legacyReleases, setLegacyReleases] = useState<QaSarReleaseView[]>([]);
   const [loading, setLoading] = useState(true);
   const [finalizing, setFinalizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,15 +43,18 @@ export function SarPreviewClient() {
       if (!selectedCycleId) {
         setModel(null);
         setReleases([]);
+        setLegacyReleases([]);
         return;
       }
       const documentParams = new URLSearchParams({ programmeId: PROGRAMME_ID, mode: nextMode });
-      const [document, releaseRows] = await Promise.all([
+      const [document, releaseRows, legacyReleaseRows] = await Promise.all([
         api.get<QaSarBookDocument>(`/api/qa/cycles/${selectedCycleId}/sar-book/document?${documentParams}`),
         api.get<QaSarBookReleaseView[]>(`/api/qa/cycles/${selectedCycleId}/sar-book/releases?${params}`),
+        api.get<QaSarReleaseView[]>(`/api/qa/cycles/${selectedCycleId}/sar-releases?${params}`),
       ]);
       setModel(document);
       setReleases(releaseRows);
+      setLegacyReleases(legacyReleaseRows);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load SAR book preview");
     } finally {
@@ -227,8 +233,8 @@ export function SarPreviewClient() {
       </article>
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 className="font-semibold">Official releases</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Exports below are rendered only from the stored immutable snapshot, never from current live SAR data.</p>
+        <h2 className="font-semibold">Official SAR Book releases</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Exports below are rendered only from the stored immutable full-book snapshot, never from current live SAR data.</p>
         <div className="mt-3 space-y-2">
           {releases.map((release) => (
             <div key={release.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
@@ -236,9 +242,50 @@ export function SarPreviewClient() {
               <div className="flex gap-2"><button onClick={() => setModel(release.snapshot)} className="rounded-md border px-2 py-1 text-xs">View</button><button onClick={() => void exportSarBookDocx(release.snapshot)} className="rounded-md border px-2 py-1 text-xs">DOCX</button><button onClick={() => exportSarBookPdf(release.snapshot)} className="rounded-md border px-2 py-1 text-xs">PDF</button></div>
             </div>
           ))}
-          {releases.length === 0 ? <div className="text-sm text-muted-foreground">No official SAR book release has been created yet.</div> : null}
+          {releases.length === 0 ? <div className="text-sm text-muted-foreground">No official SAR Book release has been created yet.</div> : null}
         </div>
       </section>
+
+      {legacyReleases.length > 0 ? (
+        <section className="rounded-2xl border bg-white p-5 shadow-sm">
+          <h2 className="font-semibold">Historical legacy SAR releases</h2>
+          <p className="mt-1 text-sm text-muted-foreground">These immutable releases were created by the earlier Part-2-only SAR document workflow. They remain readable and exportable without being rewritten into the new full-book format.</p>
+          <div className="mt-3 space-y-3">
+            {legacyReleases.map((release) => (
+              <div key={release.id} className="rounded-lg border p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className="font-medium">Legacy release v{release.version}</span> · {release.title}
+                    <div className="text-xs text-muted-foreground">{release.submissionIds.length} pinned requirement submissions · finalized by {release.finalizedBy.name} · {new Date(release.finalizedAt).toLocaleString()}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => void exportLegacySarDocx(release.snapshot, `${release.title}-v${release.version}-legacy`)} className="rounded-md border px-2 py-1 text-xs">DOCX</button>
+                    <button onClick={() => exportLegacySarPdf(release.snapshot, `${release.title}-v${release.version}-legacy`)} className="rounded-md border px-2 py-1 text-xs">PDF</button>
+                  </div>
+                </div>
+                <details className="mt-3 rounded-md bg-slate-50 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold">View legacy content</summary>
+                  <div className="mt-3 space-y-4">
+                    {release.snapshot.criteria.map((criterion) => (
+                      <section key={criterion.code}>
+                        <h3 className="font-semibold">Criterion {criterion.code}: {criterion.title}</h3>
+                        <div className="mt-2 space-y-3">
+                          {criterion.sections.map((section) => (
+                            <div key={section.requirementCode} className="border-l-2 border-slate-200 pl-3">
+                              <div className="text-xs font-medium">{section.requirementCode} {section.requirementTitle}</div>
+                              <div className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{section.plainText || "No stored narrative text."}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
