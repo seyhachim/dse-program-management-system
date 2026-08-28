@@ -21,7 +21,6 @@ import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/serv
 import { getQaSarBookPart2 } from "./part2-service.ts";
 
 export type QaSarBookEvidenceMode = "working" | "official";
-
 export class QaSarBookEvidenceReferenceConflictError extends Error {}
 
 interface TerminologyRow {
@@ -31,7 +30,6 @@ interface TerminologyRow {
   requirementLabel: string;
   criterionLabel: string;
 }
-
 interface StaticReferenceRow {
   id: string;
   programmeId: string;
@@ -43,7 +41,6 @@ interface StaticReferenceRow {
   createdAt: Date;
   evidenceTitle: string;
 }
-
 interface PresentationRow {
   evidenceId: string;
   appendixGroup: QaSarBookAppendixGroup;
@@ -63,22 +60,18 @@ async function assertCycleScope(programmeId: string, cycleId: string): Promise<v
 function dbKindToView(kind: "SystemLink" | "ExternalLink" | "Document") {
   return kind === "SystemLink" ? "systemLink" : kind === "ExternalLink" ? "externalLink" : "document";
 }
-
 function dbStatusToView(status: "Draft" | "Ready" | "Reviewed") {
   return status === "Draft" ? "draft" : status === "Ready" ? "ready" : "reviewed";
 }
-
 function staticPart(sectionKey: string): "part1" | "part3" | "part4" {
   if (sectionKey.startsWith("part1.")) return "part1";
   if (sectionKey.startsWith("part3.")) return "part3";
   return "part4";
 }
-
 function usageSortKey(usage: QaSarBookEvidenceUsage): string {
   const partOrder = usage.part === "part1" ? "1" : usage.part === "part2" ? "2" : usage.part === "part3" ? "3" : "4";
   return `${partOrder}:${usage.requirementCode ?? ""}:${usage.sectionKey}`;
 }
-
 function numberBase(usage: QaSarBookEvidenceUsage): string {
   if (usage.requirementCode) return usage.requirementCode;
   return usage.part === "part1" ? "P1" : usage.part === "part3" ? "P3" : "P4";
@@ -100,13 +93,7 @@ export function assignDeterministicExhibitNumbers(
     const next = (counters.get(base) ?? 0) + 1;
     counters.set(base, next);
     const number = `${base}-${String(next).padStart(2, "0")}`;
-    return {
-      ...row,
-      usages,
-      number,
-      citationLabel,
-      citationText: `${citationLabel} ${number}`,
-    };
+    return { ...row, usages, number, citationLabel, citationText: `${citationLabel} ${number}` };
   });
 }
 
@@ -115,9 +102,7 @@ export async function getQaSarBookTerminology(programmeId: string): Promise<QaSa
   if (!programme) throw new QaSarResourceNotFoundError("Programme not found");
   const rows = await prisma.$queryRaw<TerminologyRow[]>(Prisma.sql`
     SELECT "evidenceCitationLabel", "evidenceRegisterTitle", "appendixLabel", "requirementLabel", "criterionLabel"
-    FROM "QaSarBookTerminology"
-    WHERE "programmeId" = ${programmeId}
-    LIMIT 1
+    FROM "QaSarBookTerminology" WHERE "programmeId" = ${programmeId} LIMIT 1
   `);
   return QaSarBookTerminologySchema.parse(rows[0] ?? DEFAULT_QA_SAR_BOOK_TERMINOLOGY);
 }
@@ -135,15 +120,13 @@ export async function updateQaSarBookTerminology(
       ${input.programmeId}, ${terminology.evidenceCitationLabel}, ${terminology.evidenceRegisterTitle},
       ${terminology.appendixLabel}, ${terminology.requirementLabel}, ${terminology.criterionLabel},
       ${userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-    )
-    ON CONFLICT ("programmeId") DO UPDATE SET
+    ) ON CONFLICT ("programmeId") DO UPDATE SET
       "evidenceCitationLabel" = EXCLUDED."evidenceCitationLabel",
       "evidenceRegisterTitle" = EXCLUDED."evidenceRegisterTitle",
       "appendixLabel" = EXCLUDED."appendixLabel",
       "requirementLabel" = EXCLUDED."requirementLabel",
       "criterionLabel" = EXCLUDED."criterionLabel",
-      "updatedById" = EXCLUDED."updatedById",
-      "updatedAt" = CURRENT_TIMESTAMP
+      "updatedById" = EXCLUDED."updatedById", "updatedAt" = CURRENT_TIMESTAMP
   `);
   return getQaSarBookTerminology(input.programmeId);
 }
@@ -155,14 +138,11 @@ async function latestStaticReferenceRows(programmeId: string, cycleId: string): 
     FROM "QaSarBookSectionEvidenceReference" ref
     JOIN "QaSarBookSectionRevision" revision ON revision."id" = ref."revisionId"
     JOIN "QaEvidence" evidence ON evidence."id" = ref."evidenceId"
-    WHERE ref."programmeId" = ${programmeId}
-      AND ref."cycleId" = ${cycleId}
+    WHERE ref."programmeId" = ${programmeId} AND ref."cycleId" = ${cycleId}
       AND NOT EXISTS (
         SELECT 1 FROM "QaSarBookSectionRevision" newer
-        WHERE newer."programmeId" = revision."programmeId"
-          AND newer."cycleId" = revision."cycleId"
-          AND newer."sectionKey" = revision."sectionKey"
-          AND newer."revisionNumber" > revision."revisionNumber"
+        WHERE newer."programmeId" = revision."programmeId" AND newer."cycleId" = revision."cycleId"
+          AND newer."sectionKey" = revision."sectionKey" AND newer."revisionNumber" > revision."revisionNumber"
       )
     ORDER BY ref."sectionKey", ref."createdAt", ref."id"
   `);
@@ -170,8 +150,7 @@ async function latestStaticReferenceRows(programmeId: string, cycleId: string): 
 
 async function presentationMap(programmeId: string, cycleId: string): Promise<Map<string, QaSarBookAppendixGroup>> {
   const rows = await prisma.$queryRaw<PresentationRow[]>(Prisma.sql`
-    SELECT "evidenceId", "appendixGroup"
-    FROM "QaSarBookEvidencePresentation"
+    SELECT "evidenceId", "appendixGroup" FROM "QaSarBookEvidencePresentation"
     WHERE "programmeId" = ${programmeId} AND "cycleId" = ${cycleId}
   `);
   return new Map(rows.map((row) => [row.evidenceId, row.appendixGroup]));
@@ -189,15 +168,12 @@ export async function getQaSarBookEvidenceRegister(
     getQaSarBookTerminology(programmeId),
     presentationMap(programmeId, cycleId),
   ]);
-
   const usagesByEvidence = new Map<string, QaSarBookEvidenceUsage[]>();
   const issues: QaSarBookEvidenceRegisterView["issues"] = [];
 
   for (const criterion of part2.criteria) {
     for (const requirement of criterion.requirements) {
-      const source = mode === "official"
-        ? requirement.approvedSubmission
-        : requirement.latestSubmission ?? requirement.currentSource;
+      const source = mode === "official" ? requirement.approvedSubmission : requirement.latestSubmission ?? requirement.currentSource;
       if (!source) continue;
       for (const evidenceId of source.evidenceIds) {
         const usages = usagesByEvidence.get(evidenceId) ?? [];
@@ -241,47 +217,26 @@ export async function getQaSarBookEvidenceRegister(
   }
 
   const evidenceIds = [...usagesByEvidence.keys()];
-  const evidenceRows = evidenceIds.length
-    ? await prisma.qaEvidence.findMany({
-        where: { programmeId, id: { in: evidenceIds } },
-        select: {
-          id: true,
-          title: true,
-          kind: true,
-          status: true,
-          reportingPeriod: true,
-          sourceRef: true,
-          sourceUrl: true,
-        },
-      })
-    : [];
+  const evidenceRows = evidenceIds.length ? await prisma.qaEvidence.findMany({
+    where: { programmeId, id: { in: evidenceIds } },
+    select: { id: true, title: true, kind: true, status: true, reportingPeriod: true, sourceRef: true, sourceUrl: true },
+  }) : [];
   const evidenceById = new Map(evidenceRows.map((row) => [row.id, row]));
-
   const unnumbered: Array<Omit<QaSarBookEvidenceRegisterItem, "number" | "citationLabel" | "citationText">> = [];
   for (const [evidenceId, usages] of usagesByEvidence) {
     const evidence = evidenceById.get(evidenceId);
     if (!evidence) {
-      for (const usage of usages) {
-        issues.push({
-          type: "missingEvidence",
-          evidenceId,
-          sectionKey: usage.sectionKey,
-          requirementCode: usage.requirementCode,
-          message: `Referenced evidence ${evidenceId} is unavailable in this programme.`,
-        });
-      }
+      for (const usage of usages) issues.push({
+        type: "missingEvidence", evidenceId, sectionKey: usage.sectionKey, requirementCode: usage.requirementCode,
+        message: `Referenced evidence ${evidenceId} is unavailable in this programme.`,
+      });
       continue;
     }
     if (evidence.status === "Draft") {
-      for (const usage of usages) {
-        issues.push({
-          type: "draftEvidence",
-          evidenceId,
-          sectionKey: usage.sectionKey,
-          requirementCode: usage.requirementCode,
-          message: `${evidence.title} is still Draft and cannot be treated as official evidence.`,
-        });
-      }
+      for (const usage of usages) issues.push({
+        type: "draftEvidence", evidenceId, sectionKey: usage.sectionKey, requirementCode: usage.requirementCode,
+        message: `${evidence.title} is still Draft and cannot be treated as official evidence.`,
+      });
     }
     unnumbered.push({
       evidenceId: evidence.id,
@@ -295,43 +250,36 @@ export async function getQaSarBookEvidenceRegister(
       usages,
     });
   }
-
   const items = assignDeterministicExhibitNumbers(unnumbered, terminology.evidenceCitationLabel);
   issues.sort((a, b) => `${a.sectionKey}:${a.evidenceId}:${a.type}`.localeCompare(`${b.sectionKey}:${b.evidenceId}:${b.type}`));
-  return QaSarBookEvidenceRegisterViewSchema.parse({
-    programmeId,
-    cycleId,
-    terminology,
-    items,
-    issues,
-    generatedAt: new Date().toISOString(),
-  });
+  return QaSarBookEvidenceRegisterViewSchema.parse({ programmeId, cycleId, terminology, items, issues, generatedAt: new Date().toISOString() });
 }
 
-async function assertCurrentSectionRevision(
-  programmeId: string,
-  cycleId: string,
-  sectionKey: string,
-  revisionId: string,
-): Promise<void> {
+async function assertCurrentSectionRevision(programmeId: string, cycleId: string, sectionKey: string, revisionId: string): Promise<void> {
   const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-    SELECT "id" FROM "QaSarBookSectionRevision"
-    WHERE "id" = ${revisionId}
-      AND "programmeId" = ${programmeId}
-      AND "cycleId" = ${cycleId}
-      AND "sectionKey" = ${sectionKey}
+    SELECT revision."id" FROM "QaSarBookSectionRevision" revision
+    WHERE revision."id" = ${revisionId} AND revision."programmeId" = ${programmeId}
+      AND revision."cycleId" = ${cycleId} AND revision."sectionKey" = ${sectionKey}
       AND NOT EXISTS (
         SELECT 1 FROM "QaSarBookSectionRevision" newer
-        WHERE newer."programmeId" = ${programmeId}
-          AND newer."cycleId" = ${cycleId}
-          AND newer."sectionKey" = ${sectionKey}
-          AND newer."revisionNumber" > "QaSarBookSectionRevision"."revisionNumber"
-      )
-    LIMIT 1
+        WHERE newer."programmeId" = ${programmeId} AND newer."cycleId" = ${cycleId}
+          AND newer."sectionKey" = ${sectionKey} AND newer."revisionNumber" > revision."revisionNumber"
+      ) LIMIT 1
   `);
-  if (!rows[0]) {
-    throw new QaSarBookEvidenceReferenceConflictError("Evidence can only be linked to the current SAR section revision");
-  }
+  if (!rows[0]) throw new QaSarBookEvidenceReferenceConflictError("Evidence can only be linked to the current SAR section revision");
+}
+
+export async function getQaSarBookSectionEvidenceReferenceContext(
+  programmeId: string,
+  cycleId: string,
+  referenceId: string,
+): Promise<{ sectionKey: string } | null> {
+  await assertCycleScope(programmeId, cycleId);
+  const rows = await prisma.$queryRaw<Array<{ sectionKey: string }>>(Prisma.sql`
+    SELECT "sectionKey" FROM "QaSarBookSectionEvidenceReference"
+    WHERE "id" = ${referenceId} AND "programmeId" = ${programmeId} AND "cycleId" = ${cycleId} LIMIT 1
+  `);
+  return rows[0] ?? null;
 }
 
 export async function listQaSarBookSectionEvidenceReferences(
@@ -342,21 +290,22 @@ export async function listQaSarBookSectionEvidenceReferences(
   const section = findQaSarBookStaticSection(sectionKey);
   if (!section || section.source === "generated") throw new QaSarResourceNotFoundError("SAR book section not found");
   await assertCycleScope(programmeId, cycleId);
-  const rows = await latestStaticReferenceRows(programmeId, cycleId);
-  return rows
-    .filter((row) => row.sectionKey === sectionKey)
-    .map((row) => QaSarBookSectionEvidenceReferenceViewSchema.parse({
-      id: row.id,
-      programmeId: row.programmeId,
-      cycleId: row.cycleId,
-      sectionKey: row.sectionKey,
-      revisionId: row.revisionId,
-      evidenceId: row.evidenceId,
-      evidenceTitle: row.evidenceTitle,
-      appendixGroup: "other",
-      createdById: row.createdById,
-      createdAt: row.createdAt.toISOString(),
-    }));
+  const [rows, presentations] = await Promise.all([
+    latestStaticReferenceRows(programmeId, cycleId),
+    presentationMap(programmeId, cycleId),
+  ]);
+  return rows.filter((row) => row.sectionKey === sectionKey).map((row) => QaSarBookSectionEvidenceReferenceViewSchema.parse({
+    id: row.id,
+    programmeId: row.programmeId,
+    cycleId: row.cycleId,
+    sectionKey: row.sectionKey,
+    revisionId: row.revisionId,
+    evidenceId: row.evidenceId,
+    evidenceTitle: row.evidenceTitle,
+    appendixGroup: presentations.get(row.evidenceId) ?? "other",
+    createdById: row.createdById,
+    createdAt: row.createdAt.toISOString(),
+  }));
 }
 
 export async function addQaSarBookSectionEvidenceReference(
@@ -369,44 +318,31 @@ export async function addQaSarBookSectionEvidenceReference(
   if (!section || section.source === "generated") throw new QaSarResourceNotFoundError("SAR book section not found");
   await assertCycleScope(input.programmeId, cycleId);
   await assertCurrentSectionRevision(input.programmeId, cycleId, sectionKey, input.revisionId);
-  const evidence = await prisma.qaEvidence.findFirst({
-    where: { id: input.evidenceId, programmeId: input.programmeId },
-    select: { id: true, title: true },
-  });
+  const evidence = await prisma.qaEvidence.findFirst({ where: { id: input.evidenceId, programmeId: input.programmeId }, select: { id: true } });
   if (!evidence) throw new QaSarResourceNotFoundError("Evidence item not found in this programme");
-
   const id = randomUUID();
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw(Prisma.sql`
-      INSERT INTO "QaSarBookSectionEvidenceReference" (
-        "id", "programmeId", "cycleId", "sectionKey", "revisionId", "evidenceId", "createdById", "createdAt"
-      ) VALUES (${id}, ${input.programmeId}, ${cycleId}, ${sectionKey}, ${input.revisionId}, ${input.evidenceId}, ${userId}, CURRENT_TIMESTAMP)
+      INSERT INTO "QaSarBookSectionEvidenceReference" ("id", "programmeId", "cycleId", "sectionKey", "revisionId", "evidenceId", "createdById", "createdAt")
+      VALUES (${id}, ${input.programmeId}, ${cycleId}, ${sectionKey}, ${input.revisionId}, ${input.evidenceId}, ${userId}, CURRENT_TIMESTAMP)
       ON CONFLICT ("revisionId", "evidenceId") DO NOTHING
     `);
     await tx.$executeRaw(Prisma.sql`
-      INSERT INTO "QaSarBookEvidencePresentation" (
-        "id", "programmeId", "cycleId", "evidenceId", "appendixGroup", "updatedById", "createdAt", "updatedAt"
-      ) VALUES (${randomUUID()}, ${input.programmeId}, ${cycleId}, ${input.evidenceId}, ${input.appendixGroup}, ${userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO "QaSarBookEvidencePresentation" ("id", "programmeId", "cycleId", "evidenceId", "appendixGroup", "updatedById", "createdAt", "updatedAt")
+      VALUES (${randomUUID()}, ${input.programmeId}, ${cycleId}, ${input.evidenceId}, ${input.appendixGroup}, ${userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT ("cycleId", "evidenceId") DO NOTHING
     `);
   });
-  const refs = await listQaSarBookSectionEvidenceReferences(input.programmeId, cycleId, sectionKey);
-  const saved = refs.find((row) => row.evidenceId === input.evidenceId);
+  const saved = (await listQaSarBookSectionEvidenceReferences(input.programmeId, cycleId, sectionKey)).find((row) => row.evidenceId === input.evidenceId);
   if (!saved) throw new QaSarBookEvidenceReferenceConflictError("Evidence reference was not saved");
-  return { ...saved, appendixGroup: input.appendixGroup };
+  return saved;
 }
 
-export async function deleteQaSarBookSectionEvidenceReference(
-  programmeId: string,
-  cycleId: string,
-  referenceId: string,
-): Promise<void> {
+export async function deleteQaSarBookSectionEvidenceReference(programmeId: string, cycleId: string, referenceId: string): Promise<void> {
   await assertCycleScope(programmeId, cycleId);
   const changed = await prisma.$executeRaw(Prisma.sql`
     DELETE FROM "QaSarBookSectionEvidenceReference"
-    WHERE "id" = ${referenceId}
-      AND "programmeId" = ${programmeId}
-      AND "cycleId" = ${cycleId}
+    WHERE "id" = ${referenceId} AND "programmeId" = ${programmeId} AND "cycleId" = ${cycleId}
   `);
   if (!changed) throw new QaSarResourceNotFoundError("SAR evidence reference not found");
 }
@@ -421,13 +357,10 @@ export async function updateQaSarBookEvidencePresentation(
   const evidence = await prisma.qaEvidence.findFirst({ where: { id: evidenceId, programmeId: input.programmeId }, select: { id: true } });
   if (!evidence) throw new QaSarResourceNotFoundError("Evidence item not found in this programme");
   await prisma.$executeRaw(Prisma.sql`
-    INSERT INTO "QaSarBookEvidencePresentation" (
-      "id", "programmeId", "cycleId", "evidenceId", "appendixGroup", "updatedById", "createdAt", "updatedAt"
-    ) VALUES (${randomUUID()}, ${input.programmeId}, ${cycleId}, ${evidenceId}, ${input.appendixGroup}, ${userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    INSERT INTO "QaSarBookEvidencePresentation" ("id", "programmeId", "cycleId", "evidenceId", "appendixGroup", "updatedById", "createdAt", "updatedAt")
+    VALUES (${randomUUID()}, ${input.programmeId}, ${cycleId}, ${evidenceId}, ${input.appendixGroup}, ${userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     ON CONFLICT ("cycleId", "evidenceId") DO UPDATE SET
-      "appendixGroup" = EXCLUDED."appendixGroup",
-      "updatedById" = EXCLUDED."updatedById",
-      "updatedAt" = CURRENT_TIMESTAMP
+      "appendixGroup" = EXCLUDED."appendixGroup", "updatedById" = EXCLUDED."updatedById", "updatedAt" = CURRENT_TIMESTAMP
     WHERE "QaSarBookEvidencePresentation"."programmeId" = EXCLUDED."programmeId"
   `);
 }
