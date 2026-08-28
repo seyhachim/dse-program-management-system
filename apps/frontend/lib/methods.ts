@@ -8,9 +8,20 @@ import type {
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
+let methodsListCache: Promise<MethodsResponse> | null = null;
+
+function invalidateMethodsList() {
+  methodsListCache = null;
+}
+
 export const methodsApi = {
   list(): Promise<MethodsResponse> {
-    return api.get<MethodsResponse>("/api/methods");
+    if (methodsListCache) return methodsListCache;
+    methodsListCache = api.get<MethodsResponse>("/api/methods").catch((error) => {
+      methodsListCache = null;
+      throw error;
+    });
+    return methodsListCache;
   },
   catalog(): Promise<ManagedMethodsResponse> {
     return api.get<ManagedMethodsResponse>("/api/methods/catalog");
@@ -18,47 +29,83 @@ export const methodsApi = {
   listManaged(): Promise<ManagedMethodsResponse> {
     return api.get<ManagedMethodsResponse>("/api/methods/managed");
   },
-  add(kind: MethodKind, name: string): Promise<Method> {
-    return api.post<Method>(`/api/methods/${kind}`, { name });
+  async add(kind: MethodKind, name: string): Promise<Method> {
+    const result = await api.post<Method>(`/api/methods/${kind}`, { name });
+    invalidateMethodsList();
+    return result;
   },
-  rename(kind: MethodKind, id: string, name: string): Promise<Method> {
-    return api.put<Method>(`/api/methods/${kind}/${id}`, { name });
+  async rename(kind: MethodKind, id: string, name: string): Promise<Method> {
+    const result = await api.put<Method>(`/api/methods/${kind}/${id}`, { name });
+    invalidateMethodsList();
+    return result;
   },
-  setActive(kind: MethodKind, id: string, active: boolean): Promise<Method> {
-    return api.put<Method>(`/api/methods/${kind}/${id}/active`, { active });
+  async setActive(kind: MethodKind, id: string, active: boolean): Promise<Method> {
+    const result = await api.put<Method>(`/api/methods/${kind}/${id}/active`, { active });
+    invalidateMethodsList();
+    return result;
   },
-  createCluster(input: {
+  async createCluster(input: {
     id: string;
     name: string;
     description: string;
     sortOrder: number;
   }): Promise<ActiveLearningCluster> {
-    return api.post<ActiveLearningCluster>("/api/methods/active-learning/clusters", input);
+    const result = await api.post<ActiveLearningCluster>(
+      "/api/methods/active-learning/clusters",
+      input,
+    );
+    invalidateMethodsList();
+    return result;
   },
-  updateCluster(
+  async updateCluster(
     id: string,
     input: { name: string; description: string; sortOrder: number },
   ): Promise<ActiveLearningCluster> {
-    return api.put<ActiveLearningCluster>(`/api/methods/active-learning/clusters/${id}`, input);
+    const result = await api.put<ActiveLearningCluster>(
+      `/api/methods/active-learning/clusters/${id}`,
+      input,
+    );
+    invalidateMethodsList();
+    return result;
   },
-  setClusterActive(id: string, active: boolean): Promise<ActiveLearningCluster> {
-    return api.put<ActiveLearningCluster>(`/api/methods/active-learning/clusters/${id}/active`, { active });
+  async setClusterActive(id: string, active: boolean): Promise<ActiveLearningCluster> {
+    const result = await api.put<ActiveLearningCluster>(
+      `/api/methods/active-learning/clusters/${id}/active`,
+      { active },
+    );
+    invalidateMethodsList();
+    return result;
   },
-  createStrategy(input: {
+  async createStrategy(input: {
     id: string;
     name: string;
     clusterId: string;
     sortOrder: number;
   }): Promise<ActiveLearningStrategy> {
-    return api.post<ActiveLearningStrategy>("/api/methods/active-learning/strategies", input);
+    const result = await api.post<ActiveLearningStrategy>(
+      "/api/methods/active-learning/strategies",
+      input,
+    );
+    invalidateMethodsList();
+    return result;
   },
-  updateStrategy(
+  async updateStrategy(
     id: string,
     input: { name: string; clusterId: string; sortOrder: number },
   ): Promise<ActiveLearningStrategy> {
-    return api.put<ActiveLearningStrategy>(`/api/methods/active-learning/strategies/${id}`, input);
+    const result = await api.put<ActiveLearningStrategy>(
+      `/api/methods/active-learning/strategies/${id}`,
+      input,
+    );
+    invalidateMethodsList();
+    return result;
   },
-  setStrategyActive(id: string, active: boolean): Promise<ActiveLearningStrategy> {
-    return api.put<ActiveLearningStrategy>(`/api/methods/active-learning/strategies/${id}/active`, { active });
+  async setStrategyActive(id: string, active: boolean): Promise<ActiveLearningStrategy> {
+    const result = await api.put<ActiveLearningStrategy>(
+      `/api/methods/active-learning/strategies/${id}/active`,
+      { active },
+    );
+    invalidateMethodsList();
+    return result;
   },
 };

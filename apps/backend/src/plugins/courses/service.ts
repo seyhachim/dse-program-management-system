@@ -31,6 +31,7 @@ import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { assertCourseSpecEditable } from "./spec-lock.ts";
+import { uniqueActiveCurriculumPlacement } from "./course-spec-progress-placement.ts";
 import {
   buildCourseInfoSnapshot,
   courseInfoSnapshotData,
@@ -186,6 +187,18 @@ const SPEC_PROGRESS_COURSE_SELECT = {
     take: 1,
     select: { sections: { select: { sectionKey: true, status: true } } },
   },
+  curriculumPlacements: {
+    where: { curriculumVersion: { is: { status: "Active" } } },
+    orderBy: [
+      { yearLevel: "asc" },
+      { semester: "asc" },
+      { sortOrder: "asc" },
+    ],
+    // Fetch at most two so multiple active curriculum roots are detected
+    // instead of silently choosing whichever placement sorts first.
+    take: 2,
+    select: { yearLevel: true, semester: true, sortOrder: true },
+  },
 } satisfies Prisma.CourseSelect;
 
 type SpecProgressCourse = Prisma.CourseGetPayload<{
@@ -194,6 +207,7 @@ type SpecProgressCourse = Prisma.CourseGetPayload<{
 
 function toCourseSpecProgress(course: SpecProgressCourse): CourseSpecProgress {
   const sections = course.specs[0]?.sections ?? [];
+  const curriculumPlacement = uniqueActiveCurriculumPlacement(course.curriculumPlacements);
 
   const completedSectionIds = new Set(
     sections
@@ -218,6 +232,13 @@ function toCourseSpecProgress(course: SpecProgressCourse): CourseSpecProgress {
     title: course.title,
     completed: completedSectionIds.size,
     total: COMPLETABLE_SECTION_IDS.length,
+    curriculumPlacement: curriculumPlacement
+      ? {
+          programmeYear: curriculumPlacement.yearLevel,
+          semester: curriculumPlacement.semester,
+          sortOrder: curriculumPlacement.sortOrder,
+        }
+      : null,
     incompleteSections,
   };
 }

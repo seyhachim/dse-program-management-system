@@ -8,12 +8,11 @@ const completeStatus = {
 } as const;
 
 describe("Review & Submit readiness", () => {
-  test("preserves the existing six checks and appends Constructive Alignment as seventh", () => {
+  test("counts lecturer-completable checks plus Constructive Alignment", () => {
     const items = buildReviewReadinessItems({
       status: completeStatus,
       cloReady: true,
       teachingLearningReady: true,
-      specificationDateReady: true,
       constructiveAlignmentReady: false,
     });
 
@@ -23,23 +22,22 @@ describe("Review & Submit readiness", () => {
       "Teaching & Learning",
       "Assessment",
       "Weekly Plan",
-      "Specification Date",
       "Constructive Alignment",
     ]);
-    expect(items.filter((item) => item.complete)).toHaveLength(6);
-    expect(items).toHaveLength(7);
+    expect(items.filter((item) => item.complete)).toHaveLength(5);
+    expect(items).toHaveLength(6);
+    expect(items.some((item) => item.id === "date")).toBe(false);
   });
 
-  test("reports seven of seven when alignment is complete", () => {
+  test("reports six of six when all lecturer-completable checks are ready", () => {
     const items = buildReviewReadinessItems({
       status: completeStatus,
       cloReady: true,
       teachingLearningReady: true,
-      specificationDateReady: true,
       constructiveAlignmentReady: true,
     });
 
-    expect(items.filter((item) => item.complete)).toHaveLength(7);
+    expect(items.filter((item) => item.complete)).toHaveLength(6);
   });
 
   test("does not let alignment completion hide an existing readiness gap", () => {
@@ -47,11 +45,10 @@ describe("Review & Submit readiness", () => {
       status: { ...completeStatus, slt: "draft" },
       cloReady: true,
       teachingLearningReady: true,
-      specificationDateReady: true,
       constructiveAlignmentReady: true,
     });
 
-    expect(items.filter((item) => item.complete)).toHaveLength(6);
+    expect(items.filter((item) => item.complete)).toHaveLength(5);
     expect(items.find((item) => item.id === "slt")?.complete).toBe(false);
     expect(items.find((item) => item.id === "mapping")?.complete).toBe(true);
   });

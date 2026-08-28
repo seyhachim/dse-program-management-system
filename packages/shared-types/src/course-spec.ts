@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CourseTypeSchema } from "./courses.ts";
-import { DateOnlySchema, SemesterSchema } from "./offerings.ts";
+import { DateOnlySchema, SemesterSchema, type Semester } from "./offerings.ts";
 
 /**
  * Course Specification wizard contract. The full RUPP syllabus (Part 2 §1–25) is
@@ -161,6 +161,17 @@ export interface CourseSpecProgress {
   title: string;
   completed: number;
   total: number;
+  /**
+   * Active curriculum placement used only to organize the programme dashboard.
+   * Null means the course is not placed in the active curriculum; callers must
+   * never infer programme year or semester from the course code. Optional keeps
+   * older typed consumers source-compatible while the API now always returns it.
+   */
+  curriculumPlacement?: {
+    programmeYear: number;
+    semester: Semester;
+    sortOrder: number;
+  } | null;
   /**
    * Completable sections not yet marked Complete (in wizard order) — the
    * deterministic, explainable basis for a lecturer-facing "Attention" detail

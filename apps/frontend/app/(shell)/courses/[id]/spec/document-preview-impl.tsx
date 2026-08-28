@@ -223,13 +223,18 @@ export function DocumentPreview({
   }, []);
 
   useEffect(() => {
+    // The viewer mounts only after the async version theme is ready. Re-run this
+    // effect at that transition so the default is truly Fit Width instead of the
+    // initial 100% fallback used while no viewer element exists yet.
+    if (!officialThemeReady) return;
+
     fitWidth();
     const viewer = viewerRef.current;
     if (!viewer) return;
     const observer = new ResizeObserver(fitWidth);
     observer.observe(viewer);
     return () => observer.disconnect();
-  }, [fitWidth]);
+  }, [fitWidth, officialThemeReady]);
 
   const handleDownloadWord = async () => {
     if (exportDisabled) return;

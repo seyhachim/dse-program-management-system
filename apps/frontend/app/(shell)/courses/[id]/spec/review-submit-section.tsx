@@ -17,13 +17,9 @@ import {
   type DateSection as DateSectionValue,
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
-import { Button, Input } from "@dse-pms/ui";
+import { Button } from "@dse-pms/ui";
 import type { CourseView } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
-import {
-  isSpecificationDateReady,
-  SPECIFICATION_DATE_SUBMISSION_ERROR,
-} from "./specification-date-readiness";
 import {
   buildReviewReadinessItems,
   type ReviewReadinessItem,
@@ -77,7 +73,6 @@ export function ReviewSubmitSection({
   cloReady,
   teachingLearningReady,
   specificationDate,
-  onSaveSpecificationDate,
   onSubmit,
   onPreview,
   onGoToSection,
@@ -106,6 +101,7 @@ export function ReviewSubmitSection({
   cloReady: boolean;
   teachingLearningReady: boolean;
   specificationDate: DateSectionValue;
+  /** Kept in the component contract for read-only/spec-client compatibility; date is now system-assigned. */
   onSaveSpecificationDate: (value: DateSectionValue) => Promise<boolean>;
   onSubmit: (note: string) => Promise<boolean>;
   onPreview: () => void;
@@ -119,16 +115,9 @@ export function ReviewSubmitSection({
   const [reviewNote, setReviewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [reviewing, setReviewing] = useState(false);
-  const [dateDraft, setDateDraft] = useState(specificationDate.date ?? "");
-  const [dateSaving, setDateSaving] = useState(false);
-  const [dateError, setDateError] = useState<string | null>(null);
   const [constructiveAlignmentReady, setConstructiveAlignmentReady] =
     useState(false);
   const [alignmentLoading, setAlignmentLoading] = useState(true);
-
-  useEffect(() => {
-    setDateDraft(specificationDate.date ?? "");
-  }, [specificationDate.date]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,17 +190,12 @@ export function ReviewSubmitSection({
     };
   }, [course.id, status]);
 
-  const specificationDateReady = isSpecificationDateReady(
-    status.date,
-    specificationDate.date,
-  );
   const readinessItems = useMemo<ReviewReadinessItem[]>(
     () =>
       buildReviewReadinessItems({
         status,
         cloReady,
         teachingLearningReady,
-        specificationDateReady,
         constructiveAlignmentReady:
           !alignmentLoading && constructiveAlignmentReady,
       }),
@@ -219,7 +203,6 @@ export function ReviewSubmitSection({
       status,
       cloReady,
       teachingLearningReady,
-      specificationDateReady,
       alignmentLoading,
       constructiveAlignmentReady,
     ],
@@ -229,7 +212,10 @@ export function ReviewSubmitSection({
   const otherIncomplete = incomplete.filter((item) => item.id !== "mapping");
   const alignmentIncomplete =
     !alignmentLoading && !constructiveAlignmentReady;
-  const ready = incomplete.length === 0;
+  const hasPersistedSpecificationDate = Boolean(specificationDate.date?.trim());
+  const legacyMissingResubmissionDate =
+    review.status === "changesRequested" && !hasPersistedSpecificationDate;
+  const ready = incomplete.length === 0 && !legacyMissingResubmissionDate;
   const canSubmit =
     ready &&
     (review.status === "draft" || review.status === "changesRequested") &&
@@ -242,43 +228,18 @@ export function ReviewSubmitSection({
     review.status === "underReview" ||
     review.status === "resubmitted";
 
-  const focusSpecificationDate = () => {
-    document.getElementById("specification-date")?.focus();
-  };
-
   const goToReadinessItem = (item: ReviewReadinessItem) => {
-    if (item.id === "date") {
-      focusSpecificationDate();
-      return;
-    }
+    if (item.id === "date") return;
     onGoToSection(item.id);
   };
 
-  const saveSpecificationDate = async () => {
-    setDateSaving(true);
-    setDateError(null);
-    try {
-      const normalized = dateDraft.trim() || null;
-      const saved = await onSaveSpecificationDate({ date: normalized });
-      if (saved) setDateDraft(normalized ?? "");
-    } finally {
-      setDateSaving(false);
-    }
-  };
-
   const submit = async () => {
-    if (!specificationDateReady) {
-      setDateError(SPECIFICATION_DATE_SUBMISSION_ERROR);
-      focusSpecificationDate();
-      return;
-    }
     if (alignmentIncomplete) {
       onGoToSection("mapping");
       return;
     }
     if (!ready) return;
 
-    setDateError(null);
     setSubmitting(true);
     try {
       await onSubmit(note);
@@ -298,7 +259,9 @@ export function ReviewSubmitSection({
       case "underReview":
         return "Your course specification is currently under review. Editing is locked until the review is completed.";
       case "changesRequested":
-        return "Changes have been requested. Continue editing the course specification, then resubmit it for review.";
+        return legacyMissingResubmissionDate
+          ? "This legacy course specification is missing its original Specification Date, so resubmission is blocked until the record is repaired."
+          : "Changes have been requested. Continue editing the course specification, then resubmit it for review.";
       case "resubmitted":
         return "Your revised course specification has been resubmitted and is waiting for review.";
       case "approved":
@@ -435,7 +398,7 @@ export function ReviewSubmitSection({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-foreground">Course Specification Readiness</p>
-              <p className="mt-1 text-xs text-muted-foreground">Required sections only</p>
+              <p className="mt-1 text-xs text-muted-foreground">Lecturer-completable requirements</p>
             </div>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -533,8 +496,8 @@ export function ReviewSubmitSection({
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="font-semibold">All required sections are complete.</p>
-                  <p className="mt-1 text-emerald-700">Review the generated document before submitting.</p>
+                  <p className="font-semibold">All lecturer-completable requirements are complete.</p>
+                  <p className="mt-1 text-emerald-700">Specification Date will be assigned automatically when you submit.</p>
                 </div>
               </div>
             </div>
@@ -542,6 +505,14 @@ export function ReviewSubmitSection({
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-900">
               <p className="font-semibold">Changes requested.</p>
               <p className="mt-1">Review the comments and update the course specification before resubmitting.</p>
+              {legacyMissingResubmissionDate ? (
+                <div className="mt-3 rounded-lg border border-amber-300 bg-background/70 p-3">
+                  <p className="font-semibold">Original Specification Date is missing.</p>
+                  <p className="mt-1">
+                    PMS will not invent a new date during resubmission. This legacy record needs an authorized repair before it can be resubmitted.
+                  </p>
+                </div>
+              ) : null}
               {alignmentIncomplete ? (
                 <button
                   type="button"
@@ -580,50 +551,35 @@ export function ReviewSubmitSection({
           <div className="max-w-2xl">
             <p className="text-sm font-semibold text-foreground">Specification Date</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Official date shown on this Course Specification document. Submission and approval timestamps are recorded automatically by the system.
+              {hasPersistedSpecificationDate
+                ? "Assigned automatically when this academic version was first submitted. Resubmission and Head approval do not change it."
+                : review.status === "draft"
+                  ? "PMS will assign this automatically from the programme server date when you first submit for review."
+                  : "No Specification Date is recorded for this version."}
             </p>
           </div>
           <span
             className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
-              specificationDateReady
+              hasPersistedSpecificationDate
                 ? "bg-emerald-50 text-emerald-700"
-                : "bg-amber-50 text-amber-700"
+                : review.status === "draft"
+                  ? "bg-blue-50 text-blue-700"
+                  : "bg-amber-50 text-amber-700"
             }`}
           >
-            {specificationDateReady ? "Complete" : "Required"}
+            {hasPersistedSpecificationDate
+              ? "Assigned"
+              : review.status === "draft"
+                ? "Automatic on submission"
+                : "Missing"}
           </span>
         </div>
-        <div className="mt-4 flex max-w-xl flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block flex-1">
-            <span className="text-xs font-medium text-foreground">Specification Date</span>
-            <Input
-              id="specification-date"
-              type="date"
-              value={dateDraft}
-              disabled={!editingEnabled || saving || dateSaving}
-              onChange={(event) => {
-                setDateDraft(event.target.value);
-                setDateError(null);
-              }}
-              className="mt-1.5"
-            />
-          </label>
-          {editingEnabled ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={saveSpecificationDate}
-              disabled={saving || dateSaving}
-            >
-              {dateSaving ? "Saving…" : "Save Date"}
-            </Button>
-          ) : null}
-        </div>
-        {editingEnabled && !specificationDateReady ? (
-          <p className="mt-3 text-xs text-amber-700">
-            {dateError ?? SPECIFICATION_DATE_SUBMISSION_ERROR}
+        <div className="mt-4 max-w-xl rounded-lg border border-border bg-muted/20 px-4 py-3">
+          <p className="text-xs font-medium text-muted-foreground">Official document date</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {specificationDate.date || "Will be set on first submission"}
           </p>
-        ) : null}
+        </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -679,7 +635,7 @@ export function ReviewSubmitSection({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {review.status === "draft"
                     ? ready
-                      ? "The current saved version will be sent to the Head of Program for review."
+                      ? "The current saved version will be sent to the Head of Program. PMS will stamp the Specification Date at submission."
                       : "Submission is disabled until all required sections are complete."
                     : review.status === "changesRequested"
                       ? "Review the requested changes, update the course specification, and resubmit when ready."
@@ -735,10 +691,12 @@ export function ReviewSubmitSection({
               <p className="text-xs font-medium text-foreground">
                 {review.status === "draft"
                   ? ready
-                    ? "Ready to submit. Use the action bar below when you are ready."
+                    ? "Ready to submit. Specification Date will be assigned automatically."
                     : `${incomplete.length} required section${incomplete.length === 1 ? " is" : "s are"} incomplete.`
                   : review.status === "changesRequested"
-                    ? "You can edit the course specification and resubmit after making the requested changes."
+                    ? legacyMissingResubmissionDate
+                      ? "Resubmission is blocked because the original Specification Date is missing."
+                      : "You can edit the course specification and resubmit after making the requested changes."
                     : review.status === "approved"
                       ? "This approved version is locked for editing."
                       : "Editing and submission are locked while the course specification is in the review workflow."}
@@ -857,7 +815,9 @@ export function ReviewSubmitSection({
                   : review.status === "changesRequested"
                     ? ready
                       ? "Ready to update and resubmit"
-                      : `${incomplete.length} required section${incomplete.length === 1 ? " needs" : "s need"} attention`
+                      : legacyMissingResubmissionDate
+                        ? "Original Specification Date needs repair"
+                        : `${incomplete.length} required section${incomplete.length === 1 ? " needs" : "s need"} attention`
                     : review.status === "approved"
                       ? "Course specification approved"
                       : STATUS_META[review.status].label}
@@ -866,12 +826,14 @@ export function ReviewSubmitSection({
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {review.status === "draft"
                 ? ready
-                  ? `All ${readinessItems.length} required sections are complete. Review the document before submitting.`
+                  ? `All ${readinessItems.length} lecturer-completable requirements are complete. Specification Date will be stamped when submitted.`
                   : "Complete the required sections before submitting for review."
                 : review.status === "changesRequested"
                   ? ready
-                    ? `All ${readinessItems.length} required sections are complete. Resubmit the updated version when ready.`
-                    : "Complete the required sections before resubmitting."
+                    ? `All ${readinessItems.length} lecturer-completable requirements are complete. Resubmit the updated version when ready.`
+                    : legacyMissingResubmissionDate
+                      ? "PMS will not replace a missing original date with the resubmission date."
+                      : "Complete the required sections before resubmitting."
                   : review.status === "approved"
                     ? "This approved version is read-only."
                     : "The course specification is locked while it is in the review workflow."}
