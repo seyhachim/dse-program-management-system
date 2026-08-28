@@ -39,6 +39,23 @@ const week = (id: string, cloCodes: string[]): WeekForm => ({
   assessment: "",
 });
 
+const readyWeek = (id: string, cloCodes: string[]): WeekForm => ({
+  ...week(id, cloCodes),
+  lessonLearningOutcomes: [
+    { id: `${id}-llo`, description: `Outcome ${id}` },
+  ],
+  studentLearningActivities: [
+    {
+      id: `${id}-activity`,
+      title: `Activity ${id}`,
+      description: "",
+      lloIds: [`${id}-llo`],
+    },
+  ],
+  teachingMethodIds: ["lecture"],
+  assessmentMethodIds: ["assignment"],
+});
+
 const assessment = (
   id: string,
   cloCodes: string[],
@@ -173,5 +190,26 @@ describe("overview readiness", () => {
     );
 
     expect(status.mapping).toBeUndefined();
+  });
+
+  test("legacy Midterm and Final rows do not keep a completed instructional plan in draft", () => {
+    const midterm = {
+      ...week("w8", ["CLO1"]),
+      topic: "Midterm Exam",
+    };
+    const final = {
+      ...week("w16", ["CLO1"]),
+      topic: "Final Exam",
+    };
+    const status = deriveOverviewReadinessStatus(
+      { ...baseStatus, slt: "draft" },
+      [clo("CLO1")],
+      [readyWeek("w1", ["CLO1"]), midterm, readyWeek("w9", ["CLO1"]), final],
+      [assessment("a1", ["CLO1"])],
+      { cloReady: true, teachingLearningReady: true },
+    );
+
+    expect(status.slt).toBe("complete");
+    expect(status.mapping).toBe("complete");
   });
 });
