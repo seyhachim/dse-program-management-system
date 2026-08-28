@@ -30,40 +30,14 @@ const KIND_TO_DB = {
   other: "Other",
 } as const;
 
-const KIND_FROM_DB = Object.fromEntries(
-  Object.entries(KIND_TO_DB).map(([key, value]) => [value, key]),
-) as Record<string, LecturerPortfolioItemKind>;
+type DbKind = (typeof KIND_TO_DB)[LecturerPortfolioItemKind];
+type DbStatus = "SelfDeclared" | "Verified" | "Rejected";
+type DbAction = "Verified" | "Rejected" | "Reset";
 
-const STATUS_TO_DB = {
-  self_declared: "SelfDeclared",
-  verified: "Verified",
-  rejected: "Rejected",
-} as const;
-
-const STATUS_FROM_DB: Record<string, LecturerPortfolioVerificationStatus> = {
-  SelfDeclared: "self_declared",
-  Verified: "verified",
-  Rejected: "rejected",
-};
-
-const ACTION_TO_DB = {
-  verified: "Verified",
-  rejected: "Rejected",
-  reset: "Reset",
-} as const;
-
-const ACTION_FROM_DB: Record<string, LecturerPortfolioVerificationAction> = {
-  Verified: "verified",
-  Rejected: "rejected",
-  Reset: "reset",
-};
-
-type DbExecutor = PrismaClient | Prisma.TransactionClient;
-
-type PortfolioItemRow = {
+type ItemRow = {
   id: string;
   lecturerId: string;
-  kind: string;
+  kind: DbKind;
   title: string;
   organization: string;
   description: string;
@@ -75,34 +49,92 @@ type PortfolioItemRow = {
   tags: string[];
   isPublic: boolean;
   isFeatured: boolean;
-  verificationStatus: string;
+  verificationStatus: DbStatus;
   createdAt: Date;
   updatedAt: Date;
 };
 
 type VerificationRow = {
   id: string;
-  action: string;
+  itemId: string;
+  action: DbAction;
   note: string;
   actorId: string;
-  createdAt: Date;
   actorName: string;
+  createdAt: Date;
+};
+
+type DbClient = Pick<PrismaClient, "$queryRaw" | "$executeRaw">;
+
+const DB_TO_KIND = Object.fromEntries(
+  Object.entries(KIND_TO_DB).map(([kind, dbKind]) => [dbKind, kind]),
+) as Record<DbKind, LecturerPortfolioItemKind>;
+
+const STATUS_FROM_DB: Record<DbStatus, LecturerPortfolioVerificationStatus> = {
+  SelfDeclared: "self_declared",
+  Verified: "verified",
+  Rejected: "rejected",
+};
+
+const ACTION_FROM_DB: Record<DbAction, LecturerPortfolioVerificationAction> = {
+  Verified: "verified",
+  Rejected: "rejected",
+  Reset: "reset",
 };
 
 function dateOnly(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
 
-function toDbDate(value: string | null | undefined): Date | null | undefined {
-  if (value === undefined) return undefined;
+function toDate(value: string | null): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
-function presentItem(row: PortfolioItemRow, events: VerificationRow[]): LecturerPortfolioItem {
+function ensureDateOrder(startDate: string | null, endDate: string | null): void {
+  if (startDate && endDate && endDate < startDate) {
+    throw new PortfolioValidationError("End date must be on or after start date");
+  }
+}
+
+function tagsSql(tags: readonly string[]): Prisma.Sql {
+  if (tags.length === 0) return Prisma.sql`ARRAY[]::text[]`;
+  return Prisma.sql`ARRAY[${Prisma.join(tags)}]::text[]`;
+}
+
+async function findItem(db: DbClient, id: string, lecturerId?: string): Promise<ItemRow | null> {
+  const rows = lecturerId
+    ? await db.$queryRaw<ItemRow[]>`
+        SELECT *
+        FROM lecturer_portfolio."LecturerPortfolioItem"
+        WHERE "id" = ${id} AND "lecturerId" = ${lecturerId}
+        LIMIT 1
+      `
+    : await db.$queryRaw<ItemRow[]>`
+        SELECT *
+        FROM lecturer_portfolio."LecturerPortfolioItem"
+        WHERE "id" = ${id}
+        LIMIT 1
+      `;
+  return rows[0] ?? null;
+}
+
+async function verificationEvents(db: DbClient, itemId: string): Promise<VerificationRow[]> {
+  return db.$queryRaw<VerificationRow[]>`
+    SELECT v."id", v."itemId", v."action"::text AS "action", v."note",
+           v."actorId", u."name" AS "actorName", v."createdAt"
+    FROM lecturer_portfolio."LecturerPortfolioVerification" v
+    JOIN public."User" u ON u."id" = v."actorId"
+    WHERE v."itemId" = ${itemId}
+    ORDER BY v."createdAt" ASC, v."id" ASC
+  `;
+}
+
+async function presentItem(db: DbClient, row: ItemRow): Promise<LecturerPortfolioItem> {
+  const events = await verificationEvents(db, row.id);
   return {
     id: row.id,
     lecturerId: row.lecturerId,
-    kind: KIND_FROM_DB[row.kind] ?? "other",
+    kind: DB_TO_KIND[row.kind],
     title: row.title,
     organization: row.organization,
     description: row.description,
@@ -114,12 +146,12 @@ function presentItem(row: PortfolioItemRow, events: VerificationRow[]): Lecturer
     tags: row.tags,
     isPublic: row.isPublic,
     isFeatured: row.isFeatured,
-    verificationStatus: STATUS_FROM_DB[row.verificationStatus] ?? "self_declared",
+    verificationStatus: STATUS_FROM_DB[row.verificationStatus],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     verificationEvents: events.map((event) => ({
       id: event.id,
-      action: ACTION_FROM_DB[event.action] ?? "reset",
+      action: ACTION_FROM_DB[event.action],
       note: event.note,
       actor: { id: event.actorId, name: event.actorName },
       createdAt: event.createdAt.toISOString(),
@@ -127,162 +159,119 @@ function presentItem(row: PortfolioItemRow, events: VerificationRow[]): Lecturer
   };
 }
 
-async function listRows(db: DbExecutor, lecturerId: string): Promise<PortfolioItemRow[]> {
-  return db.$queryRaw<PortfolioItemRow[]>`
-    SELECT * FROM lecturer_portfolio."LecturerPortfolioItem"
+async function listItems(lecturerId: string): Promise<LecturerPortfolioItem[]> {
+  const rows = await prisma.$queryRaw<ItemRow[]>`
+    SELECT *
+    FROM lecturer_portfolio."LecturerPortfolioItem"
     WHERE "lecturerId" = ${lecturerId}
-    ORDER BY "isFeatured" DESC, "startDate" DESC NULLS LAST, "createdAt" DESC
+    ORDER BY "isFeatured" DESC, "updatedAt" DESC, "id" ASC
   `;
-}
-
-async function findRow(db: DbExecutor, lecturerId: string, itemId: string): Promise<PortfolioItemRow | null> {
-  const rows = await db.$queryRaw<PortfolioItemRow[]>`
-    SELECT * FROM lecturer_portfolio."LecturerPortfolioItem"
-    WHERE "id" = ${itemId} AND "lecturerId" = ${lecturerId}
-    LIMIT 1
-  `;
-  return rows[0] ?? null;
-}
-
-async function listVerificationEvents(
-  db: DbExecutor,
-  itemIds: string[],
-): Promise<Map<string, VerificationRow[]>> {
-  if (itemIds.length === 0) return new Map();
-  const rows = await db.$queryRaw<Array<VerificationRow & { portfolioItemId: string }>>(Prisma.sql`
-    SELECT v."id", v."portfolioItemId", v."action", v."note", v."actorId", v."createdAt", u."name" AS "actorName"
-    FROM lecturer_portfolio."LecturerPortfolioVerification" v
-    JOIN public."User" u ON u."id" = v."actorId"
-    WHERE v."portfolioItemId" IN (${Prisma.join(itemIds)})
-    ORDER BY v."createdAt" DESC, v."id" DESC
-  `);
-  const events = new Map<string, VerificationRow[]>();
-  for (const row of rows) {
-    const current = events.get(row.portfolioItemId) ?? [];
-    current.push(row);
-    events.set(row.portfolioItemId, current);
-  }
-  return events;
-}
-
-async function listPresentedItems(db: DbExecutor, lecturerId: string): Promise<LecturerPortfolioItem[]> {
-  const rows = await listRows(db, lecturerId);
-  const eventsByItem = await listVerificationEvents(db, rows.map((row) => row.id));
-  return rows.map((row) => presentItem(row, eventsByItem.get(row.id) ?? []));
-}
-
-async function insertVerificationEvent(
-  db: DbExecutor,
-  portfolioItemId: string,
-  actorId: string,
-  action: LecturerPortfolioVerificationAction,
-  note: string,
-): Promise<void> {
-  await db.$executeRaw`
-    INSERT INTO lecturer_portfolio."LecturerPortfolioVerification" (
-      "id", "portfolioItemId", "actorId", "action", "note"
-    ) VALUES (
-      ${randomUUID()}, ${portfolioItemId}, ${actorId},
-      ${ACTION_TO_DB[action]}::lecturer_portfolio."LecturerPortfolioVerificationAction",
-      ${note}
-    )
-  `;
+  return Promise.all(rows.map((row) => presentItem(prisma, row)));
 }
 
 export const lecturerPortfolioService = {
-  async listOwnItems(lecturerId: string) {
-    return listPresentedItems(prisma, lecturerId);
-  },
+  listOwnItems: listItems,
 
-  async listItemsForReview(lecturerId: string) {
-    const lecturer = await lecturerService.getById(lecturerId);
-    if (!lecturer) throw new Error("Lecturer not found");
-    return listPresentedItems(prisma, lecturerId);
-  },
-
-  async createOwnItem(lecturerId: string, input: CreateLecturerPortfolioItemInput) {
+  async createOwnItem(
+    lecturerId: string,
+    input: CreateLecturerPortfolioItemInput,
+  ): Promise<LecturerPortfolioItem> {
+    if (!(await lecturerService.getById(lecturerId))) {
+      throw new PortfolioNotFoundError("Lecturer profile not found");
+    }
+    ensureDateOrder(input.startDate, input.endDate);
     const id = randomUUID();
-    await prisma.$executeRaw`
+    const dbKind = KIND_TO_DB[input.kind];
+    const tags = [...new Set(input.tags)];
+    const rows = await prisma.$queryRaw<ItemRow[]>(Prisma.sql`
       INSERT INTO lecturer_portfolio."LecturerPortfolioItem" (
-        "id", "lecturerId", "kind", "title", "organization", "description", "role",
-        "identifier", "url", "startDate", "endDate", "tags", "isPublic", "isFeatured"
+        "id", "lecturerId", "kind", "title", "organization", "description",
+        "role", "identifier", "url", "startDate", "endDate", "tags",
+        "isPublic", "isFeatured"
       ) VALUES (
-        ${id}, ${lecturerId}, ${KIND_TO_DB[input.kind]}::lecturer_portfolio."LecturerPortfolioItemKind",
-        ${input.title}, ${input.organization}, ${input.description}, ${input.role}, ${input.identifier},
-        ${input.url}, ${toDbDate(input.startDate)}, ${toDbDate(input.endDate)}, ${input.tags},
-        ${input.isPublic}, ${input.isFeatured}
+        ${id}, ${lecturerId}, ${dbKind}::lecturer_portfolio."LecturerPortfolioItemKind",
+        ${input.title}, ${input.organization}, ${input.description}, ${input.role},
+        ${input.identifier}, ${input.url}, ${toDate(input.startDate)}, ${toDate(input.endDate)},
+        ${tagsSql(tags)}, ${input.isPublic}, ${input.isFeatured}
       )
-    `;
-    const row = await findRow(prisma, lecturerId, id);
-    if (!row) throw new Error("Portfolio item was not created");
-    return presentItem(row, []);
+      RETURNING *
+    `);
+    return presentItem(prisma, rows[0]!);
   },
 
   async updateOwnItem(
     lecturerId: string,
     itemId: string,
     input: UpdateLecturerPortfolioItemInput,
-  ) {
-    const existing = await findRow(prisma, lecturerId, itemId);
-    if (!existing) throw new Error("Portfolio item not found");
+  ): Promise<LecturerPortfolioItem> {
+    const existing = await findItem(prisma, itemId, lecturerId);
+    if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
 
     const next = {
-      kind: input.kind ?? (KIND_FROM_DB[existing.kind] ?? "other"),
+      kind: input.kind ?? DB_TO_KIND[existing.kind],
       title: input.title ?? existing.title,
       organization: input.organization ?? existing.organization,
       description: input.description ?? existing.description,
       role: input.role ?? existing.role,
       identifier: input.identifier ?? existing.identifier,
       url: input.url ?? existing.url,
-      startDate: input.startDate === undefined ? existing.startDate : toDbDate(input.startDate),
-      endDate: input.endDate === undefined ? existing.endDate : toDbDate(input.endDate),
+      startDate: input.startDate === undefined ? dateOnly(existing.startDate) : input.startDate,
+      endDate: input.endDate === undefined ? dateOnly(existing.endDate) : input.endDate,
       tags: input.tags ?? existing.tags,
       isPublic: input.isPublic ?? existing.isPublic,
       isFeatured: input.isFeatured ?? existing.isFeatured,
     };
+    ensureDateOrder(next.startDate, next.endDate);
+    const dbKind = KIND_TO_DB[next.kind];
+    const tags = [...new Set(next.tags)];
+    const shouldReset = existing.verificationStatus !== "SelfDeclared";
 
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
+      await tx.$executeRaw(Prisma.sql`
         UPDATE lecturer_portfolio."LecturerPortfolioItem"
-        SET
-          "kind" = ${KIND_TO_DB[next.kind]}::lecturer_portfolio."LecturerPortfolioItemKind",
-          "title" = ${next.title},
-          "organization" = ${next.organization},
-          "description" = ${next.description},
-          "role" = ${next.role},
-          "identifier" = ${next.identifier},
-          "url" = ${next.url},
-          "startDate" = ${next.startDate},
-          "endDate" = ${next.endDate},
-          "tags" = ${next.tags},
-          "isPublic" = ${next.isPublic},
-          "isFeatured" = ${next.isFeatured},
-          "verificationStatus" = 'SelfDeclared'::lecturer_portfolio."LecturerPortfolioVerificationStatus",
-          "updatedAt" = NOW()
+        SET "kind" = ${dbKind}::lecturer_portfolio."LecturerPortfolioItemKind",
+            "title" = ${next.title},
+            "organization" = ${next.organization},
+            "description" = ${next.description},
+            "role" = ${next.role},
+            "identifier" = ${next.identifier},
+            "url" = ${next.url},
+            "startDate" = ${toDate(next.startDate)},
+            "endDate" = ${toDate(next.endDate)},
+            "tags" = ${tagsSql(tags)},
+            "isPublic" = ${next.isPublic},
+            "isFeatured" = ${next.isFeatured},
+            "verificationStatus" = ${shouldReset ? "SelfDeclared" : existing.verificationStatus}::lecturer_portfolio."LecturerPortfolioVerificationStatus",
+            "updatedAt" = CURRENT_TIMESTAMP
         WHERE "id" = ${itemId} AND "lecturerId" = ${lecturerId}
-      `;
-      if (existing.verificationStatus !== "SelfDeclared") {
-        await insertVerificationEvent(
-          tx,
-          itemId,
-          lecturerId,
-          "reset",
-          "Lecturer edited the evidence after review; verification reset to self-declared.",
-        );
+      `);
+      if (shouldReset) {
+        await tx.$executeRaw`
+          INSERT INTO lecturer_portfolio."LecturerPortfolioVerification"
+            ("id", "itemId", "action", "actorId", "note")
+          VALUES (
+            ${randomUUID()}, ${itemId},
+            'Reset'::lecturer_portfolio."LecturerPortfolioVerificationAction",
+            ${lecturerId},
+            'Verification reset automatically because the lecturer edited this record.'
+          )
+        `;
       }
     });
 
-    const updated = await findRow(prisma, lecturerId, itemId);
-    if (!updated) throw new Error("Portfolio item not found after update");
-    const events = await listVerificationEvents(prisma, [itemId]);
-    return presentItem(updated, events.get(itemId) ?? []);
+    const row = await findItem(prisma, itemId, lecturerId);
+    if (!row) throw new PortfolioNotFoundError("Portfolio item not found");
+    return presentItem(prisma, row);
   },
 
-  async deleteOwnItem(lecturerId: string, itemId: string) {
-    const existing = await findRow(prisma, lecturerId, itemId);
-    if (!existing) throw new Error("Portfolio item not found");
-    if (existing.verificationStatus !== "SelfDeclared") {
-      throw new Error("Reviewed evidence cannot be deleted; edit it to reset verification and retain audit history.");
+  async deleteOwnItem(lecturerId: string, itemId: string): Promise<void> {
+    const existing = await findItem(prisma, itemId, lecturerId);
+    if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
+    const events = await verificationEvents(prisma, itemId);
+    if (events.length > 0) {
+      throw new PortfolioConflictError(
+        "Reviewed evidence cannot be deleted because its verification history is auditable. Edit the record instead.",
+      );
     }
     await prisma.$executeRaw`
       DELETE FROM lecturer_portfolio."LecturerPortfolioItem"
@@ -291,67 +280,48 @@ export const lecturerPortfolioService = {
   },
 
   async reviewItem(
+    actorId: string,
     lecturerId: string,
     itemId: string,
-    actorId: string,
-    action: "verified" | "rejected",
-    note: string,
-  ) {
-    const existing = await findRow(prisma, lecturerId, itemId);
-    if (!existing) throw new Error("Portfolio item not found");
-    const status = action === "verified" ? "Verified" : "Rejected";
+    input: ReviewLecturerPortfolioItemInput,
+  ): Promise<LecturerPortfolioItem> {
+    const existing = await findItem(prisma, itemId, lecturerId);
+    if (!existing) throw new PortfolioNotFoundError("Portfolio item not found");
+
+    const status: DbStatus = input.action === "verified" ? "Verified" : "Rejected";
+    const action: DbAction = input.action === "verified" ? "Verified" : "Rejected";
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
+      await tx.$executeRaw(Prisma.sql`
         UPDATE lecturer_portfolio."LecturerPortfolioItem"
         SET "verificationStatus" = ${status}::lecturer_portfolio."LecturerPortfolioVerificationStatus",
-            "updatedAt" = NOW()
+            "updatedAt" = CURRENT_TIMESTAMP
         WHERE "id" = ${itemId} AND "lecturerId" = ${lecturerId}
-      `;
-      await insertVerificationEvent(tx, itemId, actorId, action, note);
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO lecturer_portfolio."LecturerPortfolioVerification"
+          ("id", "itemId", "action", "note", "actorId")
+        VALUES (
+          ${randomUUID()}, ${itemId},
+          ${action}::lecturer_portfolio."LecturerPortfolioVerificationAction",
+          ${input.note}, ${actorId}
+        )
+      `);
     });
-    const updated = await findRow(prisma, lecturerId, itemId);
-    if (!updated) throw new Error("Portfolio item not found after review");
-    const events = await listVerificationEvents(prisma, [itemId]);
-    return presentItem(updated, events.get(itemId) ?? []);
+
+    const row = await findItem(prisma, itemId, lecturerId);
+    if (!row) throw new PortfolioNotFoundError("Portfolio item not found");
+    return presentItem(prisma, row);
   },
 
-  async exportAunQaEvidence(lecturerId: string): Promise<LecturerAunQaEvidenceExport> {
-    const [profile, portfolioItems, offeringsService] = await Promise.all([
+  async aunQaEvidenceExport(lecturerId: string): Promise<LecturerAunQaEvidenceExport> {
+    const offerings = registry.get<OfferingsServiceContract>("offerings").service;
+    const [profile, items, teaching] = await Promise.all([
       lecturerService.getOwnProfile(lecturerId),
-      listPresentedItems(prisma, lecturerId),
-      Promise.resolve(registry.get<OfferingsServiceContract>("offerings").service),
+      listItems(lecturerId),
+      offerings.portfolioTeachingForLecturer(lecturerId),
     ]);
-    if (!profile) throw new Error("Lecturer profile not found");
-    const teaching = await offeringsService.listLecturerPortfolioEvidence(lecturerId);
-    const evidence = [
-      ...teaching.map((row) => ({
-        id: `offering:${row.offeringId}`,
-        category: "teaching",
-        title: `${row.courseCode} ${row.courseName}`,
-        detail: `${row.assignmentRole}; ${row.sectionName}; ${row.status}`,
-        source: "Offering",
-        sourceEntityId: row.offeringId,
-        verification: "authoritative_pms" as const,
-        periodContext: "during_dse" as const,
-      })),
-      ...portfolioItems
-        .filter((item) => item.verificationStatus !== "rejected")
-        .map((item) => ({
-          id: `lecturer-portfolio:${item.id}`,
-          category: item.kind,
-          title: item.title,
-          detail: [item.organization, item.role, item.description].filter(Boolean).join(" · "),
-          source: "LecturerPortfolioItem",
-          sourceEntityId: item.id,
-          verification: item.verificationStatus === "verified"
-            ? "verified_professional" as const
-            : "self_declared" as const,
-          periodContext: classifyLecturerEvidencePeriod(
-            item.startDate,
-            profile.professionalProfile?.programmeStartDate,
-          ),
-        })),
-    ];
+    if (!profile) throw new PortfolioNotFoundError("Lecturer profile not found");
+
     return {
       schemaVersion: "lecturer-aun-qa-evidence-v1",
       generatedAt: new Date().toISOString(),
@@ -365,8 +335,40 @@ export const lecturerPortfolioService = {
         yearsOfExperience: profile.professionalProfile?.yearsOfExperience ?? null,
         programmeStartDate: profile.professionalProfile?.programmeStartDate ?? null,
       },
-      evidence,
-      note: "Read-only AUN-QA staff evidence projection. Canonical teaching is PMS-authoritative; professional evidence retains verification provenance and derived DSE service-period context. This export does not create QA evidence, ratings, or approvals and does not alter academic records.",
+      evidence: [
+        ...teaching.map((row) => ({
+          id: `offering:${row.offeringId}`,
+          category: "teaching",
+          title: `${row.courseCode} · ${row.courseTitle}`,
+          detail: `${row.term} · Section ${row.sectionCode} · ${row.role}`,
+          source: "PMS Offering",
+          sourceEntityId: row.offeringId,
+          verification: "authoritative_pms" as const,
+          periodContext: "during_dse" as const,
+        })),
+        ...items
+          .filter((item) => item.verificationStatus !== "rejected")
+          .map((item) => ({
+            id: `portfolio:${item.id}`,
+            category: item.kind,
+            title: item.title,
+            detail: [item.organization, item.role, item.identifier].filter(Boolean).join(" · "),
+            source: "Lecturer Portfolio",
+            sourceEntityId: item.id,
+            verification: item.verificationStatus === "verified"
+              ? "verified_professional" as const
+              : "self_declared" as const,
+            periodContext: classifyLecturerEvidencePeriod(
+              item.startDate,
+              profile.professionalProfile?.programmeStartDate,
+            ),
+          })),
+      ],
+      note: "Read-only evidence projection. It does not create QA evidence, ratings, approvals, or alter academic records. Self-declared records remain clearly distinct from PMS-authoritative and verified professional evidence. DSE service-period context is derived from evidence dates and the lecturer programme start date; missing dates remain unclassified.",
     };
   },
 };
+
+export class PortfolioNotFoundError extends Error {}
+export class PortfolioValidationError extends Error {}
+export class PortfolioConflictError extends Error {}
