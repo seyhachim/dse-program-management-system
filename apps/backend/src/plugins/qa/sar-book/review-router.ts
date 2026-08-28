@@ -11,10 +11,10 @@ import {
   QaSarScopeMismatchError,
 } from "../sar/service.ts";
 import { canReadSarBook } from "./router.ts";
+import { getQaSarBookReviewReadinessWithPart3 } from "./part3-readiness-service.ts";
 import {
   QaSarBookReviewConflictError,
   createQaSarBookSectionReview,
-  getQaSarBookReviewReadiness,
   listQaSarBookSectionReviews,
 } from "./review-service.ts";
 
@@ -63,7 +63,12 @@ export function createQaSarBookReviewRouter(): Router {
         return;
       }
       try {
-        res.json(await getQaSarBookReviewReadiness(parsed.data.programmeId, cycleId));
+        res.json(
+          await getQaSarBookReviewReadinessWithPart3(
+            parsed.data.programmeId,
+            cycleId,
+          ),
+        );
       } catch (error) {
         sendError(res, error);
       }
