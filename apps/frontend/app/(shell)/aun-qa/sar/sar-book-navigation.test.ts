@@ -10,7 +10,7 @@ describe("SAR book navigation", () => {
   test("keeps complete-book modes on existing QA surfaces", () => {
     expect(SAR_BOOK_MODE_HREFS).toEqual({
       content: "/aun-qa/sar",
-      evidence: "/aun-qa/evidence",
+      evidence: "/aun-qa/sar/evidence",
       review: "/aun-qa/review",
       preview: "/aun-qa/sar-preview",
     });
