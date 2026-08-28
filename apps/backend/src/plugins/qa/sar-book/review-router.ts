@@ -18,7 +18,7 @@ import {
   listQaSarBookSectionReviews,
 } from "./review-service.ts";
 
-function canReviewSarBook(
+export function canReviewSarBook(
   user: Parameters<typeof hasAnyRoleInProgramme>[0],
   programmeId: string,
 ): boolean {
