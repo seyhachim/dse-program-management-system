@@ -3,12 +3,12 @@ import { describe, expect, test } from "bun:test";
 const specClientPath = new URL("./spec-client.tsx", import.meta.url);
 const readOnlyClientPath = new URL("./read-only-spec-client.tsx", import.meta.url);
 const courseDocumentPath = new URL("./course-document-model.ts", import.meta.url);
-const courseSpecApiPath = new URL("../../../../../../../lib/course-spec.ts", import.meta.url);
+const courseSpecApiPath = new URL("../../../../../lib/course-spec.ts", import.meta.url);
 const teachingLearningApiPath = new URL(
-  "../../../../../../../lib/teaching-learning.ts",
+  "../../../../../lib/teaching-learning.ts",
   import.meta.url,
 );
-const methodsApiPath = new URL("../../../../../../../lib/methods.ts", import.meta.url);
+const methodsApiPath = new URL("../../../../../lib/methods.ts", import.meta.url);
 
 describe("Course Specification tab data reuse", () => {
   test("keeps editable and read-only tab changes inside browser history", async () => {
