@@ -239,7 +239,7 @@ export async function buildQaSarBookDocument(
   });
 }
 
-function assertFinalizable(document: QaSarBookDocument): void {
+export function assertQaSarBookFinalizable(document: QaSarBookDocument): void {
   if (!document.readiness.readyForFinalisation) {
     const first = document.readiness.blockers[0]?.message ?? "SAR book readiness preflight is not clean";
     throw new QaSarBookReleaseNotReadyError(first);
@@ -249,6 +249,29 @@ function assertFinalizable(document: QaSarBookDocument): void {
       `Evidence Register has ${document.part4.evidenceRegister.issues.length} unresolved issue(s)`,
     );
   }
+
+  const requiredNarratives = document.readiness.staticSections.filter(
+    (section) => section.required && section.source === "bookNarrative",
+  );
+  const narrativePins = new Map(
+    document.sourceIndex.narrativePins.map((pin) => [pin.sectionKey, pin]),
+  );
+  for (const section of requiredNarratives) {
+    const pin = narrativePins.get(section.sectionKey);
+    if (
+      section.reviewStatus !== "approved" ||
+      !section.revisionId ||
+      !section.revisionNumber ||
+      !pin ||
+      pin.revisionId !== section.revisionId ||
+      pin.revisionNumber !== section.revisionNumber
+    ) {
+      throw new QaSarBookReleaseNotReadyError(
+        `${section.sectionTitle} changed after its approved readiness state was captured; refresh and review the latest revision before finalising`,
+      );
+    }
+  }
+
   const requirements = document.part2.criteria.flatMap((criterion) => criterion.requirements);
   if (
     requirements.length === 0 ||
@@ -301,7 +324,7 @@ export async function finalizeQaSarBookRelease(
   title?: string,
 ): Promise<QaSarBookReleaseView> {
   const source = await buildQaSarBookDocument(programmeId, cycleId, "official");
-  assertFinalizable(source);
+  assertQaSarBookFinalizable(source);
 
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw(
