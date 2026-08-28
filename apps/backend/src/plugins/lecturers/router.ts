@@ -1,23 +1,34 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import {
   CreateLecturerInput,
+  CreateLecturerPortfolioItemInput,
   ListLecturersQuery,
+  ReviewLecturerPortfolioItemInput,
   UpdateLecturerInput,
+  UpdateLecturerPortfolioItemInput,
   UpdateMyLecturerProfileInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
+import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
+import { hasGlobalRole, hasRoleInProgramme } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import {
+  lecturerPortfolioService,
+  PortfolioConflictError,
+  PortfolioNotFoundError,
+  PortfolioValidationError,
+} from "./portfolio-service.ts";
 import { lecturerService, NotFoundError } from "./service.ts";
 
-/** Lecturers router — read for everyone, write for admins only (a lecturer cannot edit lecturer profiles, including their own, through this route). */
+/** Lecturers router — profile CRUD plus self-owned professional portfolio. */
 export function createLecturerRouter(): Router {
   const router = Router();
   router.use(requireAuth);
 
-  // Keep /me before /:id. Both operations derive the record ID from the
-  // verified bearer token, so one lecturer cannot select another target.
+  // Keep all /me routes before /:id. Self-service targets come exclusively from
+  // the verified bearer token; callers never choose another lecturer id.
   router.get("/me", async (req, res) => {
-    const lecturer = await lecturerService.getById(req.user!.id);
+    const lecturer = await lecturerService.getOwnProfile(req.user!.id);
     if (!lecturer) {
       res.status(404).json({ error: "Lecturer profile not found" });
       return;
@@ -38,6 +49,53 @@ export function createLecturerRouter(): Router {
     }
   });
 
+  router.get("/me/portfolio-items", requireLecturerPortfolioOwner, async (req, res) => {
+    res.json(await lecturerPortfolioService.listOwnItems(req.user!.id));
+  });
+
+  router.post("/me/portfolio-items", requireLecturerPortfolioOwner, async (req, res) => {
+    const parsed = CreateLecturerPortfolioItemInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.status(201).json(await lecturerPortfolioService.createOwnItem(req.user!.id, parsed.data));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err) ?? "Could not create portfolio item" });
+    }
+  });
+
+  router.patch("/me/portfolio-items/:itemId", requireLecturerPortfolioOwner, async (req, res) => {
+    const parsed = UpdateLecturerPortfolioItemInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await lecturerPortfolioService.updateOwnItem(req.user!.id, req.params.itemId!, parsed.data));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err) ?? "Could not update portfolio item" });
+    }
+  });
+
+  router.delete("/me/portfolio-items/:itemId", requireLecturerPortfolioOwner, async (req, res) => {
+    try {
+      await lecturerPortfolioService.deleteOwnItem(req.user!.id, req.params.itemId!);
+      res.status(204).end();
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err) ?? "Could not delete portfolio item" });
+    }
+  });
+
+  router.get("/me/aun-qa-evidence", requireLecturerPortfolioOwner, async (req, res) => {
+    try {
+      res.json(await lecturerPortfolioService.aunQaEvidenceExport(req.user!.id));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err) ?? "Could not assemble AUN-QA staff evidence" });
+    }
+  });
+
   router.get("/", requirePermission("lecturers:read"), async (req, res) => {
     const parsed = ListLecturersQuery.safeParse(req.query);
     if (!parsed.success) {
@@ -45,6 +103,30 @@ export function createLecturerRouter(): Router {
       return;
     }
     res.json(await lecturerService.list(parsed.data));
+  });
+
+  // Private professional evidence is visible for governance review only to a
+  // global Admin or a Programme Coordinator scoped to the DSE programme.
+  router.get("/:id/portfolio-items", requirePortfolioReviewer, async (req, res) => {
+    res.json(await lecturerPortfolioService.listOwnItems(req.params.id!));
+  });
+
+  router.post("/:id/portfolio-items/:itemId/review", requirePortfolioReviewer, async (req, res) => {
+    const parsed = ReviewLecturerPortfolioItemInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await lecturerPortfolioService.reviewItem(
+        req.user!.id,
+        req.params.id!,
+        req.params.itemId!,
+        parsed.data,
+      ));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err) ?? "Could not review portfolio item" });
+    }
   });
 
   router.get("/:id", requirePermission("lecturers:read"), async (req, res) => {
@@ -94,9 +176,30 @@ export function createLecturerRouter(): Router {
   return router;
 }
 
-/** Map service/Prisma errors to HTTP status. */
+function requireLecturerPortfolioOwner(req: Request, res: Response, next: NextFunction): void {
+  if (req.user!.roles.includes("lecturer")) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Lecturer portfolio access requires the Lecturer role" });
+}
+
+function requirePortfolioReviewer(req: Request, res: Response, next: NextFunction): void {
+  const user = req.user!;
+  if (
+    hasGlobalRole(user, "admin")
+    || hasRoleInProgramme(user, "program_coordinator", DEFAULT_PROGRAMME_ID)
+  ) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Lecturer portfolio review requires Admin or DSE Programme Coordinator role" });
+}
+
 function errStatus(err: unknown): number {
-  if (err instanceof NotFoundError) return 404;
+  if (err instanceof NotFoundError || err instanceof PortfolioNotFoundError) return 404;
+  if (err instanceof PortfolioValidationError) return 400;
+  if (err instanceof PortfolioConflictError) return 409;
   const code = (err as { code?: string }).code;
   if (code === "P2002") return 409;
   if (code === "P2025") return 404;
@@ -104,7 +207,12 @@ function errStatus(err: unknown): number {
 }
 
 function errMessage(err: unknown): string | null {
-  if (err instanceof NotFoundError) return err.message;
+  if (
+    err instanceof NotFoundError
+    || err instanceof PortfolioNotFoundError
+    || err instanceof PortfolioValidationError
+    || err instanceof PortfolioConflictError
+  ) return err.message;
   const code = (err as { code?: string }).code;
   if (code === "P2002") return "A user with that email already exists";
   if (code === "P2025") return "Lecturer not found";

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatLecturerDisplayName, type Lecturer } from "@dse-pms/shared-types";
 import { Button, DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
@@ -148,7 +149,16 @@ export function LecturersClient() {
       key: "name",
       header: "Name",
       render: (l) => (
-        <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
+        <div>
+          <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
+          {canWrite ? (
+            <div>
+              <Link href={`/lecturers/${l.id}/portfolio`} className="text-xs font-medium text-primary hover:underline">
+                Review portfolio evidence
+              </Link>
+            </div>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -209,7 +219,7 @@ export function LecturersClient() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Add each lecturer once. Admins can grant or recover DSE access; program coordinators can maintain the academic profile without controlling login credentials.
+        Add each lecturer once. Admins can grant or recover DSE access; program coordinators can maintain the academic profile and review professional portfolio evidence without controlling login credentials.
       </p>
 
       <TableToolbar

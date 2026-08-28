@@ -25,8 +25,6 @@ export interface CourseRef {
   code: string;
   title: string;
   lecturerId: string | null;
-  // Backs programme-scope access checks in offerings/router.ts (issue #147).
-  // Every Course has exactly one programme (issue #150 phase C).
   programmeId: string;
 }
 
@@ -46,8 +44,6 @@ export interface LecturerRef {
   name: string;
   email: string;
   honorific: UserHonorific | null;
-  // Syllabus "Course Details" instructor block (§7 qualification, §9 phone).
-  // `title` remains the academic position; honorific is only a form of address.
   title: string | null;
   qualification: string | null;
   phone: string | null;
@@ -79,28 +75,25 @@ export interface LecturersServiceContract {
   getById(id: string): Promise<LecturerRef | null>;
 }
 
-export interface OfferingsServiceContract {
-  /**
-   * Distinct course ids for which the given lecturer teaches at least one
-   * offering. Courses uses this (via the registry) so a lecturer who teaches an
-   * offering of a course can see/open that course, even if they don't own it.
-   */
-  courseIdsForLecturer(lecturerId: string): Promise<string[]>;
+/** Lean authoritative teaching evidence surfaced from the Offerings plugin. */
+export interface LecturerTeachingEvidenceRef {
+  offeringId: string;
+  courseId: string;
+  courseCode: string;
+  courseTitle: string;
+  term: string;
+  sectionCode: string;
+  status: "Planned" | "Active" | "Completed";
+  role: "Primary Lecturer" | "Co-Lecturer";
+}
 
-  /**
-   * Distinct requested course ids that have at least one Offering anywhere in
-   * the programme. Courses uses this narrow metadata query so Responsible
-   * Lecturers can distinguish a true pre-section course from an existing class
-   * that simply is not assigned to them, without exposing those Offering rows.
-   */
+export interface OfferingsServiceContract {
+  courseIdsForLecturer(lecturerId: string): Promise<string[]>;
   courseIdsWithOfferings(courseIds: readonly string[]): Promise<string[]>;
+  /** Read-only evidence projection; never creates a portfolio-owned teaching copy. */
+  portfolioTeachingForLecturer(lecturerId: string): Promise<LecturerTeachingEvidenceRef[]>;
 }
 
 export interface AuthServiceContract {
-  /**
-   * Remove the Supabase Auth identity linked to a User, so deleting an app row
-   * (e.g. a lecturer) doesn't leave an orphaned login behind — a `null` authId
-   * (dev-created rows that never went through account provisioning) is a no-op.
-   */
   deleteAccountForUser(authId: string | null): Promise<void>;
 }
