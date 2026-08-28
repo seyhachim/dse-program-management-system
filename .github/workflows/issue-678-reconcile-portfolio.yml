@@ -1,0 +1,64 @@
+name: Issue 678 reconcile portfolio
+
+on:
+  push:
+    branches: [agent/issue-678-staff-information-import]
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-678-staff-information-import
+          fetch-depth: 0
+      - name: Restore canonical portfolio service and layer issue 678 additions
+        shell: python
+        run: |
+          import subprocess
+          from pathlib import Path
+
+          subprocess.run(['git','fetch','origin','main'], check=True)
+          subprocess.run(['git','checkout','origin/main','--','apps/backend/src/plugins/lecturers/portfolio-service.ts'], check=True)
+
+          path = Path('apps/backend/src/plugins/lecturers/portfolio-service.ts')
+          text = path.read_text()
+
+          text = text.replace(
+              'import { Prisma, type PrismaClient } from "@prisma/client";\nimport type {',
+              'import { Prisma, type PrismaClient } from "@prisma/client";\nimport { classifyLecturerEvidencePeriod } from "@dse-pms/shared-types";\nimport type {',
+              1,
+          )
+          text = text.replace(
+              '        yearsOfExperience: profile.professionalProfile?.yearsOfExperience ?? null,\n',
+              '        yearsOfExperience: profile.professionalProfile?.yearsOfExperience ?? null,\n        programmeStartDate: profile.professionalProfile?.programmeStartDate ?? null,\n',
+              1,
+          )
+          text = text.replace(
+              '          verification: "authoritative_pms" as const,\n',
+              '          verification: "authoritative_pms" as const,\n          periodContext: "during_dse" as const,\n',
+              1,
+          )
+          text = text.replace(
+              '            verification: item.verificationStatus === "verified"\n              ? "verified_professional" as const\n              : "self_declared" as const,\n',
+              '            verification: item.verificationStatus === "verified"\n              ? "verified_professional" as const\n              : "self_declared" as const,\n            periodContext: classifyLecturerEvidencePeriod(\n              item.startDate,\n              profile.professionalProfile?.programmeStartDate,\n            ),\n',
+              1,
+          )
+          text = text.replace(
+              'Self-declared records remain clearly distinct from PMS-authoritative and verified professional evidence.',
+              'Self-declared records remain clearly distinct from PMS-authoritative and verified professional evidence. DSE service-period context is derived from evidence dates and the lecturer programme start date; missing dates remain unclassified.',
+              1,
+          )
+          path.write_text(text)
+      - name: Commit canonical reconciliation and current main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/backend/src/plugins/lecturers/portfolio-service.ts
+          git commit -m 'fix(staff-import): preserve canonical portfolio service'
+          git merge --no-edit origin/main
+          git push origin HEAD:agent/issue-678-staff-information-import
