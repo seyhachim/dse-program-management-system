@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 const specClientPath = new URL("./spec-client.tsx", import.meta.url);
 const readOnlyClientPath = new URL("./read-only-spec-client.tsx", import.meta.url);
+const overviewPath = new URL("./overview-tab.tsx", import.meta.url);
 const courseDocumentPath = new URL("./course-document-model.ts", import.meta.url);
 const courseSpecApiPath = new URL("../../../../../lib/course-spec.ts", import.meta.url);
 const teachingLearningApiPath = new URL(
@@ -35,8 +36,18 @@ describe("Course Specification tab data reuse", () => {
     expect(courseSpecApi).toContain("const cached = courseSpecReadCache.get(courseId)");
     expect(teachingLearningApi).toContain("profileReadCache");
     expect(teachingLearningApi).toContain("const cached = profileReadCache.get(courseId)");
+    expect(teachingLearningApi).toContain("profileValueCache");
+    expect(teachingLearningApi).toContain("getCached(courseId: string)");
     expect(methodsApi).toContain("methodsListCache");
     expect(methodsApi).toContain("if (methodsListCache) return methodsListCache");
+  });
+
+  test("Overview consumes the already-loaded Teaching & Learning cache instead of starting a tab-entry request", async () => {
+    const source = await Bun.file(overviewPath).text();
+
+    expect(source).toContain("teachingLearningApi.getCached(courseId)");
+    expect(source).not.toContain("teachingLearningApi\n      .get(courseId)");
+    expect(source).not.toContain("useEffect(() =>");
   });
 
   test("numbers official instructional weeks from their visible order", async () => {
