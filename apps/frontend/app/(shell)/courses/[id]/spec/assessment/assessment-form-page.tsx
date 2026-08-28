@@ -251,7 +251,7 @@ export function AssessmentFormPage({
         subtitle="Create the assessment, map it to CLOs, and define marking, submission, and feedback information."
       />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 p-6">
         <div className="mx-auto max-w-6xl space-y-4">
           <Breadcrumb>
             <BreadcrumbList>
