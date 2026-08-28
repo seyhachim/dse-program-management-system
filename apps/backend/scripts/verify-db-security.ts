@@ -128,6 +128,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "QaSarBookTerminology",
   "QaSarBookSectionEvidenceReference",
   "QaSarBookEvidencePresentation",
+  "QaSarBookSectionReview",
   "QaEvaluationScenario",
   "QaEvaluationScenarioEvidence",
   "QaEvaluationRun",

@@ -5,6 +5,6 @@ export function sarBookRequirementHref(requirementCode: string): string {
 export const SAR_BOOK_MODE_HREFS = {
   content: "/aun-qa/sar",
   evidence: "/aun-qa/sar/evidence",
-  review: "/aun-qa/review",
+  review: "/aun-qa/sar/review",
   preview: "/aun-qa/sar-preview",
 } as const;
