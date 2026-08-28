@@ -5,17 +5,22 @@
  * minted by `bun run gen-token`.
  */
 import { createInflightGetDeduper } from "./inflight-get";
+import { createInflightLoader } from "./inflight-value";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
 const runInflightGet = createInflightGetDeduper();
+const runInflightAuthHeader = createInflightLoader<Record<string, string>>();
 
 async function authHeader(): Promise<Record<string, string>> {
   if (AUTH_MODE === "supabase") {
-    const { data } = await getSupabase().auth.getSession();
-    const token = data.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return runInflightAuthHeader(async (): Promise<Record<string, string>> => {
+      const { data } = await getSupabase().auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return {};
+      return { Authorization: `Bearer ${token}` };
+    });
   }
   return DEV_TOKEN ? { Authorization: `Bearer ${DEV_TOKEN}` } : {};
 }
