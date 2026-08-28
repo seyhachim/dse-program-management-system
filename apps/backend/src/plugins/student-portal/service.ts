@@ -14,9 +14,13 @@ import type {
   PublishAssessmentResultInput,
   SetAssessmentDeadlineInput,
   StudentPortalHome,
+  AcademicYearView,
+  PublishedAcademicCalendarProjection,
+  StudentAcademicCalendarView,
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { registry } from "../../core/plugins/registry.ts";
 import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
 import { buildPortalCourseDocument } from "./course-document.ts";
@@ -75,6 +79,55 @@ async function studentForUser(userId: string) {
     throw new PortalAccessError("The linked student portal profile has no official email");
   }
   return { ...student, email: student.email };
+}
+
+interface ProgrammeCalendarReadContract {
+  academicCalendar: {
+    currentAcademicYear(programmeId: string): Promise<AcademicYearView | null>;
+    publishedProjection(programmeId: string, studyYear: number, academicYearLabel?: string): Promise<PublishedAcademicCalendarProjection>;
+  };
+}
+
+async function academicCalendarForStudent(userId: string): Promise<StudentAcademicCalendarView> {
+  const student = await studentForUser(userId);
+  const membership = await prisma.studentCohortMembership.findFirst({
+    where: { studentId: student.id, exitedAt: null },
+    include: {
+      cohort: { select: { programmeId: true } },
+      progressionRecords: { orderBy: [{ periodStart: "desc" }, { recordedAt: "desc" }] },
+    },
+    orderBy: { joinedAt: "desc" },
+  });
+  if (!membership) {
+    return { status: "unavailable", academicYear: null, studyYear: null, reason: "student-context-unavailable", message: "Your current programme cohort has not been configured yet." };
+  }
+  const programme = registry.get<ProgrammeCalendarReadContract>("programme").service;
+  const academicYear = await programme.academicCalendar.currentAcademicYear(membership.cohort.programmeId);
+  if (!academicYear) {
+    return { status: "unavailable", academicYear: null, studyYear: null, reason: "academic-year-unavailable", message: "No current academic year is configured for your programme." };
+  }
+  const progression = membership.progressionRecords.find((record) =>
+    record.academicYear === academicYear.label && record.programmeYear !== null && record.programmeYear >= 1 && record.programmeYear <= 4,
+  );
+  if (!progression?.programmeYear) {
+    return { status: "unavailable", academicYear, studyYear: null, reason: "student-context-unavailable", message: "Your current study year has not been recorded yet. Please contact the programme office." };
+  }
+  const projection = await programme.academicCalendar.publishedProjection(
+    membership.cohort.programmeId,
+    progression.programmeYear,
+    academicYear.label,
+  );
+  if (projection.status === "unavailable") {
+    return { status: "unavailable", academicYear: projection.academicYear, studyYear: progression.programmeYear, reason: projection.reason, message: projection.message };
+  }
+  return {
+    status: "available",
+    academicYear: projection.academicYear,
+    studyYear: progression.programmeYear,
+    periods: projection.periods,
+    events: projection.events,
+    nextEvent: projection.nextEvent,
+  };
 }
 
 async function enrolledRows(userId: string) {
@@ -584,6 +637,10 @@ export const studentPortalService = {
     });
   },
 
+  async academicCalendar(userId: string): Promise<StudentAcademicCalendarView> {
+    return academicCalendarForStudent(userId);
+  },
+
   async courses(userId: string): Promise<PortalCourseSummary[]> {
     return (await enrolledRows(userId)).map(toSummary);
   },
@@ -632,6 +689,7 @@ export const studentPortalService = {
     const rows = await enrolledRows(userId);
     const details = await Promise.all(rows.map((row) => toDetail(row, userId)));
     const measured = details.flatMap((course) => course.overallAchievement === null ? [] : [course.overallAchievement]);
+    const academicCalendar = await academicCalendarForStudent(userId);
     return {
       student: {
         id: rows.student.id,
@@ -654,6 +712,7 @@ export const studentPortalService = {
         .sort((a, b) => (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999"))
         .slice(0, 6),
       announcements: announcementsFrom(rows).slice(0, 5),
+      academicCalendar,
       overallAchievement: measured.length
         ? Math.round(measured.reduce((sum, item) => sum + item, 0) / measured.length)
         : null,

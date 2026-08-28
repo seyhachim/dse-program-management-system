@@ -1,5 +1,6 @@
 import cors from "cors";
 import express, { type Express } from "express";
+import { createRequestTimingMiddleware } from "./performance/request-timing.ts";
 import { registry } from "./plugins/registry.ts";
 import { studentsPlugin } from "../plugins/students/index.ts";
 import { lecturersPlugin } from "../plugins/lecturers/index.ts";
@@ -49,6 +50,7 @@ export function createApp(): Express {
     .map((o) => o.trim());
   app.use(cors({ origin: origins }));
   app.use(express.json());
+  app.use("/api", createRequestTimingMiddleware());
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 

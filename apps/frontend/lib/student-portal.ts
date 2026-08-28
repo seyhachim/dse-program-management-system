@@ -6,12 +6,15 @@ import type {
   PortalCourseDetail,
   PortalCourseDocumentDownload,
   PortalCourseSummary,
+  StudentAcademicCalendarView,
   StudentPortalHome,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
 export const studentPortalApi = {
   home: () => api.get<StudentPortalHome>("/api/student-portal/home"),
+  academicCalendar: () =>
+    api.get<StudentAcademicCalendarView>("/api/student-portal/academic-calendar"),
   courses: () => api.get<PortalCourseSummary[]>("/api/student-portal/courses"),
   course: (offeringId: string) =>
     api.get<PortalCourseDetail>(`/api/student-portal/courses/${offeringId}`),

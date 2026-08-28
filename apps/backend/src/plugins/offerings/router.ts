@@ -173,6 +173,15 @@ export function createOfferingRouter(): Router {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
       return;
     }
+    const targetProgrammeId = await offeringService.programmeIdForCourse(parsed.data.courseId);
+    if (!targetProgrammeId) {
+      res.status(400).json({ error: "Course does not exist" });
+      return;
+    }
+    if (!hasAnyRoleInProgramme(req.user!, PROGRAMME_WIDE_ROLES, targetProgrammeId)) {
+      res.status(403).json({ error: "You cannot create offerings for another programme" });
+      return;
+    }
     try {
       res.status(201).json(await offeringService.create(parsed.data));
     } catch (err) {

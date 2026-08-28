@@ -193,7 +193,9 @@ describe("public programme page merge", () => {
 
     expect(result.sectionSources.curriculum).toBe("mixed");
     expect(result.curriculumPreview.sourceBadge).toBe("Published credits · course preview");
-    expect(result.curriculumPreview.semesters[0]?.courses[0]?.code).toBe("DSE101");
+    expect(result.curriculumPreview.semesters[0]?.courses[0]?.code).toBe(
+      publicProgrammeContent.curriculumPreview.semesters[0]?.courses[0]?.code,
+    );
     expect(result.snapshot.find((item) => item.label === "Curriculum snapshot")?.value).toBe("144 Credits");
   });
 

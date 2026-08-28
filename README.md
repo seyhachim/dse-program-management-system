@@ -1,28 +1,65 @@
 # DSE Program Management System
 
-DSE-PMS is a web-based programme and course management system for the Data Science and Engineering programme. It brings programme structure, courses, offerings, lecturers, students, course specifications, teaching and learning plans, assessment design, rubrics, and academic review workflows into one system.
+DSE-PMS is a web-based programme management platform for the Data Science and Engineering programme. It centralizes programme governance, curriculum, courses and offerings, lecturer/student workflows, course specifications, academic calendars, student-facing services, AUN-QA quality-assurance work, handbook publishing, and Telegram access while preserving clear ownership of academic records and audit history.
 
-The codebase is a **Bun + Turborepo monorepo** with a **Next.js frontend**, **Express API**, **Prisma/PostgreSQL database**, shared types, and a plugin-based backend architecture.
+The codebase is a **Bun + Turborepo monorepo** with a **Next.js frontend**, **Express API**, **Prisma/PostgreSQL database**, shared Zod/TypeScript contracts, and a plugin-based backend architecture.
 
 ## Current capabilities
 
-The backend currently registers domain plugins for:
+The current `main` branch includes these major product areas:
 
-- Authentication and role/permission management
-- Programme management
-- Students
-- Lecturers
-- Courses and course specifications
-- Course offerings and lecturer assignments
-- Teaching and learning strategies
-- Teaching methods
-- Assessments and rubrics
-- Course-spec review and approval workflows
-- Enrollment-scoped student portal with courses, schedules, approved learning
-  information, assessments, published results, CLO achievement, announcements,
-  anonymous feedback, and downloadable approved course documents
+### Programme and curriculum management
 
-Course-spec data includes normalized structures for CLOs, assessments, CLO alignment, weekly planning, review status, and related teaching/learning information.
+- Programme profile, curriculum versions, curriculum placement, PLOs, competencies, and programme-level configuration.
+- Curriculum-aware course placement by study year and semester.
+- Canonical Academic Calendar with academic years, semester periods, examinations, breaks, events, publication lifecycle, source provenance, and revision history.
+- Course Offering creation linked to published Academic Calendar periods instead of duplicating canonical semester dates.
+- Safe preservation of historical Offering/calendar context.
+
+### Courses, Course Specifications, and teaching design
+
+- Course management and Offering/lecturer assignment.
+- Structured Course Specifications with CLOs, PLO alignment, teaching and learning strategies, weekly plans, assessments, rubrics, resources, and review workflow.
+- Course Specification submission/review/approval history and document preview/export support.
+- Teaching methods, teaching-learning strategies, assessment templates, and rubric management.
+- Canonical JSON Course Specification import with dry-run/commit safeguards.
+
+### Students and Student Portal
+
+- Student records, enrolments, cohorts/progression, and programme-scoped access controls.
+- Student Portal with enrolled courses, schedules, approved course learning information, assessments/deadlines, rubrics, published results, CLO achievement, announcements, anonymous feedback, and approved document downloads.
+- Student Academic Calendar view and dashboard summary resolved from the student's published academic context.
+- Published-only and enrolment-scoped data boundaries to prevent draft or cross-student leakage.
+
+### Student Handbook
+
+- Versioned Student Handbook workspace using reusable PMS source-data blocks rather than copied programme records.
+- Read-only source projections for approved programme information.
+- Handbook review/publishing workflow with immutable published source snapshots.
+- Document preview and export support.
+
+### AUN-QA quality assurance and SAR
+
+- AUN-QA programme-level criteria/requirements, assignments, evidence, mappings, provenance, analysis, and review workflows.
+- Evidence-gap analysis with deterministic and optional AI-assisted support while preserving human QA judgment.
+- QA evidence review, expert corrections, controlled research/pilot datasets, findings, and improvement actions.
+- SAR requirement writing, evidence-grounded context, review/approval, release history, and official SAR export foundations.
+- Programme-scoped QA roles and authorization; QA/SAR work does not rewrite curriculum, results, Course Specifications, or other authoritative academic records.
+
+### Telegram
+
+- Authenticated Telegram Mini App for high-frequency student/lecturer workflows such as schedules, class context, announcements, deadlines, attendance history, results/CLO achievement, surveys, lecturer workload, and authorized class-delivery actions.
+- Secure Telegram identity linking/revocation with verified init data and backend authorization.
+- Public DSE Telegram bot backed by PMS-owned published programme information, FAQs, curriculum projection, Ask DSE search, privacy-preserving question analytics, and rate limiting.
+- Telegram remains a thin access channel; the PMS backend/database stays the source of truth.
+
+### Security, auditability, and academic integrity
+
+- Explicit application RBAC and programme-scoped authorization.
+- Supabase Auth for deployed environments; local development JWT mode is fail-closed outside development/test use.
+- Protected PostgreSQL schemas, RLS/Data API hardening, database-security verification, and fresh-migration CI checks.
+- Immutable/auditable handling for approved/submitted Course Specifications, published calendars, finalized results, QA evidence/reviews, and released SAR/handbook records where applicable.
+- Cross-plugin integration through registry/service contracts rather than direct plugin implementation imports.
 
 ## Tech stack
 
@@ -32,11 +69,11 @@ Course-spec data includes normalized structures for CLOs, assessments, CLO align
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
 | Backend | Express, TypeScript, Bun |
 | Database | PostgreSQL + Prisma |
-| Authentication | Local/test Dev JWT; Supabase Auth for production |
+| Authentication | Local/test Dev JWT; Supabase Auth for deployed environments |
 | Validation/contracts | Zod + `@dse-pms/shared-types` |
 | Shared UI | `@dse-pms/ui` |
 | Production frontend | Vercel |
-| Production database | Supabase PostgreSQL |
+| Production database/auth | Supabase PostgreSQL + Supabase Auth |
 
 ## Repository structure
 
@@ -49,8 +86,10 @@ Course-spec data includes normalized structures for CLOs, assessments, CLO align
 │   ├── config/                # Shared TypeScript/configuration
 │   ├── shared-types/          # Shared schemas, types and plugin contracts
 │   └── ui/                    # Shared UI components
+├── docs/                      # Security, QA, Telegram and implementation documentation
 ├── AGENTS.md                  # Canonical verification and agent workflow
 ├── DEPLOY.md                  # Deployment and Supabase Auth guide
+├── pull_request_template.md   # Required PR inspection/implementation workflow
 ├── package.json               # Root workspace commands
 └── turbo.json                 # Turborepo task configuration
 ```
@@ -63,11 +102,9 @@ Domain modules live under:
 apps/backend/src/plugins/<plugin-id>/
 ```
 
-Plugins are registered in `apps/backend/src/core/app.ts`. The core application mounts each plugin at:
+Current plugins include programme, students, lecturers, courses, offerings, teaching-learning, methods, assessments/rubrics, Student Portal, Student Handbook, QA, Telegram, authentication, and related supporting domains.
 
-```text
-/api/<plugin-id>
-```
+Plugins are registered in `apps/backend/src/core/app.ts`. The core application mounts plugin routers through the central application/registry architecture.
 
 The live plugin manifests are available from:
 
@@ -81,6 +118,18 @@ The backend health endpoint is:
 GET /health
 ```
 
+## Performance and response time
+
+DSE-PMS includes a small first-stage response-time optimization that keeps authoritative academic data fresh:
+
+- Identical **concurrent** frontend `GET` requests are coalesced into one in-flight network request. Once that request finishes, its result is discarded rather than retained as a stale application cache, so a later `GET` reaches the backend again.
+- `POST`, `PATCH`, `PUT`, and `DELETE` requests are never coalesced.
+- Backend `/api/*` responses expose a standard `Server-Timing` header (`app;dur=...`) so browser/network tooling can show application processing time without changing API response bodies.
+- Optional slow-request logging can be enabled on the backend with a positive millisecond threshold, for example `PERF_SLOW_REQUEST_MS=400`. Logs contain only HTTP method, path without query values, response status, and duration; they do not include tokens, request bodies, user identifiers, or academic payloads.
+- Broad TTL caching is deliberately not enabled for results, approvals, attendance, permissions, Course Specification workflow state, QA/SAR workflow state, or other authoritative records. Performance work must preserve current authorization and academic-integrity boundaries.
+
+This instrumentation is intended to identify the endpoints that deserve the next round of query/index/payload optimization before adding infrastructure such as Redis or moving hosting.
+
 ## Prerequisites
 
 Install:
@@ -89,7 +138,7 @@ Install:
 - PostgreSQL access — local PostgreSQL or a hosted PostgreSQL database such as Supabase
 - Git
 
-DSE-PMS runs directly with Bun; Docker is not part of the current development workflow. Configure `DATABASE_URL` to point at the PostgreSQL database you want to use.
+DSE-PMS runs directly with Bun; **Docker is not part of the current development workflow**. Configure `DATABASE_URL` to point at the PostgreSQL database you want to use.
 
 ## Local setup
 
@@ -253,30 +302,34 @@ These commands are CI gates. They must return non-zero for real failures. The ex
 
 A production frontend build requires the Supabase public environment variables described in `DEPLOY.md`; CI supplies non-secret placeholder values so the fail-closed production configuration is exercised without using real credentials.
 
-For Prisma/database changes, also verify the intended upgrade path and a fresh database. CI applies all migrations to PostgreSQL from zero, seeds it, runs curriculum database checks, and verifies the database security posture.
+For Prisma/database changes, also verify the intended upgrade path and a fresh database. CI applies all migrations to PostgreSQL from zero, seeds it, runs domain integrity checks, and verifies the database security posture.
 
-## Course specification import
+## Data import utilities
 
-The backend contains a course-spec import utility for loading canonical course specification data into the database.
+### Course Specification import
+
+The backend contains a Course Specification importer for canonical JSON data:
 
 ```bash
 bun run --cwd apps/backend course-spec:import <path>
 ```
 
-Example options used by the importer include course filtering, replacement of existing data, commit mode, and JSON reporting. Check `apps/backend/scripts/course-spec-import.ts` before performing a production import.
+The importer is dry-run oriented and supports explicit commit/replacement/reporting controls. Inspect `apps/backend/scripts/course-spec-import.ts` and its README before production use; do not overwrite approved/official Course Specifications casually.
+
+Other domain-specific import/migration utilities may exist under `apps/backend/scripts/`. Treat dry-run/report output and human review as part of any academic-data migration workflow.
 
 ## Authentication and authorization
 
 DSE-PMS has two authentication modes with different allowed environments:
 
 1. **Development JWT** — local development and automated tests only.
-2. **Supabase Auth** — required for production/deployed environments.
+2. **Supabase Auth** — required for deployed/production environments.
 
 Both backend and frontend require an explicit auth mode. Production fails closed instead of defaulting to development authentication.
 
-Application authorization is owned by DSE-PMS. Roles and permissions are stored in PostgreSQL and enforced by the backend rather than relying only on authentication-provider metadata.
+Application authorization is owned by DSE-PMS. Roles and permissions are stored in PostgreSQL and enforced by backend service/router boundaries rather than relying only on authentication-provider metadata.
 
-Typical roles include administrator, lecturer, and student, with permissions assigned through the normalized role/permission model.
+Typical roles include Admin, Programme Coordinator, Lecturer, Student, and QA-specific contributor/reviewer responsibilities where configured. Object-level and programme-level authorization must remain server-authoritative.
 
 ## Development workflow
 
@@ -296,7 +349,7 @@ Pull Request
 review + merge
 ```
 
-Before opening or merging a PR, run the canonical verification commands above. If a change modifies Prisma models, also verify migrations against both the intended existing database path and a fresh database where appropriate.
+Before opening or merging a PR, run the canonical verification commands above. If a change modifies Prisma models or protected database schemas, also verify migrations against both the intended existing database path and a fresh database, plus the database-security verifier.
 
 Before creating or updating a PR, read the root [`pull_request_template.md`](./pull_request_template.md). Before merge, compare the finished PR against both that template and the issue acceptance criteria.
 
@@ -310,14 +363,14 @@ When introducing a new domain plugin:
 2. Create the plugin under `apps/backend/src/plugins/<id>/`.
 3. Register it in `apps/backend/src/core/app.ts`.
 4. Add the corresponding frontend workflow under `apps/frontend/app/`.
-5. Add Prisma models/migrations where persistence is required.
-6. Add tests for important service, permission, and validation behavior.
+5. Add Prisma models/migrations or protected-schema SQL where persistence is required.
+6. Add tests for important service, permission, integrity, and validation behavior.
 
-Cross-domain behavior should use explicit services/contracts rather than tightly coupling unrelated UI or database code.
+Cross-domain behavior should use explicit services/contracts and the plugin registry rather than tightly coupling unrelated UI or database implementation code.
 
 ## Deployment
 
-The current deployment architecture uses:
+The current deployment architecture is:
 
 ```text
 Supabase PostgreSQL/Auth → Bun backend API → Vercel frontend
@@ -333,22 +386,28 @@ bun run db:migrate:deploy
 
 Do not run `prisma migrate dev` against the production database.
 
+Current deployment policy keeps production deployment controlled/manual; PR branches may use Vercel Preview deployments for browser smoke verification when preview capacity is available.
+
 ## Security notes
 
-- Never commit `.env`, `.env.local`, database passwords, JWT secrets, Supabase service-role keys, or access tokens.
+- Never commit `.env`, `.env.local`, database passwords, JWT secrets, Supabase service-role keys, Telegram bot/webhook secrets, or access tokens.
 - `SUPABASE_SERVICE_ROLE_KEY` belongs on the backend only.
 - `NEXT_PUBLIC_*` variables are exposed to the browser and must not contain private secrets.
 - `NEXT_PUBLIC_DEV_TOKEN` is forbidden in production frontend builds.
 - Development JWT authentication is forbidden when the backend runs with `NODE_ENV=production`.
-- PMS application tables and protected custom schemas are backend-only; run `bun run --cwd apps/backend db:security:verify` after database-security changes.
+- PMS application tables and protected custom schemas are backend-only unless explicitly designed otherwise; run `bun run --cwd apps/backend db:security:verify` after database-security changes.
+- Published/approved/finalized academic and QA records must be changed only through their explicit revision/correction workflows.
 
 ## Documentation
 
 - [`AGENTS.md`](./AGENTS.md) — canonical repository verification and agent workflow
-- [`DEPLOY.md`](./DEPLOY.md) — production deployment and Supabase Auth setup
+- [`DEPLOY.md`](./DEPLOY.md) — deployment and Supabase Auth setup
 - [`CLAUDE.md`](./CLAUDE.md) — repository-specific development guidance and architecture notes
 - [`docs/database-security.md`](./docs/database-security.md) — backend-only database access model and verifier
+- `docs/` — additional QA, Telegram, privacy, deployment, and feature-specific documentation
 
 ## Project status
 
-DSE-PMS is under active development. The initial Students-only vertical slice has grown into a broader programme-management platform, so implementation details and workflows continue to evolve as new GitHub issues are completed.
+DSE-PMS is under active development, but it is no longer an initial Students-only prototype. The current platform already covers programme/curriculum governance, Course Specifications and teaching design, Academic Calendar and Course Offering integration, Student Portal, Student Handbook, AUN-QA evidence/SAR workflows, and Telegram channels.
+
+Open GitHub issues and draft PRs track the remaining feature expansion and release-smoke work. Treat `main` plus merged migrations/contracts as the source of truth for what is currently implemented; do not assume an open draft PR is already part of the deployed product.

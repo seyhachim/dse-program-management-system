@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, CircleAlert, Pencil } from "lucide-react";
 import {
-  COMPLETABLE_SPEC_SECTIONS,
   FOCUS_LEVELS,
+  teachingLearningIsReady,
   courseTypeLabel,
   semesterLabel,
   type CourseType,
@@ -12,6 +14,10 @@ import {
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
 import { Button, CompletionRing } from "@dse-pms/ui";
+import {
+  EMPTY_TEACHING_LEARNING_PROFILE,
+  teachingLearningApi,
+} from "@/lib/teaching-learning";
 import type { CourseInfoForm } from "./course-info-section";
 import { focusCodeOf, focusPercentOf, type CloForm } from "./clo-model";
 import type { WeeklyPlanForm } from "./weekly-plan-section";
@@ -21,6 +27,11 @@ import {
   assessmentTypeChip,
   type AssessmentForm,
 } from "./assessment-model";
+import { deriveOverviewReadinessStatus } from "./overview-readiness";
+import {
+  OVERVIEW_REQUIRED_SECTIONS,
+  type OverviewReadinessSectionId,
+} from "./overview-sections";
 import { ProgrammeSection } from "./programme-section";
 
 export function OverviewTab({
@@ -42,18 +53,61 @@ export function OverviewTab({
   /** Course's total SLT hours, used to derive each CLO's Focus (F/M/P) from its share. */
   courseTotalSlt: number | null;
   onEditCourseInfo: () => void;
-  onGoToTab: (id: SpecSectionId) => void;
+  onGoToTab: (id: SpecSectionId | "teachingLearning") => void;
   readOnly?: boolean;
 }) {
-  const fillable = COMPLETABLE_SPEC_SECTIONS;
-  const completed = fillable.filter((s) => status[s.id] === "complete").length;
-  const inProgress = fillable.filter((s) => status[s.id] === "draft").length;
+  const params = useParams<{ id: string }>();
+  const courseId = params.id;
+  const [teachingLearningProfile, setTeachingLearningProfile] = useState(
+    EMPTY_TEACHING_LEARNING_PROFILE,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    teachingLearningApi
+      .get(courseId)
+      .then((profile) => {
+        if (!cancelled) setTeachingLearningProfile(profile);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTeachingLearningProfile(EMPTY_TEACHING_LEARNING_PROFILE);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
+
+  const activeClos = clos.filter((clo) => clo.status === "active");
+  const cloReady =
+    activeClos.length > 0 &&
+    activeClos.every(
+      (clo) => clo.description.trim().length > 0 && clo.mappedPlos.length > 0,
+    );
+  const teachingLearningReady = teachingLearningIsReady(
+    teachingLearningProfile,
+    clos,
+  );
+  const readinessStatus = deriveOverviewReadinessStatus(
+    status,
+    clos,
+    weeklyPlan,
+    assessments,
+    { cloReady, teachingLearningReady },
+  );
+  const fillable = OVERVIEW_REQUIRED_SECTIONS;
+  const completed = fillable.filter((s) => readinessStatus[s.id] === "complete").length;
+  const inProgress = fillable.filter((s) => readinessStatus[s.id] === "draft").length;
   const missing = fillable.length - completed - inProgress;
   const percent = fillable.length
     ? Math.round((completed / fillable.length) * 100)
     : 0;
-  const unfinished = fillable.filter((s) => status[s.id] !== "complete");
+  const unfinished = fillable.filter((s) => readinessStatus[s.id] !== "complete");
   const nextSection = unfinished[0];
+  const nextSectionTitle = nextSection
+    ? sectionDisplayTitle(nextSection.id, nextSection.title)
+    : null;
 
   const deliverables = weeklyPlan.filter((w) => w.assessment.trim());
   const planTotals = weeklyPlanFormTotals(weeklyPlan);
@@ -80,11 +134,8 @@ export function OverviewTab({
           {courseInfo.courseCode || courseInfo.courseTitle ? (
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Field label="Course Code" value={courseInfo.courseCode} />
-
               <Field label="Course Title" value={courseInfo.courseTitle} />
-
               <Field label="Credits" value={courseInfo.credits} />
-
               <Field
                 label="Course Type"
                 value={
@@ -93,7 +144,6 @@ export function OverviewTab({
                     : ""
                 }
               />
-
               <Field
                 label="Semester"
                 value={
@@ -102,7 +152,6 @@ export function OverviewTab({
                     : ""
                 }
               />
-
               <Field
                 label="Programme Year"
                 value={
@@ -111,27 +160,12 @@ export function OverviewTab({
                     : ""
                 }
               />
-
-              <Field
-                label="Pre-requisites"
-                value={courseInfo.prerequisites}
-                full
-              />
-
+              <Field label="Pre-requisites" value={courseInfo.prerequisites} full />
               <Field label="Instructor" value={courseInfo.instructorName} />
-
               <Field label="Qualification" value={courseInfo.qualification} />
-
               <Field label="Email" value={courseInfo.email} />
-
               <Field label="Telephone" value={courseInfo.telephone} />
-
-              <Field
-                label="Co-Lecturer(s)"
-                value={courseInfo.otherLecturers}
-                full
-              />
-
+              <Field label="Co-Lecturer(s)" value={courseInfo.otherLecturers} full />
               <Field
                 label="Course Description / Synopsis"
                 value={courseInfo.description}
@@ -171,16 +205,9 @@ export function OverviewTab({
             <ul className="space-y-2">
               {clos.slice(0, 5).map((clo) => (
                 <li key={clo.code} className="flex items-start gap-3 text-sm">
-                  <span
-                    className="
-          mt-0.5 inline-flex min-w-12 shrink-0 items-center justify-center
-          rounded-full bg-accent px-2.5 py-1
-          text-xs font-semibold leading-none text-accent-foreground
-        "
-                  >
+                  <span className="mt-0.5 inline-flex min-w-12 shrink-0 items-center justify-center rounded-full bg-accent px-2.5 py-1 text-xs font-semibold leading-none text-accent-foreground">
                     {clo.code}
                   </span>
-
                   <span className="min-w-0 flex-1 leading-5 text-foreground">
                     {clo.description || "—"}
                   </span>
@@ -313,9 +340,7 @@ export function OverviewTab({
                       {assessments.length === 1 ? "assessment" : "assessments"})
                     </td>
                     <td className="py-1.5 text-right">
-                      {Math.round(assessmentTotalWeight(assessments) * 100) /
-                        100}
-                      %
+                      {Math.round(assessmentTotalWeight(assessments) * 100) / 100}%
                     </td>
                   </tr>
                 </tfoot>
@@ -358,12 +383,47 @@ export function OverviewTab({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Card>
-            <CardHeader title="Resources" />
-            <EmptyHint text="Coming in a later phase (§19)." />
+            <CardHeader
+              title="Resources"
+              action={
+                <button
+                  type="button"
+                  onClick={() => onGoToTab("resources")}
+                  className="text-sm font-medium text-accent-foreground hover:underline"
+                >
+                  View Resources
+                </button>
+              }
+            />
+            <SectionStatusList
+              items={[
+                { label: "Required Resources", status: readinessStatus.resources },
+                { label: "References / Textbooks", status: readinessStatus.references },
+              ]}
+            />
           </Card>
           <Card>
-            <CardHeader title="Policies" />
-            <EmptyHint text="Coming in a later phase (§23)." />
+            <CardHeader
+              title="Policies & Responsibilities"
+              action={
+                <button
+                  type="button"
+                  onClick={() => onGoToTab("policy")}
+                  className="text-sm font-medium text-accent-foreground hover:underline"
+                >
+                  View Policies
+                </button>
+              }
+            />
+            <SectionStatusList
+              items={[
+                { label: "Course Policy", status: readinessStatus.policy },
+                {
+                  label: "Student Responsibility",
+                  status: readinessStatus.responsibility,
+                },
+              ]}
+            />
           </Card>
         </div>
       </div>
@@ -397,19 +457,21 @@ export function OverviewTab({
                     Recommended next step
                   </p>
                   <p className="mt-1 text-sm font-semibold text-foreground">
-                    {nextSection.title}
+                    {nextSectionTitle}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {status[nextSection.id] === "draft"
-                      ? "Continue this section and mark it complete."
+                    {readinessStatus[nextSection.id] === "draft"
+                      ? "Continue this section and resolve the remaining attention items."
                       : "Add the required information to start this section."}
                   </p>
                   <button
                     type="button"
-                    onClick={() => onGoToTab(nextSection.id as SpecSectionId)}
+                    onClick={() => onGoToTab(nextSection.id)}
                     className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-foreground hover:underline"
                   >
-                    {status[nextSection.id] === "draft" ? "Continue" : "Start section"}
+                    {readinessStatus[nextSection.id] === "draft"
+                      ? "Continue"
+                      : "Start section"}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -419,9 +481,7 @@ export function OverviewTab({
             <div className="mt-5 flex items-start gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
               <div>
-                <p className="text-sm font-semibold text-foreground">
-                  Ready for review
-                </p>
+                <p className="text-sm font-semibold text-foreground">Ready for review</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   All required sections are complete. Review the document before submission.
                 </p>
@@ -439,12 +499,14 @@ export function OverviewTab({
                   <li key={section.id}>
                     <button
                       type="button"
-                      onClick={() => onGoToTab(section.id as SpecSectionId)}
+                      onClick={() => onGoToTab(section.id)}
                       className="flex w-full items-center justify-between gap-3 text-left text-sm hover:text-accent-foreground"
                     >
-                      <span className="truncate text-foreground">{section.title}</span>
+                      <span className="truncate text-foreground">
+                        {sectionDisplayTitle(section.id, section.title)}
+                      </span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {status[section.id] === "draft" ? "In progress" : "Not started"}
+                        {readinessStatus[section.id] === "draft" ? "In progress" : "Not started"}
                       </span>
                     </button>
                   </li>
@@ -463,14 +525,8 @@ export function OverviewTab({
         <Card>
           <CardHeader title="Quick Actions" />
           <ul className="divide-y divide-border text-sm">
-            <QuickAction
-              label="CLOs & PLO Mapping"
-              onClick={() => onGoToTab("clos")}
-            />
-            <QuickAction
-              label="Assessment"
-              onClick={() => onGoToTab("assessmentPlan")}
-            />
+            <QuickAction label="CLOs & PLO Mapping" onClick={() => onGoToTab("clos")} />
+            <QuickAction label="Assessment" onClick={() => onGoToTab("assessmentPlan")} />
             <QuickAction label="Weekly Plan" onClick={() => onGoToTab("slt")} />
           </ul>
         </Card>
@@ -502,10 +558,7 @@ export function OverviewTab({
                   (f) => f.code === focusCodeOf(percent),
                 );
                 return (
-                  <li
-                    key={clo.code}
-                    className="flex items-center justify-between"
-                  >
+                  <li key={clo.code} className="flex items-center justify-between">
                     <span className="text-foreground">
                       {clo.code} →{" "}
                       {clo.mappedPlos.length ? clo.mappedPlos.join(", ") : "—"}
@@ -530,6 +583,38 @@ export function OverviewTab({
         </Card>
       </div>
     </div>
+  );
+}
+
+function sectionDisplayTitle(
+  id: OverviewReadinessSectionId,
+  title: string,
+): string {
+  return id === "date" ? "Specification Date" : title;
+}
+
+function sectionStatusLabel(status: SpecSectionStatus | undefined): string {
+  if (status === "complete") return "Complete";
+  if (status === "draft") return "In progress";
+  return "Not started";
+}
+
+function SectionStatusList({
+  items,
+}: {
+  items: Array<{ label: string; status: SpecSectionStatus | undefined }>;
+}) {
+  return (
+    <ul className="divide-y divide-border text-sm">
+      {items.map((item) => (
+        <li key={item.label} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+          <span className="text-foreground">{item.label}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {sectionStatusLabel(item.status)}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

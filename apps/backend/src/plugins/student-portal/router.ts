@@ -65,6 +65,9 @@ export function createStudentPortalRouter(): Router {
   router.get("/home", requirePermission("student-portal:read"), async (req, res) => {
     try { res.json(await studentPortalService.home(req.user!.id)); } catch (error) { handleError(error, res); }
   });
+  router.get("/academic-calendar", requirePermission("student-portal:read"), async (req, res) => {
+    try { res.json(await studentPortalService.academicCalendar(req.user!.id)); } catch (error) { handleError(error, res); }
+  });
   router.get("/courses", requirePermission("student-portal:read"), async (req, res) => {
     try { res.json(await studentPortalService.courses(req.user!.id)); } catch (error) { handleError(error, res); }
   });

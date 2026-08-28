@@ -8,6 +8,7 @@ import type {
   QaDashboardView,
   QaEvidenceItemView,
 } from "@dse-pms/shared-types";
+import { FormFieldLabel } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 
@@ -318,15 +319,17 @@ export function EvidenceLibraryClient() {
 
 function EvidenceFormFields({ form, onChange }: { form: EvidenceForm; onChange: (value: EvidenceForm) => void }) {
   const set = <K extends keyof EvidenceForm>(key: K, value: EvidenceForm[K]) => onChange({ ...form, [key]: value });
+  const sourceRefRequired = form.kind === "systemLink";
+  const sourceUrlRequired = !sourceRefRequired;
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
-      <label className="text-sm md:col-span-2">Title<input value={form.title} onChange={(event) => set("title", event.target.value)} className="mt-1 h-9 w-full rounded-md border px-3" /></label>
-      <label className="text-sm md:col-span-2">Description<textarea value={form.description} onChange={(event) => set("description", event.target.value)} rows={3} className="mt-1 w-full rounded-md border px-3 py-2" /></label>
-      <label className="text-sm">Type<select value={form.kind} onChange={(event) => set("kind", event.target.value as EvidenceKind)} className="mt-1 h-9 w-full rounded-md border px-2"><option value="document">Document</option><option value="externalLink">External link</option><option value="systemLink">PMS/system link</option></select></label>
-      <label className="text-sm">Status<select value={form.status} onChange={(event) => set("status", event.target.value as EvidenceStatus)} className="mt-1 h-9 w-full rounded-md border px-2"><option value="draft">Draft</option><option value="ready">Ready</option><option value="reviewed">Reviewed</option></select></label>
-      <label className="text-sm">Reporting period<input value={form.reportingPeriod} onChange={(event) => set("reportingPeriod", event.target.value)} placeholder="2025-26" className="mt-1 h-9 w-full rounded-md border px-3" /></label>
-      <label className="text-sm">System/source reference<input value={form.sourceRef} onChange={(event) => set("sourceRef", event.target.value)} placeholder="Programme Office / PMS route" className="mt-1 h-9 w-full rounded-md border px-3" /></label>
-      <label className="text-sm md:col-span-2">Source URL<input value={form.sourceUrl} onChange={(event) => set("sourceUrl", event.target.value)} placeholder="https://…" className="mt-1 h-9 w-full rounded-md border px-3" /></label>
+      <label className="text-sm md:col-span-2"><FormFieldLabel required>Title</FormFieldLabel><input required value={form.title} onChange={(event) => set("title", event.target.value)} className="mt-1 h-9 w-full rounded-md border px-3" /></label>
+      <label className="text-sm md:col-span-2"><FormFieldLabel>Description</FormFieldLabel><textarea value={form.description} onChange={(event) => set("description", event.target.value)} rows={3} className="mt-1 w-full rounded-md border px-3 py-2" /></label>
+      <label className="text-sm"><FormFieldLabel required>Type</FormFieldLabel><select required value={form.kind} onChange={(event) => set("kind", event.target.value as EvidenceKind)} className="mt-1 h-9 w-full rounded-md border px-2"><option value="document">Document</option><option value="externalLink">External link</option><option value="systemLink">PMS/system link</option></select></label>
+      <label className="text-sm"><FormFieldLabel required>Status</FormFieldLabel><select required value={form.status} onChange={(event) => set("status", event.target.value as EvidenceStatus)} className="mt-1 h-9 w-full rounded-md border px-2"><option value="draft">Draft</option><option value="ready">Ready</option><option value="reviewed">Reviewed</option></select></label>
+      <label className="text-sm"><FormFieldLabel>Reporting period</FormFieldLabel><input value={form.reportingPeriod} onChange={(event) => set("reportingPeriod", event.target.value)} placeholder="2025-26" className="mt-1 h-9 w-full rounded-md border px-3" /></label>
+      <label className="text-sm"><FormFieldLabel required={sourceRefRequired}>System/source reference</FormFieldLabel><input required={sourceRefRequired} value={form.sourceRef} onChange={(event) => set("sourceRef", event.target.value)} placeholder="Programme Office / PMS route" className="mt-1 h-9 w-full rounded-md border px-3" /></label>
+      <label className="text-sm md:col-span-2"><FormFieldLabel required={sourceUrlRequired}>Source URL</FormFieldLabel><input required={sourceUrlRequired} type="url" value={form.sourceUrl} onChange={(event) => set("sourceUrl", event.target.value)} placeholder="https://…" className="mt-1 h-9 w-full rounded-md border px-3" /></label>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { PolicySection } from "@dse-pms/shared-types";
 import {
   POLICIES_RESPONSIBILITIES_TAB,
+  SPECIFICATION_DATE_TAB,
   mergePolicyFieldForSave,
   normalizePoliciesResponsibilitiesTab,
   reconcilePolicyDraftWithPersisted,
@@ -22,6 +23,11 @@ describe("Policies & Responsibilities Course Spec tab", () => {
 
   test("redirects legacy responsibility deep links to the combined tab", () => {
     expect(normalizePoliciesResponsibilitiesTab("responsibility")).toBe("policy");
+  });
+
+  test("routes Specification Date section targets to Review & Submit", () => {
+    expect(SPECIFICATION_DATE_TAB).toBe("reviewSubmit");
+    expect(normalizePoliciesResponsibilitiesTab("date")).toBe("reviewSubmit");
   });
 
   test("keeps existing policy deep links stable", () => {

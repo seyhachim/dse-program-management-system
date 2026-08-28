@@ -25,9 +25,11 @@ export function buildReviewReadinessItems({
   status: Record<string, SpecSectionStatus>;
   cloReady: boolean;
   teachingLearningReady: boolean;
-  specificationDateReady: boolean;
+  /** Retained for call-site compatibility; Specification Date is now system-assigned. */
+  specificationDateReady?: boolean;
   constructiveAlignmentReady: boolean;
 }): ReviewReadinessItem[] {
+  void specificationDateReady;
   return [
     {
       id: "courseInfo",
@@ -53,11 +55,6 @@ export function buildReviewReadinessItems({
       id: "slt",
       title: "Weekly Plan",
       complete: status.slt === "complete",
-    },
-    {
-      id: "date",
-      title: "Specification Date",
-      complete: specificationDateReady,
     },
     {
       id: "mapping",

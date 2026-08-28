@@ -4,11 +4,13 @@ import {
   PublicProgrammeFaqQuerySchema,
   PublicProgrammeImportantDateQuerySchema,
   PublicProgrammeLocaleQuerySchema,
+  PublicAcademicCalendarQuerySchema,
 } from "@dse-pms/shared-types";
 import {
   getPublicAbuseProtectionConfig,
   publicAbuseRateLimiter,
 } from "../../core/security/public-abuse-protection.ts";
+import { AcademicCalendarConflictError, academicCalendarService } from "./academic-calendar-service.ts";
 import {
   PublicCurriculumConflictError,
   PublicCurriculumNotFoundError,
@@ -28,7 +30,7 @@ function sendReadError(res: Response, error: unknown): void {
     res.status(404).json({ error: error.message });
     return;
   }
-  if (error instanceof PublicCurriculumConflictError) {
+  if (error instanceof PublicCurriculumConflictError || error instanceof AcademicCalendarConflictError) {
     res.status(409).json({ error: error.message });
     return;
   }
@@ -236,6 +238,14 @@ export function createPublicProgrammeReadRouter(): Router {
     } catch (error) {
       sendReadError(res, error);
     }
+  });
+
+  router.get("/programmes/:programmeId/academic-calendar", async (req, res) => {
+    const id = programmeId(req, res);
+    if (!id) return;
+    const parsed = PublicAcademicCalendarQuerySchema.safeParse(req.query);
+    if (!parsed.success) { res.status(400).json({ error: "Academic calendar requires studyYear=1..4" }); return; }
+    try { sendPublicJson(req, res, await academicCalendarService.publishedProjection(id, parsed.data.studyYear, parsed.data.academicYear)); } catch (error) { sendReadError(res, error); }
   });
 
   router.get("/programmes/:programmeId/contact", async (req, res) => {
