@@ -40,7 +40,7 @@ export function formatServerTiming(durationMs: number): string {
 
 const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NUMERIC_SEGMENT = /^\d+$/;
-const OPAQUE_ID_SEGMENT = /^[A-Za-z0-9_-]{20,}$/;
+const OPAQUE_ID_SEGMENT = /^(?=.*\d)[A-Za-z0-9_-]{20,}$/;
 
 /**
  * Converts request paths into bounded, privacy-safe route keys. Dynamic record
@@ -98,8 +98,8 @@ export function createRequestTimingMiddleware(options: RequestTimingOptions = {}
   const summaryEvery = options.summaryEvery === undefined
     ? parsePositiveInteger(process.env.PERF_SUMMARY_EVERY)
     : options.summaryEvery;
-  const summaryTop = options.summaryTop ?? parsePositiveInteger(process.env.PERF_SUMMARY_TOP) ?? 10;
-  const maxRoutes = options.maxRoutes ?? parsePositiveInteger(process.env.PERF_SUMMARY_MAX_ROUTES) ?? 100;
+  const summaryTop = Math.max(1, options.summaryTop ?? parsePositiveInteger(process.env.PERF_SUMMARY_TOP) ?? 10);
+  const maxRoutes = Math.max(1, options.maxRoutes ?? parsePositiveInteger(process.env.PERF_SUMMARY_MAX_ROUTES) ?? 100);
   const log = options.log ?? console.warn;
   const routeStats = new Map<string, RouteTimingStats>();
   let measuredRequests = 0;
@@ -131,7 +131,8 @@ export function createRequestTimingMiddleware(options: RequestTimingOptions = {}
             existing.count += 1;
             existing.totalMs += durationMs;
             existing.maxMs = Math.max(existing.maxMs, durationMs);
-          } else if (routeStats.size < maxRoutes) {
+          } else if (routeStats.size < Math.max(0, maxRoutes - 1)) {
+            // Reserve one bounded bucket for any additional route cardinality.
             routeStats.set(route, { count: 1, totalMs: durationMs, maxMs: durationMs });
           } else {
             const overflow = routeStats.get("OTHER") ?? { count: 0, totalMs: 0, maxMs: 0 };
