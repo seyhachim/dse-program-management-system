@@ -35,27 +35,25 @@ const clos: CloForm[] = [
   },
 ];
 
-const weeks: WeekForm[] = [
-  {
-    id: "week-1",
-    week: "1",
-    topic: "Topic 1",
-    cloCodes: ["CLO1"],
-    lloItems: [],
-    lessonLearningOutcomes: [],
-    activities: [],
-    studentLearningActivities: [],
-    lectureHours: "2",
-    tutorialHours: "",
-    practiceHours: "",
-    otherHours: "",
-    selfStudyHours: "2",
-    teachingMethodIds: [],
-    teachingResourceTypes: [],
-    assessmentMethodIds: [],
-    assessment: "",
-  },
-];
+const readyWeek: WeekForm = {
+  id: "week-1",
+  week: "1",
+  topic: "Topic 1",
+  cloCodes: ["CLO1"],
+  lloItems: ["Explain the weekly concept"],
+  lessonLearningOutcomes: [],
+  activities: ["Guided practice"],
+  studentLearningActivities: [],
+  lectureHours: "2",
+  tutorialHours: "",
+  practiceHours: "",
+  otherHours: "",
+  selfStudyHours: "2",
+  teachingMethodIds: ["tm-1"],
+  teachingResourceTypes: [],
+  assessmentMethodIds: ["am-1"],
+  assessment: "",
+};
 
 const assessments: AssessmentForm[] = [
   {
@@ -105,7 +103,7 @@ describe("overview readiness flow", () => {
     const effective = deriveOverviewReadinessStatus(
       completeStatus,
       clos,
-      weeks,
+      [readyWeek],
       assessments,
       { cloReady: true, teachingLearningReady: false },
     );
@@ -116,11 +114,31 @@ describe("overview readiness flow", () => {
     expect(result.unfinished[0]?.id).toBe("teachingLearning");
   });
 
+  test("Weekly Plan attention changes a persisted 10/10 view to 9/10 and becomes next step", () => {
+    const incompleteWeek: WeekForm = {
+      ...readyWeek,
+      lloItems: [],
+      teachingMethodIds: [],
+    };
+    const effective = deriveOverviewReadinessStatus(
+      completeStatus,
+      clos,
+      [incompleteWeek],
+      assessments,
+      { cloReady: true, teachingLearningReady: true },
+    );
+    const result = summary(effective);
+
+    expect(result.total).toBe(10);
+    expect(result.completed).toBe(9);
+    expect(result.unfinished[0]?.id).toBe("slt");
+  });
+
   test("Ready for review is possible only when all derived required work is ready", () => {
     const effective = deriveOverviewReadinessStatus(
       completeStatus,
       clos,
-      weeks,
+      [readyWeek],
       assessments,
       { cloReady: true, teachingLearningReady: true },
     );
