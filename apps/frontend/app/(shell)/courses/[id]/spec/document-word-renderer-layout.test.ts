@@ -40,6 +40,21 @@ describe("Course Specification Word layout", () => {
     expect(source).not.toContain("colWidths([6, 8, 38, 16, 16, 8, 8])");
   });
 
+  test("keeps the approved Section 14 CLO header", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+
+    expect(source).toContain(
+      'text("Description of the course learning outcomes – CLOs At the end of the course, students will be able to:", false, BODY)',
+    );
+    expect(source).toContain('text("PLO", false, BODY)');
+    expect(source).toContain(
+      'text("Levels in Learning Domain:\\nKnowledge (Cognitive-C), Attitude\\n(Affective-A), Skills (Psychomotor-P)", false, BODY)',
+    );
+    for (const label of ["C", "A", "P"]) {
+      expect(source).toContain(`children: [text(label, false, BODY)]`);
+    }
+  });
+
   test("keeps Part 2 as one Word table and lets Word paginate rows 14 through 25", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
 
