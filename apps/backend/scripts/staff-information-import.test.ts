@@ -24,7 +24,9 @@ function sampleCsv(overrides: Partial<Record<number, string>> = {}): string {
   data[10] = "";
   data[11] = "Full-time lecturer with 9 years of experience; teaches Example Course.";
   data[12] = "";
-  for (const [index, value] of Object.entries(overrides)) data[Number(index)] = value;
+  for (const [index, value] of Object.entries(overrides)) {
+    if (value !== undefined) data[Number(index)] = value;
+  }
   return [
     "",
     "",
