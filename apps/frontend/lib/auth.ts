@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 import type {
+  ChangePasswordInput,
   CreateAccountInput,
   MeResponse,
   ResendInvitationResponse,
+  TemporaryPasswordResponse,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
-/**
- * Auth plugin calls. `me` resolves the current caller (email + role, from the
- * backend's `User` row). `createAccount` provisions an invited account;
- * `resendInvitation` rotates only a still-pending lecturer invitation.
- */
+/** Auth plugin calls. Privileged recovery still goes through the backend. */
 export const authApi = {
   me(): Promise<MeResponse> {
     return api.get<MeResponse>("/api/auth/me");
@@ -25,14 +23,20 @@ export const authApi = {
       {},
     );
   },
+  setTemporaryPassword(userId: string): Promise<TemporaryPasswordResponse> {
+    return api.post<TemporaryPasswordResponse>(
+      `/api/auth/accounts/${userId}/temporary-password`,
+      {},
+    );
+  },
+  changePassword(input: ChangePasswordInput): Promise<MeResponse> {
+    return api.post<MeResponse>("/api/auth/change-password", input);
+  },
 };
 
 /**
  * Cached in-flight `/me` request, shared across all `useMe()` callers so the
  * sidebar, the page guard and the topbar don't each fire their own request.
- * Invalidated below whenever the Supabase session changes so switching accounts
- * doesn't leave every consumer showing the previous user's role until a full
- * page refresh reloads this module.
  */
 let mePromise: Promise<MeResponse> | null = null;
 const meListeners = new Set<() => void>();
@@ -49,10 +53,6 @@ export function invalidateMe() {
 }
 
 if (AUTH_MODE === "supabase" && typeof window !== "undefined") {
-  // A different user signing in (or out) makes the cached `/me` response stale —
-  // without this, `useMe()` keeps returning the previous account's role until a
-  // full page refresh reloads this module. Guarded to the browser since this
-  // module is also pulled into the server render pass of client components.
   let lastUserId: string | undefined;
   getSupabase().auth.onAuthStateChange((_event, session) => {
     const userId = session?.user.id;

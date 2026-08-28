@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { CreateAccountInput, ManageProgrammeRoleInput } from "@dse-pms/shared-types";
+import {
+  ChangePasswordInput,
+  CreateAccountInput,
+  ManageProgrammeRoleInput,
+} from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type AuthUser } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
@@ -29,15 +33,6 @@ function canManageProgrammeRoles(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, ["admin", "program_coordinator"], programmeId);
 }
 
-/**
- * Auth router:
- * - GET    /me                                 — the resolved caller.
- * - POST   /accounts                           — admin-only account provisioning.
- * - POST   /accounts/:userId/resend-invitation — admin-only pending lecturer invite resend.
- * - GET    /programme-roles                    — programme leadership lists additive QA grants.
- * - POST   /programme-roles                    — add an allowed programme role without replacing existing roles.
- * - DELETE /programme-roles/:userId            — remove only the requested additive programme role.
- */
 export function createAuthRouter(): Router {
   const router = Router();
   router.use(requireAuth);
@@ -88,6 +83,47 @@ export function createAuthRouter(): Router {
       }
     },
   );
+
+  router.post(
+    "/accounts/:userId/temporary-password",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = AccountUserIdParam.safeParse(req.params);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid lecturer account id" });
+        return;
+      }
+      try {
+        const result = await authService.setTemporaryPassword(req.user!.id, parsed.data.userId);
+        res.set("Cache-Control", "no-store");
+        res.set("Pragma", "no-cache");
+        res.json(result);
+      } catch (err) {
+        if (err instanceof ProvisioningError) {
+          res.status(409).json({ error: err.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not set temporary password" });
+      }
+    },
+  );
+
+  router.post("/change-password", async (req, res) => {
+    const parsed = ChangePasswordInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid password", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await authService.changePassword(req.user!.id, parsed.data));
+    } catch (err) {
+      if (err instanceof ProvisioningError) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
+      res.status(500).json({ error: "Could not change password" });
+    }
+  });
 
   router.get("/programme-roles", requirePermission("qa:manage"), async (req, res) => {
     const parsed = ProgrammeRoleListQuery.safeParse(req.query);

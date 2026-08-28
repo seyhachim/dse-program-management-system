@@ -346,6 +346,11 @@ enum UserHonorific {
   Prof
 }
 
+enum UserSecurityAuditAction {
+  TemporaryPasswordSet
+  PasswordChanged
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users holding the "lecturer" role via `roleAssignments`, surfaced
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
@@ -359,7 +364,8 @@ model User {
   title         String?
   qualification String?
   phone         String?
-  createdAt     DateTime       @default(now())
+  createdAt          DateTime @default(now())
+  mustChangePassword Boolean  @default(false)
 
   coursesLed                         Course[]                                  @relation("CourseLecturer")
   offeringsLed                       Offering[]                                @relation("OfferingLecturer")
@@ -409,6 +415,8 @@ model User {
   academicCalendarsCreated           AcademicCalendar[]                        @relation("AcademicCalendarCreatedBy")
   academicCalendarsPublished         AcademicCalendar[]                        @relation("AcademicCalendarPublishedBy")
   academicCalendarAuditActions       AcademicCalendarAuditAction[]             @relation("AcademicCalendarAuditActor")
+securityAuditEventsAsActor         UserSecurityAuditEvent[]                  @relation("UserSecurityAuditActor")
+securityAuditEventsAsTarget        UserSecurityAuditEvent[]                  @relation("UserSecurityAuditTarget")
 }
 
 /// Lecturer-specific professional metadata used for AUN-QA staff evidence.
@@ -3101,4 +3109,18 @@ model ProgrammePublicProfile {
   applicationUrl  String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+/// Security-only account recovery audit. Password values are never stored.
+model UserSecurityAuditEvent {
+  id           String                  @id @default(uuid()) @db.Uuid
+  action       UserSecurityAuditAction
+  actorUserId  String
+  actor        User                    @relation("UserSecurityAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  targetUserId String
+  target       User                    @relation("UserSecurityAuditTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  createdAt    DateTime                @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([targetUserId, createdAt])
 }
