@@ -47,6 +47,7 @@ function getTeachingLearningProfile(courseId: string): Promise<TeachingLearningP
 
 export const teachingLearningApi = {
   get: getTeachingLearningProfile,
+  peek: (courseId: string) => profileCache.get(courseId) ?? null,
   save: (courseId: string, value: TeachingLearningProfile) =>
     api
       .put<TeachingLearningProfile>(`/api/teaching-learning/${courseId}`, value)
