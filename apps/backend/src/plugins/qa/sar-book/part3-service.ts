@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import {
   AUN_QA_V4_ID,
   QaSarBookPart3ViewSchema,
-  type QaSarBookPart3AssociationKindSchema,
   type QaSarBookPart3View,
   type UpdateQaSarCriterionSelfRatingInput,
   type UpdateQaSarRequirementSelfRatingInput,
