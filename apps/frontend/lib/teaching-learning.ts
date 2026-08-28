@@ -22,6 +22,7 @@ export const EMPTY_TEACHING_LEARNING_PROFILE: TeachingLearningProfile = {
 };
 
 const profileReadCache = new Map<string, Promise<TeachingLearningProfile>>();
+const profileValueCache = new Map<string, TeachingLearningProfile>();
 
 export const teachingLearningApi = {
   get(courseId: string): Promise<TeachingLearningProfile> {
@@ -30,18 +31,27 @@ export const teachingLearningApi = {
 
     const request = api
       .get<TeachingLearningProfile>(`/api/teaching-learning/${courseId}`)
+      .then((profile) => {
+        profileValueCache.set(courseId, profile);
+        return profile;
+      })
       .catch((error) => {
         profileReadCache.delete(courseId);
+        profileValueCache.delete(courseId);
         throw error;
       });
     profileReadCache.set(courseId, request);
     return request;
+  },
+  getCached(courseId: string): TeachingLearningProfile | undefined {
+    return profileValueCache.get(courseId);
   },
   async save(courseId: string, value: TeachingLearningProfile) {
     const saved = await api.put<TeachingLearningProfile>(
       `/api/teaching-learning/${courseId}`,
       value,
     );
+    profileValueCache.set(courseId, saved);
     profileReadCache.set(courseId, Promise.resolve(saved));
     return saved;
   },
