@@ -6,6 +6,7 @@ import {
   type ConstructiveAlignmentAudit,
 } from "./constructive-alignment-model";
 import type { WeekForm } from "./weekly-plan-model";
+import { weeklyPlanIsReady } from "./weekly-plan-readiness";
 
 export type OverviewDerivedReadiness = {
   cloReady?: boolean;
@@ -14,10 +15,10 @@ export type OverviewDerivedReadiness = {
 
 /**
  * Overview readiness must reflect source-data semantics used by the actual
- * submission workflow. Constructive Alignment, CLO validity, and Teaching &
- * Learning readiness are derived from current source data rather than stale
- * persisted completion flags. Specification Date is system-assigned on first
- * submission and is therefore not lecturer work.
+ * authoring workflow. Constructive Alignment, CLO validity, Teaching & Learning,
+ * and Weekly Plan readiness are derived from current source data rather than
+ * stale persisted completion flags. Specification Date is system-assigned on
+ * first submission and is therefore not lecturer work.
  */
 export function deriveOverviewReadinessStatus(
   status: Record<string, SpecSectionStatus>,
@@ -39,6 +40,8 @@ export function deriveOverviewReadinessStatus(
       ? "complete"
       : "draft";
   }
+
+  effective.slt = weeklyPlanIsReady(weeklyPlan) ? "complete" : "draft";
 
   // Kept complete for compatibility with other completion consumers. Overview's
   // lecturer-work list excludes Date and includes Teaching & Learning instead.
