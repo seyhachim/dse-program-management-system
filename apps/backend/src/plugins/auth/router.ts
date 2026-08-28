@@ -33,15 +33,6 @@ function canManageProgrammeRoles(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, ["admin", "program_coordinator"], programmeId);
 }
 
-/**
- * Auth router:
- * - GET    /me                                  — the resolved caller.
- * - POST   /accounts                            — admin-only account provisioning.
- * - POST   /accounts/:userId/resend-invitation — admin-only pending lecturer invite resend.
- * - POST   /accounts/:userId/temporary-password — admin-only active lecturer recovery.
- * - POST   /change-password                     — authenticated caller replaces own credential.
- * - GET/POST/DELETE /programme-roles            — scoped additive QA grants.
- */
 export function createAuthRouter(): Router {
   const router = Router();
   router.use(requireAuth);
@@ -103,7 +94,10 @@ export function createAuthRouter(): Router {
         return;
       }
       try {
-        res.json(await authService.setTemporaryPassword(req.user!.id, parsed.data.userId));
+        const result = await authService.setTemporaryPassword(req.user!.id, parsed.data.userId);
+        res.set("Cache-Control", "no-store");
+        res.set("Pragma", "no-cache");
+        res.json(result);
       } catch (err) {
         if (err instanceof ProvisioningError) {
           res.status(409).json({ error: err.message });
