@@ -19,6 +19,12 @@ type AssessmentPlanWithTemplateMetadata = {
   templateMetadata?: AssessmentTemplateResponse;
 };
 
+const courseSpecReadCache = new Map<string, Promise<CourseSpecView>>();
+
+function invalidateCourseSpecRead(courseId: string) {
+  courseSpecReadCache.delete(courseId);
+}
+
 function mergeAssessmentTemplateMetadata(
   spec: CourseSpecView,
   metadata: AssessmentTemplateResponse,
@@ -51,33 +57,51 @@ function mergeAssessmentTemplateMetadata(
   };
 }
 
+async function fetchCourseSpec(courseId: string): Promise<CourseSpecView> {
+  const [spec, metadata] = await Promise.all([
+    api.get<CourseSpecView>(`/api/courses/${courseId}/spec`),
+    api
+      .get<AssessmentTemplateResponse>(`/api/assessment-template/${courseId}`)
+      .catch(() => ({ items: [] })),
+  ]);
+  return mergeAssessmentTemplateMetadata(spec, metadata);
+}
+
 /** Client for the Course Specification wizard endpoints (courses plugin sub-resource). */
 export const courseSpecApi = {
-  async get(courseId: string): Promise<CourseSpecView> {
-    const [spec, metadata] = await Promise.all([
-      api.get<CourseSpecView>(`/api/courses/${courseId}/spec`),
-      api
-        .get<AssessmentTemplateResponse>(`/api/assessment-template/${courseId}`)
-        .catch(() => ({ items: [] })),
-    ]);
-    return mergeAssessmentTemplateMetadata(spec, metadata);
+  get(courseId: string): Promise<CourseSpecView> {
+    const cached = courseSpecReadCache.get(courseId);
+    if (cached) return cached;
+
+    const request = fetchCourseSpec(courseId).catch((error) => {
+      courseSpecReadCache.delete(courseId);
+      throw error;
+    });
+    courseSpecReadCache.set(courseId, request);
+    return request;
   },
-  submit(courseId: string, note: string) {
-    return api.post<CourseSpecView>(`/api/courses/${courseId}/spec/submit`, {
+  async submit(courseId: string, note: string) {
+    const result = await api.post<CourseSpecView>(`/api/courses/${courseId}/spec/submit`, {
       note,
     });
+    invalidateCourseSpecRead(courseId);
+    return result;
   },
-  requestChanges(courseId: string, note: string) {
-    return api.post<CourseSpecView>(
+  async requestChanges(courseId: string, note: string) {
+    const result = await api.post<CourseSpecView>(
       `/api/courses/${courseId}/spec/review/request-changes`,
       { note },
     );
+    invalidateCourseSpecRead(courseId);
+    return result;
   },
-  approve(courseId: string, note: string) {
-    return api.post<CourseSpecView>(
+  async approve(courseId: string, note: string) {
+    const result = await api.post<CourseSpecView>(
       `/api/courses/${courseId}/spec/review/approve`,
       { note },
     );
+    invalidateCourseSpecRead(courseId);
+    return result;
   },
   async saveSection(
     courseId: string,
@@ -97,12 +121,15 @@ export const courseSpecApi = {
           templateMetadata,
         );
       }
+      invalidateCourseSpecRead(courseId);
       return result;
     }
 
-    return api.put<CourseSpecView>(
+    const result = await api.put<CourseSpecView>(
       `/api/courses/${courseId}/spec/${sectionId}`,
       values,
     );
+    invalidateCourseSpecRead(courseId);
+    return result;
   },
 };

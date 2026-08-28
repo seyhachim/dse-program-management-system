@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   teachingLearningIsReady,
   type CourseSpecReviewStatus,
@@ -144,7 +144,6 @@ const BANNER_COPY: Partial<
 const rejectMutation = async () => false;
 
 export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { me } = useMe();
@@ -192,14 +191,18 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
     (id: TabId) => {
       const normalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
       setActiveTabState(normalizedId);
-      router.replace(
-        normalizedId === "overview"
-          ? pathname
-          : `${pathname}?tab=${normalizedId}`,
-        { scroll: false },
-      );
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (normalizedId === "overview") url.searchParams.delete("tab");
+        else url.searchParams.set("tab", normalizedId);
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${pathname}${url.search}${url.hash}`,
+        );
+      }
     },
-    [pathname, router],
+    [pathname],
   );
 
   const load = useCallback(async () => {

@@ -319,7 +319,8 @@ export function buildCourseDocument({
     assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
   }));
 
-  const documentWeeks = instructionalWeeklyPlan(weeklyPlan).map((week) => {
+  const documentWeeks = instructionalWeeklyPlan(weeklyPlan).map((week, index) => {
+    const displayWeek = String(index + 1);
     const contact = weekContactHoursForm(week);
     const slt = weekSltForm(week);
     const learningActivities = week.studentLearningActivities.map((activity) =>
@@ -328,8 +329,8 @@ export function buildCourseDocument({
     const lloItems = week.lessonLearningOutcomes.map((llo) => llo.description.trim()).filter(Boolean);
     return {
       id: week.id,
-      week: week.week,
-      topic: normalizeCourseDocumentTopic(week.week, week.topic),
+      week: displayWeek,
+      topic: normalizeCourseDocumentTopic(displayWeek, week.topic),
       cloCodes: week.cloCodes,
       lloItems,
       learningActivities: learningActivities.length > 0 ? learningActivities : week.activities,

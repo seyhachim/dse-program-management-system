@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   type Method,
   type SpecSectionId,
@@ -140,7 +140,6 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
 const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
 
 export function SpecClient({ courseId }: { courseId: string }) {
-  const router = useRouter();
   const { me } = useMe();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -219,12 +218,18 @@ export function SpecClient({ courseId }: { courseId: string }) {
           ? "reviewSubmit"
           : normalizedId;
       setActiveTabState(nextId);
-      router.replace(
-        nextId === "overview" ? pathname : `${pathname}?tab=${nextId}`,
-        { scroll: false },
-      );
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (nextId === "overview") url.searchParams.delete("tab");
+        else url.searchParams.set("tab", nextId);
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${pathname}${url.search}${url.hash}`,
+        );
+      }
     },
-    [pathname, review, router],
+    [pathname, review],
   );
 
   const editingLocked =

@@ -77,6 +77,11 @@ export function WeeklyPlanSectionForm({
     () => new Set(),
   );
 
+  const displayWeekForId = (weekId: string) => {
+    const index = plan.findIndex((item) => item.id === weekId);
+    return index >= 0 ? String(index + 1) : "";
+  };
+
   const persistInstructional = (next: WeeklyPlanForm) =>
     onPersist(mergeInstructionalWeeklyPlan(value, next));
 
@@ -108,21 +113,25 @@ export function WeeklyPlanSectionForm({
       return;
     }
 
+    const sourceDisplayWeek = displayWeekForId(id);
     const next = duplicateWeeklyPlanWeek(plan, id);
     const duplicated = next.at(-1);
+    const duplicatedDisplayWeek = duplicated
+      ? String(next.findIndex((item) => item.id === duplicated.id) + 1)
+      : "";
     const ok = await persistInstructional(next);
     setNotice(
       ok
-        ? `Week ${duplicated?.week ?? ""} was created from week ${source.week}.`
-        : `Could not duplicate week ${source.week}.`,
+        ? `Week ${duplicatedDisplayWeek} was created from week ${sourceDisplayWeek}.`
+        : `Could not duplicate week ${sourceDisplayWeek}.`,
     );
   };
 
   const remove = async (id: string) => {
-    const week = plan.find((item) => item.id === id);
+    const displayWeek = displayWeekForId(id);
     if (
       typeof window !== "undefined" &&
-      !window.confirm(`Delete week ${week?.week}? This can't be undone.`)
+      !window.confirm(`Delete week ${displayWeek}? This can't be undone.`)
     ) return;
 
     const ok = await persistInstructional(plan.filter((item) => item.id !== id));
@@ -183,7 +192,8 @@ export function WeeklyPlanSectionForm({
           <EmptyWeeklyPlan onAdd={openAdd} />
         ) : (
           <div className="space-y-2.5">
-            {plan.map((week) => {
+            {plan.map((week, weekIndex) => {
+              const displayWeek = String(weekIndex + 1);
               const llos = weekLessonOutcomes(week);
               const activities = weekActivities(week);
               const teaching = week.teachingMethodIds.map(
@@ -211,7 +221,7 @@ export function WeeklyPlanSectionForm({
                       <div className="grid min-w-0 gap-3 sm:grid-cols-[52px_minmax(0,2fr)_minmax(120px,1fr)_76px_minmax(110px,1fr)_110px_22px] sm:items-center">
                         <div className="flex items-center gap-2 sm:block">
                           <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-accent px-2 text-xs font-semibold text-accent-foreground">
-                            {week.week || "—"}
+                            {displayWeek}
                           </span>
                           <span className="text-xs font-medium text-muted-foreground sm:hidden">Week</span>
                         </div>
@@ -237,9 +247,9 @@ export function WeeklyPlanSectionForm({
                     </button>
 
                     <div className="flex shrink-0 flex-col justify-center gap-1 border-l border-border bg-muted/15 px-1.5 sm:flex-row sm:items-center sm:border-l-0 sm:bg-transparent sm:px-3">
-                      <IconButton label={`Edit week ${week.week}`} onClick={() => openEdit(week.id)}><Pencil className="h-4 w-4" /></IconButton>
-                      <IconButton label={`Duplicate week ${week.week}`} onClick={() => duplicate(week.id)}><Copy className="h-4 w-4" /></IconButton>
-                      <IconButton label={`Delete week ${week.week}`} danger onClick={() => remove(week.id)}><Trash2 className="h-4 w-4" /></IconButton>
+                      <IconButton label={`Edit week ${displayWeek}`} onClick={() => openEdit(week.id)}><Pencil className="h-4 w-4" /></IconButton>
+                      <IconButton label={`Duplicate week ${displayWeek}`} onClick={() => duplicate(week.id)}><Copy className="h-4 w-4" /></IconButton>
+                      <IconButton label={`Delete week ${displayWeek}`} danger onClick={() => remove(week.id)}><Trash2 className="h-4 w-4" /></IconButton>
                     </div>
                   </div>
 
@@ -274,7 +284,7 @@ export function WeeklyPlanSectionForm({
                       </div>
                       <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs text-muted-foreground">Edit opens the existing weekly-plan form. Saving continues through the same Course Specification persistence flow.</p>
-                        <Button size="sm" onClick={() => openEdit(week.id)}><Pencil className="mr-1.5 h-4 w-4" />Edit Week {week.week}</Button>
+                        <Button size="sm" onClick={() => openEdit(week.id)}><Pencil className="mr-1.5 h-4 w-4" />Edit Week {displayWeek}</Button>
                       </div>
                     </div>
                   ) : null}
@@ -368,7 +378,7 @@ function CloCoverageOverview({ plan, cloCodes }: { plan: WeeklyPlanForm; cloCode
   const allocationByCode = new Map(allocations.map((item) => [item.code, item.sltHours]));
   const maxAllocation = Math.max(1, ...allocations.map((item) => item.sltHours));
   const totalSlt = weeklyPlanFormTotals(plan).slt;
-  return <Card><div className="mb-3"><h3 className="text-sm font-semibold text-foreground">CLO Coverage</h3><p className="mt-1 text-[11px] text-muted-foreground">Planned learning time and weekly coverage for each CLO.</p></div>{coverage.length === 0 ? <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center"><p className="text-sm text-muted-foreground">Link CLOs to weeks to see coverage.</p></div> : <><div className="hidden grid-cols-[52px_minmax(0,1fr)_105px_60px] items-center gap-2 border-b border-border pb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid"><span>CLO</span><span>Coverage</span><span>Weeks</span><span className="text-right">SLT</span></div><div>{coverage.map((item) => { const hours = allocationByCode.get(item.code) ?? 0; const width = Math.min(100, (hours / maxAllocation) * 100); const weeks = plan.filter((week) => week.cloCodes.includes(item.code)).map((week) => Number(week.week)).filter((week) => Number.isFinite(week) && week > 0).sort((a, b) => a - b); return <div key={item.code} className="grid gap-2 border-b border-border/60 py-3 last:border-b-0 sm:grid-cols-[52px_minmax(0,1fr)_105px_60px] sm:items-center"><span className={`inline-flex w-fit rounded-md px-1.5 py-0.5 text-xs font-semibold ${cloChip(item.code)}`}>{item.code}</span><div className="min-w-0"><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: cloColor(item.code) }} /></div><p className="mt-1 text-[10px] text-muted-foreground">{item.weeks > 0 ? `${item.weeks} ${item.weeks === 1 ? "week" : "weeks"} linked` : "Not linked"}</p></div><span className="text-[11px] text-muted-foreground">{formatWeekRange(weeks)}</span><span className="text-xs font-semibold text-foreground sm:text-right">{hours.toFixed(1)} h</span></div>; })}</div><div className="mt-2 flex items-center justify-between border-t border-border pt-3"><span className="text-xs font-semibold text-foreground">Total Student Learning Time</span><span className="text-sm font-bold text-foreground">{totalSlt.toFixed(1)} h</span></div></>}</Card>;
+  return <Card><div className="mb-3"><h3 className="text-sm font-semibold text-foreground">CLO Coverage</h3><p className="mt-1 text-[11px] text-muted-foreground">Planned learning time and weekly coverage for each CLO.</p></div>{coverage.length === 0 ? <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center"><p className="text-sm text-muted-foreground">Link CLOs to weeks to see coverage.</p></div> : <><div className="hidden grid-cols-[52px_minmax(0,1fr)_105px_60px] items-center gap-2 border-b border-border pb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid"><span>CLO</span><span>Coverage</span><span>Weeks</span><span className="text-right">SLT</span></div><div>{coverage.map((item) => { const hours = allocationByCode.get(item.code) ?? 0; const width = Math.min(100, (hours / maxAllocation) * 100); const weeks = plan.flatMap((week, index) => week.cloCodes.includes(item.code) ? [index + 1] : []); return <div key={item.code} className="grid gap-2 border-b border-border/60 py-3 last:border-b-0 sm:grid-cols-[52px_minmax(0,1fr)_105px_60px] sm:items-center"><span className={`inline-flex w-fit rounded-md px-1.5 py-0.5 text-xs font-semibold ${cloChip(item.code)}`}>{item.code}</span><div className="min-w-0"><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: cloColor(item.code) }} /></div><p className="mt-1 text-[10px] text-muted-foreground">{item.weeks > 0 ? `${item.weeks} ${item.weeks === 1 ? "week" : "weeks"} linked` : "Not linked"}</p></div><span className="text-[11px] text-muted-foreground">{formatWeekRange(weeks)}</span><span className="text-xs font-semibold text-foreground sm:text-right">{hours.toFixed(1)} h</span></div>; })}</div><div className="mt-2 flex items-center justify-between border-t border-border pt-3"><span className="text-xs font-semibold text-foreground">Total Student Learning Time</span><span className="text-sm font-bold text-foreground">{totalSlt.toFixed(1)} h</span></div></>}</Card>;
 }
 
 function AttentionSummary({ plan }: { plan: WeeklyPlanForm }) {
