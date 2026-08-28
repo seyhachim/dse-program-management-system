@@ -1,0 +1,94 @@
+name: Issue 703 Prisma schema patch
+
+on:
+  push:
+    branches:
+      - agent/issue-703-temp-password-recovery
+
+permissions:
+  contents: write
+
+jobs:
+  patch-schema:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-703-temp-password-recovery
+      - name: Patch Prisma schema additively
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/backend/prisma/schema.prisma')
+          text = path.read_text()
+
+          if 'enum UserSecurityAuditAction {' not in text:
+              marker = '''enum UserHonorific {
+            Mr
+            Ms
+            Mrs
+            Mx
+            Dr
+            Prof
+          }
+          '''
+              replacement = marker + '''
+          enum UserSecurityAuditAction {
+            TemporaryPasswordSet
+            PasswordChanged
+          }
+          '''
+              if marker not in text:
+                  raise SystemExit('UserHonorific marker not found')
+              text = text.replace(marker, replacement, 1)
+
+          if 'mustChangePassword Boolean' not in text:
+              marker = '  createdAt     DateTime       @default(now())\n\n  coursesLed'
+              replacement = '  createdAt          DateTime @default(now())\n  mustChangePassword Boolean  @default(false)\n\n  coursesLed'
+              if marker not in text:
+                  raise SystemExit('User createdAt marker not found')
+              text = text.replace(marker, replacement, 1)
+
+          if 'securityAuditEventsAsActor' not in text:
+              marker = '  academicCalendarAuditActions       AcademicCalendarAuditAction[]             @relation("AcademicCalendarAuditActor")\n}'
+              replacement = '''  academicCalendarAuditActions       AcademicCalendarAuditAction[]             @relation("AcademicCalendarAuditActor")
+          securityAuditEventsAsActor         UserSecurityAuditEvent[]                  @relation("UserSecurityAuditActor")
+          securityAuditEventsAsTarget        UserSecurityAuditEvent[]                  @relation("UserSecurityAuditTarget")
+          }'''
+              if marker not in text:
+                  raise SystemExit('User relation marker not found')
+              text = text.replace(marker, replacement, 1)
+
+          if 'model UserSecurityAuditEvent {' not in text:
+              text = text.rstrip() + '''
+
+          /// Security-only account recovery audit. Password values are never stored.
+          model UserSecurityAuditEvent {
+            id           String                  @id @default(uuid()) @db.Uuid
+            action       UserSecurityAuditAction
+            actorUserId  String
+            actor        User                    @relation("UserSecurityAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+            targetUserId String
+            target       User                    @relation("UserSecurityAuditTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+            createdAt    DateTime                @default(now())
+
+            @@index([actorUserId, createdAt])
+            @@index([targetUserId, createdAt])
+          }
+          '''
+
+          path.write_text(text)
+          PY
+      - name: Commit schema patch
+        run: |
+          if git diff --quiet -- apps/backend/prisma/schema.prisma; then
+            echo "Schema already patched"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backend/prisma/schema.prisma
+          git commit -m "feat(db): model temporary password recovery state"
+          git push origin HEAD:agent/issue-703-temp-password-recovery
