@@ -31,6 +31,39 @@ export type WeekForm = {
 export type WeeklyPlanForm = WeekForm[];
 
 export const EMPTY_WEEKLY_PLAN: WeeklyPlanForm = [];
+export const MAX_INSTRUCTIONAL_WEEKS = 14;
+
+const ASSESSMENT_ONLY_TOPIC =
+  /^(?:mid[- ]?term(?:\s+(?:exam|quiz|assessment))?|final(?:\s+(?:exam|assessment))?|final\s+exam\s*:\s*.*|exam\s*:\s*.*)$/i;
+
+/**
+ * Legacy imports sometimes stored Midterm / Final Exam rows inside §18.
+ * Keep those records intact in persistence, but exclude them from the teaching
+ * week view and official instructional-week document calculations.
+ */
+export function isAssessmentOnlyWeek(week: WeekForm): boolean {
+  return ASSESSMENT_ONLY_TOPIC.test(week.topic.trim());
+}
+
+export function instructionalWeeklyPlan(form: WeeklyPlanForm): WeeklyPlanForm {
+  return form.filter((week) => !isAssessmentOnlyWeek(week)).slice(0, MAX_INSTRUCTIONAL_WEEKS);
+}
+
+export function legacyAssessmentOnlyWeeks(form: WeeklyPlanForm): WeeklyPlanForm {
+  const instructionalIds = new Set(instructionalWeeklyPlan(form).map((week) => week.id));
+  return form.filter((week) => !instructionalIds.has(week.id));
+}
+
+/** Merge edited instructional rows back with preserved legacy assessment rows. */
+export function mergeInstructionalWeeklyPlan(
+  original: WeeklyPlanForm,
+  instructional: WeeklyPlanForm,
+): WeeklyPlanForm {
+  const preserved = legacyAssessmentOnlyWeeks(original);
+  return [...instructional, ...preserved].sort(
+    (a, b) => (Number(a.week) || 0) - (Number(b.week) || 0),
+  );
+}
 
 const uuid = () => globalThis.crypto.randomUUID();
 const str = (v: unknown) => (v == null ? "" : String(v));
@@ -89,10 +122,17 @@ const studentLearningActivityArray = (
     ];
   });
 };
-/** A fresh week, numbered one past the current highest week. */
+/** A fresh instructional week, using the first available week number 1–14. */
 export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
+  const used = new Set(
+    instructionalWeeklyPlan(existing)
+      .map((week) => Number(week.week))
+      .filter((week) => Number.isInteger(week) && week >= 1 && week <= MAX_INSTRUCTIONAL_WEEKS),
+  );
   const nextNo =
-    existing.reduce((max, w) => Math.max(max, Number(w.week) || 0), 0) + 1;
+    Array.from({ length: MAX_INSTRUCTIONAL_WEEKS }, (_, index) => index + 1).find(
+      (week) => !used.has(week),
+    ) ?? MAX_INSTRUCTIONAL_WEEKS;
   return {
     id: uuid(),
     week: String(nextNo),

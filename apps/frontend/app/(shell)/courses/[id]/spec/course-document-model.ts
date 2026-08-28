@@ -18,6 +18,7 @@ import {
 import type { CourseInfoForm } from "./course-info-section";
 import type { CloForm } from "./clo-model";
 import {
+  instructionalWeeklyPlan,
   weekContactHoursForm,
   weekSltForm,
   type WeeklyPlanForm,
@@ -26,16 +27,15 @@ import { assessmentSltHours, type AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 import type { ResourcesForm } from "./resources-model";
 import type { ReferencesForm } from "./references-model";
+import { courseDocumentCloSltHours } from "./course-document-mapping";
+import { normalizeCourseDocumentTopic } from "./course-document-topic";
 
 export type CourseDocumentModel = {
   title: string;
   partTitle: string;
   programmeProfile: ProgrammeAcademicConfig["profile"];
-  /** Exact programme grading-policy revision pinned to this CourseSpec. */
   gradingScale: ProgrammeGradingScaleVersion | null;
-  /** §25 Date — spec last revised/approved date, YYYY-MM-DD or null if unset. */
   specDate: string | null;
-  /** Part 1 cover page PLO taxonomy table. */
   plos: ProgrammeAcademicConfig["plos"];
   courseInformation: {
     programmeTitle: string;
@@ -93,11 +93,8 @@ export type CourseDocumentModel = {
     sltHours: string;
     assessment: string;
   }[];
-  /** §19: facilities, infrastructure, platforms, software, or equipment needed to deliver the course. */
   requiredDeliveryResources: string[];
-  /** §20: course-level instructional materials used to support teaching and student learning. */
   teachingLearningMaterials: string[];
-  /** Detailed files, links, textbooks, references, and resource records managed in the Resources tab. */
   resources: {
     id: string;
     resourceType: string;
@@ -151,7 +148,6 @@ export type CourseDocumentModel = {
     independentSltHours: string;
     totalSltHours: number;
   }[];
-  /** §22 — one entry per active assessment with a linked Rubric Library rubric. */
   rubrics: {
     assessmentName: string;
     name: string;
@@ -170,27 +166,16 @@ export type CourseDocumentModel = {
   };
 };
 
-/**
- * Single source of truth for Course Specification presentation.
- *
- * Keep content/data decisions out of this object. It only controls how the
- * same CourseDocumentModel is presented in the browser preview and Word export.
- * Font sizes are expressed in points so both renderers use the same unit.
- */
 export const COURSE_DOCUMENT_STYLE = {
   fontFamily: "Times New Roman",
-
   colors: {
     labelBackground: "#E2EEDB",
     tableHeaderBackground: "#E2EEDB",
     border: "#000000",
     link: "#0563C1",
   },
-
-  // Backward-compatible aliases for existing renderers.
   labelBackground: "#E2EEDB",
   borderColor: "#000000",
-
   fontSize: {
     body: 10,
     small: 9,
@@ -204,13 +189,7 @@ export const COURSE_DOCUMENT_STYLE = {
     profileBody: 9,
     profileHeading: 10,
   },
-
-  lineHeight: {
-    body: 1.25,
-    compact: 1.2,
-    profile: 1.2,
-  },
-
+  lineHeight: { body: 1.25, compact: 1.2, profile: 1.2 },
   spacing: {
     paragraphAfterPt: 2,
     centeredAfterPt: 1,
@@ -219,7 +198,6 @@ export const COURSE_DOCUMENT_STYLE = {
     tableCellVerticalPt: 3,
     tableCellHorizontalPt: 4,
   },
-
   page: {
     orientation: "landscape",
     preview: {
@@ -242,12 +220,7 @@ export const COURSE_DOCUMENT_STYLE = {
       marginRightTwips: 720,
     },
   },
-
-  logo: {
-    width: 90,
-    height: 90,
-  },
-
+  logo: { width: 90, height: 90 },
   title: "COURSE SPECIFICATION",
   partTitle: "PART 2: COURSE DETAILS",
   courseInfoTitle: "Course Information",
@@ -292,18 +265,11 @@ const EMPTY_TEACHING_LEARNING_PROFILE: TeachingLearningProfile = {
   technologyTypes: [],
 };
 
-type CourseType =
-  | "Basic"
-  | "Core"
-  | "Elective"
-  | "Specialization"
-  | "MoeysHeip";
+type CourseType = "Basic" | "Core" | "Elective" | "Specialization" | "MoeysHeip";
 type Semester = "First" | "Second";
 
 function isCourseType(value: string): value is CourseType {
-  return ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"].includes(
-    value,
-  );
+  return ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"].includes(value);
 }
 
 function isSemester(value: string): value is Semester {
@@ -339,10 +305,7 @@ export function buildCourseDocument({
   specDate,
   courseTotalSlt = null,
 }: BuildCourseDocumentInput): CourseDocumentModel {
-  const ploByCode = new Map(
-    (programme?.plos ?? []).map((plo) => [plo.code, plo.description]),
-  );
-
+  const ploByCode = new Map((programme?.plos ?? []).map((plo) => [plo.code, plo.description]));
   const activeClos = clos.filter((clo) => clo.status === "active");
 
   const documentClos = activeClos.map((clo) => ({
@@ -350,42 +313,29 @@ export function buildCourseDocument({
     outcome: clo.description,
     level: clo.level,
     mappedPlos: clo.mappedPlos,
-    mappedPloDescriptions: clo.mappedPlos
-      .map((code) => ploByCode.get(code) ?? "")
-      .filter(Boolean),
+    mappedPloDescriptions: clo.mappedPlos.map((code) => ploByCode.get(code) ?? "").filter(Boolean),
     sltHours: clo.sltHours,
     teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
     assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
   }));
 
-  const documentWeeks = weeklyPlan.map((week) => {
+  const documentWeeks = instructionalWeeklyPlan(weeklyPlan).map((week) => {
     const contact = weekContactHoursForm(week);
     const slt = weekSltForm(week);
     const learningActivities = week.studentLearningActivities.map((activity) =>
-      activity.description.trim()
-        ? `${activity.title}: ${activity.description}`
-        : activity.title,
+      activity.description.trim() ? `${activity.title}: ${activity.description}` : activity.title,
     );
-    const lloItems = week.lessonLearningOutcomes
-      .map((llo) => llo.description.trim())
-      .filter(Boolean);
-
+    const lloItems = week.lessonLearningOutcomes.map((llo) => llo.description.trim()).filter(Boolean);
     return {
       id: week.id,
       week: week.week,
-      topic: week.topic,
+      topic: normalizeCourseDocumentTopic(week.week, week.topic),
       cloCodes: week.cloCodes,
       lloItems,
-      learningActivities:
-        learningActivities.length > 0 ? learningActivities : week.activities,
+      learningActivities: learningActivities.length > 0 ? learningActivities : week.activities,
       teachingMethods: methodNames(week.teachingMethodIds, teachingMethods),
-      activeLearningStrategies: week.studentLearningActivities.map(
-        (activity) => activity.title,
-      ),
-      assessmentMethods: methodNames(
-        week.assessmentMethodIds,
-        assessmentMethods,
-      ),
+      activeLearningStrategies: week.studentLearningActivities.map((activity) => activity.title),
+      assessmentMethods: methodNames(week.assessmentMethodIds, assessmentMethods),
       resources: week.teachingResourceTypes,
       lectureHours: week.lectureHours,
       tutorialHours: week.tutorialHours,
@@ -399,7 +349,6 @@ export function buildCourseDocument({
   });
 
   const rubricById = new Map(rubrics.map((rubric) => [rubric.id, rubric]));
-
   const documentAssessments = assessments
     .filter((assessment) => assessment.status === "active")
     .map((assessment) => ({
@@ -413,8 +362,7 @@ export function buildCourseDocument({
         assessment.mappedPlos.length > 0
           ? assessment.mappedPlos
           : assessment.cloCodes.flatMap(
-              (code) =>
-                activeClos.find((clo) => clo.code === code)?.mappedPlos ?? [],
+              (code) => activeClos.find((clo) => clo.code === code)?.mappedPlos ?? [],
             ),
       ),
       capLevels: unique(
@@ -429,8 +377,7 @@ export function buildCourseDocument({
       submissionMethod: assessment.submissionMethod,
       feedbackMethod: assessment.feedbackMethod,
       feedbackTimeline: assessment.feedbackTimeline,
-      evaluationDefinition:
-        rubricById.get(assessment.rubricId)?.description ?? "",
+      evaluationDefinition: rubricById.get(assessment.rubricId)?.description ?? "",
       rubricName: rubricById.get(assessment.rubricId)?.name ?? "",
       rubricUrl: assessment.rubricId
         ? `/courses/${encodeURIComponent(courseId)}/spec/assessment/rubrics/${encodeURIComponent(assessment.rubricId)}/edit`
@@ -442,53 +389,6 @@ export function buildCourseDocument({
       independentSltHours: assessment.independentSltHours,
       totalSltHours: assessmentSltHours(assessment),
     }));
-
-  const documentRubrics = assessments
-    .filter((assessment) => assessment.status === "active")
-    .flatMap((assessment) => {
-      const rubric = rubricById.get(assessment.rubricId);
-      if (!rubric) return [];
-      return [
-        {
-          assessmentName: assessment.name,
-          name: rubric.name,
-          type: rubric.type,
-          scaleSummary: rubricScaleSummary(rubric.levels),
-          levels: rubric.levels.map((level) => ({
-            label: level.label,
-            points: level.points,
-          })),
-          criteria: rubric.criteria.map((criterion) => ({
-            name: criterion.name,
-            descriptors: criterion.descriptors,
-          })),
-        },
-      ];
-    });
-
-  const documentMapping = activeClos.map((clo) => {
-    const snapshotTotalSlt =
-      courseInfo.totalSltHours === undefined
-        ? courseTotalSlt
-        : courseInfo.totalSltHours;
-    const focusPercent = cloFocusPercent(
-      clo.sltHours ? Number(clo.sltHours) : null,
-      snapshotTotalSlt,
-    );
-    return {
-      cloCode: clo.code,
-      ploCodes: clo.mappedPlos,
-      level: clo.level,
-      teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
-      assessmentMethods: methodNames(
-        clo.assessmentMethodIds,
-        assessmentMethods,
-      ),
-      sltHours: clo.sltHours,
-      focusPercent,
-      focusCode: cloFocusCode(focusPercent) ?? "",
-    };
-  });
 
   const weeklyPlanSlt = documentWeeks.reduce(
     (sum, week) => sum + (Number(week.sltHours) || 0),
@@ -502,6 +402,64 @@ export function buildCourseDocument({
     .reduce((sum, assessment) => sum + assessment.totalSltHours, 0);
   const assessmentSlt = continuousAssessmentSlt + finalAssessmentSlt;
   const courseContentSlt = weeklyPlanSlt;
+  const derivedGrandSlt = courseContentSlt + assessmentSlt;
+  const snapshotTotalSlt =
+    courseInfo.totalSltHours === undefined ? courseTotalSlt : courseInfo.totalSltHours;
+  const focusDenominator = snapshotTotalSlt && snapshotTotalSlt > 0
+    ? snapshotTotalSlt
+    : derivedGrandSlt > 0
+      ? derivedGrandSlt
+      : null;
+
+  const documentMapping = activeClos.map((clo) => {
+    const sltHours = courseDocumentCloSltHours(
+      clo.code,
+      documentWeeks,
+      documentAssessments,
+      clo.sltHours,
+    );
+    const focusPercent = cloFocusPercent(
+      sltHours ? Number(sltHours) : null,
+      focusDenominator,
+    );
+    const assessmentNames = unique(
+      documentAssessments
+        .filter((assessment) => assessment.cloCodes.includes(clo.code))
+        .map((assessment) => assessment.name),
+    );
+    return {
+      cloCode: clo.code,
+      ploCodes: clo.mappedPlos,
+      level: clo.level,
+      teachingMethods: methodNames(clo.teachingMethodIds, teachingMethods),
+      assessmentMethods:
+        assessmentNames.length > 0
+          ? assessmentNames
+          : methodNames(clo.assessmentMethodIds, assessmentMethods),
+      sltHours,
+      focusPercent,
+      focusCode: cloFocusCode(focusPercent) ?? "",
+    };
+  });
+
+  const documentRubrics = assessments
+    .filter((assessment) => assessment.status === "active")
+    .flatMap((assessment) => {
+      const rubric = rubricById.get(assessment.rubricId);
+      if (!rubric) return [];
+      return [{
+        assessmentName: assessment.name,
+        name: rubric.name,
+        type: rubric.type,
+        scaleSummary: rubricScaleSummary(rubric.levels),
+        levels: rubric.levels.map((level) => ({ label: level.label, points: level.points })),
+        criteria: rubric.criteria.map((criterion) => ({
+          name: criterion.name,
+          descriptors: criterion.descriptors,
+        })),
+      }];
+    });
+
   const assessmentWeight = documentAssessments.reduce(
     (sum, assessment) => sum + (Number(assessment.weight) || 0),
     0,
@@ -521,8 +479,7 @@ export function buildCourseDocument({
     specDate: specDate?.date ?? null,
     plos: programme?.plos ?? [],
     courseInformation: {
-      programmeTitle:
-        courseInfo.programmeTitle || programme?.title || PROGRAMME_TITLE,
+      programmeTitle: courseInfo.programmeTitle || programme?.title || PROGRAMME_TITLE,
       courseTitle: courseInfo.courseTitle,
       courseCode: courseInfo.courseCode,
       credits: courseInfo.credits,
@@ -532,12 +489,8 @@ export function buildCourseDocument({
       email: courseInfo.email,
       telephone: courseInfo.telephone,
       otherLecturers: courseInfo.otherLecturers,
-      courseType: isCourseType(courseInfo.courseType)
-        ? courseTypeLabel(courseInfo.courseType)
-        : "",
-      semester: isSemester(courseInfo.semester)
-        ? semesterLabel(courseInfo.semester)
-        : "",
+      courseType: isCourseType(courseInfo.courseType) ? courseTypeLabel(courseInfo.courseType) : "",
+      semester: isSemester(courseInfo.semester) ? semesterLabel(courseInfo.semester) : "",
       programmeYear: courseInfo.programmeYear,
       description: courseInfo.description,
     },
@@ -576,7 +529,7 @@ export function buildCourseDocument({
       continuousAssessmentSlt,
       finalAssessmentSlt,
       assessmentSlt,
-      grandSlt: courseContentSlt + assessmentSlt,
+      grandSlt: derivedGrandSlt,
       assessmentWeight,
     },
   };

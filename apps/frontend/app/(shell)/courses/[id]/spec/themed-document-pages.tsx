@@ -3,6 +3,8 @@
 import type { CSSProperties } from "react";
 import type { CourseSpecDocumentTheme } from "@dse-pms/shared-types";
 import type { CourseDocumentModel } from "./course-document-model";
+import { courseTypeCheckboxText } from "./course-information-checkboxes";
+import { presentCourseDocumentResources } from "./course-document-resources";
 import { DocumentPages } from "./document-preview-pages";
 
 export function ThemedDocumentPages({
@@ -35,6 +37,14 @@ export function ThemedDocumentPages({
     "--cs-footer-size": `${theme.footerFontSizePt}pt`,
     "--cs-frame-gap": "3mm",
   } as CSSProperties;
+  const presentationDocument: CourseDocumentModel = {
+    ...document,
+    courseInformation: {
+      ...document.courseInformation,
+      courseType: courseTypeCheckboxText(document.courseInformation.courseType),
+    },
+    resources: presentCourseDocumentResources(document.resources),
+  };
 
   return (
     <div
@@ -44,7 +54,7 @@ export function ThemedDocumentPages({
       data-show-footer={String(theme.showFooter)}
       data-show-page-numbers={String(theme.showPageNumbers)}
     >
-      <DocumentPages document={document} zoom={zoom} />
+      <DocumentPages document={presentationDocument} zoom={zoom} />
       <style jsx global>{`
         .course-spec-theme-root article[data-doc-page] {
           font-family: var(--cs-font-family) !important;
@@ -56,13 +66,61 @@ export function ThemedDocumentPages({
         /* Page 1 is an approved fixed-composition programme overview. Its 34/66
            grid, compact typography and internal spacing are template-controlled
            so the full Vision/Mission/Goals/Philosophy/PEO content fits one
-           landscape page. The saved font family still inherits from the article. */
-        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) {
+           landscape page. The PLO continuation is excluded because it is a
+           Part 1 table row, not a normal document page body, and therefore owns
+           its compact cell padding. */
+        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview):not(#plo-taxonomy) {
           box-sizing: border-box;
           padding-top: calc(var(--cs-margin-top) + var(--cs-frame-gap)) !important;
           padding-bottom: calc(var(--cs-margin-bottom) + var(--cs-frame-gap)) !important;
           padding-left: calc(var(--cs-margin-left) + var(--cs-frame-gap)) !important;
           padding-right: calc(var(--cs-margin-right) + var(--cs-frame-gap)) !important;
+        }
+
+        /* Part 1 has fixed approved typography independent of the saved body
+           theme: the institution, faculty, department, programme and Course
+           Specification header lines are 11pt bold Times New Roman; the Part 1
+           title is 14pt bold Times New Roman. */
+        .course-spec-theme-root #programme-overview header > p {
+          font-family: "Times New Roman", Times, serif !important;
+          font-size: 11pt !important;
+          font-weight: 700 !important;
+          line-height: 1.1 !important;
+        }
+
+        .course-spec-theme-root #programme-overview h1 {
+          font-family: "Times New Roman", Times, serif !important;
+          font-size: 14pt !important;
+          font-weight: 700 !important;
+          line-height: 1.1 !important;
+        }
+
+        /* The fixed-page preview cannot physically keep one CSS grid across a
+           page break. Page 2 therefore resumes Part 1 with exactly one full-width
+           continuation row. Its outer border aligns to the 54px programme table
+           edges, and every PLO element stays inside that row. The 42px top gap
+           matches the programme-page vertical inset used by the document style. */
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy {
+          box-sizing: border-box;
+          height: auto !important;
+          width: auto;
+          margin: 42px 54px 0;
+          padding: 8px !important;
+          border: 1px solid #000;
+        }
+
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2 {
+          margin: 0 !important;
+          font-size: 10px !important;
+          line-height: 1.2 !important;
+          text-transform: uppercase;
+        }
+
+        .course-spec-theme-root article[data-doc-page] > #plo-taxonomy > h2 + p {
+          margin-top: 4px !important;
+          margin-bottom: 6px !important;
+          font-size: 10px !important;
+          line-height: 1.2 !important;
         }
 
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) p,
