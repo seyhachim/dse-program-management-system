@@ -36,9 +36,10 @@ describe("Course Specification preview role parity", () => {
 
   test("keeps mobile flow content-driven by applying the bounded viewer only at desktop", () => {
     const layout = getCourseSpecPreviewLayout(false);
+    const classes = layout.gridClassName.split(" ");
 
-    expect(layout.gridClassName).not.toContain("[&>main]:absolute ");
-    expect(layout.gridClassName).toContain("lg:[&>main]:absolute");
+    expect(classes).not.toContain("[&>main]:absolute");
+    expect(classes).toContain("lg:[&>main]:absolute");
   });
 
   test("re-runs Fit Width setup when the async official preview becomes ready", async () => {
