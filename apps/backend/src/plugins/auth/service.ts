@@ -15,8 +15,6 @@ import { defaultProgrammeIdForRole, type Role } from "../../core/auth/token.ts";
  * Auth service: privileged account provisioning and recovery. Supabase Admin API
  * access is server-only; no service-role credential is ever exposed to a client.
  */
-
-/** A lean shape mirroring how lecturers are surfaced elsewhere. */
 const accountSelect = {
   id: true,
   authId: true,
@@ -29,7 +27,6 @@ export class ProgrammeRoleAssignmentError extends Error {}
 
 let adminClient: SupabaseClient | undefined;
 
-/** Lazily build the service_role admin client so dev mode can run without Supabase env. */
 function getAdminClient(): SupabaseClient {
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -44,28 +41,9 @@ function getAdminClient(): SupabaseClient {
   return adminClient;
 }
 
-function createTemporaryPassword(): string {
-  // 24 URL-safe random characters plus explicit character classes required by
-  // ChangePasswordInput. Never log or persist the generated value.
+/** Exported only so security tests can assert the generated value against the API policy. */
+export function createTemporaryPassword(): string {
   return `${randomBytes(18).toString("base64url")}!Aa7`;
-}
-
-async function readMustChangePassword(userId: string): Promise<boolean> {
-  const rows = await prisma.$queryRaw<Array<{ mustChangePassword: boolean }>>`
-    SELECT "mustChangePassword"
-    FROM "User"
-    WHERE "id" = ${userId}
-    LIMIT 1
-  `;
-  return rows[0]?.mustChangePassword ?? false;
-}
-
-async function setMustChangePassword(userId: string, value: boolean): Promise<void> {
-  await prisma.$executeRaw`
-    UPDATE "User"
-    SET "mustChangePassword" = ${value}
-    WHERE "id" = ${userId}
-  `;
 }
 
 async function recordSecurityAudit(
@@ -73,10 +51,9 @@ async function recordSecurityAudit(
   actorUserId: string,
   targetUserId: string,
 ): Promise<void> {
-  await prisma.$executeRaw`
-    INSERT INTO "UserSecurityAuditEvent" ("id", "action", "actorUserId", "targetUserId", "createdAt")
-    VALUES (gen_random_uuid(), ${action}::"UserSecurityAuditAction", ${actorUserId}, ${targetUserId}, CURRENT_TIMESTAMP)
-  `;
+  await prisma.userSecurityAuditEvent.create({
+    data: { action, actorUserId, targetUserId },
+  });
 }
 
 async function programmeRoleView(
@@ -99,7 +76,6 @@ async function programmeRoleView(
 }
 
 export const authService = {
-  /** Full profile (incl. name) for the resolved caller — `req.user` only carries id/email/roles. */
   async me(userId: string) {
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -107,6 +83,7 @@ export const authService = {
         id: true,
         email: true,
         name: true,
+        mustChangePassword: true,
         roleAssignments: { select: { role: { select: { slug: true } } } },
       },
     });
@@ -118,15 +95,10 @@ export const authService = {
       role: roles[0],
       roles,
       permissions: await permissionsForRoles(roles),
-      mustChangePassword: await readMustChangePassword(user.id),
+      mustChangePassword: user.mustChangePassword,
     };
   },
 
-  /**
-   * Provision a login account: invite the email via Supabase, then upsert the
-   * app `User` (role from input, authId = the new auth uid). If a profile row
-   * already exists for the email, it is linked/updated rather than duplicated.
-   */
   async createAccount(input: CreateAccountInput) {
     const studentProfile = input.role === "student"
       ? await prisma.student.findUnique({ where: { email: input.email } })
@@ -142,7 +114,6 @@ export const authService = {
 
     const admin = getAdminClient();
     const redirectTo = process.env.SUPABASE_INVITE_REDIRECT_URL;
-
     const { data, error } = await admin.auth.admin.inviteUserByEmail(input.email, {
       data: { name: input.name, role: input.role },
       ...(redirectTo ? { redirectTo } : {}),
@@ -153,15 +124,8 @@ export const authService = {
 
     const user = await prisma.user.upsert({
       where: { email: input.email },
-      update: {
-        authId: data.user.id,
-        name: input.name,
-      },
-      create: {
-        authId: data.user.id,
-        email: input.email,
-        name: input.name,
-      },
+      update: { authId: data.user.id, name: input.name },
+      create: { authId: data.user.id, email: input.email, name: input.name },
       select: accountSelect,
     });
 
@@ -180,10 +144,7 @@ export const authService = {
     });
 
     if (studentProfile) {
-      await prisma.student.update({
-        where: { id: studentProfile.id },
-        data: { userId: user.id },
-      });
+      await prisma.student.update({ where: { id: studentProfile.id }, data: { userId: user.id } });
     }
 
     const roles = await prisma.userRoleAssignment.findMany({
@@ -195,9 +156,9 @@ export const authService = {
   },
 
   /**
-   * Admin recovery for an already-active lecturer account. The PMS user id is
-   * authoritative; the browser never supplies a Supabase uid. Flag first so a
-   * successful credential reset can never leave normal PMS access enabled.
+   * Admin recovery for an active lecturer. The browser supplies only a PMS user
+   * id; this service resolves the linked Supabase uid server-side. The PMS gate
+   * is set before the remote credential change so the operation fails closed.
    */
   async setTemporaryPassword(
     actorUserId: string,
@@ -221,15 +182,19 @@ export const authService = {
     }
 
     const temporaryPassword = createTemporaryPassword();
-    await setMustChangePassword(target.id, true);
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { mustChangePassword: true },
+    });
 
     const { error } = await getAdminClient().auth.admin.updateUserById(target.authId, {
       password: temporaryPassword,
     });
     if (error) {
-      // Cross-system transactions are impossible; rollback the gate when the
-      // credential was not changed. If this rollback fails, it fails closed.
-      await setMustChangePassword(target.id, false).catch(() => undefined);
+      await prisma.user.update({
+        where: { id: target.id },
+        data: { mustChangePassword: false },
+      }).catch(() => undefined);
       throw new ProvisioningError(error.message);
     }
 
@@ -237,7 +202,7 @@ export const authService = {
     return { userId: target.id, email: target.email, temporaryPassword };
   },
 
-  /** Change only the authenticated caller's Supabase credential, then clear the forced-change gate. */
+  /** Change only the authenticated caller's credential and then clear the forced-change gate. */
   async changePassword(userId: string, input: ChangePasswordInput) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -252,14 +217,20 @@ export const authService = {
     });
     if (error) throw new ProvisioningError(error.message);
 
-    // If the DB update fails after Supabase succeeds, the account remains gated
-    // and the user can retry — fail closed rather than accidentally bypassing recovery.
-    await setMustChangePassword(user.id, false);
-    await recordSecurityAudit("PasswordChanged", user.id, user.id);
+    // Supabase succeeded first. If this DB transaction fails the account remains
+    // gated and can retry, instead of silently regaining normal application access.
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { mustChangePassword: false },
+      }),
+      prisma.userSecurityAuditEvent.create({
+        data: { action: "PasswordChanged", actorUserId: user.id, targetUserId: user.id },
+      }),
+    ]);
     return this.me(user.id);
   },
 
-  /** Add a narrowly-allowed programme role without replacing any existing role. */
   async assignProgrammeRole(input: ManageProgrammeRoleInput): Promise<ProgrammeRoleAssignmentView> {
     const [user, programme, role] = await Promise.all([
       prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } }),
@@ -283,17 +254,12 @@ export const authService = {
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: input.userId, roleId: role.id } },
       update: { programmeId: input.programmeId },
-      create: {
-        userId: input.userId,
-        roleId: role.id,
-        programmeId: input.programmeId,
-      },
+      create: { userId: input.userId, roleId: role.id, programmeId: input.programmeId },
     });
 
     return programmeRoleView(input.userId, input.programmeId, input.role);
   },
 
-  /** Remove only the requested additive programme role; all other roles remain intact. */
   async removeProgrammeRole(input: ManageProgrammeRoleInput): Promise<void> {
     const role = await prisma.role.findUnique({
       where: { slug: input.role },
@@ -302,11 +268,7 @@ export const authService = {
     if (!role) throw new ProgrammeRoleAssignmentError("Programme role is not installed");
 
     await prisma.userRoleAssignment.deleteMany({
-      where: {
-        userId: input.userId,
-        roleId: role.id,
-        programmeId: input.programmeId,
-      },
+      where: { userId: input.userId, roleId: role.id, programmeId: input.programmeId },
     });
   },
 
@@ -314,10 +276,7 @@ export const authService = {
     programmeId: string,
   ): Promise<ProgrammeRoleAssignmentView[]> {
     const rows = await prisma.userRoleAssignment.findMany({
-      where: {
-        programmeId,
-        role: { slug: "qa_contributor" },
-      },
+      where: { programmeId, role: { slug: "qa_contributor" } },
       orderBy: { user: { name: "asc" } },
       select: {
         userId: true,
@@ -338,11 +297,8 @@ export const authService = {
 
   async deleteAccountForUser(authId: string | null): Promise<void> {
     if (!authId) return;
-    const admin = getAdminClient();
-    const { error } = await admin.auth.admin.deleteUser(authId);
-    if (error && error.status !== 404) {
-      throw new ProvisioningError(error.message);
-    }
+    const { error } = await getAdminClient().auth.admin.deleteUser(authId);
+    if (error && error.status !== 404) throw new ProvisioningError(error.message);
   },
 };
 
