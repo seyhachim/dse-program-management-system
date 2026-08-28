@@ -21,16 +21,14 @@ declare global {
 class UnprovisionedAccountError extends Error {}
 
 async function mustChangePassword(userId: string): Promise<boolean> {
-  const rows = await prisma.$queryRaw<Array<{ mustChangePassword: boolean }>>`
-    SELECT "mustChangePassword"
-    FROM "User"
-    WHERE "id" = ${userId}
-    LIMIT 1
-  `;
-  return rows[0]?.mustChangePassword ?? false;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { mustChangePassword: true },
+  });
+  return user?.mustChangePassword ?? false;
 }
 
-function isPasswordRecoveryRoute(req: Request): boolean {
+export function isPasswordRecoveryRoute(req: Pick<Request, "baseUrl" | "path">): boolean {
   // The caller must still be able to inspect /me so the frontend can route to
   // the recovery screen, and must be able to submit that one recovery action.
   return req.baseUrl === "/api/auth" && (req.path === "/me" || req.path === "/change-password");
@@ -97,7 +95,6 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
     throw new UnprovisionedAccountError("No account provisioned for this login");
   }
 
-  // UserRoleAssignment is the authorization source of truth (issue #77).
   const roles = user.roleAssignments.map((a) => a.role.slug as Role);
   const programmeRoles = user.roleAssignments.map((a) => ({
     role: a.role.slug as Role,
