@@ -15,10 +15,11 @@ const runInflightAuthHeader = createInflightLoader<Record<string, string>>();
 
 async function authHeader(): Promise<Record<string, string>> {
   if (AUTH_MODE === "supabase") {
-    return runInflightAuthHeader(async () => {
+    return runInflightAuthHeader(async (): Promise<Record<string, string>> => {
       const { data } = await getSupabase().auth.getSession();
       const token = data.session?.access_token;
-      return token ? { Authorization: `Bearer ${token}` } : {};
+      if (!token) return {};
+      return { Authorization: `Bearer ${token}` };
     });
   }
   return DEV_TOKEN ? { Authorization: `Bearer ${DEV_TOKEN}` } : {};
