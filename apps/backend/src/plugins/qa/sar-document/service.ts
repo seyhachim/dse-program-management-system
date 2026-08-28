@@ -12,6 +12,8 @@ import { prisma } from "../../../core/db/prisma.ts";
 import { prepareQaSarExternalEvidence } from "../evidence-sharing/sar-integration.ts";
 import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
 
+const LEGACY_QA_SAR_TEMPLATE_VERSION = "aun-qa-sar-v1" as const;
+
 const sectionStatus = {
   NotStarted: "missing",
   Drafting: "draft",
@@ -354,7 +356,7 @@ export async function finalizeQaSarDocument(
       cycleId,
       version: (latest?.version ?? 0) + 1,
       title: title?.trim() || `${model.programmeName} — ${model.cycleTitle} SAR`,
-      templateVersion: "aun-qa-sar-v1",
+      templateVersion: LEGACY_QA_SAR_TEMPLATE_VERSION,
       snapshot: model as unknown as Prisma.InputJsonValue,
       submissionIds,
       finalizedById: userId,
@@ -367,7 +369,7 @@ export async function finalizeQaSarDocument(
 export async function listQaSarReleases(programmeId: string, cycleId: string): Promise<QaSarReleaseView[]> {
   await resolveCycle(programmeId, cycleId);
   const rows = await prisma.qaSarRelease.findMany({
-    where: { programmeId, cycleId },
+    where: { programmeId, cycleId, templateVersion: LEGACY_QA_SAR_TEMPLATE_VERSION },
     orderBy: { version: "desc" },
     include: { finalizedBy: { select: { id: true, name: true } } },
   });
@@ -379,7 +381,9 @@ export async function getQaSarRelease(programmeId: string, releaseId: string): P
     where: { id: releaseId },
     include: { finalizedBy: { select: { id: true, name: true } } },
   });
-  if (!row) throw new QaSarResourceNotFoundError("Official SAR release not found");
+  if (!row || row.templateVersion !== LEGACY_QA_SAR_TEMPLATE_VERSION) {
+    throw new QaSarResourceNotFoundError("Official SAR release not found");
+  }
   if (row.programmeId !== programmeId) {
     throw new QaSarScopeMismatchError("Official SAR release belongs to a different programme");
   }
