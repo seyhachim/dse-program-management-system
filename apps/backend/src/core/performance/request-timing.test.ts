@@ -25,6 +25,7 @@ async function startTestServer(options?: Parameters<typeof createRequestTimingMi
   app.use("/api", createRequestTimingMiddleware(options));
   app.get("/api/example", (_req, res) => res.status(200).json({ ok: true }));
   app.get("/api/students/:id", (_req, res) => res.status(200).json({ ok: true }));
+  app.get("/api/courses/:id", (_req, res) => res.status(200).json({ ok: true }));
 
   const server = app.listen(0, "127.0.0.1");
   servers.push(server);
@@ -62,6 +63,7 @@ describe("request timing", () => {
     expect(normalizePerformancePath("/api/students/60f3cf56-62f0-4c14-a827-9af7657389f8/results")).toBe("/api/students/:id/results");
     expect(normalizePerformancePath("/api/items/cuidlikeidentifier1234567890")).toBe("/api/items/:id");
     expect(normalizePerformancePath("/api/calendar/dse/2026-2027/year-4")).toBe("/api/calendar/dse/2026-2027/year-4");
+    expect(normalizePerformancePath("/api/programme-public-information/settings")).toBe("/api/programme-public-information/settings");
   });
 
   test("adds Server-Timing to API responses", async () => {
@@ -107,7 +109,7 @@ describe("request timing", () => {
     expect(messages[0]).not.toContain("should-not-appear");
   });
 
-  test("emits a ranked bounded summary and resets the reporting window", async () => {
+  test("emits a ranked summary and resets the reporting window", async () => {
     const messages: string[] = [];
     let tick = 0;
     const baseUrl = await startTestServer({
@@ -118,7 +120,7 @@ describe("request timing", () => {
       slowRequestMs: null,
       summaryEvery: 3,
       summaryTop: 2,
-      maxRoutes: 2,
+      maxRoutes: 3,
       log: (message) => messages.push(message),
     });
 
@@ -139,5 +141,29 @@ describe("request timing", () => {
     await fetch(`${baseUrl}/api/example`);
     expect(messages).toHaveLength(2);
     expect(messages[1]).toContain("GET /api/example count=3");
+  });
+
+  test("keeps route-cardinality within the configured bound", async () => {
+    const messages: string[] = [];
+    let tick = 0;
+    const baseUrl = await startTestServer({
+      now: () => {
+        tick += 2;
+        return tick;
+      },
+      slowRequestMs: null,
+      summaryEvery: 3,
+      summaryTop: 5,
+      maxRoutes: 2,
+      log: (message) => messages.push(message),
+    });
+
+    await fetch(`${baseUrl}/api/example`);
+    await fetch(`${baseUrl}/api/students/1`);
+    await fetch(`${baseUrl}/api/courses/1`);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("GET /api/example count=1");
+    expect(messages[0]).toContain("OTHER count=2");
   });
 });
