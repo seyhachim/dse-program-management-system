@@ -1,19 +1,19 @@
+import { randomBytes } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
+  ChangePasswordInput,
   CreateAccountInput,
   ManageProgrammeRoleInput,
   ProgrammeRoleAssignmentView,
+  TemporaryPasswordResponse,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { permissionsForRoles } from "../../core/permissions/index.ts";
 import { defaultProgrammeIdForRole, type Role } from "../../core/auth/token.ts";
 
 /**
- * Auth service: admin-only account provisioning. Creates a Supabase auth
- * credential via the Admin API (service_role key — server-only, never shipped to
- * the browser) and links it to an app `User` row. `inviteUserByEmail` sends the
- * invite so the new lecturer sets their own password; no plaintext password ever
- * transits our API. Idempotent on email — re-inviting reuses the existing row.
+ * Auth service: privileged account provisioning and recovery. Supabase Admin API
+ * access is server-only; no service-role credential is ever exposed to a client.
  */
 
 /** A lean shape mirroring how lecturers are surfaced elsewhere. */
@@ -35,13 +35,48 @@ function getAdminClient(): SupabaseClient {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
     throw new ProvisioningError(
-      "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to create accounts",
+      "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for account administration",
     );
   }
   adminClient ??= createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   return adminClient;
+}
+
+function createTemporaryPassword(): string {
+  // 24 URL-safe random characters plus explicit character classes required by
+  // ChangePasswordInput. Never log or persist the generated value.
+  return `${randomBytes(18).toString("base64url")}!Aa7`;
+}
+
+async function readMustChangePassword(userId: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ mustChangePassword: boolean }>>`
+    SELECT "mustChangePassword"
+    FROM "User"
+    WHERE "id" = ${userId}
+    LIMIT 1
+  `;
+  return rows[0]?.mustChangePassword ?? false;
+}
+
+async function setMustChangePassword(userId: string, value: boolean): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE "User"
+    SET "mustChangePassword" = ${value}
+    WHERE "id" = ${userId}
+  `;
+}
+
+async function recordSecurityAudit(
+  action: "TemporaryPasswordSet" | "PasswordChanged",
+  actorUserId: string,
+  targetUserId: string,
+): Promise<void> {
+  await prisma.$executeRaw`
+    INSERT INTO "UserSecurityAuditEvent" ("id", "action", "actorUserId", "targetUserId", "createdAt")
+    VALUES (gen_random_uuid(), ${action}::"UserSecurityAuditAction", ${actorUserId}, ${targetUserId}, CURRENT_TIMESTAMP)
+  `;
 }
 
 async function programmeRoleView(
@@ -75,9 +110,6 @@ export const authService = {
         roleAssignments: { select: { role: { select: { slug: true } } } },
       },
     });
-    // Every creation path writes a UserRoleAssignment row, so this is always
-    // non-empty in practice (the legacy single-role column it used to fall
-    // back to was dropped in issue #77 phase C).
     const roles = user.roleAssignments.map((a) => a.role.slug) as Role[];
     return {
       id: user.id,
@@ -86,6 +118,7 @@ export const authService = {
       role: roles[0],
       roles,
       permissions: await permissionsForRoles(roles),
+      mustChangePassword: await readMustChangePassword(user.id),
     };
   },
 
@@ -132,9 +165,6 @@ export const authService = {
       select: accountSelect,
     });
 
-    // UserRoleAssignment is the role source of truth. Account provisioning keeps
-    // its historical single-primary-role behavior, but additive QA Contributor
-    // grants are preserved so re-inviting a lecturer cannot silently remove SAR work access.
     const role = await prisma.role.findUniqueOrThrow({ where: { slug: input.role } });
     await prisma.userRoleAssignment.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
@@ -162,6 +192,71 @@ export const authService = {
       orderBy: { createdAt: "asc" },
     });
     return { ...user, role: role.slug, roles: roles.map((assignment) => assignment.role.slug) };
+  },
+
+  /**
+   * Admin recovery for an already-active lecturer account. The PMS user id is
+   * authoritative; the browser never supplies a Supabase uid. Flag first so a
+   * successful credential reset can never leave normal PMS access enabled.
+   */
+  async setTemporaryPassword(
+    actorUserId: string,
+    targetUserId: string,
+  ): Promise<TemporaryPasswordResponse> {
+    const target = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: {
+        id: true,
+        email: true,
+        authId: true,
+        roleAssignments: { select: { role: { select: { slug: true } } } },
+      },
+    });
+    if (!target) throw new ProvisioningError("Lecturer account not found");
+    if (!target.roleAssignments.some((assignment) => assignment.role.slug === "lecturer")) {
+      throw new ProvisioningError("Temporary password recovery is only available for lecturer accounts");
+    }
+    if (!target.authId) {
+      throw new ProvisioningError("This lecturer does not have a linked Supabase account");
+    }
+
+    const temporaryPassword = createTemporaryPassword();
+    await setMustChangePassword(target.id, true);
+
+    const { error } = await getAdminClient().auth.admin.updateUserById(target.authId, {
+      password: temporaryPassword,
+    });
+    if (error) {
+      // Cross-system transactions are impossible; rollback the gate when the
+      // credential was not changed. If this rollback fails, it fails closed.
+      await setMustChangePassword(target.id, false).catch(() => undefined);
+      throw new ProvisioningError(error.message);
+    }
+
+    await recordSecurityAudit("TemporaryPasswordSet", actorUserId, target.id);
+    return { userId: target.id, email: target.email, temporaryPassword };
+  },
+
+  /** Change only the authenticated caller's Supabase credential, then clear the forced-change gate. */
+  async changePassword(userId: string, input: ChangePasswordInput) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, authId: true },
+    });
+    if (!user?.authId) {
+      throw new ProvisioningError("This account is not linked to Supabase authentication");
+    }
+
+    const { error } = await getAdminClient().auth.admin.updateUserById(user.authId, {
+      password: input.password,
+    });
+    if (error) throw new ProvisioningError(error.message);
+
+    // If the DB update fails after Supabase succeeds, the account remains gated
+    // and the user can retry — fail closed rather than accidentally bypassing recovery.
+    await setMustChangePassword(user.id, false);
+    await recordSecurityAudit("PasswordChanged", user.id, user.id);
+    return this.me(user.id);
   },
 
   /** Add a narrowly-allowed programme role without replacing any existing role. */
@@ -241,20 +336,10 @@ export const authService = {
       : []);
   },
 
-  /**
-   * Called via the registry when another plugin deletes a User (e.g. lecturers)
-   * so the linked Supabase Auth identity doesn't outlive the app row — without
-   * this, the login stays active (harmless — resolveSupabaseUser then 403s as
-   * unprovisioned) and permanently blocks re-inviting that email, since
-   * `inviteUserByEmail` rejects an address already registered in Supabase.
-   * A `null` authId (dev-created rows, never provisioned) is a no-op, so this
-   * is safe to call unconditionally and never requires Supabase env locally.
-   */
   async deleteAccountForUser(authId: string | null): Promise<void> {
     if (!authId) return;
     const admin = getAdminClient();
     const { error } = await admin.auth.admin.deleteUser(authId);
-    // Already gone is success, not failure — keeps this idempotent/retry-safe.
     if (error && error.status !== 404) {
       throw new ProvisioningError(error.message);
     }
