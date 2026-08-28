@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, CircleAlert, Pencil } from "lucide-react";
 import {
-  COMPLETABLE_SPEC_SECTIONS,
   FOCUS_LEVELS,
+  teachingLearningIsReady,
   courseTypeLabel,
   semesterLabel,
   type CourseType,
@@ -12,6 +14,10 @@ import {
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
 import { Button, CompletionRing } from "@dse-pms/ui";
+import {
+  EMPTY_TEACHING_LEARNING_PROFILE,
+  teachingLearningApi,
+} from "@/lib/teaching-learning";
 import type { CourseInfoForm } from "./course-info-section";
 import { focusCodeOf, focusPercentOf, type CloForm } from "./clo-model";
 import type { WeeklyPlanForm } from "./weekly-plan-section";
@@ -22,6 +28,10 @@ import {
   type AssessmentForm,
 } from "./assessment-model";
 import { deriveOverviewReadinessStatus } from "./overview-readiness";
+import {
+  OVERVIEW_REQUIRED_SECTIONS,
+  type OverviewReadinessSectionId,
+} from "./overview-sections";
 import { ProgrammeSection } from "./programme-section";
 
 export function OverviewTab({
@@ -43,16 +53,50 @@ export function OverviewTab({
   /** Course's total SLT hours, used to derive each CLO's Focus (F/M/P) from its share. */
   courseTotalSlt: number | null;
   onEditCourseInfo: () => void;
-  onGoToTab: (id: SpecSectionId) => void;
+  onGoToTab: (id: SpecSectionId | "teachingLearning") => void;
   readOnly?: boolean;
 }) {
+  const params = useParams<{ id: string }>();
+  const courseId = params.id;
+  const [teachingLearningProfile, setTeachingLearningProfile] = useState(
+    EMPTY_TEACHING_LEARNING_PROFILE,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    teachingLearningApi
+      .get(courseId)
+      .then((profile) => {
+        if (!cancelled) setTeachingLearningProfile(profile);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTeachingLearningProfile(EMPTY_TEACHING_LEARNING_PROFILE);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
+
+  const activeClos = clos.filter((clo) => clo.status === "active");
+  const cloReady =
+    activeClos.length > 0 &&
+    activeClos.every(
+      (clo) => clo.description.trim().length > 0 && clo.mappedPlos.length > 0,
+    );
+  const teachingLearningReady = teachingLearningIsReady(
+    teachingLearningProfile,
+    clos,
+  );
   const readinessStatus = deriveOverviewReadinessStatus(
     status,
     clos,
     weeklyPlan,
     assessments,
+    { cloReady, teachingLearningReady },
   );
-  const fillable = COMPLETABLE_SPEC_SECTIONS;
+  const fillable = OVERVIEW_REQUIRED_SECTIONS;
   const completed = fillable.filter((s) => readinessStatus[s.id] === "complete").length;
   const inProgress = fillable.filter((s) => readinessStatus[s.id] === "draft").length;
   const missing = fillable.length - completed - inProgress;
@@ -416,22 +460,18 @@ export function OverviewTab({
                     {nextSectionTitle}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {nextSection.id === "date"
-                      ? "Enter the official Specification Date in Review & Submit."
-                      : readinessStatus[nextSection.id] === "draft"
-                        ? "Continue this section and mark it complete."
-                        : "Add the required information to start this section."}
+                    {readinessStatus[nextSection.id] === "draft"
+                      ? "Continue this section and resolve the remaining attention items."
+                      : "Add the required information to start this section."}
                   </p>
                   <button
                     type="button"
-                    onClick={() => onGoToTab(nextSection.id as SpecSectionId)}
+                    onClick={() => onGoToTab(nextSection.id)}
                     className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-foreground hover:underline"
                   >
-                    {nextSection.id === "date"
-                      ? "Enter date"
-                      : readinessStatus[nextSection.id] === "draft"
-                        ? "Continue"
-                        : "Start section"}
+                    {readinessStatus[nextSection.id] === "draft"
+                      ? "Continue"
+                      : "Start section"}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -459,7 +499,7 @@ export function OverviewTab({
                   <li key={section.id}>
                     <button
                       type="button"
-                      onClick={() => onGoToTab(section.id as SpecSectionId)}
+                      onClick={() => onGoToTab(section.id)}
                       className="flex w-full items-center justify-between gap-3 text-left text-sm hover:text-accent-foreground"
                     >
                       <span className="truncate text-foreground">
@@ -546,7 +586,10 @@ export function OverviewTab({
   );
 }
 
-function sectionDisplayTitle(id: string, title: string): string {
+function sectionDisplayTitle(
+  id: OverviewReadinessSectionId,
+  title: string,
+): string {
   return id === "date" ? "Specification Date" : title;
 }
 

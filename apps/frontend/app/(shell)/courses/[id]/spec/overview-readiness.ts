@@ -6,23 +6,45 @@ import {
   type ConstructiveAlignmentAudit,
 } from "./constructive-alignment-model";
 import type { WeekForm } from "./weekly-plan-model";
+import { weeklyPlanIsReady } from "./weekly-plan-readiness";
+
+export type OverviewDerivedReadiness = {
+  cloReady?: boolean;
+  teachingLearningReady?: boolean;
+};
 
 /**
  * Overview readiness must reflect source-data semantics used by the actual
- * submission workflow. Constructive Alignment is derived from CLO coverage, and
- * Specification Date is system-assigned on first submission rather than lecturer
- * work, so neither should be driven by a stale/manual section flag here.
+ * authoring workflow. Constructive Alignment, CLO validity, Teaching & Learning,
+ * and Weekly Plan readiness are derived from current source data rather than
+ * stale persisted completion flags. Specification Date is system-assigned on
+ * first submission and is therefore not lecturer work.
  */
 export function deriveOverviewReadinessStatus(
   status: Record<string, SpecSectionStatus>,
   clos: CloForm[],
   weeklyPlan: WeekForm[],
   assessments: AssessmentForm[],
+  derived: OverviewDerivedReadiness = {},
 ): Record<string, SpecSectionStatus> {
   const effective = applyDerivedAlignmentStatus(
     status,
     deriveConstructiveAlignmentAudit(clos, weeklyPlan, assessments),
   );
+
+  if (derived.cloReady !== undefined) {
+    effective.clos = derived.cloReady ? "complete" : "draft";
+  }
+  if (derived.teachingLearningReady !== undefined) {
+    effective.teachingLearning = derived.teachingLearningReady
+      ? "complete"
+      : "draft";
+  }
+
+  effective.slt = weeklyPlanIsReady(weeklyPlan) ? "complete" : "draft";
+
+  // Kept complete for compatibility with other completion consumers. Overview's
+  // lecturer-work list excludes Date and includes Teaching & Learning instead.
   effective.date = "complete";
   return effective;
 }

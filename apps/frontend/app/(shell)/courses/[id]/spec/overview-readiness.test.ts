@@ -94,6 +94,43 @@ describe("overview readiness", () => {
     expect(status.date).toBe("complete");
   });
 
+  test("overrides stale complete CLO status when current CLO validation fails", () => {
+    const status = deriveOverviewReadinessStatus(
+      baseStatus,
+      [clo("CLO1")],
+      [week("w1", ["CLO1"])],
+      [assessment("a1", ["CLO1"])],
+      { cloReady: false },
+    );
+
+    expect(status.clos).toBe("draft");
+  });
+
+  test("uses current Teaching & Learning readiness instead of persisted completion", () => {
+    const status = deriveOverviewReadinessStatus(
+      baseStatus,
+      [clo("CLO1")],
+      [week("w1", ["CLO1"])],
+      [assessment("a1", ["CLO1"])],
+      { teachingLearningReady: false },
+    );
+
+    expect(status.teachingLearning).toBe("draft");
+  });
+
+  test("marks derived CLO and Teaching & Learning readiness complete when both pass", () => {
+    const status = deriveOverviewReadinessStatus(
+      { ...baseStatus, clos: "draft", teachingLearning: "draft" },
+      [clo("CLO1")],
+      [week("w1", ["CLO1"])],
+      [assessment("a1", ["CLO1"])],
+      { cloReady: true, teachingLearningReady: true },
+    );
+
+    expect(status.clos).toBe("complete");
+    expect(status.teachingLearning).toBe("complete");
+  });
+
   test("overrides stale missing mapping status when source data is fully aligned", () => {
     const status = deriveOverviewReadinessStatus(
       baseStatus,
