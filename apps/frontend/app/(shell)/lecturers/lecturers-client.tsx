@@ -8,6 +8,12 @@ import { authApi, useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { LecturerForm, type LecturerFormValues } from "./lecturer-form";
 
+interface TemporaryCredential {
+  lecturerName: string;
+  email: string;
+  password: string;
+}
+
 export function LecturersClient() {
   const [rows, setRows] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,11 +24,12 @@ export function LecturersClient() {
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
-  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [temporaryCredential, setTemporaryCredential] = useState<TemporaryCredential | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   // Creating/editing/deleting a lecturer record needs `lecturers:write`
-  // (admin, program_coordinator); provisioning/resending login access needs
+  // (admin, program_coordinator); account provisioning/recovery needs
   // `accounts:create` (admin only).
   const { me } = useMe();
   const canWrite = me?.permissions.includes("lecturers:write") ?? false;
@@ -54,9 +61,6 @@ export function LecturersClient() {
         await lecturersApi.update(editing.id, values);
         setNotice(`${values.name} updated.`);
       } else if (giveDseAccess) {
-        // Account provisioning is admin-only on the backend. It upserts the
-        // lecturer User by email and assigns the lecturer role; then we persist
-        // the syllabus/contact fields on that same User row.
         const account = await authApi.createAccount({
           name: values.name,
           email: values.email,
@@ -93,17 +97,37 @@ export function LecturersClient() {
     }
   };
 
-  const handleResendInvitation = async (lecturer: Lecturer) => {
-    setResendingId(lecturer.id);
+  const handleSetTemporaryPassword = async (lecturer: Lecturer) => {
+    const confirmed = window.confirm(
+      `Set a new temporary password for ${lecturer.name}? Their current password will stop working immediately and they must choose a new password at the next login.`,
+    );
+    if (!confirmed) return;
+
+    setResettingId(lecturer.id);
     setError(null);
     setNotice(null);
+    setTemporaryCredential(null);
     try {
-      await authApi.resendInvitation(lecturer.id);
-      setNotice(`A fresh invitation was sent to ${lecturer.email}.`);
+      const result = await authApi.setTemporaryPassword(lecturer.id);
+      setTemporaryCredential({
+        lecturerName: lecturer.name,
+        email: result.email,
+        password: result.temporaryPassword,
+      });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to resend invitation");
+      setError(err instanceof ApiError ? err.message : "Failed to set temporary password");
     } finally {
-      setResendingId(null);
+      setResettingId(null);
+    }
+  };
+
+  const handleCopyTemporaryPassword = async () => {
+    if (!temporaryCredential) return;
+    try {
+      await navigator.clipboard.writeText(temporaryCredential.password);
+      setNotice("Temporary password copied. Share it with the lecturer through a secure channel.");
+    } catch {
+      setNotice("Copy was not available. Select the temporary password and copy it manually.");
     }
   };
 
@@ -156,10 +180,10 @@ export function LecturersClient() {
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={resendingId === l.id}
-                onClick={() => handleResendInvitation(l)}
+                disabled={resettingId === l.id}
+                onClick={() => handleSetTemporaryPassword(l)}
               >
-                {resendingId === l.id ? "Resending…" : "Resend invitation"}
+                {resettingId === l.id ? "Setting…" : "Set temporary password"}
               </Button>
             ) : null}
           </div>
@@ -185,7 +209,7 @@ export function LecturersClient() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Add each lecturer once. Admins can send DSE access during creation; program coordinators can maintain the academic profile without provisioning a login.
+        Add each lecturer once. Admins can grant or recover DSE access; program coordinators can maintain the academic profile without controlling login credentials.
       </p>
 
       <TableToolbar
@@ -212,6 +236,36 @@ export function LecturersClient() {
       {notice ? (
         <div className="rounded-lg border border-status-live bg-status-live-bg px-4 py-2 text-sm text-status-live">
           {notice}
+        </div>
+      ) : null}
+
+      {temporaryCredential ? (
+        <div className="space-y-3 rounded-lg border border-border bg-card p-4" role="status">
+          <div>
+            <p className="font-medium text-foreground">Temporary password created</p>
+            <p className="text-sm text-muted-foreground">
+              {temporaryCredential.lecturerName} ({temporaryCredential.email}) must use this once, then DSE PMS will require a new personal password.
+            </p>
+          </div>
+          <code className="block select-all break-all rounded-md bg-muted px-3 py-2 text-sm text-foreground">
+            {temporaryCredential.password}
+          </code>
+          <p className="text-xs text-muted-foreground">
+            This password is shown only in this browser state. It is not stored by DSE PMS. Share it securely, then dismiss it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={handleCopyTemporaryPassword}>
+              Copy password
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setTemporaryCredential(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
         </div>
       ) : null}
 
