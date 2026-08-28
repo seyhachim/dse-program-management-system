@@ -9,7 +9,7 @@ import { QaSarBookPart3SnapshotSchema } from "./qa-sar-book-part3-snapshot.ts";
 import { QaSarBookReviewReadinessViewSchema } from "./qa-sar-book-review.ts";
 
 export const QA_SAR_BOOK_RELEASE_TEMPLATE_VERSION =
-  `${QA_SAR_BOOK_TEMPLATE_VERSION}-release-v1` as const;
+  "aun-qa-v4-sar-book-v1-release-v1" as const;
 
 export const QaSarBookDocumentModeSchema = z.enum(["working", "official", "released"]);
 
