@@ -55,7 +55,7 @@ export function SarBookEvidenceClient() {
   const editableStaticSections = useMemo(() => {
     if (!book) return [];
     return book.parts.flatMap((part) =>
-      part.sections.filter((item) => item.source !== "generated" && item.source !== "requirement"),
+      part.sections.filter((item) => item.source !== "generated" && item.source !== "requirementSar"),
     );
   }, [book]);
 
@@ -86,7 +86,7 @@ export function SarBookEvidenceClient() {
       setTerminology(registerView.terminology);
       setLibrary(evidenceRows);
       if (!sectionKey) {
-        const first = bookView.parts.flatMap((part) => part.sections).find((item) => item.source !== "generated" && item.source !== "requirement");
+        const first = bookView.parts.flatMap((part) => part.sections).find((item) => item.source !== "generated" && item.source !== "requirementSar");
         if (first) setSectionKey(first.key);
       }
     } catch (caught) {
