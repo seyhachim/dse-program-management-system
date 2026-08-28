@@ -2,8 +2,11 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  Footer,
+  Header,
   ImageRun,
   PageBreak,
+  PageNumber,
   Packer,
   Paragraph,
   Table,
@@ -16,26 +19,32 @@ import {
   WidthType,
 } from "docx";
 
-import { PLOS, referenceKindLabel } from "@dse-pms/shared-types";
+import {
+  DEFAULT_COURSE_SPEC_DOCUMENT_THEME,
+  PLOS,
+  referenceKindLabel,
+  type CourseSpecDocumentTheme,
+} from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
 } from "./course-document-model";
+import { resolveCourseSpecWordTheme } from "./document-word-theme";
 import {
   contiguousRowSpans,
   programmePloCountLabel,
   splitLeadingWord,
 } from "./plo-preview-format";
 
-const CONTENT_WIDTH_TWIPS =
-  COURSE_DOCUMENT_STYLE.page.word.widthTwips -
-  COURSE_DOCUMENT_STYLE.page.word.marginLeftTwips -
-  COURSE_DOCUMENT_STYLE.page.word.marginRightTwips;
+let wordTheme = resolveCourseSpecWordTheme(DEFAULT_COURSE_SPEC_DOCUMENT_THEME);
+let CONTENT_WIDTH_TWIPS = wordTheme.contentWidthTwips;
+let FONT = wordTheme.fontFamily;
+let BODY = wordTheme.bodyHalfPoints;
+let SMALL = wordTheme.tableHalfPoints;
+let HEADING = wordTheme.heading1HalfPoints;
+let TABLE_CELL_PADDING = wordTheme.tableCellPaddingTwips;
+let exportQueue: Promise<void> = Promise.resolve();
 
-const FONT = COURSE_DOCUMENT_STYLE.fontFamily;
-const BODY = COURSE_DOCUMENT_STYLE.fontSize.body * 2;
-const SMALL = COURSE_DOCUMENT_STYLE.fontSize.small * 2;
-const HEADING = COURSE_DOCUMENT_STYLE.fontSize.heading * 2;
 const BORDER = COURSE_DOCUMENT_STYLE.borderColor.replace("#", "");
 const LABEL = COURSE_DOCUMENT_STYLE.labelBackground.replace("#", "");
 const TABLE_HEADER = COURSE_DOCUMENT_STYLE.colors.tableHeaderBackground.replace("#", "");
@@ -60,20 +69,71 @@ const noBorders = {
 const noTopBorder = { top: { style: BorderStyle.NONE, size: 0, color: BORDER } };
 const noBottomBorder = { bottom: { style: BorderStyle.NONE, size: 0, color: BORDER } };
 
+function applyWordTheme(theme: CourseSpecDocumentTheme) {
+  wordTheme = resolveCourseSpecWordTheme(theme);
+  CONTENT_WIDTH_TWIPS = wordTheme.contentWidthTwips;
+  FONT = wordTheme.fontFamily;
+  BODY = wordTheme.bodyHalfPoints;
+  SMALL = wordTheme.tableHalfPoints;
+  HEADING = wordTheme.heading1HalfPoints;
+  TABLE_CELL_PADDING = wordTheme.tableCellPaddingTwips;
+}
+
+function defaultAlignment() {
+  if (wordTheme.defaultAlignment === "center") return AlignmentType.CENTER;
+  if (wordTheme.defaultAlignment === "right") return AlignmentType.RIGHT;
+  if (wordTheme.defaultAlignment === "justify") return AlignmentType.JUSTIFIED;
+  return AlignmentType.LEFT;
+}
+
+function tableCellMargins() {
+  return {
+    top: TABLE_CELL_PADDING,
+    bottom: TABLE_CELL_PADDING,
+    left: TABLE_CELL_PADDING,
+    right: TABLE_CELL_PADDING,
+  };
+}
+
 function text(value: string, bold = false, size = BODY) {
-  return new TextRun({ text: value, bold, font: FONT, size });
+  return new TextRun({
+    text: value,
+    bold,
+    font: FONT,
+    size,
+    characterSpacing: wordTheme.characterSpacingTwips,
+  });
 }
 
 function paragraph(value: string, bold = false, size = BODY) {
-  return new Paragraph({ spacing: { before: 0, after: 40, line: 220 }, children: [text(value, bold, size)] });
+  return new Paragraph({
+    alignment: defaultAlignment(),
+    spacing: {
+      before: 0,
+      after: wordTheme.paragraphAfterTwips,
+      line: wordTheme.lineTwips,
+    },
+    children: [text(value, bold, size)],
+  });
 }
 
 function centered(value: string, bold = false, size = BODY) {
-  return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 20 }, children: [text(value, bold, size)] });
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: {
+      before: 0,
+      after: wordTheme.paragraphAfterTwips,
+      line: wordTheme.lineTwips,
+    },
+    children: [text(value, bold, size)],
+  });
 }
 
 function sectionTitle(number: string, title: string) {
-  return new Paragraph({ spacing: { before: 30, after: 60 }, children: [text(`${number}. ${title}`, true, HEADING)] });
+  return new Paragraph({
+    spacing: { before: 30, after: 60, line: wordTheme.lineTwips },
+    children: [text(`${number}. ${title}`, true, HEADING)],
+  });
 }
 
 function colWidths(weights: number[]): number[] {
@@ -90,7 +150,7 @@ function cell(value: string, options?: { bold?: boolean; shade?: string; width?:
     columnSpan: options?.columnSpan,
     shading: options?.shade ? { fill: options.shade } : undefined,
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 55, bottom: 55, left: 70, right: 70 },
+    margins: tableCellMargins(),
     children: [paragraph(value || "—", options?.bold ?? false, SMALL)],
   });
 }
@@ -101,8 +161,8 @@ function courseInfoCell(value: string, options?: { bold?: boolean; shade?: strin
     columnSpan: options?.columnSpan,
     shading: options?.shade ? { fill: options.shade } : undefined,
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 80, bottom: 80, left: 75, right: 75 },
-    children: [new Paragraph({ spacing: { before: 20, after: 50, line: 225 }, children: [text(value || "—", options?.bold ?? false, SMALL)] })],
+    margins: tableCellMargins(),
+    children: [new Paragraph({ alignment: defaultAlignment(), spacing: { before: 0, after: wordTheme.paragraphAfterTwips, line: wordTheme.lineTwips }, children: [text(value || "—", options?.bold ?? false, SMALL)] })],
   });
 }
 
@@ -162,8 +222,8 @@ function courseInformationTable(info: CourseDocumentModel["courseInformation"], 
 
 function levelParts(level: string) { const normalized = level.trim().toUpperCase(); return { c: normalized.startsWith("C") ? normalized : "", a: normalized.startsWith("A") ? normalized : "", p: normalized.startsWith("P") ? normalized : "" }; }
 
-function compactWordCell(value: string, width: number, alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT, bold = false, size = SMALL) {
-  return new TableCell({ width: { size: width, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 28, bottom: 28, left: 48, right: 48 }, children: [new Paragraph({ alignment, spacing: { before: 0, after: 0, line: 205 }, children: [text(value, bold, size)] })] });
+function compactWordCell(value: string, width: number, alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = defaultAlignment(), bold = false, size = SMALL) {
+  return new TableCell({ width: { size: width, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment, spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text(value, bold, size)] })] });
 }
 
 function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
@@ -172,23 +232,23 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
   const domainWidth = bodyW[3]! + bodyW[4]! + bodyW[5]!;
   const mainRows: TableRow[] = [
     new TableRow({ cantSplit: true, children: [
-      new TableCell({ columnSpan: 2, width: { size: descriptionWidth, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: { top: 42, bottom: 18, left: 45, right: 45 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0, line: 215 }, children: [text("Description of the course learning outcomes – CLOs At the end of the course, students will be able to:", false, BODY)] })] }),
-      new TableCell({ width: { size: bodyW[2]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: { top: 42, bottom: 18, left: 35, right: 35 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text("PLO", false, BODY)] })] }),
-      new TableCell({ columnSpan: 3, width: { size: domainWidth, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: { top: 25, bottom: 25, left: 22, right: 22 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0, line: 215 }, children: [text("Levels in Learning Domain:\nKnowledge (Cognitive-C), Attitude\n(Affective-A), Skills (Psychomotor-P)", false, BODY)] })] }),
+      new TableCell({ columnSpan: 2, width: { size: descriptionWidth, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: defaultAlignment(), spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text("Description of the course learning outcomes – CLOs At the end of the course, students will be able to:", false, BODY)] })] }),
+      new TableCell({ width: { size: bodyW[2]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text("PLO", false, BODY)] })] }),
+      new TableCell({ columnSpan: 3, width: { size: domainWidth, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: defaultAlignment(), spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text("Levels in Learning Domain:\nKnowledge (Cognitive-C), Attitude\n(Affective-A), Skills (Psychomotor-P)", false, BODY)] })] }),
     ] }),
     new TableRow({ cantSplit: true, children: [
-      new TableCell({ columnSpan: 2, width: { size: descriptionWidth, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, margins: { top: 0, bottom: 28, left: 45, right: 45 }, children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }),
-      new TableCell({ width: { size: bodyW[2]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, margins: { top: 0, bottom: 28, left: 35, right: 35 }, children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }),
-      ...(["C", "A", "P"] as const).map((label, index) => new TableCell({ width: { size: bodyW[index + 3]!, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: { top: 20, bottom: 20, left: 18, right: 18 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text(label, false, BODY)] })] })),
+      new TableCell({ columnSpan: 2, width: { size: descriptionWidth, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, margins: tableCellMargins(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }),
+      new TableCell({ width: { size: bodyW[2]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, margins: tableCellMargins(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }),
+      ...(["C", "A", "P"] as const).map((label, index) => new TableCell({ width: { size: bodyW[index + 3]!, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text(label, false, BODY)] })] })),
     ] }),
   ];
   if (document.clos.length) {
     for (const clo of document.clos) {
       const domain = levelParts(clo.level);
-      mainRows.push(new TableRow({ cantSplit: true, children: [compactWordCell(clo.code, bodyW[0]!, AlignmentType.CENTER, false, BODY), compactWordCell(clo.outcome, bodyW[1]!, AlignmentType.LEFT, false, BODY), compactWordCell(values(clo.mappedPlos), bodyW[2]!, AlignmentType.CENTER, false, BODY), compactWordCell(domain.c, bodyW[3]!, AlignmentType.CENTER, false, BODY), compactWordCell(domain.a, bodyW[4]!, AlignmentType.CENTER, false, BODY), compactWordCell(domain.p, bodyW[5]!, AlignmentType.CENTER, false, BODY)] }));
+      mainRows.push(new TableRow({ cantSplit: true, children: [compactWordCell(clo.code, bodyW[0]!, AlignmentType.CENTER, false, BODY), compactWordCell(clo.outcome, bodyW[1]!, defaultAlignment(), false, BODY), compactWordCell(values(clo.mappedPlos), bodyW[2]!, AlignmentType.CENTER, false, BODY), compactWordCell(domain.c, bodyW[3]!, AlignmentType.CENTER, false, BODY), compactWordCell(domain.a, bodyW[4]!, AlignmentType.CENTER, false, BODY), compactWordCell(domain.p, bodyW[5]!, AlignmentType.CENTER, false, BODY)] }));
     }
   } else {
-    mainRows.push(new TableRow({ children: [new TableCell({ columnSpan: 6, width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, margins: { top: 35, bottom: 35, left: 50, right: 50 }, children: [paragraph("No Course Learning Outcomes have been added.", false, SMALL)] })] }));
+    mainRows.push(new TableRow({ children: [new TableCell({ columnSpan: 6, width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, margins: tableCellMargins(), children: [paragraph("No Course Learning Outcomes have been added.", false, SMALL)] })] }));
   }
   const mainTable = new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: bodyW, layout: TableLayoutType.FIXED, borders, rows: mainRows });
   const taxonomyData: [string, [string, string, string][]][] = [
@@ -200,13 +260,13 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
   const legendCells = taxonomyData.map(([title, entries], domainIndex) => {
     const innerW = [Math.round(legendW[domainIndex]! * 0.12), Math.round(legendW[domainIndex]! * 0.75), 0];
     innerW[2] = legendW[domainIndex]! - innerW[0]! - innerW[1]!;
-    const inner = new Table({ width: { size: legendW[domainIndex]!, type: WidthType.DXA }, columnWidths: innerW, layout: TableLayoutType.FIXED, borders, rows: entries.map(([number, label, code]) => new TableRow({ cantSplit: true, children: [compactWordCell(number, innerW[0]!, AlignmentType.CENTER), compactWordCell(label, innerW[1]!, AlignmentType.LEFT), compactWordCell(code, innerW[2]!, AlignmentType.CENTER)] })) });
-    return new TableCell({ width: { size: legendW[domainIndex]!, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, margins: { top: 30, bottom: 30, left: 35, right: 35 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 0, after: 20 }, children: [text(title, true, SMALL)] }), inner] });
+    const inner = new Table({ width: { size: legendW[domainIndex]!, type: WidthType.DXA }, columnWidths: innerW, layout: TableLayoutType.FIXED, borders, rows: entries.map(([number, label, code]) => new TableRow({ cantSplit: true, children: [compactWordCell(number, innerW[0]!, AlignmentType.CENTER), compactWordCell(label, innerW[1]!, defaultAlignment()), compactWordCell(code, innerW[2]!, AlignmentType.CENTER)] })) });
+    return new TableCell({ width: { size: legendW[domainIndex]!, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, margins: tableCellMargins(), children: [new Paragraph({ alignment: defaultAlignment(), spacing: { before: 0, after: wordTheme.paragraphAfterTwips }, children: [text(title, true, SMALL)] }), inner] });
   });
   const legendTable = new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: legendW, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ cantSplit: true, children: legendCells })] });
-  const title = new Paragraph({ keepNext: true, keepLines: true, spacing: { before: 30, after: 18 }, children: [text("14. Course Learning Outcomes", true, 22)] });
-  const subtitle = new Paragraph({ keepNext: true, keepLines: true, spacing: { before: 0, after: 35, line: 205 }, children: [text("Here are the CLOs of this course:", false, 18)] });
-  const legendCaption = new Paragraph({ keepNext: true, spacing: { before: 55, after: 20, line: 205 }, children: [text("* Levels in Learning Domain: Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)] });
+  const title = new Paragraph({ keepNext: true, keepLines: true, spacing: { before: 30, after: wordTheme.paragraphAfterTwips, line: wordTheme.lineTwips }, children: [text("14. Course Learning Outcomes", true, HEADING)] });
+  const subtitle = new Paragraph({ keepNext: true, keepLines: true, alignment: defaultAlignment(), spacing: { before: 0, after: wordTheme.paragraphAfterTwips, line: wordTheme.lineTwips }, children: [text("Here are the CLOs of this course:", false, BODY)] });
+  const legendCaption = new Paragraph({ keepNext: true, alignment: defaultAlignment(), spacing: { before: 55, after: wordTheme.paragraphAfterTwips, line: wordTheme.lineTwips }, children: [text("* Levels in Learning Domain: Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)", false, SMALL)] });
   return [title, subtitle, mainTable, legendCaption, legendTable];
 }
 
@@ -215,8 +275,8 @@ function officialCloPloMatrixTable(document: CourseDocumentModel, mode: "percent
   const ploWidth = w.slice(1).reduce((sum, width) => sum + width, 0);
   const matrixTitle = mode === "hours" ? "Programme Learning Outcomes – Total Hours for Student Learning Time (SLT) including learning and assessment" : "Programme Learning Outcomes – Percentages";
   const rows: TableRow[] = [
-    new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: { top: 34, bottom: 15, left: 28, right: 28 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text("CLO", false, SMALL)] })] }), new TableCell({ columnSpan: 10, width: { size: ploWidth, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: { top: 34, bottom: 34, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 210 }, children: [text(matrixTitle, false, SMALL)] })] })] }),
-    new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, verticalAlign: VerticalAlign.CENTER, margins: { top: 0, bottom: 24, left: 28, right: 28 }, children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }), ...PLOS.map((plo, index) => new TableCell({ width: { size: w[index + 1]!, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: { top: 22, bottom: 22, left: 18, right: 18 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text(plo.id === "PLO9" ? "PLO 9" : plo.id, false, SMALL)] })] }))] }),
+    new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text("CLO", false, SMALL)] })] }), new TableCell({ columnSpan: 10, width: { size: ploWidth, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text(matrixTitle, false, SMALL)] })] })] }),
+    new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }), ...PLOS.map((plo, index) => new TableCell({ width: { size: w[index + 1]!, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text(plo.id === "PLO9" ? "PLO 9" : plo.id, false, SMALL)] })] }))] }),
   ];
   for (const row of document.mapping) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(row.cloCode, w[0]!, AlignmentType.CENTER), ...PLOS.map((plo, index) => { const width = w[index + 1]!; if (!row.ploCodes.includes(plo.id)) return compactWordCell("", width, AlignmentType.CENTER); const value = mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "" : row.sltHours || ""; return compactWordCell(value, width, AlignmentType.CENTER); })] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
@@ -236,10 +296,10 @@ function cleanSltValue(value: string | number | null | undefined) { if (value ==
 
 function headerMergeCell(value: string, width: number, options?: { columnSpan?: number; top?: boolean; bottom?: boolean; bold?: boolean }) {
   const top = options?.top ?? true; const bottom = options?.bottom ?? true;
-  return new TableCell({ width: { size: width, type: WidthType.DXA }, columnSpan: options?.columnSpan, shading: { fill: LABEL }, borders: top && bottom ? undefined : top ? noBottomBorder : bottom ? noTopBorder : { ...noTopBorder, ...noBottomBorder }, verticalAlign: VerticalAlign.CENTER, margins: { top: 20, bottom: 20, left: 22, right: 22 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 205 }, children: value ? [text(value, options?.bold ?? false, SMALL)] : [] })] });
+  return new TableCell({ width: { size: width, type: WidthType.DXA }, columnSpan: options?.columnSpan, shading: { fill: LABEL }, borders: top && bottom ? undefined : top ? noBottomBorder : bottom ? noTopBorder : { ...noTopBorder, ...noBottomBorder }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: value ? [text(value, options?.bold ?? false, SMALL)] : [] })] });
 }
 
-function topicSltCell(week: string, topic: string, width: number) { return new TableCell({ width: { size: width, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 24, bottom: 24, left: 45, right: 45 }, children: [new Paragraph({ spacing: { before: 0, after: 0, line: 205 }, children: [text(`Topic ${week}: `, true, SMALL), text(topic, false, SMALL)] })] }); }
+function topicSltCell(week: string, topic: string, width: number) { return new TableCell({ width: { size: width, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: defaultAlignment(), spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text(`Topic ${week}: `, true, SMALL), text(topic, false, SMALL)] })] }); }
 
 function courseContentSltTable(document: CourseDocumentModel) {
   const w = colWidths([3, 38, 5, 4, 4, 4, 4, 4, 4, 4, 4, 11, 7]);
@@ -252,22 +312,22 @@ function courseContentSltTable(document: CourseDocumentModel) {
   ];
   for (const week of document.weeklyPlan) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(week.week, w[0]!, AlignmentType.CENTER), topicSltCell(week.week, week.topic, w[1]!), compactWordCell(week.cloCodes.join(", "), w[2]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.lectureHours), w[3]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.tutorialHours), w[4]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.practiceHours), w[5]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.otherHours), w[6]!, AlignmentType.CENTER), compactWordCell("", w[7]!, AlignmentType.CENTER), compactWordCell("", w[8]!, AlignmentType.CENTER), compactWordCell("", w[9]!, AlignmentType.CENTER), compactWordCell("", w[10]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.selfStudyHours), w[11]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.sltHours), w[12]!, AlignmentType.CENTER)] }));
   const labelWidth = w.slice(0, 12).reduce((sum, width) => sum + width, 0);
-  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 12, width: { size: labelWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 24, bottom: 24, left: 45, right: 45 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text("Total SLT for Course Content", true, SMALL)] })] }), compactWordCell(String(document.totals.courseContentSlt), w[12]!, AlignmentType.CENTER)] }));
+  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 12, width: { size: labelWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text("Total SLT for Course Content", true, SMALL)] })] }), compactWordCell(String(document.totals.courseContentSlt), w[12]!, AlignmentType.CENTER)] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
 }
 
 function assessmentSltTable(document: CourseDocumentModel, category: "continuous" | "final") {
   const w = colWidths([3, 38, 6, 16, 19, 13, 5]); const nameWidth = w[0]! + w[1]!; const f2fWidth = w[3]! + w[4]!; const label = category === "continuous" ? "Continuous Assessment" : "Final Assessment"; const assessments = document.assessments.filter((assessment) => assessment.assessmentCategory === category); const categoryTotal = category === "continuous" ? document.totals.continuousAssessmentSlt : document.totals.finalAssessmentSlt;
   const rows: TableRow[] = [new TableRow({ cantSplit: true, children: [headerMergeCell(label, nameWidth, { columnSpan: 2, bottom: false }), headerMergeCell("%", w[2]!, { bottom: false }), headerMergeCell("Face to Face (F2F)", f2fWidth, { columnSpan: 2 }), headerMergeCell("NF2F\nIndependent Learning\n(Asynchronous)", w[5]!, { bottom: false }), headerMergeCell("Total\nSLT", w[6]!, { bottom: false })] }), new TableRow({ cantSplit: true, children: [headerMergeCell("", nameWidth, { columnSpan: 2, top: false }), headerMergeCell("", w[2]!, { top: false }), headerMergeCell("Physical", w[3]!), headerMergeCell("Online/Technology-mediated\n(Synchronous)", w[4]!), headerMergeCell("", w[5]!, { top: false }), headerMergeCell("", w[6]!, { top: false })] })];
-  assessments.forEach((assessment, index) => rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(String(index + 1), w[0]!, AlignmentType.CENTER), compactWordCell(assessment.name, w[1]!), compactWordCell(cleanSltValue(assessment.weight), w[2]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.physicalSltHours), w[3]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.onlineSltHours), w[4]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.independentSltHours), w[5]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.totalSltHours), w[6]!, AlignmentType.CENTER)] })));
+  assessments.forEach((assessment, index) => rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(String(index + 1), w[0]!, AlignmentType.CENTER), compactWordCell(assessment.name, w[1]!), compactWordCell(cleanSltValue(assessment.weight), w[2]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.totalSltHours), w[5]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.physicalSltHours), w[3]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.onlineSltHours), w[4]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.independentSltHours), w[5]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.totalSltHours), w[6]!, AlignmentType.CENTER)] })));
   const totalLabelWidth = w.slice(0, 6).reduce((sum, width) => sum + width, 0);
-  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 6, width: { size: totalLabelWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 24, bottom: 24, left: 45, right: 45 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text(`Total SLT for ${label}`, true, SMALL)] })] }), compactWordCell(String(categoryTotal), w[6]!, AlignmentType.CENTER)] }));
+  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 6, width: { size: totalLabelWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text(`Total SLT for ${label}`, true, SMALL)] })] }), compactWordCell(String(categoryTotal), w[6]!, AlignmentType.CENTER)] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
 }
 
 function grandTotalSltTable(document: CourseDocumentModel) {
   const w = colWidths([93, 7]);
-  return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, margins: { top: 24, bottom: 24, left: 45, right: 45 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text("Grand Total SLT", true, SMALL)] })] }), compactWordCell(String(document.totals.grandSlt), w[1]!, AlignmentType.CENTER, true)] })] });
+  return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text("Grand Total SLT", true, SMALL)] })] }), compactWordCell(String(document.totals.grandSlt), w[1]!, AlignmentType.CENTER, true)] })] });
 }
 
 function assessmentPlanTable(document: CourseDocumentModel) {
@@ -282,13 +342,13 @@ function assessmentPlanTable(document: CourseDocumentModel) {
   const groupTotals = new Map<string, { weight: number; slt: number }>(); document.assessments.forEach((assessment, index) => { const key = rowGroupKeys[index]!; const current = groupTotals.get(key) ?? { weight: 0, slt: 0 }; current.weight += Number(assessment.weight) || 0; current.slt += assessment.totalSltHours; groupTotals.set(key, current); });
   document.assessments.forEach((assessment, index) => { const key = rowGroupKeys[index]!; const firstInGroup = index === 0 || rowGroupKeys[index - 1] !== key; const totals = groupTotals.get(key) ?? { weight: 0, slt: 0 }; rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(firstInGroup ? assessment.cloCodes.join(", ") : "", w[0]!, AlignmentType.CENTER), compactWordCell(firstInGroup ? assessment.mappedPlos.join(", ") : "", w[1]!, AlignmentType.CENTER), compactWordCell(assessment.name, w[2]!), compactWordCell(assessment.mode === "group" ? "G" : "I", w[3]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.weight), w[4]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(assessment.totalSltHours), w[5]!, AlignmentType.CENTER), compactWordCell(assessment.capLevels.join(", "), w[6]!, AlignmentType.CENTER), ...Array.from({ length: 15 }, (_, topicIndex) => compactWordCell(assessment.topicNumbers.includes(topicIndex + 1) ? "✓" : "", w[topicIndex + 7]!, AlignmentType.CENTER)), compactWordCell(firstInGroup && totals.weight > 0 ? String(totals.weight) : "", w[22]!, AlignmentType.CENTER), compactWordCell(firstInGroup && totals.slt > 0 ? String(totals.slt) : "", w[23]!, AlignmentType.CENTER)] })); });
   const prefixWidth = w.slice(0, 4).reduce((sum, width) => sum + width, 0); const footerTopicWidth = w.slice(7, 22).reduce((sum, width) => sum + width, 0);
-  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 4, width: { size: prefixWidth, type: WidthType.DXA }, margins: { top: 24, bottom: 24, left: 30, right: 30 }, children: [new Paragraph({ children: [] })] }), compactWordCell(cleanSltValue(document.totals.assessmentWeight), w[4]!, AlignmentType.CENTER, true), compactWordCell("", w[5]!, AlignmentType.CENTER), compactWordCell("", w[6]!, AlignmentType.CENTER), new TableCell({ columnSpan: 15, width: { size: footerTopicWidth, type: WidthType.DXA }, margins: { top: 24, bottom: 24, left: 30, right: 30 }, children: [new Paragraph({ children: [] })] }), compactWordCell(cleanSltValue(document.totals.assessmentWeight), w[22]!, AlignmentType.CENTER), new TableCell({ width: { size: w[23]!, type: WidthType.DXA }, shading: { fill: "F4B183" }, verticalAlign: VerticalAlign.CENTER, margins: { top: 28, bottom: 28, left: 48, right: 48 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 205 }, children: [text(String(document.totals.assessmentSlt), true, SMALL)] })] })] }));
+  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 4, width: { size: prefixWidth, type: WidthType.DXA }, margins: tableCellMargins(), children: [new Paragraph({ children: [] })] }), compactWordCell(cleanSltValue(document.totals.assessmentWeight), w[4]!, AlignmentType.CENTER, true), compactWordCell("", w[5]!, AlignmentType.CENTER), compactWordCell("", w[6]!, AlignmentType.CENTER), new TableCell({ columnSpan: 15, width: { size: footerTopicWidth, type: WidthType.DXA }, margins: tableCellMargins(), children: [new Paragraph({ children: [] })] }), compactWordCell(cleanSltValue(document.totals.assessmentWeight), w[22]!, AlignmentType.CENTER), new TableCell({ width: { size: w[23]!, type: WidthType.DXA }, shading: { fill: "F4B183" }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text(String(document.totals.assessmentSlt), true, SMALL)] })] })] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
 }
 
 function lloText(week: CourseDocumentModel["weeklyPlan"][number]) { return week.lloItems.length ? week.lloItems.map((value, index) => `LLO${index + 1}: ${value}`).join("\n") : ""; }
 function lessonLearningOutcomesTable(weeks: CourseDocumentModel["weeklyPlan"]) {
-  const w = colWidths([3.5, 25.5, 6, 65]); const rows: TableRow[] = [new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 4, width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: { top: 20, bottom: 20, left: 25, right: 25 }, children: [centered("Lesson Learning Outcome (LLOs)", false, SMALL)] })] }), new TableRow({ cantSplit: true, children: [headerMergeCell("", w[0]!), headerMergeCell("Topic", w[1]!), headerMergeCell("CLOs", w[2]!), headerMergeCell("Lesson Learning Outcomes (LLOs)", w[3]!)] })];
+  const w = colWidths([3.5, 25.5, 6, 65]); const rows: TableRow[] = [new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 4, width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [centered("Lesson Learning Outcome (LLOs)", false, SMALL)] })] }), new TableRow({ cantSplit: true, children: [headerMergeCell("", w[0]!), headerMergeCell("Topic", w[1]!), headerMergeCell("CLOs", w[2]!), headerMergeCell("Lesson Learning Outcomes (LLOs)", w[3]!)] })];
   for (const week of weeks) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(week.week, w[0]!, AlignmentType.CENTER), topicSltCell(week.week, week.topic, w[1]!), compactWordCell(week.cloCodes.join(", "), w[2]!, AlignmentType.CENTER), compactWordCell(lloText(week), w[3]!)] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
 }
@@ -304,15 +364,15 @@ function detailCourseSyllabusTable(document: CourseDocumentModel, weeks: CourseD
 function resourcesTable(resources: CourseDocumentModel["resources"]) { const w = colWidths([18, 27, 25, 30]); const headers = ["Resource Type", "Resource Name / Description", "Link", "Notes"]; const rows = [new TableRow({ children: headers.map((header, index) => headerCell(header, w[index])) })]; for (const resource of resources) { const rowValues = [resource.resourceType, resource.title, resource.url, resource.notes]; rows.push(new TableRow({ children: rowValues.map((value, index) => cell(value, { width: w[index] })) })); } return table(rows, w); }
 function referenceCitation(reference: CourseDocumentModel["references"][number]): string { const parts = [reference.authors, reference.year ? `(${reference.year})` : "", reference.title, reference.publisher].filter(Boolean); return parts.length ? parts.join(". ") : "—"; }
 function referencesTable(references: CourseDocumentModel["references"]) { const w = colWidths([13, 45, 12, 15, 15]); const headers = ["Kind", "Citation", "ISBN", "Link", "Notes"]; const rows = [new TableRow({ children: headers.map((header, index) => headerCell(header, w[index])) })]; for (const reference of references) { const rowValues = [referenceKindLabel(reference.kind), referenceCitation(reference), reference.isbn, reference.url, reference.notes]; rows.push(new TableRow({ children: rowValues.map((value, index) => cell(value, { width: w[index] })) })); } return table(rows, w); }
-function bulletedList(items: string[]) { return items.map((item) => new Paragraph({ bullet: { level: 0 }, spacing: { before: 0, after: 60, line: 220 }, children: [text(item, false, SMALL)] })); }
-function policyParagraphs(policy: CourseDocumentModel["policy"]) { const sections: [string, string][] = [["Attendance & Preparation", policy.attendancePreparation], ["Academic Integrity", policy.academicIntegrity], ["Homework & Assignments", policy.assignmentsLateSubmission], ["Examinations", policy.examinationRules], ["Penalties", policy.penaltiesConsequences]]; return sections.flatMap(([label, value]) => [paragraph(label, true, SMALL), paragraph(value || "—", false, SMALL)]); }
+function bulletedList(items: string[]) { return items.map((item) => new Paragraph({ bullet: { level: 0 }, alignment: defaultAlignment(), spacing: { before: 0, after: wordTheme.paragraphAfterTwips, line: wordTheme.lineTwips }, children: [text(item, false, SMALL)] })); }
+function policyParagraphs(policy: CourseDocumentModel["policy"]) { const sections: [string, string][] = [["Attendance & Preparation", policy.attendancePreparation], ["Academic Integrity", policy.academicIntegrity], ["Homework & Assignments", policy.assignmentsLateSubmission], ["Examinations", policy.examinationRules], ["Penalties", policy.penaltiesConsequences]]; return sections.flatMap(([label, value]) => [paragraph(label, true, wordTheme.heading3HalfPoints), paragraph(value || "—", false, BODY)]); }
 function rubricGridTable(rubric: CourseDocumentModel["rubrics"][number]) { const w = colWidths([22, ...rubric.levels.map(() => 78 / rubric.levels.length)]); const headers = ["Criteria", ...rubric.levels.map((level) => `${level.points} – ${level.label}`)]; const rows = [new TableRow({ children: headers.map((header, index) => headerCell(header, w[index])) })]; for (const criterion of rubric.criteria) { const rowValues = [criterion.name, ...rubric.levels.map((_level, levelIndex) => criterion.descriptors[levelIndex] ?? "—")]; rows.push(new TableRow({ children: rowValues.map((value, index) => cell(value, { width: w[index], bold: index === 0 })) })); } return table(rows, w); }
-function rubricSection(document: CourseDocumentModel) { if (document.rubrics.length === 0) return [paragraph("No assessment has a rubric linked from the Rubric Library.", false, SMALL)]; return document.rubrics.flatMap((rubric) => [paragraph(`${rubric.assessmentName} — ${rubric.name} (${rubric.type})`, true, SMALL), paragraph(`Rating Scale: ${rubric.scaleSummary}`, false, SMALL), rubricGridTable(rubric), new Paragraph({ spacing: { before: 90, after: 0 }, children: [] })]); }
+function rubricSection(document: CourseDocumentModel) { if (document.rubrics.length === 0) return [paragraph("No assessment has a rubric linked from the Rubric Library.", false, BODY)]; return document.rubrics.flatMap((rubric) => [paragraph(`${rubric.assessmentName} — ${rubric.name} (${rubric.type})`, true, wordTheme.heading2HalfPoints), paragraph(`Rating Scale: ${rubric.scaleSummary}`, false, BODY), rubricGridTable(rubric), new Paragraph({ spacing: { before: 90, after: 0 }, children: [] })]); }
 
 function ploColumnWidths(totalWidth: number) { const weights = [19, 19, 35, 12, 15]; const totalWeight = weights.reduce((sum, weight) => sum + weight, 0); const widths = weights.map((weight) => Math.floor((weight / totalWeight) * totalWidth)); const distributed = widths.reduce((sum, width) => sum + width, 0); widths[widths.length - 1]! += totalWidth - distributed; return widths; }
-function ploWordCell(width: number, children: TextRun[], options?: { alignment?: (typeof AlignmentType)[keyof typeof AlignmentType]; columnSpan?: number; verticalMerge?: (typeof VerticalMergeType)[keyof typeof VerticalMergeType] }) { return new TableCell({ width: { size: width, type: WidthType.DXA }, columnSpan: options?.columnSpan, verticalMerge: options?.verticalMerge, verticalAlign: VerticalAlign.CENTER, margins: { top: 28, bottom: 28, left: 36, right: 36 }, children: [new Paragraph({ alignment: options?.alignment ?? AlignmentType.LEFT, spacing: { before: 0, after: 0, line: 205 }, children })] }); }
+function ploWordCell(width: number, children: TextRun[], options?: { alignment?: (typeof AlignmentType)[keyof typeof AlignmentType]; columnSpan?: number; verticalMerge?: (typeof VerticalMergeType)[keyof typeof VerticalMergeType] }) { return new TableCell({ width: { size: width, type: WidthType.DXA }, columnSpan: options?.columnSpan, verticalMerge: options?.verticalMerge, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: options?.alignment ?? defaultAlignment(), spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children })] }); }
 function ploHeaderCell(value: string, width: number, options?: { columnSpan?: number; verticalMerge?: (typeof VerticalMergeType)[keyof typeof VerticalMergeType] }) { return ploWordCell(width, value ? [text(value, true, SMALL)] : [], { alignment: AlignmentType.CENTER, columnSpan: options?.columnSpan, verticalMerge: options?.verticalMerge }); }
-function ploMergedValueCell(value: string, width: number, span: number, alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT) { if (span === 0) return ploWordCell(width, [], { alignment, verticalMerge: VerticalMergeType.CONTINUE }); return ploWordCell(width, value ? [text(value, false, SMALL)] : [], { alignment, verticalMerge: span > 1 ? VerticalMergeType.RESTART : undefined }); }
+function ploMergedValueCell(value: string, width: number, span: number, alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = defaultAlignment()) { if (span === 0) return ploWordCell(width, [], { alignment, verticalMerge: VerticalMergeType.CONTINUE }); return ploWordCell(width, value ? [text(value, false, SMALL)] : [], { alignment, verticalMerge: span > 1 ? VerticalMergeType.RESTART : undefined }); }
 function ploTaxonomyTable(plos: CourseDocumentModel["plos"], totalWidth: number) {
   const w = ploColumnWidths(totalWidth); const majorRowSpans = contiguousRowSpans(plos, (plo) => plo.major); const capRowSpans = contiguousRowSpans(plos, (plo) => plo.cap); const rows: TableRow[] = [new TableRow({ cantSplit: true, children: [ploHeaderCell("CQF Learning Domains", w[0]! + w[1]!, { columnSpan: 2 }), ploHeaderCell("PLO", w[2]!, { verticalMerge: VerticalMergeType.RESTART }), ploHeaderCell("Specific/Generic", w[3]!, { verticalMerge: VerticalMergeType.RESTART }), ploHeaderCell("Learning/Assessment Domains", w[4]!, { verticalMerge: VerticalMergeType.RESTART })] }), new TableRow({ cantSplit: true, children: [ploHeaderCell("Major Domain", w[0]!), ploHeaderCell("Learning Domain", w[1]!), ploHeaderCell("", w[2]!, { verticalMerge: VerticalMergeType.CONTINUE }), ploHeaderCell("", w[3]!, { verticalMerge: VerticalMergeType.CONTINUE }), ploHeaderCell("", w[4]!, { verticalMerge: VerticalMergeType.CONTINUE })] })];
   plos.forEach((plo, index) => { const { leadingWord, remainder } = splitLeadingWord(plo.description); const descriptionRuns = [text(`${plo.code}: ${leadingWord}`.trim(), true, SMALL), ...(remainder ? [text(` ${remainder}`, false, SMALL)] : [])]; rows.push(new TableRow({ cantSplit: true, children: [ploMergedValueCell(plo.major ?? "", w[0]!, majorRowSpans[index] ?? 1), ploWordCell(w[1]!, [text(plo.learningDomain || "—", false, SMALL)]), ploWordCell(w[2]!, descriptionRuns), ploWordCell(w[3]!, [text(plo.specificOrGeneric || "—", false, SMALL)], { alignment: AlignmentType.CENTER }), ploMergedValueCell(plo.cap ?? "", w[4]!, capRowSpans[index] ?? 1, AlignmentType.CENTER)] })); });
@@ -325,27 +385,27 @@ function programmePloContinuationCell(document: CourseDocumentModel) {
   return new TableCell({ columnSpan: 2, width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, margins: { top: cellMargin, bottom: cellMargin, left: cellMargin, right: cellMargin }, children });
 }
 
-function partTwoContinuationRow(children: (Paragraph | Table)[]) { return new TableRow({ children: [new TableCell({ columnSpan: 4, width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, margins: { top: 70, bottom: 70, left: 75, right: 75 }, children })] }); }
+function partTwoContinuationRow(children: (Paragraph | Table)[]) { return new TableRow({ children: [new TableCell({ columnSpan: 4, width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, margins: tableCellMargins(), children })] }); }
 function partTwoContinuationRows(document: CourseDocumentModel): TableRow[] {
   return [
     partTwoContinuationRow(cloSection(document)),
     partTwoContinuationRow([
       sectionTitle("15", "Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods"),
       officialCloPloMatrixTable(document, "hours"),
-      paragraph("1 Credit = 40 Student Learning Time (SLT)", false, SMALL),
+      paragraph("1 Credit = 40 Student Learning Time (SLT)", false, BODY),
       officialCloPloMatrixTable(document, "percent"),
-      paragraph("*", false, SMALL),
-      paragraph("• Fully (F) indicates a focus of more than 50% of the total SLT on this PLO.", false, SMALL),
-      paragraph("• Moderate (M) indicates a focus of 31%–50% of the total SLT on this PLO.", false, SMALL),
-      paragraph("• Partial (P) indicates a focus of less than 30% of the total SLT on this PLO.", false, SMALL),
+      paragraph("*", false, BODY),
+      paragraph("• Fully (F) indicates a focus of more than 50% of the total SLT on this PLO.", false, BODY),
+      paragraph("• Moderate (M) indicates a focus of 31%–50% of the total SLT on this PLO.", false, BODY),
+      paragraph("• Partial (P) indicates a focus of less than 30% of the total SLT on this PLO.", false, BODY),
       mappingDetailTable(document),
     ]),
-    partTwoContinuationRow([sectionTitle("16", "Distribution of Student Learning Time (SLT)"), paragraph("* Lecture (L), Tutoring (T), Practice (P), Other (O)", false, SMALL), courseContentSltTable(document), new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }), assessmentSltTable(document, "continuous"), new Paragraph({ spacing: { before: 70, after: 0 }, children: [] }), assessmentSltTable(document, "final"), new Paragraph({ spacing: { before: 45, after: 0 }, children: [] }), grandTotalSltTable(document)]),
+    partTwoContinuationRow([sectionTitle("16", "Distribution of Student Learning Time (SLT)"), paragraph("* Lecture (L), Tutoring (T), Practice (P), Other (O)", false, BODY), courseContentSltTable(document), new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }), assessmentSltTable(document, "continuous"), new Paragraph({ spacing: { before: 70, after: 0 }, children: [] }), assessmentSltTable(document, "final"), new Paragraph({ spacing: { before: 45, after: 0 }, children: [] }), grandTotalSltTable(document)]),
     partTwoContinuationRow([sectionTitle("17", "Course Assessment Plan"), assessmentPlanTable(document)]),
-    partTwoContinuationRow([sectionTitle("18", "Course Outline/detailed lesson plan"), lessonLearningOutcomesTable(document.weeklyPlan), paragraph("* Active Learning Strategies (ALS)", false, SMALL), centered("Detail Course Syllabus", false, SMALL), detailCourseSyllabusTable(document, document.weeklyPlan)]),
-    partTwoContinuationRow([sectionTitle("19", "Required Resources to Deliver the Course"), ...(document.resources.length === 0 ? [paragraph("No required resources have been confirmed.", false, SMALL)] : [resourcesTable(document.resources)])]),
-    partTwoContinuationRow([sectionTitle("20", "References / Textbooks"), ...(document.references.length === 0 ? [paragraph("No references have been recorded.", false, SMALL)] : [referencesTable(document.references)])]),
-    partTwoContinuationRow([sectionTitle("21", "Student Responsibility"), ...(document.responsibilities.length === 0 ? [paragraph("No student responsibilities have been recorded.", false, SMALL)] : bulletedList(document.responsibilities))]),
+    partTwoContinuationRow([sectionTitle("18", "Course Outline/detailed lesson plan"), lessonLearningOutcomesTable(document.weeklyPlan), paragraph("* Active Learning Strategies (ALS)", false, BODY), centered("Detail Course Syllabus", false, wordTheme.heading2HalfPoints), detailCourseSyllabusTable(document, document.weeklyPlan)]),
+    partTwoContinuationRow([sectionTitle("19", "Required Resources to Deliver the Course"), ...(document.resources.length === 0 ? [paragraph("No required resources have been confirmed.", false, BODY)] : [resourcesTable(document.resources)])]),
+    partTwoContinuationRow([sectionTitle("20", "References / Textbooks"), ...(document.references.length === 0 ? [paragraph("No references have been recorded.", false, BODY)] : [referencesTable(document.references)])]),
+    partTwoContinuationRow([sectionTitle("21", "Student Responsibility"), ...(document.responsibilities.length === 0 ? [paragraph("No student responsibilities have been recorded.", false, BODY)] : bulletedList(document.responsibilities))]),
     partTwoContinuationRow([sectionTitle("22", "Rubric"), ...rubricSection(document)]),
     partTwoContinuationRow([sectionTitle("23", "Course Policy"), ...policyParagraphs(document.policy)]),
     partTwoContinuationRow([sectionTitle("24", "Rating Scale"), ratingScaleTable(document)]),
@@ -356,15 +416,73 @@ function partTwoContinuationRows(document: CourseDocumentModel): TableRow[] {
 function dateTable(specDate: CourseDocumentModel["specDate"]) { const w = colWidths([50, 50]); return table([new TableRow({ children: ["Item", "Date"].map((header, index) => headerCell(header, w[index])) }), new TableRow({ children: [cell("Course Specification Last Revised / Approved", { width: w[0] }), cell(specDate ?? "", { width: w[1] })] })], w); }
 function ratingScaleTable(document: CourseDocumentModel) { const w = colWidths([25, 25, 25, 25]); const headers = ["Letter Grade", "Grade Point", "Score", "Explanation"]; const rows = [new TableRow({ children: headers.map((header, index) => headerCell(header, w[index])) })]; const grades = document.gradingScale?.grades ?? []; if (grades.length === 0) { rows.push(new TableRow({ children: [cell("No approved programme grading scale is bound to this Course Specification.", { width: w[0] }), cell("", { width: w[1] }), cell("", { width: w[2] }), cell("", { width: w[3] })] })); return table(rows, w); } for (const grade of grades) { const rowValues = [grade.letterGrade, grade.gradePoint.toFixed(2), grade.scoreLabel, grade.explanation]; rows.push(new TableRow({ children: rowValues.map((value, index) => cell(value, { width: w[index] })) })); } return table(rows, w); }
 
-export async function exportCourseSpecWord(document: CourseDocumentModel) {
+function documentHeader() {
+  if (!wordTheme.showHeader) return undefined;
+  return new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0 },
+        children: [text("Course Specification", false, wordTheme.headerHalfPoints)],
+      }),
+    ],
+  });
+}
+
+function documentFooter(courseCode: string) {
+  if (!wordTheme.showFooter) return undefined;
+  const pageNumberRuns = wordTheme.showPageNumbers
+    ? [new TextRun({ font: FONT, size: wordTheme.footerHalfPoints, children: [PageNumber.CURRENT] })]
+    : [];
+  return new Footer({
+    children: [
+      new Table({
+        width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA },
+        columnWidths: [Math.floor(CONTENT_WIDTH_TWIPS / 2), Math.ceil(CONTENT_WIDTH_TWIPS / 2)],
+        layout: TableLayoutType.FIXED,
+        borders: noBorders,
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [text(courseCode || "Course Specification", false, wordTheme.footerHalfPoints)] })],
+              }),
+              new TableCell({
+                margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: pageNumberRuns })],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+async function exportCourseSpecWordInternal(document: CourseDocumentModel, theme: CourseSpecDocumentTheme) {
+  applyWordTheme(theme);
   const children: (Paragraph | Table)[] = []; const info = document.courseInformation;
   children.push(await programmeProfileHeader(document));
   children.push(new Paragraph({ spacing: { before: 0, after: 120, line: 220 }, children: [text("PART 1: VISION, MISSION, GOALS, AND OBJECTIVES", true, 28)] }));
   children.push(await programmeProfileTable(document));
   children.push(new Paragraph({ children: [new PageBreak()] }));
-  children.push(paragraph(document.partTitle, true));
-  children.push(paragraph(COURSE_DOCUMENT_STYLE.courseInfoTitle, true));
+  children.push(paragraph(document.partTitle, true, wordTheme.documentTitleHalfPoints));
+  children.push(paragraph(COURSE_DOCUMENT_STYLE.courseInfoTitle, true, wordTheme.heading1HalfPoints));
   children.push(courseInformationTable(info, partTwoContinuationRows(document)));
-  const doc = new Document({ sections: [{ properties: { page: { size: { width: COURSE_DOCUMENT_STYLE.page.word.widthTwips, height: COURSE_DOCUMENT_STYLE.page.word.heightTwips }, margin: { top: COURSE_DOCUMENT_STYLE.page.word.marginTopTwips, bottom: COURSE_DOCUMENT_STYLE.page.word.marginBottomTwips, left: COURSE_DOCUMENT_STYLE.page.word.marginLeftTwips, right: COURSE_DOCUMENT_STYLE.page.word.marginRightTwips } } }, children }] });
+  const header = documentHeader();
+  const footer = documentFooter(info.courseCode);
+  const doc = new Document({ sections: [{ properties: { page: { size: { width: COURSE_DOCUMENT_STYLE.page.word.widthTwips, height: COURSE_DOCUMENT_STYLE.page.word.heightTwips }, margin: { top: wordTheme.marginTopTwips, bottom: wordTheme.marginBottomTwips, left: wordTheme.marginLeftTwips, right: wordTheme.marginRightTwips } } }, headers: header ? { default: header } : undefined, footers: footer ? { default: footer } : undefined, children }] });
   const blob = await Packer.toBlob(doc); const url = URL.createObjectURL(blob); const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = `${info.courseCode || "course"}-course-specification.docx`; window.document.body.appendChild(anchor); anchor.click(); window.document.body.removeChild(anchor); URL.revokeObjectURL(url);
+}
+
+export function exportCourseSpecWord(
+  document: CourseDocumentModel,
+  theme: CourseSpecDocumentTheme,
+): Promise<void> {
+  const nextExport = exportQueue.then(() =>
+    exportCourseSpecWordInternal(document, theme),
+  );
+  exportQueue = nextExport.catch(() => undefined);
+  return nextExport;
 }
