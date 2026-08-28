@@ -7,6 +7,7 @@ import {
   UpdateQaSarBookTerminologySchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
+import type { AuthUser } from "../../../core/auth/token.ts";
 import { requirePermission, roleHasPermission } from "../../../core/permissions/index.ts";
 import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
 import {
@@ -36,7 +37,7 @@ function sendError(res: Response, error: unknown): void {
 }
 
 async function canWriteSectionEvidence(
-  user: NonNullable<Express.Request["user"]>,
+  user: AuthUser,
   programmeId: string,
   cycleId: string,
   sectionKey: string,
