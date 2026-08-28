@@ -46,16 +46,6 @@ export function createTemporaryPassword(): string {
   return `${randomBytes(18).toString("base64url")}!Aa7`;
 }
 
-async function recordSecurityAudit(
-  action: "TemporaryPasswordSet" | "PasswordChanged",
-  actorUserId: string,
-  targetUserId: string,
-): Promise<void> {
-  await prisma.userSecurityAuditEvent.create({
-    data: { action, actorUserId, targetUserId },
-  });
-}
-
 async function programmeRoleView(
   userId: string,
   programmeId: string,
@@ -157,8 +147,11 @@ export const authService = {
 
   /**
    * Admin recovery for an active lecturer. The browser supplies only a PMS user
-   * id; this service resolves the linked Supabase uid server-side. The PMS gate
-   * is set before the remote credential change so the operation fails closed.
+   * id; this service resolves the linked Supabase uid server-side. The gate and
+   * audit row are committed before the remote credential change. If Supabase
+   * rejects the change, both are compensated together. This ordering guarantees
+   * that a successful remote reset never strands the admin without the returned
+   * password merely because a later audit insert failed.
    */
   async setTemporaryPassword(
     actorUserId: string,
@@ -182,23 +175,37 @@ export const authService = {
     }
 
     const temporaryPassword = createTemporaryPassword();
-    await prisma.user.update({
-      where: { id: target.id },
-      data: { mustChangePassword: true },
+    const auditEvent = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: target.id },
+        data: { mustChangePassword: true },
+      });
+      return tx.userSecurityAuditEvent.create({
+        data: {
+          action: "TemporaryPasswordSet",
+          actorUserId,
+          targetUserId: target.id,
+        },
+      });
     });
 
     const { error } = await getAdminClient().auth.admin.updateUserById(target.authId, {
       password: temporaryPassword,
     });
     if (error) {
-      await prisma.user.update({
-        where: { id: target.id },
-        data: { mustChangePassword: false },
-      }).catch(() => undefined);
+      // Compensate the local state only when Supabase confirms it did not install
+      // the generated credential. If compensation itself fails, the gate remains
+      // fail-closed and the original remote error is still returned.
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: target.id },
+          data: { mustChangePassword: false },
+        }),
+        prisma.userSecurityAuditEvent.delete({ where: { id: auditEvent.id } }),
+      ]).catch(() => undefined);
       throw new ProvisioningError(error.message);
     }
 
-    await recordSecurityAudit("TemporaryPasswordSet", actorUserId, target.id);
     return { userId: target.id, email: target.email, temporaryPassword };
   },
 
