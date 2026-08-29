@@ -80,6 +80,24 @@ describe("Action Research shared contracts", () => {
     expect(result.success).toBe(false);
   });
 
+  test("rejects null required intervention and delivery timestamps", () => {
+    const plan = CreateResearchInterventionSchema.safeParse({
+      programmeId: "dse",
+      title: "Guided practice labs",
+      target: "CLO3 achievement",
+      responsibleResearcherIds: ["lecturer-1"],
+      plannedStart: null,
+      plannedEnd: null,
+    });
+    expect(plan.success).toBe(false);
+
+    const log = CreateResearchInterventionLogSchema.safeParse({
+      programmeId: "dse",
+      occurredAt: null,
+    });
+    expect(log.success).toBe(false);
+  });
+
   test("keeps planned and delivered dosage separate and validates reach", () => {
     const valid = CreateResearchInterventionLogSchema.parse({
       programmeId: "dse",
