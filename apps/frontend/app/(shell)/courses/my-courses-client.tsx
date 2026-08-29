@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, AlertTriangle, CheckCircle2, Search } from "lucide-react";
 import {
   SEMESTERS,
@@ -29,6 +30,7 @@ import { coursesApi, type CourseView } from "@/lib/courses";
 import { offeringsApi } from "@/lib/offerings";
 import { useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { courseSectionEmptyPresentation } from "./course-section-empty-state";
 import {
   ALL_COURSE_FILTER as ALL,
@@ -39,47 +41,60 @@ import {
 
 export function MyCoursesClient() {
   const router = useRouter();
-  const { me } = useMe();
-  const [courses, setCourses] = useState<CourseView[]>([]);
-  const [offerings, setOfferings] = useState<OfferingView[]>([]);
-  const [specProgress, setSpecProgress] = useState<CourseSpecProgress[]>([]);
-  const [sectionPresence, setSectionPresence] = useState<CourseSectionPresence[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { me, loading: meLoading } = useMe();
+  const queryScope = { userId: me?.id ?? "pending" };
+
+  const coursesQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "courses", "list"),
+    queryFn: () => coursesApi.list(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.reference,
+  });
+  const offeringsQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "offerings", "list"),
+    queryFn: () => offeringsApi.list(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const specProgressQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "courses", "spec-progress"),
+    queryFn: () => coursesApi.specProgress(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.review,
+  });
+  const sectionPresenceQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "courses", "section-presence"),
+    queryFn: () => coursesApi.sectionPresence(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+
+  const courses: CourseView[] = coursesQuery.data ?? [];
+  const offerings: OfferingView[] = offeringsQuery.data ?? [];
+  const specProgress: CourseSpecProgress[] = specProgressQuery.data ?? [];
+  const sectionPresence: CourseSectionPresence[] = sectionPresenceQuery.data ?? [];
+  const firstError = [
+    coursesQuery.error,
+    offeringsQuery.error,
+    specProgressQuery.error,
+    sectionPresenceQuery.error,
+  ].find((value): value is Error => value instanceof Error);
+  const error = firstError
+    ? firstError instanceof ApiError
+      ? firstError.message
+      : "Failed to load course specifications"
+    : null;
+  const loading =
+    meLoading ||
+    coursesQuery.isPending ||
+    offeringsQuery.isPending ||
+    specProgressQuery.isPending ||
+    sectionPresenceQuery.isPending;
+
   const [search, setSearch] = useState("");
   const [term, setTerm] = useState(ALL);
   const [semester, setSemester] = useState<Semester | typeof ALL>(ALL);
   const [studyYear, setStudyYear] = useState(ALL);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [coursesRes, offeringsRes, progressRes, sectionPresenceRes] =
-        await Promise.all([
-          coursesApi.list(),
-          offeringsApi.list(),
-          coursesApi.specProgress(),
-          coursesApi.sectionPresence(),
-        ]);
-      setCourses(coursesRes);
-      setOfferings(offeringsRes);
-      setSpecProgress(progressRes);
-      setSectionPresence(sectionPresenceRes);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to load course specifications",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const sectionPresenceByCourse = useMemo(
     () =>
