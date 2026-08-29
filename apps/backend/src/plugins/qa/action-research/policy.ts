@@ -58,6 +58,14 @@ export function assertInterventionTransition(
   }
 }
 
+export function assertCanCompleteIntervention(fidelityRecordCount: number): void {
+  if (fidelityRecordCount < 1) {
+    throw new ActionResearchLifecycleError(
+      "Record at least one fidelity or actual-delivery entry before completing the intervention",
+    );
+  }
+}
+
 export function assertCanLogIntervention(
   cycleStatus: ResearchCycleStatus,
   interventionStatus: ResearchInterventionStatus,
