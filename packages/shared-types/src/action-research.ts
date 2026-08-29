@@ -37,9 +37,17 @@ export const ResearchProtocolReviewActionSchema = z.enum([
   "REQUEST_REVISION",
   "APPROVE",
 ]);
+export const ResearchInterventionStatusSchema = z.enum([
+  "PLANNED",
+  "ACTIVE",
+  "COMPLETED",
+  "CANCELLED",
+]);
 
 const OptionalId = z.string().trim().min(1).max(120).optional().nullable();
 const OptionalText = (max: number) => z.string().trim().max(max).optional().default("");
+const ResearcherIdsSchema = z.array(z.string().trim().min(1).max(120)).min(1).max(20)
+  .refine((value) => new Set(value).size === value.length, "Responsible researchers must be unique");
 
 export const CreateResearchProjectSchema = z.object({
   programmeId: z.string().trim().min(1),
@@ -120,15 +128,66 @@ export const LockResearchBaselineSchema = z.object({
   path: ["baselineEnd"],
 });
 
+const ResearchInterventionPlanFields = {
+  programmeId: z.string().trim().min(1),
+  title: z.string().trim().min(3).max(180),
+  description: OptionalText(6000),
+  target: z.string().trim().min(3).max(2000),
+  responsibleResearcherIds: ResearcherIdsSchema,
+  plannedStart: z.coerce.date(),
+  plannedEnd: z.coerce.date(),
+  expectedEffect: OptionalText(4000),
+  expectedDelay: OptionalText(1000),
+};
+
+export const CreateResearchInterventionSchema = z.object(ResearchInterventionPlanFields)
+  .refine((value) => value.plannedEnd >= value.plannedStart, {
+    message: "Planned end must be on or after planned start",
+    path: ["plannedEnd"],
+  });
+
+export const UpdateResearchInterventionSchema = z.object(ResearchInterventionPlanFields)
+  .refine((value) => value.plannedEnd >= value.plannedStart, {
+    message: "Planned end must be on or after planned start",
+    path: ["plannedEnd"],
+  });
+
+export const UpdateResearchInterventionStatusSchema = z.object({
+  programmeId: z.string().trim().min(1),
+  status: z.enum(["ACTIVE", "COMPLETED", "CANCELLED"]),
+});
+
+export const CreateResearchInterventionLogSchema = z.object({
+  programmeId: z.string().trim().min(1),
+  occurredAt: z.coerce.date(),
+  plannedDosage: OptionalText(2000),
+  deliveredDosage: OptionalText(2000),
+  reachCount: z.number().int().nonnegative().optional().nullable(),
+  reachDenominator: z.number().int().positive().optional().nullable(),
+  reachNote: OptionalText(2000),
+  deviation: OptionalText(4000),
+  deviationReason: OptionalText(4000),
+  contextualEvents: OptionalText(4000),
+  lecturerObservation: OptionalText(6000),
+  evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(30).default([]),
+}).refine(
+  (value) => value.reachCount == null || value.reachDenominator == null || value.reachCount <= value.reachDenominator,
+  { message: "Reach count cannot exceed the denominator", path: ["reachCount"] },
+);
+
 export type ResearchAssignmentRole = z.infer<typeof ResearchAssignmentRoleSchema>;
 export type ResearchAssignmentStatus = z.infer<typeof ResearchAssignmentStatusSchema>;
 export type ResearchCycleStatus = z.infer<typeof ResearchCycleStatusSchema>;
 export type ResearchProtocolStatus = z.infer<typeof ResearchProtocolStatusSchema>;
+export type ResearchInterventionStatus = z.infer<typeof ResearchInterventionStatusSchema>;
 export type CreateResearchProjectInput = z.infer<typeof CreateResearchProjectSchema>;
 export type CreateResearchAssignmentInput = z.infer<typeof CreateResearchAssignmentSchema>;
 export type SaveResearchProtocolInput = z.infer<typeof SaveResearchProtocolSchema>;
 export type ReviewResearchProtocolInput = z.infer<typeof ReviewResearchProtocolSchema>;
 export type LockResearchBaselineInput = z.infer<typeof LockResearchBaselineSchema>;
+export type CreateResearchInterventionInput = z.infer<typeof CreateResearchInterventionSchema>;
+export type UpdateResearchInterventionInput = z.infer<typeof UpdateResearchInterventionSchema>;
+export type CreateResearchInterventionLogInput = z.infer<typeof CreateResearchInterventionLogSchema>;
 
 export interface ResearchAssignmentView {
   id: string;
@@ -184,6 +243,52 @@ export interface ResearchBaselineLockView {
   snapshot: z.infer<typeof LockResearchBaselineSchema>["indicatorDefinitions"];
   lockedById: string;
   lockedAt: string;
+}
+
+export interface ResearchInterventionResearcherView {
+  userId: string;
+  name: string;
+}
+
+export interface ResearchInterventionLogView {
+  id: string;
+  interventionId: string;
+  occurredAt: string;
+  plannedDosage: string;
+  deliveredDosage: string;
+  reachCount: number | null;
+  reachDenominator: number | null;
+  reachNote: string;
+  deviation: string;
+  deviationReason: string;
+  contextualEvents: string;
+  lecturerObservation: string;
+  evidenceRefs: string[];
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface ResearchInterventionView {
+  id: string;
+  cycleId: string;
+  title: string;
+  description: string;
+  target: string;
+  plannedStart: string;
+  plannedEnd: string;
+  expectedEffect: string;
+  expectedDelay: string;
+  status: ResearchInterventionStatus;
+  version: number;
+  createdById: string;
+  responsibleResearchers: ResearchInterventionResearcherView[];
+  logs: ResearchInterventionLogView[];
+  delayed: boolean;
+  missed: boolean;
+  hasDeviation: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ResearchCycleView {
