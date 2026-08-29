@@ -16,6 +16,8 @@
     "course-spec:import": "bun scripts/course-spec-import.ts",
     "lecturer-profile:import": "bun scripts/lecturer-profile-import.ts",
     "student-roster:import": "bun scripts/student-roster-import.ts",
+    "performance:http": "bun scripts/performance-benchmark.ts",
+    "performance:db": "bun scripts/performance-db-latency.ts",
     "gen-token": "bun scripts/gen-token.ts",
     "test": "bun test"
   },
