@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, LogOut, Moon, Settings, Sun } from "lucide-react";
 import {
   DropdownMenu,
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@dse-pms/ui";
 import { useMe } from "@/lib/auth";
+import { clearProtectedQueryCache } from "@/lib/query-client";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
 /** First letter of each of the first two words in `name` (e.g. "Grace Hopper" → "GH"). */
@@ -34,6 +36,7 @@ function rolesOf(roles: string[]): string {
 /** Profile pic (initials avatar), name, role title(s), and a dropdown with account info, theme and sign out. */
 export function TopbarUser() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { me } = useMe();
   const { setTheme, resolvedTheme } = useTheme();
   // Avoid a hydration mismatch: the resolved theme is only known client-side.
@@ -41,6 +44,10 @@ export function TopbarUser() {
   useEffect(() => setMounted(true), []);
 
   const signOut = async () => {
+    // Remove protected completed reads before another identity can be established.
+    // The auth-state listener repeats this eviction on logout/user switch as a
+    // second safety boundary.
+    clearProtectedQueryCache(queryClient);
     await getSupabase().auth.signOut();
     router.replace("/login");
   };

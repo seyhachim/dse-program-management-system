@@ -40,6 +40,7 @@ export const authApi = {
  */
 let mePromise: Promise<MeResponse> | null = null;
 const meListeners = new Set<() => void>();
+const authIdentityListeners = new Set<(userId: string | undefined) => void>();
 
 function fetchMe(): Promise<MeResponse> {
   if (!mePromise) mePromise = authApi.me();
@@ -52,12 +53,24 @@ export function invalidateMe() {
   meListeners.forEach((listener) => listener());
 }
 
+/**
+ * Subscribe to Supabase identity changes. Protected application caches use this
+ * signal to evict prior-user data on logout or account switching.
+ */
+export function subscribeAuthIdentityChange(
+  listener: (userId: string | undefined) => void,
+): () => void {
+  authIdentityListeners.add(listener);
+  return () => authIdentityListeners.delete(listener);
+}
+
 if (AUTH_MODE === "supabase" && typeof window !== "undefined") {
   let lastUserId: string | undefined;
   getSupabase().auth.onAuthStateChange((_event, session) => {
     const userId = session?.user.id;
     if (userId === lastUserId) return;
     lastUserId = userId;
+    authIdentityListeners.forEach((listener) => listener(userId));
     invalidateMe();
   });
 }
