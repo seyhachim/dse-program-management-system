@@ -1,6 +1,8 @@
 import type {
+  ResearchAssignmentRole,
   ResearchAssignmentStatus,
   ResearchCycleStatus,
+  ResearchInterventionStatus,
   ResearchProtocolStatus,
 } from "@dse-pms/shared-types";
 
@@ -15,6 +17,13 @@ const ASSIGNMENT_TRANSITIONS: Record<ResearchAssignmentStatus, ResearchAssignmen
   COMPLETED: [],
 };
 
+const INTERVENTION_TRANSITIONS: Record<ResearchInterventionStatus, ResearchInterventionStatus[]> = {
+  PLANNED: ["ACTIVE", "CANCELLED"],
+  ACTIVE: ["COMPLETED", "CANCELLED"],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
 export function assertAssignmentTransition(
   current: ResearchAssignmentStatus,
   next: ResearchAssignmentStatus,
@@ -26,6 +35,46 @@ export function assertAssignmentTransition(
 
 export function canEditProtocol(status: ResearchProtocolStatus): boolean {
   return status === "DRAFT" || status === "REVISION_REQUIRED";
+}
+
+export function canManageIntervention(role: ResearchAssignmentRole | null | undefined): boolean {
+  return role === "LEAD_RESEARCHER" || role === "CO_RESEARCHER";
+}
+
+export function assertCanPlanIntervention(status: ResearchCycleStatus): void {
+  if (status !== "BASELINE_LOCKED" && status !== "INTERVENTION_ACTIVE") {
+    throw new ActionResearchLifecycleError(
+      `Interventions can only be planned after the baseline is locked: ${status}`,
+    );
+  }
+}
+
+export function assertInterventionTransition(
+  current: ResearchInterventionStatus,
+  next: ResearchInterventionStatus,
+): void {
+  if (!INTERVENTION_TRANSITIONS[current].includes(next)) {
+    throw new ActionResearchLifecycleError(`Invalid intervention transition: ${current} -> ${next}`);
+  }
+}
+
+export function assertCanCompleteIntervention(fidelityRecordCount: number): void {
+  if (fidelityRecordCount < 1) {
+    throw new ActionResearchLifecycleError(
+      "Record at least one fidelity or actual-delivery entry before completing the intervention",
+    );
+  }
+}
+
+export function assertCanLogIntervention(
+  cycleStatus: ResearchCycleStatus,
+  interventionStatus: ResearchInterventionStatus,
+): void {
+  if (cycleStatus !== "INTERVENTION_ACTIVE" || interventionStatus !== "ACTIVE") {
+    throw new ActionResearchLifecycleError(
+      `Fidelity logs require an active intervention in an active intervention cycle: ${cycleStatus}/${interventionStatus}`,
+    );
+  }
 }
 
 export function nextActionForCycleStatus(status: ResearchCycleStatus): string {
