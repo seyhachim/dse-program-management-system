@@ -136,23 +136,34 @@ export function InterventionsClient() {
   const [fidelity, setFidelity] = useState<FidelityState>(emptyFidelity);
 
   const roles = me?.roles ?? [];
-  const isManager = roles.some((role) => role === "admin" || role === "program_coordinator");
+  const mayHaveManagerRole = roles.some(
+    (role) => role === "admin" || role === "program_coordinator",
+  );
 
   const loadChoices = useCallback(async () => {
     if (!me) return;
     setLoading(true);
     setError(null);
     try {
-      const [mine, managed] = await Promise.all([
-        api.get<MyActionResearchView>(
-          `/api/qa/action-research/my-work?programmeId=${encodeURIComponent(PROGRAMME_ID)}`,
-        ),
-        isManager
-          ? api.get<ResearchProjectView[]>(
-              `/api/qa/action-research/projects?programmeId=${encodeURIComponent(PROGRAMME_ID)}`,
-            )
-          : Promise.resolve([]),
-      ]);
+      const mine = await api.get<MyActionResearchView>(
+        `/api/qa/action-research/my-work?programmeId=${encodeURIComponent(PROGRAMME_ID)}`,
+      );
+
+      let managed: ResearchProjectView[] = [];
+      if (mayHaveManagerRole) {
+        try {
+          managed = await api.get<ResearchProjectView[]>(
+            `/api/qa/action-research/projects?programmeId=${encodeURIComponent(PROGRAMME_ID)}`,
+          );
+        } catch (managerError) {
+          // `/me` exposes a union of account roles, while manager authority is
+          // programme-scoped on the backend. A coordinator in another programme
+          // must still be able to load their assigned DSE research work.
+          if (!(managerError instanceof ApiError) || managerError.status !== 403) {
+            throw managerError;
+          }
+        }
+      }
 
       const byId = new Map<string, ProjectChoice>();
       for (const assignment of mine.assignments) {
@@ -181,7 +192,7 @@ export function InterventionsClient() {
     } finally {
       setLoading(false);
     }
-  }, [isManager, me]);
+  }, [mayHaveManagerRole, me]);
 
   const loadProject = useCallback(async (projectId: string) => {
     if (!projectId) {
@@ -531,7 +542,15 @@ export function InterventionsClient() {
                     {item.status === "ACTIVE" && (
                       <>
                         <button type="button" disabled={busy} className={`${buttonClass} bg-blue-50 text-blue-700`} onClick={() => startFidelity(item)}>Add actual delivery</button>
-                        <button type="button" disabled={busy} className={`${buttonClass} bg-emerald-700 text-white`} onClick={() => void updateStatus(item, "COMPLETED")}>Complete</button>
+                        <button
+                          type="button"
+                          disabled={busy || item.logs.length === 0}
+                          title={item.logs.length === 0 ? "Record actual delivery before completing" : undefined}
+                          className={`${buttonClass} bg-emerald-700 text-white`}
+                          onClick={() => void updateStatus(item, "COMPLETED")}
+                        >
+                          Complete
+                        </button>
                         <button type="button" disabled={busy} className={`${buttonClass} bg-slate-100 text-slate-700`} onClick={() => void updateStatus(item, "CANCELLED")}>Cancel</button>
                       </>
                     )}
