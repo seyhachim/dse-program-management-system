@@ -46,6 +46,9 @@ export const ResearchInterventionStatusSchema = z.enum([
 
 const OptionalId = z.string().trim().min(1).max(120).optional().nullable();
 const OptionalText = (max: number) => z.string().trim().max(max).optional().default("");
+const RequiredDateSchema = z.union([z.string().trim().min(1), z.date()])
+  .transform((value) => value instanceof Date ? value : new Date(value))
+  .refine((value) => !Number.isNaN(value.getTime()), "A valid date is required");
 const ResearcherIdsSchema = z.array(z.string().trim().min(1).max(120)).min(1).max(20)
   .refine((value) => new Set(value).size === value.length, "Responsible researchers must be unique");
 
@@ -113,8 +116,8 @@ export const ReviewResearchProtocolSchema = z.object({
 
 export const LockResearchBaselineSchema = z.object({
   programmeId: z.string().trim().min(1),
-  baselineStart: z.coerce.date(),
-  baselineEnd: z.coerce.date(),
+  baselineStart: RequiredDateSchema,
+  baselineEnd: RequiredDateSchema,
   indicatorDefinitions: z.array(z.object({
     key: z.string().trim().min(1).max(200),
     label: z.string().trim().min(1).max(300),
@@ -134,8 +137,8 @@ const ResearchInterventionPlanFields = {
   description: OptionalText(6000),
   target: z.string().trim().min(3).max(2000),
   responsibleResearcherIds: ResearcherIdsSchema,
-  plannedStart: z.coerce.date(),
-  plannedEnd: z.coerce.date(),
+  plannedStart: RequiredDateSchema,
+  plannedEnd: RequiredDateSchema,
   expectedEffect: OptionalText(4000),
   expectedDelay: OptionalText(1000),
 };
@@ -159,7 +162,7 @@ export const UpdateResearchInterventionStatusSchema = z.object({
 
 export const CreateResearchInterventionLogSchema = z.object({
   programmeId: z.string().trim().min(1),
-  occurredAt: z.coerce.date(),
+  occurredAt: RequiredDateSchema,
   plannedDosage: OptionalText(2000),
   deliveredDosage: OptionalText(2000),
   reachCount: z.number().int().nonnegative().optional().nullable(),
