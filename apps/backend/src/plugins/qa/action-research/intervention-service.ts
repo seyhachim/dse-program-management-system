@@ -17,6 +17,7 @@ import {
   assertCycleProgramme,
 } from "./service.ts";
 import {
+  assertCanCompleteIntervention,
   assertCanLogIntervention,
   assertCanPlanIntervention,
   assertInterventionTransition,
@@ -358,6 +359,7 @@ export async function updateResearchInterventionStatus(
     if (!existing) throw new ActionResearchNotFoundError("Research intervention not found");
     assertInterventionTransition(existing.status, status);
     if (status === "ACTIVE") assertCanPlanIntervention(locked.status);
+    if (status === "COMPLETED") assertCanCompleteIntervention(existing.logs.length);
 
     const nextIntervention: StoredResearchIntervention = {
       ...existing,
