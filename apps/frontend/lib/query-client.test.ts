@@ -53,7 +53,8 @@ describe("protected query cache", () => {
     clearProtectedQueryCache(client);
 
     expect(client.getQueryData(protectedKey)).toBeUndefined();
-    expect(client.getQueryData(publicKey)).toEqual({ title: "DSE" });
+    const publicData = client.getQueryData<{ title: string }>(publicKey);
+    expect(publicData?.title).toBe("DSE");
   });
 
   test("reuses completed fresh GET data and refetches after invalidation", async () => {
@@ -73,12 +74,15 @@ describe("protected query cache", () => {
       staleTime: QUERY_STALE_MS.reference,
     };
 
-    expect(await client.fetchQuery(options)).toEqual({ calls: 1 });
-    expect(await client.fetchQuery(options)).toEqual({ calls: 1 });
+    const first = await client.fetchQuery(options);
+    const cached = await client.fetchQuery(options);
+    expect(first.calls).toBe(1);
+    expect(cached.calls).toBe(1);
     expect(calls).toBe(1);
 
     await client.invalidateQueries({ queryKey: key });
-    expect(await client.fetchQuery(options)).toEqual({ calls: 2 });
+    const refetched = await client.fetchQuery(options);
+    expect(refetched.calls).toBe(2);
     expect(calls).toBe(2);
   });
 
