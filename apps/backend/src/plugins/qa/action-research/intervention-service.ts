@@ -195,6 +195,7 @@ async function renderInterventions(
           .sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt))
           .map((log) => ({
             ...log,
+            interventionId: intervention.id,
             authorName: names.get(log.authorId) ?? "Unknown user",
           })),
         ...flags,
@@ -403,6 +404,7 @@ export async function createResearchInterventionLog(
 
     const log: StoredResearchInterventionLog = {
       id: randomUUID(),
+      planVersion: existing.version,
       occurredAt: input.occurredAt.toISOString(),
       plannedDosage: input.plannedDosage,
       deliveredDosage: input.deliveredDosage,
@@ -432,7 +434,7 @@ export async function createResearchInterventionLog(
     await auditTx(tx, locked.projectId, locked.id, actorId, "INTERVENTION_FIDELITY_LOGGED", {
       interventionId,
       logId: log.id,
-      planVersion: existing.version,
+      planVersion: log.planVersion,
       occurredAt: log.occurredAt,
       plannedDosage: log.plannedDosage,
       deliveredDosage: log.deliveredDosage,
