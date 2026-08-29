@@ -2,6 +2,7 @@ import { Router } from "express";
 import { qaManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { createQaActionRouter } from "./actions/router.ts";
+import { createActionResearchRouter } from "./action-research/router.ts";
 import { createQaLlmRouter } from "./analysis/llm-router.ts";
 import { createQaAssignmentsRouter } from "./assignments/router.ts";
 import { createQaEvidenceLibraryRouter } from "./evidence/router.ts";
@@ -28,6 +29,7 @@ const router = Router();
 // Public token resolver must remain outside routers that apply requireAuth.
 router.use(createQaExternalEvidenceRouter());
 router.use(createQaRouter());
+router.use(createActionResearchRouter());
 router.use(createQaAssignmentsRouter());
 router.use(createQaEvidenceLibraryRouter());
 router.use(createQaEvidenceSharingRouter());
