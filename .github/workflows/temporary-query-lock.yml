@@ -1,0 +1,26 @@
+name: Temporary Query Lock Generator
+
+on:
+  push:
+    branches:
+      - agent/issue-738-query-cache
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Resolve workspace lockfile
+        run: bun install --ignore-scripts
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: query-lock
+          path: bun.lock
+          if-no-files-found: error
