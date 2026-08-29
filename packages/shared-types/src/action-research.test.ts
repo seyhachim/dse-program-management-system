@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  CreateResearchInterventionLogSchema,
+  CreateResearchInterventionSchema,
   CreateResearchProjectSchema,
   LockResearchBaselineSchema,
   SaveResearchProtocolSchema,
@@ -48,5 +50,55 @@ describe("Action Research shared contracts", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  test("normalizes a reproducible intervention plan", () => {
+    const result = CreateResearchInterventionSchema.parse({
+      programmeId: "dse",
+      title: "Guided practice labs",
+      target: "CLO3 achievement in the selected Year 2 offering",
+      responsibleResearcherIds: ["lecturer-1", "lecturer-2"],
+      plannedStart: "2026-09-01T08:00:00Z",
+      plannedEnd: "2026-09-21T17:00:00Z",
+    });
+
+    expect(result.description).toBe("");
+    expect(result.expectedEffect).toBe("");
+    expect(result.responsibleResearcherIds).toEqual(["lecturer-1", "lecturer-2"]);
+  });
+
+  test("rejects invalid intervention dates and duplicate responsible researchers", () => {
+    const result = CreateResearchInterventionSchema.safeParse({
+      programmeId: "dse",
+      title: "Guided practice labs",
+      target: "CLO3 achievement",
+      responsibleResearcherIds: ["lecturer-1", "lecturer-1"],
+      plannedStart: "2026-09-21T08:00:00Z",
+      plannedEnd: "2026-09-01T17:00:00Z",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  test("keeps planned and delivered dosage separate and validates reach", () => {
+    const valid = CreateResearchInterventionLogSchema.parse({
+      programmeId: "dse",
+      occurredAt: "2026-09-08T10:00:00Z",
+      plannedDosage: "90-minute guided lab",
+      deliveredDosage: "75-minute guided lab",
+      reachCount: 38,
+      reachDenominator: 43,
+      deviation: "Started 15 minutes late",
+    });
+    expect(valid.plannedDosage).toBe("90-minute guided lab");
+    expect(valid.deliveredDosage).toBe("75-minute guided lab");
+
+    const invalid = CreateResearchInterventionLogSchema.safeParse({
+      programmeId: "dse",
+      occurredAt: "2026-09-08T10:00:00Z",
+      reachCount: 44,
+      reachDenominator: 43,
+    });
+    expect(invalid.success).toBe(false);
   });
 });
