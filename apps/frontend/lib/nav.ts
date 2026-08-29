@@ -82,6 +82,13 @@ const qaNavigationManifest: PluginManifest = {
       group: "Quality Assurance",
     },
     {
+      label: "Action Research",
+      path: "/aun-qa/action-research",
+      icon: "refresh-cw",
+      roles: ["admin", "program_coordinator", "lecturer", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
       label: "SAR Workspace",
       path: "/aun-qa/sar",
       icon: "file-text",
