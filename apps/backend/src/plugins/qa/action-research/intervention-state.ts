@@ -5,6 +5,7 @@ import type {
 
 export interface StoredResearchInterventionLog {
   id: string;
+  planVersion: number;
   occurredAt: string;
   plannedDosage: string;
   deliveredDosage: string;
@@ -53,6 +54,10 @@ function asNullableInt(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) ? value : null;
 }
 
+function positiveInt(value: unknown, fallback = 1): number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
@@ -65,6 +70,7 @@ function parseLog(value: unknown): StoredResearchInterventionLog | null {
   if (typeof row.id !== "string" || typeof row.occurredAt !== "string") return null;
   return {
     id: row.id,
+    planVersion: positiveInt(row.planVersion),
     occurredAt: row.occurredAt,
     plannedDosage: asString(row.plannedDosage),
     deliveredDosage: asString(row.deliveredDosage),
@@ -99,9 +105,7 @@ function parseIntervention(value: unknown): StoredResearchIntervention | null {
     expectedEffect: asString(row.expectedEffect),
     expectedDelay: asString(row.expectedDelay),
     status,
-    version: typeof row.version === "number" && Number.isInteger(row.version) && row.version > 0
-      ? row.version
-      : 1,
+    version: positiveInt(row.version),
     createdById: asString(row.createdById),
     logs: Array.isArray(row.logs)
       ? row.logs.map(parseLog).filter((item): item is StoredResearchInterventionLog => Boolean(item))
