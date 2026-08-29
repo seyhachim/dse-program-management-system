@@ -65,7 +65,6 @@ async function measure(url: URL): Promise<Sample> {
   const startedAt = performance.now();
   const response = await fetch(url, {
     method: "GET",
-    cache: "no-store",
     headers: bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined,
   });
   const body = await response.arrayBuffer();
