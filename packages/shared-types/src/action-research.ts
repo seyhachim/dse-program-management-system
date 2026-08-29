@@ -253,6 +253,7 @@ export interface ResearchInterventionResearcherView {
 export interface ResearchInterventionLogView {
   id: string;
   interventionId: string;
+  planVersion: number;
   occurredAt: string;
   plannedDosage: string;
   deliveredDosage: string;
