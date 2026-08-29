@@ -6,7 +6,7 @@ on:
       - agent/issue-738-query-cache
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate-lock:
@@ -18,9 +18,14 @@ jobs:
           bun-version: 1.2.23
       - name: Resolve workspace lockfile
         run: bun install --ignore-scripts
-      - name: Upload generated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: query-lock
-          path: bun.lock
-          if-no-files-found: error
+      - name: Commit generated lockfile when changed
+        run: |
+          if git diff --quiet -- bun.lock; then
+            echo "bun.lock is already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock
+          git commit -m "chore: update Bun lockfile for TanStack Query"
+          git push origin HEAD:agent/issue-738-query-cache
