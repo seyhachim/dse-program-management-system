@@ -53,6 +53,7 @@ describe("Action Research intervention state", () => {
       logs: [
         {
           id: "log-1",
+          planVersion: 2,
           occurredAt: "2026-09-08T10:00:00.000Z",
           plannedDosage: "90-minute guided lab",
           deliveredDosage: "75-minute guided lab",
@@ -71,6 +72,7 @@ describe("Action Research intervention state", () => {
     });
 
     const flags = deriveInterventionFlags(withLog, new Date("2026-09-10T00:00:00.000Z"));
+    expect(withLog.logs[0]?.planVersion).toBe(2);
     expect(withLog.logs[0]?.plannedDosage).toBe("90-minute guided lab");
     expect(withLog.logs[0]?.deliveredDosage).toBe("75-minute guided lab");
     expect(flags.hasDeviation).toBe(true);
