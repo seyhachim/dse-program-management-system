@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   ActionResearchLifecycleError,
   assertAssignmentTransition,
+  assertCanCompleteIntervention,
   assertCanLogIntervention,
   assertCanPlanIntervention,
   assertInterventionTransition,
@@ -49,6 +50,11 @@ describe("Action Research lifecycle policy", () => {
     expect(() => assertCanLogIntervention("INTERVENTION_ACTIVE", "ACTIVE")).not.toThrow();
     expect(() => assertCanLogIntervention("BASELINE_LOCKED", "PLANNED")).toThrow(ActionResearchLifecycleError);
     expect(() => assertCanLogIntervention("OBSERVATION", "COMPLETED")).toThrow(ActionResearchLifecycleError);
+  });
+
+  test("requires at least one fidelity record before completion", () => {
+    expect(() => assertCanCompleteIntervention(0)).toThrow(ActionResearchLifecycleError);
+    expect(() => assertCanCompleteIntervention(1)).not.toThrow();
   });
 
   test("provides a concrete next action for protocol and intervention stages", () => {
