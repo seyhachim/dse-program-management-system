@@ -112,6 +112,17 @@ export function invalidationForSuccessfulMutation(
     };
   }
 
+  // Action Research is mounted by the QA plugin, so this specific rule must
+  // precede the generic /api/qa rule. This keeps research cache invalidation
+  // semantic and avoids accidentally treating it as a SAR/evidence mutation.
+  if (/^\/api\/qa\/action-research(?:\/|$)/.test(cleanPath)) {
+    return {
+      domain: "action-research",
+      resources: ["action-research"],
+      reason: "Action Research lifecycle writes invalidate mutable project and cycle projections.",
+    };
+  }
+
   if (
     /^\/api\/(?:aun-qa|qa)(?:\/|$)/.test(cleanPath) ||
     cleanPath.includes("/sar-book/") ||
@@ -121,14 +132,6 @@ export function invalidationForSuccessfulMutation(
       domain: "qa-sar",
       resources: ["qa"],
       reason: "QA/SAR live workflow writes invalidate mutable QA projections only.",
-    };
-  }
-
-  if (/^\/api\/action-research(?:\/|$)/.test(cleanPath)) {
-    return {
-      domain: "action-research",
-      resources: ["action-research"],
-      reason: "Action Research lifecycle writes invalidate mutable project and cycle projections.",
     };
   }
 
