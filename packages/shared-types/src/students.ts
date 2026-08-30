@@ -92,7 +92,7 @@ export const SetStudentStatusInput = z.object({
 });
 export type SetStudentStatusInput = z.infer<typeof SetStudentStatusInput>;
 
-/** Query params for GET /api/students. */
+/** Query params for the legacy GET /api/students list. */
 export const ListStudentsQuery = z.object({
   search: z.string().trim().optional(),
   activeOnly: z
@@ -101,3 +101,21 @@ export const ListStudentsQuery = z.object({
     .transform((v) => v === true || v === "true"),
 });
 export type ListStudentsQuery = z.infer<typeof ListStudentsQuery>;
+
+/**
+ * Query params for the bounded interactive roster read.
+ *
+ * The cursor is intentionally opaque to clients. The backend encodes the
+ * stable `(createdAt, id)` sort position so equal timestamps and concurrent
+ * inserts cannot make interactive page navigation skip or duplicate rows.
+ */
+export const ListStudentsPageQuery = ListStudentsQuery.extend({
+  cursor: z.string().trim().min(1).max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type ListStudentsPageQuery = z.infer<typeof ListStudentsPageQuery>;
+
+export interface StudentPage {
+  items: Student[];
+  nextCursor: string | null;
+}
