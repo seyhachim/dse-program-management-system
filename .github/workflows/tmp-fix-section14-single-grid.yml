@@ -99,14 +99,6 @@ jobs:
         }
 ''')
           theme.write_text(css)
-
-          test = Path('apps/frontend/app/(shell)/courses/[id]/spec/document-preview-pages-layout.test.ts')
-          t = test.read_text()
-          t = t.replace("    expect(source).toContain('className=\"section14-header-table');\n    expect(source).toContain('className=\"section14-body-table');\n    expect(source).not.toContain('<thead><tr className=\\\"section14-header-row\\\">');\n", "")
-          marker = '    expect(source).toContain(\'className="section14-header-row"\');\n'
-          if marker in t:
-              t = t.replace(marker, marker + '    expect(source).toContain(\'className="section14-grid-table\');\n    expect(source).toContain(\'section14-header-primary\');\n    expect(source).toContain(\'section14-header-secondary\');\n')
-          test.write_text(t)
           PY
 
           git rm -f .github/workflows/tmp-fix-section14-single-grid.yml .github/workflows/tmp-fix-section14-split-tables.yml .github/workflows/tmp-fix-section14-grid.yml 2>/dev/null || true
