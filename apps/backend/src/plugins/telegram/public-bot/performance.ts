@@ -102,7 +102,9 @@ export function createPublicTelegramTimingTracker(
     }
   }
 
-  function wrapTelegramClient(base: TelegramPublicBotClient): TelegramPublicBotClient {
+  function wrapTelegramClient(
+    base: TelegramPublicBotClient,
+  ): TelegramPublicBotClient {
     return {
       sendMessage(input) {
         return timeTelegram("telegramSendMs", () => base.sendMessage(input));
