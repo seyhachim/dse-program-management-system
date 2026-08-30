@@ -9,6 +9,25 @@ import { prisma } from "../../core/db/prisma.ts";
 
 const withProfile = { profile: true } as const;
 
+/** Compact projection used by interactive roster lists. */
+export const STUDENT_LIST_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  studentId: true,
+  status: true,
+  createdAt: true,
+} as const;
+
+/** Exact cross-plugin StudentRef projection; never hydrate profile data for joins. */
+export const STUDENT_REF_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  studentId: true,
+  status: true,
+} as const;
+
 function hasProfileValues(profile: StudentProfileInput | undefined): boolean {
   return Boolean(
     profile && Object.values(profile).some((value) => value !== null && value !== undefined),
@@ -37,7 +56,7 @@ export const studentService = {
             }
           : {}),
       },
-      include: withProfile,
+      select: STUDENT_LIST_SELECT,
       orderBy: { createdAt: "desc" },
     });
   },
@@ -51,7 +70,10 @@ export const studentService = {
   },
 
   async findByIds(ids: string[]) {
-    return prisma.student.findMany({ where: { id: { in: ids } }, include: withProfile });
+    return prisma.student.findMany({
+      where: { id: { in: ids } },
+      select: STUDENT_REF_SELECT,
+    });
   },
 
   async create(input: CreateStudentInput) {
