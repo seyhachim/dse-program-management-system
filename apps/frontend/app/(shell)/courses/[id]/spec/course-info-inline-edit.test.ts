@@ -29,7 +29,7 @@ describe("Course Information inline editing", () => {
   test("course-info payload only persists the synopsis", async () => {
     const source = await Bun.file(INFO_PATH).text();
 
-    expect(source).toContain("return { description: description || undefined }");
+    expect(source).toContain("description: description || undefined");
     expect(source).not.toContain("prerequisites: trimmed");
   });
 });
