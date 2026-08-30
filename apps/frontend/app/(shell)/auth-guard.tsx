@@ -47,7 +47,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <main className="flex min-h-screen items-center justify-center bg-background p-6">
         <div
           role="alert"
-          className="w-full max-w-md rounded-xl border border-error/30 bg-error-bg p-5 text-sm text-error"
+          className="w-full max-w-md rounded-xl border border-status-upcoming bg-status-upcoming-bg p-5 text-sm text-status-upcoming"
         >
           We could not verify your DSE-PMS account access. Refresh the page or sign in again.
         </div>
