@@ -2,11 +2,11 @@ name: One-shot Section 14 split-table fix
 on:
   push:
     branches: [fix/issue-766-inline-course-synopsis]
-    paths: [.github/workflows/tmp-fix-section14-split-tables.yml]
 permissions:
   contents: write
 jobs:
   patch:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -105,12 +105,13 @@ jobs:
           style_test = Path('apps/frontend/app/(shell)/courses/[id]/spec/section14-preview-style.test.ts')
           st = style_test.read_text()
           marker = '    expect(source).toContain("font-size: 8.5pt !important");\n'
-          if marker in st and 'section14-body-table' not in st:
+          if marker in st and '.section14-body-table' not in st:
               st = st.replace(marker, marker + '    expect(source).toContain(".section14-header-table");\n    expect(source).toContain(".section14-body-table");\n')
           style_test.write_text(st)
           PY
-
-          git rm .github/workflows/tmp-fix-section14-split-tables.yml
+          rm .github/workflows/tmp-fix-section14-split-tables.yml
+      - name: Commit
+        run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
