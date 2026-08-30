@@ -15,6 +15,10 @@ export const studentsApi = {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return api.get<Student[]>(`/api/students${suffix}`);
   },
+  /** Load the profile-aware detail record before an edit form is opened. */
+  get(id: string): Promise<Student> {
+    return api.get<Student>(`/api/students/${id}`);
+  },
   create(input: CreateStudentInput): Promise<Student> {
     return api.post<Student>("/api/students", input);
   },
