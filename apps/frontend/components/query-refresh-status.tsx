@@ -20,7 +20,7 @@ export function QueryRefreshStatus({
       <div
         role="status"
         aria-live="polite"
-        className="rounded-lg border border-warning/30 bg-warning-bg px-4 py-2 text-sm text-warning"
+        className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming"
       >
         {label} refresh failed — showing the last available data.
       </div>
