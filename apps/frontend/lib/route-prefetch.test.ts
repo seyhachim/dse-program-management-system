@@ -16,7 +16,7 @@ const prefix = [
 ] as const;
 
 describe("protected route prefetch plans", () => {
-  test("students prefetches the exact initial list key", () => {
+  test("students prefetches the exact first cursor-page key", () => {
     const plan = protectedRoutePrefetchPlan({
       userId: "user-1",
       roles: ["admin"],
@@ -27,9 +27,11 @@ describe("protected route prefetch plans", () => {
     expect(plan[0]?.queryKey).toEqual([
       ...prefix,
       "students",
-      "list",
+      "page",
       "",
       false,
+      "first",
+      50,
     ]);
     expect(plan[0]?.staleTime).toBe(QUERY_STALE_MS.operational);
   });
