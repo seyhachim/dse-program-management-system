@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, type QueryKey } from "@tanstack/react-query";
 import { ApiError } from "./api";
 
 export const PROTECTED_QUERY_ROOT = ["protected"] as const;
@@ -39,6 +39,39 @@ export function protectedQueryKey(
 
 export function clearProtectedQueryCache(queryClient: QueryClient): void {
   queryClient.removeQueries({ queryKey: PROTECTED_QUERY_ROOT });
+}
+
+/**
+ * Match only the resource segment of the canonical protected query key. Exact
+ * matching is deliberate: invalidating mutable `qa` must not touch a future
+ * immutable `qa-release` or `qa-snapshot` cache entry.
+ */
+export function isProtectedResourceQueryKey(
+  queryKey: QueryKey,
+  resources: readonly string[],
+): boolean {
+  if (
+    queryKey[0] !== "protected" ||
+    queryKey[1] !== "user" ||
+    typeof queryKey[2] !== "string" ||
+    queryKey[3] !== "programme" ||
+    typeof queryKey[4] !== "string" ||
+    typeof queryKey[5] !== "string"
+  ) {
+    return false;
+  }
+  return resources.includes(queryKey[5]);
+}
+
+export function invalidateProtectedQueryResources(
+  queryClient: QueryClient,
+  resources: readonly string[],
+): Promise<void> {
+  if (!resources.length) return Promise.resolve();
+  return queryClient.invalidateQueries({
+    predicate: (query) =>
+      isProtectedResourceQueryKey(query.queryKey, resources),
+  });
 }
 
 function retryProtectedQuery(failureCount: number, error: unknown): boolean {
