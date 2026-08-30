@@ -193,7 +193,7 @@ export function ThemedDocumentPages({
           vertical-align: middle;
         }
 
-        .course-spec-theme-root #clos .section14-table thead th {
+        .course-spec-theme-root #clos .section14-table .section14-header-row th {
           background: #e2eedb !important;
           color: #000 !important;
           vertical-align: middle !important;
