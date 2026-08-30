@@ -6,6 +6,7 @@
  */
 import { createInflightGetDeduper } from "./inflight-get";
 import { createInflightLoader } from "./inflight-value";
+import { runConfirmedMutation } from "./mutation-invalidation";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -79,10 +80,25 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
 
 export const api = {
   get: <T>(path: string) => runInflightGet(path, () => request<T>(path)),
-  post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
-  patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
-  put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
-  delete: <T>(path: string, body?: unknown) => request<T>(path, { method: "DELETE", ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
+  post: <T>(path: string, body: unknown) =>
+    runConfirmedMutation("POST", path, () =>
+      request<T>(path, { method: "POST", body: JSON.stringify(body) }),
+    ),
+  patch: <T>(path: string, body: unknown) =>
+    runConfirmedMutation("PATCH", path, () =>
+      request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+    ),
+  put: <T>(path: string, body: unknown) =>
+    runConfirmedMutation("PUT", path, () =>
+      request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+    ),
+  delete: <T>(path: string, body?: unknown) =>
+    runConfirmedMutation("DELETE", path, () =>
+      request<T>(path, {
+        method: "DELETE",
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+    ),
 };
 
 export { API_URL };
