@@ -62,6 +62,7 @@ export function CoursesClient() {
   });
   const rows = coursesQuery.data ?? [];
   const hasData = coursesQuery.data !== undefined;
+  const hardQueryError = !hasData && coursesQuery.isError;
 
   useEffect(() => {
     if (!me || !canReadCurriculum) return;
@@ -207,7 +208,7 @@ export function CoursesClient() {
         </div>
       ) : null}
 
-      {!hasData && coursesQuery.isError ? (
+      {hardQueryError ? (
         <div
           role="alert"
           className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming"
@@ -232,48 +233,50 @@ export function CoursesClient() {
         </div>
       ) : null}
 
-      <DataTable
-        columns={columns}
-        rows={displayRows}
-        getRowId={(c) => c.id}
-        dragHandle
-        groupBy={
-          curriculumReady
-            ? (course) => curriculumGroupLabel(course.curriculumPlacement)
-            : undefined
-        }
-        renderGroupHeader={(group, groupRows) => (
-          <div className="flex items-center gap-2">
-            <span>{group}</span>
-            <span className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground">
-              {groupRows.length} {groupRows.length === 1 ? "course" : "courses"}
-            </span>
-          </div>
-        )}
-        actions={[
-          {
-            key: "syllabus",
-            label: canReview ? "Open Specification" : "Syllabus",
-            icon: <FileText className="mr-1 h-3.5 w-3.5" />,
-            onClick: (c) => router.push(canReview ? `/courses/${c.id}/spec?tab=reviewSubmit` : `/courses/${c.id}/spec`),
-          },
-          ...(canManage
-            ? [{
-                key: "responsible-lecturers",
-                label: "Responsible Lecturers",
-                icon: <Users className="mr-1 h-3.5 w-3.5" />,
-                onClick: (c: CourseListRow) =>
-                  router.push(`/courses/${c.id}/spec/responsible-lecturers`),
-              }]
-            : []),
-        ]}
-        onEdit={canManage ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}
-        onDelete={canManage ? handleDelete : undefined}
-        loading={!hasData && coursesQuery.isPending}
-        emptyMessage={
-          canManage ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
-        }
-      />
+      {!hardQueryError ? (
+        <DataTable
+          columns={columns}
+          rows={displayRows}
+          getRowId={(c) => c.id}
+          dragHandle
+          groupBy={
+            curriculumReady
+              ? (course) => curriculumGroupLabel(course.curriculumPlacement)
+              : undefined
+          }
+          renderGroupHeader={(group, groupRows) => (
+            <div className="flex items-center gap-2">
+              <span>{group}</span>
+              <span className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground">
+                {groupRows.length} {groupRows.length === 1 ? "course" : "courses"}
+              </span>
+            </div>
+          )}
+          actions={[
+            {
+              key: "syllabus",
+              label: canReview ? "Open Specification" : "Syllabus",
+              icon: <FileText className="mr-1 h-3.5 w-3.5" />,
+              onClick: (c) => router.push(canReview ? `/courses/${c.id}/spec?tab=reviewSubmit` : `/courses/${c.id}/spec`),
+            },
+            ...(canManage
+              ? [{
+                  key: "responsible-lecturers",
+                  label: "Responsible Lecturers",
+                  icon: <Users className="mr-1 h-3.5 w-3.5" />,
+                  onClick: (c: CourseListRow) =>
+                    router.push(`/courses/${c.id}/spec/responsible-lecturers`),
+                }]
+              : []),
+          ]}
+          onEdit={canManage ? (c) => router.push(`/courses/${c.id}/edit`) : undefined}
+          onDelete={canManage ? handleDelete : undefined}
+          loading={!hasData && coursesQuery.isPending}
+          emptyMessage={
+            canManage ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
+          }
+        />
+      ) : null}
     </div>
   );
 }
