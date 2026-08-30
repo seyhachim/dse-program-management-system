@@ -74,19 +74,28 @@ describe("mutation invalidation registry", () => {
     }
   });
 
-  test("classifies QA/SAR and Action Research as mutable semantic domains", () => {
+  test("classifies QA/SAR and QA-mounted Action Research separately", () => {
     expect(
       invalidationForSuccessfulMutation("POST", "/api/qa/sar-book/cycles/cycle-1/release"),
     ).toMatchObject({ domain: "qa-sar", resources: ["qa"] });
     expect(
       invalidationForSuccessfulMutation(
         "PATCH",
-        "/api/action-research/projects/project-1/review",
+        "/api/qa/action-research/projects/project-1/review",
       ),
     ).toMatchObject({
       domain: "action-research",
       resources: ["action-research"],
     });
+  });
+
+  test("does not classify the obsolete unmounted Action Research prefix", () => {
+    expect(
+      invalidationForSuccessfulMutation(
+        "PATCH",
+        "/api/action-research/projects/project-1/review",
+      ),
+    ).toBeNull();
   });
 
   test("does not classify unrelated authenticated mutations", () => {
