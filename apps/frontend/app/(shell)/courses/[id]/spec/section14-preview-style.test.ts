@@ -6,6 +6,9 @@ describe("Section 14 preview layout", () => {
   test("wraps and constrains the approved grouped header", async () => {
     const source = await Bun.file(THEME_PATH).text();
     expect(source).toContain(".section14-header-row:first-child");
+    expect(source).toContain(".section14-table > table");
+    expect(source).toContain("table-layout: fixed !important");
+    expect(source).toContain("max-width: 100% !important");
     expect(source).toContain("height: 44px");
     expect(source).toContain("white-space: normal !important");
     expect(source).toContain("overflow-wrap: anywhere !important");

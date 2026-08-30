@@ -218,7 +218,23 @@ export function ThemedDocumentPages({
         }
 
         .course-spec-theme-root #clos .section14-table {
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+        }
+
+        .course-spec-theme-root #clos .section14-table > table {
+          width: 100% !important;
+          max-width: 100% !important;
           table-layout: fixed !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table th,
+        .course-spec-theme-root #clos .section14-table td {
+          min-width: 0 !important;
+          max-width: 100%;
+          overflow: hidden;
+          overflow-wrap: anywhere !important;
         }
 
         .course-spec-theme-root #clos .section14-table .section14-header-row:first-child {
