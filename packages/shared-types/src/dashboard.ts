@@ -18,7 +18,8 @@ export const DashboardCourseSpecProgressSchema = z
         sortOrder: z.number().int(),
       })
       .strict()
-      .nullable(),
+      .nullable()
+      .optional(),
   })
   .strict();
 export type DashboardCourseSpecProgress = z.infer<
