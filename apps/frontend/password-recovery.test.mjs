@@ -9,7 +9,8 @@ describe("forced password recovery UI wiring", () => {
   test("normal shell access redirects a flagged account to change-password", () => {
     expect(guardSource).toContain("me?.mustChangePassword");
     expect(guardSource).toContain('router.replace("/change-password")');
-    expect(guardSource).toContain("me.mustChangePassword");
+    expect(guardSource).toContain("if (!sessionReady || meLoading || me?.mustChangePassword)");
+    expect(guardSource).toContain("return <ShellLoadingFrame />");
   });
 
   test("change-password route uses the backend contract and clears cached me state", () => {

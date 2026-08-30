@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { BookOpen, Pencil, Trash2, Users } from "lucide-react";
 import type { OfferingView, Student } from "@dse-pms/shared-types";
@@ -11,6 +12,7 @@ import {
   TableToolbar,
   type DataTableColumn,
 } from "@dse-pms/ui";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { offeringsApi, offeringTone } from "@/lib/offerings";
 import {
   groupOfferings,
@@ -19,6 +21,7 @@ import {
 import { studentsApi } from "@/lib/students";
 import { useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { EnrollmentDialog } from "./enrollment-dialog";
 
 /**
@@ -30,14 +33,40 @@ import { EnrollmentDialog } from "./enrollment-dialog";
  */
 const OFFERING_ROSTER_WIDE_ROLES = ["admin", "program_coordinator", "program_secretary"];
 
+function sortOfferings(offerings: OfferingView[]): OfferingView[] {
+  return [...offerings].sort((a, b) => {
+    // 1. Semester
+    const semesterCompare = String(a.semester ?? "").localeCompare(
+      String(b.semester ?? ""),
+      undefined,
+      { numeric: true },
+    );
+
+    if (semesterCompare !== 0) return semesterCompare;
+
+    // 2. Study year
+    const yearCompare = String(a.programmeYear ?? "").localeCompare(
+      String(b.programmeYear ?? ""),
+      undefined,
+      { numeric: true },
+    );
+
+    if (yearCompare !== 0) return yearCompare;
+
+    // 3. Course code, then class/section.
+    const courseCompare = String(a.course?.code ?? "").localeCompare(
+      String(b.course?.code ?? ""),
+    );
+    return courseCompare || a.sectionCode.localeCompare(b.sectionCode);
+  });
+}
+
 export function OfferingsClient() {
   const router = useRouter();
-  const [rows, setRows] = useState<OfferingView[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [manage, setManage] = useState<OfferingView | null>(null);
 
@@ -49,68 +78,42 @@ export function OfferingsClient() {
   const canManage = me?.permissions.includes("offerings:manage") ?? false;
   const canManageAnyRoster = me?.roles.some((r) => OFFERING_ROSTER_WIDE_ROLES.includes(r)) ?? false;
   const currentUserId = me?.id ?? null;
+  const queryScope = { userId: me?.id ?? "pending" };
+  const offeringsKey = protectedQueryKey(queryScope, "offerings", "list");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const offerings = await offeringsApi.list();
-
-      offerings.sort((a, b) => {
-        // 1. Semester
-        const semesterCompare = String(a.semester ?? "").localeCompare(
-          String(b.semester ?? ""),
-          undefined,
-          { numeric: true },
-        );
-
-        if (semesterCompare !== 0) return semesterCompare;
-
-        // 2. Study year
-        const yearCompare = String(a.programmeYear ?? "").localeCompare(
-          String(b.programmeYear ?? ""),
-          undefined,
-          { numeric: true },
-        );
-
-        if (yearCompare !== 0) return yearCompare;
-
-        // 3. Course code, then class/section.
-        const courseCompare = String(a.course?.code ?? "").localeCompare(
-          String(b.course?.code ?? ""),
-        );
-        return courseCompare || a.sectionCode.localeCompare(b.sectionCode);
-      });
-
-      setRows(offerings);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to load offerings",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const offeringsQuery = useQuery({
+    queryKey: offeringsKey,
+    queryFn: async () => sortOfferings(await offeringsApi.list()),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
 
   // Reference data for the enrollment dialog.
-  useEffect(() => {
-    studentsApi
-      .list({})
-      .then(setStudents)
-      .catch(() => setStudents([]));
-  }, []);
+  const studentsQuery = useQuery({
+    queryKey: protectedQueryKey(
+      queryScope,
+      "students",
+      "list",
+      "offering-roster-reference",
+    ),
+    queryFn: () => studentsApi.list({}),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.reference,
+  });
+
+  const rows = offeringsQuery.data ?? [];
+  const students: Student[] = studentsQuery.data ?? [];
+  const hasData = offeringsQuery.data !== undefined;
+  const hardQueryError = !hasData && offeringsQuery.isError;
 
   const handleDelete = async (offering: OfferingView) => {
     if (!confirm(`Delete ${offering.course?.code} · Class ${offering.sectionCode} · ${offering.term}?`)) return;
+    setActionError(null);
     try {
       await offeringsApi.remove(offering.id);
-      await load();
+      await offeringsQuery.refetch();
     } catch (err) {
-      setError(
+      setActionError(
         err instanceof ApiError ? err.message : "Failed to delete offering",
       );
     }
@@ -121,16 +124,20 @@ export function OfferingsClient() {
       offering.lecturer?.id === currentUserId ||
       offering.coLecturers.some((l) => l.id === currentUserId);
     if (!canManageAnyRoster && !isAssigned) {
-      setError("You can only manage enrollment for offerings you teach.");
+      setActionError("You can only manage enrollment for offerings you teach.");
       return;
     }
-    setError(null);
+    setActionError(null);
     setManage(offering);
   };
 
-  // When enrollment changes, patch the row in place and keep the dialog in sync.
+  // When enrollment changes, patch the cached row in place and keep the dialog in sync.
   const applyUpdate = (updated: OfferingView) => {
-    setRows((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
+    queryClient.setQueryData<OfferingView[]>(offeringsKey, (current) =>
+      current
+        ? current.map((row) => (row.id === updated.id ? updated : row))
+        : current,
+    );
     setManage((m) => (m && m.id === updated.id ? updated : m));
   };
 
@@ -439,36 +446,60 @@ export function OfferingsClient() {
         onAdd={canManage ? () => router.push("/offerings/new") : undefined}
       />
 
-      {error ? (
-        <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
-          {error}
+      {actionError ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming"
+        >
+          {actionError}
         </div>
       ) : null}
 
-      <DataTable
-        columns={columns}
-        rows={visibleGroups}
-        getRowId={(group) => group.id}
-        isRowExpanded={(group) => expandedGroups.has(group.id)}
-        onToggleRow={toggleGroup}
-        renderExpandedRow={renderClassDetails}
-        actions={[
-          {
-            key: "course-spec",
-            label: "Course Spec",
-            icon: <BookOpen className="mr-1 h-3.5 w-3.5" />,
-            onClick: (group) => {
-              if (group.course) router.push(`/courses/${group.course.id}/spec`);
-            },
-          },
-        ]}
-        loading={loading}
-        emptyMessage={
-          search
-            ? "No course offerings match your search."
-            : "No offerings yet. Add one to link a course, lecturer and students for a term."
-        }
+      {hardQueryError ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming"
+        >
+          {offeringsQuery.error instanceof ApiError
+            ? offeringsQuery.error.message
+            : "Failed to load offerings"}
+        </div>
+      ) : null}
+
+      <QueryRefreshStatus
+        hasData={hasData}
+        isPending={offeringsQuery.isPending}
+        isFetching={offeringsQuery.isFetching}
+        isError={offeringsQuery.isError}
+        label="Offerings"
       />
+
+      {!hardQueryError ? (
+        <DataTable
+          columns={columns}
+          rows={visibleGroups}
+          getRowId={(group) => group.id}
+          isRowExpanded={(group) => expandedGroups.has(group.id)}
+          onToggleRow={toggleGroup}
+          renderExpandedRow={renderClassDetails}
+          actions={[
+            {
+              key: "course-spec",
+              label: "Course Spec",
+              icon: <BookOpen className="mr-1 h-3.5 w-3.5" />,
+              onClick: (group) => {
+                if (group.course) router.push(`/courses/${group.course.id}/spec`);
+              },
+            },
+          ]}
+          loading={!hasData && offeringsQuery.isPending}
+          emptyMessage={
+            search
+              ? "No course offerings match your search."
+              : "No offerings yet. Add one to link a course, lecturer and students for a term."
+          }
+        />
+      ) : null}
 
       <EnrollmentDialog
         open={manage !== null}
