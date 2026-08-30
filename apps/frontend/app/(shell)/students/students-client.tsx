@@ -56,10 +56,6 @@ export function StudentsClient() {
   const coldLoading = !hasData && studentsQuery.isPending;
   const hardQueryError = !hasData && studentsQuery.isError;
 
-  const refresh = async () => {
-    await studentsQuery.refetch();
-  };
-
   const handleSubmit = async (values: StudentFormValues) => {
     setSubmitting(true);
     setActionError(null);
@@ -68,7 +64,6 @@ export function StudentsClient() {
       else await studentsApi.create(values);
       setFormOpen(false);
       setEditing(null);
-      await refresh();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to save student");
     } finally {
@@ -80,7 +75,6 @@ export function StudentsClient() {
     setActionError(null);
     try {
       await studentsApi.setStatus(student.id, active ? "Active" : "Inactive");
-      await refresh();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to update student status");
     }
@@ -91,7 +85,6 @@ export function StudentsClient() {
     setActionError(null);
     try {
       await studentsApi.remove(student.id);
-      await refresh();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to delete student");
     }
