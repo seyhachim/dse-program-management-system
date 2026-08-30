@@ -45,10 +45,6 @@ export function StudentsClient() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [pageCursor, debouncedSearch, activeOnly]);
-
   const queryScope = { userId: me?.id ?? "pending" };
   const studentsQuery = useQuery({
     queryKey: protectedQueryKey(
@@ -155,6 +151,7 @@ export function StudentsClient() {
   const handleNextPage = () => {
     const nextCursor = studentsQuery.data?.nextCursor;
     if (!nextCursor || studentsQuery.isFetching) return;
+    setSelectedIds([]);
     setPreviousCursors((current) => [...current, pageCursor]);
     setPageCursor(nextCursor);
   };
@@ -162,6 +159,7 @@ export function StudentsClient() {
   const handlePreviousPage = () => {
     if (previousCursors.length === 0 || studentsQuery.isFetching) return;
     const previous = previousCursors[previousCursors.length - 1];
+    setSelectedIds([]);
     setPreviousCursors((current) => current.slice(0, -1));
     setPageCursor(previous);
   };
@@ -196,10 +194,14 @@ export function StudentsClient() {
     <div className="space-y-4">
       <TableToolbar
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setSelectedIds([]);
+        }}
         searchPlaceholder="Search students…"
         activeOnly={activeOnly}
         onActiveOnlyChange={(checked) => {
+          setSelectedIds([]);
           setActiveOnly(checked);
           setPageCursor(undefined);
           setPreviousCursors([]);
