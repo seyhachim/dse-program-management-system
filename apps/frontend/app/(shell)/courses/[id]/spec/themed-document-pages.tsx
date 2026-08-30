@@ -256,6 +256,29 @@ export function ThemedDocumentPages({
           width: 9% !important;
         }
 
+        /* Chrome can still redistribute columns between two adjacent table
+           elements even when their colgroups match. Render every CLO data row
+           on the exact approved six-column grid so its vertical rules line up
+           with the grouped header: CLO 7%, Description 58%, PLO 8%, C/A/P 9%. */
+        .course-spec-theme-root #clos .section14-body-table tbody tr {
+          display: grid !important;
+          grid-template-columns: 7% 58% 8% 9% 9% 9% !important;
+          width: 100% !important;
+        }
+
+        .course-spec-theme-root #clos .section14-body-table tbody td {
+          box-sizing: border-box !important;
+          width: auto !important;
+        }
+
+        .course-spec-theme-root #clos .section14-body-table tbody td + td {
+          border-left-width: 0 !important;
+        }
+
+        .course-spec-theme-root #clos .section14-body-table tbody tr + tr td {
+          border-top-width: 0 !important;
+        }
+
         .course-spec-theme-root #clos .section14-table th,
         .course-spec-theme-root #clos .section14-table td {
           min-width: 0 !important;
