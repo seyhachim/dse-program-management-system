@@ -209,22 +209,24 @@ export function StudentsClient() {
         label="Students"
       />
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        getRowId={(s) => s.id}
-        dragHandle
-        selectable
-        selectedIds={selectedIds}
-        onSelectedChange={setSelectedIds}
-        onEdit={(s) => {
-          setEditing(s);
-          setFormOpen(true);
-        }}
-        onDelete={handleDelete}
-        loading={coldLoading}
-        emptyMessage="No students yet. Add your first student."
-      />
+      {!hardQueryError ? (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          getRowId={(s) => s.id}
+          dragHandle
+          selectable
+          selectedIds={selectedIds}
+          onSelectedChange={setSelectedIds}
+          onEdit={(s) => {
+            setEditing(s);
+            setFormOpen(true);
+          }}
+          onDelete={handleDelete}
+          loading={coldLoading}
+          emptyMessage="No students yet. Add your first student."
+        />
+      ) : null}
 
       <StudentForm
         open={formOpen}
