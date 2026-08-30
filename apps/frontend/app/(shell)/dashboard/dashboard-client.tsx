@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { BookOpen, CalendarRange, GraduationCap, Users } from "lucide-react";
 import {
-  OFFERING_STATUSES,
-  STUDENT_STATUSES,
-  type CourseSpecProgress,
-  type OfferingView,
-  type Student,
+  type DashboardCourseSpecProgress,
 } from "@dse-pms/shared-types";
 import { CompletionRing, Progress, Skeleton, type StatusTone } from "@dse-pms/ui";
-import { coursesApi, type CourseView } from "@/lib/courses";
-import { offeringsApi, offeringTone } from "@/lib/offerings";
-import { statusTone, studentsApi } from "@/lib/students";
-import { lecturersApi } from "@/lib/lecturers";
+import { useMe } from "@/lib/auth";
+import { dashboardApi } from "@/lib/dashboard";
+import { offeringTone } from "@/lib/offerings";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
+import { statusTone } from "@/lib/students";
 import { buildCourseSpecProgressGroups, visibleCourseSpecRows } from "./course-spec-progress-groups";
+import {
+  dashboardFailedSources,
+  dashboardSourceData,
+} from "./dashboard-summary-view";
 
 /** Maps the app's semantic status tones to their themed CSS variables (defined
  * in globals.css, adapt to light/dark) so distribution-bar colors stay in sync
@@ -27,66 +29,22 @@ const TONE_COLORS: Record<StatusTone, string> = {
   neutral: "var(--status-neutral)",
 };
 
-interface LoadState {
-  students: Student[];
-  courses: CourseView[];
-  offerings: OfferingView[];
-  lecturerCount: number;
-  specProgress: CourseSpecProgress[];
-}
-
-const EMPTY_STATE: LoadState = { students: [], courses: [], offerings: [], lecturerCount: 0, specProgress: [] };
-
-/** Programme-wide overview for the "Dashboard" nav item (admin, program_coordinator,
- * program_secretary — see `dashboardManifest` in packages/shared-types/src/plugins.ts)
- * — counts plus spec-completion and status-distribution visualizations across every
- * course, offering, student and lecturer. */
+/** Programme-wide overview for the "Dashboard" nav item (admin,
+ * program_coordinator, program_secretary). One compact server-authorized query
+ * now replaces the previous five full-domain browser reads. */
 export function DashboardClient() {
-  const [loading, setLoading] = useState(true);
-  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const { me, loading: meLoading } = useMe();
   const [incompleteOnly, setIncompleteOnly] = useState(false);
-  const [state, setState] = useState<LoadState>(EMPTY_STATE);
+  const queryScope = { userId: me?.id ?? "pending" };
+  const summaryQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "dashboard", "summary"),
+    queryFn: () => dashboardApi.summary(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const summary = summaryQuery.data;
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      const [studentsRes, coursesRes, offeringsRes, lecturersRes, specRes] = await Promise.allSettled([
-        studentsApi.list({}),
-        coursesApi.list(),
-        offeringsApi.list(),
-        lecturersApi.list(),
-        coursesApi.specProgress(),
-      ]);
-      if (!active) return;
-
-      // Apply whatever loaded successfully rather than discarding it all when
-      // one source fails, so an outage in one endpoint doesn't render every
-      // other (successfully fetched) panel as misleading zeros.
-      const failed: string[] = [];
-      const orElse = <T,>(label: string, result: PromiseSettledResult<T>, fallback: T): T => {
-        if (result.status === "fulfilled") return result.value;
-        failed.push(label);
-        return fallback;
-      };
-      setState({
-        students: orElse("students", studentsRes, EMPTY_STATE.students),
-        courses: orElse("courses", coursesRes, EMPTY_STATE.courses),
-        offerings: orElse("offerings", offeringsRes, EMPTY_STATE.offerings),
-        lecturerCount: orElse("lecturers", lecturersRes, []).length,
-        specProgress: orElse("spec progress", specRes, EMPTY_STATE.specProgress),
-      });
-      setFailedSources(failed);
-      setLoading(false);
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const { students, courses, offerings, lecturerCount, specProgress } = state;
-
-  if (loading) {
+  if (meLoading || (!summary && summaryQuery.isPending)) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -96,63 +54,75 @@ export function DashboardClient() {
     );
   }
 
-  const totalCompleted = specProgress.reduce((s, c) => s + c.completed, 0);
-  const totalReady = specProgress.reduce((s, c) => s + c.total, 0);
-  const overallSpecPercent = totalReady ? Math.round((totalCompleted / totalReady) * 100) : 0;
+  if (!summary) {
+    return (
+      <div className="rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error">
+        Dashboard data is temporarily unavailable. Try refreshing the page.
+      </div>
+    );
+  }
+
+  const students = dashboardSourceData(summary.students);
+  const courses = dashboardSourceData(summary.courses);
+  const offerings = dashboardSourceData(summary.offerings);
+  const lecturers = dashboardSourceData(summary.lecturers);
+  const failedSources = dashboardFailedSources(summary);
+  const specProgress = courses?.specProgress ?? [];
+
+  const totalCompleted = specProgress.reduce((sum, row) => sum + row.completed, 0);
+  const totalReady = specProgress.reduce((sum, row) => sum + row.total, 0);
+  const overallSpecPercent = totalReady
+    ? Math.round((totalCompleted / totalReady) * 100)
+    : 0;
   const groupedSpecProgress = buildCourseSpecProgressGroups(specProgress);
   const visibleGroupedSpecProgress = buildCourseSpecProgressGroups(
     visibleCourseSpecRows(specProgress, incompleteOnly),
   );
 
-  const totalEnrolled = offerings.reduce((s, o) => s + o.enrolledCount, 0);
-  const totalCapacity = offerings.reduce((s, o) => s + o.capacity, 0);
-
-  const offeringsByStatus = OFFERING_STATUSES.map((status) => ({
-    status,
-    count: offerings.filter((o) => o.status === status).length,
-  }));
-  const studentsByStatus = STUDENT_STATUSES.map((status) => ({
-    status,
-    count: students.filter((s) => s.status === status).length,
-  }));
-
   return (
     <div className="space-y-6">
       {failedSources.length > 0 ? (
         <div className="rounded-lg border border-warning/30 bg-warning-bg px-4 py-2 text-sm text-warning">
-          Failed to load {failedSources.join(", ")} — showing the rest of the dashboard. Try refreshing.
+          Failed to load {failedSources.join(", ")} — unavailable panels are marked instead of showing misleading zeros.
         </div>
+      ) : null}
+
+      {summaryQuery.isError ? (
+        <div className="rounded-lg border border-warning/30 bg-warning-bg px-4 py-2 text-sm text-warning">
+          Dashboard refresh failed — showing the last available cached data.
+        </div>
+      ) : summaryQuery.isFetching ? (
+        <p className="text-xs text-muted-foreground">Refreshing dashboard…</p>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           icon={Users}
           tint="bg-primary-light text-primary"
-          value={students.length}
+          value={students?.total ?? null}
           label="Students"
         />
         <StatTile
           icon={BookOpen}
           tint="bg-info-bg text-info"
-          value={courses.length}
+          value={courses?.total ?? null}
           label="Courses"
         />
         <StatTile
           icon={CalendarRange}
           tint="bg-success-bg text-success"
-          value={offerings.length}
+          value={offerings?.total ?? null}
           label="Course Offerings"
         />
         <StatTile
           icon={GraduationCap}
           tint="bg-warning-bg text-warning"
-          value={lecturerCount}
+          value={lecturers?.total ?? null}
           label="Lecturers"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Course Specification Progress */}
         <section className="rounded-xl border border-border bg-card p-5 lg:col-span-2">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -161,17 +131,22 @@ export function DashboardClient() {
                 Grouped by the active curriculum year and semester.
               </p>
             </div>
-            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={incompleteOnly}
-                onChange={(event) => setIncompleteOnly(event.target.checked)}
-                className="h-4 w-4 rounded border-border"
-              />
-              Incomplete only
-            </label>
+            {courses ? (
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={incompleteOnly}
+                  onChange={(event) => setIncompleteOnly(event.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Incomplete only
+              </label>
+            ) : null}
           </div>
-          {specProgress.length === 0 ? (
+
+          {!courses ? (
+            <UnavailableMessage message="Course specification progress is unavailable." />
+          ) : specProgress.length === 0 ? (
             <p className="text-sm text-muted-foreground">No courses yet.</p>
           ) : (
             <div className="flex flex-col gap-5 xl:flex-row">
@@ -263,48 +238,59 @@ export function DashboardClient() {
           )}
         </section>
 
-        {/* Enrollment */}
         <section className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-4 text-sm font-semibold text-foreground">Enrollment</h3>
-          <div className="flex justify-center">
-            <CompletionRing
-              value={totalCapacity ? Math.round((totalEnrolled / totalCapacity) * 100) : 0}
-              size={120}
-              label="Capacity used"
-            />
-          </div>
-          <p className="mt-3 text-center text-sm text-muted-foreground">
-            {totalEnrolled} enrolled of {totalCapacity} seats across {offerings.length} offerings
-          </p>
+          {!offerings ? (
+            <UnavailableMessage message="Enrollment totals are unavailable." />
+          ) : (
+            <>
+              <div className="flex justify-center">
+                <CompletionRing
+                  value={offerings.totalCapacity ? Math.round((offerings.totalEnrolled / offerings.totalCapacity) * 100) : 0}
+                  size={120}
+                  label="Capacity used"
+                />
+              </div>
+              <p className="mt-3 text-center text-sm text-muted-foreground">
+                {offerings.totalEnrolled} enrolled of {offerings.totalCapacity} seats across {offerings.total} offerings
+              </p>
+            </>
+          )}
         </section>
 
-        {/* Offerings by Status */}
-        <DistributionCard
-          title="Offerings by Status"
-          total={offerings.length}
-          segments={offeringsByStatus.map(({ status, count }) => ({
-            name: status,
-            count,
-            color: TONE_COLORS[offeringTone(status)],
-          }))}
-        />
+        {offerings ? (
+          <DistributionCard
+            title="Offerings by Status"
+            total={offerings.total}
+            segments={offerings.byStatus.map(({ status, count }) => ({
+              name: status,
+              count,
+              color: TONE_COLORS[offeringTone(status)],
+            }))}
+          />
+        ) : (
+          <UnavailableCard title="Offerings by Status" message="Offering status totals are unavailable." />
+        )}
 
-        {/* Students by Status */}
-        <DistributionCard
-          title="Students by Status"
-          total={students.length}
-          segments={studentsByStatus.map(({ status, count }) => ({
-            name: status,
-            count,
-            color: TONE_COLORS[statusTone(status)],
-          }))}
-        />
+        {students ? (
+          <DistributionCard
+            title="Students by Status"
+            total={students.total}
+            segments={students.byStatus.map(({ status, count }) => ({
+              name: status,
+              count,
+              color: TONE_COLORS[statusTone(status)],
+            }))}
+          />
+        ) : (
+          <UnavailableCard title="Students by Status" message="Student status totals are unavailable." />
+        )}
       </div>
     </div>
   );
 }
 
-function CourseProgressList({ courses }: { courses: CourseSpecProgress[] }) {
+function CourseProgressList({ courses }: { courses: DashboardCourseSpecProgress[] }) {
   return (
     <ul className="space-y-3 px-3 pb-3">
       {courses.map((course) => {
@@ -337,7 +323,7 @@ function StatTile({
 }: {
   icon: typeof Users;
   tint: string;
-  value: number;
+  value: number | null;
   label: string;
 }) {
   return (
@@ -345,9 +331,26 @@ function StatTile({
       <span className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg ${tint}`}>
         <Icon className="h-5 w-5" />
       </span>
-      <div className="text-2xl font-bold text-foreground">{value}</div>
+      <div className="text-2xl font-bold text-foreground">{value ?? "—"}</div>
       <div className="text-sm text-muted-foreground">{label}</div>
     </div>
+  );
+}
+
+function UnavailableMessage({ message }: { message: string }) {
+  return (
+    <p className="rounded-lg border border-border bg-background px-3 py-4 text-sm text-muted-foreground">
+      {message}
+    </p>
+  );
+}
+
+function UnavailableCard({ title, message }: { title: string; message: string }) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <h3 className="mb-4 text-sm font-semibold text-foreground">{title}</h3>
+      <UnavailableMessage message={message} />
+    </section>
   );
 }
 
@@ -367,23 +370,29 @@ function DistributionCard({
         {total === 0
           ? null
           : segments
-              .filter((s) => s.count > 0)
-              .map((s) => (
+              .filter((segment) => segment.count > 0)
+              .map((segment) => (
                 <div
-                  key={s.name}
-                  style={{ width: `${(s.count / total) * 100}%`, backgroundColor: s.color }}
-                  title={`${s.name}: ${s.count}`}
+                  key={segment.name}
+                  style={{
+                    width: `${(segment.count / total) * 100}%`,
+                    backgroundColor: segment.color,
+                  }}
+                  title={`${segment.name}: ${segment.count}`}
                 />
               ))}
       </div>
       <ul className="mt-3 space-y-1.5">
-        {segments.map((s) => (
-          <li key={s.name} className="flex items-center justify-between text-sm">
+        {segments.map((segment) => (
+          <li key={segment.name} className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: s.color }} />
-              {s.name}
+              <span
+                className="h-2 w-2 rounded-sm"
+                style={{ backgroundColor: segment.color }}
+              />
+              {segment.name}
             </span>
-            <span className="font-medium text-foreground">{s.count}</span>
+            <span className="font-medium text-foreground">{segment.count}</span>
           </li>
         ))}
       </ul>
