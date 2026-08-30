@@ -10,6 +10,7 @@ import { methodsPlugin } from "../plugins/methods/index.ts";
 import { rubricsPlugin } from "../plugins/rubrics/index.ts";
 import { authPlugin } from "../plugins/auth/index.ts";
 import { programmePlugin } from "../plugins/programme/index.ts";
+import { resourcesPlugin } from "../plugins/resources/index.ts";
 import { teachingLearningPlugin } from "../plugins/teaching-learning/index.ts";
 import { assessmentTemplatePlugin } from "../plugins/assessment-template/index.ts";
 import { studentPortalPlugin } from "../plugins/student-portal/index.ts";
@@ -35,6 +36,7 @@ export function createApp(): Express {
   registry.register(rubricsPlugin);
   registry.register(authPlugin);
   registry.register(programmePlugin);
+  registry.register(resourcesPlugin);
   registry.register(teachingLearningPlugin);
   registry.register(assessmentTemplatePlugin);
   registry.register(studentPortalPlugin);
