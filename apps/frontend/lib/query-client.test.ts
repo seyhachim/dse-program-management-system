@@ -4,6 +4,8 @@ import {
   QUERY_STALE_MS,
   clearProtectedQueryCache,
   createAppQueryClient,
+  invalidateProtectedQueryResources,
+  isProtectedResourceQueryKey,
   protectedQueryKey,
 } from "./query-client";
 
@@ -92,5 +94,65 @@ describe("protected query cache", () => {
     expect(QUERY_STALE_MS.draft).toBe(10_000);
     expect(QUERY_STALE_MS.review).toBe(5_000);
     expect(QUERY_STALE_MS.immutable).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  test("matches only the canonical protected resource segment", () => {
+    const qa = protectedQueryKey(
+      { userId: "user-1", programmeId: "dse" },
+      "qa",
+      "live",
+    );
+    const release = protectedQueryKey(
+      { userId: "user-1", programmeId: "dse" },
+      "qa-release",
+      "release-1",
+    );
+
+    expect(isProtectedResourceQueryKey(qa, ["qa"])).toBe(true);
+    expect(isProtectedResourceQueryKey(release, ["qa"])).toBe(false);
+    expect(isProtectedResourceQueryKey(["public", "qa"], ["qa"])).toBe(false);
+  });
+
+  test("invalidates selected mutable resources without touching immutable siblings", async () => {
+    const client = createAppQueryClient();
+    const studentsKey = protectedQueryKey(
+      { userId: "user-1", programmeId: "dse" },
+      "students",
+      "list",
+    );
+    const dashboardKey = protectedQueryKey(
+      { userId: "user-1", programmeId: "dse" },
+      "dashboard",
+      "summary",
+    );
+    const releaseKey = protectedQueryKey(
+      { userId: "user-1", programmeId: "dse" },
+      "qa-release",
+      "release-1",
+    );
+
+    client.setQueryData(studentsKey, [{ id: "student-1" }]);
+    client.setQueryData(dashboardKey, { students: 1 });
+    client.setQueryData(releaseKey, { id: "release-1" });
+
+    await invalidateProtectedQueryResources(client, ["students", "dashboard"]);
+
+    expect(client.getQueryState(studentsKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(dashboardKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(releaseKey)?.isInvalidated).toBe(false);
+  });
+
+  test("does not cross-match another mutable resource", async () => {
+    const client = createAppQueryClient();
+    const studentsKey = protectedQueryKey({ userId: "user-1" }, "students", "list");
+    const coursesKey = protectedQueryKey({ userId: "user-1" }, "courses", "list");
+
+    client.setQueryData(studentsKey, []);
+    client.setQueryData(coursesKey, []);
+
+    await invalidateProtectedQueryResources(client, ["students"]);
+
+    expect(client.getQueryState(studentsKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(coursesKey)?.isInvalidated).toBe(false);
   });
 });
