@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { getNavGroups, iconMap } from "@/lib/nav";
 import { useMe } from "@/lib/auth";
+import {
+  prefetchRouteData,
+  protectedRoutePrefetchPlan,
+} from "@/lib/route-prefetch";
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -32,6 +37,8 @@ function matchesRoute(pathname: string, routePath: string): boolean {
 /** Sidebar follows the canvas theme (white in light mode, near-black in dark), collapsible to icons. Nav items come from the plugin manifest, grouped into sections. */
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { me, loading } = useMe();
   // Only show nav the caller's roles are allowed to see. While `me` loads we show
   // skeletons rather than the full list, so restricted items never flash in.
@@ -44,6 +51,19 @@ export function AppSidebar() {
   const activeRoutePath = allRoutes
     .filter((route) => matchesRoute(pathname, route.path))
     .sort((a, b) => b.path.length - a.path.length)[0]?.path;
+
+  const prefetchIntent = (routePath: string) => {
+    if (!me || matchesRoute(pathname, routePath)) return;
+    const plan = protectedRoutePrefetchPlan({
+      userId: me.id,
+      roles: me.roles,
+      path: routePath,
+    });
+    if (plan.length === 0) return;
+
+    router.prefetch(routePath);
+    void prefetchRouteData(queryClient, plan);
+  };
 
   return (
     <SidebarPrimitive
@@ -98,7 +118,12 @@ export function AppSidebar() {
                           isActive={active}
                           tooltip={label}
                           render={
-                            <Link href={route.path}>
+                            <Link
+                              href={route.path}
+                              onPointerEnter={() => prefetchIntent(route.path)}
+                              onFocus={() => prefetchIntent(route.path)}
+                              onTouchStart={() => prefetchIntent(route.path)}
+                            >
                               {Icon ? <Icon /> : null}
                               <span>{label}</span>
                             </Link>
@@ -127,7 +152,12 @@ export function AppSidebar() {
                     isActive={active}
                     tooltip={label}
                     render={
-                      <Link href={route.path}>
+                      <Link
+                        href={route.path}
+                        onPointerEnter={() => prefetchIntent(route.path)}
+                        onFocus={() => prefetchIntent(route.path)}
+                        onTouchStart={() => prefetchIntent(route.path)}
+                      >
                         {Icon ? <Icon /> : null}
                         <span>{label}</span>
                       </Link>
