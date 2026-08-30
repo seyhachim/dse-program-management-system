@@ -1,0 +1,207 @@
+name: One-shot Section 14 grid fix
+on:
+  push:
+    branches:
+      - fix/issue-766-inline-course-synopsis
+    paths:
+      - .github/workflows/tmp-fix-section14-grid.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-766-inline-course-synopsis
+          fetch-depth: 0
+      - name: Replace Section 14 split tables with deterministic six-column grid
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/frontend/app/(shell)/courses/[id]/spec/document-preview-pages.tsx')
+          src = path.read_text()
+          start = src.index('        <div className="section14-table">')
+          end = src.index('        <TaxonomyLegend />', start)
+          replacement = '''        <div className="section14-table">
+          <div className="section14-header-grid">
+            <div className="section14-header-description">Description of the course learning outcomes – CLOs. At the end of the course, students will be able to:</div>
+            <div className="section14-header-plo">PLO</div>
+            <div className="section14-header-domain">
+              <div className="section14-header-domain-title">Levels in Learning Domain:<br />Knowledge (Cognitive-C), Attitude<br />(Affective-A), Skills (Psychomotor-P)</div>
+              <div className="section14-header-domain-columns"><span>C</span><span>A</span><span>P</span></div>
+            </div>
+          </div>
+          <div className="section14-body-grid">
+            {document.clos.length ? document.clos.map((clo) => {
+              const domain = learningDomain(clo.level);
+              return <div className="section14-body-row" key={clo.code}>
+                <div className="section14-cell section14-cell-center">{clo.code}</div>
+                <div className="section14-cell">{clo.outcome}</div>
+                <div className="section14-cell section14-cell-center">{joinValues(clo.mappedPlos)}</div>
+                <div className="section14-cell section14-cell-center">{domain.cognitive || " "}</div>
+                <div className="section14-cell section14-cell-center">{domain.affective || " "}</div>
+                <div className="section14-cell section14-cell-center section14-cell-last">{domain.psychomotor || " "}</div>
+              </div>;
+            }) : <div className="section14-empty-row">No Course Learning Outcomes have been added.</div>}
+          </div>
+        </div>
+'''
+          path.write_text(src[:start] + replacement + src[end:])
+
+          theme = Path('apps/frontend/app/(shell)/courses/[id]/spec/themed-document-pages.tsx')
+          css = theme.read_text()
+          start_css = css.index('        .course-spec-theme-root #clos .section14-table {')
+          end_css = css.index('\n\n\n        .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) td {', start_css)
+          css_block = '''        .course-spec-theme-root #clos .section14-table {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          font-size: 8.5pt;
+          line-height: 1.08;
+        }
+
+        .course-spec-theme-root #clos .section14-header-grid {
+          display: grid;
+          grid-template-columns: 65% 8% 27%;
+          width: 100%;
+          border-top: 1px solid #000;
+          border-left: 1px solid #000;
+          box-sizing: border-box;
+          background: #e2eedb;
+        }
+
+        .course-spec-theme-root #clos .section14-header-description,
+        .course-spec-theme-root #clos .section14-header-plo,
+        .course-spec-theme-root #clos .section14-header-domain {
+          border-right: 1px solid #000;
+          border-bottom: 1px solid #000;
+          min-width: 0;
+          box-sizing: border-box;
+        }
+
+        .course-spec-theme-root #clos .section14-header-description,
+        .course-spec-theme-root #clos .section14-header-plo {
+          min-height: 62px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 3pt 2pt;
+        }
+
+        .course-spec-theme-root #clos .section14-header-domain {
+          display: grid;
+          grid-template-rows: 44px 18px;
+        }
+
+        .course-spec-theme-root #clos .section14-header-domain-title {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 2pt;
+          border-bottom: 1px solid #000;
+          white-space: normal;
+          overflow-wrap: anywhere;
+        }
+
+        .course-spec-theme-root #clos .section14-header-domain-columns {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+        }
+
+        .course-spec-theme-root #clos .section14-header-domain-columns > span {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          border-right: 1px solid #000;
+        }
+
+        .course-spec-theme-root #clos .section14-header-domain-columns > span:last-child {
+          border-right: 0;
+        }
+
+        .course-spec-theme-root #clos .section14-body-grid {
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .course-spec-theme-root #clos .section14-body-row {
+          display: grid;
+          grid-template-columns: 7% 58% 8% 9% 9% 9%;
+          width: 100%;
+          box-sizing: border-box;
+          border-left: 1px solid #000;
+        }
+
+        .course-spec-theme-root #clos .section14-cell {
+          min-width: 0;
+          padding: 2pt 1.5pt;
+          border-right: 1px solid #000;
+          border-bottom: 1px solid #000;
+          box-sizing: border-box;
+          overflow-wrap: anywhere;
+        }
+
+        .course-spec-theme-root #clos .section14-cell-center {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+        }
+
+        .course-spec-theme-root #clos .section14-empty-row {
+          border-left: 1px solid #000;
+          border-right: 1px solid #000;
+          border-bottom: 1px solid #000;
+          padding: 2pt 1.5pt;
+        }
+'''
+          theme.write_text(css[:start_css] + css_block + css[end_css:])
+
+          test = Path('apps/frontend/app/(shell)/courses/[id]/spec/document-preview-pages-layout.test.ts')
+          t = test.read_text()
+          old_start = t.index('    expect(source).toContain(\'className="section14-header-table\');') if 'className="section14-header-table' in t else -1
+          if old_start >= 0:
+              old_end = t.index('    expect(source).toContain(\'className="bg-[#E2EEDB] text-center font-normal"\');', old_start)
+              old_end = t.index('\n', old_end) + 1
+              new_asserts = '''    expect(source).toContain('className="section14-header-grid"');
+    expect(source).toContain('className="section14-header-domain-columns"');
+    expect(source).toContain('className="section14-body-row"');
+'''
+              t = t[:old_start] + new_asserts + t[old_end:]
+          test.write_text(t)
+
+          style_test = Path('apps/frontend/app/(shell)/courses/[id]/spec/section14-preview-style.test.ts')
+          st = style_test.read_text()
+          st = st.replace('expect(source).toContain(".section14-table > table");', 'expect(source).toContain(".section14-header-grid");')
+          st = st.replace('expect(source).toContain("table-layout: fixed !important");', 'expect(source).toContain("grid-template-columns: 65% 8% 27%");')
+          st = st.replace('expect(source).toContain("max-width: 100% !important");', 'expect(source).toContain("grid-template-columns: 7% 58% 8% 9% 9% 9%");')
+          st = st.replace('expect(source).toContain("min-width: 0 !important");', 'expect(source).toContain("grid-template-columns: repeat(3, 1fr)");')
+          st = st.replace('expect(source).toContain("height: 44px");', 'expect(source).toContain("grid-template-rows: 44px 18px");')
+          st = st.replace('expect(source).toContain("white-space: normal !important");', 'expect(source).toContain("white-space: normal");')
+          st = st.replace('expect(source).toContain("overflow-wrap: anywhere !important");', 'expect(source).toContain("overflow-wrap: anywhere");')
+          st = st.replace('expect(source).toContain("font-size: 8.5pt !important");', 'expect(source).toContain("font-size: 8.5pt");')
+          # Replace outdated colgroup-specific test body.
+          marker = '  test("reserves explicit space for CLO, description, PLO, C, A, and P", async () => {'
+          if marker in st:
+              s = st.index(marker)
+              e = st.index('\n  });', s) + len('\n  });')
+              repl = '''  test("reserves explicit space for CLO, description, PLO, C, A, and P", async () => {
+    const source = await Bun.file(THEME_PATH).text();
+    expect(source).toContain("grid-template-columns: 7% 58% 8% 9% 9% 9%");
+    expect(source).toContain("grid-template-columns: repeat(3, 1fr)");
+  });'''
+              st = st[:s] + repl + st[e:]
+          style_test.write_text(st)
+          PY
+
+          git rm .github/workflows/tmp-fix-section14-grid.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix(course-spec): make CLO C A P grid deterministic"
+          git push origin HEAD:fix/issue-766-inline-course-synopsis
