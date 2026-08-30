@@ -53,7 +53,7 @@ export function AppSidebar() {
     .sort((a, b) => b.path.length - a.path.length)[0]?.path;
 
   const prefetchIntent = (routePath: string) => {
-    if (!me) return;
+    if (!me || matchesRoute(pathname, routePath)) return;
     const plan = protectedRoutePrefetchPlan({
       userId: me.id,
       roles: me.roles,
