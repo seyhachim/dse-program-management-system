@@ -193,6 +193,24 @@ export function ThemedDocumentPages({
           vertical-align: middle;
         }
 
+        .course-spec-theme-root #clos .section14-table thead th {
+          background: #e2eedb !important;
+          color: #000 !important;
+          vertical-align: middle !important;
+          text-align: center !important;
+          font-weight: 400 !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(1),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(3),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(4),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(5),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(6) {
+          text-align: center !important;
+          vertical-align: middle !important;
+        }
+
+
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) td {
           vertical-align: top;
         }

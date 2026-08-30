@@ -20,11 +20,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Tabs,
   TabsContent,
   TabsList,
@@ -41,7 +36,6 @@ import {
   teachingLearningApi,
 } from "@/lib/teaching-learning";
 import {
-  CourseInfoSection,
   EMPTY_COURSE_INFO,
   toCourseInfoForm,
   toCourseInfoPayload,
@@ -186,7 +180,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [courseInfoDialogOpen, setCourseInfoDialogOpen] = useState(false);
 
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
@@ -307,6 +300,36 @@ export function SpecClient({ courseId }: { courseId: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const persistCourseDescription = useCallback(
+    async (description: string) => {
+      if (editingLocked) {
+        setError("This course specification is locked while it is in the review workflow.");
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      const nextCourseInfo = { ...courseInfo, description };
+      try {
+        await courseSpecApi.saveSection(
+          courseId,
+          "courseInfo",
+          toCourseInfoPayload(nextCourseInfo),
+        );
+        setCourseInfo(nextCourseInfo);
+        setStatus((current) => ({ ...current, courseInfo: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to save the course description");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, courseInfo, editingLocked],
+  );
 
   const persistClos = useCallback(
     async (items: CloForm[]) => {
@@ -759,10 +782,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 assessments={assessments}
                 status={status}
                 courseTotalSlt={courseTotalSlt}
-                onEditCourseInfo={() => {
-                  if (!editingLocked) setCourseInfoDialogOpen(true);
-                  else setError("This course specification is locked while it is in the review workflow.");
-                }}
+                onSaveCourseDescription={persistCourseDescription}
+                savingCourseDescription={saving}
                 onGoToTab={(id) => setActiveTab(id)}
                 readOnly={editingLocked}
               />
@@ -890,36 +911,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
         </>
       )}
 
-      <Dialog
-        open={courseInfoDialogOpen && !editingLocked}
-        onOpenChange={(open) => {
-          if (!editingLocked) setCourseInfoDialogOpen(open);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Course Information</DialogTitle>
-          </DialogHeader>
-          <CourseInfoSection
-            value={courseInfo}
-            onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCourseInfoDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                const ok = await saveSection("courseInfo");
-                if (ok) setCourseInfoDialogOpen(false);
-              }}
-              disabled={saving}
-            >
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
