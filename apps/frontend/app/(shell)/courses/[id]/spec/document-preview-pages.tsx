@@ -198,6 +198,100 @@ function CloPloMatrix({ mapping, mode }: { mapping: CourseDocumentModel["mapping
   );
 }
 
+function compactSltValue(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || String(value).trim() === "") return "";
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric === 0) return "";
+  return String(value).replace(/\.0+$/, "");
+}
+
+function SltCell({
+  value,
+  className = "",
+  colSpan,
+}: {
+  value: string | number | null | undefined;
+  className?: string;
+  colSpan?: number;
+}) {
+  const display = compactSltValue(value);
+  return (
+    <td
+      colSpan={colSpan}
+      className={["border border-black px-1 py-[1px] align-middle", className].join(" ")}
+    >
+      {display || " "}
+    </td>
+  );
+}
+
+function AssessmentSltTable({
+  document,
+  category,
+}: {
+  document: CourseDocumentModel;
+  category: "continuous" | "final";
+}) {
+  const label = category === "continuous" ? "Continuous Assessment" : "Final Assessment";
+  const assessments = document.assessments.filter(
+    (assessment) => assessment.assessmentCategory === category,
+  );
+  const paddedRows = Array.from(
+    { length: Math.max(5, assessments.length) },
+    (_, index) => assessments[index] ?? null,
+  );
+  const categoryTotal =
+    category === "continuous"
+      ? document.totals.continuousAssessmentSlt
+      : document.totals.finalAssessmentSlt;
+
+  return (
+    <Table className="section16-assessment-table mt-4 text-[8px] leading-[1.05]">
+      <colgroup>
+        <col style={{ width: "3%" }} />
+        <col style={{ width: "38%" }} />
+        <col style={{ width: "6%" }} />
+        <col style={{ width: "16%" }} />
+        <col style={{ width: "19%" }} />
+        <col style={{ width: "13%" }} />
+        <col style={{ width: "5%" }} />
+      </colgroup>
+      <thead>
+        <tr>
+          <TH rowSpan={2} colSpan={2} className="bg-[#E2EEDB] text-center font-normal">{label}</TH>
+          <TH rowSpan={2} className="bg-[#E2EEDB] text-center font-normal">%</TH>
+          <TH colSpan={2} className="bg-[#E2EEDB] text-center font-normal">Face to Face (F2F)</TH>
+          <TH rowSpan={2} className="bg-[#E2EEDB] text-center font-normal">NF2F<br />Independent Learning<br />(Asynchronous)</TH>
+          <TH rowSpan={2} className="bg-[#E2EEDB] text-center font-normal">Total<br />SLT</TH>
+        </tr>
+        <tr>
+          <TH className="bg-[#E2EEDB] text-center font-normal">Physical</TH>
+          <TH className="bg-[#E2EEDB] text-center font-normal">Online/Technology-mediated<br />(Synchronous)</TH>
+        </tr>
+      </thead>
+      <tbody>
+        {paddedRows.map((assessment, index) => (
+          <tr key={assessment?.id ?? `${category}-blank-${index}`}>
+            <SltCell value={index + 1} className="text-center" />
+            <SltCell value={assessment?.name ?? ""} />
+            <SltCell value={assessment?.weight ?? ""} className="text-center" />
+            <SltCell value={assessment?.physicalSltHours ?? ""} className="text-center" />
+            <SltCell value={assessment?.onlineSltHours ?? ""} className="text-center" />
+            <SltCell value={assessment?.independentSltHours ?? ""} className="text-center" />
+            <SltCell value={assessment?.totalSltHours ?? ""} className="text-center" />
+          </tr>
+        ))}
+        <tr>
+          <td colSpan={6} className="border border-black px-1 py-[1px] text-right align-middle font-semibold">
+            Total SLT for {label}:
+          </td>
+          <SltCell value={categoryTotal} className="bg-[#FFF2CC] text-center font-semibold" />
+        </tr>
+      </tbody>
+    </Table>
+  );
+}
+
 export function DocumentPages({ document, zoom }: { document: CourseDocumentModel; zoom: number }) {
   const info = document.courseInformation;
   const weeklyPages: CourseDocumentModel["weeklyPlan"][] = [];
@@ -267,7 +361,79 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
         <Table><colgroup><col className="w-[8%]" /><col className="w-[15%]" /><col className="w-[9%]" /><col className="w-[34%]" /><col className="w-[34%]" /></colgroup><thead><tr><TH>CLO</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Teaching Method</TH><TH>Assessment Methods</TH></tr></thead><tbody>{document.mapping.map((row) => <tr key={row.cloCode}><TD className="font-medium">{row.cloCode}</TD><TD>{joinValues(row.ploCodes)}</TD><TD>{displayDocumentValue(row.level)}</TD><TD>{joinValues(row.teachingMethods)}</TD><TD>{joinValues(row.assessmentMethods)}</TD></tr>)}</tbody></Table>
       </PartTwoRow><PageFooter courseCode={info.courseCode} page={6} /></div></Page>
 
-      <Page zoom={zoom} pageNumber={7}><div id="slt" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="16">Distribution of Student Learning Time (SLT)</SectionTitle><Table><colgroup><col className="w-[5%]" /><col className="w-[29%]" /><col className="w-[8%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[11%]" /></colgroup><thead><tr><TH>Week</TH><TH>Course Content Outline / Topic</TH><TH>CLOs</TH><TH>L</TH><TH>T</TH><TH>P</TH><TH>O</TH><TH>Independent</TH><TH>Total SLT</TH></tr></thead><tbody>{document.weeklyPlan.map((week) => <tr key={week.id}><TD>{week.week}</TD><TD>{week.topic}</TD><TD>{joinValues(week.cloCodes)}</TD><TD>{displayDocumentValue(week.lectureHours)}</TD><TD>{displayDocumentValue(week.tutorialHours)}</TD><TD>{displayDocumentValue(week.practiceHours)}</TD><TD>{displayDocumentValue(week.otherHours)}</TD><TD>{displayDocumentValue(week.selfStudyHours)}</TD><TD>{week.sltHours ? `${week.sltHours} h` : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={3} className="font-semibold">Total SLT for Course Content</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.lectureHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.tutorialHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.practiceHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.otherHours) || 0), 0)}</TD><TD className="font-semibold">{document.weeklyPlan.reduce((s, w) => s + (Number(w.selfStudyHours) || 0), 0)}</TD><TD className="font-semibold">{document.totals.courseContentSlt} h</TD></tr></tfoot></Table><div className="mt-5 rounded border border-black p-3 text-[10px]"><p className="font-bold">Assessment SLT</p><p className="mt-1">Continuous Assessment SLT: <strong>{document.totals.continuousAssessmentSlt} h</strong></p><p>Final Assessment SLT: <strong>{document.totals.finalAssessmentSlt} h</strong></p><p className="mt-2">Grand Total SLT: <strong>{document.totals.grandSlt} h</strong></p></div></PartTwoRow><PageFooter courseCode={info.courseCode} page={7} /></div></Page>
+      <Page zoom={zoom} pageNumber={7}><div id="slt" className="h-full px-[54px] py-[42px]"><PartTwoRow>
+        <SectionTitle number="16">Distribution of Student Learning Time (SLT)</SectionTitle>
+        <p className="mb-3 text-[8.5px]">* Lecture (L), Tutoring (T), Practice (P), Other (O)</p>
+        <Table className="section16-content-table text-[8px] leading-[1.05]">
+          <colgroup>
+            <col style={{ width: "3.125%" }} />
+            <col style={{ width: "39.583%" }} />
+            <col style={{ width: "5.208%" }} />
+            {Array.from({ length: 8 }, (_, index) => <col key={`activity-col-${index}`} style={{ width: "4.167%" }} />)}
+            <col style={{ width: "11.458%" }} />
+            <col style={{ width: "7.292%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <TH rowSpan={4} colSpan={2} className="bg-[#E2EEDB] text-center font-normal">Course Content Outline and subtopics</TH>
+              <TH rowSpan={4} className="bg-[#E2EEDB] text-center font-normal">CLOs</TH>
+              <TH colSpan={9} className="bg-[#E2EEDB] text-center font-normal">Learning and Teaching Activities</TH>
+              <TH rowSpan={4} className="bg-[#E2EEDB] text-center font-normal">Total<br />SLT</TH>
+            </tr>
+            <tr>
+              <TH colSpan={8} className="bg-[#E2EEDB] text-center font-normal">Face to Face (F2F)</TH>
+              <TH rowSpan={3} className="bg-[#E2EEDB] text-center font-normal">NF2F<br />Independent Learning<br />(Asynchronous)</TH>
+            </tr>
+            <tr>
+              <TH colSpan={4} className="bg-[#E2EEDB] text-center font-normal">Physical</TH>
+              <TH colSpan={4} className="bg-[#E2EEDB] text-center font-normal">Online/Technology-mediated<br />(Synchronous)</TH>
+            </tr>
+            <tr>
+              {(["L", "T", "P", "O", "L", "T", "P", "O"] as const).map((label, index) => (
+                <TH key={`${label}-${index}`} className="bg-[#E2EEDB] text-center font-normal">{label}</TH>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {document.weeklyPlan.map((week) => (
+              <tr key={week.id}>
+                <SltCell value={week.week} className="text-center" />
+                <td className="border border-black px-1 py-[1px] align-middle">
+                  <strong>Topic {week.week}:</strong>{" "}{week.topic}
+                </td>
+                <SltCell value={week.cloCodes.join(", ")} className="text-center" />
+                <SltCell value={week.lectureHours} className="text-center" />
+                <SltCell value={week.tutorialHours} className="text-center" />
+                <SltCell value={week.practiceHours} className="text-center" />
+                <SltCell value={week.otherHours} className="text-center" />
+                <SltCell value="" className="text-center" />
+                <SltCell value="" className="text-center" />
+                <SltCell value="" className="text-center" />
+                <SltCell value="" className="text-center" />
+                <SltCell value={week.selfStudyHours} className="text-center" />
+                <SltCell value={week.sltHours} className="text-center" />
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={3} className="border border-black px-1 py-[1px] text-right align-middle font-semibold">Total SLT for Course Content</td>
+              <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.lectureHours) || 0), 0)} className="text-center font-semibold" />
+              <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.tutorialHours) || 0), 0)} className="text-center font-semibold" />
+              <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.practiceHours) || 0), 0)} className="text-center font-semibold" />
+              <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.otherHours) || 0), 0)} className="text-center font-semibold" />
+              <SltCell value="" className="text-center" />
+              <SltCell value="" className="text-center" />
+              <SltCell value="" className="text-center" />
+              <SltCell value="" className="text-center" />
+              <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.selfStudyHours) || 0), 0)} className="text-center font-semibold" />
+              <SltCell value={document.totals.courseContentSlt} className="text-center font-semibold" />
+            </tr>
+          </tfoot>
+        </Table>
+        <AssessmentSltTable document={document} category="continuous" />
+        <AssessmentSltTable document={document} category="final" />
+      </PartTwoRow><PageFooter courseCode={info.courseCode} page={7} /></div></Page>
 
       <Page zoom={zoom} pageNumber={8}><div id="assessment-plan" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[7%]" /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[23%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[10%]" /><col className="w-[14%]" /><col className="w-[14%]" /></colgroup><thead><tr><TH>CLOs</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Assessment &amp; Description</TH><TH>G/I</TH><TH>Weight (%)</TH><TH>SLT</TH><TH>Evaluation Definition</TH><TH>Rubric</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD><p className="font-semibold">{displayDocumentValue(assessment.name)}</p>{assessment.description ? <p className="mt-1 text-[9px] text-slate-700">{assessment.description}</p> : null}</TD><TD className="text-center">{assessment.mode === "group" ? "G" : "I"}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{assessment.totalSltHours > 0 ? `${assessment.totalSltHours} h` : "—"}</TD><TD>{displayDocumentValue(assessment.evaluationDefinition)}</TD><TD>{assessment.rubricName && assessment.rubricUrl ? <Link href={assessment.rubricUrl} className="font-semibold text-blue-700 underline underline-offset-2">{assessment.rubricName} ↗</Link> : assessment.rubricName ? assessment.rubricName : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={5} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD className="font-semibold">{document.totals.assessmentSlt} h</TD><TD colSpan={2}></TD></tr></tfoot></Table></PartTwoRow><PageFooter courseCode={info.courseCode} page={8} /></div></Page>
 

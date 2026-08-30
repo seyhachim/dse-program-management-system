@@ -73,11 +73,26 @@ describe("Course Specification Part 2 continuation rows", () => {
     );
   });
 
-  test("shows persisted assessment SLT in Sections 16 and 17", async () => {
+  test("matches the approved Section 16 SLT distribution layout", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
+    expect(source).toContain("Course Content Outline and subtopics");
+    expect(source).toContain("Learning and Teaching Activities");
+    expect(source).toContain("Face to Face (F2F)");
+    expect(source).toContain("Online/Technology-mediated");
+    expect(source).toContain("NF2F<br />Independent Learning<br />(Asynchronous)");
+    expect(source).toContain("* Lecture (L), Tutoring (T), Practice (P), Other (O)");
+    expect(source).toContain('category="continuous"');
+    expect(source).toContain('category="final"');
+    expect(source).toContain("physicalSltHours");
+    expect(source).toContain("onlineSltHours");
+    expect(source).toContain("independentSltHours");
     expect(source).toContain("document.totals.continuousAssessmentSlt");
     expect(source).toContain("document.totals.finalAssessmentSlt");
-    expect(source).toContain("document.totals.grandSlt");
+    expect(source).not.toContain("Assessment SLT</p>");
+  });
+
+  test("shows persisted assessment SLT in Section 17", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
     expect(source).toContain("assessment.totalSltHours");
   });
 });
