@@ -6,6 +6,7 @@ import { studentsPlugin } from "../plugins/students/index.ts";
 import { lecturersPlugin } from "../plugins/lecturers/index.ts";
 import { coursesPlugin } from "../plugins/courses/index.ts";
 import { offeringsPlugin } from "../plugins/offerings/index.ts";
+import { dashboardPlugin } from "../plugins/dashboard/index.ts";
 import { methodsPlugin } from "../plugins/methods/index.ts";
 import { rubricsPlugin } from "../plugins/rubrics/index.ts";
 import { authPlugin } from "../plugins/auth/index.ts";
@@ -31,6 +32,7 @@ export function createApp(): Express {
   registry.register(lecturersPlugin);
   registry.register(coursesPlugin);
   registry.register(offeringsPlugin);
+  registry.register(dashboardPlugin);
   registry.register(methodsPlugin);
   registry.register(rubricsPlugin);
   registry.register(authPlugin);
