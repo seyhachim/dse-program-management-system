@@ -71,6 +71,11 @@ export function StudentsClient() {
   const hasData = studentsQuery.data !== undefined;
   const coldLoading = !hasData && studentsQuery.isPending;
   const hardQueryError = !hasData && studentsQuery.isError;
+  const canAdvancePage =
+    !studentsQuery.isFetching &&
+    !studentsQuery.isPlaceholderData &&
+    !studentsQuery.isError &&
+    Boolean(studentsQuery.data?.nextCursor);
 
   const handleSubmit = async (values: StudentFormValues) => {
     setSubmitting(true);
@@ -150,7 +155,7 @@ export function StudentsClient() {
 
   const handleNextPage = () => {
     const nextCursor = studentsQuery.data?.nextCursor;
-    if (!nextCursor || studentsQuery.isFetching) return;
+    if (!nextCursor || !canAdvancePage) return;
     setSelectedIds([]);
     setPreviousCursors((current) => [...current, pageCursor]);
     setPageCursor(nextCursor);
@@ -290,7 +295,7 @@ export function StudentsClient() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={!studentsQuery.data?.nextCursor || studentsQuery.isFetching}
+                  disabled={!canAdvancePage}
                   onClick={handleNextPage}
                 >
                   Next
