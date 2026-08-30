@@ -220,13 +220,30 @@ export function ThemedDocumentPages({
         .course-spec-theme-root #clos .section14-table {
           width: 100%;
           max-width: 100%;
-          overflow: hidden;
+          box-sizing: border-box;
         }
 
         .course-spec-theme-root #clos .section14-table > table {
           width: 100% !important;
           max-width: 100% !important;
+          min-width: 0 !important;
           table-layout: fixed !important;
+          box-sizing: border-box !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(1) {
+          width: 7% !important;
+        }
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(2) {
+          width: 58% !important;
+        }
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(3) {
+          width: 8% !important;
+        }
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(4),
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(5),
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(6) {
+          width: 9% !important;
         }
 
         .course-spec-theme-root #clos .section14-table th,
