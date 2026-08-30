@@ -43,6 +43,7 @@ import {
   type InlineButton,
   type RouteKey,
 } from "./index.ts";
+import { createPublicTelegramTimingTracker } from "./performance.ts";
 import {
   createTelegramPublicBotClient,
   type TelegramPublicBotClient,
@@ -798,7 +799,10 @@ export function createPublicTelegramRouter(
       }
     }
 
-    const client =
+    const timing = createPublicTelegramTimingTracker(
+      update.callback_query ? "callback" : update.message ? "message" : "other",
+    );
+    const baseClient =
       deps.client ?? createTelegramPublicBotClient(config.botToken);
     const programmeService =
       deps.publicRead &&
@@ -806,15 +810,22 @@ export function createPublicTelegramRouter(
       deps.publicQuestionAnalytics
         ? null
         : resolveProgrammeService();
-    const publicRead = deps.publicRead ?? programmeService!.publicRead;
-    const publicCurriculumRead =
+    const basePublicRead = deps.publicRead ?? programmeService!.publicRead;
+    const basePublicCurriculumRead =
       deps.publicCurriculumRead ?? programmeService!.publicCurriculumRead;
-    const publicSearch = deps.publicSearch ?? publicProgrammeSearchService;
+    const basePublicSearch = deps.publicSearch ?? publicProgrammeSearchService;
+    const client = timing.wrapTelegramClient(baseClient);
+    const publicRead = timing.wrapPmsService(basePublicRead);
+    const publicCurriculumRead = timing.wrapPmsService(
+      basePublicCurriculumRead,
+    );
+    const publicSearch = timing.wrapPmsService(basePublicSearch);
     const publicQuestionAnalytics =
       deps.publicQuestionAnalytics ?? programmeService!.publicQuestionAnalytics;
     const programmeId = config.publicProgrammeId;
     const locale =
       actorId === undefined ? "en" : (deps.localeForChat?.(actorId) ?? "en");
+    let timingOutcome: "ok" | "error" = "ok";
 
     try {
       if (update.message?.text) {
@@ -974,6 +985,11 @@ export function createPublicTelegramRouter(
             text: "This action is unavailable.",
           });
         } else {
+          // Telegram's client keeps a visible waiting state until the callback is
+          // acknowledged. Do this before any PMS read/render work so a slow DB or
+          // message edit does not make a valid button tap feel unresponsive.
+          await client.answerCallbackQuery({ callbackQueryId: callback.id });
+
           let rendered;
           if (parsedCallback.kind === "static") {
             rendered = await renderStaticCallback(
@@ -1023,13 +1039,15 @@ export function createPublicTelegramRouter(
             messageId: callback.message.message_id,
             ...rendered,
           });
-          await client.answerCallbackQuery({ callbackQueryId: callback.id });
         }
       }
       res.json({ ok: true });
     } catch (error) {
+      timingOutcome = "error";
       console.error("Public Telegram webhook failed", error);
       res.status(500).json({ error: "Could not process Telegram update" });
+    } finally {
+      timing.finish(timingOutcome);
     }
   });
 
