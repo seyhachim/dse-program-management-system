@@ -171,7 +171,6 @@ integrationDescribe("Dashboard compact summary", () => {
       "email",
       "phone",
       "qualification",
-      "students\"",
       "meetings",
       "coLecturers",
       "incompleteSections",
