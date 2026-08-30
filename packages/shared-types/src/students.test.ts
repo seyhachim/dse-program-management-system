@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { CreateStudentInput, UpdateStudentInput } from "./students.ts";
+import {
+  CreateStudentInput,
+  ListStudentsPageQuery,
+  UpdateStudentInput,
+} from "./students.ts";
 
 describe("student roster contracts", () => {
   test("accepts a roster student without email and normalizes optional profile text", () => {
@@ -58,5 +62,24 @@ describe("student roster contracts", () => {
       email: null,
       profile: { latinGivenName: null },
     });
+  });
+
+  test("bounds cursor page size and coerces query-string values", () => {
+    expect(
+      ListStudentsPageQuery.parse({
+        search: "  data  ",
+        activeOnly: "true",
+        limit: "25",
+      }),
+    ).toEqual({
+      search: "data",
+      activeOnly: true,
+      limit: 25,
+    });
+
+    expect(ListStudentsPageQuery.parse({}).limit).toBe(50);
+    expect(() => ListStudentsPageQuery.parse({ limit: "0" })).toThrow();
+    expect(() => ListStudentsPageQuery.parse({ limit: "101" })).toThrow();
+    expect(() => ListStudentsPageQuery.parse({ cursor: "" })).toThrow();
   });
 });
