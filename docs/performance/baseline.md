@@ -74,7 +74,7 @@ Record representative GET routes for these flows. Use the actual authorized rout
 
 | Surface | Cold/warm route set | Requests | Payload | Wall p50/p95 | App p50/p95 | Notes |
 | --- | --- | ---: | ---: | --- | --- | --- |
-| Dashboard | pending | pending | pending | pending | pending | Current UI aggregates multiple sources |
+| Dashboard | pending | pending | pending | pending | pending | Production-like measurement remains pending under #737; CI evidence is recorded separately below |
 | Courses | pending | pending | pending | pending | pending | Include list and one authorized detail flow |
 | Students | pending | pending | pending | pending | pending | List only; no student-identifiable output committed |
 | Offerings | pending | pending | pending | pending | pending | Include normal programme scope |
@@ -83,6 +83,19 @@ Record representative GET routes for these flows. Use the actual authorized rout
 | Action Research | pending | pending | pending | pending | pending | Read-only assigned/project flow |
 
 Do not replace `pending` with invented numbers. Measurements must come from a production-like run and identify the environment/date/commit.
+
+## Dashboard Phase 3 CI integration sample — 2026-08-30
+
+This is reproducible **CI evidence**, not a production latency claim. It was captured from the isolated seeded PostgreSQL integration environment in CI #1473 on implementation head `ac658c555538ec3fec35234a065b0ea7f80889d5`. The test uses the same authenticated admin scope for both paths and records only request count, response bytes, and wall time.
+
+| Dashboard read path | Requests | Response bytes | Observed wall time |
+| --- | ---: | ---: | ---: |
+| Legacy browser-equivalent set (`/api/students`, `/api/courses`, `/api/offerings`, `/api/lecturers`, `/api/courses/spec-progress`) | 5 | 6,447 | 32.6 ms |
+| Compact `/api/dashboard/summary` | 1 | 948 | 7.0 ms |
+
+On this seeded CI fixture, Phase 3 reduced the cold Dashboard request count by **80%** (5 → 1) and response payload bytes by **85.3%** (6,447 → 948). The observed wall time was lower in this run, but CI timing is noisy and must not be treated as a production SLO or a substitute for #737's production-like measurements.
+
+The Dashboard query uses the shared authenticated in-memory query cache with a 45-second operational stale time. A same-user revisit while the summary remains fresh reuses the completed value without another Dashboard network read; once stale, the cached value remains available while the single summary request revalidates. Protected cache eviction on logout/user switch remains the Phase 2 security boundary.
 
 ## Deployment-region audit — 2026-08-29
 

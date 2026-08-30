@@ -39,6 +39,20 @@ export interface CourseSpecVersionRef {
   effectiveFrom: string | null;
 }
 
+/** Lean CourseSpec progress shape used by cross-plugin read projections. */
+export interface CourseSpecProgressRef {
+  courseId: string;
+  code: string;
+  title: string;
+  completed: number;
+  total: number;
+  curriculumPlacement?: {
+    programmeYear: number;
+    semester: "First" | "Second";
+    sortOrder: number;
+  } | null;
+}
+
 export interface LecturerRef {
   id: string;
   name: string;
@@ -59,6 +73,8 @@ export interface CoursesServiceContract {
   getCourseSpecVersion(id: string): Promise<CourseSpecVersionRef | null>;
   listApprovedSpecVersions(courseId: string): Promise<CourseSpecVersionRef[]>;
   weeklyContactHours(courseSpecId: string): Promise<CourseWeeklyContactHoursRef[]>;
+  /** Narrow read used by the Dashboard without exposing CourseSpec content. */
+  listSpecProgress(lecturerScope?: string): Promise<CourseSpecProgressRef[]>;
 }
 
 export interface CourseWeeklyContactHoursRef {
