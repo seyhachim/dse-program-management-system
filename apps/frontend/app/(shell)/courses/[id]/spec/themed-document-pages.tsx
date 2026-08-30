@@ -193,12 +193,30 @@ export function ThemedDocumentPages({
           vertical-align: middle;
         }
 
+        .course-spec-theme-root #clos .section14-table {
+          table-layout: fixed !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table .section14-header-row:first-child {
+          height: 44px;
+        }
+
+        .course-spec-theme-root #clos .section14-table .section14-header-row:nth-child(2) {
+          height: 18px;
+        }
+
         .course-spec-theme-root #clos .section14-table .section14-header-row th {
           background: #e2eedb !important;
           color: #000 !important;
           vertical-align: middle !important;
           text-align: center !important;
           font-weight: 400 !important;
+          font-size: 8.5pt !important;
+          line-height: 1.08 !important;
+          white-space: normal !important;
+          overflow-wrap: anywhere !important;
+          word-break: normal !important;
+          padding: 3pt 2pt !important;
         }
 
         .course-spec-theme-root #clos .section14-table tbody td:nth-child(1),
