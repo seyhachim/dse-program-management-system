@@ -1,0 +1,28 @@
+name: Apply issue 766 CI follow-up
+
+on:
+  push:
+    branches:
+      - fix/issue-766-inline-course-synopsis
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-766-inline-course-synopsis
+      - name: Apply issue 766 CI follow-up
+        run: python scripts/issue766-ci-followup.py
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/frontend/app/\(shell\)/courses/\[id\]/spec/spec-client.tsx apps/frontend/app/\(shell\)/courses/\[id\]/spec/read-only-spec-client.tsx apps/frontend/app/\(shell\)/courses/\[id\]/spec/document-preview-pages.tsx apps/frontend/app/\(shell\)/courses/\[id\]/spec/course-info-inline-edit.test.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(course-spec): complete inline synopsis contract"
+          git push origin HEAD:fix/issue-766-inline-course-synopsis
