@@ -1,0 +1,43 @@
+name: One-shot Section 14 width fix
+on:
+  push:
+    branches: [fix/issue-766-inline-course-synopsis]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-766-inline-course-synopsis
+          fetch-depth: 0
+      - name: Patch Section 14 table containment
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          theme = Path('apps/frontend/app/(shell)/courses/[id]/spec/themed-document-pages.tsx')
+          text = theme.read_text()
+          old = '''        .course-spec-theme-root #clos .section14-table {\n          table-layout: fixed !important;\n        }\n'''
+          new = '''        .course-spec-theme-root #clos .section14-table {\n          width: 100%;\n          max-width: 100%;\n          overflow: hidden;\n        }\n\n        .course-spec-theme-root #clos .section14-table > table {\n          width: 100% !important;\n          max-width: 100% !important;\n          table-layout: fixed !important;\n        }\n\n        .course-spec-theme-root #clos .section14-table th,\n        .course-spec-theme-root #clos .section14-table td {\n          min-width: 0 !important;\n          max-width: 100%;\n          overflow: hidden;\n          overflow-wrap: anywhere !important;\n        }\n'''
+          if old not in text:
+              raise SystemExit('Section 14 CSS target not found')
+          theme.write_text(text.replace(old, new, 1))
+
+          test = Path('apps/frontend/app/(shell)/courses/[id]/spec/section14-preview-style.test.ts')
+          t = test.read_text()
+          marker = '    expect(source).toContain(".section14-header-row:first-child");\n'
+          insert = marker + '    expect(source).toContain(".section14-table > table");\n    expect(source).toContain("table-layout: fixed !important");\n    expect(source).toContain("max-width: 100% !important");\n'
+          if marker not in t:
+              raise SystemExit('Section 14 test marker not found')
+          test.write_text(t.replace(marker, insert, 1))
+          PY
+          rm .github/workflows/tmp-fix-section14-table-width.yml
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix(course-spec): contain Section 14 CLO table"
+          git push origin HEAD:fix/issue-766-inline-course-synopsis
