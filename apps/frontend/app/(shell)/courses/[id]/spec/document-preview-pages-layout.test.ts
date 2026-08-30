@@ -51,8 +51,9 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source).toContain("Levels in Learning Domain:<br />Knowledge (Cognitive-C), Attitude<br />(Affective-A), Skills (Psychomotor-P)");
     expect(source).toContain('>C</TH><TH className="bg-[#E2EEDB] text-center font-normal">A</TH><TH className="bg-[#E2EEDB] text-center font-normal">P</TH>');
     expect(source).toContain('className="section14-header-row"');
-    expect(source).toContain('<thead><tr className=\"section14-header-row\">');
-    expect(source).toContain('</thead><tbody>{document.clos.length ?');
+    expect(source).toContain('className="section14-header-table');
+    expect(source).toContain('className="section14-body-table');
+    expect(source).not.toContain('<thead><tr className=\"section14-header-row\">');
     expect(source).toContain('className="bg-[#E2EEDB] text-center font-normal"');
     expect(source).toContain('{domain.cognitive || " "}');
     expect(source).toContain('{domain.affective || " "}');

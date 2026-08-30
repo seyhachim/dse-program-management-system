@@ -231,6 +231,16 @@ export function ThemedDocumentPages({
           box-sizing: border-box !important;
         }
 
+        .course-spec-theme-root #clos .section14-header-table,
+        .course-spec-theme-root #clos .section14-body-table {
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
+        }
+
+        .course-spec-theme-root #clos .section14-body-table {
+          margin-top: -1px !important;
+        }
+
         .course-spec-theme-root #clos .section14-table colgroup col:nth-child(1) {
           width: 7% !important;
         }

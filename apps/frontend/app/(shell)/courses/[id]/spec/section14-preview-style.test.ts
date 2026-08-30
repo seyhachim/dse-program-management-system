@@ -14,6 +14,8 @@ describe("Section 14 preview layout", () => {
     expect(source).toContain("white-space: normal !important");
     expect(source).toContain("overflow-wrap: anywhere !important");
     expect(source).toContain("font-size: 8.5pt !important");
+    expect(source).toContain(".section14-header-table");
+    expect(source).toContain(".section14-body-table");
   });
 
   test("reserves explicit space for CLO, description, PLO, C, A, and P", async () => {
