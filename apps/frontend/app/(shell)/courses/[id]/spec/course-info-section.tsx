@@ -77,25 +77,22 @@ export function toCourseInfoForm(data: Record<string, unknown> | undefined): Cou
 }
 
 /**
- * Convert the form model into the CourseInfoInput payload the API validates.
- * Every other Course Information field is admin/assignment-derived (managed via
- * Course Management or the course's offering) and read-only here, so it isn't
- * sent — the backend's `CourseInfoInput` schema only accepts these two anyway.
+ * Convert the form model into the lecturer-editable Course Information payload.
+ * Authoritative course, offering, prerequisite, and lecturer-profile data is
+ * read-only in Course Specification. This workflow may only persist the synopsis.
  */
 export function toCourseInfoPayload(f: CourseInfoForm) {
-  const trimmed = (v: string) => (v.trim() ? v.trim() : undefined);
+  const description = f.description.trim();
   return {
-    prerequisites: trimmed(f.prerequisites),
-    description: trimmed(f.description),
+    description: description || undefined,
   };
 }
 
 /**
- * §1–13 are a read-only document view — those fields come from the Course
- * entity, the assigned lecturer's profile, or the course's offering, and are
- * changed there rather than here (see `CourseInfoInput` in course-spec.ts for
- * why the API enforces this too, not just the UI). Only Pre-requisites (§5) and
- * the Description/Synopsis (§14) are actually editable on this form.
+ * Course information is a read-only document view except for the synopsis.
+ * Course metadata comes from Course Management, offering data from the assigned
+ * offering, prerequisite data from curriculum/course management, and lecturer
+ * identity/contact data from the lecturer profile.
  */
 export function CourseInfoSection({
   value,
@@ -164,12 +161,8 @@ export function CourseInfoSection({
 
       <fieldset className="space-y-4 rounded-lg border border-border p-4">
         <legend className="px-1 text-sm font-semibold text-foreground">Course Specification</legend>
-        <Field label="5. Pre-requisites (if any)">
-          <Input
-            placeholder="e.g. Math I–III; Statistics I–II; Advanced Programming"
-            value={value.prerequisites}
-            onChange={(e) => set({ prerequisites: e.target.value })}
-          />
+        <Field label="5. Pre-requisites (if any)" hint="Managed in curriculum/course management.">
+          <Input value={value.prerequisites} disabled readOnly />
         </Field>
         <Field label="14. Course Description / Synopsis">
           <textarea
