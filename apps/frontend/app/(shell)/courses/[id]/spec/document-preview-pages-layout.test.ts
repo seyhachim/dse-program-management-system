@@ -45,12 +45,15 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source).toContain("COURSE_DOCUMENT_STYLE.courseInfoTitle");
     expect(source).toContain('text-[9px]">Here are the CLOs of this course:');
     expect(source).toContain(
-      "Description of the course learning outcomes – CLOs At the end of the course, students will be able to:",
+      "Description of the course learning outcomes – CLOs. At the end of the course, students will be able to:",
     );
     expect(source).toContain(">PLO</TH>");
     expect(source).toContain("Levels in Learning Domain:<br />Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)");
     expect(source).toContain('>C</TH><TH className="bg-[#E2EEDB] text-center font-normal">A</TH><TH className="bg-[#E2EEDB] text-center font-normal">P</TH>');
-    expect(source).toContain('className="bg-[#E2EEDB] text-left font-normal"');
+    expect(source).toContain('className="bg-[#E2EEDB] text-center font-normal"');
+    expect(source).toContain('{domain.cognitive || " "}');
+    expect(source).toContain('{domain.affective || " "}');
+    expect(source).toContain('{domain.psychomotor || " "}');
     expect(source).toContain('className="text-left align-middle">{clo.outcome}');
     expect(source).toContain('className="border border-black px-1.5 py-[2px] text-left"');
   });
