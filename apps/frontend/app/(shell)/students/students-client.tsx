@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { UserPlus } from "lucide-react";
 import type { Student } from "@dse-pms/shared-types";
 import {
@@ -11,78 +12,88 @@ import {
   TableToolbar,
   type DataTableColumn,
 } from "@dse-pms/ui";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { statusTone, studentsApi } from "@/lib/students";
 import { ApiError } from "@/lib/api";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { StudentForm, type StudentFormValues } from "./student-form";
 import { authApi, useMe } from "@/lib/auth";
 
 export function StudentsClient() {
   const { me } = useMe();
-  const [rows, setRows] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setRows(await studentsApi.list({ search, activeOnly }));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load students");
-    } finally {
-      setLoading(false);
-    }
-  }, [search, activeOnly]);
-
-  // Debounce list reloads on filter changes.
   useEffect(() => {
-    const t = setTimeout(load, 200);
-    return () => clearTimeout(t);
-  }, [load]);
+    const timer = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const queryScope = { userId: me?.id ?? "pending" };
+  const studentsQuery = useQuery({
+    queryKey: protectedQueryKey(
+      queryScope,
+      "students",
+      "list",
+      debouncedSearch,
+      activeOnly,
+    ),
+    queryFn: () => studentsApi.list({ search: debouncedSearch, activeOnly }),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+    placeholderData: keepPreviousData,
+  });
+  const rows = studentsQuery.data ?? [];
+  const hasData = studentsQuery.data !== undefined;
+  const coldLoading = !hasData && studentsQuery.isPending;
+  const hardQueryError = !hasData && studentsQuery.isError;
+
+  const refresh = async () => {
+    await studentsQuery.refetch();
+  };
 
   const handleSubmit = async (values: StudentFormValues) => {
     setSubmitting(true);
+    setActionError(null);
     try {
       if (editing) await studentsApi.update(editing.id, values);
       else await studentsApi.create(values);
       setFormOpen(false);
       setEditing(null);
-      await load();
+      await refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to save student");
+      setActionError(err instanceof ApiError ? err.message : "Failed to save student");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleToggleStatus = async (student: Student, active: boolean) => {
-    // Optimistic flip; revert on failure.
-    const next = active ? "Active" : "Inactive";
-    setRows((rs) => rs.map((r) => (r.id === student.id ? { ...r, status: next } : r)));
+    setActionError(null);
     try {
-      await studentsApi.setStatus(student.id, next);
-    } catch {
-      await load();
+      await studentsApi.setStatus(student.id, active ? "Active" : "Inactive");
+      await refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to update student status");
     }
   };
 
   const handleDelete = async (student: Student) => {
     if (!confirm(`Delete ${student.name}?`)) return;
+    setActionError(null);
     try {
       await studentsApi.remove(student.id);
-      await load();
+      await refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to delete student");
+      setActionError(err instanceof ApiError ? err.message : "Failed to delete student");
     }
   };
 
@@ -93,12 +104,12 @@ export function StudentsClient() {
   const handleInvite = async () => {
     if (!selectedStudent) return;
     if (!selectedStudent.email) {
-      setError("Add an official email to this student before sending a portal invitation.");
+      setActionError("Add an official email to this student before sending a portal invitation.");
       return;
     }
     if (!confirm(`Send a student portal invitation to ${selectedStudent.email}?`)) return;
     setInviting(true);
-    setError(null);
+    setActionError(null);
     setNotice(null);
     try {
       await authApi.createAccount({
@@ -108,18 +119,14 @@ export function StudentsClient() {
       });
       setNotice(`Portal invitation sent to ${selectedStudent.email}.`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to send portal invitation");
+      setActionError(err instanceof ApiError ? err.message : "Failed to send portal invitation");
     } finally {
       setInviting(false);
     }
   };
 
   const columns: DataTableColumn<Student>[] = [
-    {
-      key: "name",
-      header: "Name",
-      render: (s) => <span className="font-medium">{s.name}</span>,
-    },
+    { key: "name", header: "Name", render: (s) => <span className="font-medium">{s.name}</span> },
     { key: "studentId", header: "Student ID", render: (s) => s.studentId },
     {
       key: "email",
@@ -137,7 +144,7 @@ export function StudentsClient() {
       render: (s) => (
         <Switch
           checked={s.status === "Active"}
-          onCheckedChange={(c) => handleToggleStatus(s, c)}
+          onCheckedChange={(checked) => handleToggleStatus(s, checked)}
           aria-label={`Toggle ${s.name} active`}
         />
       ),
@@ -182,11 +189,25 @@ export function StudentsClient() {
         </div>
       ) : null}
 
-      {error ? (
-        <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
-          {error}
+      {actionError ? (
+        <div role="alert" className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
+          {actionError}
         </div>
       ) : null}
+
+      {hardQueryError ? (
+        <div role="alert" className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
+          {studentsQuery.error instanceof ApiError ? studentsQuery.error.message : "Failed to load students"}
+        </div>
+      ) : null}
+
+      <QueryRefreshStatus
+        hasData={hasData}
+        isPending={studentsQuery.isPending}
+        isFetching={studentsQuery.isFetching}
+        isError={studentsQuery.isError}
+        label="Students"
+      />
 
       <DataTable
         columns={columns}
@@ -201,15 +222,15 @@ export function StudentsClient() {
           setFormOpen(true);
         }}
         onDelete={handleDelete}
-        loading={loading}
+        loading={coldLoading}
         emptyMessage="No students yet. Add your first student."
       />
 
       <StudentForm
         open={formOpen}
-        onOpenChange={(o) => {
-          setFormOpen(o);
-          if (!o) setEditing(null);
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditing(null);
         }}
         editing={editing}
         onSubmit={handleSubmit}
