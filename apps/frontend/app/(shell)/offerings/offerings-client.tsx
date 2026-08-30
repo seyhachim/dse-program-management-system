@@ -104,6 +104,7 @@ export function OfferingsClient() {
   const rows = offeringsQuery.data ?? [];
   const students: Student[] = studentsQuery.data ?? [];
   const hasData = offeringsQuery.data !== undefined;
+  const hardQueryError = !hasData && offeringsQuery.isError;
 
   const handleDelete = async (offering: OfferingView) => {
     if (!confirm(`Delete ${offering.course?.code} · Class ${offering.sectionCode} · ${offering.term}?`)) return;
@@ -454,7 +455,7 @@ export function OfferingsClient() {
         </div>
       ) : null}
 
-      {!hasData && offeringsQuery.isError ? (
+      {hardQueryError ? (
         <div
           role="alert"
           className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming"
@@ -473,30 +474,32 @@ export function OfferingsClient() {
         label="Offerings"
       />
 
-      <DataTable
-        columns={columns}
-        rows={visibleGroups}
-        getRowId={(group) => group.id}
-        isRowExpanded={(group) => expandedGroups.has(group.id)}
-        onToggleRow={toggleGroup}
-        renderExpandedRow={renderClassDetails}
-        actions={[
-          {
-            key: "course-spec",
-            label: "Course Spec",
-            icon: <BookOpen className="mr-1 h-3.5 w-3.5" />,
-            onClick: (group) => {
-              if (group.course) router.push(`/courses/${group.course.id}/spec`);
+      {!hardQueryError ? (
+        <DataTable
+          columns={columns}
+          rows={visibleGroups}
+          getRowId={(group) => group.id}
+          isRowExpanded={(group) => expandedGroups.has(group.id)}
+          onToggleRow={toggleGroup}
+          renderExpandedRow={renderClassDetails}
+          actions={[
+            {
+              key: "course-spec",
+              label: "Course Spec",
+              icon: <BookOpen className="mr-1 h-3.5 w-3.5" />,
+              onClick: (group) => {
+                if (group.course) router.push(`/courses/${group.course.id}/spec`);
+              },
             },
-          },
-        ]}
-        loading={!hasData && offeringsQuery.isPending}
-        emptyMessage={
-          search
-            ? "No course offerings match your search."
-            : "No offerings yet. Add one to link a course, lecturer and students for a term."
-        }
-      />
+          ]}
+          loading={!hasData && offeringsQuery.isPending}
+          emptyMessage={
+            search
+              ? "No course offerings match your search."
+              : "No offerings yet. Add one to link a course, lecturer and students for a term."
+          }
+        />
+      ) : null}
 
       <EnrollmentDialog
         open={manage !== null}
