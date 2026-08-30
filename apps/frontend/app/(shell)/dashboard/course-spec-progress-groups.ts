@@ -1,4 +1,7 @@
-import type { CourseSpecProgress, Semester } from "@dse-pms/shared-types";
+import type {
+  DashboardCourseSpecProgress as CourseSpecProgress,
+  Semester,
+} from "@dse-pms/shared-types";
 
 export interface CourseSpecSemesterGroup {
   semester: Semester;
