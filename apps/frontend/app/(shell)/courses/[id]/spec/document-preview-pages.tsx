@@ -202,7 +202,7 @@ function compactSltValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined || String(value).trim() === "") return "";
   const numeric = Number(value);
   if (Number.isFinite(numeric) && numeric === 0) return "";
-  return String(value).replace(/\.0+$/, "");
+  return Number.isFinite(numeric) ? String(numeric) : String(value);
 }
 
 function SltCell({

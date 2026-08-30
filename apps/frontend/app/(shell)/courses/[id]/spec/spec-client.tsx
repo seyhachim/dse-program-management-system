@@ -646,7 +646,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
     (sectionId: SpecSectionId) => {
       if (sectionId === "courseInfo") {
         setActiveTab("overview");
-        setCourseInfoDialogOpen(true);
       } else if (sectionId === "references") {
         setActiveTab("resources");
       } else {
