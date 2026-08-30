@@ -1,0 +1,21 @@
+from pathlib import Path
+
+path = Path("apps/frontend/app/(shell)/courses/[id]/spec/document-preview-pages.tsx")
+source = path.read_text()
+old = '<div className="section14-table"><Table className="text-[10.5px] leading-[1.22]"><colgroup><col className="w-[7%]" /><col className="w-[58%]" /><col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[9%]" /></colgroup><thead><tr><TH rowSpan={2} colSpan={2} className="bg-[#E2EEDB] text-center font-normal">Description of the course learning outcomes – CLOs. At the end of the course, students will be able to:</TH><TH rowSpan={2} className="bg-[#E2EEDB] text-center font-normal">PLO</TH><TH colSpan={3} className="bg-[#E2EEDB] text-center font-normal">Levels in Learning Domain:<br />Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)</TH></tr><tr><TH className="bg-[#E2EEDB] text-center font-normal">C</TH><TH className="bg-[#E2EEDB] text-center font-normal">A</TH><TH className="bg-[#E2EEDB] text-center font-normal">P</TH></tr></thead><tbody>{document.clos.length ? document.clos.map((clo) => { const domain = learningDomain(clo.level); return <tr key={clo.code}><TD className="text-center align-middle">{clo.code}</TD><TD className="text-left align-middle">{clo.outcome}</TD><TD className="text-center align-middle">{joinValues(clo.mappedPlos)}</TD><TD className="text-center align-middle">{domain.cognitive || " "}</TD><TD className="text-center align-middle">{domain.affective || " "}</TD><TD className="text-center align-middle">{domain.psychomotor || " "}</TD></tr>; }) : <tr><TD colSpan={6}>No Course Learning Outcomes have been added.</TD></tr>}</tbody></Table></div>'
+new = '<div className="section14-table"><Table className="text-[10.5px] leading-[1.22]"><colgroup><col className="w-[7%]" /><col className="w-[58%]" /><col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[9%]" /></colgroup><tbody><tr className="section14-header-row"><TH rowSpan={2} colSpan={2} className="bg-[#E2EEDB] text-center font-normal">Description of the course learning outcomes – CLOs. At the end of the course, students will be able to:</TH><TH rowSpan={2} className="bg-[#E2EEDB] text-center font-normal">PLO</TH><TH colSpan={3} className="bg-[#E2EEDB] text-center font-normal">Levels in Learning Domain:<br />Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)</TH></tr><tr className="section14-header-row"><TH className="bg-[#E2EEDB] text-center font-normal">C</TH><TH className="bg-[#E2EEDB] text-center font-normal">A</TH><TH className="bg-[#E2EEDB] text-center font-normal">P</TH></tr>{document.clos.length ? document.clos.map((clo) => { const domain = learningDomain(clo.level); return <tr key={clo.code}><TD className="text-center align-middle">{clo.code}</TD><TD className="text-left align-middle">{clo.outcome}</TD><TD className="text-center align-middle">{joinValues(clo.mappedPlos)}</TD><TD className="text-center align-middle">{domain.cognitive || " "}</TD><TD className="text-center align-middle">{domain.affective || " "}</TD><TD className="text-center align-middle">{domain.psychomotor || " "}</TD></tr>; }) : <tr><TD colSpan={6}>No Course Learning Outcomes have been added.</TD></tr>}</tbody></Table></div>'
+if old not in source:
+    raise SystemExit("Section 14 table block not found")
+path.write_text(source.replace(old, new, 1))
+
+style_path = Path("apps/frontend/app/(shell)/courses/[id]/spec/themed-document-pages.tsx")
+style = style_path.read_text()
+style = style.replace('.course-spec-theme-root #clos .section14-table thead th {', '.course-spec-theme-root #clos .section14-table .section14-header-row th {', 1)
+style_path.write_text(style)
+
+test_path = Path("apps/frontend/app/(shell)/courses/[id]/spec/document-preview-pages-layout.test.ts")
+tests = test_path.read_text()
+if 'section14-header-row' not in tests:
+    anchor = '    expect(source).toContain(\'>C</TH><TH className="bg-[#E2EEDB] text-center font-normal">A</TH><TH className="bg-[#E2EEDB] text-center font-normal">P</TH>\');\n'
+    tests = tests.replace(anchor, anchor + '    expect(source).toContain(\'className="section14-header-row"\');\n    expect(source).not.toContain(\'<thead><tr><TH rowSpan={2} colSpan={2}\');\n', 1)
+test_path.write_text(tests)
