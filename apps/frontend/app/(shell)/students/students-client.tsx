@@ -71,6 +71,20 @@ export function StudentsClient() {
     }
   };
 
+  const handleEdit = async (student: Student) => {
+    setActionError(null);
+    try {
+      // Phase 7 intentionally keeps list rows compact. Always load the
+      // profile-aware detail record before populating the edit form so absent
+      // profile fields can never be submitted back as accidental blanks.
+      const detail = await studentsApi.get(student.id);
+      setEditing(detail);
+      setFormOpen(true);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to load student details");
+    }
+  };
+
   const handleToggleStatus = async (student: Student, active: boolean) => {
     setActionError(null);
     try {
@@ -211,9 +225,8 @@ export function StudentsClient() {
           selectable
           selectedIds={selectedIds}
           onSelectedChange={setSelectedIds}
-          onEdit={(s) => {
-            setEditing(s);
-            setFormOpen(true);
+          onEdit={(student) => {
+            void handleEdit(student);
           }}
           onDelete={handleDelete}
           loading={coldLoading}
