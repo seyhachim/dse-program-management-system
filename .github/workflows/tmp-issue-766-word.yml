@@ -1,0 +1,28 @@
+name: Apply issue 766 Word CLO fix
+
+on:
+  push:
+    branches:
+      - fix/issue-766-inline-course-synopsis
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-766-inline-course-synopsis
+      - name: Apply Word CLO patch
+        run: python scripts/issue766-word-clo-patch.py
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/frontend/app/\(shell\)/courses/\[id\]/spec/document-word-renderer.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(course-spec): align Word CLO header with approved template"
+          git push origin HEAD:fix/issue-766-inline-course-synopsis
