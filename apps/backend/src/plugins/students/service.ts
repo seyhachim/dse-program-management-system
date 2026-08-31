@@ -61,6 +61,48 @@ export function decodeStudentPageCursor(cursor: string): StudentPageCursor {
   }
 }
 
+/**
+ * Build the bounded Prisma read independently from the database call so cursor,
+ * filter, ordering, and look-ahead behaviour can be unit-tested without a live
+ * DATABASE_URL. The service remains the only caller that executes this query.
+ */
+export function buildStudentPageFindManyArgs(query: ListStudentsPageQuery) {
+  const { search, activeOnly, limit, cursor: encodedCursor } = query;
+  const cursor = encodedCursor ? decodeStudentPageCursor(encodedCursor) : null;
+
+  return {
+    where: {
+      ...(activeOnly ? { status: "Active" as const } : {}),
+      AND: [
+        ...(search
+          ? [
+              {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" as const } },
+                  { email: { contains: search, mode: "insensitive" as const } },
+                  { studentId: { contains: search, mode: "insensitive" as const } },
+                ],
+              },
+            ]
+          : []),
+        ...(cursor
+          ? [
+              {
+                OR: [
+                  { createdAt: { lt: cursor.createdAt } },
+                  { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+                ],
+              },
+            ]
+          : []),
+      ],
+    },
+    select: STUDENT_LIST_SELECT,
+    orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
+    take: limit + 1,
+  };
+}
+
 function hasProfileValues(profile: StudentProfileInput | undefined): boolean {
   return Boolean(
     profile && Object.values(profile).some((value) => value !== null && value !== undefined),
@@ -102,42 +144,9 @@ export const studentService = {
    * shifting rows between already-visited pages.
    */
   async listPage(query: ListStudentsPageQuery): Promise<StudentPage> {
-    const { search, activeOnly, limit, cursor: encodedCursor } = query;
-    const cursor = encodedCursor ? decodeStudentPageCursor(encodedCursor) : null;
-    const rows = await prisma.student.findMany({
-      where: {
-        ...(activeOnly ? { status: "Active" } : {}),
-        AND: [
-          ...(search
-            ? [
-                {
-                  OR: [
-                    { name: { contains: search, mode: "insensitive" as const } },
-                    { email: { contains: search, mode: "insensitive" as const } },
-                    { studentId: { contains: search, mode: "insensitive" as const } },
-                  ],
-                },
-              ]
-            : []),
-          ...(cursor
-            ? [
-                {
-                  OR: [
-                    { createdAt: { lt: cursor.createdAt } },
-                    { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-                  ],
-                },
-              ]
-            : []),
-        ],
-      },
-      select: STUDENT_LIST_SELECT,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: limit + 1,
-    });
-
-    const hasNextPage = rows.length > limit;
-    const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
+    const rows = await prisma.student.findMany(buildStudentPageFindManyArgs(query));
+    const hasNextPage = rows.length > query.limit;
+    const pageRows = hasNextPage ? rows.slice(0, query.limit) : rows;
     return {
       items: pageRows.map((row) => ({
         ...row,
