@@ -18,6 +18,7 @@ const PROGRAMME_WIDE_COURSE_ROLES: readonly Role[] = [
   "program_secretary",
   "qa_reviewer",
 ];
+const STUDENT_PAGE_SIZE = 50;
 
 function isLecturerOnlyCourseView(roles: readonly Role[]): boolean {
   return (
@@ -69,8 +70,17 @@ export function protectedRoutePrefetchPlan(input: {
   if (input.path === "/students") {
     return [
       {
-        queryKey: protectedQueryKey(scope, "students", "list", "", false),
-        queryFn: () => studentsApi.list({ search: "", activeOnly: false }),
+        queryKey: protectedQueryKey(
+          scope,
+          "students",
+          "page",
+          "",
+          false,
+          "first",
+          STUDENT_PAGE_SIZE,
+        ),
+        queryFn: () =>
+          studentsApi.listPage({ search: "", activeOnly: false, limit: STUDENT_PAGE_SIZE }),
         staleTime: QUERY_STALE_MS.operational,
       },
     ];

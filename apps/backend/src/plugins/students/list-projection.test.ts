@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { STUDENT_LIST_SELECT, STUDENT_REF_SELECT } from "./service.ts";
+import {
+  InvalidStudentPageCursorError,
+  STUDENT_LIST_SELECT,
+  STUDENT_REF_SELECT,
+  decodeStudentPageCursor,
+} from "./service.ts";
 
 function selectedKeys(select: Record<string, boolean>): string[] {
   return Object.entries(select)
@@ -73,5 +78,30 @@ describe("student compact projections", () => {
     expect(legacyBytes).toBe(583);
     expect(compactBytes).toBe(181);
     expect(compactBytes).toBeLessThan(legacyBytes * 0.4);
+  });
+
+  test("cursor decoding preserves the composite createdAt/id position", () => {
+    const cursor = Buffer.from(
+      JSON.stringify({
+        createdAt: "2026-08-30T12:34:56.000Z",
+        id: "11111111-1111-4111-8111-111111111111",
+      }),
+      "utf8",
+    ).toString("base64url");
+
+    expect(decodeStudentPageCursor(cursor)).toEqual({
+      createdAt: new Date("2026-08-30T12:34:56.000Z"),
+      id: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
+  test("malformed or incomplete cursors fail closed", () => {
+    for (const cursor of [
+      "not-base64-json",
+      Buffer.from(JSON.stringify({ id: "student-1" }), "utf8").toString("base64url"),
+      Buffer.from(JSON.stringify({ createdAt: "not-a-date", id: "student-1" }), "utf8").toString("base64url"),
+    ]) {
+      expect(() => decodeStudentPageCursor(cursor)).toThrow(InvalidStudentPageCursorError);
+    }
   });
 });

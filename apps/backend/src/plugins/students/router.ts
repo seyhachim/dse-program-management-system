@@ -1,13 +1,17 @@
 import { Router } from "express";
 import {
   CreateStudentInput,
+  ListStudentsPageQuery,
   ListStudentsQuery,
   SetStudentStatusInput,
   UpdateStudentInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
-import { studentService } from "./service.ts";
+import {
+  InvalidStudentPageCursorError,
+  studentService,
+} from "./service.ts";
 import { createStudentCohortRouter } from "./cohort-router.ts";
 
 /**
@@ -23,6 +27,7 @@ export function createStudentRouter(): Router {
   router.use("/cohorts", createStudentCohortRouter());
 
   // GET /api/students?search=&activeOnly=
+  // Kept for compatibility with existing non-interactive/cross-plugin callers.
   router.get("/", requirePermission("students:read"), async (req, res) => {
     const parsed = ListStudentsQuery.safeParse(req.query);
     if (!parsed.success) {
@@ -31,6 +36,25 @@ export function createStudentRouter(): Router {
     }
     const students = await studentService.list(parsed.data);
     res.json(students);
+  });
+
+  // GET /api/students/page?search=&activeOnly=&cursor=&limit=
+  // Interactive roster reads use this bounded, deterministic cursor contract.
+  router.get("/page", requirePermission("students:read"), async (req, res) => {
+    const parsed = ListStudentsPageQuery.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await studentService.listPage(parsed.data));
+    } catch (error) {
+      if (error instanceof InvalidStudentPageCursorError) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
   });
 
   // GET /api/students/:id

@@ -19,11 +19,15 @@ import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { StudentForm, type StudentFormValues } from "./student-form";
 import { authApi, useMe } from "@/lib/auth";
 
+const PAGE_SIZE = 50;
+
 export function StudentsClient() {
   const { me } = useMe();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
+  const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
+  const [previousCursors, setPreviousCursors] = useState<Array<string | undefined>>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
@@ -33,7 +37,11 @@ export function StudentsClient() {
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 200);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPageCursor(undefined);
+      setPreviousCursors([]);
+    }, 200);
     return () => clearTimeout(timer);
   }, [search]);
 
@@ -42,19 +50,32 @@ export function StudentsClient() {
     queryKey: protectedQueryKey(
       queryScope,
       "students",
-      "list",
+      "page",
       debouncedSearch,
       activeOnly,
+      pageCursor ?? "first",
+      PAGE_SIZE,
     ),
-    queryFn: () => studentsApi.list({ search: debouncedSearch, activeOnly }),
+    queryFn: () =>
+      studentsApi.listPage({
+        search: debouncedSearch,
+        activeOnly,
+        cursor: pageCursor,
+        limit: PAGE_SIZE,
+      }),
     enabled: Boolean(me?.id),
     staleTime: QUERY_STALE_MS.operational,
     placeholderData: keepPreviousData,
   });
-  const rows = studentsQuery.data ?? [];
+  const rows = studentsQuery.data?.items ?? [];
   const hasData = studentsQuery.data !== undefined;
   const coldLoading = !hasData && studentsQuery.isPending;
   const hardQueryError = !hasData && studentsQuery.isError;
+  const canAdvancePage =
+    !studentsQuery.isFetching &&
+    !studentsQuery.isPlaceholderData &&
+    !studentsQuery.isError &&
+    Boolean(studentsQuery.data?.nextCursor);
 
   const handleSubmit = async (values: StudentFormValues) => {
     setSubmitting(true);
@@ -132,6 +153,22 @@ export function StudentsClient() {
     }
   };
 
+  const handleNextPage = () => {
+    const nextCursor = studentsQuery.data?.nextCursor;
+    if (!nextCursor || !canAdvancePage) return;
+    setSelectedIds([]);
+    setPreviousCursors((current) => [...current, pageCursor]);
+    setPageCursor(nextCursor);
+  };
+
+  const handlePreviousPage = () => {
+    if (previousCursors.length === 0 || studentsQuery.isFetching) return;
+    const previous = previousCursors[previousCursors.length - 1];
+    setSelectedIds([]);
+    setPreviousCursors((current) => current.slice(0, -1));
+    setPageCursor(previous);
+  };
+
   const columns: DataTableColumn<Student>[] = [
     { key: "name", header: "Name", render: (s) => <span className="font-medium">{s.name}</span> },
     { key: "studentId", header: "Student ID", render: (s) => s.studentId },
@@ -162,10 +199,18 @@ export function StudentsClient() {
     <div className="space-y-4">
       <TableToolbar
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setSelectedIds([]);
+        }}
         searchPlaceholder="Search students…"
         activeOnly={activeOnly}
-        onActiveOnlyChange={setActiveOnly}
+        onActiveOnlyChange={(checked) => {
+          setSelectedIds([]);
+          setActiveOnly(checked);
+          setPageCursor(undefined);
+          setPreviousCursors([]);
+        }}
         addLabel="Add Student"
         onAdd={() => {
           setEditing(null);
@@ -217,21 +262,48 @@ export function StudentsClient() {
       />
 
       {!hardQueryError ? (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          getRowId={(s) => s.id}
-          dragHandle
-          selectable
-          selectedIds={selectedIds}
-          onSelectedChange={setSelectedIds}
-          onEdit={(student) => {
-            void handleEdit(student);
-          }}
-          onDelete={handleDelete}
-          loading={coldLoading}
-          emptyMessage="No students yet. Add your first student."
-        />
+        <>
+          <DataTable
+            columns={columns}
+            rows={rows}
+            getRowId={(s) => s.id}
+            dragHandle
+            selectable
+            selectedIds={selectedIds}
+            onSelectedChange={setSelectedIds}
+            onEdit={(student) => {
+              void handleEdit(student);
+            }}
+            onDelete={handleDelete}
+            loading={coldLoading}
+            emptyMessage="No students yet. Add your first student."
+          />
+          {hasData ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Page {previousCursors.length + 1} · up to {PAGE_SIZE} students per page
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={previousCursors.length === 0 || studentsQuery.isFetching}
+                  onClick={handlePreviousPage}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!canAdvancePage}
+                  onClick={handleNextPage}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       <StudentForm
