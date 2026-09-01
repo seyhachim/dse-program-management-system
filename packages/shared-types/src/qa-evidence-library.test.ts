@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
   CreateQaEvidenceItemSchema,
   MapQaEvidenceSchema,
+  QaEvidenceLibraryPageQuerySchema,
 } from "./qa-evidence-library.ts";
 
 test("canonical QA evidence can be created without choosing a requirement", () => {
@@ -44,4 +45,15 @@ test("system-linked canonical evidence still requires a PMS reference", () => {
   });
 
   expect(result.success).toBe(false);
+});
+
+test("evidence library page query is bounded and defaults to fifty rows", () => {
+  expect(QaEvidenceLibraryPageQuerySchema.parse({ programmeId: "dse" })).toEqual({
+    programmeId: "dse",
+    limit: 50,
+  });
+  expect(QaEvidenceLibraryPageQuerySchema.parse({ programmeId: "dse", limit: "100" }).limit).toBe(100);
+  expect(QaEvidenceLibraryPageQuerySchema.safeParse({ programmeId: "dse", limit: 0 }).success).toBe(false);
+  expect(QaEvidenceLibraryPageQuerySchema.safeParse({ programmeId: "dse", limit: 101 }).success).toBe(false);
+  expect(QaEvidenceLibraryPageQuerySchema.safeParse({ programmeId: "dse", cursor: "" }).success).toBe(false);
 });
