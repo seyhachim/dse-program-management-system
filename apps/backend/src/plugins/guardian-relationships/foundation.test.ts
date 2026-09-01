@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   CreateGuardianRelationshipInput,
+  GuardianRelationshipListQuery,
   INVITABLE_ROLES,
   Role,
 } from "@dse-pms/shared-types";
@@ -34,6 +35,28 @@ test("guardian relationship contract requires explicit scopes and valid effectiv
     ...parsed,
     accessScopes: [],
   }).success).toBe(false);
+});
+
+test("guardian list query parses boolean strings without truthiness coercion", () => {
+  expect(GuardianRelationshipListQuery.parse({
+    programmeId: "dse",
+    includeInactive: "false",
+  }).includeInactive).toBe(false);
+  expect(GuardianRelationshipListQuery.parse({
+    programmeId: "dse",
+    includeInactive: "true",
+  }).includeInactive).toBe(true);
+  expect(GuardianRelationshipListQuery.parse({ programmeId: "dse" }).includeInactive).toBe(false);
+});
+
+test("guardian lifecycle writes are guarded against concurrent state and overlap races", () => {
+  const servicePath = fileURLToPath(new URL("./service.ts", import.meta.url));
+  const service = readFileSync(servicePath, "utf8");
+
+  expect(service).toContain("pg_advisory_xact_lock");
+  expect(service).toContain('WHERE "id" = ${id} AND "status" = \'PENDING\'');
+  expect(service).toContain('WHERE "id" = ${id} AND "status" IN (\'PENDING\', \'VERIFIED\')');
+  expect(service).toContain("if (changed !== 1)");
 });
 
 test("guardian persistence stays outside the public schema and blocks Data API roles", () => {
