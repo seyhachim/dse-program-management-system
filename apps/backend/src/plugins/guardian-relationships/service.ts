@@ -196,6 +196,16 @@ async function ensureGuardianRole(
   });
 }
 
+async function lockRelationshipSet(
+  tx: Prisma.TransactionClient,
+  guardianUserId: string,
+  studentId: string,
+  programmeId: string,
+): Promise<void> {
+  const lockKey = `${guardianUserId}:${studentId}:${programmeId}`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+}
+
 async function findOverlappingRelationship(
   tx: Prisma.TransactionClient,
   input: {
@@ -241,6 +251,7 @@ export const guardianRelationshipService = {
       }
 
       await ensureGuardianRole(tx, input.guardianUserId, input.programmeId);
+      await lockRelationshipSet(tx, input.guardianUserId, input.studentId, input.programmeId);
 
       let profile = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "guardian_portal"."GuardianProfile"
@@ -299,12 +310,15 @@ export const guardianRelationshipService = {
       if (current.status !== "PENDING") {
         throw new GuardianRelationshipError("INVALID_STATE", "Only pending relationships can be verified");
       }
-      await tx.$executeRaw`
+      const changed = await tx.$executeRaw`
         UPDATE "guardian_portal"."StudentGuardianRelationship"
         SET "status" = 'VERIFIED', "verifiedByUserId" = ${actorUserId},
             "verifiedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-        WHERE "id" = ${id}
+        WHERE "id" = ${id} AND "status" = 'PENDING'
       `;
+      if (changed !== 1) {
+        throw new GuardianRelationshipError("INVALID_STATE", "Only pending relationships can be verified");
+      }
       const updated = await getRelationshipWithClient(tx, id);
       if (!updated) throw new Error("Failed to read verified guardian relationship");
       await appendAudit(tx, id, "VERIFIED", actorUserId, updated);
@@ -318,7 +332,11 @@ export const guardianRelationshipService = {
     actorUserId: string,
   ): Promise<GuardianRelationshipView> {
     return prisma.$transaction(async (tx) => {
-      const current = await getRelationshipWithClient(tx, id);
+      let current = await getRelationshipWithClient(tx, id);
+      if (!current) throw new GuardianRelationshipError("NOT_FOUND", "Guardian relationship not found");
+
+      await lockRelationshipSet(tx, current.guardianUserId, current.studentId, current.programmeId);
+      current = await getRelationshipWithClient(tx, id);
       if (!current) throw new GuardianRelationshipError("NOT_FOUND", "Guardian relationship not found");
       if (current.status === "REVOKED" || current.status === "ENDED") {
         throw new GuardianRelationshipError("INVALID_STATE", "Inactive relationships cannot be edited");
@@ -375,12 +393,15 @@ export const guardianRelationshipService = {
       if (current.status !== "PENDING" && current.status !== "VERIFIED") {
         throw new GuardianRelationshipError("INVALID_STATE", "Relationship is already inactive");
       }
-      await tx.$executeRaw`
+      const changed = await tx.$executeRaw`
         UPDATE "guardian_portal"."StudentGuardianRelationship"
         SET "status" = 'REVOKED', "revokedByUserId" = ${actorUserId},
             "revokedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-        WHERE "id" = ${id}
+        WHERE "id" = ${id} AND "status" IN ('PENDING', 'VERIFIED')
       `;
+      if (changed !== 1) {
+        throw new GuardianRelationshipError("INVALID_STATE", "Relationship is already inactive");
+      }
       const updated = await getRelationshipWithClient(tx, id);
       if (!updated) throw new Error("Failed to read revoked guardian relationship");
       await appendAudit(tx, id, "REVOKED", actorUserId, updated);
