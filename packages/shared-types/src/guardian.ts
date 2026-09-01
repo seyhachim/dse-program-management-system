@@ -57,11 +57,17 @@ export const UpdateGuardianRelationshipInput = z.object({
 });
 export type UpdateGuardianRelationshipInput = z.infer<typeof UpdateGuardianRelationshipInput>;
 
+const QueryBoolean = z.preprocess((value) => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}, z.boolean());
+
 export const GuardianRelationshipListQuery = z.object({
   programmeId: z.string().trim().min(1),
   studentId: z.string().uuid().optional(),
   guardianUserId: z.string().uuid().optional(),
-  includeInactive: z.coerce.boolean().default(false),
+  includeInactive: QueryBoolean.default(false),
 });
 export type GuardianRelationshipListQuery = z.infer<typeof GuardianRelationshipListQuery>;
 
