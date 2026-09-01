@@ -102,3 +102,61 @@ export interface GuardianLinkedStudentView {
   effectiveFrom: string;
   effectiveTo: string | null;
 }
+
+export type ParentAttendanceHealthState = "healthy" | "watch" | "warning" | "recovery";
+export type ParentAttendanceWarningLevel = "watch" | "warning";
+
+export interface ParentAttendanceWarning {
+  offeringId: string;
+  courseCode: string;
+  kind: "attendance" | "punctuality";
+  level: ParentAttendanceWarningLevel;
+  count: number;
+  message: string;
+}
+
+export interface ParentAttendanceSummary {
+  relationshipId: string;
+  studentId: string;
+  programmeId: string;
+  totalSessions: number;
+  markedSessions: number;
+  attendanceRate: number | null;
+  counts: {
+    Present: number;
+    Absent: number;
+    Late: number;
+    Excused: number;
+    PermissionPending: number;
+  };
+  healthState: ParentAttendanceHealthState;
+  warnings: ParentAttendanceWarning[];
+}
+
+export const ParentAcademicStatus = z.enum([
+  "ON_TRACK",
+  "NEEDS_ATTENTION",
+  "UNAVAILABLE",
+]);
+export type ParentAcademicStatus = z.infer<typeof ParentAcademicStatus>;
+
+export interface ParentOfficialCourseResult {
+  offeringId: string;
+  courseCode: string;
+  courseTitle: string;
+  term: string;
+  sectionCode: string;
+  totalGrade: number;
+  finalizedAt: string;
+}
+
+export interface ParentAcademicProgressSummary {
+  relationshipId: string;
+  studentId: string;
+  programmeId: string;
+  academicStatus: ParentAcademicStatus;
+  progressionStatus: string | null;
+  academicYear: string | null;
+  programmeYear: number | null;
+  officialResults: ParentOfficialCourseResult[];
+}
