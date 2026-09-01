@@ -145,9 +145,9 @@ async function studentBelongsToProgramme(
   studentId: string,
   programmeId: string,
 ): Promise<{ belongs: boolean; studentUserId: string | null }> {
-  const rows = await tx.$queryRaw<Array<{ userId: string | null; belongs: boolean }>>`
+  const rows = await tx.$queryRaw<Array<{ studentUserId: string | null; belongs: boolean }>>`
     SELECT
-      s."userId",
+      s."userId" AS "studentUserId",
       (
         EXISTS (
           SELECT 1
@@ -196,6 +196,33 @@ async function ensureGuardianRole(
   });
 }
 
+async function findOverlappingRelationship(
+  tx: Prisma.TransactionClient,
+  input: {
+    guardianUserId: string;
+    studentId: string;
+    programmeId: string;
+    effectiveFrom: Date;
+    effectiveTo: Date | null;
+    excludeRelationshipId?: string;
+  },
+): Promise<string | null> {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT r."id"
+    FROM "guardian_portal"."StudentGuardianRelationship" r
+    JOIN "guardian_portal"."GuardianProfile" gp ON gp."id" = r."guardianProfileId"
+    WHERE gp."userId" = ${input.guardianUserId}
+      AND r."studentId" = ${input.studentId}
+      AND r."programmeId" = ${input.programmeId}
+      AND r."status" IN ('PENDING', 'VERIFIED')
+      AND (${input.excludeRelationshipId ?? null}::text IS NULL OR r."id" <> ${input.excludeRelationshipId ?? null})
+      AND COALESCE(r."effectiveTo", 'infinity'::timestamptz) > ${input.effectiveFrom}
+      AND COALESCE(${input.effectiveTo}::timestamptz, 'infinity'::timestamptz) > r."effectiveFrom"
+    LIMIT 1
+  `;
+  return rows[0]?.id ?? null;
+}
+
 export const guardianRelationshipService = {
   async create(
     input: CreateGuardianRelationshipInput,
@@ -229,18 +256,16 @@ export const guardianRelationshipService = {
         profile = [{ id: profileId }];
       }
 
-      const overlapping = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT "id"
-        FROM "guardian_portal"."StudentGuardianRelationship"
-        WHERE "guardianProfileId" = ${profile[0]!.id}
-          AND "studentId" = ${input.studentId}
-          AND "programmeId" = ${input.programmeId}
-          AND "status" IN ('PENDING', 'VERIFIED')
-          AND COALESCE("effectiveTo", 'infinity'::timestamptz) > ${new Date(input.effectiveFrom)}
-          AND COALESCE(${input.effectiveTo ? new Date(input.effectiveTo) : null}::timestamptz, 'infinity'::timestamptz) > "effectiveFrom"
-        LIMIT 1
-      `;
-      if (overlapping[0]) {
+      const effectiveFrom = new Date(input.effectiveFrom);
+      const effectiveTo = input.effectiveTo ? new Date(input.effectiveTo) : null;
+      const overlapping = await findOverlappingRelationship(tx, {
+        guardianUserId: input.guardianUserId,
+        studentId: input.studentId,
+        programmeId: input.programmeId,
+        effectiveFrom,
+        effectiveTo,
+      });
+      if (overlapping) {
         throw new GuardianRelationshipError(
           "CONFLICT",
           "An active or pending guardian relationship already overlaps this period",
@@ -255,7 +280,7 @@ export const guardianRelationshipService = {
           "createdByUserId"
         ) VALUES (
           ${id}, ${profile[0]!.id}, ${input.studentId}, ${input.programmeId}, ${input.relationshipType},
-          'PENDING', ${new Date(input.effectiveFrom)}, ${input.effectiveTo ? new Date(input.effectiveTo) : null},
+          'PENDING', ${effectiveFrom}, ${effectiveTo},
           ${input.verificationMethod ?? null}, ${input.verificationNotes ?? null}, ${actorUserId}
         )
       `;
@@ -307,6 +332,21 @@ export const guardianRelationshipService = {
         throw new GuardianRelationshipError("CONFLICT", "effectiveTo must be after effectiveFrom");
       }
 
+      const overlapping = await findOverlappingRelationship(tx, {
+        guardianUserId: current.guardianUserId,
+        studentId: current.studentId,
+        programmeId: current.programmeId,
+        effectiveFrom,
+        effectiveTo,
+        excludeRelationshipId: id,
+      });
+      if (overlapping) {
+        throw new GuardianRelationshipError(
+          "CONFLICT",
+          "Updated relationship dates overlap another active or pending relationship",
+        );
+      }
+
       await tx.$executeRaw`
         UPDATE "guardian_portal"."StudentGuardianRelationship"
         SET "relationshipType" = ${input.relationshipType ?? current.relationshipType},
@@ -338,8 +378,7 @@ export const guardianRelationshipService = {
       await tx.$executeRaw`
         UPDATE "guardian_portal"."StudentGuardianRelationship"
         SET "status" = 'REVOKED', "revokedByUserId" = ${actorUserId},
-            "revokedAt" = CURRENT_TIMESTAMP, "effectiveTo" = LEAST(COALESCE("effectiveTo", CURRENT_TIMESTAMP), CURRENT_TIMESTAMP),
-            "updatedAt" = CURRENT_TIMESTAMP
+            "revokedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
         WHERE "id" = ${id}
       `;
       const updated = await getRelationshipWithClient(tx, id);
