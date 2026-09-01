@@ -11,8 +11,10 @@ import { z } from "zod";
  *   an existing staff account rather than a standalone account type.
  * - `student` requires a roster profile with the same email; account
  *   provisioning links that profile to the invited User.
+ * - `guardian` creates only the login/coarse role; student access still requires
+ *   an explicit verified StudentGuardianRelationship (#790).
  */
-export const INVITABLE_ROLES = ["lecturer", "program_coordinator", "program_secretary", "qa_reviewer", "student"] as const;
+export const INVITABLE_ROLES = ["lecturer", "program_coordinator", "program_secretary", "qa_reviewer", "student", "guardian"] as const;
 export const CreateAccountInput = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("A valid email is required"),
@@ -57,6 +59,8 @@ export type TemporaryPasswordResponse = z.infer<typeof TemporaryPasswordResponse
  * Application roles. `qa_contributor` is intentionally additive: a lecturer or
  * other staff member can hold it alongside their existing role to work on an
  * assigned AUN-QA/SAR scope without receiving programme-management authority.
+ * `guardian` is only a coarse account role; exact student access is granted by
+ * verified, effective-dated guardian relationships and per-relationship scopes.
  */
 export const Role = z.enum([
   "admin",
@@ -66,6 +70,7 @@ export const Role = z.enum([
   "qa_contributor",
   "qa_reviewer",
   "student",
+  "guardian",
 ]);
 export type Role = z.infer<typeof Role>;
 
