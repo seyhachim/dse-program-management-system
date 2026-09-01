@@ -1,9 +1,22 @@
-import type { GuardianAccessScope, GuardianLinkedStudentView } from "@dse-pms/shared-types";
+import type {
+  GuardianAccessScope,
+  GuardianLinkedStudentView,
+  ParentAcademicProgressSummary,
+  ParentAttendanceSummary,
+} from "@dse-pms/shared-types";
 import { api } from "./api";
 
 export const parentPortalApi = {
   linkedStudents: () =>
     api.get<GuardianLinkedStudentView[]>("/api/guardian-relationships/me"),
+  attendance: (relationshipId: string) =>
+    api.get<ParentAttendanceSummary>(
+      `/api/guardian-relationships/me/relationships/${relationshipId}/attendance`,
+    ),
+  academicProgress: (relationshipId: string) =>
+    api.get<ParentAcademicProgressSummary>(
+      `/api/guardian-relationships/me/relationships/${relationshipId}/academic-progress`,
+    ),
 };
 
 const SCOPE_LABELS: Record<GuardianAccessScope, string> = {
@@ -27,5 +40,15 @@ export function relationshipLabel(type: GuardianLinkedStudentView["relationshipT
     case "FATHER": return "Father";
     case "LEGAL_GUARDIAN": return "Legal guardian";
     case "OTHER_AUTHORIZED_GUARDIAN": return "Authorized guardian";
+  }
+}
+
+export function academicStatusLabel(
+  status: ParentAcademicProgressSummary["academicStatus"],
+): string {
+  switch (status) {
+    case "ON_TRACK": return "On track";
+    case "NEEDS_ATTENTION": return "Needs attention";
+    case "UNAVAILABLE": return "Not available yet";
   }
 }
