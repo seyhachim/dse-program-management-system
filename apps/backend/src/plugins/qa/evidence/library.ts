@@ -231,9 +231,7 @@ export async function listQaEvidenceLibrary(
   return rows.map(evidenceToView);
 }
 
-export function buildQaEvidenceLibraryPageFindManyArgs(
-  query: QaEvidenceLibraryPageQuery,
-): Prisma.QaEvidenceFindManyArgs {
+export function buildQaEvidenceLibraryPageFindManyArgs(query: QaEvidenceLibraryPageQuery) {
   const filters: Prisma.QaEvidenceWhereInput[] = [];
   if (query.search) {
     const contains = { contains: query.search, mode: "insensitive" as const };
@@ -261,10 +259,10 @@ export function buildQaEvidenceLibraryPageFindManyArgs(
 
   return {
     where: filters.length > 0 ? { programmeId: query.programmeId, AND: filters } : { programmeId: query.programmeId },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
     include: libraryInclude,
     take: query.limit + 1,
-  };
+  } satisfies Prisma.QaEvidenceFindManyArgs;
 }
 
 export async function listQaEvidenceLibraryPage(
