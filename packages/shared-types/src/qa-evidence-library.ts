@@ -43,9 +43,19 @@ export const QaEvidenceLibraryQuerySchema = z.object({
   programmeId: z.string().trim().min(1),
 });
 
+/**
+ * Bounded interactive Evidence Library query. The opaque cursor is owned by
+ * the backend and represents a stable `(createdAt, id)` sort position.
+ */
+export const QaEvidenceLibraryPageQuerySchema = QaEvidenceLibraryQuerySchema.extend({
+  cursor: z.string().trim().min(1).max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
 export type CreateQaEvidenceItemInput = z.infer<typeof CreateQaEvidenceItemSchema>;
 export type UpdateQaEvidenceItemInput = z.infer<typeof UpdateQaEvidenceItemSchema>;
 export type MapQaEvidenceInput = z.infer<typeof MapQaEvidenceSchema>;
+export type QaEvidenceLibraryPageQuery = z.infer<typeof QaEvidenceLibraryPageQuerySchema>;
 
 export interface QaEvidenceMappingView {
   id: string;
@@ -71,4 +81,9 @@ export interface QaEvidenceItemView {
   createdAt: string;
   updatedAt: string;
   mappings: QaEvidenceMappingView[];
+}
+
+export interface QaEvidenceLibraryPage {
+  items: QaEvidenceItemView[];
+  nextCursor: string | null;
 }
