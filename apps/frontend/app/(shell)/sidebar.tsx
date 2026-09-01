@@ -43,11 +43,16 @@ export function AppSidebar() {
   // Only show nav the caller's roles are allowed to see. While `me` loads we show
   // skeletons rather than the full list, so restricted items never flash in.
   const groups = me ? getNavGroups(me.roles) : [];
+  const guardianPortalVisible = Boolean(me?.roles.includes("guardian"));
   // "footer" is a special group label rendered in the sidebar footer (e.g. Help
   // & Support) instead of the main scrollable nav list.
   const footerRoutes = groups.find((g) => g.label === "footer")?.routes ?? [];
   const mainGroups = groups.filter((g) => g.label !== "footer");
-  const allRoutes = [...mainGroups.flatMap((group) => group.routes), ...footerRoutes];
+  const allRoutes = [
+    ...(guardianPortalVisible ? [{ label: "Parent Home", path: "/parent", icon: "home" }] : []),
+    ...mainGroups.flatMap((group) => group.routes),
+    ...footerRoutes,
+  ];
   const activeRoutePath = allRoutes
     .filter((route) => matchesRoute(pathname, route.path))
     .sort((a, b) => b.path.length - a.path.length)[0]?.path;
@@ -99,43 +104,65 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         ) : (
-          mainGroups.map((group, i) => (
-            <SidebarGroup key={group.label ?? `ungrouped-${i}`}>
-              {group.label ? (
-                <SidebarGroupLabel className="text-sidebar-muted">
-                  {group.label}
-                </SidebarGroupLabel>
-              ) : null}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.routes.map((route) => {
-                    const Icon = route.icon ? iconMap[route.icon] : undefined;
-                    const active = route.path === activeRoutePath;
-                    const label = sidebarLabel(route.label, route.path);
-                    return (
-                      <SidebarMenuItem key={`${route.path}-${route.label}`}>
-                        <SidebarMenuButton
-                          isActive={active}
-                          tooltip={label}
-                          render={
-                            <Link
-                              href={route.path}
-                              onPointerEnter={() => prefetchIntent(route.path)}
-                              onFocus={() => prefetchIntent(route.path)}
-                              onTouchStart={() => prefetchIntent(route.path)}
-                            >
-                              {Icon ? <Icon /> : null}
-                              <span>{label}</span>
-                            </Link>
-                          }
-                        />
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))
+          <>
+            {guardianPortalVisible ? (
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={activeRoutePath === "/parent"}
+                        tooltip="Parent Home"
+                        render={
+                          <Link href="/parent">
+                            {iconMap.home ? (() => { const HomeIcon = iconMap.home; return <HomeIcon />; })() : null}
+                            <span>Parent Home</span>
+                          </Link>
+                        }
+                      />
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ) : null}
+            {mainGroups.map((group, i) => (
+              <SidebarGroup key={group.label ?? `ungrouped-${i}`}>
+                {group.label ? (
+                  <SidebarGroupLabel className="text-sidebar-muted">
+                    {group.label}
+                  </SidebarGroupLabel>
+                ) : null}
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.routes.map((route) => {
+                      const Icon = route.icon ? iconMap[route.icon] : undefined;
+                      const active = route.path === activeRoutePath;
+                      const label = sidebarLabel(route.label, route.path);
+                      return (
+                        <SidebarMenuItem key={`${route.path}-${route.label}`}>
+                          <SidebarMenuButton
+                            isActive={active}
+                            tooltip={label}
+                            render={
+                              <Link
+                                href={route.path}
+                                onPointerEnter={() => prefetchIntent(route.path)}
+                                onFocus={() => prefetchIntent(route.path)}
+                                onTouchStart={() => prefetchIntent(route.path)}
+                              >
+                                {Icon ? <Icon /> : null}
+                                <span>{label}</span>
+                              </Link>
+                            }
+                          />
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
+          </>
         )}
       </SidebarContent>
 
