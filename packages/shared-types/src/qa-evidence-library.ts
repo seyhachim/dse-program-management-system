@@ -45,9 +45,11 @@ export const QaEvidenceLibraryQuerySchema = z.object({
 
 /**
  * Bounded interactive Evidence Library query. The opaque cursor is owned by
- * the backend and represents a stable `(createdAt, id)` sort position.
+ * the backend and represents a stable `(createdAt, id)` sort position. Search
+ * remains server-side so filtering is applied before page projection.
  */
 export const QaEvidenceLibraryPageQuerySchema = QaEvidenceLibraryQuerySchema.extend({
+  search: z.string().trim().max(200).optional(),
   cursor: z.string().trim().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
