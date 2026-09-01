@@ -36,6 +36,7 @@ const ROLE_LABELS: Record<(typeof INVITABLE_ROLES)[number], string> = {
   program_secretary: "Program Secretary",
   qa_reviewer: "QA Reviewer",
   student: "Student",
+  guardian: "Parent / Guardian",
 };
 
 const empty: CreateAccountValues = { name: "", email: "", role: "lecturer" };
@@ -44,7 +45,8 @@ const empty: CreateAccountValues = { name: "", email: "", role: "lecturer" };
  * Admin-only: provision a login account for one of the invitable roles
  * (admin is deliberately not offered here). For `lecturer`, this is distinct from "Add Lecturer"
  * (which creates a profile only) — this sends a Supabase invite so the
- * invitee sets their own password and can sign in.
+ * invitee sets their own password and can sign in. Guardian login creation does
+ * not grant student access; that still requires a verified relationship.
  */
 export function CreateAccountForm({ open, onOpenChange, onSubmit, submitting }: CreateAccountFormProps) {
   const {
@@ -70,7 +72,8 @@ export function CreateAccountForm({ open, onOpenChange, onSubmit, submitting }: 
           <DialogDescription>
             Sends an invite email so the invitee can set a password and sign in. For a lecturer,
             this also creates or links their lecturer profile automatically. Student invites require
-            an existing student roster profile with the same email.
+            an existing student roster profile with the same email. Parent / Guardian accounts need
+            a separately verified student relationship before they can view student information.
           </DialogDescription>
         </DialogHeader>
 
