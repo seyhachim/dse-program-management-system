@@ -14,6 +14,7 @@ import { programmePlugin } from "../plugins/programme/index.ts";
 import { teachingLearningPlugin } from "../plugins/teaching-learning/index.ts";
 import { assessmentTemplatePlugin } from "../plugins/assessment-template/index.ts";
 import { studentPortalPlugin } from "../plugins/student-portal/index.ts";
+import { guardianRelationshipsPlugin } from "../plugins/guardian-relationships/index.ts";
 import { qaPlugin } from "../plugins/qa/index.ts";
 import { telegramPlugin } from "../plugins/telegram/index.ts";
 import { communityPlugin } from "../plugins/community/index.ts";
@@ -40,6 +41,7 @@ export function createApp(): Express {
   registry.register(teachingLearningPlugin);
   registry.register(assessmentTemplatePlugin);
   registry.register(studentPortalPlugin);
+  registry.register(guardianRelationshipsPlugin);
   registry.register(qaPlugin);
   registry.register(telegramPlugin);
   registry.register(communityPlugin);
