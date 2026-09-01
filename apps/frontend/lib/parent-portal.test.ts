@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { guardianScopeLabel, relationshipLabel } from "./parent-portal";
+import { academicStatusLabel, guardianScopeLabel, relationshipLabel } from "./parent-portal";
 
 describe("parent portal presentation helpers", () => {
   test("uses parent-facing labels for relationship types", () => {
@@ -18,5 +18,11 @@ describe("parent portal presentation helpers", () => {
     expect(guardianScopeLabel("support_cases")).toBe("Student support");
     expect(guardianScopeLabel("meeting_requests")).toBe("Meeting requests");
     expect(guardianScopeLabel("parent_feedback")).toBe("Parent feedback");
+  });
+
+  test("uses parent-facing academic progress labels", () => {
+    expect(academicStatusLabel("ON_TRACK")).toBe("On track");
+    expect(academicStatusLabel("NEEDS_ATTENTION")).toBe("Needs attention");
+    expect(academicStatusLabel("UNAVAILABLE")).toBe("Not available yet");
   });
 });
