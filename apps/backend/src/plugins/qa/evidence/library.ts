@@ -4,6 +4,8 @@ import {
   type CreateQaEvidenceItemInput,
   type MapQaEvidenceInput,
   type QaEvidenceItemView,
+  type QaEvidenceLibraryPage,
+  type QaEvidenceLibraryPageQuery,
   type QaEvidenceMappingView,
   type QaEvidenceView,
 } from "@dse-pms/shared-types";
@@ -35,6 +37,35 @@ const toDbEvidenceStatus = {
 
 export class QaEvidenceLibraryResourceNotFoundError extends Error {}
 export class QaEvidenceLibraryScopeMismatchError extends Error {}
+export class InvalidQaEvidenceLibraryPageCursorError extends Error {}
+
+type QaEvidenceLibraryCursor = {
+  createdAt: string;
+  id: string;
+};
+
+function encodePageCursor(cursor: QaEvidenceLibraryCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+export function decodeQaEvidenceLibraryPageCursor(cursor: string): QaEvidenceLibraryCursor {
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as unknown;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof (parsed as QaEvidenceLibraryCursor).createdAt !== "string" ||
+      typeof (parsed as QaEvidenceLibraryCursor).id !== "string" ||
+      !(parsed as QaEvidenceLibraryCursor).id ||
+      Number.isNaN(Date.parse((parsed as QaEvidenceLibraryCursor).createdAt))
+    ) {
+      throw new Error("invalid cursor payload");
+    }
+    return parsed as QaEvidenceLibraryCursor;
+  } catch {
+    throw new InvalidQaEvidenceLibraryPageCursorError("Invalid evidence-library page cursor");
+  }
+}
 
 function mappingToView(mapping: {
   id: string;
@@ -197,6 +228,43 @@ export async function listQaEvidenceLibrary(
     include: libraryInclude,
   });
   return rows.map(evidenceToView);
+}
+
+export function buildQaEvidenceLibraryPageFindManyArgs(query: QaEvidenceLibraryPageQuery) {
+  const cursor = query.cursor ? decodeQaEvidenceLibraryPageCursor(query.cursor) : null;
+  const cursorBoundary = cursor
+    ? {
+        OR: [
+          { createdAt: { lt: new Date(cursor.createdAt) } },
+          { createdAt: new Date(cursor.createdAt), id: { lt: cursor.id } },
+        ],
+      }
+    : undefined;
+
+  return {
+    where: cursorBoundary
+      ? { programmeId: query.programmeId, AND: [cursorBoundary] }
+      : { programmeId: query.programmeId },
+    orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
+    include: libraryInclude,
+    take: query.limit + 1,
+  };
+}
+
+export async function listQaEvidenceLibraryPage(
+  query: QaEvidenceLibraryPageQuery,
+): Promise<QaEvidenceLibraryPage> {
+  const rows = await prisma.qaEvidence.findMany(buildQaEvidenceLibraryPageFindManyArgs(query));
+  const hasNextPage = rows.length > query.limit;
+  const visibleRows = hasNextPage ? rows.slice(0, query.limit) : rows;
+  const last = visibleRows.at(-1);
+  return {
+    items: visibleRows.map(evidenceToView),
+    nextCursor:
+      hasNextPage && last
+        ? encodePageCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
+        : null,
+  };
 }
 
 export async function listMappedQaEvidenceForCycle(
