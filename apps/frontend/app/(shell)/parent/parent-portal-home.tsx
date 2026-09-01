@@ -34,7 +34,7 @@ function MessageState({ title, description }: { title: string; description: stri
 
 export function ParentPortalHome() {
   const [students, setStudents] = useState<GuardianLinkedStudentView[] | null>(null);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+  const [selectedRelationshipId, setSelectedRelationshipId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
 
@@ -44,9 +44,9 @@ export function ParentPortalHome() {
       setStudents(next);
       setForbidden(false);
       setError(null);
-      setSelectedStudentId((current) => {
-        if (next.some((student) => student.studentId === current)) return current;
-        return next[0]?.studentId ?? "";
+      setSelectedRelationshipId((current) => {
+        if (next.some((student) => student.relationshipId === current)) return current;
+        return next[0]?.relationshipId ?? "";
       });
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status === 403) {
@@ -73,8 +73,8 @@ export function ParentPortalHome() {
   }, [load]);
 
   const selected = useMemo(
-    () => students?.find((student) => student.studentId === selectedStudentId) ?? null,
-    [students, selectedStudentId],
+    () => students?.find((student) => student.relationshipId === selectedRelationshipId) ?? null,
+    [students, selectedRelationshipId],
   );
 
   if (students === null && !error) return <LoadingState />;
@@ -105,12 +105,14 @@ export function ParentPortalHome() {
               Linked student
               <select
                 id="linked-student"
-                value={selectedStudentId}
-                onChange={(event) => setSelectedStudentId(event.target.value)}
+                value={selectedRelationshipId}
+                onChange={(event) => setSelectedRelationshipId(event.target.value)}
                 className="mt-1 block min-w-60 rounded-lg border border-primary-foreground/25 bg-background px-3 py-2 text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {students.map((student) => (
-                  <option key={student.relationshipId} value={student.studentId}>{student.studentName}</option>
+                  <option key={student.relationshipId} value={student.relationshipId}>
+                    {student.studentName}{students.some((other) => other !== student && other.studentId === student.studentId) ? ` · ${student.programmeId}` : ""}
+                  </option>
                 ))}
               </select>
             </label>
