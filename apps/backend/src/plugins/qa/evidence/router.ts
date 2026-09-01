@@ -2,6 +2,7 @@ import { Router, type Response } from "express";
 import {
   CreateQaEvidenceItemSchema,
   MapQaEvidenceSchema,
+  QaEvidenceLibraryPageQuerySchema,
   QaEvidenceLibraryQuerySchema,
   UpdateQaEvidenceItemSchema,
 } from "@dse-pms/shared-types";
@@ -10,10 +11,12 @@ import { hasAnyRoleInProgramme } from "../../../core/auth/token.ts";
 import { requirePermission } from "../../../core/permissions/index.ts";
 import { listMyQaRequirementAssignments } from "../assignments/service.ts";
 import {
+  InvalidQaEvidenceLibraryPageCursorError,
   QaEvidenceLibraryResourceNotFoundError,
   QaEvidenceLibraryScopeMismatchError,
   createQaEvidenceItem,
   listQaEvidenceLibrary,
+  listQaEvidenceLibraryPage,
   mapQaEvidence,
   unmapQaEvidence,
 } from "./library.ts";
@@ -47,6 +50,10 @@ async function canMapRequirement(
 }
 
 function sendLibraryError(res: Response, error: unknown): void {
+  if (error instanceof InvalidQaEvidenceLibraryPageCursorError) {
+    res.status(400).json({ error: error.message });
+    return;
+  }
   if (error instanceof QaEvidenceLibraryResourceNotFoundError) {
     res.status(404).json({ error: error.message });
     return;
@@ -61,6 +68,24 @@ function sendLibraryError(res: Response, error: unknown): void {
 export function createQaEvidenceLibraryRouter(): Router {
   const router = Router();
   router.use(requireAuth);
+
+  router.get("/evidence-library/page", requirePermission("qa:read"), async (req, res) => {
+    const parsed = QaEvidenceLibraryPageQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid evidence-library page query", details: parsed.error.flatten() });
+      return;
+    }
+    if (!canAccessEvidenceLibrary(req.user!, parsed.data.programmeId)) {
+      res.status(403).json({ error: "You do not have access to this programme evidence library" });
+      return;
+    }
+
+    try {
+      res.json(await listQaEvidenceLibraryPage(parsed.data));
+    } catch (error) {
+      sendLibraryError(res, error);
+    }
+  });
 
   router.get("/evidence-library", requirePermission("qa:read"), async (req, res) => {
     const parsed = QaEvidenceLibraryQuerySchema.safeParse(req.query);
