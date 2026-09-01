@@ -6,7 +6,7 @@ import {
   Role,
 } from "./auth.ts";
 
-test("Role supports the additive QA contributor role", () => {
+test("Role supports additive QA contributor and guardian roles", () => {
   expect(Role.options).toEqual([
     "admin",
     "program_coordinator",
@@ -15,6 +15,7 @@ test("Role supports the additive QA contributor role", () => {
     "qa_contributor",
     "qa_reviewer",
     "student",
+    "guardian",
   ]);
 });
 
@@ -66,6 +67,15 @@ test("CreateAccountInput accepts student portal invites", () => {
     name: "Ada",
     email: "ada@dse.dev",
     role: "student",
+  });
+  expect(result.success).toBe(true);
+});
+
+test("CreateAccountInput accepts guardian invites without granting a student relationship", () => {
+  const result = CreateAccountInput.safeParse({
+    name: "Parent One",
+    email: "parent@dse.dev",
+    role: "guardian",
   });
   expect(result.success).toBe(true);
 });

@@ -1,6 +1,7 @@
 export * from "./plugins.ts";
 export * from "./contracts.ts";
 export * from "./auth.ts";
+export * from "./guardian.ts";
 export * from "./programme.ts";
 export * from "./academic-calendar.ts";
 export * from "./public-programme-info.ts";
