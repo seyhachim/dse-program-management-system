@@ -3,6 +3,8 @@ import {
   CreateGuardianRelationshipInput,
   GuardianAccessScope,
   GuardianRelationshipListQuery,
+  ParentAcademicProgressSummarySchema,
+  ParentAttendanceSummarySchema,
   UpdateGuardianRelationshipInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
@@ -64,10 +66,11 @@ export function createGuardianRelationshipRouter(): Router {
   router.get("/me/relationships/:relationshipId/attendance", async (req, res) => {
     if (!assertGuardian(req, res)) return;
     try {
-      res.json(await parentProgressService.attendance(
+      const projection = await parentProgressService.attendance(
         req.user!.id,
         req.params.relationshipId!,
-      ));
+      );
+      res.json(ParentAttendanceSummarySchema.parse(projection));
     } catch (error) {
       handleServiceError(error, res);
     }
@@ -76,10 +79,11 @@ export function createGuardianRelationshipRouter(): Router {
   router.get("/me/relationships/:relationshipId/academic-progress", async (req, res) => {
     if (!assertGuardian(req, res)) return;
     try {
-      res.json(await parentProgressService.academicProgress(
+      const projection = await parentProgressService.academicProgress(
         req.user!.id,
         req.params.relationshipId!,
-      ));
+      );
+      res.json(ParentAcademicProgressSummarySchema.parse(projection));
     } catch (error) {
       handleServiceError(error, res);
     }
