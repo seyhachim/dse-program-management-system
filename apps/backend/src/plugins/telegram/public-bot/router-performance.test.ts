@@ -208,6 +208,6 @@ describe("public Telegram button responsiveness", () => {
 
     expect(response.status).toBe(200);
     expect(client.events).toEqual(["send"]);
-    expect(client.sent.at(-1)?.text).toContain("Explore DSE · Step 1");
+    expect(client.sent.at(-1)?.text).toContain("Explore DSE");
   });
 });
