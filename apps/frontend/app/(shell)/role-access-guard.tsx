@@ -19,11 +19,18 @@ export function RoleAccessGuard({ children }: { children: React.ReactNode }) {
     ? Math.max(...candidates.map((r) => r.path.length))
     : 0;
   const matched = candidates.filter((r) => r.path.length === longestLength);
-  const allowed =
+  const manifestAllowed =
     !me || matched.length === 0 || matched.some((r) => routeAllowsRole(r, me.roles));
+  const parentPortalAllowed =
+    !pathname.startsWith("/parent") || Boolean(me?.roles.includes("guardian"));
+  const allowed = manifestAllowed && parentPortalAllowed;
 
   useEffect(() => {
     if (loading || allowed) return;
+    if (me?.roles.includes("guardian")) {
+      router.replace("/parent");
+      return;
+    }
     const home = getNavRoutes(me!.roles)[0];
     router.replace(home ? home.path : "/login");
   }, [loading, allowed, me, router]);
