@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import {
   AUN_QA_V4_ID,
   type CreateQaEvidenceInput,
@@ -230,22 +231,37 @@ export async function listQaEvidenceLibrary(
   return rows.map(evidenceToView);
 }
 
-export function buildQaEvidenceLibraryPageFindManyArgs(query: QaEvidenceLibraryPageQuery) {
-  const cursor = query.cursor ? decodeQaEvidenceLibraryPageCursor(query.cursor) : null;
-  const cursorBoundary = cursor
-    ? {
-        OR: [
-          { createdAt: { lt: new Date(cursor.createdAt) } },
-          { createdAt: new Date(cursor.createdAt), id: { lt: cursor.id } },
-        ],
-      }
-    : undefined;
+export function buildQaEvidenceLibraryPageFindManyArgs(
+  query: QaEvidenceLibraryPageQuery,
+): Prisma.QaEvidenceFindManyArgs {
+  const filters: Prisma.QaEvidenceWhereInput[] = [];
+  if (query.search) {
+    const contains = { contains: query.search, mode: "insensitive" as const };
+    filters.push({
+      OR: [
+        { title: contains },
+        { description: contains },
+        { sourceRef: contains },
+        { reportingPeriod: contains },
+        { mappings: { some: { requirement: { code: contains } } } },
+      ],
+    });
+  }
+
+  if (query.cursor) {
+    const cursor = decodeQaEvidenceLibraryPageCursor(query.cursor);
+    const createdAt = new Date(cursor.createdAt);
+    filters.push({
+      OR: [
+        { createdAt: { lt: createdAt } },
+        { createdAt, id: { lt: cursor.id } },
+      ],
+    });
+  }
 
   return {
-    where: cursorBoundary
-      ? { programmeId: query.programmeId, AND: [cursorBoundary] }
-      : { programmeId: query.programmeId },
-    orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
+    where: filters.length > 0 ? { programmeId: query.programmeId, AND: filters } : { programmeId: query.programmeId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: libraryInclude,
     take: query.limit + 1,
   };
