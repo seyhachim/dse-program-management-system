@@ -10,22 +10,6 @@ export interface TelegramConfig {
   initDataMaxFutureSkewSeconds: number;
 }
 
-/**
- * Runtime configuration for the public DSE Information Bot.
- *
- * This intentionally keeps the same common property names used by the public
- * router while separating where the values come from. The optional inherited
- * PMS fields preserve structural compatibility with existing router tests and
- * injected test configurations; public runtime code does not read them.
- */
-export interface PublicTelegramConfig extends Partial<TelegramConfig> {
-  enabled: boolean;
-  botToken?: string;
-  botUsername?: string;
-  webhookSecret?: string;
-  publicProgrammeId: string;
-}
-
 const DEFAULT_INIT_DATA_MAX_AGE_SECONDS = 300;
 const DEFAULT_INIT_DATA_MAX_FUTURE_SKEW_SECONDS = 30;
 const DEFAULT_PUBLIC_PROGRAMME_ID = "dse";
@@ -135,21 +119,31 @@ export function getPmsTelegramConfig(
   return config;
 }
 
-/** Public DSE Information Bot configuration. No PMS/legacy credential fallback. */
+/**
+ * Public DSE Information Bot configuration.
+ *
+ * It intentionally returns the existing runtime shape so the mature public
+ * router/test dependency contract stays stable. Mini-App-only fields are not
+ * populated and the public bot never falls back to PMS or legacy credentials.
+ */
 export function getPublicTelegramConfig(
   env: NodeJS.ProcessEnv = process.env,
-): PublicTelegramConfig {
+): TelegramConfig {
   const enabled = readEnabled(
     "TELEGRAM_PUBLIC_ENABLED",
     env.TELEGRAM_PUBLIC_ENABLED,
   );
-  const config: PublicTelegramConfig = {
+  const config: TelegramConfig = {
     enabled,
     botToken: env.TELEGRAM_PUBLIC_BOT_TOKEN?.trim() || undefined,
     botUsername: env.TELEGRAM_PUBLIC_BOT_USERNAME?.trim() || undefined,
+    miniAppUrl: undefined,
+    miniAppShortName: undefined,
     webhookSecret: env.TELEGRAM_PUBLIC_WEBHOOK_SECRET?.trim() || undefined,
     publicProgrammeId:
       env.TELEGRAM_PUBLIC_PROGRAMME_ID?.trim() || DEFAULT_PUBLIC_PROGRAMME_ID,
+    initDataMaxAgeSeconds: DEFAULT_INIT_DATA_MAX_AGE_SECONDS,
+    initDataMaxFutureSkewSeconds: DEFAULT_INIT_DATA_MAX_FUTURE_SKEW_SECONDS,
   };
 
   if (enabled) {
@@ -171,7 +165,7 @@ export function getPublicTelegramConfig(
   return config;
 }
 
-/** @deprecated Prefer getPmsTelegramConfig for new authenticated-bot code. */
+/** @deprecated Prefer getPmsTelegramConfig for authenticated-bot code. */
 export function getTelegramConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): TelegramConfig {
