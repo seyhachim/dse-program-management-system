@@ -34,6 +34,9 @@ async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T;
 }
 
+const root = await readJson<{
+  overrides?: Record<string, string>;
+}>("package.json");
 const frontend = await readJson<{
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -44,6 +47,14 @@ const ui = await readJson<{
 }>("packages/ui/package.json");
 
 const structuralErrors: string[] = [];
+if (root.overrides?.browserslist !== "^4.28.7") {
+  structuralErrors.push(
+    "root browserslist override must stay on the patched ^4.28.7 security line",
+  );
+}
+if (root.overrides?.qs !== "6.16.0") {
+  structuralErrors.push("root qs override must remain pinned to patched 6.16.0");
+}
 if (frontend.dependencies?.shadcn) {
   structuralErrors.push("apps/frontend must not ship shadcn as a production dependency");
 }
