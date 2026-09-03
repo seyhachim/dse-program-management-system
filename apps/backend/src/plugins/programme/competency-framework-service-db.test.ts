@@ -31,7 +31,7 @@ async function createBase() {
 }
 
 describeDb("curriculum competency framework versioning", () => {
-  test("snapshots canonical competencies including active-state context, versions append-only, binds Draft only, and revision inherits the exact snapshot", async () => {
+  test("snapshots canonical competencies including active-state context and PLO order, versions append-only, binds Draft only, and revision inherits the exact snapshot", async () => {
     const { user, programme, curriculum, token } = await createBase();
     const frameworkCode = `framework-${token}`;
     const canonical = await prisma.programCompetency.findMany({
@@ -51,7 +51,10 @@ describeDb("curriculum competency framework versioning", () => {
       canonical.map((item) => item.active),
     );
     expect(snapshot.competencies[0]?.ploCodes).toEqual(
-      canonical[0]!.ploLinks.map((link) => link.plo.code).sort(),
+      canonical[0]!.ploLinks
+        .slice()
+        .sort((a, b) => a.plo.order - b.plo.order)
+        .map((link) => link.plo.code),
     );
 
     const secondSnapshot = await competencyFrameworkService.createSnapshot(programme.id, user.id, {
