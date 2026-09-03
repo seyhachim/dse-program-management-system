@@ -78,26 +78,28 @@ export const competencyFrameworkService = {
     actorId: string,
     input: CreateProgrammeCompetencyFrameworkVersionInput,
   ): Promise<ProgrammeCompetencyFrameworkVersion> {
-    const [programme, sourceCompetencies] = await Promise.all([
-      prisma.programme.findUnique({ where: { id: programmeId }, select: { id: true } }),
-      prisma.programCompetency.findMany({
-        orderBy: [{ order: "asc" }, { code: "asc" }],
-        include: {
-          ploLinks: { include: { plo: { select: { code: true } } } },
-        },
-      }),
-    ]);
-    if (!programme) throw new CompetencyFrameworkNotFoundError("Programme not found");
-    if (sourceCompetencies.length === 0) {
-      throw new InvalidCompetencyFrameworkAssignmentError(
-        "The current programme competency catalogue has no competencies to snapshot",
-      );
-    }
-
     let createdId: string;
     try {
       createdId = await prisma.$transaction(
         async (tx) => {
+          const programme = await tx.programme.findUnique({
+            where: { id: programmeId },
+            select: { id: true },
+          });
+          if (!programme) throw new CompetencyFrameworkNotFoundError("Programme not found");
+
+          const sourceCompetencies = await tx.programCompetency.findMany({
+            orderBy: [{ order: "asc" }, { code: "asc" }],
+            include: {
+              ploLinks: { include: { plo: { select: { code: true } } } },
+            },
+          });
+          if (sourceCompetencies.length === 0) {
+            throw new InvalidCompetencyFrameworkAssignmentError(
+              "The current programme competency catalogue has no competencies to snapshot",
+            );
+          }
+
           const existingFramework = await tx.programmeCompetencyFramework.findUnique({
             where: { programmeId_code: { programmeId, code: input.code } },
             select: { id: true },
