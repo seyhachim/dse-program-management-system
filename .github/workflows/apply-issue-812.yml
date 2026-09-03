@@ -1,0 +1,36 @@
+name: Apply issue 812 competency framework slice
+
+on:
+  push:
+    branches:
+      - feat/812-competency-framework-versioning
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'implement competency framework versioning') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/812-competency-framework-versioning
+
+      - name: Apply guarded patch
+        run: python3 scripts/apply-issue-812.py
+
+      - name: Remove one-shot patch machinery
+        run: |
+          rm scripts/apply-issue-812.py
+          rm .github/workflows/apply-issue-812.yml
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(curriculum): implement competency framework versioning (#812)"
+          git push origin HEAD:feat/812-competency-framework-versioning
