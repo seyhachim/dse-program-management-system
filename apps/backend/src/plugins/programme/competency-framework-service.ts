@@ -140,7 +140,10 @@ export const competencyFrameworkService = {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === "P2002" || error.code === "P2034")
+      ) {
         throw new CompetencyFrameworkConflictError(
           "Competency framework version changed concurrently; retry the snapshot",
         );
