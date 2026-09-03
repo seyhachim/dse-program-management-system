@@ -31,12 +31,11 @@ async function createBase() {
 }
 
 describeDb("curriculum competency framework versioning", () => {
-  test("snapshots canonical competencies, binds Draft only, and revision inherits the exact snapshot", async () => {
+  test("snapshots canonical competencies including active-state context, binds Draft only, and revision inherits the exact snapshot", async () => {
     const { user, programme, curriculum, token } = await createBase();
     const canonical = await prisma.programCompetency.findMany({
-      where: { active: true },
       include: { ploLinks: { include: { plo: true } } },
-      orderBy: { order: "asc" },
+      orderBy: [{ order: "asc" }, { code: "asc" }],
     });
     expect(canonical.length).toBeGreaterThan(0);
 
@@ -47,6 +46,9 @@ describeDb("curriculum competency framework versioning", () => {
     });
     expect(snapshot.version).toBe(1);
     expect(snapshot.competencies.map((item) => item.code)).toEqual(canonical.map((item) => item.code));
+    expect(snapshot.competencies.map((item) => item.sourceActive)).toEqual(
+      canonical.map((item) => item.active),
+    );
     expect(snapshot.competencies[0]?.ploCodes).toEqual(
       canonical[0]!.ploLinks.map((link) => link.plo.code).sort(),
     );
