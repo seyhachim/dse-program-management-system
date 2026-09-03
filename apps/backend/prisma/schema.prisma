@@ -377,6 +377,8 @@ model User {
   courseSpecRevisionRequests         CourseSpecRevisionRequest[]               @relation("CourseSpecRevisionRequestedBy")
   curriculumVersionsCreated          ProgrammeCurriculumVersion[]              @relation("ProgrammeCurriculumVersionCreatedBy")
   curriculumAuditActions             ProgrammeCurriculumAuditAction[]          @relation("ProgrammeCurriculumAuditActor")
+  competencyFrameworkVersionsCreated ProgrammeCompetencyFrameworkVersion[]     @relation("ProgrammeCompetencyFrameworkVersionCreatedBy")
+  competencyFrameworkAssignments     ProgrammeCurriculumVersion[]              @relation("ProgrammeCurriculumCompetencyFrameworkAssignedBy")
   gradingScaleVersionsCreated        ProgrammeGradingScaleVersion[]            @relation("ProgrammeGradingScaleVersionCreatedBy")
   gradingScaleVersionsApproved       ProgrammeGradingScaleVersion[]            @relation("ProgrammeGradingScaleVersionApprovedBy")
   gradingScaleAuditActions           ProgrammeGradingScaleAuditAction[]        @relation("ProgrammeGradingScaleAuditActor")
@@ -469,6 +471,7 @@ model Programme {
   roleAssignments          UserRoleAssignment[]
   courses                  Course[]
   curricula                ProgrammeCurriculum[]
+  competencyFrameworks     ProgrammeCompetencyFramework[]
   gradingScales            ProgrammeGradingScale[]
   qaCycles                 QaAssessmentCycle[]
   qaEvidence               QaEvidence[]
@@ -619,6 +622,62 @@ model AcademicCalendarAuditAction {
   @@index([actorId])
 }
 
+/// Stable programme-owned identity for a graduate competency framework. The
+/// mutable/current ProgramCompetency catalogue remains the authoring source; these
+/// framework versions snapshot that source for reproducible curriculum history.
+model ProgrammeCompetencyFramework {
+  id          String    @id @default(uuid())
+  programmeId String
+  programme   Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  code        String
+  createdAt   DateTime  @default(now())
+
+  versions ProgrammeCompetencyFrameworkVersion[]
+
+  @@unique([programmeId, code])
+  @@index([programmeId])
+}
+
+/// Immutable snapshot of the programme competency/PLO design context. Corrections
+/// create a new framework version rather than rewriting historical snapshots.
+model ProgrammeCompetencyFrameworkVersion {
+  id          String                       @id @default(uuid())
+  frameworkId String
+  framework   ProgrammeCompetencyFramework @relation(fields: [frameworkId], references: [id], onDelete: Restrict)
+  version     Int
+  name        String
+  changeNote  String                       @default("")
+  createdById String
+  createdBy   User                         @relation("ProgrammeCompetencyFrameworkVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime                     @default(now())
+
+  competencies       ProgrammeCompetencyFrameworkCompetency[]
+  curriculumVersions ProgrammeCurriculumVersion[]
+
+  @@unique([frameworkId, version])
+  @@index([frameworkId])
+  @@index([createdById])
+}
+
+/// One competency copied from the canonical current ProgramCompetency catalogue
+/// into an immutable framework version, including the PLO codes applicable then.
+model ProgrammeCompetencyFrameworkCompetency {
+  id                 String                              @id @default(uuid())
+  frameworkVersionId String
+  frameworkVersion   ProgrammeCompetencyFrameworkVersion @relation(fields: [frameworkVersionId], references: [id], onDelete: Restrict)
+  code               String
+  name               String
+  description        String?
+  order              Int
+  sourceActive       Boolean                             @default(true)
+  ploCodes           String[]                            @default([])
+  createdAt          DateTime                            @default(now())
+
+  @@unique([frameworkVersionId, code])
+  @@unique([frameworkVersionId, order])
+  @@index([frameworkVersionId])
+}
+
 /// Canonical curriculum identity for one programme. Versions are immutable
 /// academic snapshots once approved; the root remains stable across revisions.
 model ProgrammeCurriculum {
@@ -660,6 +719,11 @@ model ProgrammeCurriculumVersion {
   approvedAt       DateTime?
   createdById      String
   createdBy        User                                 @relation("ProgrammeCurriculumVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  competencyFrameworkVersionId String?
+  competencyFrameworkVersion   ProgrammeCompetencyFrameworkVersion? @relation(fields: [competencyFrameworkVersionId], references: [id], onDelete: Restrict)
+  competencyFrameworkAssignedById String?
+  competencyFrameworkAssignedBy   User? @relation("ProgrammeCurriculumCompetencyFrameworkAssignedBy", fields: [competencyFrameworkAssignedById], references: [id], onDelete: Restrict)
+  competencyFrameworkAssignedAt   DateTime?
   createdAt        DateTime                             @default(now())
   updatedAt        DateTime                             @updatedAt
 
@@ -671,6 +735,8 @@ model ProgrammeCurriculumVersion {
   @@index([curriculumId, status])
   @@index([basedOnVersionId])
   @@index([createdById])
+  @@index([competencyFrameworkVersionId])
+  @@index([competencyFrameworkAssignedById])
 }
 
 /// A version-scoped mutually exclusive curriculum route. Pathway identity is

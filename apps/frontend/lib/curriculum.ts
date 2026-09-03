@@ -1,7 +1,9 @@
 import type {
   AddCurriculumCourseInput,
   BindCurriculumCourseSpecInput,
+  BindProgrammeCurriculumCompetencyFrameworkInput,
   CreateInitialCurriculumInput,
+  CreateProgrammeCompetencyFrameworkVersionInput,
   CurriculumArtifactView,
   CurriculumComparison,
   CurriculumCourseSpecBindings,
@@ -11,6 +13,7 @@ import type {
   CurriculumVersionHistory,
   CurriculumVersionSummary,
   CurriculumWorkflowState,
+  ProgrammeCompetencyFrameworkVersion,
   ProgrammeCurriculumRead,
   ReorderCurriculumCoursesInput,
   UpdateCurriculumCourseInput,
@@ -44,6 +47,28 @@ export const curriculumApi = {
   get(curriculumId: string, versionId?: string): Promise<ProgrammeCurriculumRead> {
     const query = versionId ? `?versionId=${encodeURIComponent(versionId)}` : "";
     return api.get<ProgrammeCurriculumRead>(`/api/programme/curricula/${encodeURIComponent(curriculumId)}${query}`);
+  },
+  listCompetencyFrameworkVersions(): Promise<ProgrammeCompetencyFrameworkVersion[]> {
+    return api.get<ProgrammeCompetencyFrameworkVersion[]>(
+      `/api/programme/competency-frameworks/programmes/${CURRENT_PROGRAMME_ID}`,
+    );
+  },
+  createCompetencyFrameworkSnapshot(
+    input: CreateProgrammeCompetencyFrameworkVersionInput,
+  ): Promise<ProgrammeCompetencyFrameworkVersion> {
+    return api.post<ProgrammeCompetencyFrameworkVersion>(
+      `/api/programme/competency-frameworks/programmes/${CURRENT_PROGRAMME_ID}`,
+      input,
+    );
+  },
+  bindCompetencyFramework(
+    versionId: string,
+    input: BindProgrammeCurriculumCompetencyFrameworkInput,
+  ): Promise<ProgrammeCurriculumRead> {
+    return api.put<ProgrammeCurriculumRead>(
+      `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/competency-framework`,
+      input,
+    );
   },
   addCourse(versionId: string, input: AddCurriculumCourseInput): Promise<ProgrammeCurriculumRead> {
     return api.post<ProgrammeCurriculumRead>(`/api/programme/curricula/versions/${encodeURIComponent(versionId)}/courses`, input);
