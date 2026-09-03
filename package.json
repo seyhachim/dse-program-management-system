@@ -7,6 +7,10 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "browserslist": "^4.28.7",
+    "qs": "6.16.0"
+  },
   "scripts": {
     "postinstall": "bun run db:generate",
     "dev": "turbo run dev",
