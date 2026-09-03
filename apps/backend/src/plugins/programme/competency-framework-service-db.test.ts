@@ -31,8 +31,9 @@ async function createBase() {
 }
 
 describeDb("curriculum competency framework versioning", () => {
-  test("snapshots canonical competencies including active-state context, binds Draft only, and revision inherits the exact snapshot", async () => {
+  test("snapshots canonical competencies including active-state context, versions append-only, binds Draft only, and revision inherits the exact snapshot", async () => {
     const { user, programme, curriculum, token } = await createBase();
+    const frameworkCode = `framework-${token}`;
     const canonical = await prisma.programCompetency.findMany({
       include: { ploLinks: { include: { plo: true } } },
       orderBy: [{ order: "asc" }, { code: "asc" }],
@@ -40,7 +41,7 @@ describeDb("curriculum competency framework versioning", () => {
     expect(canonical.length).toBeGreaterThan(0);
 
     const snapshot = await competencyFrameworkService.createSnapshot(programme.id, user.id, {
-      code: `framework-${token}`,
+      code: frameworkCode,
       name: "Graduate Competencies",
       changeNote: "Initial curriculum design baseline",
     });
@@ -53,6 +54,18 @@ describeDb("curriculum competency framework versioning", () => {
       canonical[0]!.ploLinks.map((link) => link.plo.code).sort(),
     );
 
+    const secondSnapshot = await competencyFrameworkService.createSnapshot(programme.id, user.id, {
+      code: frameworkCode,
+      name: "Graduate Competencies 2027",
+      changeNote: "Scheduled framework review",
+    });
+    expect(secondSnapshot.frameworkId).toBe(snapshot.frameworkId);
+    expect(secondSnapshot.version).toBe(2);
+    expect(secondSnapshot.frameworkVersionId).not.toBe(snapshot.frameworkVersionId);
+    expect((await competencyFrameworkService.getById(snapshot.frameworkVersionId)).changeNote).toBe(
+      "Initial curriculum design baseline",
+    );
+
     await competencyFrameworkService.bindToCurriculumVersion(
       curriculum.selectedVersion.id,
       snapshot.frameworkVersionId,
@@ -61,7 +74,7 @@ describeDb("curriculum competency framework versioning", () => {
     const bound = await curriculumService.getById(curriculum.curriculum.id, curriculum.selectedVersion.id);
     expect(bound.competencyFramework).toMatchObject({
       frameworkVersionId: snapshot.frameworkVersionId,
-      frameworkCode: `framework-${token}`,
+      frameworkCode,
       version: 1,
     });
 
@@ -72,7 +85,7 @@ describeDb("curriculum competency framework versioning", () => {
     await expect(
       competencyFrameworkService.bindToCurriculumVersion(
         curriculum.selectedVersion.id,
-        snapshot.frameworkVersionId,
+        secondSnapshot.frameworkVersionId,
         user.id,
       ),
     ).rejects.toBeInstanceOf(InvalidCompetencyFrameworkAssignmentError);
