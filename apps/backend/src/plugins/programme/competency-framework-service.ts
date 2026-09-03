@@ -81,7 +81,6 @@ export const competencyFrameworkService = {
     const [programme, sourceCompetencies] = await Promise.all([
       prisma.programme.findUnique({ where: { id: programmeId }, select: { id: true } }),
       prisma.programCompetency.findMany({
-        where: { active: true },
         orderBy: [{ order: "asc" }, { code: "asc" }],
         include: {
           ploLinks: { include: { plo: { select: { code: true } } } },
@@ -91,7 +90,7 @@ export const competencyFrameworkService = {
     if (!programme) throw new CompetencyFrameworkNotFoundError("Programme not found");
     if (sourceCompetencies.length === 0) {
       throw new InvalidCompetencyFrameworkAssignmentError(
-        "The current programme competency catalogue has no active competencies to snapshot",
+        "The current programme competency catalogue has no competencies to snapshot",
       );
     }
 
