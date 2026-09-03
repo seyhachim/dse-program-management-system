@@ -44,7 +44,7 @@ function preferred(
   if (env[primaryName] !== undefined) {
     return { name: primaryName, value: env[primaryName] };
   }
-  if (legacyName) {
+  if (legacyName && env[legacyName] !== undefined) {
     return { name: legacyName, value: env[legacyName] };
   }
   return { name: primaryName, value: undefined };
