@@ -3,7 +3,7 @@ import type {
   TelegramInitDataVerifyResponse,
   TelegramPublicConfig,
 } from "@dse-pms/shared-types";
-import { getTelegramConfig } from "./config.ts";
+import { getPmsTelegramConfig } from "./config.ts";
 import { verifyTelegramInitData } from "./init-data.ts";
 import {
   telegramReplayStore,
@@ -26,7 +26,7 @@ export interface TelegramService {
 }
 
 interface TelegramServiceDependencies {
-  getConfig?: typeof getTelegramConfig;
+  getConfig?: typeof getPmsTelegramConfig;
   verifier?: typeof verifyTelegramInitData;
   replayStore?: TelegramReplayStore;
 }
@@ -34,7 +34,7 @@ interface TelegramServiceDependencies {
 export function createTelegramService(
   dependencies: TelegramServiceDependencies = {},
 ): TelegramService {
-  const readConfig = dependencies.getConfig ?? getTelegramConfig;
+  const readConfig = dependencies.getConfig ?? getPmsTelegramConfig;
   const verifier = dependencies.verifier ?? verifyTelegramInitData;
   const replayStore = dependencies.replayStore ?? telegramReplayStore;
 
