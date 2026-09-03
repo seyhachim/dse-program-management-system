@@ -98,12 +98,16 @@ export const competencyFrameworkService = {
     try {
       createdId = await prisma.$transaction(
         async (tx) => {
-          const framework = await tx.programmeCompetencyFramework.upsert({
+          const existingFramework = await tx.programmeCompetencyFramework.findUnique({
             where: { programmeId_code: { programmeId, code: input.code } },
-            update: {},
-            create: { programmeId, code: input.code },
             select: { id: true },
           });
+          const framework =
+            existingFramework ??
+            (await tx.programmeCompetencyFramework.create({
+              data: { programmeId, code: input.code },
+              select: { id: true },
+            }));
           const latest = await tx.programmeCompetencyFrameworkVersion.aggregate({
             where: { frameworkId: framework.id },
             _max: { version: true },
