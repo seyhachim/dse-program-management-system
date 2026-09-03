@@ -38,7 +38,6 @@ export function CurriculumCreditChart({ totals }: { totals: CurriculumTotals }) 
           <div className="mt-5 h-64 w-full sm:h-72" aria-hidden="true">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                accessibilityLayer
                 data={chartData}
                 layout="vertical"
                 margin={{ top: 4, right: 12, bottom: 4, left: 8 }}
