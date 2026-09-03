@@ -125,9 +125,12 @@ export function CurriculumCompetencyFrameworkPanel({
                     <p className="text-xs font-semibold text-muted-foreground">{competency.code}</p>
                     <p className="font-medium">{competency.name}</p>
                   </div>
-                  {competency.ploCodes.length > 0 && (
-                    <span className="text-xs text-muted-foreground">{competency.ploCodes.join(", ")}</span>
-                  )}
+                  <div className="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
+                    {!competency.sourceActive && (
+                      <span className="rounded-full border px-2 py-0.5">Inactive at snapshot</span>
+                    )}
+                    {competency.ploCodes.length > 0 && <span>{competency.ploCodes.join(", ")}</span>}
+                  </div>
                 </div>
                 {competency.description && (
                   <p className="mt-2 text-sm text-muted-foreground">{competency.description}</p>
