@@ -7,8 +7,8 @@ import { prisma } from "../../core/db/prisma.ts";
 
 const frameworkVersionInclude = {
   framework: { select: { id: true, programmeId: true, code: true } },
-  competencies: { orderBy: [{ order: "asc" as const }, { code: "asc" as const }] },
-} as const;
+  competencies: { orderBy: [{ order: "asc" }, { code: "asc" }] },
+} satisfies Prisma.ProgrammeCompetencyFrameworkVersionInclude;
 
 function toFrameworkVersionView(version: {
   id: string;
