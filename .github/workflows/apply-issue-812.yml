@@ -22,15 +22,13 @@ jobs:
       - name: Apply guarded patch
         run: python3 scripts/apply-issue-812.py
 
-      - name: Remove one-shot patch machinery
-        run: |
-          rm scripts/apply-issue-812.py
-          rm .github/workflows/apply-issue-812.yml
+      - name: Keep repository CI unchanged in the generated commit
+        run: git checkout -- .github/workflows/ci.yml
 
-      - name: Commit implementation
+      - name: Commit implementation files only
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add apps packages
           git commit -m "feat(curriculum): implement competency framework versioning (#812)"
           git push origin HEAD:feat/812-competency-framework-versioning
