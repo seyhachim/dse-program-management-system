@@ -45,7 +45,7 @@ function toFrameworkVersionView(version: {
       description: competency.description,
       order: competency.order,
       sourceActive: competency.sourceActive,
-      ploCodes: [...competency.ploCodes].sort(),
+      ploCodes: [...competency.ploCodes],
     })),
   };
 }
@@ -91,7 +91,7 @@ export const competencyFrameworkService = {
           const sourceCompetencies = await tx.programCompetency.findMany({
             orderBy: [{ order: "asc" }, { code: "asc" }],
             include: {
-              ploLinks: { include: { plo: { select: { code: true } } } },
+              ploLinks: { include: { plo: { select: { code: true, order: true } } } },
             },
           });
           if (sourceCompetencies.length === 0) {
@@ -129,7 +129,10 @@ export const competencyFrameworkService = {
                   description: competency.description,
                   order: competency.order,
                   sourceActive: competency.active,
-                  ploCodes: competency.ploLinks.map((link) => link.plo.code).sort(),
+                  ploCodes: competency.ploLinks
+                    .slice()
+                    .sort((a, b) => a.plo.order - b.plo.order)
+                    .map((link) => link.plo.code),
                 })),
               },
             },
