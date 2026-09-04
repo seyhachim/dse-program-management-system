@@ -11,6 +11,7 @@ import {
   specificationDateForSubmission,
 } from "./automatic-specification-date.ts";
 import { attachLatestCourseSpecReviewStatus } from "./course-list-review-status.ts";
+import { protectCourseInfoWrite } from "./course-info-write-boundary.ts";
 import { enrichCourseSpecProgress } from "./course-spec-progress-readiness.ts";
 import { createCourseRouter } from "./router.ts";
 import { createCourseSectionPresenceRouter } from "./section-presence-router.ts";
@@ -87,6 +88,25 @@ courseService.lecturerCanAccess = async (courseId, lecturerId) =>
   (await responsibleLecturerCanAccess(courseId, lecturerId));
 
 courseService.saveSection = async (courseId, sectionId, values) => {
+  if (sectionId === "courseInfo") {
+    const currentCourse = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { prerequisites: true },
+    });
+    if (!currentCourse) throw new ReferenceError("Course not found");
+
+    const protectedWrite = protectCourseInfoWrite(
+      values,
+      currentCourse.prerequisites,
+    );
+    if (protectedWrite.attemptedPrerequisiteWrite) {
+      throw new ReferenceError(
+        "Course prerequisites are read-only in Course Specification",
+      );
+    }
+    values = protectedWrite.values;
+  }
+
   const result = await canonicalSaveSection(courseId, sectionId, values);
   // The first successful Course Spec save creates the academic version. Snapshot
   // the programme style immediately so later default changes cannot restyle it.

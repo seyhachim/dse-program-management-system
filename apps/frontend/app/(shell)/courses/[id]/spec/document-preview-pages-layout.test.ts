@@ -45,12 +45,19 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source).toContain("COURSE_DOCUMENT_STYLE.courseInfoTitle");
     expect(source).toContain('text-[9px]">Here are the CLOs of this course:');
     expect(source).toContain(
-      "Description of the course learning outcomes – CLOs At the end of the course, students will be able to:",
+      "Description of the course learning outcomes – CLOs. At the end of the course, students will be able to:",
     );
     expect(source).toContain(">PLO</TH>");
-    expect(source).toContain("Levels in Learning Domain:<br />Knowledge (Cognitive-C), Attitude (Affective-A), Skills (Psychomotor-P)");
+    expect(source).toContain("Levels in Learning Domain:<br />Knowledge (Cognitive-C), Attitude<br />(Affective-A), Skills (Psychomotor-P)");
     expect(source).toContain('>C</TH><TH className="bg-[#E2EEDB] text-center font-normal">A</TH><TH className="bg-[#E2EEDB] text-center font-normal">P</TH>');
-    expect(source).toContain('className="bg-[#E2EEDB] text-left font-normal"');
+    expect(source).toContain('className="section14-header-row"');
+    expect(source).toContain('className="section14-header-table');
+    expect(source).toContain('className="section14-body-table');
+    expect(source).not.toContain('<thead><tr className=\"section14-header-row\">');
+    expect(source).toContain('className="bg-[#E2EEDB] text-center font-normal"');
+    expect(source).toContain('{domain.cognitive || " "}');
+    expect(source).toContain('{domain.affective || " "}');
+    expect(source).toContain('{domain.psychomotor || " "}');
     expect(source).toContain('className="text-left align-middle">{clo.outcome}');
     expect(source).toContain('className="border border-black px-1.5 py-[2px] text-left"');
   });
@@ -68,11 +75,26 @@ describe("Course Specification Part 2 continuation rows", () => {
     );
   });
 
-  test("shows persisted assessment SLT in Sections 16 and 17", async () => {
+  test("matches the approved Section 16 SLT distribution layout", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
+    expect(source).toContain("Course Content Outline and subtopics");
+    expect(source).toContain("Learning and Teaching Activities");
+    expect(source).toContain("Face to Face (F2F)");
+    expect(source).toContain("Online/Technology-mediated");
+    expect(source).toContain("NF2F<br />Independent Learning<br />(Asynchronous)");
+    expect(source).toContain("* Lecture (L), Tutoring (T), Practice (P), Other (O)");
+    expect(source).toContain('category="continuous"');
+    expect(source).toContain('category="final"');
+    expect(source).toContain("physicalSltHours");
+    expect(source).toContain("onlineSltHours");
+    expect(source).toContain("independentSltHours");
     expect(source).toContain("document.totals.continuousAssessmentSlt");
     expect(source).toContain("document.totals.finalAssessmentSlt");
-    expect(source).toContain("document.totals.grandSlt");
+    expect(source).not.toContain("Assessment SLT</p>");
+  });
+
+  test("shows persisted assessment SLT in Section 17", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
     expect(source).toContain("assessment.totalSltHours");
   });
 });
