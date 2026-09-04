@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Settings,
   ShieldCheck,
+  Trophy,
   UserCog,
   Users,
   type LucideIcon,
@@ -156,6 +157,21 @@ const publicInformationManifest: PluginManifest = {
   ],
 };
 
+const studentOpportunitiesManifest: PluginManifest = {
+  id: "student-opportunities",
+  name: "Student Opportunities",
+  version: "0.1.0",
+  routes: [
+    {
+      label: "Opportunities",
+      path: "/opportunities",
+      icon: "trophy",
+      roles: ["admin", "program_coordinator", "lecturer", "student"],
+      group: "Student",
+    },
+  ],
+};
+
 const frontendManifests = [
   ...pluginManifests.filter(
     (manifest) => manifest.id !== "rubrics" && manifest.id !== "qa",
@@ -168,6 +184,7 @@ const frontendManifests = [
   communityManifest,
   lecturerPortfolioManifest,
   publicInformationManifest,
+  studentOpportunitiesManifest,
 ];
 
 const SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS: Role[] = ["admin", "program_coordinator"];
@@ -204,6 +221,7 @@ export const iconMap: Record<string, LucideIcon> = {
   chart: ChartNoAxesCombined,
   bell: Bell,
   megaphone: Megaphone,
+  trophy: Trophy,
 };
 
 /** All nav routes, or — when roles are given — only those the caller's roles may see. */
