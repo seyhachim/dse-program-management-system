@@ -20,6 +20,12 @@ import {
 import { ClosDashboard } from "./clo-dashboard";
 import { CloWizardModal } from "./clos/clo-wizard-modal";
 import type { ProgrammeAcademicConfig } from "@dse-pms/shared-types";
+import {
+  CourseSpecAuthoringHeader,
+  CourseSpecAuthoringStack,
+  CourseSpecEmptyState,
+  CourseSpecNotice,
+} from "./authoring-section-ui";
 // Re-exported so the wizard can keep importing the CLO model from this section.
 export {
   EMPTY_CLOS,
@@ -56,12 +62,14 @@ export function ClosSection({
   courseId,
   lastSavedAt,
   programme,
+  ready,
   onPersist,
 }: {
   value: CloForm[];
   courseId: string;
   lastSavedAt: Date | null;
   programme: ProgrammeAcademicConfig | null;
+  ready: boolean;
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
   const clos = withCodes(value);
@@ -133,58 +141,46 @@ export function ClosSection({
     ) {
       return;
     }
-    onPersist(withCodes(clos.filter((_, i) => i !== index)));
+    void onPersist(withCodes(clos.filter((_, i) => i !== index)));
   };
 
   return (
-    <div className="space-y-4">
-      {/* Section header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-foreground">
-            Course Learning Outcomes (CLOs)
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Define and manage the Course Learning Outcomes for this course.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {lastSavedAt ? (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              Last saved: {formatSaved(lastSavedAt)}
-            </span>
-          ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setNotice("Preview & PDF export are coming in a later phase.")
-            }
-          >
-            <Eye className="mr-1.5 h-4 w-4" /> Preview CLOs
-          </Button>
-          <Button size="sm" onClick={openAdd}>
-            <Plus className="mr-1.5 h-4 w-4" /> Add CLO
-          </Button>
-        </div>
-      </div>
+    <CourseSpecAuthoringStack>
+      <CourseSpecAuthoringHeader
+        title="Course Learning Outcomes"
+        description="Define and manage the measurable learning outcomes students should achieve in this course."
+        ready={ready}
+        feedback={
+          lastSavedAt
+            ? { state: "saved", label: `Saved ${formatSaved(lastSavedAt)}` }
+            : undefined
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setNotice("Preview & PDF export are coming in a later phase.")
+              }
+            >
+              <Eye className="mr-1.5 h-4 w-4" /> Preview CLOs
+            </Button>
+            <Button size="sm" onClick={openAdd}>
+              <Plus className="mr-1.5 h-4 w-4" /> Add CLO
+            </Button>
+          </>
+        }
+      />
 
       {notice ? (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        <CourseSpecNotice onDismiss={() => setNotice(null)}>
           {notice}
-          <button
-            type="button"
-            onClick={() => setNotice(null)}
-            className="text-xs font-medium hover:text-foreground"
-          >
-            Dismiss
-          </button>
-        </div>
+        </CourseSpecNotice>
       ) : null}
 
       <ClosDashboard clos={clos} />
 
-      {/* Table */}
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-sm font-semibold text-foreground">
@@ -218,18 +214,15 @@ export function ClosSection({
         </div>
 
         {clos.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border py-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              No learning outcomes yet.
-            </p>
-            <button
-              type="button"
-              onClick={openAdd}
-              className="mt-1 text-sm font-medium text-accent-foreground hover:underline"
-            >
-              + Add your first CLO
-            </button>
-          </div>
+          <CourseSpecEmptyState
+            title="No learning outcomes yet"
+            description="Add the first CLO to define what students should know or be able to do by the end of the course."
+            action={
+              <Button size="sm" onClick={openAdd}>
+                <Plus className="mr-1.5 h-4 w-4" /> Add your first CLO
+              </Button>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1080px] text-sm">
@@ -331,7 +324,7 @@ export function ClosSection({
                             </IconButton>
                             <IconButton
                               label={`Duplicate ${clo.code}`}
-                              onClick={() => duplicate(index)}
+                              onClick={() => void duplicate(index)}
                             >
                               <Copy className="h-4 w-4" />
                             </IconButton>
@@ -370,7 +363,7 @@ export function ClosSection({
         programme={programme}
         onPersist={onPersist}
       />
-    </div>
+    </CourseSpecAuthoringStack>
   );
 }
 
@@ -406,7 +399,6 @@ function formatSaved(d: Date): string {
   return d.toLocaleString(undefined, {
     day: "2-digit",
     month: "short",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
