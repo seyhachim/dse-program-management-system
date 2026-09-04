@@ -12,7 +12,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:security:verify": "bun scripts/verify-db-security.ts",
-    "seed": "bun prisma/seed.ts && bun prisma/sync-qa-permissions.ts",
+    "seed": "bun prisma/seed.ts && bun prisma/sync-qa-permissions.ts && bun prisma/sync-resource-permissions.ts",
     "course-spec:import": "bun scripts/course-spec-import.ts",
     "lecturer-profile:import": "bun scripts/lecturer-profile-import.ts",
     "student-roster:import": "bun scripts/student-roster-import.ts",

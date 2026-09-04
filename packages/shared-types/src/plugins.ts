@@ -290,6 +290,26 @@ export const programmeManifest: PluginManifest = {
   permissions: ["programme:read", "programme:write"],
 };
 
+/**
+ * Resources is backend-only in #751. The first inventory UI is delivered by
+ * #752, so this manifest deliberately contributes permissions without adding a
+ * dead sidebar route.
+ */
+export const resourcesManifest: PluginManifest = {
+  id: "resources",
+  name: "Resources & Inventory",
+  version: "0.1.0",
+  description:
+    "Programme resource catalogue, logical locations and accountable resource responsibilities.",
+  permissions: [
+    "inventory:read",
+    "inventory:write",
+    "inventory:receive",
+    "inventory:approve",
+    "inventory:maintain",
+  ],
+};
+
 export const qaManifest: PluginManifest = {
   id: "qa",
   name: "Quality Assurance",
@@ -480,6 +500,7 @@ export const pluginManifests: PluginManifest[] = [
   offeringsManifest,
   lecturersManifest,
   programmeManifest,
+  resourcesManifest,
   qaManifest,
   placeholdersManifest,
   methodsManifest,
