@@ -307,6 +307,40 @@ export function SpecClient({ courseId }: { courseId: string }) {
     void load();
   }, [load]);
 
+  const persistCourseDescription = useCallback(
+    async (description: string) => {
+      if (editingLocked) {
+        setError("This course specification is locked while it is in the review workflow.");
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      const nextCourseInfo = { ...courseInfo, description };
+      try {
+        await courseSpecApi.saveSection(
+          courseId,
+          "courseInfo",
+          toCourseInfoPayload(nextCourseInfo),
+        );
+        setCourseInfo(nextCourseInfo);
+        setStatus((current) => ({ ...current, courseInfo: "complete" }));
+        setCourseInfoSavedFlash(true);
+        setTimeout(() => setCourseInfoSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to save the course description",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, courseInfo, editingLocked],
+  );
+
   const persistClos = useCallback(
     async (items: CloForm[]) => {
       if (editingLocked) {
@@ -758,10 +792,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 assessments={assessments}
                 status={status}
                 courseTotalSlt={courseTotalSlt}
-                onEditCourseInfo={() => {
-                  if (!editingLocked) setActiveTab("courseInfo");
-                  else setError("This course specification is locked while it is in the review workflow.");
-                }}
+                onSaveCourseDescription={persistCourseDescription}
+                savingCourseDescription={saving}
                 onGoToTab={(id) => setActiveTab(id)}
                 readOnly={editingLocked}
               />
