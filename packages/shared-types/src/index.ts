@@ -42,6 +42,7 @@ export * from "./result-corrections.ts";
 export * from "./telegram.ts";
 export * from "./telegram-phase2.ts";
 export * from "./document-content.ts";
+export * from "./knowledge-sources.ts";
 export * from "./qa.ts";
 export * from "./qa-knowledge.ts";
 export * from "./qa-evidence-semantics.ts";
