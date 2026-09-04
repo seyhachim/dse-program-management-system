@@ -25,6 +25,18 @@ function invalidateCourseSpecRead(courseId: string) {
   courseSpecReadCache.delete(courseId);
 }
 
+const LEGACY_FINAL_ASSESSMENT_PATTERN = /\b(final|defen[cs]e|capstone)\b/i;
+
+function resolveLegacyAssessmentCategory(
+  item: Record<string, unknown>,
+  metadataCategory: "continuous" | "final",
+): "continuous" | "final" {
+  if (metadataCategory === "final") return "final";
+
+  const label = `${String(item.name ?? "")} ${String(item.type ?? "")}`.trim();
+  return LEGACY_FINAL_ASSESSMENT_PATTERN.test(label) ? "final" : "continuous";
+}
+
 function mergeAssessmentTemplateMetadata(
   spec: CourseSpecView,
   metadata: AssessmentTemplateResponse,
@@ -50,7 +62,14 @@ function mergeAssessmentTemplateMetadata(
           const metadataItem = metadataById.get(String(item.id ?? ""));
           if (!metadataItem) return item;
           const { assessmentId: _assessmentId, ...templateFields } = metadataItem;
-          return { ...item, ...templateFields };
+          return {
+            ...item,
+            ...templateFields,
+            assessmentCategory: resolveLegacyAssessmentCategory(
+              item,
+              templateFields.assessmentCategory,
+            ),
+          };
         }),
       },
     },

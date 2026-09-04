@@ -69,6 +69,21 @@ const topicArray = (v: unknown) =>
         .filter((x) => Number.isInteger(x) && x >= 1 && x <= 15)
     : [];
 
+/**
+ * Legacy/imported course specs may predate persisted §16 assessment metadata.
+ * Infer only when the category is absent; never override an explicit saved value.
+ * This keeps historical author intent authoritative while giving old specs the
+ * expected official-template split for unmistakably final assessment labels.
+ */
+function legacyAssessmentCategory(d: Record<string, unknown>): "continuous" | "final" {
+  if (d.assessmentCategory === "final") return "final";
+  if (d.assessmentCategory === "continuous") return "continuous";
+
+  const label = `${str(d.name)} ${str(d.type)}`.trim().toLowerCase();
+  const finalPattern = /\b(final|defen[cs]e|capstone)\b/;
+  return finalPattern.test(label) ? "final" : "continuous";
+}
+
 /** A fresh, empty assessment. */
 export function emptyAssessment(): AssessmentForm {
   return {
@@ -146,8 +161,7 @@ export function toAssessmentForm(data: unknown): AssessmentForm[] {
       feedbackTimeline: str(d.feedbackTimeline),
       mappedPlos: strArray(d.mappedPlos),
       notes: str(d.notes),
-      assessmentCategory:
-        d.assessmentCategory === "final" ? "final" : "continuous",
+      assessmentCategory: legacyAssessmentCategory(d),
       topicNumbers: topicArray(d.topicNumbers),
       physicalSltHours:
         d.physicalSltHours == null ? "" : String(d.physicalSltHours),
