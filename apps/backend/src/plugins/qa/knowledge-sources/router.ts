@@ -59,7 +59,12 @@ export function createKnowledgeSourcesRouter(): Router {
       return;
     }
     try {
-      res.json(await listKnowledgeSources(parsed.data));
+      const sources = await listKnowledgeSources(parsed.data);
+      res.json(
+        canManage(req.user!, parsed.data.programmeId)
+          ? sources
+          : sources.filter((source) => source.accessClassification !== "RESTRICTED"),
+      );
     } catch (error) {
       sendError(res, error);
     }
@@ -77,7 +82,12 @@ export function createKnowledgeSourcesRouter(): Router {
       return;
     }
     try {
-      res.json(await getKnowledgeSource(parsed.data.programmeId, sourceId));
+      const source = await getKnowledgeSource(parsed.data.programmeId, sourceId);
+      if (source.accessClassification === "RESTRICTED" && !canManage(req.user!, parsed.data.programmeId)) {
+        res.status(403).json({ error: "This trusted source is restricted to programme leadership" });
+        return;
+      }
+      res.json(source);
     } catch (error) {
       sendError(res, error);
     }
