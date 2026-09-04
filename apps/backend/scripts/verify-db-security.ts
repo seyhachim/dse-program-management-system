@@ -149,6 +149,9 @@ const EXPECTED_PUBLIC_TABLES = [
   "CopDiscussion",
   "CopComment",
   "CopAction",
+  "knowledge_sources",
+  "knowledge_source_versions",
+  "knowledge_source_audit_events",
 ] as const;
 
 const EXPECTED_ATTENDANCE_TABLES = [
