@@ -63,3 +63,17 @@ export function buildReviewReadinessItems({
     },
   ];
 }
+
+/** Lecturer-authored areas shown as content completion in Review & Submit. */
+export function reviewAuthoringItems(
+  items: readonly ReviewReadinessItem[],
+): ReviewReadinessItem[] {
+  return items.filter((item) => item.id !== "mapping");
+}
+
+/** System-derived validation gates that remain required for overall readiness. */
+export function reviewValidationItems(
+  items: readonly ReviewReadinessItem[],
+): ReviewReadinessItem[] {
+  return items.filter((item) => item.id === "mapping");
+}
