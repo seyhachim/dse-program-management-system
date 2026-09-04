@@ -1,15 +1,11 @@
-import type { SpecSectionStatus } from "@dse-pms/shared-types";
+import {
+  deriveCourseSpecAuthoringReadinessStatus,
+  type SpecSectionStatus,
+} from "@dse-pms/shared-types";
 import type { AssessmentForm } from "./assessment-model";
 import type { CloForm } from "./clo-model";
-import {
-  deriveConstructiveAlignmentAudit,
-  type ConstructiveAlignmentAudit,
-} from "./constructive-alignment-model";
-import {
-  instructionalWeeklyPlan,
-  type WeekForm,
-} from "./weekly-plan-model";
-import { weeklyPlanIsReady } from "./weekly-plan-readiness";
+import type { ConstructiveAlignmentAudit } from "./constructive-alignment-model";
+import type { WeekForm } from "./weekly-plan-model";
 
 export type OverviewDerivedReadiness = {
   cloReady?: boolean;
@@ -17,13 +13,9 @@ export type OverviewDerivedReadiness = {
 };
 
 /**
- * Overview readiness must reflect source-data semantics used by the actual
- * authoring workflow. Constructive Alignment, CLO validity, Teaching & Learning,
- * and Weekly Plan readiness are derived from current source data rather than
- * stale persisted completion flags. Legacy assessment-only Midterm/Final rows
- * remain preserved in storage but are excluded from instructional-week readiness.
- * Specification Date is system-assigned on first submission and is therefore not
- * lecturer work.
+ * Overview and the lecturer Course Specifications list share the same authoring
+ * readiness semantics. Source-derived CLO, Teaching & Learning, Weekly Plan, and
+ * Constructive Alignment readiness override stale persisted completion flags.
  */
 export function deriveOverviewReadinessStatus(
   status: Record<string, SpecSectionStatus>,
@@ -32,29 +24,20 @@ export function deriveOverviewReadinessStatus(
   assessments: AssessmentForm[],
   derived: OverviewDerivedReadiness = {},
 ): Record<string, SpecSectionStatus> {
-  const instructionalPlan = instructionalWeeklyPlan(weeklyPlan);
-  const effective = applyDerivedAlignmentStatus(
+  return deriveCourseSpecAuthoringReadinessStatus(
     status,
-    deriveConstructiveAlignmentAudit(clos, instructionalPlan, assessments),
+    clos,
+    weeklyPlan,
+    assessments,
+    derived,
   );
-
-  if (derived.cloReady !== undefined) {
-    effective.clos = derived.cloReady ? "complete" : "draft";
-  }
-  if (derived.teachingLearningReady !== undefined) {
-    effective.teachingLearning = derived.teachingLearningReady
-      ? "complete"
-      : "draft";
-  }
-
-  effective.slt = weeklyPlanIsReady(instructionalPlan) ? "complete" : "draft";
-
-  // Kept complete for compatibility with other completion consumers. Overview's
-  // lecturer-work list excludes Date and includes Teaching & Learning instead.
-  effective.date = "complete";
-  return effective;
 }
 
+/**
+ * Retained for focused alignment regression tests and callers that already have
+ * the richer frontend audit. The canonical full readiness flow above derives the
+ * same state through shared source semantics.
+ */
 export function applyDerivedAlignmentStatus(
   status: Record<string, SpecSectionStatus>,
   audit: ConstructiveAlignmentAudit,
@@ -66,9 +49,6 @@ export function applyDerivedAlignmentStatus(
     return effective;
   }
 
-  // If there is source material to review, alignment is genuinely in progress.
-  // Otherwise remove a stale persisted "complete" flag so Overview presents it
-  // as not started rather than contradicting the current source data.
   if (audit.activeCloCount > 0 || audit.hasWeeklyPlan || audit.hasAssessments) {
     effective.mapping = "draft";
   } else {

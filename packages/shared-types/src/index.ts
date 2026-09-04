@@ -30,6 +30,7 @@ export * from "./document-theme.ts";
 export * from "./course-spec-document-theme.ts";
 export * from "./course-spec.ts";
 export * from "./course-spec-alignment-readiness.ts";
+export * from "./course-spec-authoring-readiness.ts";
 export * from "./course-spec-revision.ts";
 export * from "./course-spec-periodic-review.ts";
 export * from "./course-spec-version-history.ts";
