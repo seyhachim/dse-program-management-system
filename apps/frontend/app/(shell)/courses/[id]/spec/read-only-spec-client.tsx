@@ -480,7 +480,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   assessments={assessments}
                   status={status}
                   courseTotalSlt={courseTotalSlt}
-                  onEditCourseInfo={() => undefined}
+                  onSaveCourseDescription={() => Promise.resolve(false)}
                   onGoToTab={(id) => setActiveTab(id)}
                   readOnly
                 />

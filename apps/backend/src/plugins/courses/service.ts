@@ -604,13 +604,12 @@ export const courseService = {
   },
 
   /**
-   * Upsert one section of the spec, marking it complete. For Course Information,
-   * `CourseInfoInput` intentionally permits only prerequisites/description. The
-   * initial save captures all administrative §1–13 values into CourseSpecCourseInfo;
-   * later draft edits update only those two permitted fields in both Course and
-   * the active version snapshot. Other snapshot fields change only by creating a
-   * new academic revision. `clos` additionally rebuilds normalized CourseSpecClo
-   * rows; other sections keep their existing normalized storage behavior.
+   * Upsert one section of the spec, marking it complete. Course Information is
+   * snapshotted from authoritative course/programme/offering/lecturer data; this
+   * authoring path only persists the lecturer-editable course synopsis. It never
+   * rewrites prerequisites or other authoritative snapshot fields. `clos`
+   * additionally rebuilds normalized CourseSpecClo rows; other sections keep
+   * their existing normalized storage behavior.
    */
   async saveSection(
     courseId: string,
@@ -644,14 +643,12 @@ export const courseService = {
         course = await tx.course.update({
           where: { id: courseId },
           data: {
-            prerequisites: info.prerequisites || null,
             description: info.description || null,
           },
         });
         await tx.courseSpecCourseInfo.update({
           where: { courseSpecId: spec.id },
           data: {
-            prerequisites: info.prerequisites ?? "",
             description: info.description ?? "",
           },
         });

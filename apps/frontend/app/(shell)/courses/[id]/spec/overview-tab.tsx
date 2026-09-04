@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, CircleAlert, Pencil } from "lucide-react";
 import {
@@ -44,7 +45,8 @@ export function OverviewTab({
   assessments,
   status,
   courseTotalSlt,
-  onEditCourseInfo,
+  onSaveCourseDescription,
+  savingCourseDescription = false,
   onGoToTab,
   readOnly = false,
 }: {
@@ -55,7 +57,8 @@ export function OverviewTab({
   status: Record<string, SpecSectionStatus>;
   /** Course's total SLT hours, used to derive each CLO's Focus (F/M/P) from its share. */
   courseTotalSlt: number | null;
-  onEditCourseInfo: () => void;
+  onSaveCourseDescription: (description: string) => Promise<boolean>;
+  savingCourseDescription?: boolean;
   onGoToTab: (id: SpecSectionId | "teachingLearning") => void;
   readOnly?: boolean;
 }) {
@@ -97,25 +100,23 @@ export function OverviewTab({
 
   const deliverables = instructionalPlan.filter((w) => w.assessment.trim());
   const planTotals = weeklyPlanFormTotals(instructionalPlan);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState(courseInfo.description);
+
+  useEffect(() => {
+    if (!editingDescription) setDescriptionDraft(courseInfo.description);
+  }, [courseInfo.description, editingDescription]);
+
+  const saveDescription = async () => {
+    const ok = await onSaveCourseDescription(descriptionDraft);
+    if (ok) setEditingDescription(false);
+  };
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
         <Card>
-          <CardHeader
-            title="Course Information"
-            action={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onEditCourseInfo}
-                disabled={readOnly}
-              >
-                <Pencil className="mr-1 h-3.5 w-3.5" />{" "}
-                {readOnly ? "Read-only" : "Edit"}
-              </Button>
-            }
-          />
+          <CardHeader title="Course Information" />
           {courseInfo.courseCode || courseInfo.courseTitle ? (
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Field label="Course Code" value={courseInfo.courseCode} />
@@ -151,17 +152,54 @@ export function OverviewTab({
               <Field label="Email" value={courseInfo.email} />
               <Field label="Telephone" value={courseInfo.telephone} />
               <Field label="Co-Lecturer(s)" value={courseInfo.otherLecturers} full />
-              <Field
-                label="Course Description / Synopsis"
-                value={courseInfo.description}
-                full
-              />
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">Course Description / Synopsis</span>
+                  {!editingDescription && !readOnly ? (
+                    <Button variant="ghost" size="sm" onClick={() => setEditingDescription(true)}>
+                      <Pencil className="mr-1 h-3.5 w-3.5" />
+                      Edit description
+                    </Button>
+                  ) : null}
+                </div>
+                {editingDescription ? (
+                  <div className="mt-1.5 space-y-2">
+                    <textarea
+                      className="min-h-[150px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      value={descriptionDraft}
+                      onChange={(event) => setDescriptionDraft(event.target.value)}
+                      disabled={savingCourseDescription}
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDescriptionDraft(courseInfo.description);
+                          setEditingDescription(false);
+                        }}
+                        disabled={savingCourseDescription}
+                      >
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={saveDescription} disabled={savingCourseDescription}>
+                        {savingCourseDescription ? "Saving…" : "Save changes"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-foreground">
+                    {courseInfo.description || "—"}
+                  </p>
+                )}
+              </div>
             </dl>
           ) : (
             <EmptyHint
               text="No course information yet."
-              action={readOnly ? undefined : "Fill it in"}
-              onClick={readOnly ? undefined : onEditCourseInfo}
+              action={undefined}
+              onClick={undefined}
             />
           )}
         </Card>

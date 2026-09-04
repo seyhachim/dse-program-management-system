@@ -59,6 +59,44 @@ describe("assessment grading and CLO evidence separation", () => {
   });
 });
 
+describe("legacy assessment category compatibility", () => {
+  test("infers unmistakable final assessments when old records have no category", () => {
+    const items = toAssessmentForm({
+      items: [
+        { id: "a", name: "Assignment 1", type: "Assignment", weight: 15 },
+        { id: "b", name: "Final Report & Kaggle Submission", type: "Report", weight: 25 },
+        { id: "c", name: "Presentation & Defence", type: "Presentation", weight: 20 },
+      ],
+    });
+
+    expect(items[0]?.assessmentCategory).toBe("continuous");
+    expect(items[1]?.assessmentCategory).toBe("final");
+    expect(items[2]?.assessmentCategory).toBe("final");
+  });
+
+  test("never overrides an explicit saved assessment category", () => {
+    const [explicitContinuous, explicitFinal] = toAssessmentForm({
+      items: [
+        {
+          id: "a",
+          name: "Final Reflection",
+          type: "Report",
+          assessmentCategory: "continuous",
+        },
+        {
+          id: "b",
+          name: "Project",
+          type: "Project",
+          assessmentCategory: "final",
+        },
+      ],
+    });
+
+    expect(explicitContinuous?.assessmentCategory).toBe("continuous");
+    expect(explicitFinal?.assessmentCategory).toBe("final");
+  });
+});
+
 describe("Group + Individual assessment form model", () => {
   test("new assessments keep Individual as the backward-compatible default", () => {
     const item = emptyAssessment();
