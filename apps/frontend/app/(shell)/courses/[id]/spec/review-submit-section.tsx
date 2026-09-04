@@ -22,6 +22,8 @@ import type { CourseView } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
 import {
   buildReviewReadinessItems,
+  reviewAuthoringItems,
+  reviewValidationItems,
   type ReviewReadinessItem,
   type ReviewReadinessItemId,
 } from "./review-submit-readiness";
@@ -63,6 +65,9 @@ const isEditableReviewStatus = (status: CourseSpecReviewStatus) =>
 
 const CONSTRUCTIVE_ALIGNMENT_BLOCKING_COPY =
   "Constructive Alignment is incomplete. Every active CLO must be linked to at least one Weekly Plan item and at least one active Assessment before submission.";
+
+const CONSTRUCTIVE_ALIGNMENT_PASSED_COPY =
+  "PMS verified that every active CLO is taught in the Weekly Plan and assessed by an active assessment.";
 
 type ReadinessSectionId = Exclude<ReviewReadinessItemId, "date">;
 
@@ -207,9 +212,13 @@ export function ReviewSubmitSection({
       constructiveAlignmentReady,
     ],
   );
-  const completed = readinessItems.filter((item) => item.complete);
+  const authoringItems = reviewAuthoringItems(readinessItems);
+  const validationItems = reviewValidationItems(readinessItems);
+  const completedAuthoring = authoringItems.filter((item) => item.complete);
+  const authoringReady = completedAuthoring.length === authoringItems.length;
   const incomplete = readinessItems.filter((item) => !item.complete);
   const otherIncomplete = incomplete.filter((item) => item.id !== "mapping");
+  const alignmentItem = validationItems[0];
   const alignmentIncomplete =
     !alignmentLoading && !constructiveAlignmentReady;
   const hasPersistedSpecificationDate = Boolean(specificationDate.date?.trim());
@@ -253,7 +262,7 @@ export function ReviewSubmitSection({
       case "draft":
         return ready
           ? "Your course specification is ready. Review the document, then submit it to the Head of Program."
-          : "Complete all required sections before submitting.";
+          : "Complete the required authoring areas and validation checks before submitting.";
       case "submitted":
         return "Your course specification has been submitted and is waiting for the Head of Program review.";
       case "underReview":
@@ -398,18 +407,18 @@ export function ReviewSubmitSection({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-foreground">Course Specification Readiness</p>
-              <p className="mt-1 text-xs text-muted-foreground">Lecturer-completable requirements</p>
+              <p className="mt-1 text-xs text-muted-foreground">Authoring areas and validation</p>
             </div>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                authoringReady ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
               }`}
             >
-              {completed.length}/{readinessItems.length} Complete
+              {completedAuthoring.length}/{authoringItems.length} authoring areas complete
             </span>
           </div>
           <div className="mt-4 space-y-2">
-            {readinessItems.map((section) => {
+            {authoringItems.map((section) => {
               const done = section.complete;
               return (
                 <button
@@ -433,6 +442,72 @@ export function ReviewSubmitSection({
                 </button>
               );
             })}
+          </div>
+
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Validation check
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                editingEnabled && alignmentIncomplete && onGoToSection("mapping")
+              }
+              disabled={!editingEnabled || !alignmentIncomplete}
+              className={`mt-2 w-full rounded-lg border p-3 text-left ${
+                alignmentLoading
+                  ? "cursor-default border-border bg-muted/20"
+                  : constructiveAlignmentReady
+                    ? "cursor-default border-emerald-200 bg-emerald-50/60"
+                    : editingEnabled
+                      ? "border-amber-200 bg-amber-50/60 transition-colors hover:bg-amber-50"
+                      : "cursor-default border-amber-200 bg-amber-50/60"
+              }`}
+            >
+              <span className="flex items-start gap-2">
+                {alignmentLoading ? (
+                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                ) : constructiveAlignmentReady ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-foreground">
+                      {alignmentItem?.title ?? "Constructive Alignment"}
+                    </span>
+                    <span
+                      className={`text-[11px] ${
+                        alignmentLoading
+                          ? "text-muted-foreground"
+                          : constructiveAlignmentReady
+                            ? "text-emerald-600"
+                            : "text-amber-600"
+                      }`}
+                    >
+                      {alignmentLoading
+                        ? "Checking…"
+                        : constructiveAlignmentReady
+                          ? "Passed"
+                          : "Needs attention"}
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">
+                    {alignmentLoading
+                      ? "Checking current CLO, Weekly Plan, and Assessment links."
+                      : constructiveAlignmentReady
+                        ? CONSTRUCTIVE_ALIGNMENT_PASSED_COPY
+                        : CONSTRUCTIVE_ALIGNMENT_BLOCKING_COPY}
+                  </span>
+                  {editingEnabled && alignmentIncomplete ? (
+                    <span className="mt-2 block text-[11px] font-medium text-amber-700">
+                      Review Constructive Alignment →
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+            </button>
           </div>
         </section>
 
@@ -466,7 +541,7 @@ export function ReviewSubmitSection({
                   <span className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span className="flex-1">
-                      <span className="block font-semibold">Constructive Alignment is incomplete.</span>
+                      <span className="block font-semibold">Constructive Alignment needs attention.</span>
                       <span className="mt-1 block">
                         Every active CLO must be linked to at least one Weekly Plan item and at least one active Assessment before submission.
                       </span>
@@ -488,7 +563,7 @@ export function ReviewSubmitSection({
                 </button>
               ))}
               {otherIncomplete.length > 3 ? (
-                <p className="text-xs text-muted-foreground">+ {otherIncomplete.length - 3} more required section(s)</p>
+                <p className="text-xs text-muted-foreground">+ {otherIncomplete.length - 3} more required authoring area(s)</p>
               ) : null}
             </div>
           ) : review.status === "draft" ? (
@@ -496,7 +571,7 @@ export function ReviewSubmitSection({
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="font-semibold">All lecturer-completable requirements are complete.</p>
+                  <p className="font-semibold">All authoring areas are complete and Constructive Alignment passed.</p>
                   <p className="mt-1 text-emerald-700">Specification Date will be assigned automatically when you submit.</p>
                 </div>
               </div>
@@ -519,7 +594,7 @@ export function ReviewSubmitSection({
                   onClick={() => onGoToSection("mapping")}
                   className="mt-3 w-full rounded-lg border border-amber-300 bg-background/70 p-3 text-left"
                 >
-                  <span className="block font-semibold">Constructive Alignment is incomplete.</span>
+                  <span className="block font-semibold">Constructive Alignment needs attention.</span>
                   <span className="mt-1 block">
                     Every active CLO must be linked to at least one Weekly Plan item and at least one active Assessment before submission.
                   </span>
@@ -636,7 +711,7 @@ export function ReviewSubmitSection({
                   {review.status === "draft"
                     ? ready
                       ? "The current saved version will be sent to the Head of Program. PMS will stamp the Specification Date at submission."
-                      : "Submission is disabled until all required sections are complete."
+                      : "Submission is disabled until all authoring areas are complete and validation checks pass."
                     : review.status === "changesRequested"
                       ? "Review the requested changes, update the course specification, and resubmit when ready."
                       : statusMessage}
@@ -692,7 +767,7 @@ export function ReviewSubmitSection({
                 {review.status === "draft"
                   ? ready
                     ? "Ready to submit. Specification Date will be assigned automatically."
-                    : `${incomplete.length} required section${incomplete.length === 1 ? " is" : "s are"} incomplete.`
+                    : `${incomplete.length} readiness check${incomplete.length === 1 ? " needs" : "s need"} attention.`
                   : review.status === "changesRequested"
                     ? legacyMissingResubmissionDate
                       ? "Resubmission is blocked because the original Specification Date is missing."
@@ -811,13 +886,13 @@ export function ReviewSubmitSection({
                 {review.status === "draft"
                   ? ready
                     ? "Ready to submit"
-                    : `${incomplete.length} required section${incomplete.length === 1 ? " needs" : "s need"} attention`
+                    : `${incomplete.length} readiness check${incomplete.length === 1 ? " needs" : "s need"} attention`
                   : review.status === "changesRequested"
                     ? ready
                       ? "Ready to update and resubmit"
                       : legacyMissingResubmissionDate
                         ? "Original Specification Date needs repair"
-                        : `${incomplete.length} required section${incomplete.length === 1 ? " needs" : "s need"} attention`
+                        : `${incomplete.length} readiness check${incomplete.length === 1 ? " needs" : "s need"} attention`
                     : review.status === "approved"
                       ? "Course specification approved"
                       : STATUS_META[review.status].label}
@@ -826,14 +901,14 @@ export function ReviewSubmitSection({
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {review.status === "draft"
                 ? ready
-                  ? `All ${readinessItems.length} lecturer-completable requirements are complete. Specification Date will be stamped when submitted.`
-                  : "Complete the required sections before submitting for review."
+                  ? `All ${authoringItems.length} authoring areas are complete and Constructive Alignment passed. Specification Date will be stamped when submitted.`
+                  : "Complete the required authoring areas and validation checks before submitting for review."
                 : review.status === "changesRequested"
                   ? ready
-                    ? `All ${readinessItems.length} lecturer-completable requirements are complete. Resubmit the updated version when ready.`
+                    ? `All ${authoringItems.length} authoring areas are complete and Constructive Alignment passed. Resubmit the updated version when ready.`
                     : legacyMissingResubmissionDate
                       ? "PMS will not replace a missing original date with the resubmission date."
-                      : "Complete the required sections before resubmitting."
+                      : "Complete the required authoring areas and validation checks before resubmitting."
                   : review.status === "approved"
                     ? "This approved version is read-only."
                     : "The course specification is locked while it is in the review workflow."}
@@ -844,10 +919,10 @@ export function ReviewSubmitSection({
             {editingEnabled ? (
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                  ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                  authoringReady ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
                 }`}
               >
-                {completed.length}/{readinessItems.length} complete
+                {completedAuthoring.length}/{authoringItems.length} authoring
               </span>
             ) : null}
             <Button variant="outline" onClick={onPreview}>
