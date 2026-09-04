@@ -7,7 +7,12 @@ import {
   courseTypeLabel,
   semesterLabel,
 } from "@dse-pms/shared-types";
-import { Input } from "@dse-pms/ui";
+import { Button, Input } from "@dse-pms/ui";
+import { Loader2, Save } from "lucide-react";
+import {
+  CourseSpecAuthoringHeader,
+  CourseSpecAuthoringStack,
+} from "./authoring-section-ui";
 
 /** All fields held as strings for input binding; converted on save by the wizard. */
 export type CourseInfoForm = {
@@ -100,15 +105,46 @@ export function toCourseInfoPayload(f: CourseInfoForm) {
 export function CourseInfoSection({
   value,
   onChange,
+  ready,
+  saving,
+  saved,
+  onSave,
 }: {
   value: CourseInfoForm;
   onChange: (patch: Partial<CourseInfoForm>) => void;
+  ready: boolean;
+  saving: boolean;
+  saved: boolean;
+  onSave: () => Promise<boolean>;
 }) {
   const set = (patch: Partial<CourseInfoForm>) => onChange(patch);
 
   return (
-    <div className="space-y-6">
-      <fieldset className="space-y-4 rounded-lg border border-border p-4">
+    <CourseSpecAuthoringStack>
+      <CourseSpecAuthoringHeader
+        title="Course Information"
+        description="Review authoritative course data and maintain the lecturer-editable prerequisites and course synopsis."
+        ready={ready}
+        feedback={
+          saving
+            ? { state: "saving", label: "Saving…" }
+            : saved
+              ? { state: "saved", label: "Saved" }
+              : undefined
+        }
+        actions={
+          <Button size="sm" onClick={() => void onSave()} disabled={saving}>
+            {saving ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-1.5 h-4 w-4" />
+            )}
+            Save changes
+          </Button>
+        }
+      />
+
+      <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5">
         <legend className="px-1 text-sm font-semibold text-foreground">
           Course & Programme Information
         </legend>
@@ -141,7 +177,7 @@ export function CourseInfoSection({
         </div>
       </fieldset>
 
-      <fieldset className="space-y-4 rounded-lg border border-border p-4">
+      <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5">
         <legend className="px-1 text-sm font-semibold text-foreground">Assigned Lecturer</legend>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="6. Course Instructor" hint="From the course's assigned lecturer.">
@@ -162,7 +198,7 @@ export function CourseInfoSection({
         </Field>
       </fieldset>
 
-      <fieldset className="space-y-4 rounded-lg border border-border p-4">
+      <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5">
         <legend className="px-1 text-sm font-semibold text-foreground">Course Specification</legend>
         <Field label="5. Pre-requisites (if any)">
           <Input
@@ -180,7 +216,7 @@ export function CourseInfoSection({
           />
         </Field>
       </fieldset>
-    </div>
+    </CourseSpecAuthoringStack>
   );
 }
 

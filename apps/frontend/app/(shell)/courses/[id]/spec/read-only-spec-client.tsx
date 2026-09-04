@@ -48,6 +48,7 @@ import {
   type CloForm,
 } from "./clos-section";
 import {
+  CourseInfoSection,
   EMPTY_COURSE_INFO,
   toCourseInfoForm,
   type CourseInfoForm,
@@ -108,6 +109,7 @@ type ReviewState = NonNullable<
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "courseInfo", label: "Course Information" },
   { id: "clos", label: "CLOs" },
   { id: "teachingLearning", label: "Teaching & Learning" },
   { id: "assessmentPlan", label: "Assessment" },
@@ -385,7 +387,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
 
   const goToSection = useCallback(
     (sectionId: SpecSectionId) => {
-      setActiveTab(sectionId === "courseInfo" ? "overview" : sectionId);
+      setActiveTab(sectionId);
     },
     [setActiveTab],
   );
@@ -485,6 +487,19 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
               </CourseSpecReadOnlyBoundary>
             </TabsContent>
 
+            <TabsContent value="courseInfo" className="mt-4">
+              <CourseSpecReadOnlyBoundary>
+                <CourseInfoSection
+                  value={courseInfo}
+                  onChange={() => undefined}
+                  ready={status.courseInfo === "complete"}
+                  saving={false}
+                  saved={false}
+                  onSave={rejectMutation}
+                />
+              </CourseSpecReadOnlyBoundary>
+            </TabsContent>
+
             <TabsContent value="clos" className="mt-4">
               <CourseSpecReadOnlyBoundary>
                 <ClosSection
@@ -492,6 +507,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   courseId={courseId}
                   lastSavedAt={null}
                   programme={programme}
+                  ready={cloReady}
                   onPersist={rejectMutation}
                 />
               </CourseSpecReadOnlyBoundary>
@@ -514,6 +530,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   value={assessments}
                   clos={clos}
                   courseId={courseId}
+                  ready={status.assessmentPlan === "complete"}
                   onPersist={rejectMutation}
                 />
               </CourseSpecReadOnlyBoundary>
@@ -526,6 +543,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   onPersist={rejectMutation}
                   courseId={courseId}
                   courseName={`${course.code} - ${course.title}`}
+                  ready={status.slt === "complete"}
                   clos={clos}
                   teachingMethods={teachingMethods}
                   assessmentMethods={assessmentMethods}

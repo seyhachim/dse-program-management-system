@@ -20,11 +20,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Tabs,
   TabsContent,
   TabsList,
@@ -104,6 +99,7 @@ import {
 import { EMPTY_STUDENT_RESPONSIBILITY } from "./student-responsibility-section";
 import { PoliciesResponsibilitiesSection } from "./policies-responsibilities-section";
 import { normalizePoliciesResponsibilitiesTab } from "./policies-responsibilities-model";
+import { CourseSpecNotice } from "./authoring-section-ui";
 
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
@@ -115,6 +111,7 @@ type TabId =
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "courseInfo", label: "Course Information" },
   { id: "clos", label: "CLOs" },
   { id: "teachingLearning", label: "Teaching & Learning" },
   { id: "assessmentPlan", label: "Assessment" },
@@ -127,6 +124,7 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 const EDITABLE_SPEC_TABS = new Set<TabId>([
+  "courseInfo",
   "clos",
   "teachingLearning",
   "assessmentPlan",
@@ -173,6 +171,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [responsibility, setResponsibility] =
     useState<StudentResponsibilityValue>(EMPTY_STUDENT_RESPONSIBILITY);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
+  const [courseInfoSavedFlash, setCourseInfoSavedFlash] = useState(false);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [teachingLearningProfile, setTeachingLearningProfile] =
@@ -186,7 +185,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [courseInfoDialogOpen, setCourseInfoDialogOpen] = useState(false);
 
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
@@ -206,6 +204,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
     () => teachingLearningIsReady(teachingLearningProfile, clos),
     [teachingLearningProfile, clos],
   );
+
   const setActiveTab = useCallback(
     (id: TabId) => {
       const policyNormalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
@@ -305,7 +304,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   }, [courseId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const persistClos = useCallback(
@@ -560,8 +559,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
           await courseSpecApi.saveSection(courseId, "mapping", payload);
         }
         setStatus((s) => ({ ...s, [sectionId]: "complete" }));
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
+        if (sectionId === "courseInfo") {
+          setCourseInfoSavedFlash(true);
+          setTimeout(() => setCourseInfoSavedFlash(false), 2000);
+        } else {
+          setSavedFlash(true);
+          setTimeout(() => setSavedFlash(false), 2000);
+        }
         return true;
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to save this section");
@@ -621,10 +625,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
   const goToSection = useCallback(
     (sectionId: SpecSectionId) => {
-      if (sectionId === "courseInfo") {
-        setActiveTab("overview");
-        setCourseInfoDialogOpen(true);
-      } else if (sectionId === "references") {
+      if (sectionId === "references") {
         setActiveTab("resources");
       } else {
         setActiveTab(sectionId);
@@ -712,9 +713,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       </header>
 
       {error ? (
-        <div className="rounded-lg border border-status-live/40 bg-status-live/10 px-3 py-2 text-sm text-status-live">
-          {error}
-        </div>
+        <CourseSpecNotice tone="error">{error}</CourseSpecNotice>
       ) : null}
 
       {loading ? (
@@ -722,7 +721,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       ) : (
         <>
           {editingLocked ? (
-            <div className="rounded-lg border border-blue-200/70 bg-blue-50/60 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-200">
+            <CourseSpecNotice>
               <span className="font-semibold">
                 {review?.status === "approved"
                   ? "Course specification approved."
@@ -731,7 +730,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               {review?.status === "approved"
                 ? "This approved version is read-only."
                 : "Editing is unavailable while the course specification is in the review workflow."}
-            </div>
+            </CourseSpecNotice>
           ) : null}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
             <div className="rounded-xl border border-border bg-card p-1.5 shadow-sm">
@@ -760,11 +759,22 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 status={status}
                 courseTotalSlt={courseTotalSlt}
                 onEditCourseInfo={() => {
-                  if (!editingLocked) setCourseInfoDialogOpen(true);
+                  if (!editingLocked) setActiveTab("courseInfo");
                   else setError("This course specification is locked while it is in the review workflow.");
                 }}
                 onGoToTab={(id) => setActiveTab(id)}
                 readOnly={editingLocked}
+              />
+            </TabsContent>
+
+            <TabsContent value="courseInfo" className="mt-4">
+              <CourseInfoSection
+                value={courseInfo}
+                onChange={(patch) => setCourseInfo((current) => ({ ...current, ...patch }))}
+                ready={status.courseInfo === "complete"}
+                saving={saving}
+                saved={courseInfoSavedFlash}
+                onSave={() => saveSection("courseInfo")}
               />
             </TabsContent>
 
@@ -774,6 +784,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 courseId={courseId}
                 lastSavedAt={closSavedAt}
                 programme={programme}
+                ready={cloReady}
                 onPersist={persistClos}
               />
             </TabsContent>
@@ -793,6 +804,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 onPersist={persistWeeklyPlan}
                 courseId={courseId}
                 courseName={course ? `${course.code} - ${course.title}` : undefined}
+                ready={status.slt === "complete"}
                 clos={clos}
                 teachingMethods={teachingMethods}
                 assessmentMethods={assessmentMethods}
@@ -804,6 +816,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 value={assessments}
                 clos={clos}
                 courseId={courseId}
+                ready={status.assessmentPlan === "complete"}
                 onPersist={persistAssessments}
               />
             </TabsContent>
@@ -879,7 +892,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
                 {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
                 <Button
                   variant="outline"
-                  onClick={() => saveSection("mapping")}
+                  onClick={() => void saveSection("mapping")}
                   disabled={saving}
                 >
                   {saving ? "Saving…" : "Save"}
@@ -889,37 +902,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
           </Tabs>
         </>
       )}
-
-      <Dialog
-        open={courseInfoDialogOpen && !editingLocked}
-        onOpenChange={(open) => {
-          if (!editingLocked) setCourseInfoDialogOpen(open);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Course Information</DialogTitle>
-          </DialogHeader>
-          <CourseInfoSection
-            value={courseInfo}
-            onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCourseInfoDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                const ok = await saveSection("courseInfo");
-                if (ok) setCourseInfoDialogOpen(false);
-              }}
-              disabled={saving}
-            >
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
