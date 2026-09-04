@@ -1,29 +1,14 @@
 import {
-  COMPLETABLE_SPEC_SECTIONS,
-  type SpecSectionId,
+  COURSE_SPEC_AUTHORING_SECTIONS,
+  type CourseSpecAuthoringSection,
+  type CourseSpecAuthoringSectionId,
 } from "@dse-pms/shared-types";
 
-export type OverviewReadinessSectionId = SpecSectionId | "teachingLearning";
-
-export type OverviewReadinessSection = {
-  id: OverviewReadinessSectionId;
-  title: string;
-};
+export type OverviewReadinessSectionId = CourseSpecAuthoringSectionId;
+export type OverviewReadinessSection = CourseSpecAuthoringSection;
 
 /**
- * Lecturer-work readiness differs slightly from raw persisted CourseSpec
- * sections: Specification Date is assigned by the PMS on first submission,
- * while Teaching & Learning is real required authoring work stored through its
- * dedicated profile API.
+ * Shared canonical lecturer-work readiness list. Specification Date is automatic;
+ * Teaching & Learning is required authoring work.
  */
-export const OVERVIEW_REQUIRED_SECTIONS: readonly OverviewReadinessSection[] =
-  COMPLETABLE_SPEC_SECTIONS.flatMap((section) => {
-    if (section.id === "date") return [];
-    if (section.id === "clos") {
-      return [
-        section,
-        { id: "teachingLearning", title: "Teaching & Learning" },
-      ];
-    }
-    return [section];
-  });
+export const OVERVIEW_REQUIRED_SECTIONS = COURSE_SPEC_AUTHORING_SECTIONS;

@@ -11,6 +11,7 @@ import {
   specificationDateForSubmission,
 } from "./automatic-specification-date.ts";
 import { attachLatestCourseSpecReviewStatus } from "./course-list-review-status.ts";
+import { enrichCourseSpecProgress } from "./course-spec-progress-readiness.ts";
 import { createCourseRouter } from "./router.ts";
 import { createCourseSectionPresenceRouter } from "./section-presence-router.ts";
 import { createCourseSpecPeriodicReviewRouter } from "./periodic-review-router.ts";
@@ -60,22 +61,25 @@ courseService.list = async (query, lecturerScope) => {
 
 courseService.listSpecProgress = async (lecturerScope) => {
   const rows = await offeringScopedSpecProgress(lecturerScope);
-  if (!lecturerScope) return rows;
+  let scopedRows = rows;
 
-  const existingCourseIds = new Set(rows.map((row) => row.courseId));
-  const missingResponsibleCourseIds = (
-    await courseIdsForResponsibleLecturer(lecturerScope)
-  ).filter((courseId) => !existingCourseIds.has(courseId));
+  if (lecturerScope) {
+    const existingCourseIds = new Set(rows.map((row) => row.courseId));
+    const missingResponsibleCourseIds = (
+      await courseIdsForResponsibleLecturer(lecturerScope)
+    ).filter((courseId) => !existingCourseIds.has(courseId));
 
-  if (missingResponsibleCourseIds.length === 0) return rows;
+    if (missingResponsibleCourseIds.length > 0) {
+      const responsibleOnlyRows = await listSpecProgressForCourseIds(
+        missingResponsibleCourseIds,
+      );
+      scopedRows = [...rows, ...responsibleOnlyRows].sort((a, b) =>
+        a.code.localeCompare(b.code),
+      );
+    }
+  }
 
-  const responsibleOnlyRows = await listSpecProgressForCourseIds(
-    missingResponsibleCourseIds,
-  );
-
-  return [...rows, ...responsibleOnlyRows].sort((a, b) =>
-    a.code.localeCompare(b.code),
-  );
+  return enrichCourseSpecProgress(scopedRows);
 };
 
 courseService.lecturerCanAccess = async (courseId, lecturerId) =>
