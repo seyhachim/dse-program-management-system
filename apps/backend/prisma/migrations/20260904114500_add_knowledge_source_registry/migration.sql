@@ -23,6 +23,8 @@ CREATE TABLE "knowledge_sources" (
   CONSTRAINT "knowledge_sources_created_by_fk" FOREIGN KEY ("created_by_id") REFERENCES "User"("id") ON DELETE RESTRICT
 );
 
+ALTER TABLE "knowledge_sources" ENABLE ROW LEVEL SECURITY;
+
 CREATE INDEX "knowledge_sources_programme_domain_idx"
   ON "knowledge_sources" ("programme_id", "domain");
 CREATE INDEX "knowledge_sources_programme_trust_idx"
@@ -54,6 +56,8 @@ CREATE TABLE "knowledge_source_versions" (
   CONSTRAINT "knowledge_source_versions_unique_label" UNIQUE ("source_id", "version_label")
 );
 
+ALTER TABLE "knowledge_source_versions" ENABLE ROW LEVEL SECURITY;
+
 CREATE UNIQUE INDEX "knowledge_source_versions_one_current_idx"
   ON "knowledge_source_versions" ("source_id")
   WHERE "status" = 'CURRENT';
@@ -76,6 +80,8 @@ CREATE TABLE "knowledge_source_audit_events" (
   CONSTRAINT "knowledge_source_audit_version_fk" FOREIGN KEY ("version_id") REFERENCES "knowledge_source_versions"("id") ON DELETE RESTRICT,
   CONSTRAINT "knowledge_source_audit_actor_fk" FOREIGN KEY ("actor_id") REFERENCES "User"("id") ON DELETE RESTRICT
 );
+
+ALTER TABLE "knowledge_source_audit_events" ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX "knowledge_source_audit_source_created_idx"
   ON "knowledge_source_audit_events" ("source_id", "created_at" DESC);
