@@ -12,6 +12,7 @@ import {
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme } from "../../../core/auth/token.ts";
+import { listMyActionResearchOptimized } from "./my-work.ts";
 import {
   InvalidResearchProjectPageCursorError,
   listResearchProjectPage,
@@ -27,7 +28,6 @@ import {
   createResearchAssignment,
   createResearchProject,
   getResearchProject,
-  listMyActionResearch,
   listResearchAssignments,
   listResearchProjects,
   lockResearchBaseline,
@@ -206,7 +206,7 @@ export function createActionResearchRouter(): Router {
       return;
     }
     try {
-      res.json(await listMyActionResearch(parsed.data.programmeId, req.user!.id));
+      res.json(await listMyActionResearchOptimized(parsed.data.programmeId, req.user!.id));
     } catch (error) {
       sendActionResearchError(res, error);
     }
