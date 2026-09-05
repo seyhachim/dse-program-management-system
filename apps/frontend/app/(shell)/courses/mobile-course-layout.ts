@@ -5,7 +5,7 @@ export const MOBILE_COURSES_LAYOUT = {
   addButton:
     "inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground",
   filters: "grid grid-cols-2 gap-2 md:hidden",
-  filterTrigger: "h-11 w-full",
+  filterTrigger: "h-11 w-full data-[size=default]:h-11",
   desktopFilters: "hidden md:flex md:flex-wrap md:items-end md:gap-3",
   cards: "space-y-3 md:hidden",
   card: "rounded-2xl border border-border bg-card p-4 shadow-sm",
