@@ -1,46 +1,58 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCircle2, Pin, Send } from "lucide-react";
 import type { CourseDeliveryOffering } from "@dse-pms/shared-types";
 import { Button, Input } from "@dse-pms/ui";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
+import { useMe } from "@/lib/auth";
 import { courseDeliveryApi } from "@/lib/course-delivery";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 
 export function AnnouncementsClient() {
-  const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
+  const { me, loading: meLoading } = useMe();
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await courseDeliveryApi.offerings();
-      setOfferings(rows);
-      setSelectedId((current) => rows.some((row) => row.offeringId === current) ? current : (rows[0]?.offeringId ?? ""));
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Could not load announcements");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const queryScope = { userId: me?.id ?? "pending" };
+  const deliveryKey = protectedQueryKey(queryScope, "course-delivery", "offerings");
+  const deliveryQuery = useQuery({
+    queryKey: deliveryKey,
+    queryFn: () => courseDeliveryApi.offerings(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const offerings: CourseDeliveryOffering[] = deliveryQuery.data ?? [];
+  const hasData = deliveryQuery.data !== undefined;
+  const loading = meLoading || (!hasData && deliveryQuery.isPending);
+  const hardError = !hasData && deliveryQuery.isError;
+  const queryError = hardError
+    ? deliveryQuery.error instanceof ApiError
+      ? deliveryQuery.error.message
+      : "Could not load announcements"
+    : null;
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    setSelectedId((current) =>
+      offerings.some((row) => row.offeringId === current) ? current : (offerings[0]?.offeringId ?? ""),
+    );
+  }, [offerings]);
   const selected = offerings.find((row) => row.offeringId === selectedId) ?? null;
 
   const publish = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selected) return;
     setSaving(true);
-    setError(null);
+    setMutationError(null);
     setNotice(null);
     try {
       await courseDeliveryApi.publishAnnouncement({
@@ -53,9 +65,9 @@ export function AnnouncementsClient() {
       setBody("");
       setPinned(false);
       setNotice("Announcement published to this section.");
-      await load();
+      await queryClient.invalidateQueries({ queryKey: deliveryKey, exact: true });
     } catch (reason) {
-      setError(reason instanceof ApiError || reason instanceof Error ? reason.message : "Could not publish announcement");
+      setMutationError(reason instanceof ApiError || reason instanceof Error ? reason.message : "Could not publish announcement");
     } finally {
       setSaving(false);
     }
@@ -66,7 +78,14 @@ export function AnnouncementsClient() {
       <Topbar title="Announcements" subtitle="Publish section-specific updates to enrolled students." />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-6xl space-y-5">
-          {loading ? <StateCard>Loading your course sections…</StateCard> : error && !offerings.length ? <StateCard>{error}</StateCard> : !offerings.length ? <StateCard>No assigned course sections.</StateCard> : selected ? (
+          <QueryRefreshStatus
+            hasData={hasData}
+            isPending={deliveryQuery.isPending}
+            isFetching={deliveryQuery.isFetching}
+            isError={deliveryQuery.isError}
+            label="Announcements"
+          />
+          {loading ? <StateCard>Loading your course sections…</StateCard> : queryError ? <StateCard>{queryError}</StateCard> : !offerings.length ? <StateCard>No assigned course sections.</StateCard> : selected ? (
             <>
               <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -80,7 +99,7 @@ export function AnnouncementsClient() {
                     <p className="mt-1 text-sm text-muted-foreground">Only students enrolled in this section receive these announcements.</p>
                   </div>
                   <label className="text-sm font-medium">Course section
-                    <select value={selected.offeringId} onChange={(event) => { setSelectedId(event.target.value); setNotice(null); }} className="mt-1 block h-10 min-w-72 rounded-lg border border-input bg-background px-3 text-sm">
+                    <select value={selected.offeringId} onChange={(event) => { setSelectedId(event.target.value); setNotice(null); setMutationError(null); }} className="mt-1 block h-10 min-w-72 rounded-lg border border-input bg-background px-3 text-sm">
                       {offerings.map((offering) => <option key={offering.offeringId} value={offering.offeringId}>{offering.code} · Section {offering.sectionCode} · {offering.term}</option>)}
                     </select>
                   </label>
@@ -88,7 +107,7 @@ export function AnnouncementsClient() {
               </section>
 
               {notice ? <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{notice}</div> : null}
-              {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
+              {mutationError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{mutationError}</div> : null}
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                 <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
