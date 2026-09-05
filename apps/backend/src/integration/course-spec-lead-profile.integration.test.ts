@@ -281,13 +281,13 @@ integrationDescribe("Course Spec Course Team snapshot", () => {
             id: lecturerA.id,
             name: lecturerA.name,
             email: lecturerA.email,
-            role: "RESPONSIBLE",
+            role: "RESPONSIBLE" as const,
           },
           {
             id: lecturerB.id,
             name: lecturerB.name,
             email: lecturerB.email,
-            role: "CO_LECTURER",
+            role: "CO_LECTURER" as const,
           },
         ].sort((a, b) => a.name.localeCompare(b.name)),
       });
