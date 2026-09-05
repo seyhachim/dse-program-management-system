@@ -13,6 +13,23 @@ const config = {
     // unrelated lockfile above the repo (e.g. ~/package-lock.json).
     root: fileURLToPath(new URL("../..", import.meta.url)),
   },
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          {
+            key: "Service-Worker-Allowed",
+            value: "/",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default config;
