@@ -291,13 +291,15 @@ function formatMissingPublishedTopic(slug: string): string {
   return `DSE Information\n\nNo published information is available yet for “${slug.replaceAll("-", " ")}”.`;
 }
 
-function formatFaqs(title: string, faqs: PublicProgrammeFaq[]): string {
+function formatMenu(title: string): string {
+  return `${title}\n\nChoose an option below.`;
+}
+
+function formatFaqQuestions(title: string, faqs: PublicProgrammeFaq[]): string {
   if (!faqs.length)
     return `${title}\n\nNo published information is available yet.`;
-  const items = faqs
-    .slice(0, 8)
-    .map((faq) => `• ${faq.question}\n${faq.shortAnswer || faq.answer}`);
-  return `${title}\n\n${items.join("\n\n")}`;
+  const questions = faqs.slice(0, 8).map((faq) => `• ${faq.question}`);
+  return `${title}\n\n${questions.join("\n")}\n\nType one of these questions directly, or choose a topic below.`;
 }
 
 function formatDates(dates: PublicProgrammeImportantDate[]): string {
@@ -453,22 +455,19 @@ async function renderRoute(
       replyMarkup: inlineKeyboard("home"),
     };
   }
-  if (route === "admission") {
-    const admission = await publicRead.getAdmission(programmeId, locale);
-    const details = [
-      admission.applicationUrl && `Apply: ${admission.applicationUrl}`,
-      admission.admissionEmail && `Email: ${admission.admissionEmail}`,
-      admission.phone && `Phone: ${admission.phone}`,
-    ].filter(Boolean);
+  if (
+    route === "admission" ||
+    route === "fees" ||
+    route === "scholarships" ||
+    route === "about" ||
+    route === "curriculum" ||
+    route === "careers" ||
+    route === "studentLife" ||
+    route === "facilities" ||
+    route === "lecturers"
+  ) {
     return {
-      text: `${formatFaqs("Admission", admission.faqs)}${details.length ? `\n\n${details.join("\n")}` : ""}`,
-      replyMarkup: inlineKeyboard(route),
-    };
-  }
-  if (route === "fees" || route === "scholarships") {
-    const data = await publicRead.getFeesScholarships(programmeId, locale);
-    return {
-      text: formatFaqs("Fees & Scholarships", data.faqs),
+      text: formatMenu(MENUS[route].title),
       replyMarkup: inlineKeyboard(route),
     };
   }
@@ -487,35 +486,13 @@ async function renderRoute(
     };
   }
   if (route === "ask") {
-    const faqs = await publicRead.listFaqs(programmeId, {
-      featured: true,
-      locale,
-    });
     return {
-      text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nYou can also type a question directly.`,
-      replyMarkup: inlineKeyboard(route),
-    };
-  }
-  const categoryByRoute: Partial<Record<RouteKey, ProgrammeFaqCategory>> = {
-    about: "About",
-    curriculum: "Curriculum",
-    careers: "Careers",
-    studentLife: "StudentLife",
-    facilities: "Facilities",
-    lecturers: "Lecturers",
-  };
-  const category = categoryByRoute[route];
-  if (category) {
-    return {
-      text: formatFaqs(
-        MENUS[route].title,
-        await publicRead.listFaqs(programmeId, { category, locale }),
-      ),
+      text: `${formatMenu("Ask DSE")}\n\nYou can also type a question directly.`,
       replyMarkup: inlineKeyboard(route),
     };
   }
   return {
-    text: `${MENUS[route].title}\n\nChoose an option below.`,
+    text: formatMenu(MENUS[route].title),
     replyMarkup: inlineKeyboard(route),
   };
 }
@@ -547,7 +524,7 @@ async function renderStaticCallback(
 
   if (data === "faq:popular") {
     return {
-      text: formatFaqs(
+      text: formatFaqQuestions(
         "Popular Questions",
         await publicRead.listFaqs(programmeId, { featured: true, locale }),
       ),
@@ -564,7 +541,7 @@ async function renderStaticCallback(
   const explicitCategory = faqCategoryCallbacks[data];
   if (explicitCategory) {
     return {
-      text: formatFaqs(
+      text: formatFaqQuestions(
         "DSE Information",
         await publicRead.listFaqs(programmeId, {
           category: explicitCategory,
@@ -667,10 +644,7 @@ async function renderStaticCallback(
                     ? "facilities"
                     : "lecturers";
     return {
-      text: formatFaqs(
-        MENUS[routeForCategory].title,
-        await publicRead.listFaqs(programmeId, { category, locale }),
-      ),
+      text: formatMenu(MENUS[routeForCategory].title),
       replyMarkup: inlineKeyboard(routeForCategory),
     };
   }
@@ -1012,25 +986,13 @@ export function createPublicTelegramRouter(
               };
             } catch {
               rendered = {
-                text: formatFaqs(
-                  "DSE Curriculum",
-                  await publicRead.listFaqs(programmeId, {
-                    category: "Curriculum",
-                    locale,
-                  }),
-                ),
+                text: formatMenu(MENUS.curriculum.title),
                 replyMarkup: inlineKeyboard("curriculum"),
               };
             }
           } else {
             rendered = {
-              text: formatFaqs(
-                "DSE Lecturers",
-                await publicRead.listFaqs(programmeId, {
-                  category: "Lecturers",
-                  locale,
-                }),
-              ),
+              text: formatMenu(MENUS.lecturers.title),
               replyMarkup: inlineKeyboard("lecturers"),
             };
           }

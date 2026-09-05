@@ -313,15 +313,46 @@ describe("public Telegram webhook", () => {
     expect(keyboard.flat().map((item) => item.text)).toContain("❓ Ask DSE");
   });
 
-  test("primary Admission selection renders PMS-owned published FAQ content", async () => {
+  test("primary Admission selection renders a concise menu instead of dumping FAQ answers", async () => {
     const response = await webhook({
       update_id: 3,
       message: { message_id: 3, chat: { id: 11 }, text: "📝 Admission" },
     });
     expect(response.status).toBe(200);
     const sent = client.sent.at(-1)!;
-    expect(sent.text).toContain("Published admission answer.");
-    expect(sent.text).toContain("https://example.edu/apply");
+    expect(sent.text).toBe("Admission\n\nChoose an option below.");
+    expect(sent.text).not.toContain("Published admission answer.");
+    expect(sent.text).not.toContain("https://example.edu/apply");
+    expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
+  });
+
+  test("About DSE menu callback keeps choices visible without dumping FAQ answers", async () => {
+    const response = await webhook({
+      update_id: 39,
+      callback_query: {
+        id: "cb-about-menu",
+        data: "about:menu",
+        message: { message_id: 49, chat: { id: 21 } },
+      },
+    });
+    expect(response.status).toBe(200);
+    const edited = client.edited.at(-1)!;
+    expect(edited.text).toBe("About DSE\n\nChoose an option below.");
+    expect(edited.text).not.toContain("Published admission answer.");
+    expect(edited.replyMarkup).toHaveProperty("inline_keyboard");
+    expect(client.answered.at(-1)).toEqual({ callbackQueryId: "cb-about-menu" });
+  });
+
+  test("Ask DSE menu stays compact until the user asks or opens a question list", async () => {
+    const response = await webhook({
+      update_id: 40,
+      message: { message_id: 40, chat: { id: 22 }, text: "❓ Ask DSE" },
+    });
+    expect(response.status).toBe(200);
+    const sent = client.sent.at(-1)!;
+    expect(sent.text).toContain("Ask DSE\n\nChoose an option below.");
+    expect(sent.text).toContain("You can also type a question directly.");
+    expect(sent.text).not.toContain("Published DSE answer.");
     expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
   });
 
@@ -392,7 +423,7 @@ describe("public Telegram webhook", () => {
     expect(client.sent.at(-1)?.text).toContain("couldn't find a confirmed answer");
   });
 
-  test("FAQ callback edits the existing message and answers the callback query", async () => {
+  test("FAQ callback lists question titles without dumping their answers", async () => {
     const response = await webhook({
       update_id: 4,
       callback_query: {
@@ -402,7 +433,9 @@ describe("public Telegram webhook", () => {
       },
     });
     expect(response.status).toBe(200);
-    expect(client.edited.at(-1)?.text).toContain("Published DSE answer.");
+    expect(client.edited.at(-1)?.text).toContain("• What is DSE?");
+    expect(client.edited.at(-1)?.text).toContain("Type one of these questions directly");
+    expect(client.edited.at(-1)?.text).not.toContain("Published DSE answer.");
     expect(client.edited.at(-1)?.messageId).toBe(44);
     expect(client.answered.at(-1)).toEqual({ callbackQueryId: "cb-1" });
   });

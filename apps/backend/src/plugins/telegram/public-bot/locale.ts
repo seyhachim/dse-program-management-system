@@ -171,11 +171,19 @@ export function localizeReplyMarkup(
 
 function localizeHeading(line: string): string {
   const headings = new Map<string, string>([
+    ["About DSE", "អំពី DSE"],
     ["Admission", "ការចូលរៀន"],
+    ["Study & Curriculum", "ការសិក្សា និងកម្មវិធីសិក្សា"],
+    ["Careers", "អាជីព"],
     ["Fees & Scholarships", "ថ្លៃសិក្សា និងអាហារូបករណ៍"],
+    ["Scholarships", "អាហារូបករណ៍"],
+    ["Student Life", "ជីវិតនិស្សិត"],
+    ["Labs & Facilities", "មន្ទីរពិសោធន៍ និងបរិក្ខារ"],
+    ["Lecturers", "សាស្ត្រាចារ្យ"],
     ["Important Dates", "កាលបរិច្ឆេទសំខាន់ៗ"],
     ["Contact Us", "ទាក់ទងយើង"],
     ["Ask DSE", "សួរ DSE"],
+    ["DSE Information", "ព័ត៌មាន DSE"],
     ["Ask DSE · Popular Questions", "សួរ DSE · សំណួរពេញនិយម"],
     ["Ask DSE · Possible matches", "សួរ DSE · សំណួរដែលអាចត្រូវ"],
     ["Courses · Published Curriculum", "មុខវិជ្ជា · កម្មវិធីសិក្សាដែលបានផ្សព្វផ្សាយ"],
@@ -224,6 +232,8 @@ export function localizeBotText(text: string, locale: TelegramLocale): string {
     .replace("No official published dates are available yet.", "មិនទាន់មានកាលបរិច្ឆេទផ្លូវការដែលបានផ្សព្វផ្សាយទេ។")
     .replace("No published contact information is available yet.", "មិនទាន់មានព័ត៌មានទំនាក់ទំនងដែលបានផ្សព្វផ្សាយទេ។")
     .replace("No published curriculum courses are available yet.", "មិនទាន់មានមុខវិជ្ជាពីកម្មវិធីសិក្សាដែលបានផ្សព្វផ្សាយទេ។")
+    .replace("Choose an option below.", "សូមជ្រើសរើសជម្រើសខាងក្រោម។")
+    .replace("Type one of these questions directly, or choose a topic below.", "សូមវាយសំណួរមួយក្នុងចំណោមសំណួរទាំងនេះដោយផ្ទាល់ ឬជ្រើសប្រធានបទខាងក្រោម។")
     .replace("You can also type a question directly.", "អ្នកក៏អាចវាយសំណួរដោយផ្ទាល់បានផងដែរ។")
     .replace("Please ask one of these more specifically.", "សូមសួរមួយក្នុងចំណោមសំណួរទាំងនេះឱ្យជាក់លាក់ជាងមុន។")
     .replace("I couldn't find a confirmed answer in the published DSE information. Try a more specific question, /courses, or choose a topic from the menu.", "ខ្ញុំរកមិនឃើញចម្លើយដែលបានបញ្ជាក់ក្នុងព័ត៌មាន DSE ដែលបានផ្សព្វផ្សាយទេ។ សូមសួរឱ្យជាក់លាក់ជាងមុន វាយ /courses ឬជ្រើសប្រធានបទពីម៉ឺនុយ។")
