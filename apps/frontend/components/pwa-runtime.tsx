@@ -83,11 +83,12 @@ export function PwaRuntime() {
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleInstalled);
 
-    if (isIosLike()) setShowIosInstall(true);
+    const iosInstallTimer = isIosLike() ? window.setTimeout(() => setShowIosInstall(true), 0) : null;
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleInstalled);
+      if (iosInstallTimer !== null) window.clearTimeout(iosInstallTimer);
     };
   }, [suppressPwaUi]);
 
