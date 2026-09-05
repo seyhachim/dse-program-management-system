@@ -2,6 +2,7 @@ import type {
   Course,
   CourseSectionPresence,
   CourseSpecProgress,
+  CourseSpecTeamSummary,
   CourseSpecVersionRef,
   CreateCourseInput,
   Lecturer,
@@ -10,10 +11,11 @@ import type {
 import { api } from "./api";
 import { optionalCourseSectionPresence } from "./course-section-presence";
 
-/** Course as returned by the API — lecturer joined via the registry. */
+/** Course as returned by the API — lecturer and current Course Spec team joined. */
 export type CourseView = Course & {
   lecturer: Lecturer | null;
   reviewStatus?: string | null;
+  courseTeam?: CourseSpecTeamSummary;
 };
 
 export const coursesApi = {
