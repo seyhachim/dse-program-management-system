@@ -51,6 +51,24 @@ describe("mutation invalidation registry", () => {
     });
   });
 
+  test("refreshes CourseSpec after confirmed Teaching & Learning profile writes", () => {
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/teaching-learning/course-1",
+      ),
+    ).toMatchObject({
+      domain: "course-spec",
+      resources: ["course-spec"],
+    });
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/teaching-learning/course-1/project-progress/week-1",
+      ),
+    ).toBeNull();
+  });
+
   test("distinguishes offering enrollment from structural writes", () => {
     expect(
       invalidationForSuccessfulMutation(
