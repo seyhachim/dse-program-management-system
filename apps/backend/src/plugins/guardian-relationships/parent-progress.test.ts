@@ -17,6 +17,13 @@ describe("guardian parent progress boundary", () => {
     expect(source).toContain('relationship.accessScopes.includes("official_results")');
   });
 
+  test("batches parent attendance health across offerings", () => {
+    const source = readFileSync(new URL("./parent-progress-service.ts", import.meta.url), "utf8");
+    expect(source).toContain("healthForStudentOfferings(");
+    expect(source).not.toContain("healthForStudent(studentId: string, offeringId: string)");
+    expect(source).not.toContain("Promise.all(enrollments.map");
+  });
+
   test("API routes validate strict parent-safe DTOs", () => {
     const source = readFileSync(new URL("./router.ts", import.meta.url), "utf8");
     expect(source).toContain("ParentAttendanceSummarySchema.parse(projection)");
