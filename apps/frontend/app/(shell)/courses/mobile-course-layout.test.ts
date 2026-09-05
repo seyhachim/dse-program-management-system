@@ -15,6 +15,9 @@ describe("mobile Courses layout", () => {
     expect(MOBILE_COURSES_LAYOUT.filters).toContain("grid-cols-2");
     expect(MOBILE_COURSES_LAYOUT.filters).toContain("md:hidden");
     expect(MOBILE_COURSES_LAYOUT.filterTrigger).toContain("h-11");
+    expect(MOBILE_COURSES_LAYOUT.filterTrigger).toContain(
+      "data-[size=default]:h-11",
+    );
     expect(MOBILE_COURSES_LAYOUT.filterTrigger).toContain("w-full");
     expect(MOBILE_COURSES_LAYOUT.desktopFilters).toContain("hidden");
     expect(MOBILE_COURSES_LAYOUT.desktopFilters).toContain("md:flex");
