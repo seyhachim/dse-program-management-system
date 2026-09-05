@@ -328,12 +328,7 @@ export function MyCoursesClient() {
         columns={columns}
         rows={rows}
         getRowId={(row) => row.course.id}
-        groupBy={(row) =>
-          courseSectionEmptyPresentation(
-            row.offerings.length,
-            sectionPresenceByCourse.get(row.course.id),
-          )?.groupLabel ?? courseSpecRowGroupLabel(row)
-        }
+        groupBy={(row) => courseSpecRowGroupLabel(row)}
         actions={[
           {
             key: "open-spec",
