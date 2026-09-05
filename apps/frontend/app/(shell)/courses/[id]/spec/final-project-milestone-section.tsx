@@ -49,12 +49,6 @@ function initialStudentActivities(week: WeekForm): string {
   return (structured.length > 0 ? structured : week.activities).join("\n");
 }
 
-function statusLabel(status: WeekProjectProgress["status"]): string {
-  if (status === "in_progress") return "In progress";
-  if (status === "completed") return "Completed";
-  return "Planned";
-}
-
 type MilestoneEditorState = {
   week: WeekForm;
   expectedLearning: string;
@@ -147,20 +141,28 @@ export function FinalProjectMilestoneSection({
     if (!editor) return;
     const expectedLearning = lines(editor.expectedLearning);
     const studentActivities = lines(editor.studentActivities);
+    const lessonLearningOutcomes = expectedLearning.map((description, index) => ({
+      id: editor.week.lessonLearningOutcomes[index]?.id ?? uuid(),
+      description,
+    }));
+    const validLloIds = new Set(
+      lessonLearningOutcomes.map((outcome) => outcome.id),
+    );
+    const studentLearningActivities = studentActivities.map((title, index) => {
+      const existing = editor.week.studentLearningActivities[index];
+      return {
+        id: existing?.id ?? uuid(),
+        title,
+        description: existing?.description ?? "",
+        lloIds: (existing?.lloIds ?? []).filter((id) => validLloIds.has(id)),
+      };
+    });
     const week: WeekForm = {
       ...editor.week,
       topic: editor.week.topic.trim(),
-      lessonLearningOutcomes: expectedLearning.map((description, index) => ({
-        id: editor.week.lessonLearningOutcomes[index]?.id ?? uuid(),
-        description,
-      })),
+      lessonLearningOutcomes,
       lloItems: expectedLearning,
-      studentLearningActivities: studentActivities.map((title, index) => ({
-        id: editor.week.studentLearningActivities[index]?.id ?? uuid(),
-        title,
-        description: "",
-        lloIds: [],
-      })),
+      studentLearningActivities,
       activities: studentActivities,
       lectureHours: "",
       tutorialHours: "",
@@ -564,9 +566,6 @@ export function FinalProjectMilestoneSection({
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">
                         {week.topic || "—"}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {statusLabel("planned")}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
