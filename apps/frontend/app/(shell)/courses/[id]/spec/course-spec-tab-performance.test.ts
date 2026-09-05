@@ -6,6 +6,10 @@ const gatewayPath = new URL("./course-spec-client-gateway.tsx", import.meta.url)
 const versionHistoryPath = new URL("./version-history-bar.tsx", import.meta.url);
 const readOnlyClientPath = new URL("./read-only-spec-client.tsx", import.meta.url);
 const overviewPath = new URL("./overview-tab.tsx", import.meta.url);
+const teachingLearningWorkspacePath = new URL(
+  "./teaching-learning/teaching-learning-workspace.tsx",
+  import.meta.url,
+);
 const courseDocumentPath = new URL("./course-document-model.ts", import.meta.url);
 const courseSpecApiPath = new URL("../../../../../lib/course-spec.ts", import.meta.url);
 const teachingLearningApiPath = new URL(
@@ -57,7 +61,9 @@ describe("Course Specification tab data reuse", () => {
   test("still caches slow-changing method vocabulary locally with explicit mutation invalidation", async () => {
     const methodsApi = await Bun.file(methodsApiPath).text();
     expect(methodsApi).toContain("methodsListCache");
+    expect(methodsApi).toContain("methodsListValueCache");
     expect(methodsApi).toContain("if (methodsListCache) return methodsListCache");
+    expect(methodsApi).toContain("getCached(): MethodsResponse | undefined");
     expect(methodsApi).toContain("invalidateMethodsList");
   });
 
@@ -74,6 +80,17 @@ describe("Course Specification tab data reuse", () => {
 
     expect(source).toContain("teachingLearningApi.getCached(courseId)");
     expect(source).not.toContain("teachingLearningApi.get(courseId)");
+  });
+
+  test("Teaching & Learning consumes already-loaded profile and vocabulary without mount-time GETs", async () => {
+    const source = await Bun.file(teachingLearningWorkspacePath).text();
+
+    expect(source).toContain("teachingLearningApi.getCached(courseId)");
+    expect(source).toContain("methodsApi.getCached()");
+    expect(source).toContain("EMPTY_TEACHING_LEARNING_PROFILE");
+    expect(source).not.toContain("teachingLearningApi.get(courseId)");
+    expect(source).not.toContain("methodsApi.list()");
+    expect(source).not.toContain("useEffect(");
   });
 
   test("numbers official instructional weeks from their visible order", async () => {
