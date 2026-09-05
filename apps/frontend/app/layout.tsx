@@ -10,7 +10,10 @@ export const metadata: Metadata = {
   applicationName: "DSE PMS",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/pwa-icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa-icon.svg", type: "image/svg+xml" },
+    ],
     apple: [{ url: "/rupp-logo.png", sizes: "512x512", type: "image/png" }],
   },
   appleWebApp: {
