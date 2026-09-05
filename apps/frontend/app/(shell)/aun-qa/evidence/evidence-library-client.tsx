@@ -1,18 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileCheck2, Link2, Pencil, Plus, Search, Unlink2 } from "lucide-react";
 import type {
   QaContributorWorkspaceView,
   QaDashboardView,
   QaEvidenceItemView,
+  QaEvidenceLibraryPage,
 } from "@dse-pms/shared-types";
 import { FormFieldLabel } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
+import {
+  invalidateProtectedQueryResources,
+  protectedQueryKey,
+  QUERY_STALE_MS,
+} from "@/lib/query-client";
 
 const PROGRAMME_ID = "dse";
+const PAGE_SIZE = 50;
 type EvidenceKind = "systemLink" | "externalLink" | "document";
 type EvidenceStatus = "draft" | "ready" | "reviewed";
 type RequirementOption = { code: string; title: string };
@@ -39,83 +47,126 @@ const EMPTY_FORM: EvidenceForm = {
 
 export function EvidenceLibraryClient() {
   const { me, loading: meLoading } = useMe();
-  const [items, setItems] = useState<QaEvidenceItemView[]>([]);
+  const queryClient = useQueryClient();
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [requirements, setRequirements] = useState<RequirementOption[]>([]);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
+  const [previousCursors, setPreviousCursors] = useState<Array<string | undefined>>([]);
   const [form, setForm] = useState<EvidenceForm>(EMPTY_FORM);
   const [showCreate, setShowCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [mappingChoice, setMappingChoice] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [scopeLoading, setScopeLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const canManageMetadata = me?.permissions.includes("qa:manage") ?? false;
   const leadershipOrReviewer =
     me?.roles.some((role) => ["admin", "program_coordinator", "qa_reviewer"].includes(role)) ?? false;
 
-  const load = useCallback(async () => {
-    if (!me) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ programmeId: PROGRAMME_ID });
-      const evidencePromise = api.get<QaEvidenceItemView[]>(`/api/qa/evidence-library?${params}`);
-
-      if (leadershipOrReviewer) {
-        const dashboard = await api.get<QaDashboardView>(`/api/qa/dashboard?${params}`);
-        setCycleId(dashboard.selectedCycle?.id ?? null);
-        setRequirements(
-          dashboard.criteria.flatMap((criterion) =>
-            criterion.requirements.map((requirement) => ({
-              code: requirement.code,
-              title: requirement.title,
-            })),
-          ),
-        );
-      } else {
-        const workspace = await api.get<QaContributorWorkspaceView>(`/api/qa/workspace/my-work?${params}`);
-        setCycleId(workspace.selectedCycle?.id ?? null);
-        setRequirements(
-          workspace.work.map((item) => ({
-            code: item.assignment.requirementCode,
-            title: item.assignment.requirementTitle,
-          })),
-        );
-      }
-
-      setItems(await evidencePromise);
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not load the Evidence Library");
-    } finally {
-      setLoading(false);
-    }
-  }, [leadershipOrReviewer, me]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPageCursor(undefined);
+      setPreviousCursors([]);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
-    if (!meLoading && me) void load();
-  }, [load, me, meLoading]);
+    if (meLoading || !me) return;
+    let cancelled = false;
+    void (async () => {
+      setScopeLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({ programmeId: PROGRAMME_ID });
+        if (leadershipOrReviewer) {
+          const dashboard = await api.get<QaDashboardView>(`/api/qa/dashboard?${params}`);
+          if (cancelled) return;
+          setCycleId(dashboard.selectedCycle?.id ?? null);
+          setRequirements(
+            dashboard.criteria.flatMap((criterion) =>
+              criterion.requirements.map((requirement) => ({
+                code: requirement.code,
+                title: requirement.title,
+              })),
+            ),
+          );
+        } else {
+          const workspace = await api.get<QaContributorWorkspaceView>(`/api/qa/workspace/my-work?${params}`);
+          if (cancelled) return;
+          setCycleId(workspace.selectedCycle?.id ?? null);
+          setRequirements(
+            workspace.work.map((item) => ({
+              code: item.assignment.requirementCode,
+              title: item.assignment.requirementTitle,
+            })),
+          );
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setError(caught instanceof ApiError ? caught.message : "Could not load Evidence Library scope");
+        }
+      } finally {
+        if (!cancelled) setScopeLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leadershipOrReviewer, me, meLoading]);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return items;
-    return items.filter((item) =>
-      [item.title, item.description, item.sourceRef, item.reportingPeriod, ...item.mappings.map((mapping) => mapping.requirementCode)]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [items, query]);
+  const queryScope = { userId: me?.id ?? "pending", programmeId: PROGRAMME_ID };
+  const evidenceQuery = useQuery({
+    queryKey: protectedQueryKey(
+      queryScope,
+      "qa-evidence-library",
+      "page",
+      debouncedQuery,
+      pageCursor ?? "first",
+      PAGE_SIZE,
+    ),
+    queryFn: () => {
+      const params = new URLSearchParams({
+        programmeId: PROGRAMME_ID,
+        limit: String(PAGE_SIZE),
+      });
+      if (debouncedQuery) params.set("search", debouncedQuery);
+      if (pageCursor) params.set("cursor", pageCursor);
+      return api.get<QaEvidenceLibraryPage>(`/api/qa/evidence-library/page?${params}`);
+    },
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+    placeholderData: keepPreviousData,
+  });
+
+  const items = evidenceQuery.data?.items ?? [];
+  const hasData = evidenceQuery.data !== undefined;
+  const coldLoading = !hasData && evidenceQuery.isPending;
+  const hardQueryError = !hasData && evidenceQuery.isError;
+  const canAdvancePage =
+    !evidenceQuery.isFetching &&
+    !evidenceQuery.isPlaceholderData &&
+    !evidenceQuery.isError &&
+    Boolean(evidenceQuery.data?.nextCursor);
 
   const duplicateHints = useMemo(() => {
     const title = form.title.trim().toLowerCase();
     if (title.length < 4) return [];
-    return items.filter((item) => item.title.toLowerCase().includes(title) || title.includes(item.title.toLowerCase())).slice(0, 3);
+    return items
+      .filter((item) => item.title.toLowerCase().includes(title) || title.includes(item.title.toLowerCase()))
+      .slice(0, 3);
   }, [form.title, items]);
 
   function payload(values: EvidenceForm) {
     return { programmeId: PROGRAMME_ID, ...values };
+  }
+
+  async function refreshEvidence() {
+    await invalidateProtectedQueryResources(queryClient, ["qa-evidence-library"]);
   }
 
   async function saveNew() {
@@ -125,7 +176,9 @@ export function EvidenceLibraryClient() {
       await api.post<QaEvidenceItemView>("/api/qa/evidence-library", payload(form));
       setForm(EMPTY_FORM);
       setShowCreate(false);
-      await load();
+      setPageCursor(undefined);
+      setPreviousCursors([]);
+      await refreshEvidence();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not add evidence");
     } finally {
@@ -154,7 +207,7 @@ export function EvidenceLibraryClient() {
       await api.put<QaEvidenceItemView>(`/api/qa/evidence-library/${editingId}`, payload(form));
       setEditingId(null);
       setForm(EMPTY_FORM);
-      await load();
+      await refreshEvidence();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not update evidence metadata");
     } finally {
@@ -175,7 +228,7 @@ export function EvidenceLibraryClient() {
         relevanceNote: "",
       });
       setMappingChoice((current) => ({ ...current, [item.id]: "" }));
-      await load();
+      await refreshEvidence();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not link evidence");
     } finally {
@@ -190,7 +243,7 @@ export function EvidenceLibraryClient() {
     try {
       const params = new URLSearchParams({ programmeId: PROGRAMME_ID });
       await api.delete(`/api/qa/cycles/${cycleId}/evidence/${item.id}/mapping/${requirementCode}?${params}`);
-      await load();
+      await refreshEvidence();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not unlink evidence");
     } finally {
@@ -198,9 +251,33 @@ export function EvidenceLibraryClient() {
     }
   }
 
-  if (meLoading || loading) {
+  function handleNextPage() {
+    const nextCursor = evidenceQuery.data?.nextCursor;
+    if (!nextCursor || !canAdvancePage) return;
+    setEditingId(null);
+    setPreviousCursors((current) => [...current, pageCursor]);
+    setPageCursor(nextCursor);
+  }
+
+  function handlePreviousPage() {
+    if (previousCursors.length === 0 || evidenceQuery.isFetching) return;
+    const previous = previousCursors[previousCursors.length - 1];
+    setEditingId(null);
+    setPreviousCursors((current) => current.slice(0, -1));
+    setPageCursor(previous);
+  }
+
+  if (meLoading || scopeLoading || coldLoading) {
     return <div className="rounded-xl border bg-white p-8 text-sm text-muted-foreground">Loading Evidence Library…</div>;
   }
+
+  const visibleError =
+    error ??
+    (hardQueryError
+      ? evidenceQuery.error instanceof ApiError
+        ? evidenceQuery.error.message
+        : "Could not load the Evidence Library"
+      : null);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -221,7 +298,7 @@ export function EvidenceLibraryClient() {
         </div>
       </section>
 
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+      {visibleError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{visibleError}</div> : null}
 
       {showCreate ? (
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
@@ -246,10 +323,11 @@ export function EvidenceLibraryClient() {
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, source, reporting period, or requirement…" className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm" />
         </div>
+        {hasData && evidenceQuery.isFetching ? <div role="status" className="mt-2 text-xs text-muted-foreground">Refreshing evidence…</div> : null}
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        {filtered.map((item) => {
+        {items.map((item) => {
           const currentMappings = item.mappings.filter((mapping) => !cycleId || mapping.cycleId === cycleId);
           const mappedCodes = new Set(currentMappings.map((mapping) => mapping.requirementCode));
           const availableRequirements = requirements.filter((requirement) => !mappedCodes.has(requirement.code));
@@ -312,7 +390,12 @@ export function EvidenceLibraryClient() {
         })}
       </section>
 
-      {filtered.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-10 text-center text-sm text-muted-foreground">No evidence matches your search.</div> : null}
+      {items.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-10 text-center text-sm text-muted-foreground">{debouncedQuery ? "No evidence matches your search." : "No evidence has been added yet."}</div> : null}
+
+      <div className="flex items-center justify-end gap-2 rounded-xl border bg-white p-3">
+        <button disabled={previousCursors.length === 0 || evidenceQuery.isFetching} onClick={handlePreviousPage} className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50">Previous</button>
+        <button disabled={!canAdvancePage} onClick={handleNextPage} className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50">Next</button>
+      </div>
     </div>
   );
 }
