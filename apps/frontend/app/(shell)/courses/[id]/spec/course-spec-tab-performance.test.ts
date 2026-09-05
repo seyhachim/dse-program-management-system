@@ -45,10 +45,11 @@ describe("Course Specification tab data reuse", () => {
 
     expect(cachedEditor).toContain("courseSpecAuthoringQueryKey");
     expect(cachedEditor).toContain("COURSE_SPEC_STALE_MS.draft");
-    expect(cachedEditor).toContain("pinnedDataRef");
+    expect(cachedEditor).toContain("setPinnedEditor");
     expect(cachedEditor).toContain("onInputCapture");
     expect(gateway).toContain("courseSpecCoreQueryKey");
-    expect(gateway).toContain("initialWorkflowRef");
+    expect(gateway).toContain("ResolvedCourseSpecClient");
+    expect(gateway).toContain("useState(initialStatus)");
     expect(versionHistory).toContain("courseSpecHistoryQueryKey");
     expect(versionHistory).toContain("COURSE_SPEC_STALE_MS.history");
   });
