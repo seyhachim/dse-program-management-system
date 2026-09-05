@@ -21,16 +21,19 @@ describe("DSE PMS PWA", () => {
     expect(value.start_url).toBe("/");
     expect(value.scope).toBe("/");
     expect(value.display).toBe("standalone");
+    expect(value.orientation).toBe("any");
     expect(value.icons?.some((icon) => icon.src === "/pwa-icon-192.png" && icon.sizes === "192x192")).toBe(true);
-    expect(value.icons?.some((icon) => icon.src === "/rupp-logo.png" && icon.sizes === "512x512")).toBe(true);
+    expect(value.icons?.some((icon) => icon.src === "/pwa-icon-512.png" && icon.sizes === "512x512")).toBe(true);
     expect(value.icons?.some((icon) => icon.purpose === "maskable")).toBe(true);
   });
 
-  test("ships a real 192px PNG install icon", async () => {
-    const icon = await readFile(join(here, "public", "pwa-icon-192.png"));
+  test("ships real 192px and 512px PNG install icons", async () => {
+    for (const file of ["pwa-icon-192.png", "pwa-icon-512.png"]) {
+      const icon = await readFile(join(here, "public", file));
 
-    expect(icon.length).toBeGreaterThan(1000);
-    expect([...icon.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+      expect(icon.length).toBeGreaterThan(1000);
+      expect([...icon.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    }
   });
 
   test("navigation stays network-first and never writes protected screens to cache", async () => {
