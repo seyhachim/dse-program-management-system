@@ -63,6 +63,15 @@ export function invalidationForSuccessfulMutation(
     };
   }
 
+  if (/^\/api\/assessment-template\/[^/]+$/.test(cleanPath)) {
+    return {
+      domain: "course-spec",
+      resources: ["course-spec"],
+      reason:
+        "Assessment-template metadata is merged into the live CourseSpec read and must refresh after its confirmed write.",
+    };
+  }
+
   if (/^\/api\/offerings\/[^/]+\/enrollments(?:\/|$)/.test(cleanPath)) {
     return {
       domain: "offerings",
