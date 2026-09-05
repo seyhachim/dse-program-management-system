@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DSE PMS">
+  <rect width="512" height="512" fill="#0f1e3a"/>
+  <rect x="330" y="86" width="96" height="96" rx="24" fill="#2563eb"/>
+  <rect x="86" y="328" width="158" height="12" rx="6" fill="#2563eb"/>
+  <text x="84" y="294" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="132" font-weight="700" letter-spacing="-7">DSE</text>
+  <text x="86" y="402" fill="#b8c7e0" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700" letter-spacing="7">PMS</text>
+</svg>
