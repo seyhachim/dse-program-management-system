@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   BookOpen,
@@ -15,9 +16,11 @@ import {
   type LecturerWorkloadSummary,
   type OfferingView,
 } from "@dse-pms/shared-types";
-import { offeringsApi } from "@/lib/offerings";
-import { useMe } from "@/lib/auth";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
+import { useMe } from "@/lib/auth";
+import { offeringsApi } from "@/lib/offerings";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 
 function formatHours(hours: number): string {
@@ -52,36 +55,37 @@ function roomsLabel(offering: OfferingView): string {
 }
 
 export function LecturerOverviewClient() {
-  const { me } = useMe();
-  const [offerings, setOfferings] = useState<OfferingView[]>([]);
-  const [workload, setWorkload] = useState<LecturerWorkloadSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { me, loading: meLoading } = useMe();
   const [term, setTerm] = useState("__all__");
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    Promise.all([offeringsApi.list(), offeringsApi.workload()])
-      .then(([offeringRows, workloadSummary]) => {
-        if (cancelled) return;
-        setOfferings(offeringRows);
-        setWorkload(workloadSummary);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "Failed to load lecturer overview");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const queryScope = { userId: me?.id ?? "pending" };
+  const offeringsQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "offerings", "list"),
+    queryFn: () => offeringsApi.list(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const workloadQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "offerings", "workload"),
+    queryFn: () => offeringsApi.workload(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const offerings = offeringsQuery.data ?? [];
+  const workload: LecturerWorkloadSummary | null = workloadQuery.data ?? null;
+  const hasOfferings = offeringsQuery.data !== undefined;
+  const hasWorkload = workloadQuery.data !== undefined;
+  const hasData = hasOfferings && hasWorkload;
+  const loading = meLoading || (!hasData && (offeringsQuery.isPending || workloadQuery.isPending));
+  const hardQueryError =
+    (!hasOfferings && offeringsQuery.isError) || (!hasWorkload && workloadQuery.isError);
+  const queryError = offeringsQuery.error ?? workloadQuery.error;
+  const error = hardQueryError
+    ? queryError instanceof ApiError
+      ? queryError.message
+      : "Failed to load lecturer overview"
+    : null;
+  const refreshing = offeringsQuery.isFetching || workloadQuery.isFetching;
+  const refreshError = offeringsQuery.isError || workloadQuery.isError;
 
   const terms = useMemo(
     () => [...new Set(offerings.map((offering) => offering.term))].filter(Boolean).sort().reverse(),
@@ -142,6 +146,14 @@ export function LecturerOverviewClient() {
               </select>
             </label>
           </section>
+
+          <QueryRefreshStatus
+            hasData={hasData}
+            isPending={!hasData && (offeringsQuery.isPending || workloadQuery.isPending)}
+            isFetching={refreshing}
+            isError={refreshError}
+            label="Lecturer overview"
+          />
 
           {loading ? (
             <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">

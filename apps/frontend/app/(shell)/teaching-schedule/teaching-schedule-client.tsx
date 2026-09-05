@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { CalendarDays, Clock3, MapPin, UsersRound } from "lucide-react";
 import {
@@ -8,8 +9,11 @@ import {
   type LecturerScheduleRow,
   type LecturerWorkloadSummary,
 } from "@dse-pms/shared-types";
-import { offeringsApi, workloadForTerm } from "@/lib/offerings";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
+import { useMe } from "@/lib/auth";
+import { offeringsApi, workloadForTerm } from "@/lib/offerings";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 
 const ALL_TERMS = "__all__";
@@ -19,38 +23,24 @@ function formatHours(hours: number): string {
 }
 
 export function TeachingScheduleClient() {
-  const [summary, setSummary] = useState<LecturerWorkloadSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { me, loading: meLoading } = useMe();
   const [term, setTerm] = useState(ALL_TERMS);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    offeringsApi
-      .workload()
-      .then((value) => {
-        if (!cancelled) setSummary(value);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(
-            err instanceof ApiError
-              ? err.message
-              : "Failed to load your teaching schedule",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const queryScope = { userId: me?.id ?? "pending" };
+  const workloadQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "offerings", "workload"),
+    queryFn: () => offeringsApi.workload(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const summary: LecturerWorkloadSummary | null = workloadQuery.data ?? null;
+  const hasData = workloadQuery.data !== undefined;
+  const loading = meLoading || (!hasData && workloadQuery.isPending);
+  const hardQueryError = !hasData && workloadQuery.isError;
+  const error = hardQueryError
+    ? workloadQuery.error instanceof ApiError
+      ? workloadQuery.error.message
+      : "Failed to load your teaching schedule"
+    : null;
 
   const terms = useMemo(() => {
     if (!summary) return [];
@@ -121,6 +111,14 @@ export function TeachingScheduleClient() {
               </select>
             </label>
           </div>
+
+          <QueryRefreshStatus
+            hasData={hasData}
+            isPending={workloadQuery.isPending}
+            isFetching={workloadQuery.isFetching}
+            isError={workloadQuery.isError}
+            label="Teaching schedule"
+          />
 
           {loading ? (
             <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
