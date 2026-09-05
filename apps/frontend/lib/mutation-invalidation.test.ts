@@ -23,7 +23,19 @@ describe("mutation invalidation registry", () => {
       ),
     ).toMatchObject({
       domain: "course-spec",
-      resources: ["courses", "dashboard"],
+      resources: ["course-spec", "courses", "dashboard"],
+    });
+  });
+
+  test("maps CourseSpec section saves to the live editor cache", () => {
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/courses/course-1/spec/courseInfo",
+      ),
+    ).toMatchObject({
+      domain: "course-spec",
+      resources: ["course-spec", "courses", "dashboard"],
     });
   });
 
