@@ -22,10 +22,11 @@ import {
   projectionForRelationship,
   relationshipLabel,
 } from "@/lib/parent-portal";
+import { MOBILE_PARENT_PORTAL_LAYOUT as mobile } from "./mobile-parent-portal-layout";
 
 function LoadingState() {
   return (
-    <main className="mx-auto flex min-h-[55vh] max-w-5xl items-center justify-center p-6">
+    <main className={mobile.statePage}>
       <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
         Loading your parent portal…
       </p>
@@ -35,11 +36,11 @@ function LoadingState() {
 
 function MessageState({ title, description }: { title: string; description: string }) {
   return (
-    <main className="mx-auto flex min-h-[55vh] max-w-3xl items-center justify-center p-6">
-      <section className="w-full rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
+    <main className={mobile.statePage}>
+      <section className={`${mobile.card} w-full max-w-3xl text-center`}>
         <ShieldCheck className="mx-auto h-10 w-10 text-primary" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-semibold">{title}</h1>
-        <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">{description}</p>
+        <h1 className="mt-4 break-words text-xl font-semibold">{title}</h1>
+        <p className="mx-auto mt-2 max-w-xl break-words text-sm text-muted-foreground">{description}</p>
       </section>
     </main>
   );
@@ -47,7 +48,7 @@ function MessageState({ title, description }: { title: string; description: stri
 
 function ProjectionLoading() {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+    <div className={`${mobile.card} text-sm text-muted-foreground`}>
       Loading the latest authorised summary…
     </div>
   );
@@ -164,24 +165,24 @@ export function ParentPortalHome() {
   const selectedAcademic = projectionForRelationship(academic, selected.relationshipId);
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-6 overflow-y-auto p-4 pb-10 sm:p-6">
-      <header className="rounded-2xl bg-primary p-5 text-primary-foreground shadow-sm sm:p-6">
+    <main className={mobile.page}>
+      <header className={mobile.hero}>
         <p className="text-sm opacity-80">Parent / Guardian Portal</p>
-        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold sm:text-3xl">{selected.studentName}</h1>
-            <p className="mt-1 text-sm opacity-85">
+        <div className={mobile.heroContent}>
+          <div className={mobile.heroIdentity}>
+            <h1 className={`${mobile.wrap} text-2xl font-bold sm:text-3xl`}>{selected.studentName}</h1>
+            <p className={`${mobile.wrap} mt-1 text-sm opacity-85`}>
               {relationshipLabel(selected.relationshipType)} · Programme {selected.programmeId}
             </p>
           </div>
           {students.length > 1 ? (
-            <label className="text-sm font-medium" htmlFor="linked-student">
+            <label className={mobile.selectorLabel} htmlFor="linked-student">
               Linked student
               <select
                 id="linked-student"
                 value={selectedRelationshipId}
                 onChange={(event) => setSelectedRelationshipId(event.target.value)}
-                className="mt-1 block min-w-60 rounded-lg border border-primary-foreground/25 bg-background px-3 py-2 text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={mobile.selector}
               >
                 {students.map((student) => (
                   <option key={student.relationshipId} value={student.relationshipId}>
@@ -194,33 +195,33 @@ export function ParentPortalHome() {
         </div>
       </header>
 
-      <section aria-labelledby="student-summary" className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-primary/10 p-2 text-primary"><UserRound className="h-5 w-5" aria-hidden="true" /></span>
-            <div>
-              <h2 id="student-summary" className="font-semibold">Student summary</h2>
-              <p className="text-sm text-muted-foreground">Verified relationship information</p>
+      <section aria-labelledby="student-summary" className="grid min-w-0 gap-3 md:grid-cols-2 md:gap-4">
+        <article className={mobile.card}>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="shrink-0 rounded-xl bg-primary/10 p-2 text-primary"><UserRound className="h-5 w-5" aria-hidden="true" /></span>
+            <div className="min-w-0">
+              <h2 id="student-summary" className="break-words font-semibold">Student summary</h2>
+              <p className="break-words text-sm text-muted-foreground">Verified relationship information</p>
             </div>
           </div>
-          <dl className="mt-5 space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-4"><dt className="text-muted-foreground">Student</dt><dd className="font-medium text-right">{selected.studentName}</dd></div>
-            <div className="flex items-center justify-between gap-4"><dt className="text-muted-foreground">Student ID</dt><dd className="font-medium text-right">{selected.studentInstitutionalId}</dd></div>
-            <div className="flex items-center justify-between gap-4"><dt className="text-muted-foreground">Relationship</dt><dd className="font-medium text-right">{relationshipLabel(selected.relationshipType)}</dd></div>
+          <dl className="mt-4 space-y-3 text-sm sm:mt-5">
+            <div className={mobile.factRow}><dt className="text-muted-foreground">Student</dt><dd className={mobile.factValue}>{selected.studentName}</dd></div>
+            <div className={mobile.factRow}><dt className="text-muted-foreground">Student ID</dt><dd className={mobile.factValue}>{selected.studentInstitutionalId}</dd></div>
+            <div className={mobile.factRow}><dt className="text-muted-foreground">Relationship</dt><dd className={mobile.factValue}>{relationshipLabel(selected.relationshipType)}</dd></div>
           </dl>
         </article>
 
-        <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-primary/10 p-2 text-primary"><UsersRound className="h-5 w-5" aria-hidden="true" /></span>
-            <div>
-              <h2 className="font-semibold">Information available to you</h2>
-              <p className="text-sm text-muted-foreground">Based on your current verified access scopes</p>
+        <article className={mobile.card}>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="shrink-0 rounded-xl bg-primary/10 p-2 text-primary"><UsersRound className="h-5 w-5" aria-hidden="true" /></span>
+            <div className="min-w-0">
+              <h2 className="break-words font-semibold">Information available to you</h2>
+              <p className="break-words text-sm text-muted-foreground">Based on your current verified access scopes</p>
             </div>
           </div>
-          <ul className="mt-5 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-4 grid min-w-0 gap-2 sm:mt-5 sm:grid-cols-2">
             {selected.accessScopes.map((scope) => (
-              <li key={scope} className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm font-medium">
+              <li key={scope} className="min-w-0 break-words rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm font-medium">
                 {guardianScopeLabel(scope)}
               </li>
             ))}
@@ -230,83 +231,83 @@ export function ParentPortalHome() {
 
       {projectionLoading ? <ProjectionLoading /> : null}
       {projectionError ? (
-        <div role="alert" className="rounded-2xl border border-status-upcoming bg-status-upcoming-bg p-5 text-sm text-status-upcoming">
+        <div role="alert" className={`${mobile.warning} break-words`}>
           {projectionError}
         </div>
       ) : null}
 
       {!projectionLoading && !projectionError ? (
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section className="grid min-w-0 gap-3 lg:grid-cols-2 lg:gap-4">
           {selected.accessScopes.includes("attendance") && selectedAttendance ? (
-            <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="rounded-xl bg-primary/10 p-2 text-primary"><BarChart3 className="h-5 w-5" aria-hidden="true" /></span>
-                  <div>
-                    <h2 className="font-semibold">Attendance summary</h2>
-                    <p className="text-sm text-muted-foreground">Finalised attendance records only</p>
+            <article className={mobile.card}>
+              <div className={mobile.attendanceHeader}>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="shrink-0 rounded-xl bg-primary/10 p-2 text-primary"><BarChart3 className="h-5 w-5" aria-hidden="true" /></span>
+                  <div className="min-w-0">
+                    <h2 className="break-words font-semibold">Attendance summary</h2>
+                    <p className="break-words text-sm text-muted-foreground">Finalised attendance records only</p>
                   </div>
                 </div>
-                <span className="text-2xl font-bold">{selectedAttendance.attendanceRate === null ? "—" : `${selectedAttendance.attendanceRate}%`}</span>
+                <span className="shrink-0 text-2xl font-bold">{selectedAttendance.attendanceRate === null ? "—" : `${selectedAttendance.attendanceRate}%`}</span>
               </div>
-              <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Present</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Present}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Late</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Late}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Absent</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Absent}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Permission / excused</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Excused}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Permission pending</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.PermissionPending}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Marked classes</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.markedSessions}</dd></div>
+              <dl className={mobile.attendanceMetricGrid}>
+                <div className={mobile.attendanceMetric}><dt className="break-words text-muted-foreground">Present</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Present}</dd></div>
+                <div className={mobile.attendanceMetric}><dt className="break-words text-muted-foreground">Late</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Late}</dd></div>
+                <div className={mobile.attendanceMetric}><dt className="break-words text-muted-foreground">Absent</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Absent}</dd></div>
+                <div className={mobile.attendanceMetric}><dt className="break-words text-muted-foreground">Permission / excused</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Excused}</dd></div>
+                <div className={mobile.attendanceMetric}><dt className="break-words text-muted-foreground">Permission pending</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.PermissionPending}</dd></div>
+                <div className={mobile.attendanceMetric}><dt className="break-words text-muted-foreground">Marked classes</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.markedSessions}</dd></div>
               </dl>
               {selectedAttendance.warnings.length ? (
                 <div className="mt-4 space-y-2">
                   {selectedAttendance.warnings.map((warning) => (
-                    <div key={`${warning.offeringId}-${warning.kind}`} className="flex gap-3 rounded-xl border border-status-upcoming bg-status-upcoming-bg p-3 text-sm text-status-upcoming">
+                    <div key={`${warning.offeringId}-${warning.kind}`} className={mobile.warning}>
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                      <p><strong>{warning.courseCode}:</strong> {warning.message}</p>
+                      <p className="min-w-0 break-words"><strong>{warning.courseCode}:</strong> {warning.message}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-muted-foreground">No current attendance warning is recorded by the existing attendance rules.</p>
+                <p className="mt-4 break-words text-sm text-muted-foreground">No current attendance warning is recorded by the existing attendance rules.</p>
               )}
             </article>
           ) : null}
 
           {selected.accessScopes.includes("academic_status") && selectedAcademic ? (
-            <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <span className="rounded-xl bg-primary/10 p-2 text-primary"><GraduationCap className="h-5 w-5" aria-hidden="true" /></span>
-                <div>
-                  <h2 className="font-semibold">Academic progress</h2>
-                  <p className="text-sm text-muted-foreground">Based on recorded programme progression</p>
+            <article className={mobile.card}>
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="shrink-0 rounded-xl bg-primary/10 p-2 text-primary"><GraduationCap className="h-5 w-5" aria-hidden="true" /></span>
+                <div className="min-w-0">
+                  <h2 className="break-words font-semibold">Academic progress</h2>
+                  <p className="break-words text-sm text-muted-foreground">Based on recorded programme progression</p>
                 </div>
               </div>
-              <div className="mt-5 rounded-xl bg-muted/40 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current status</p>
-                <p className="mt-1 text-xl font-semibold">{academicStatusLabel(selectedAcademic.academicStatus)}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
+              <div className="mt-4 min-w-0 rounded-xl bg-muted/40 p-4 sm:mt-5">
+                <p className="break-words text-xs font-medium uppercase tracking-wide text-muted-foreground">Current status</p>
+                <p className="mt-1 break-words text-xl font-semibold">{academicStatusLabel(selectedAcademic.academicStatus)}</p>
+                <p className="mt-2 break-words text-sm text-muted-foreground">
                   {selectedAcademic.progressionStatus ?? "No progression record available"}
                   {selectedAcademic.programmeYear ? ` · Year ${selectedAcademic.programmeYear}` : ""}
                   {selectedAcademic.academicYear ? ` · ${selectedAcademic.academicYear}` : ""}
                 </p>
               </div>
               {selected.accessScopes.includes("official_results") ? (
-                <div className="mt-5">
-                  <h3 className="text-sm font-semibold">Official completed course results</h3>
+                <div className="mt-5 min-w-0">
+                  <h3 className="break-words text-sm font-semibold">Official completed course results</h3>
                   {selectedAcademic.officialResults.length ? (
                     <div className="mt-3 space-y-2">
                       {selectedAcademic.officialResults.map((result) => (
-                        <div key={result.offeringId} className="flex items-center justify-between gap-4 rounded-xl border border-border p-3 text-sm">
-                          <div>
-                            <p className="font-medium">{result.courseCode} · {result.courseTitle}</p>
-                            <p className="text-xs text-muted-foreground">{result.term} · Section {result.sectionCode}</p>
+                        <div key={result.offeringId} className={mobile.resultRow}>
+                          <div className={mobile.resultText}>
+                            <p className="break-words font-medium">{result.courseCode} · {result.courseTitle}</p>
+                            <p className="break-words text-xs text-muted-foreground">{result.term} · Section {result.sectionCode}</p>
                           </div>
-                          <span className="text-lg font-semibold">{result.totalGrade}</span>
+                          <span className={mobile.resultGrade}>{result.totalGrade}</span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm text-muted-foreground">No fully finalised course result is available yet.</p>
+                    <p className="mt-2 break-words text-sm text-muted-foreground">No fully finalised course result is available yet.</p>
                   )}
                 </div>
               ) : null}
@@ -314,14 +315,14 @@ export function ParentPortalHome() {
           ) : null}
 
           {!selected.accessScopes.includes("attendance") && !selected.accessScopes.includes("academic_status") ? (
-            <article className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm lg:col-span-2">
-              Attendance and academic progress are not included in this guardian relationship's current access scopes.
+            <article className={`${mobile.card} break-words text-sm text-muted-foreground lg:col-span-2`}>
+              Attendance and academic progress are not included in this guardian relationship&apos;s current access scopes.
             </article>
           ) : null}
         </section>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
+      <p className="min-w-0 break-words text-xs text-muted-foreground">
         Access is checked again whenever this page loads or regains focus. Revoked, expired, or scope-restricted information is removed by the server and is not retained in a client cache. Draft grades and lecturer-private comments are never requested by this dashboard.
       </p>
     </main>
