@@ -27,6 +27,9 @@ import {
 } from "./teaching-learning/strategy-catalog";
 
 const PROJECT_BASED_LEARNING_ID = "project-based-learning";
+const PROJECT_WORK = "Project Work";
+
+type ChoiceOption = string | { id: string; label: string };
 
 function toggleValue(value: string, values: string[]): string[] {
   return values.includes(value)
@@ -43,7 +46,7 @@ function ChoiceChips({
 }: {
   label: string;
   description: string;
-  options: readonly { id: string; label: string }[];
+  options: readonly ChoiceOption[];
   values: string[];
   onChange: (next: string[]) => void;
 }) {
@@ -54,7 +57,11 @@ function ChoiceChips({
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {options.map((option) => {
+        {options.map((rawOption) => {
+          const option =
+            typeof rawOption === "string"
+              ? { id: rawOption, label: rawOption }
+              : rawOption;
           const selected = values.includes(option.id);
           return (
             <button
@@ -100,9 +107,9 @@ export function FinalProjectSupervisionSection({
   );
   const [methodIds, setMethodIds] = useState(profile.teachingMethodIds);
   const [independentLearning, setIndependentLearning] = useState(
-    profile.independentLearningTypes.includes("project-work")
+    profile.independentLearningTypes.includes(PROJECT_WORK)
       ? profile.independentLearningTypes
-      : [...profile.independentLearningTypes, "project-work"],
+      : [...profile.independentLearningTypes, PROJECT_WORK],
   );
   const [materials, setMaterials] = useState(profile.resourceTypes);
   const [resources, setResources] = useState(profile.technologyTypes);
