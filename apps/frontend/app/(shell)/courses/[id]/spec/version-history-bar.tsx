@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  CreateCourseSpecPeriodicReviewSchema,
-  type CourseSpecVersionHistoryView,
-} from "@dse-pms/shared-types";
+import { useQuery } from "@tanstack/react-query";
+import { CreateCourseSpecPeriodicReviewSchema } from "@dse-pms/shared-types";
 import {
   Button,
   Dialog,
@@ -14,10 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@dse-pms/ui";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { useMe } from "@/lib/auth";
 import { courseSpecGovernanceActionDecision } from "@/lib/course-spec-governance-actions";
 import { courseSpecHistoryApi, comparisonHref, exactVersionHref } from "@/lib/course-spec-history";
 import { courseSpecPeriodicReviewApi } from "@/lib/course-spec-periodic-review";
+import {
+  COURSE_SPEC_QUERY_GC_MS,
+  COURSE_SPEC_STALE_MS,
+  courseSpecHistoryQueryKey,
+} from "@/lib/course-spec-query";
 
 function todayLocalIsoDate() {
   const now = new Date();
@@ -29,27 +33,21 @@ function todayLocalIsoDate() {
 
 export function VersionHistoryBar({ courseId }: { courseId: string }) {
   const { me } = useMe();
-  const [history, setHistory] = useState<CourseSpecVersionHistoryView | null>(null);
+  const userId = me?.id ?? "pending";
+  const historyQuery = useQuery({
+    queryKey: courseSpecHistoryQueryKey(userId, courseId),
+    queryFn: () => courseSpecHistoryApi.list(courseId),
+    enabled: Boolean(me?.id),
+    staleTime: COURSE_SPEC_STALE_MS.history,
+    gcTime: COURSE_SPEC_QUERY_GC_MS,
+  });
+  const history = historyQuery.data ?? null;
   const [error, setError] = useState<string | null>(null);
   const [reaffirmOpen, setReaffirmOpen] = useState(false);
   const [reviewedAt, setReviewedAt] = useState(todayLocalIsoDate);
   const [evidenceSummary, setEvidenceSummary] = useState("");
   const [decisionReason, setDecisionReason] = useState("");
   const [reaffirming, setReaffirming] = useState(false);
-
-  const loadHistory = async () => {
-    try {
-      const next = await courseSpecHistoryApi.list(courseId);
-      setHistory(next);
-      setError(null);
-    } catch {
-      setError("Could not load version history.");
-    }
-  };
-
-  useEffect(() => {
-    void loadHistory();
-  }, [courseId]);
 
   const current = history?.versions.find((version) => version.isCurrent) ?? null;
   const previous = useMemo(() => {
@@ -82,7 +80,7 @@ export function VersionHistoryBar({ courseId }: { courseId: string }) {
       setEvidenceSummary("");
       setDecisionReason("");
       setReviewedAt(todayLocalIsoDate());
-      await loadHistory();
+      await historyQuery.refetch();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not reaffirm this Course Specification.");
     } finally {
@@ -91,13 +89,27 @@ export function VersionHistoryBar({ courseId }: { courseId: string }) {
   };
 
   if (!history || history.versions.length === 0) {
-    return error ? (
-      <div className="rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground">{error}</div>
+    const loadError = historyQuery.isError
+      ? historyQuery.error instanceof Error
+        ? historyQuery.error.message
+        : "Could not load version history."
+      : null;
+    return loadError ? (
+      <div className="rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground">
+        {loadError}
+      </div>
     ) : null;
   }
 
   return (
     <>
+      <QueryRefreshStatus
+        hasData
+        isPending={historyQuery.isPending}
+        isFetching={historyQuery.isFetching}
+        isError={historyQuery.isError}
+        label="Course Specification history"
+      />
       <section className="rounded-xl border bg-card p-4 shadow-sm" aria-label="Course specification version history">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>

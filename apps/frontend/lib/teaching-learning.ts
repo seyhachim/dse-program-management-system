@@ -21,27 +21,24 @@ export const EMPTY_TEACHING_LEARNING_PROFILE: TeachingLearningProfile = {
   technologyTypes: [],
 };
 
-const profileReadCache = new Map<string, Promise<TeachingLearningProfile>>();
+// Keep the latest resolved value only for synchronous Overview reuse. Network
+// freshness belongs to the shared query cache; `api.get` already deduplicates
+// concurrent requests, so a second completed-promise cache would make this data
+// stale indefinitely across collaborative editing sessions.
 const profileValueCache = new Map<string, TeachingLearningProfile>();
 
 export const teachingLearningApi = {
   get(courseId: string): Promise<TeachingLearningProfile> {
-    const cached = profileReadCache.get(courseId);
-    if (cached) return cached;
-
-    const request = api
+    return api
       .get<TeachingLearningProfile>(`/api/teaching-learning/${courseId}`)
       .then((profile) => {
         profileValueCache.set(courseId, profile);
         return profile;
       })
       .catch((error) => {
-        profileReadCache.delete(courseId);
         profileValueCache.delete(courseId);
         throw error;
       });
-    profileReadCache.set(courseId, request);
-    return request;
   },
   getCached(courseId: string): TeachingLearningProfile | undefined {
     return profileValueCache.get(courseId);
@@ -52,7 +49,6 @@ export const teachingLearningApi = {
       value,
     );
     profileValueCache.set(courseId, saved);
-    profileReadCache.set(courseId, Promise.resolve(saved));
     return saved;
   },
   getWeekProjectProgress: (courseId: string, weekId: string) =>

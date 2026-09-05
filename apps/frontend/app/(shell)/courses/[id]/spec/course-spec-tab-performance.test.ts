@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 const specClientPath = new URL("./spec-client.tsx", import.meta.url);
+const cachedEditorPath = new URL("./course-spec-cached-editor.tsx", import.meta.url);
+const gatewayPath = new URL("./course-spec-client-gateway.tsx", import.meta.url);
+const versionHistoryPath = new URL("./version-history-bar.tsx", import.meta.url);
 const readOnlyClientPath = new URL("./read-only-spec-client.tsx", import.meta.url);
 const overviewPath = new URL("./overview-tab.tsx", import.meta.url);
 const courseDocumentPath = new URL("./course-document-model.ts", import.meta.url);
@@ -25,21 +28,45 @@ describe("Course Specification tab data reuse", () => {
     }
   });
 
-  test("deduplicates repeated Course Spec, Teaching & Learning, and method vocabulary reads", async () => {
-    const [courseSpecApi, teachingLearningApi, methodsApi] = await Promise.all([
-      Bun.file(courseSpecApiPath).text(),
-      Bun.file(teachingLearningApiPath).text(),
-      Bun.file(methodsApiPath).text(),
-    ]);
+  test("uses the shared protected query cache instead of indefinite CourseSpec promise caches", async () => {
+    const [courseSpecApi, teachingLearningApi, cachedEditor, gateway, versionHistory] =
+      await Promise.all([
+        Bun.file(courseSpecApiPath).text(),
+        Bun.file(teachingLearningApiPath).text(),
+        Bun.file(cachedEditorPath).text(),
+        Bun.file(gatewayPath).text(),
+        Bun.file(versionHistoryPath).text(),
+      ]);
 
-    expect(courseSpecApi).toContain("courseSpecReadCache");
-    expect(courseSpecApi).toContain("const cached = courseSpecReadCache.get(courseId)");
-    expect(teachingLearningApi).toContain("profileReadCache");
-    expect(teachingLearningApi).toContain("const cached = profileReadCache.get(courseId)");
+    expect(courseSpecApi).not.toContain("courseSpecReadCache");
+    expect(teachingLearningApi).not.toContain("profileReadCache");
     expect(teachingLearningApi).toContain("profileValueCache");
     expect(teachingLearningApi).toContain("getCached(courseId: string)");
+
+    expect(cachedEditor).toContain("courseSpecAuthoringQueryKey");
+    expect(cachedEditor).toContain("COURSE_SPEC_STALE_MS.draft");
+    expect(cachedEditor).toContain("setPinnedEditor");
+    expect(cachedEditor).toContain("onInputCapture");
+    expect(gateway).toContain("courseSpecCoreQueryKey");
+    expect(gateway).toContain("ResolvedCourseSpecClient");
+    expect(gateway).toContain("useState(initialStatus)");
+    expect(versionHistory).toContain("courseSpecHistoryQueryKey");
+    expect(versionHistory).toContain("COURSE_SPEC_STALE_MS.history");
+  });
+
+  test("still caches slow-changing method vocabulary locally with explicit mutation invalidation", async () => {
+    const methodsApi = await Bun.file(methodsApiPath).text();
     expect(methodsApi).toContain("methodsListCache");
     expect(methodsApi).toContain("if (methodsListCache) return methodsListCache");
+    expect(methodsApi).toContain("invalidateMethodsList");
+  });
+
+  test("hydrates the editor from the cached authoring bundle instead of mount-time aggregate loading", async () => {
+    const source = await Bun.file(specClientPath).text();
+    expect(source).toContain("initialData: CourseSpecAuthoringData");
+    expect(source).toContain("const initialSpec = initialData.spec");
+    expect(source).not.toContain("const load = useCallback");
+    expect(source).not.toContain("setLoading(true)");
   });
 
   test("Overview consumes already-loaded Teaching & Learning state without starting a tab-entry request", async () => {

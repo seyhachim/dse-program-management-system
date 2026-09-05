@@ -23,8 +23,50 @@ describe("mutation invalidation registry", () => {
       ),
     ).toMatchObject({
       domain: "course-spec",
-      resources: ["courses", "dashboard"],
+      resources: ["course-spec", "courses", "dashboard"],
     });
+  });
+
+  test("maps CourseSpec section saves to the live editor cache", () => {
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/courses/course-1/spec/courseInfo",
+      ),
+    ).toMatchObject({
+      domain: "course-spec",
+      resources: ["course-spec", "courses", "dashboard"],
+    });
+  });
+
+  test("refreshes CourseSpec after confirmed assessment-template metadata writes", () => {
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/assessment-template/course-1",
+      ),
+    ).toMatchObject({
+      domain: "course-spec",
+      resources: ["course-spec"],
+    });
+  });
+
+  test("refreshes CourseSpec after confirmed Teaching & Learning profile writes", () => {
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/teaching-learning/course-1",
+      ),
+    ).toMatchObject({
+      domain: "course-spec",
+      resources: ["course-spec"],
+    });
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/teaching-learning/course-1/project-progress/week-1",
+      ),
+    ).toBeNull();
   });
 
   test("distinguishes offering enrollment from structural writes", () => {
