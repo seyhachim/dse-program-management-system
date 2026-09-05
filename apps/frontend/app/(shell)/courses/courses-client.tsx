@@ -313,7 +313,7 @@ function CourseTeamCell({ team }: { team: CourseSpecTeamSummary | undefined }) {
 
   const lead =
     team.lecturers.find((lecturer) => lecturer.role === "RESPONSIBLE") ??
-    team.lecturers[0];
+    team.lecturers[0]!;
   const coCount = team.lecturers.filter((lecturer) => lecturer.role === "CO_LECTURER").length;
   return (
     <div className="space-y-0.5">
