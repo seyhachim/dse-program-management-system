@@ -1,10 +1,11 @@
 import type {
   CourseSpecResponsibleLecturersView,
+  CourseSpecTeamSummary,
   LecturersServiceContract,
   ListCoursesQuery,
   SetCourseSpecResponsibleLecturersInput,
 } from "@dse-pms/shared-types";
-import type { CourseSpecReviewStatus } from "@prisma/client";
+import { Prisma, type CourseSpecReviewStatus } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import {
@@ -27,12 +28,53 @@ type ResponsibleLecturerRow = {
   email: string;
 };
 
+type ResponsibleLecturerCourseRow = ResponsibleLecturerRow & {
+  courseId: string;
+};
+
 type ResponsibleCourseRow = {
   courseId: string;
 };
 
+const SHARED_RESPONSIBILITY_COURSE_CODES = new Set(["FPR401", "FPR402"]);
+
 function lecturers(): LecturersServiceContract {
   return registry.get<LecturersServiceContract>("lecturers").service;
+}
+
+function isSharedResponsibilityCourse(code: string): boolean {
+  return SHARED_RESPONSIBILITY_COURSE_CODES.has(code.toUpperCase());
+}
+
+function courseTeamSummary(
+  course: { code: string; lecturerId: string | null | undefined },
+  team: ResponsibleLecturerRow[],
+): CourseSpecTeamSummary {
+  const leadIsOnTeam = Boolean(
+    course.lecturerId && team.some((lecturer) => lecturer.id === course.lecturerId),
+  );
+  const responsibilityMode =
+    isSharedResponsibilityCourse(course.code) || (team.length > 0 && !leadIsOnTeam)
+      ? ("SHARED" as const)
+      : ("LEAD_AND_CO" as const);
+  const leadLecturerId =
+    responsibilityMode === "LEAD_AND_CO" && leadIsOnTeam
+      ? (course.lecturerId ?? null)
+      : null;
+
+  return {
+    responsibilityMode,
+    leadLecturerId,
+    lecturers: team.map((lecturer) => ({
+      ...lecturer,
+      role:
+        responsibilityMode === "SHARED"
+          ? ("SHARED" as const)
+          : lecturer.id === leadLecturerId
+            ? ("RESPONSIBLE" as const)
+            : ("CO_LECTURER" as const),
+    })),
+  };
 }
 
 async function currentSpec(courseId: string): Promise<CurrentSpecRow | null> {
@@ -70,12 +112,51 @@ export async function responsibleLecturerCanAccess(
   return (await courseIdsForResponsibleLecturer(lecturerId)).includes(courseId);
 }
 
+/**
+ * Attach the current Course Specification team to a course list in one query.
+ * `Course.lecturerId` is the lead for Lead + Co-Lecturer teams; FPR401/FPR402
+ * deliberately ignore a lead and always render equal shared responsibility.
+ */
+export async function attachCourseSpecTeams<
+  T extends { id: string; code: string; lecturerId?: string | null },
+>(rows: T[]): Promise<Array<T & { courseTeam: CourseSpecTeamSummary }>> {
+  if (rows.length === 0) return [];
+
+  const courseIds = rows.map((row) => row.id);
+  const assignments = await prisma.$queryRaw<ResponsibleLecturerCourseRow[]>(
+    Prisma.sql`
+      SELECT current_spec."courseId", lecturer."id", lecturer."name", lecturer."email"
+      FROM (
+        SELECT DISTINCT ON ("courseId") "id", "courseId"
+        FROM "CourseSpec"
+        WHERE "courseId" IN (${Prisma.join(courseIds)})
+        ORDER BY "courseId", "versionMajor" DESC, "versionMinor" DESC
+      ) current_spec
+      INNER JOIN "CourseSpecResponsibleLecturer" responsibility
+        ON responsibility."courseSpecId" = current_spec."id"
+      INNER JOIN "User" lecturer ON lecturer."id" = responsibility."lecturerId"
+      ORDER BY current_spec."courseId", lecturer."name" ASC
+    `,
+  );
+  const byCourse = new Map<string, ResponsibleLecturerRow[]>();
+  for (const assignment of assignments) {
+    const team = byCourse.get(assignment.courseId) ?? [];
+    team.push({ id: assignment.id, name: assignment.name, email: assignment.email });
+    byCourse.set(assignment.courseId, team);
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    courseTeam: courseTeamSummary(row, byCourse.get(row.id) ?? []),
+  }));
+}
+
 export async function getCourseSpecResponsibleLecturers(
   courseId: string,
 ): Promise<CourseSpecResponsibleLecturersView | null> {
   const course = await prisma.course.findUnique({
     where: { id: courseId },
-    select: { id: true },
+    select: { id: true, code: true, lecturerId: true },
   });
   if (!course) return null;
 
@@ -89,13 +170,15 @@ export async function getCourseSpecResponsibleLecturers(
         ORDER BY lecturer."name" ASC
       `
     : [];
+  const summary = courseTeamSummary(course, team);
 
   return {
     courseId,
+    courseCode: course.code,
     courseSpecId: spec?.id ?? null,
     academicVersion: spec ? `${spec.versionMajor}.${spec.versionMinor}` : "1.0",
     reviewStatus: spec?.reviewStatus ?? "Draft",
-    lecturers: team,
+    ...summary,
   };
 }
 
@@ -106,9 +189,26 @@ export async function setCourseSpecResponsibleLecturers(
   const course = await prisma.course.findUnique({ where: { id: courseId } });
   if (!course) throw new Error("Course not found");
 
+  if (
+    isSharedResponsibilityCourse(course.code) &&
+    input.responsibilityMode !== "SHARED"
+  ) {
+    throw new Error(`${course.code} uses shared responsibility for all Course Team members`);
+  }
+
+  const leadLecturerId =
+    input.responsibilityMode === "LEAD_AND_CO" ? (input.leadLecturerId ?? null) : null;
+  if (
+    input.responsibilityMode === "LEAD_AND_CO" &&
+    input.lecturerIds.length > 0 &&
+    (!leadLecturerId || !input.lecturerIds.includes(leadLecturerId))
+  ) {
+    throw new Error("Choose one Responsible Lecturer from the Course Team");
+  }
+
   for (const lecturerId of input.lecturerIds) {
     if (!(await lecturers().getById(lecturerId))) {
-      throw new Error("Assigned responsible lecturer does not exist");
+      throw new Error("Assigned Course Team lecturer does not exist");
     }
   }
 
@@ -144,6 +244,10 @@ export async function setCourseSpecResponsibleLecturers(
         VALUES (${spec!.id}, ${lecturerId})
       `;
     }
+    await tx.course.update({
+      where: { id: courseId },
+      data: { lecturerId: leadLecturerId },
+    });
   });
 
   return (await getCourseSpecResponsibleLecturers(courseId))!;
