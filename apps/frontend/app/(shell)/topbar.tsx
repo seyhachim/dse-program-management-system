@@ -1,4 +1,5 @@
 import { SidebarTrigger } from "@dse-pms/ui";
+import { MOBILE_SHELL_LAYOUT } from "./mobile-shell-layout";
 import { TopbarUser } from "./topbar-user";
 
 export interface TopbarProps {
@@ -6,18 +7,22 @@ export interface TopbarProps {
   subtitle?: string;
 }
 
-/** Page topbar: sidebar toggle (mobile only, md:hidden) + title + user menu + theme switcher. On desktop the toggle lives in the sidebar header instead, next to the logo. */
+/** Page topbar: compact app bar on phones, full title/subtitle context on larger screens. */
 export function Topbar({ title, subtitle }: TopbarProps) {
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
-      <div className="flex items-center gap-3">
-        <SidebarTrigger className="md:hidden" />
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-          {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
+    <header className={MOBILE_SHELL_LAYOUT.topbar}>
+      <div className={MOBILE_SHELL_LAYOUT.topbarLeading}>
+        <SidebarTrigger className={MOBILE_SHELL_LAYOUT.sidebarTrigger} />
+        <div className={MOBILE_SHELL_LAYOUT.titleBlock}>
+          <h1 className={MOBILE_SHELL_LAYOUT.title}>{title}</h1>
+          {subtitle ? (
+            <p className={MOBILE_SHELL_LAYOUT.subtitle} title={subtitle}>
+              {subtitle}
+            </p>
+          ) : null}
         </div>
       </div>
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+      <div className={MOBILE_SHELL_LAYOUT.userArea}>
         <TopbarUser />
       </div>
     </header>
