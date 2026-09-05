@@ -21,8 +21,16 @@ describe("DSE PMS PWA", () => {
     expect(value.start_url).toBe("/");
     expect(value.scope).toBe("/");
     expect(value.display).toBe("standalone");
+    expect(value.icons?.some((icon) => icon.src === "/pwa-icon-192.png" && icon.sizes === "192x192")).toBe(true);
     expect(value.icons?.some((icon) => icon.src === "/rupp-logo.png" && icon.sizes === "512x512")).toBe(true);
     expect(value.icons?.some((icon) => icon.purpose === "maskable")).toBe(true);
+  });
+
+  test("ships a real 192px PNG install icon", async () => {
+    const icon = await readFile(join(here, "public", "pwa-icon-192.png"));
+
+    expect(icon.length).toBeGreaterThan(1000);
+    expect([...icon.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
   });
 
   test("navigation stays network-first and never writes protected screens to cache", async () => {
@@ -45,6 +53,13 @@ describe("DSE PMS PWA", () => {
     expect(source).toContain('url.pathname.startsWith("/_next/static/")');
     expect(source).toContain("PRECACHE_URLS.includes(url.pathname)");
     expect(source).toContain("if (!isStaticBuildAsset && !isExplicitPublicAsset) return;");
+  });
+
+  test("install UI stays out of the Telegram companion routes", async () => {
+    const source = await readFile(join(here, "components", "pwa-runtime.tsx"), "utf8");
+
+    expect(source).toContain('pathname.startsWith("/telegram")');
+    expect(source).toContain('pathname === "/offline"');
   });
 
   test("service worker is served without a stale HTTP cache", async () => {
