@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useCallback, useRef, useState, type MouseEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { useMe } from "@/lib/auth";
@@ -56,11 +56,6 @@ export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
     setDirty(true);
   }, [authoringQuery.data, authoringQuery.dataUpdatedAt, dirty]);
 
-  const handleFormInteraction = useCallback(
-    (_event: FormEvent<HTMLDivElement>) => markDirty(),
-    [markDirty],
-  );
-
   const handleButtonInteraction = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       const target = event.target;
@@ -95,8 +90,8 @@ export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
 
   return (
     <div
-      onInputCapture={handleFormInteraction}
-      onChangeCapture={handleFormInteraction}
+      onInputCapture={markDirty}
+      onChangeCapture={markDirty}
       onClickCapture={handleButtonInteraction}
     >
       <QueryRefreshStatus
