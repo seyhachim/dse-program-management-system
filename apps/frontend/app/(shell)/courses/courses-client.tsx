@@ -17,7 +17,6 @@ import {
   curriculumGroupLabel,
   orderCoursesByCurriculum,
   type CourseWithCurriculumPlacement,
-  type CurriculumPlacement,
 } from "./course-curriculum-groups";
 import { courseReviewStatusLabel } from "./course-review-status";
 
@@ -25,12 +24,7 @@ type CourseListRow = CourseWithCurriculumPlacement<CourseView>;
 
 export function CoursesClient() {
   const router = useRouter();
-  const [groupingError, setGroupingError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [curriculumReady, setCurriculumReady] = useState(false);
-  const [placementByCourseId, setPlacementByCourseId] = useState<
-    Map<string, CurriculumPlacement>
-  >(new Map());
 
   // Creating/editing/deleting a course record needs `courses:manage`
   // (admin, program_coordinator); lecturers hold `courses:write` for editing
@@ -64,52 +58,49 @@ export function CoursesClient() {
   const hasData = coursesQuery.data !== undefined;
   const hardQueryError = !hasData && coursesQuery.isError;
 
-  useEffect(() => {
-    if (!me || !canReadCurriculum) return;
-    let cancelled = false;
+  // Curriculum placement is reference data. Keep it in the shared React Query
+  // cache instead of rebuilding local component state on every route mount.
+  // Stale cached data stays rendered while React Query refreshes in the background,
+  // so year/semester cluster bars do not disappear and reappear during navigation.
+  const curriculumQuery = useQuery({
+    queryKey: protectedQueryKey(
+      { userId: me?.id ?? "pending", programmeId: "dse" },
+      "curriculum",
+      "course-placement",
+    ),
+    queryFn: async () => {
+      const curricula = await curriculumApi.list();
+      const current =
+        curricula.find((curriculum) =>
+          curriculum.versions.some((version) => version.status === "Active"),
+        ) ??
+        curricula.find((curriculum) =>
+          curriculum.versions.some((version) => version.status === "Approved"),
+        ) ??
+        curricula[0];
 
-    (async () => {
-      setGroupingError(null);
-      try {
-        const curricula = await curriculumApi.list();
-        const current =
-          curricula.find((curriculum) =>
-            curriculum.versions.some((version) => version.status === "Active"),
-          ) ??
-          curricula.find((curriculum) =>
-            curriculum.versions.some((version) => version.status === "Approved"),
-          ) ??
-          curricula[0];
+      return current ? curriculumApi.get(current.id) : null;
+    },
+    enabled: Boolean(me?.id && canReadCurriculum),
+    staleTime: QUERY_STALE_MS.reference,
+    gcTime: 60 * 60_000,
+  });
 
-        if (!current) {
-          if (!cancelled) {
-            setPlacementByCourseId(new Map());
-            setCurriculumReady(true);
-          }
-          return;
-        }
-
-        const curriculum = await curriculumApi.get(current.id);
-        if (!cancelled) {
-          setPlacementByCourseId(buildCoursePlacementMap(curriculum.years));
-          setCurriculumReady(true);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setCurriculumReady(false);
-          setGroupingError(
-            err instanceof ApiError
-              ? `Year/semester grouping unavailable: ${err.message}`
-              : "Year/semester grouping is temporarily unavailable.",
-          );
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canReadCurriculum, me]);
+  const curriculumReady =
+    canReadCurriculum && curriculumQuery.data !== undefined;
+  const placementByCourseId = useMemo(
+    () =>
+      curriculumQuery.data
+        ? buildCoursePlacementMap(curriculumQuery.data.years)
+        : new Map(),
+    [curriculumQuery.data],
+  );
+  const groupingError =
+    curriculumQuery.isError && curriculumQuery.data === undefined
+      ? curriculumQuery.error instanceof ApiError
+        ? `Year/semester grouping unavailable: ${curriculumQuery.error.message}`
+        : "Year/semester grouping is temporarily unavailable."
+      : null;
 
   const displayRows: CourseListRow[] = useMemo(
     () =>
