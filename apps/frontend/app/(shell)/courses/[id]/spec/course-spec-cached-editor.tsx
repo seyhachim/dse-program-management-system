@@ -41,8 +41,8 @@ export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
   // The query may refresh while a lecturer is typing. Pin the exact bundle that
   // the editor was created from as soon as local interaction starts. Fresh
   // server data can continue updating the cache, but it cannot remount the form
-  // and replace unsaved local input. A confirmed save unpins the editor, after
-  // which the mutation-triggered query refresh can safely become visible.
+  // and replace local input. The refreshed cache becomes visible on the next
+  // route mount, while all writes remain server-authoritative in this session.
   const [dirty, setDirty] = useState(false);
   const pinnedDataRef = useRef<CourseSpecAuthoringData | null>(null);
   const pinnedUpdatedAtRef = useRef(0);
@@ -55,10 +55,6 @@ export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
     }
     setDirty(true);
   }, [authoringQuery.data, authoringQuery.dataUpdatedAt, dirty]);
-
-  const markCommitted = useCallback(() => {
-    setDirty(false);
-  }, []);
 
   const handleFormInteraction = useCallback(
     (_event: FormEvent<HTMLDivElement>) => markDirty(),
@@ -114,7 +110,6 @@ export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
         key={`${courseId}:${editorVersion}`}
         courseId={courseId}
         initialData={data}
-        onCommitted={markCommitted}
       />
     </div>
   );
