@@ -14,7 +14,8 @@ type AttendanceCounts = ParentAttendanceSummary["counts"];
 
 type OfferingsProjectionContract = {
   studentAttendanceHistory: {
-    healthForStudent(studentId: string, offeringId: string): Promise<{
+    healthForStudentOfferings(studentId: string, offeringIds: string[]): Promise<Array<{
+      offeringId: string;
       history: {
         totalSessions: number;
         markedSessions: number;
@@ -29,7 +30,7 @@ type OfferingsProjectionContract = {
           count: number;
         }>;
       };
-    } | null>;
+    }>>;
   };
 };
 
@@ -93,13 +94,13 @@ export const parentProgressService = {
       },
     });
     const offerings = registry.get<OfferingsProjectionContract>("offerings").service;
-    const evaluations = await Promise.all(enrollments.map(async (enrollment) => ({
-      enrollment,
-      evaluation: await offerings.studentAttendanceHistory.healthForStudent(
-        relationship.studentId,
-        enrollment.offeringId,
-      ),
-    })));
+    const evaluations = await offerings.studentAttendanceHistory.healthForStudentOfferings(
+      relationship.studentId,
+      enrollments.map((enrollment) => enrollment.offeringId),
+    );
+    const evaluationByOffering = new Map(
+      evaluations.map((evaluation) => [evaluation.offeringId, evaluation]),
+    );
 
     const counts = emptyCounts();
     let totalSessions = 0;
@@ -107,7 +108,8 @@ export const parentProgressService = {
     const states: ParentAttendanceHealthState[] = [];
     const warnings: ParentAttendanceSummary["warnings"] = [];
 
-    for (const { enrollment, evaluation } of evaluations) {
+    for (const enrollment of enrollments) {
+      const evaluation = evaluationByOffering.get(enrollment.offeringId);
       if (!evaluation) continue;
       totalSessions += evaluation.history.totalSessions;
       markedSessions += evaluation.history.markedSessions;
