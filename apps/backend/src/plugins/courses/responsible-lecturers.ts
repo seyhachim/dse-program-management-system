@@ -1,6 +1,7 @@
 import type {
   CourseSpecResponsibleLecturersView,
   CourseSpecTeamSummary,
+  LecturerRef,
   LecturersServiceContract,
   ListCoursesQuery,
   SetCourseSpecResponsibleLecturersInput,
@@ -75,6 +76,24 @@ function courseTeamSummary(
             : ("CO_LECTURER" as const),
     })),
   };
+}
+
+function courseInfoLeadProfileData(leadLecturer: LecturerRef | null) {
+  return leadLecturer
+    ? {
+        instructorName: leadLecturer.name,
+        instructorTitle: leadLecturer.title ?? "",
+        qualification: leadLecturer.qualification ?? "",
+        email: leadLecturer.email,
+        telephone: leadLecturer.phone ?? "",
+      }
+    : {
+        instructorName: "",
+        instructorTitle: "",
+        qualification: "",
+        email: "",
+        telephone: "",
+      };
 }
 
 async function currentSpec(courseId: string): Promise<CurrentSpecRow | null> {
@@ -206,11 +225,17 @@ export async function setCourseSpecResponsibleLecturers(
     throw new Error("Choose one Responsible Lecturer from the Course Team");
   }
 
+  const lecturerById = new Map<string, LecturerRef>();
   for (const lecturerId of input.lecturerIds) {
-    if (!(await lecturers().getById(lecturerId))) {
+    const lecturer = await lecturers().getById(lecturerId);
+    if (!lecturer) {
       throw new Error("Assigned Course Team lecturer does not exist");
     }
+    lecturerById.set(lecturerId, lecturer);
   }
+  const leadLecturer = leadLecturerId
+    ? (lecturerById.get(leadLecturerId) ?? null)
+    : null;
 
   let spec = await currentSpec(courseId);
   if (!spec) {
@@ -247,6 +272,10 @@ export async function setCourseSpecResponsibleLecturers(
     await tx.course.update({
       where: { id: courseId },
       data: { lecturerId: leadLecturerId },
+    });
+    await tx.courseSpecCourseInfo.update({
+      where: { courseSpecId: spec!.id },
+      data: courseInfoLeadProfileData(leadLecturer),
     });
   });
 
