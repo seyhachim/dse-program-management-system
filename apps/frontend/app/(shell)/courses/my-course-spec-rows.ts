@@ -4,6 +4,10 @@ import type {
   OfferingView,
   Semester,
 } from "@dse-pms/shared-types";
+import {
+  curriculumGroupLabel,
+  type CurriculumPlacement,
+} from "./course-curriculum-groups";
 
 export const ALL_COURSE_FILTER = "__all__";
 
@@ -40,6 +44,21 @@ function emptyProgress(course: CourseSpecCourse): CourseSpecProgress {
     total: 0,
     incompleteSections: [],
   };
+}
+
+function curriculumPlacementForRow(row: CourseSpecRow): CurriculumPlacement | null {
+  const placement = row.progress.curriculumPlacement;
+  if (!placement) return null;
+
+  return {
+    yearLevel: placement.programmeYear,
+    semester: placement.semester,
+    sortOrder: placement.sortOrder,
+  };
+}
+
+function semesterRank(semester: CurriculumPlacement["semester"]): number {
+  return semester === "First" ? 0 : 1;
 }
 
 export function buildCourseSpecRows({
@@ -136,18 +155,25 @@ export function buildCourseSpecRows({
   }
 
   return rows.sort((a, b) => {
-    if (a.programmeYear == null && b.programmeYear != null) return 1;
-    if (a.programmeYear != null && b.programmeYear == null) return -1;
-    if (a.programmeYear !== b.programmeYear) {
-      return (a.programmeYear ?? 99) - (b.programmeYear ?? 99);
+    const aPlacement = curriculumPlacementForRow(a);
+    const bPlacement = curriculumPlacementForRow(b);
+
+    if (aPlacement && !bPlacement) return -1;
+    if (!aPlacement && bPlacement) return 1;
+    if (aPlacement && bPlacement) {
+      if (aPlacement.yearLevel !== bPlacement.yearLevel) {
+        return aPlacement.yearLevel - bPlacement.yearLevel;
+      }
+      const semesterDiff =
+        semesterRank(aPlacement.semester) - semesterRank(bPlacement.semester);
+      if (semesterDiff !== 0) return semesterDiff;
+      const sortOrderDiff = aPlacement.sortOrder - bPlacement.sortOrder;
+      if (sortOrderDiff !== 0) return sortOrderDiff;
     }
     return a.course.code.localeCompare(b.course.code);
   });
 }
 
 export function courseSpecRowGroupLabel(row: CourseSpecRow): string {
-  if (row.offerings.length === 0) return "Course Spec preparation";
-  return row.programmeYear != null
-    ? `Year ${row.programmeYear}`
-    : "Study year not set";
+  return curriculumGroupLabel(curriculumPlacementForRow(row));
 }

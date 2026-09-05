@@ -20,13 +20,25 @@ function course(id: string, code: string, title = `${code} title`): CourseSpecCo
   return { id, code, title };
 }
 
-function progress(courseRow: CourseSpecCourse): CourseSpecProgress {
+function placement(
+  programmeYear: number,
+  semester: "First" | "Second",
+  sortOrder = 0,
+): NonNullable<CourseSpecProgress["curriculumPlacement"]> {
+  return { programmeYear, semester, sortOrder };
+}
+
+function progress(
+  courseRow: CourseSpecCourse,
+  curriculumPlacement: CourseSpecProgress["curriculumPlacement"] = null,
+): CourseSpecProgress {
   return {
     courseId: courseRow.id,
     code: courseRow.code,
     title: courseRow.title,
     completed: 3,
     total: 8,
+    curriculumPlacement,
     incompleteSections: [],
   };
 }
@@ -63,9 +75,9 @@ function offering({
 }
 
 describe("lecturer Course Specification rows", () => {
-  test("keeps a Responsible-Lecturer-only course and uses its real progress object", () => {
+  test("keeps a Responsible-Lecturer-only course and groups it by active curriculum placement", () => {
     const pan202 = course("pan202", "PAN202", "Predictive Analytics");
-    const pan202Progress = progress(pan202);
+    const pan202Progress = progress(pan202, placement(2, "Second", 3));
 
     const rows = buildCourseSpecRows({
       courses: [pan202],
@@ -81,7 +93,7 @@ describe("lecturer Course Specification rows", () => {
     expect(rows[0]?.role).toBe("Responsible");
     expect(rows[0]?.progress).toBe(pan202Progress);
     expect(rows[0]?.progress.total).toBe(8);
-    expect(courseSpecRowGroupLabel(rows[0]!)).toBe("Course Spec preparation");
+    expect(courseSpecRowGroupLabel(rows[0]!)).toBe("Year 2 · Semester 2");
   });
 
   test("preserves Offering primary/co-lecturer access and groups sections once per course", () => {
@@ -110,7 +122,10 @@ describe("lecturer Course Specification rows", () => {
           sectionCode: "A",
         }),
       ],
-      specProgress: [progress(primaryCourse), progress(coCourse)],
+      specProgress: [
+        progress(primaryCourse, placement(2, "First", 1)),
+        progress(coCourse, placement(2, "First", 2)),
+      ],
       lecturerId,
       filters: allFilters,
     });
@@ -128,6 +143,69 @@ describe("lecturer Course Specification rows", () => {
     expect(coRow?.offerings).toHaveLength(1);
   });
 
+  test("uses curriculum placement for grouping even when Offering metadata differs", () => {
+    const taught = course("taught", "TAUGHT202");
+    const rows = buildCourseSpecRows({
+      courses: [taught],
+      offerings: [
+        offering({
+          id: "taught-a",
+          courseRow: taught,
+          primaryLecturerId: lecturerId,
+          semester: "First",
+          programmeYear: 4,
+        }),
+      ],
+      specProgress: [progress(taught, placement(2, "Second", 4))],
+      lecturerId,
+      filters: allFilters,
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(courseSpecRowGroupLabel(rows[0]!)).toBe("Year 2 · Semester 2");
+  });
+
+  test("orders rows by curriculum year, semester, sort order, then code and puts unplaced courses last", () => {
+    const year2Second = course("year2-second", "B202");
+    const year1Second = course("year1-second", "A102");
+    const year1FirstLater = course("year1-first-later", "B101");
+    const year1FirstEarlier = course("year1-first-earlier", "A101");
+    const sameSortLaterCode = course("same-sort-later-code", "C101");
+    const unplaced = course("unplaced", "ZZZ999");
+
+    const rows = buildCourseSpecRows({
+      courses: [
+        unplaced,
+        year2Second,
+        sameSortLaterCode,
+        year1Second,
+        year1FirstLater,
+        year1FirstEarlier,
+      ],
+      offerings: [],
+      specProgress: [
+        progress(unplaced),
+        progress(year2Second, placement(2, "Second", 1)),
+        progress(sameSortLaterCode, placement(1, "First", 2)),
+        progress(year1Second, placement(1, "Second", 1)),
+        progress(year1FirstLater, placement(1, "First", 2)),
+        progress(year1FirstEarlier, placement(1, "First", 1)),
+      ],
+      lecturerId,
+      filters: allFilters,
+    });
+
+    expect(rows.map((row) => row.course.id)).toEqual([
+      year1FirstEarlier.id,
+      year1FirstLater.id,
+      sameSortLaterCode.id,
+      year1Second.id,
+      year2Second.id,
+      unplaced.id,
+    ]);
+    expect(courseSpecRowGroupLabel(rows.at(-1)!)).toBe("Not in current curriculum");
+  });
+
   test("concrete Offering filters exclude zero-Offering courses and All restores them", () => {
     const responsibleOnly = course("responsible", "RESP202");
     const taught = course("taught", "TAUGHT202");
@@ -143,7 +221,10 @@ describe("lecturer Course Specification rows", () => {
     const termFiltered = buildCourseSpecRows({
       courses: [responsibleOnly, taught],
       offerings: [taughtOffering],
-      specProgress: [progress(responsibleOnly), progress(taught)],
+      specProgress: [
+        progress(responsibleOnly, placement(2, "First", 1)),
+        progress(taught, placement(3, "Second", 1)),
+      ],
       lecturerId,
       filters: {
         ...allFilters,
@@ -156,7 +237,10 @@ describe("lecturer Course Specification rows", () => {
     const allRows = buildCourseSpecRows({
       courses: [responsibleOnly, taught],
       offerings: [taughtOffering],
-      specProgress: [progress(responsibleOnly), progress(taught)],
+      specProgress: [
+        progress(responsibleOnly, placement(2, "First", 1)),
+        progress(taught, placement(3, "Second", 1)),
+      ],
       lecturerId,
       filters: allFilters,
     });
@@ -179,7 +263,10 @@ describe("lecturer Course Specification rows", () => {
           primaryLecturerId: lecturerId,
         }),
       ],
-      specProgress: [progress(authorized), progress(stray)],
+      specProgress: [
+        progress(authorized, placement(2, "First", 1)),
+        progress(stray, placement(2, "First", 2)),
+      ],
       lecturerId,
       filters: allFilters,
     });
