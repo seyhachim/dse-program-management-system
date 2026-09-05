@@ -11,7 +11,7 @@ const runIntegration = process.env.BACKEND_INTEGRATION_TESTS === "1";
 const integrationDescribe = runIntegration ? describe : describe.skip;
 
 const TEST_SECRET =
-  "issue-863-course-spec-lead-profile-integration-secret-at-least-32-characters";
+  "issue-857-course-spec-team-snapshot-integration-secret-at-least-32-characters";
 
 type HttpResult = {
   status: number;
@@ -35,11 +35,12 @@ type CourseInfoResponse = {
       qualification?: string;
       email?: string;
       telephone?: string;
+      otherLecturers?: string;
     };
   };
 };
 
-integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
+integrationDescribe("Course Spec Course Team snapshot", () => {
   let appServer: Server;
   let baseUrl = "";
   let coordinator: AuthUser;
@@ -62,16 +63,16 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
     await prisma.$disconnect();
   });
 
-  test("Lead + Co-Lecturers snapshots the selected lead profile and follows lead changes", async () => {
+  test("Lead + Co-Lecturers snapshots lead/co roles, follows lead changes, and handles shared/empty teams", async () => {
     const [lecturerA, lecturerB] = await Promise.all([
       createLecturerFixture("A"),
       createLecturerFixture("B"),
     ]);
     const course = await prisma.course.create({
       data: {
-        code: `I863-${crypto.randomUUID().slice(0, 8)}`,
-        title: "Issue 863 lead profile integration fixture",
-        description: "Lead lecturer Course Information snapshot regression fixture",
+        code: `I857-${crypto.randomUUID().slice(0, 8)}`,
+        title: "Issue 857 Course Team snapshot fixture",
+        description: "Course Team Course Information snapshot regression fixture",
         credits: 3,
         courseType: "Core",
         totalSltHours: 120,
@@ -91,8 +92,8 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
         .courseSpecId;
       expect(courseSpecId).toBeTruthy();
 
-      await expectSnapshot(courseSpecId!, lecturerA);
-      await expectSpecApi(course.id, lecturerA);
+      await expectSnapshot(courseSpecId!, lecturerA, lecturerB.name);
+      await expectSpecApi(course.id, lecturerA, lecturerB.name);
       expect(
         (await prisma.course.findUniqueOrThrow({ where: { id: course.id } }))
           .lecturerId,
@@ -104,8 +105,8 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
         lecturerB.id,
       );
       expect(changedLead.status).toBe(200);
-      await expectSnapshot(courseSpecId!, lecturerB);
-      await expectSpecApi(course.id, lecturerB);
+      await expectSnapshot(courseSpecId!, lecturerB, lecturerA.name);
+      await expectSpecApi(course.id, lecturerB, lecturerA.name);
       expect(
         (await prisma.course.findUniqueOrThrow({ where: { id: course.id } }))
           .lecturerId,
@@ -125,6 +126,9 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
       );
       expect(shared.status).toBe(200);
 
+      const sharedNames = [lecturerA.name, lecturerB.name]
+        .sort((a, b) => a.localeCompare(b))
+        .join(", ");
       const sharedSnapshot =
         await prisma.courseSpecCourseInfo.findUniqueOrThrow({
           where: { courseSpecId: courseSpecId! },
@@ -135,11 +139,38 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
         qualification: "",
         email: "",
         telephone: "",
+        otherLecturers: sharedNames,
       });
       expect(
         (await prisma.course.findUniqueOrThrow({ where: { id: course.id } }))
           .lecturerId,
       ).toBeNull();
+
+      const cleared = await request(
+        `/api/courses/${course.id}/spec/responsible-lecturers`,
+        {
+          method: "PUT",
+          token: signToken(coordinator),
+          body: {
+            lecturerIds: [],
+            responsibilityMode: "SHARED",
+            leadLecturerId: null,
+          },
+        },
+      );
+      expect(cleared.status).toBe(200);
+      const clearedSnapshot =
+        await prisma.courseSpecCourseInfo.findUniqueOrThrow({
+          where: { courseSpecId: courseSpecId! },
+        });
+      expect(clearedSnapshot).toMatchObject({
+        instructorName: "",
+        instructorTitle: "",
+        qualification: "",
+        email: "",
+        telephone: "",
+        otherLecturers: "",
+      });
     } finally {
       await prisma.course.delete({ where: { id: course.id } });
       await deleteLecturerFixture(lecturerA.id);
@@ -166,6 +197,7 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
   async function expectSnapshot(
     courseSpecId: string,
     lecturer: LecturerFixture,
+    otherLecturers: string,
   ): Promise<void> {
     const snapshot = await prisma.courseSpecCourseInfo.findUniqueOrThrow({
       where: { courseSpecId },
@@ -176,12 +208,14 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
       qualification: lecturer.qualification ?? "",
       email: lecturer.email,
       telephone: lecturer.phone ?? "",
+      otherLecturers,
     });
   }
 
   async function expectSpecApi(
     courseId: string,
     lecturer: LecturerFixture,
+    otherLecturers: string,
   ): Promise<void> {
     const response = await request(`/api/courses/${courseId}/spec`, {
       token: signToken(coordinator),
@@ -194,6 +228,7 @@ integrationDescribe("Course Spec lead lecturer profile snapshot", () => {
       qualification: lecturer.qualification ?? "",
       email: lecturer.email,
       telephone: lecturer.phone ?? "",
+      otherLecturers,
     });
   }
 
@@ -222,11 +257,11 @@ async function createLecturerFixture(label: string): Promise<LecturerFixture> {
   const token = crypto.randomUUID().slice(0, 8);
   const lecturer = await prisma.user.create({
     data: {
-      email: `issue863-${label.toLowerCase()}-${token}@dse.invalid`,
-      name: `Issue 863 Lecturer ${label}`,
+      email: `issue857-${label.toLowerCase()}-${token}@dse.invalid`,
+      name: `Issue 857 Lecturer ${label}`,
       title: label === "A" ? "Dr." : "Assoc. Prof.",
       qualification: label === "A" ? "PhD Data Science" : "PhD Software Engineering",
-      phone: label === "A" ? "+855 10 863 001" : "+855 10 863 002",
+      phone: label === "A" ? "+855 10 857 001" : "+855 10 857 002",
     },
     select: {
       id: true,
