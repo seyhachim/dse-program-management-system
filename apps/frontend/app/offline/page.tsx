@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { RefreshCw, WifiOff } from "lucide-react";
 
 /**
@@ -16,13 +17,13 @@ export default function OfflinePage() {
           DSE PMS needs a connection to load current protected academic data. We do not present cached grades,
           attendance, permissions, or other protected records as if they are current.
         </p>
-        <a
+        <Link
           href="/"
           className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           <RefreshCw className="size-4" aria-hidden="true" />
           Try again
-        </a>
+        </Link>
       </section>
     </main>
   );
