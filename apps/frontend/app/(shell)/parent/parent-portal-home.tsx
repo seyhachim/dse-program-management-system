@@ -19,6 +19,7 @@ import {
   academicStatusLabel,
   guardianScopeLabel,
   parentPortalApi,
+  projectionForRelationship,
   relationshipLabel,
 } from "@/lib/parent-portal";
 
@@ -159,6 +160,9 @@ export function ParentPortalHome() {
   }
   if (!selected) return <LoadingState />;
 
+  const selectedAttendance = projectionForRelationship(attendance, selected.relationshipId);
+  const selectedAcademic = projectionForRelationship(academic, selected.relationshipId);
+
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 overflow-y-auto p-4 pb-10 sm:p-6">
       <header className="rounded-2xl bg-primary p-5 text-primary-foreground shadow-sm sm:p-6">
@@ -233,7 +237,7 @@ export function ParentPortalHome() {
 
       {!projectionLoading && !projectionError ? (
         <section className="grid gap-4 lg:grid-cols-2">
-          {selected.accessScopes.includes("attendance") && attendance ? (
+          {selected.accessScopes.includes("attendance") && selectedAttendance ? (
             <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -243,19 +247,19 @@ export function ParentPortalHome() {
                     <p className="text-sm text-muted-foreground">Finalised attendance records only</p>
                   </div>
                 </div>
-                <span className="text-2xl font-bold">{attendance.attendanceRate === null ? "—" : `${attendance.attendanceRate}%`}</span>
+                <span className="text-2xl font-bold">{selectedAttendance.attendanceRate === null ? "—" : `${selectedAttendance.attendanceRate}%`}</span>
               </div>
               <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Present</dt><dd className="mt-1 text-lg font-semibold">{attendance.counts.Present}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Late</dt><dd className="mt-1 text-lg font-semibold">{attendance.counts.Late}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Absent</dt><dd className="mt-1 text-lg font-semibold">{attendance.counts.Absent}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Permission / excused</dt><dd className="mt-1 text-lg font-semibold">{attendance.counts.Excused}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Permission pending</dt><dd className="mt-1 text-lg font-semibold">{attendance.counts.PermissionPending}</dd></div>
-                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Marked classes</dt><dd className="mt-1 text-lg font-semibold">{attendance.markedSessions}</dd></div>
+                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Present</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Present}</dd></div>
+                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Late</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Late}</dd></div>
+                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Absent</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Absent}</dd></div>
+                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Permission / excused</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.Excused}</dd></div>
+                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Permission pending</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.counts.PermissionPending}</dd></div>
+                <div className="rounded-xl bg-muted/40 p-3"><dt className="text-muted-foreground">Marked classes</dt><dd className="mt-1 text-lg font-semibold">{selectedAttendance.markedSessions}</dd></div>
               </dl>
-              {attendance.warnings.length ? (
+              {selectedAttendance.warnings.length ? (
                 <div className="mt-4 space-y-2">
-                  {attendance.warnings.map((warning) => (
+                  {selectedAttendance.warnings.map((warning) => (
                     <div key={`${warning.offeringId}-${warning.kind}`} className="flex gap-3 rounded-xl border border-status-upcoming bg-status-upcoming-bg p-3 text-sm text-status-upcoming">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                       <p><strong>{warning.courseCode}:</strong> {warning.message}</p>
@@ -268,7 +272,7 @@ export function ParentPortalHome() {
             </article>
           ) : null}
 
-          {selected.accessScopes.includes("academic_status") && academic ? (
+          {selected.accessScopes.includes("academic_status") && selectedAcademic ? (
             <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="rounded-xl bg-primary/10 p-2 text-primary"><GraduationCap className="h-5 w-5" aria-hidden="true" /></span>
@@ -279,19 +283,19 @@ export function ParentPortalHome() {
               </div>
               <div className="mt-5 rounded-xl bg-muted/40 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current status</p>
-                <p className="mt-1 text-xl font-semibold">{academicStatusLabel(academic.academicStatus)}</p>
+                <p className="mt-1 text-xl font-semibold">{academicStatusLabel(selectedAcademic.academicStatus)}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {academic.progressionStatus ?? "No progression record available"}
-                  {academic.programmeYear ? ` · Year ${academic.programmeYear}` : ""}
-                  {academic.academicYear ? ` · ${academic.academicYear}` : ""}
+                  {selectedAcademic.progressionStatus ?? "No progression record available"}
+                  {selectedAcademic.programmeYear ? ` · Year ${selectedAcademic.programmeYear}` : ""}
+                  {selectedAcademic.academicYear ? ` · ${selectedAcademic.academicYear}` : ""}
                 </p>
               </div>
               {selected.accessScopes.includes("official_results") ? (
                 <div className="mt-5">
                   <h3 className="text-sm font-semibold">Official completed course results</h3>
-                  {academic.officialResults.length ? (
+                  {selectedAcademic.officialResults.length ? (
                     <div className="mt-3 space-y-2">
-                      {academic.officialResults.map((result) => (
+                      {selectedAcademic.officialResults.map((result) => (
                         <div key={result.offeringId} className="flex items-center justify-between gap-4 rounded-xl border border-border p-3 text-sm">
                           <div>
                             <p className="font-medium">{result.courseCode} · {result.courseTitle}</p>
