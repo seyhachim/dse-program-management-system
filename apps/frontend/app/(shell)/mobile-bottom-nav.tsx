@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
@@ -21,7 +22,14 @@ import {
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { me, loading } = useMe();
-  const { toggleSidebar } = useSidebar();
+  const { setOpenMobile, toggleSidebar } = useSidebar();
+
+  // Shell layouts persist across App Router navigation. Close the mobile Sheet
+  // whenever navigation completes so a choice made from More never leaves the
+  // old menu covering the newly selected page.
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
 
   if (loading || !me) return null;
 
