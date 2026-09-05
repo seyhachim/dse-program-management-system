@@ -1,7 +1,12 @@
 import type { CourseSpecReviewStatus } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { attachCourseSpecTeams } from "./responsible-lecturers.ts";
 
-type CourseRow = { id: string };
+type CourseRow = {
+  id: string;
+  code: string;
+  lecturerId?: string | null;
+};
 type CourseSpecStatusRow = {
   courseId: string;
   versionMajor: number;
@@ -46,7 +51,7 @@ export function projectLatestCourseSpecReviewStatus<T extends CourseRow>(
 
 export async function attachLatestCourseSpecReviewStatus<T extends CourseRow>(
   courses: readonly T[],
-): Promise<Array<T & { reviewStatus: CourseSpecReviewStatus | null }>> {
+) {
   if (courses.length === 0) return [];
 
   const specs = await prisma.courseSpec.findMany({
@@ -59,5 +64,5 @@ export async function attachLatestCourseSpecReviewStatus<T extends CourseRow>(
     },
   });
 
-  return projectLatestCourseSpecReviewStatus(courses, specs);
+  return attachCourseSpecTeams(projectLatestCourseSpecReviewStatus(courses, specs));
 }
