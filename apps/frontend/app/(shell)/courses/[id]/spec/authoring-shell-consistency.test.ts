@@ -32,12 +32,14 @@ describe("Course Specification authoring shell", () => {
     }
   });
 
-  test("Course Information is a first-class authoring tab instead of a modal", async () => {
+  test("keeps Course Information on Overview instead of a separate navigation tab", async () => {
     const source = await Bun.file(CLIENT_PATH).text();
 
-    expect(source).toContain('{ id: "courseInfo", label: "Course Information" }');
-    expect(source).toContain('<TabsContent value="courseInfo"');
-    expect(source).toContain('setActiveTab("courseInfo")');
+    expect(source).not.toContain('{ id: "courseInfo", label: "Course Information" }');
+    expect(source).not.toContain('<TabsContent value="courseInfo"');
+    expect(source).toContain('requested === "courseInfo"');
+    expect(source).toContain('return "overview"');
+    expect(source).toContain('policyNormalizedId === "courseInfo"');
     expect(source).not.toContain("courseInfoDialogOpen");
     expect(source).not.toContain("<Dialog");
   });
@@ -52,14 +54,16 @@ describe("Course Specification authoring shell", () => {
     expect(source).toContain("teachingLearningIsReady(teachingLearningProfile, clos)");
   });
 
-  test("preserves Course Information review locking as an editable authoring tab", async () => {
+  test("keeps Course Information out of review-lock tab routing", async () => {
     const source = await Bun.file(CLIENT_PATH).text();
 
     const editableStart = source.indexOf("const EDITABLE_SPEC_TABS");
     const editableEnd = source.indexOf("const REVIEW_EDITABLE_STATUSES");
     const editableBlock = source.slice(editableStart, editableEnd);
 
-    expect(editableBlock).toContain('"courseInfo"');
+    expect(editableBlock).not.toContain('"courseInfo"');
+    expect(source).toContain('policyNormalizedId === "courseInfo"');
+    expect(source).toContain('? "overview"');
     expect(source).toContain("locked && EDITABLE_SPEC_TABS.has(normalizedId)");
   });
 });
