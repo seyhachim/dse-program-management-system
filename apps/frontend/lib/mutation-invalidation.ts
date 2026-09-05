@@ -72,6 +72,15 @@ export function invalidationForSuccessfulMutation(
     };
   }
 
+  if (/^\/api\/teaching-learning\/[^/]+$/.test(cleanPath)) {
+    return {
+      domain: "course-spec",
+      resources: ["course-spec"],
+      reason:
+        "Teaching & Learning profile data is part of the cached CourseSpec authoring bundle and document readiness.",
+    };
+  }
+
   if (/^\/api\/offerings\/[^/]+\/enrollments(?:\/|$)/.test(cleanPath)) {
     return {
       domain: "offerings",
