@@ -37,6 +37,12 @@ type ResponsibleCourseRow = {
   courseId: string;
 };
 
+type CourseSpecTeamSnapshotRow = {
+  courseCode: string;
+  instructorName: string | null;
+  email: string | null;
+};
+
 const SHARED_RESPONSIBILITY_COURSE_CODES = new Set(["FPR401", "FPR402"]);
 
 function lecturers(): LecturersServiceContract {
@@ -122,6 +128,70 @@ async function currentSpec(courseId: string): Promise<CurrentSpecRow | null> {
   return rows[0] ?? null;
 }
 
+async function teamForSpec(courseSpecId: string): Promise<ResponsibleLecturerRow[]> {
+  return prisma.$queryRaw<ResponsibleLecturerRow[]>`
+    SELECT lecturer."id", lecturer."name", lecturer."email"
+    FROM "CourseSpecResponsibleLecturer" responsibility
+    INNER JOIN "User" lecturer ON lecturer."id" = responsibility."lecturerId"
+    WHERE responsibility."courseSpecId" = ${courseSpecId}
+    ORDER BY lecturer."name" ASC
+  `;
+}
+
+/**
+ * Resolve the academic Course Team for one exact CourseSpec version.
+ *
+ * Course.lecturerId is deliberately not used here: it follows the current editable
+ * version and could therefore mislabel a historical Approved version after a later
+ * revision changes the lead. Instead, match the exact version's frozen CourseInfo
+ * instructor identity against that same version's CourseSpecResponsibleLecturer rows.
+ * If the frozen lead cannot be proven, return shared responsibility rather than
+ * inventing a historical lead.
+ */
+export async function courseSpecTeamForVersion(
+  courseSpecId: string,
+): Promise<CourseSpecTeamSummary | null> {
+  const snapshotRows = await prisma.$queryRaw<CourseSpecTeamSnapshotRow[]>`
+    SELECT
+      course."code" AS "courseCode",
+      info."instructorName" AS "instructorName",
+      info."email" AS "email"
+    FROM "CourseSpec" spec
+    INNER JOIN "Course" course ON course."id" = spec."courseId"
+    LEFT JOIN "CourseSpecCourseInfo" info ON info."courseSpecId" = spec."id"
+    WHERE spec."id" = ${courseSpecId}
+    LIMIT 1
+  `;
+  const snapshot = snapshotRows[0];
+  if (!snapshot) return null;
+
+  const team = await teamForSpec(courseSpecId);
+  if (isSharedResponsibilityCourse(snapshot.courseCode)) {
+    return courseTeamSummary({ code: snapshot.courseCode, lecturerId: null }, team);
+  }
+  if (team.length === 0) {
+    return courseTeamSummary({ code: snapshot.courseCode, lecturerId: null }, team);
+  }
+
+  const frozenEmail = snapshot.email?.trim().toLowerCase() ?? "";
+  let lead = frozenEmail
+    ? team.find((lecturer) => lecturer.email.trim().toLowerCase() === frozenEmail)
+    : undefined;
+
+  if (!lead) {
+    const frozenName = snapshot.instructorName?.trim() ?? "";
+    if (frozenName) {
+      const matches = team.filter((lecturer) => lecturer.name.trim() === frozenName);
+      if (matches.length === 1) lead = matches[0];
+    }
+  }
+
+  return courseTeamSummary(
+    { code: snapshot.courseCode, lecturerId: lead?.id ?? null },
+    team,
+  );
+}
+
 export async function courseIdsForResponsibleLecturer(
   lecturerId: string,
 ): Promise<string[]> {
@@ -195,15 +265,7 @@ export async function getCourseSpecResponsibleLecturers(
   if (!course) return null;
 
   const spec = await currentSpec(courseId);
-  const team = spec
-    ? await prisma.$queryRaw<ResponsibleLecturerRow[]>`
-        SELECT lecturer."id", lecturer."name", lecturer."email"
-        FROM "CourseSpecResponsibleLecturer" responsibility
-        INNER JOIN "User" lecturer ON lecturer."id" = responsibility."lecturerId"
-        WHERE responsibility."courseSpecId" = ${spec.id}
-        ORDER BY lecturer."name" ASC
-      `
-    : [];
+  const team = spec ? await teamForSpec(spec.id) : [];
   const summary = courseTeamSummary(course, team);
 
   return {

@@ -40,6 +40,21 @@ type CourseInfoResponse = {
   };
 };
 
+type ApprovedSpecVersionResponse = Array<{
+  id: string;
+  version: string;
+  courseTeam?: {
+    responsibilityMode: "LEAD_AND_CO" | "SHARED";
+    leadLecturerId: string | null;
+    lecturers: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: "RESPONSIBLE" | "CO_LECTURER" | "SHARED";
+    }>;
+  };
+}>;
+
 integrationDescribe("Course Spec Course Team snapshot", () => {
   let appServer: Server;
   let baseUrl = "";
@@ -178,6 +193,112 @@ integrationDescribe("Course Spec Course Team snapshot", () => {
     }
   });
 
+  test("Approved version lookup keeps the exact historical team when a newer draft has another lead", async () => {
+    const [lecturerA, lecturerB, lecturerC] = await Promise.all([
+      createLecturerFixture("V1-A"),
+      createLecturerFixture("V2-B"),
+      createLecturerFixture("V2-C"),
+    ]);
+    const code = `I865-${crypto.randomUUID().slice(0, 8)}`;
+    const title = "Issue 865 exact-version Course Team fixture";
+    const course = await prisma.course.create({
+      data: {
+        code,
+        title,
+        description: "Approved CourseSpec team must not follow a newer draft",
+        credits: 3,
+        courseType: "Core",
+        totalSltHours: 120,
+        programmeId: "dse",
+        lecturerId: lecturerB.id,
+      },
+      select: { id: true },
+    });
+
+    try {
+      const approvedSpec = await prisma.courseSpec.create({
+        data: {
+          courseId: course.id,
+          versionMajor: 1,
+          versionMinor: 0,
+          reviewStatus: "Approved",
+          approvedAt: new Date(),
+          courseInfo: {
+            create: {
+              programmeTitle: "Data Science and Engineering",
+              courseTitle: title,
+              courseCode: code,
+              instructorName: lecturerA.name,
+              instructorTitle: lecturerA.title ?? "",
+              qualification: lecturerA.qualification ?? "",
+              email: lecturerA.email,
+              telephone: lecturerA.phone ?? "",
+              otherLecturers: lecturerB.name,
+            },
+          },
+        },
+        select: { id: true },
+      });
+      await insertCourseSpecTeam(approvedSpec.id, [lecturerA.id, lecturerB.id]);
+
+      const newerDraft = await prisma.courseSpec.create({
+        data: {
+          courseId: course.id,
+          versionMajor: 2,
+          versionMinor: 0,
+          reviewStatus: "Draft",
+          courseInfo: {
+            create: {
+              programmeTitle: "Data Science and Engineering",
+              courseTitle: title,
+              courseCode: code,
+              instructorName: lecturerB.name,
+              instructorTitle: lecturerB.title ?? "",
+              qualification: lecturerB.qualification ?? "",
+              email: lecturerB.email,
+              telephone: lecturerB.phone ?? "",
+              otherLecturers: lecturerC.name,
+            },
+          },
+        },
+        select: { id: true },
+      });
+      await insertCourseSpecTeam(newerDraft.id, [lecturerB.id, lecturerC.id]);
+
+      const response = await request(
+        `/api/courses/${course.id}/approved-spec-versions`,
+        { token: signToken(coordinator) },
+      );
+      expect(response.status).toBe(200);
+      const versions = response.body as ApprovedSpecVersionResponse;
+      expect(versions).toHaveLength(1);
+      expect(versions[0]?.id).toBe(approvedSpec.id);
+      expect(versions[0]?.courseTeam).toEqual({
+        responsibilityMode: "LEAD_AND_CO",
+        leadLecturerId: lecturerA.id,
+        lecturers: [
+          {
+            id: lecturerA.id,
+            name: lecturerA.name,
+            email: lecturerA.email,
+            role: "RESPONSIBLE" as const,
+          },
+          {
+            id: lecturerB.id,
+            name: lecturerB.name,
+            email: lecturerB.email,
+            role: "CO_LECTURER" as const,
+          },
+        ].sort((a, b) => a.name.localeCompare(b.name)),
+      });
+    } finally {
+      await prisma.course.delete({ where: { id: course.id } });
+      await deleteLecturerFixture(lecturerA.id);
+      await deleteLecturerFixture(lecturerB.id);
+      await deleteLecturerFixture(lecturerC.id);
+    }
+  });
+
   async function assignLeadTeam(
     courseId: string,
     lecturerIds: string[],
@@ -250,6 +371,18 @@ integrationDescribe("Course Spec Course Team snapshot", () => {
   }
 });
 
+async function insertCourseSpecTeam(
+  courseSpecId: string,
+  lecturerIds: string[],
+): Promise<void> {
+  for (const lecturerId of lecturerIds) {
+    await prisma.$executeRaw`
+      INSERT INTO "CourseSpecResponsibleLecturer" ("courseSpecId", "lecturerId")
+      VALUES (${courseSpecId}, ${lecturerId})
+    `;
+  }
+}
+
 async function createLecturerFixture(label: string): Promise<LecturerFixture> {
   const lecturerRole = await prisma.role.findUniqueOrThrow({
     where: { slug: "lecturer" },
@@ -259,9 +392,9 @@ async function createLecturerFixture(label: string): Promise<LecturerFixture> {
     data: {
       email: `issue857-${label.toLowerCase()}-${token}@dse.invalid`,
       name: `Issue 857 Lecturer ${label}`,
-      title: label === "A" ? "Dr." : "Assoc. Prof.",
-      qualification: label === "A" ? "PhD Data Science" : "PhD Software Engineering",
-      phone: label === "A" ? "+855 10 857 001" : "+855 10 857 002",
+      title: label.includes("A") ? "Dr." : "Assoc. Prof.",
+      qualification: label.includes("A") ? "PhD Data Science" : "PhD Software Engineering",
+      phone: label.includes("A") ? "+855 10 857 001" : "+855 10 857 002",
     },
     select: {
       id: true,

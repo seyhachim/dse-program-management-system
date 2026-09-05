@@ -29,6 +29,10 @@ import { coursesApi, type CourseView } from "@/lib/courses";
 import { lecturersApi } from "@/lib/lecturers";
 import { offeringsApi } from "@/lib/offerings";
 import { OfferingFormFields, type OfferingFormValues } from "./offering-form-fields";
+import {
+  offeringTeamSuggestion,
+  removePrimaryFromCoLecturers,
+} from "./offering-team-suggestion";
 
 const BACK_HREF = "/offerings";
 
@@ -83,6 +87,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   } = useForm<OfferingFormValues>({ defaultValues: emptyDefaults });
   const courseId = useWatch({ control, name: "courseId" }) ?? "";
   const lecturerId = useWatch({ control, name: "lecturerId" }) ?? null;
+  const coLecturerIds = useWatch({ control, name: "coLecturerIds" }) ?? [];
   const studyYear = useWatch({ control, name: "programmeYear" }) ?? null;
   const semester = useWatch({ control, name: "semester" }) ?? null;
   const courseSpecId = useWatch({ control, name: "courseSpecId" }) ?? "";
@@ -93,6 +98,14 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const legacyTeachingPeriod = legacyOffering && loadedOffering
     ? { startDate: loadedOffering.startDate, endDate: loadedOffering.endDate }
     : null;
+  const selectedCourseSpec = useMemo(
+    () => courseSpecVersions.find((spec) => spec.id === courseSpecId) ?? null,
+    [courseSpecId, courseSpecVersions],
+  );
+  const selectedTeamSuggestion = useMemo(
+    () => offeringTeamSuggestion(selectedCourseSpec, editing),
+    [editing, selectedCourseSpec],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -142,6 +155,16 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     return () => { cancelled = true; };
   }, [offeringId, reset]);
 
+  // A CourseSpec belongs to one course. When Admin changes course on a new
+  // Offering, clear the prior version/team instead of leaving a stale selection
+  // that the backend would later reject as belonging to another course.
+  useEffect(() => {
+    if (editing) return;
+    setValue("courseSpecId", "");
+    setValue("lecturerId", null);
+    setValue("coLecturerIds", []);
+  }, [courseId, editing, setValue]);
+
   useEffect(() => {
     let cancelled = false;
     if (!courseId) { setCourseSpecVersions([]); return; }
@@ -152,6 +175,26 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
       .finally(() => { if (!cancelled) setCourseSpecLoading(false); });
     return () => { cancelled = true; };
   }, [courseId]);
+
+  // New Offerings get an initial teaching-team suggestion from the exact Approved
+  // CourseSpec version the Admin selected. Editing is deliberately excluded so a
+  // historical delivery team's saved assignments are never overwritten.
+  useEffect(() => {
+    if (!selectedTeamSuggestion) return;
+    setValue("lecturerId", selectedTeamSuggestion.primaryLecturerId, { shouldDirty: true });
+    setValue("coLecturerIds", selectedTeamSuggestion.coLecturerIds, { shouldDirty: true });
+  }, [selectedTeamSuggestion, setValue]);
+
+  // Shared CourseSpecs have no academic lead. Once Admin chooses the actual
+  // delivery Primary Lecturer, remove that person from the suggested co-team so
+  // the Offering's no-primary-as-co invariant remains valid.
+  useEffect(() => {
+    if (editing || !lecturerId || coLecturerIds.length === 0) return;
+    const nextCoLecturerIds = removePrimaryFromCoLecturers(lecturerId, coLecturerIds);
+    if (nextCoLecturerIds.length !== coLecturerIds.length) {
+      setValue("coLecturerIds", nextCoLecturerIds, { shouldDirty: true });
+    }
+  }, [coLecturerIds, editing, lecturerId, setValue]);
 
   useEffect(() => {
     let cancelled = false;
@@ -252,6 +295,11 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
     { label: "Weekly schedule", complete: meetings.length > 0 },
     { label: "Teaching team", complete: Boolean(lecturerId) },
   ];
+  const suggestedLead = selectedCourseSpec?.courseTeam?.leadLecturerId
+    ? selectedCourseSpec.courseTeam.lecturers.find(
+        (lecturer) => lecturer.id === selectedCourseSpec.courseTeam?.leadLecturerId,
+      ) ?? null
+    : null;
 
   return (
     <>
@@ -276,6 +324,27 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                   ))}
                 </div>
               </section>
+
+              {!editing && selectedCourseSpec?.courseTeam ? (
+                <section className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm">
+                  <p className="font-semibold text-foreground">
+                    Teaching team suggested from Approved CourseSpec v{selectedCourseSpec.version}
+                  </p>
+                  {selectedCourseSpec.courseTeam.responsibilityMode === "LEAD_AND_CO" ? (
+                    <p className="mt-1 text-muted-foreground">
+                      {suggestedLead
+                        ? `${suggestedLead.name} is prefilled as Primary Lecturer. Other Course Team members are prefilled as Co-Lecturers.`
+                        : "This version has no provable Responsible Lecturer, so choose the actual Primary Lecturer for this delivery."}
+                      {" "}Confirm or change these assignments for this offering before saving.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground">
+                      This CourseSpec uses shared academic responsibility, so no Primary Lecturer is invented. Course Team members are suggested as co-teaching candidates; choose the actual Primary Lecturer for this section. The chosen primary is removed from the Co-Lecturer list automatically.
+                    </p>
+                  )}
+                </section>
+              ) : null}
+
               <OfferingFormFields
                 control={control}
                 register={register}

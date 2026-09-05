@@ -37,6 +37,8 @@ export interface CourseSpecVersionRef {
   reviewStatus: string;
   approvedAt: string | null;
   effectiveFrom: string | null;
+  /** Exact version-scoped academic Course Team, when the read projection provides it. */
+  courseTeam?: import("./courses.ts").CourseSpecTeamSummary;
 }
 
 /** Lean CourseSpec progress shape used by cross-plugin read projections. */
