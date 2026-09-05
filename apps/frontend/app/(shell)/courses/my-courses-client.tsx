@@ -12,6 +12,7 @@ import {
   specCompletionPercent,
   type CourseSectionPresence,
   type CourseSpecProgress,
+  type CourseSpecTeamSummary,
   type OfferingView,
   type Semester,
 } from "@dse-pms/shared-types";
@@ -217,29 +218,12 @@ export function MyCoursesClient() {
       },
     },
     {
-      key: "role",
-      header: "My Role",
-      render: (row) => {
-        if (row.role === "Responsible") {
-          return (
-            <span className="font-medium text-primary">
-              Responsible Lecturer
-            </span>
-          );
-        }
-
-        return (
-          <span
-            className={
-              row.role === "Primary"
-                ? "font-medium text-status-tournament"
-                : "font-medium text-primary"
-            }
-          >
-            {row.role === "Primary" ? "Primary Lecturer" : "Co-Lecturer"}
-          </span>
-        );
-      },
+      key: "courseTeam",
+      header: "Course Team",
+      className: "w-56",
+      render: (row) => (
+        <CourseTeamCell team={row.course.courseTeam} currentUserId={me?.id ?? null} />
+      ),
     },
     {
       key: "status",
@@ -329,7 +313,7 @@ export function MyCoursesClient() {
       </div>
 
       <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        One row represents one shared course specification. Responsible Lecturers
+        One row represents one shared course specification. Course Team members
         can prepare a Course Spec before class sections are created; existing
         sections are grouped when they share that specification.
       </div>
@@ -371,6 +355,57 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="flex flex-col gap-1">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {children}
+    </div>
+  );
+}
+
+function CourseTeamCell({
+  team,
+  currentUserId,
+}: {
+  team: CourseSpecTeamSummary | undefined;
+  currentUserId: string | null;
+}) {
+  if (!team || team.lecturers.length === 0) {
+    return <span className="text-sm text-muted-foreground">Not assigned</span>;
+  }
+
+  if (team.responsibilityMode === "SHARED") {
+    const visible = team.lecturers.slice(0, 2);
+    const hidden = team.lecturers.length - visible.length;
+    return (
+      <div className="space-y-0.5">
+        <div className="text-sm font-medium text-foreground">
+          {team.lecturers.length} {team.lecturers.length === 1 ? "lecturer" : "lecturers"}
+        </div>
+        <div className="text-xs font-medium text-primary">Shared responsibility</div>
+        <div className="text-xs text-muted-foreground">
+          {visible
+            .map((lecturer) =>
+              lecturer.id === currentUserId ? `${lecturer.name} (You)` : lecturer.name,
+            )
+            .join(" · ")}
+          {hidden > 0 ? ` · +${hidden}` : ""}
+        </div>
+      </div>
+    );
+  }
+
+  const lead =
+    team.lecturers.find((lecturer) => lecturer.role === "RESPONSIBLE") ??
+    team.lecturers[0]!;
+  const coCount = team.lecturers.filter((lecturer) => lecturer.role === "CO_LECTURER").length;
+  return (
+    <div className="space-y-0.5">
+      <div className="text-sm font-medium text-foreground">
+        {lead.name}{lead.id === currentUserId ? " · You" : ""}
+      </div>
+      <div className="text-xs font-medium text-primary">Responsible Lecturer</div>
+      {coCount > 0 ? (
+        <div className="text-xs text-muted-foreground">
+          +{coCount} {coCount === 1 ? "co-lecturer" : "co-lecturers"}
+        </div>
+      ) : null}
     </div>
   );
 }

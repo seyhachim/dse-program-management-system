@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { FileText, Users } from "lucide-react";
-import { courseTypeLabel } from "@dse-pms/shared-types";
+import { courseTypeLabel, type CourseSpecTeamSummary } from "@dse-pms/shared-types";
 import { DataTable, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { coursesApi, type CourseView } from "@/lib/courses";
@@ -161,6 +161,12 @@ export function CoursesClient() {
           <span className="text-muted-foreground">—</span>
         ),
     },
+    {
+      key: "courseTeam",
+      header: "Course Team",
+      className: "w-56",
+      render: (c) => <CourseTeamCell team={c.courseTeam} />,
+    },
     ...(canReview
       ? [{
           key: "reviewStatus",
@@ -261,8 +267,8 @@ export function CoursesClient() {
             },
             ...(canManage
               ? [{
-                  key: "responsible-lecturers",
-                  label: "Responsible Lecturers",
+                  key: "course-team",
+                  label: "Manage Course Team",
                   icon: <Users className="mr-1 h-3.5 w-3.5" />,
                   onClick: (c: CourseListRow) =>
                     router.push(`/courses/${c.id}/spec/responsible-lecturers`),
@@ -276,6 +282,47 @@ export function CoursesClient() {
             canManage ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
           }
         />
+      ) : null}
+    </div>
+  );
+}
+
+function CourseTeamCell({ team }: { team: CourseSpecTeamSummary | undefined }) {
+  if (!team || team.lecturers.length === 0) {
+    return (
+      <span className="text-sm font-medium text-amber-700">Not assigned</span>
+    );
+  }
+
+  if (team.responsibilityMode === "SHARED") {
+    const visible = team.lecturers.slice(0, 2);
+    const hidden = team.lecturers.length - visible.length;
+    return (
+      <div className="space-y-0.5">
+        <div className="text-sm font-medium text-foreground">
+          {team.lecturers.length} {team.lecturers.length === 1 ? "lecturer" : "lecturers"}
+        </div>
+        <div className="text-xs font-medium text-primary">Shared responsibility</div>
+        <div className="text-xs text-muted-foreground">
+          {visible.map((lecturer) => lecturer.name).join(" · ")}
+          {hidden > 0 ? ` · +${hidden}` : ""}
+        </div>
+      </div>
+    );
+  }
+
+  const lead =
+    team.lecturers.find((lecturer) => lecturer.role === "RESPONSIBLE") ??
+    team.lecturers[0]!;
+  const coCount = team.lecturers.filter((lecturer) => lecturer.role === "CO_LECTURER").length;
+  return (
+    <div className="space-y-0.5">
+      <div className="text-sm font-medium text-foreground">{lead.name}</div>
+      <div className="text-xs font-medium text-primary">Responsible Lecturer</div>
+      {coCount > 0 ? (
+        <div className="text-xs text-muted-foreground">
+          +{coCount} {coCount === 1 ? "co-lecturer" : "co-lecturers"}
+        </div>
       ) : null}
     </div>
   );

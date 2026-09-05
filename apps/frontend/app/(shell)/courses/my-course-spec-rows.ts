@@ -1,5 +1,6 @@
 import type {
   CourseSpecProgress,
+  CourseSpecTeamSummary,
   OfferingView,
   Semester,
 } from "@dse-pms/shared-types";
@@ -12,6 +13,7 @@ export type CourseSpecCourse = {
   id: string;
   code: string;
   title: string;
+  courseTeam?: CourseSpecTeamSummary;
 };
 
 export interface CourseSpecRow {
@@ -102,13 +104,15 @@ export function buildCourseSpecRows({
       return true;
     });
 
-    // Academic-period filters describe Offerings. A Responsible-Lecturer-only
-    // course stays visible under All, but cannot match a concrete Offering filter.
+    // Academic-period filters describe Offerings. A Course-Team-only course stays
+    // visible under All, but cannot match a concrete Offering filter.
     if (hasOfferingFilter && matchingOfferings.length === 0) continue;
 
     const displayedOfferings = hasOfferingFilter
       ? matchingOfferings
       : allCourseOfferings;
+    // Keep the historical Offering role for internal grouping/tests. The UI now
+    // shows the objective Course Team instead of a viewer-relative "My Role".
     const isPrimary = displayedOfferings.some(
       (offering) => offering.lecturer?.id === lecturerId,
     );
