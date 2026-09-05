@@ -4,6 +4,7 @@ import {
   CreateResearchProjectSchema,
   LockResearchBaselineSchema,
   ResearchProjectListQuerySchema,
+  ResearchProjectPageQuerySchema,
   ResearchScopeSchema,
   ReviewResearchProtocolSchema,
   SaveResearchProtocolSchema,
@@ -11,6 +12,10 @@ import {
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme } from "../../../core/auth/token.ts";
+import {
+  InvalidResearchProjectPageCursorError,
+  listResearchProjectPage,
+} from "./project-pagination.ts";
 import {
   ActionResearchAuthorizationError,
   ActionResearchConflictError,
@@ -43,6 +48,10 @@ const PARTICIPANT_ROLES = [
 const REVIEWER_ROLES = ["admin", "program_coordinator", "qa_reviewer"] as const;
 
 function sendActionResearchError(res: Response, error: unknown): void {
+  if (error instanceof InvalidResearchProjectPageCursorError) {
+    res.status(400).json({ error: error.message });
+    return;
+  }
   if (error instanceof ActionResearchNotFoundError) {
     res.status(404).json({ error: error.message });
     return;
@@ -76,6 +85,23 @@ function canReview(req: Parameters<typeof hasAnyRoleInProgramme>[0], programmeId
 export function createActionResearchRouter(): Router {
   const router = Router();
   router.use(requireAuth);
+
+  router.get("/action-research/projects/page", async (req, res) => {
+    const parsed = ResearchProjectPageQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid Action Research project page query", details: parsed.error.flatten() });
+      return;
+    }
+    if (!canManage(req.user!, parsed.data.programmeId)) {
+      res.status(403).json({ error: "You cannot manage Action Research for this programme" });
+      return;
+    }
+    try {
+      res.json(await listResearchProjectPage(parsed.data));
+    } catch (error) {
+      sendActionResearchError(res, error);
+    }
+  });
 
   router.get("/action-research/projects", async (req, res) => {
     const parsed = ResearchProjectListQuerySchema.safeParse(req.query);
