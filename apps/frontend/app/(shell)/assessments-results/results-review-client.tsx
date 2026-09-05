@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -18,63 +19,62 @@ import type {
   PortalCloAchievement,
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
+import { useMe } from "@/lib/auth";
 import { courseDeliveryApi } from "@/lib/course-delivery";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 import { FinalizedResultCorrections } from "./finalized-result-corrections";
 
 export function ResultsReviewClient() {
-  const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
+  const { me, loading: meLoading } = useMe();
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
-  const [review, setReview] = useState<CourseDeliveryResultReview | null>(null);
-  const [loadingOfferings, setLoadingOfferings] = useState(true);
-  const [loadingReview, setLoadingReview] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryScope = { userId: me?.id ?? "pending" };
+  const offeringsKey = protectedQueryKey(queryScope, "course-delivery", "offerings");
+  const offeringsQuery = useQuery({
+    queryKey: offeringsKey,
+    queryFn: () => courseDeliveryApi.offerings(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.review,
+  });
+  const offerings: CourseDeliveryOffering[] = offeringsQuery.data ?? [];
 
-  const loadOfferings = useCallback(async () => {
-    setLoadingOfferings(true);
-    setError(null);
-    try {
-      const rows = await courseDeliveryApi.offerings();
-      setOfferings(rows);
-      setSelectedId((current) =>
-        rows.some((item) => item.offeringId === current)
-          ? current
-          : (rows[0]?.offeringId ?? ""),
-      );
-    } catch (reason) {
-      setError(messageFrom(reason, "Could not load assigned course sections"));
-    } finally {
-      setLoadingOfferings(false);
-    }
-  }, []);
+  useEffect(() => {
+    setSelectedId((current) =>
+      offerings.some((item) => item.offeringId === current)
+        ? current
+        : (offerings[0]?.offeringId ?? ""),
+    );
+  }, [offerings]);
 
-  const loadReview = useCallback(async (offeringId: string) => {
-    if (!offeringId) {
-      setReview(null);
-      return;
-    }
-    setLoadingReview(true);
-    setError(null);
-    try {
-      setReview(await courseDeliveryApi.resultReview(offeringId));
-    } catch (reason) {
-      setReview(null);
-      setError(messageFrom(reason, "Could not load result review"));
-    } finally {
-      setLoadingReview(false);
-    }
-  }, []);
-
-  useEffect(() => { void loadOfferings(); }, [loadOfferings]);
-  useEffect(() => { void loadReview(selectedId); }, [selectedId, loadReview]);
-
-  const refreshReviewAfterCorrection = useCallback(
-    () => loadReview(selectedId),
-    [loadReview, selectedId],
-  );
-
+  const reviewKey = protectedQueryKey(queryScope, "course-delivery", "result-review", selectedId || "none");
+  const reviewQuery = useQuery({
+    queryKey: reviewKey,
+    queryFn: () => courseDeliveryApi.resultReview(selectedId),
+    enabled: Boolean(me?.id && selectedId),
+    staleTime: QUERY_STALE_MS.review,
+  });
+  const review: CourseDeliveryResultReview | null = reviewQuery.data ?? null;
   const selected = offerings.find((item) => item.offeringId === selectedId) ?? null;
+  const hasOfferings = offeringsQuery.data !== undefined;
+  const hasReview = !selectedId || reviewQuery.data !== undefined;
+  const loadingOfferings = meLoading || (!hasOfferings && offeringsQuery.isPending);
+  const loadingReview = Boolean(selectedId) && !hasReview && reviewQuery.isPending;
+  const queryError = offeringsQuery.error ?? reviewQuery.error;
+  const hardQueryError = (!hasOfferings && offeringsQuery.isError) || (!hasReview && reviewQuery.isError);
+  const error = hardQueryError
+    ? queryError instanceof ApiError
+      ? queryError.message
+      : "Could not load result review"
+    : null;
+
+  const refreshReviewAfterCorrection = async () => {
+    if (!selectedId) return;
+    await queryClient.invalidateQueries({ queryKey: reviewKey, exact: true });
+  };
+
   const configuredWeight = review?.rows[0]?.configuredGradeWeight ?? 0;
   const completeCount = review?.rows.filter((row) => row.courseGradeComplete).length ?? 0;
   const incompleteCount = (review?.rows.length ?? 0) - completeCount;
@@ -126,15 +126,22 @@ export function ResultsReviewClient() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => void loadReview(selectedId)}
-                  disabled={!selectedId || loadingReview}
+                  onClick={() => void reviewQuery.refetch()}
+                  disabled={!selectedId || reviewQuery.isFetching}
                 >
-                  <RefreshCw />{loadingReview ? "Refreshing…" : "Refresh"}
+                  <RefreshCw />{reviewQuery.isFetching ? "Refreshing…" : "Refresh"}
                 </Button>
               </div>
             </div>
           </section>
 
+          <QueryRefreshStatus
+            hasData={hasOfferings && hasReview}
+            isPending={!hasOfferings || !hasReview}
+            isFetching={offeringsQuery.isFetching || reviewQuery.isFetching}
+            isError={offeringsQuery.isError || reviewQuery.isError}
+            label="Results review"
+          />
           {error ? <ErrorBanner message={error} /> : null}
           {loadingOfferings ? <LoadingCard message="Loading assigned course sections…" /> : null}
           {!loadingOfferings && !offerings.length ? (
@@ -370,8 +377,4 @@ function EmptyCard({ message }: { message: string }) {
       <p className="mt-3 text-sm text-muted-foreground">{message}</p>
     </div>
   );
-}
-
-function messageFrom(reason: unknown, fallback: string) {
-  return reason instanceof ApiError || reason instanceof Error ? reason.message : fallback;
 }
