@@ -9,7 +9,5 @@ export const MOBILE_RESULTS_LAYOUT = {
   mobileRows: "divide-y divide-border md:hidden",
   mobileRow: "space-y-4 p-4",
   desktopRows: "hidden overflow-x-auto md:block",
-  mobileCorrectionRows: "divide-y divide-border md:hidden",
-  desktopCorrectionRows: "hidden overflow-x-auto md:block",
   fullWidthPhoneAction: "h-11 w-full sm:w-auto",
 } as const;
