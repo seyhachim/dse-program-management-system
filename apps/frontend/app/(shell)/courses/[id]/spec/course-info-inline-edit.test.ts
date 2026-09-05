@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 const OVERVIEW_PATH = new URL("./overview-tab.tsx", import.meta.url);
 const CLIENT_PATH = new URL("./spec-client.tsx", import.meta.url);
 const READ_ONLY_PATH = new URL("./read-only-spec-client.tsx", import.meta.url);
+const INFO_PATH = new URL("./course-info-section.tsx", import.meta.url);
 
 describe("Course Information Overview-only editing", () => {
   test("edits only the Course Description / Synopsis from the Overview card", async () => {
@@ -44,5 +45,17 @@ describe("Course Information Overview-only editing", () => {
     expect(source).toContain('policyNormalizedId === "courseInfo"');
     expect(source).toContain("onSaveCourseDescription={() => Promise.resolve(false)}");
     expect(source).toContain("readOnly");
+  });
+
+  test("the Course Information save payload contains only the synopsis", async () => {
+    const source = await Bun.file(INFO_PATH).text();
+    const payloadStart = source.indexOf("export function toCourseInfoPayload");
+    const payloadEnd = source.indexOf("export function CourseInfoSection", payloadStart);
+    const payload = source.slice(payloadStart, payloadEnd);
+
+    expect(payload).toContain("description: description || undefined");
+    expect(payload).not.toContain("prerequisites:");
+    expect(source).toContain('hint="Managed in curriculum/course management."');
+    expect(source).toContain("<Input value={value.prerequisites} disabled readOnly />");
   });
 });
