@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Download, Share2, X } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -42,14 +43,18 @@ function rememberDismissal(): void {
 /**
  * Registers the deliberately conservative service worker and exposes a small,
  * dismissible install affordance when the browser says installation is useful.
+ * Telegram keeps its own thin companion UX, so the install prompt is suppressed
+ * inside Telegram Mini App routes to avoid presenting two competing app choices.
  */
 export function PwaRuntime() {
+  const pathname = usePathname();
+  const suppressPwaUi = pathname.startsWith("/telegram") || pathname === "/offline";
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIosInstall, setShowIosInstall] = useState(false);
   const [showIosHelp, setShowIosHelp] = useState(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    if (suppressPwaUi || process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
 
     navigator.serviceWorker
       .register("/sw.js", {
@@ -58,10 +63,10 @@ export function PwaRuntime() {
       })
       .then((registration) => registration.update())
       .catch(() => undefined);
-  }, []);
+  }, [suppressPwaUi]);
 
   useEffect(() => {
-    if (isStandalone() || wasDismissedThisSession()) return;
+    if (suppressPwaUi || isStandalone() || wasDismissedThisSession()) return;
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -84,7 +89,7 @@ export function PwaRuntime() {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleInstalled);
     };
-  }, []);
+  }, [suppressPwaUi]);
 
   const dismiss = () => {
     rememberDismissal();
@@ -106,7 +111,7 @@ export function PwaRuntime() {
     }
   };
 
-  if (!installPrompt && !showIosInstall) return null;
+  if (suppressPwaUi || (!installPrompt && !showIosInstall)) return null;
 
   return (
     <aside
