@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { CourseSpecReviewStatus } from "@dse-pms/shared-types";
 import { useMe } from "@/lib/auth";
@@ -24,6 +24,26 @@ export function isCourseSpecEditableStatus(
   return status == null || EDITABLE_STATUSES.has(status);
 }
 
+function ResolvedCourseSpecClient({
+  courseId,
+  initialStatus,
+}: {
+  courseId: string;
+  initialStatus: CourseSpecReviewStatus | null;
+}) {
+  // Freeze the workflow client chosen for this route mount. If a background
+  // refresh discovers a workflow transition, do not replace an active editor
+  // underneath possible unsaved input. Backend write/review guards still fail
+  // closed immediately, and the next route mount uses the refreshed cache.
+  const [routeStatus] = useState(initialStatus);
+
+  return isCourseSpecEditableStatus(routeStatus) ? (
+    <CourseSpecCachedEditor courseId={courseId} />
+  ) : (
+    <ReadOnlySpecClient courseId={courseId} />
+  );
+}
+
 export function CourseSpecClientGateway({ courseId }: { courseId: string }) {
   const { me, loading: meLoading } = useMe();
   const userId = me?.id ?? "pending";
@@ -35,28 +55,11 @@ export function CourseSpecClientGateway({ courseId }: { courseId: string }) {
     gcTime: COURSE_SPEC_QUERY_GC_MS,
   });
 
-  // Do not switch the editor component underneath a lecturer who may have local
-  // unsaved input. The first resolved workflow state chooses the client for this
-  // route mount. Background refresh still updates the protected cache, and every
-  // write is re-authorized/revalidated by the backend. A later route mount uses
-  // the refreshed workflow state.
-  const initialWorkflowRef = useRef<{
-    resolved: boolean;
-    status: CourseSpecReviewStatus | null;
-  }>({ resolved: false, status: null });
-
-  if (!initialWorkflowRef.current.resolved && specQuery.data) {
-    initialWorkflowRef.current = {
-      resolved: true,
-      status: specQuery.data.review?.status ?? null,
-    };
-  }
-
-  if (meLoading || (!initialWorkflowRef.current.resolved && specQuery.isPending)) {
+  if (meLoading || (!specQuery.data && specQuery.isPending)) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
-  if (!initialWorkflowRef.current.resolved) {
+  if (!specQuery.data) {
     return (
       <div className="rounded-lg border border-status-live/40 bg-status-live/10 px-3 py-2 text-sm text-status-live">
         {specQuery.error instanceof Error
@@ -66,9 +69,10 @@ export function CourseSpecClientGateway({ courseId }: { courseId: string }) {
     );
   }
 
-  return isCourseSpecEditableStatus(initialWorkflowRef.current.status) ? (
-    <CourseSpecCachedEditor courseId={courseId} />
-  ) : (
-    <ReadOnlySpecClient courseId={courseId} />
+  return (
+    <ResolvedCourseSpecClient
+      courseId={courseId}
+      initialStatus={specQuery.data.review?.status ?? null}
+    />
   );
 }
