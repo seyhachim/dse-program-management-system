@@ -82,25 +82,21 @@ export function toCourseInfoForm(data: Record<string, unknown> | undefined): Cou
 }
 
 /**
- * Convert the form model into the CourseInfoInput payload the API validates.
- * Every other Course Information field is admin/assignment-derived (managed via
- * Course Management or the course's offering) and read-only here, so it isn't
- * sent — the backend's `CourseInfoInput` schema only accepts these two anyway.
+ * Convert the form model into the lecturer-editable Course Information payload.
+ * Course/curriculum/Course Team/profile data is authoritative and read-only here,
+ * so this workflow persists only the course synopsis.
  */
 export function toCourseInfoPayload(f: CourseInfoForm) {
-  const trimmed = (v: string) => (v.trim() ? v.trim() : undefined);
+  const description = f.description.trim();
   return {
-    prerequisites: trimmed(f.prerequisites),
-    description: trimmed(f.description),
+    description: description || undefined,
   };
 }
 
 /**
- * §1–13 are a read-only document view — those fields come from the Course
- * entity, the assigned lecturer's profile, or the course's offering, and are
- * changed there rather than here (see `CourseInfoInput` in course-spec.ts for
- * why the API enforces this too, not just the UI). Only Pre-requisites (§5) and
- * the Description/Synopsis (§14) are actually editable on this form.
+ * Retained as an internal compatibility view for any stale in-memory tab state.
+ * Course Information is no longer exposed as a navigation tab; the normal authoring
+ * UX edits only the synopsis inline on Overview.
  */
 export function CourseInfoSection({
   value,
@@ -123,7 +119,7 @@ export function CourseInfoSection({
     <CourseSpecAuthoringStack>
       <CourseSpecAuthoringHeader
         title="Course Information"
-        description="Review authoritative course data and maintain the lecturer-editable prerequisites and course synopsis."
+        description="Review authoritative course data and maintain the lecturer-editable course synopsis."
         ready={ready}
         feedback={
           saving
@@ -168,19 +164,19 @@ export function CourseInfoSection({
               readOnly
             />
           </Field>
-          <Field label="12. Semester" hint="Managed on the course offering.">
+          <Field label="12. Semester" hint="Delivery context from the course offering.">
             <Input value={value.semester ? semesterLabel(value.semester as (typeof SEMESTERS)[number]) : ""} disabled readOnly />
           </Field>
-          <Field label="13. Year" hint="Managed on the course offering.">
+          <Field label="13. Year" hint="Delivery context from the course offering.">
             <Input value={value.programmeYear ? `Year ${value.programmeYear}` : ""} disabled readOnly />
           </Field>
         </div>
       </fieldset>
 
       <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5">
-        <legend className="px-1 text-sm font-semibold text-foreground">Assigned Lecturer</legend>
+        <legend className="px-1 text-sm font-semibold text-foreground">Course Team</legend>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="6. Course Instructor" hint="From the course's assigned lecturer.">
+          <Field label="6. Responsible Lecturer" hint="From the Course Specification Team.">
             <Input value={value.instructorName} disabled readOnly />
           </Field>
           <Field label="7. Qualification" hint="From the lecturer's profile.">
@@ -193,19 +189,15 @@ export function CourseInfoSection({
             <Input value={value.telephone} disabled readOnly />
           </Field>
         </div>
-        <Field label="10. Other Course Lecturer(s) (if any)" hint="Managed on the course offering.">
+        <Field label="10. Co-Lecturer(s) / Shared Course Team" hint="From the Course Specification Team.">
           <Input value={value.otherLecturers} disabled readOnly />
         </Field>
       </fieldset>
 
       <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5">
         <legend className="px-1 text-sm font-semibold text-foreground">Course Specification</legend>
-        <Field label="5. Pre-requisites (if any)">
-          <Input
-            placeholder="e.g. Math I–III; Statistics I–II; Advanced Programming"
-            value={value.prerequisites}
-            onChange={(e) => set({ prerequisites: e.target.value })}
-          />
+        <Field label="5. Pre-requisites (if any)" hint="Managed in curriculum/course management.">
+          <Input value={value.prerequisites} disabled readOnly />
         </Field>
         <Field label="14. Course Description / Synopsis">
           <textarea

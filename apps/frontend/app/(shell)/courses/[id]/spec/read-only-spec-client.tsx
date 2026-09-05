@@ -109,7 +109,6 @@ type ReviewState = NonNullable<
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "courseInfo", label: "Course Information" },
   { id: "clos", label: "CLOs" },
   { id: "teachingLearning", label: "Teaching & Learning" },
   { id: "assessmentPlan", label: "Assessment" },
@@ -154,6 +153,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
     const requested = normalizePoliciesResponsibilitiesTab(
       searchParams.get("tab"),
     );
+    if (requested === "courseInfo") return "overview";
     return TABS.some((tab) => tab.id === requested)
       ? (requested as TabId)
       : "overview";
@@ -191,7 +191,9 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
 
   const setActiveTab = useCallback(
     (id: TabId) => {
-      const normalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      const policyNormalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      const normalizedId: TabId =
+        policyNormalizedId === "courseInfo" ? "overview" : policyNormalizedId;
       setActiveTabState(normalizedId);
       if (typeof window !== "undefined") {
         const url = new URL(window.location.href);
@@ -387,7 +389,11 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
 
   const goToSection = useCallback(
     (sectionId: SpecSectionId) => {
-      setActiveTab(sectionId);
+      if (sectionId === "courseInfo") {
+        setActiveTab("overview");
+      } else {
+        setActiveTab(sectionId);
+      }
     },
     [setActiveTab],
   );
@@ -480,13 +486,17 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   assessments={assessments}
                   status={status}
                   courseTotalSlt={courseTotalSlt}
-                  onEditCourseInfo={() => undefined}
-                  onGoToTab={(id) => setActiveTab(id)}
+                  onSaveCourseDescription={() => Promise.resolve(false)}
+                  onGoToTab={(id) =>
+                    setActiveTab(id === "courseInfo" ? "overview" : id)
+                  }
                   readOnly
                 />
               </CourseSpecReadOnlyBoundary>
             </TabsContent>
 
+            {/* Internal compatibility surface only; Course Information is no longer
+                exposed in read-only navigation. */}
             <TabsContent value="courseInfo" className="mt-4">
               <CourseSpecReadOnlyBoundary>
                 <CourseInfoSection

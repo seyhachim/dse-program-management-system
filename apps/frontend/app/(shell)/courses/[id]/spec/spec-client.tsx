@@ -92,7 +92,6 @@ type TabId =
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "courseInfo", label: "Course Information" },
   { id: "clos", label: "CLOs" },
   { id: "teachingLearning", label: "Teaching & Learning" },
   { id: "assessmentPlan", label: "Assessment" },
@@ -105,7 +104,6 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 const EDITABLE_SPEC_TABS = new Set<TabId>([
-  "courseInfo",
   "clos",
   "teachingLearning",
   "assessmentPlan",
@@ -141,6 +139,7 @@ export function SpecClient({
       searchParams.get("tab"),
     );
     if (requested === "references") return "resources";
+    if (requested === "courseInfo") return "overview";
     return TABS.some((t) => t.id === requested)
       ? (requested as TabId)
       : "overview";
@@ -218,7 +217,11 @@ export function SpecClient({
     (id: TabId) => {
       const policyNormalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
       const normalizedId: TabId =
-        policyNormalizedId === "references" ? "resources" : policyNormalizedId;
+        policyNormalizedId === "references"
+          ? "resources"
+          : policyNormalizedId === "courseInfo"
+            ? "overview"
+            : policyNormalizedId;
       const locked =
         review !== null && !REVIEW_EDITABLE_STATUSES.has(review.status);
       const nextId =
@@ -248,6 +251,43 @@ export function SpecClient({
       setActiveTab("reviewSubmit");
     }
   }, [activeTab, editingLocked, setActiveTab]);
+
+  const persistCourseDescription = useCallback(
+    async (description: string) => {
+      if (editingLocked) {
+        setError("This course specification is locked while it is in the review workflow.");
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      const nextCourseInfo = { ...courseInfo, description };
+      try {
+        // Keep the existing CourseInfo payload shape here. It carries the current
+        // prerequisite back unchanged so the current canonical save service cannot
+        // accidentally clear it while this Overview-only UX is being restored.
+        await courseSpecApi.saveSection(
+          courseId,
+          "courseInfo",
+          toCourseInfoPayload(nextCourseInfo),
+        );
+        setCourseInfo(nextCourseInfo);
+        setStatus((current) => ({ ...current, courseInfo: "complete" }));
+        setCourseInfoSavedFlash(true);
+        setTimeout(() => setCourseInfoSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to save the course description",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, courseInfo, editingLocked],
+  );
 
   const persistClos = useCallback(
     async (items: CloForm[]) => {
@@ -569,6 +609,8 @@ export function SpecClient({
     (sectionId: SpecSectionId) => {
       if (sectionId === "references") {
         setActiveTab("resources");
+      } else if (sectionId === "courseInfo") {
+        setActiveTab("overview");
       } else {
         setActiveTab(sectionId);
       }
@@ -694,15 +736,15 @@ export function SpecClient({
             assessments={assessments}
             status={status}
             courseTotalSlt={courseTotalSlt}
-            onEditCourseInfo={() => {
-              if (!editingLocked) setActiveTab("courseInfo");
-              else setError("This course specification is locked while it is in the review workflow.");
-            }}
+            onSaveCourseDescription={persistCourseDescription}
+            savingCourseDescription={saving}
             onGoToTab={(id) => setActiveTab(id)}
             readOnly={editingLocked}
           />
         </TabsContent>
 
+        {/* Kept as an internal compatibility surface for stale in-memory state;
+            Course Information is no longer exposed as a navigation tab. */}
         <TabsContent value="courseInfo" className="mt-4">
           <CourseInfoSection
             value={courseInfo}
