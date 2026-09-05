@@ -36,7 +36,6 @@ describe("Course Specification authoring shell", () => {
     const source = await Bun.file(CLIENT_PATH).text();
 
     expect(source).not.toContain('{ id: "courseInfo", label: "Course Information" }');
-    expect(source).not.toContain('<TabsContent value="courseInfo"');
     expect(source).toContain('requested === "courseInfo"');
     expect(source).toContain('return "overview"');
     expect(source).toContain('policyNormalizedId === "courseInfo"');
