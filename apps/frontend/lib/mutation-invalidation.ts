@@ -3,6 +3,7 @@ export type MutationMethod = "POST" | "PATCH" | "PUT" | "DELETE";
 export const MUTABLE_PROTECTED_RESOURCES = [
   "students",
   "courses",
+  "course-spec",
   "offerings",
   "dashboard",
   "academic-calendar",
@@ -56,8 +57,9 @@ export function invalidationForSuccessfulMutation(
   if (/^\/api\/courses\/[^/]+\/spec(?:\/|$)/.test(cleanPath)) {
     return {
       domain: "course-spec",
-      resources: ["courses", "dashboard"],
-      reason: "CourseSpec state contributes to course progress and dashboard summary.",
+      resources: ["course-spec", "courses", "dashboard"],
+      reason:
+        "CourseSpec writes invalidate the live editor cache plus course progress and dashboard summary.",
     };
   }
 
