@@ -39,6 +39,18 @@ describe("mutation invalidation registry", () => {
     });
   });
 
+  test("refreshes CourseSpec after confirmed assessment-template metadata writes", () => {
+    expect(
+      invalidationForSuccessfulMutation(
+        "PUT",
+        "/api/assessment-template/course-1",
+      ),
+    ).toMatchObject({
+      domain: "course-spec",
+      resources: ["course-spec"],
+    });
+  });
+
   test("distinguishes offering enrollment from structural writes", () => {
     expect(
       invalidationForSuccessfulMutation(
