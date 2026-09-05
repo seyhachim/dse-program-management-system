@@ -70,6 +70,7 @@ export * from "./qa-evaluation.ts";
 export * from "./qa-research-metrics.ts";
 export * from "./qa-pilot.ts";
 export * from "./action-research.ts";
+export * from "./action-research-pagination.ts";
 export * from "./community.ts";
 export * from "./community-plugin.ts";
 export * from "./student-handbook.ts";
