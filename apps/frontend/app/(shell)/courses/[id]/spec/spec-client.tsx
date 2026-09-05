@@ -4,13 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  type Method,
   type SpecSectionId,
   type SpecSectionStatus,
-  type ProgrammeAcademicConfig,
-  type Rubric,
   teachingLearningIsReady,
-  type TeachingLearningProfile,
+  type DateSection as DateSectionValue,
+  type PolicySection as PolicySectionValue,
+  type StudentResponsibilitySection as StudentResponsibilityValue,
 } from "@dse-pms/shared-types";
 import {
   Breadcrumb,
@@ -20,50 +19,35 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@dse-pms/ui";
-import { ApiError, api } from "@/lib/api";
-import { coursesApi, type CourseView } from "@/lib/courses";
+import { ApiError } from "@/lib/api";
+import type { CourseSpecAuthoringData } from "@/lib/course-spec-authoring-data";
 import { courseSpecApi } from "@/lib/course-spec";
-import { rubricsApi } from "@/lib/rubrics";
 import { useMe } from "@/lib/auth";
-import { methodsApi } from "@/lib/methods";
-import {
-  EMPTY_TEACHING_LEARNING_PROFILE,
-  teachingLearningApi,
-} from "@/lib/teaching-learning";
 import {
   CourseInfoSection,
-  EMPTY_COURSE_INFO,
   toCourseInfoForm,
   toCourseInfoPayload,
   type CourseInfoForm,
 } from "./course-info-section";
 import {
   ClosSection,
-  EMPTY_CLOS,
   toClosForm,
   toClosPayload,
   type CloForm,
 } from "./clos-section";
 import {
   WeeklyPlanSectionForm,
-  EMPTY_WEEKLY_PLAN,
   toWeeklyPlanForm,
   toWeeklyPlanPayload,
   type WeeklyPlanForm,
 } from "./weekly-plan-section";
 import {
   AssessmentSection,
-  EMPTY_ASSESSMENTS,
   toAssessmentForm,
   toAssessmentPayload,
   type AssessmentForm,
@@ -71,7 +55,6 @@ import {
 import { MappingSection } from "./mapping-section";
 import { TeachingLearningSection } from "./teaching-learning-section";
 import {
-  EMPTY_MAPPING,
   toMappingForm,
   toMappingPayload,
   validRefs,
@@ -83,20 +66,13 @@ import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
 import { EMPTY_POLICY } from "./policy-section";
 import { EMPTY_DATE } from "./date-section";
-import type {
-  DateSection as DateSectionValue,
-  PolicySection as PolicySectionValue,
-  StudentResponsibilitySection as StudentResponsibilityValue,
-} from "@dse-pms/shared-types";
 import { LearningResourcesSection } from "./learning-resources-section";
 import {
-  EMPTY_RESOURCES,
   toResourcesForm,
   toResourcesPayload,
   type ResourcesForm,
 } from "./resources-model";
 import {
-  EMPTY_REFERENCES,
   toReferencesForm,
   toReferencesPayload,
   type ReferencesForm,
@@ -104,6 +80,7 @@ import {
 import { EMPTY_STUDENT_RESPONSIBILITY } from "./student-responsibility-section";
 import { PoliciesResponsibilitiesSection } from "./policies-responsibilities-section";
 import { normalizePoliciesResponsibilitiesTab } from "./policies-responsibilities-model";
+import { CourseSpecNotice } from "./authoring-section-ui";
 
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
@@ -139,54 +116,83 @@ const EDITABLE_SPEC_TABS = new Set<TabId>([
 
 const REVIEW_EDITABLE_STATUSES = new Set(["draft", "changesRequested"]);
 
-export function SpecClient({ courseId }: { courseId: string }) {
+export function SpecClient({
+  courseId,
+  initialData,
+}: {
+  courseId: string;
+  initialData: CourseSpecAuthoringData;
+}) {
   const { me } = useMe();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const initialSpec = initialData.spec;
+  const course = initialData.course;
+  const teachingMethods = initialData.methods.teaching;
+  const assessmentMethods = initialData.methods.assessment;
+  const rubrics = initialData.rubrics;
+  const programme = initialData.programme;
+  const courseTotalSlt = course.totalSltHours ?? null;
+
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
     const requested = normalizePoliciesResponsibilitiesTab(
       searchParams.get("tab"),
     );
     if (requested === "references") return "resources";
+    if (requested === "courseInfo") return "overview";
     return TABS.some((t) => t.id === requested)
       ? (requested as TabId)
       : "overview";
   });
-  const [course, setCourse] = useState<CourseView | null>(null);
-  const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
+  const [status, setStatus] = useState<Record<string, SpecSectionStatus>>(
+    initialSpec.status ?? {},
+  );
   const [review, setReview] = useState<NonNullable<
     Awaited<ReturnType<typeof courseSpecApi.get>>["review"]
-  > | null>(null);
-  const [courseInfo, setCourseInfo] =
-    useState<CourseInfoForm>(EMPTY_COURSE_INFO);
-  const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
-  const [weeklyPlan, setWeeklyPlan] =
-    useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
-  const [assessments, setAssessments] =
-    useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
-  const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
-  const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
-  const [specDate, setSpecDate] = useState<DateSectionValue>(EMPTY_DATE);
-  const [resources, setResources] = useState<ResourcesForm>(EMPTY_RESOURCES);
-  const [references, setReferences] =
-    useState<ReferencesForm>(EMPTY_REFERENCES);
-  const [responsibility, setResponsibility] =
-    useState<StudentResponsibilityValue>(EMPTY_STUDENT_RESPONSIBILITY);
-  const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
-  const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
-  const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
-  const [teachingLearningProfile, setTeachingLearningProfile] =
-    useState<TeachingLearningProfile>(EMPTY_TEACHING_LEARNING_PROFILE);
-  const [programme, setProgramme] = useState<ProgrammeAcademicConfig | null>(
-    null,
+  > | null>(initialSpec.review);
+  const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(() =>
+    toCourseInfoForm(
+      initialSpec.data.courseInfo as Record<string, unknown> | undefined,
+    ),
   );
-  const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
-  const [rubrics, setRubrics] = useState<Rubric[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [clos, setClos] = useState<CloForm[]>(() =>
+    toClosForm(initialSpec.data.clos, initialSpec.data.cloMapping),
+  );
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanForm>(() =>
+    toWeeklyPlanForm(initialSpec.data.slt),
+  );
+  const [assessments, setAssessments] = useState<AssessmentForm[]>(() =>
+    toAssessmentForm(initialSpec.data.assessmentPlan),
+  );
+  const [mapping, setMapping] = useState<MappingForm>(() =>
+    toMappingForm(initialSpec.data.mapping),
+  );
+  const [policy, setPolicy] = useState<PolicySectionValue>(
+    (initialSpec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
+  );
+  const [specDate, setSpecDate] = useState<DateSectionValue>(
+    (initialSpec.data.date as DateSectionValue | undefined) ?? EMPTY_DATE,
+  );
+  const [resources, setResources] = useState<ResourcesForm>(() =>
+    toResourcesForm(initialSpec.data.resources),
+  );
+  const [references, setReferences] = useState<ReferencesForm>(() =>
+    toReferencesForm(initialSpec.data.references),
+  );
+  const [responsibility, setResponsibility] =
+    useState<StudentResponsibilityValue>(
+      (initialSpec.data.responsibility as
+        | StudentResponsibilityValue
+        | undefined) ?? EMPTY_STUDENT_RESPONSIBILITY,
+    );
+  const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
+  const [courseInfoSavedFlash, setCourseInfoSavedFlash] = useState(false);
+  const [teachingLearningProfile, setTeachingLearningProfile] = useState(
+    initialData.teachingLearningProfile,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [courseInfoDialogOpen, setCourseInfoDialogOpen] = useState(false);
 
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
@@ -206,11 +212,16 @@ export function SpecClient({ courseId }: { courseId: string }) {
     () => teachingLearningIsReady(teachingLearningProfile, clos),
     [teachingLearningProfile, clos],
   );
+
   const setActiveTab = useCallback(
     (id: TabId) => {
       const policyNormalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
       const normalizedId: TabId =
-        policyNormalizedId === "references" ? "resources" : policyNormalizedId;
+        policyNormalizedId === "references"
+          ? "resources"
+          : policyNormalizedId === "courseInfo"
+            ? "overview"
+            : policyNormalizedId;
       const locked =
         review !== null && !REVIEW_EDITABLE_STATUSES.has(review.status);
       const nextId =
@@ -241,72 +252,42 @@ export function SpecClient({ courseId }: { courseId: string }) {
     }
   }, [activeTab, editingLocked, setActiveTab]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [
-        spec,
-        methods,
-        courseView,
-        programmeConfig,
-        rubricList,
-        teachingLearningProfile,
-      ] = await Promise.all([
-        courseSpecApi.get(courseId),
-        methodsApi.list(),
-        coursesApi.get(courseId),
-        api.get<ProgrammeAcademicConfig>("/api/programme"),
-        rubricsApi.list().catch(() => [] as Rubric[]),
-        teachingLearningApi
-          .get(courseId)
-          .catch(() => EMPTY_TEACHING_LEARNING_PROFILE),
-      ]);
-      setTeachingLearningProfile(teachingLearningProfile);
-      setCourseInfo(
-        toCourseInfoForm(
-          spec.data.courseInfo as Record<string, unknown> | undefined,
-        ),
-      );
-      setClos(toClosForm(spec.data.clos, spec.data.cloMapping));
-      setWeeklyPlan(toWeeklyPlanForm(spec.data.slt));
-      setAssessments(toAssessmentForm(spec.data.assessmentPlan));
-      setMapping(toMappingForm(spec.data.mapping));
-      setPolicy(
-        (spec.data.policy as PolicySectionValue | undefined) ?? EMPTY_POLICY,
-      );
-      setSpecDate(
-        (spec.data.date as DateSectionValue | undefined) ?? EMPTY_DATE,
-      );
-      setResources(toResourcesForm(spec.data.resources));
-      setReferences(toReferencesForm(spec.data.references));
-      setResponsibility(
-        (spec.data.responsibility as
-          | StudentResponsibilityValue
-          | undefined) ?? EMPTY_STUDENT_RESPONSIBILITY,
-      );
-      setStatus(spec.status ?? {});
-      setReview(spec.review);
-      setTeachingMethods(methods.teaching);
-      setAssessmentMethods(methods.assessment);
-      setRubrics(rubricList);
-      setCourse(courseView);
-      setCourseTotalSlt(courseView.totalSltHours ?? null);
-      setProgramme(programmeConfig);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to load the course specification",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [courseId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const persistCourseDescription = useCallback(
+    async (description: string) => {
+      if (editingLocked) {
+        setError("This course specification is locked while it is in the review workflow.");
+        return false;
+      }
+      setSaving(true);
+      setError(null);
+      const nextCourseInfo = { ...courseInfo, description };
+      try {
+        // Keep the existing CourseInfo payload shape here. It carries the current
+        // prerequisite back unchanged so the current canonical save service cannot
+        // accidentally clear it while this Overview-only UX is being restored.
+        await courseSpecApi.saveSection(
+          courseId,
+          "courseInfo",
+          toCourseInfoPayload(nextCourseInfo),
+        );
+        setCourseInfo(nextCourseInfo);
+        setStatus((current) => ({ ...current, courseInfo: "complete" }));
+        setCourseInfoSavedFlash(true);
+        setTimeout(() => setCourseInfoSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to save the course description",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, courseInfo, editingLocked],
+  );
 
   const persistClos = useCallback(
     async (items: CloForm[]) => {
@@ -560,8 +541,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
           await courseSpecApi.saveSection(courseId, "mapping", payload);
         }
         setStatus((s) => ({ ...s, [sectionId]: "complete" }));
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 2000);
+        if (sectionId === "courseInfo") {
+          setCourseInfoSavedFlash(true);
+          setTimeout(() => setCourseInfoSavedFlash(false), 2000);
+        } else {
+          setSavedFlash(true);
+          setTimeout(() => setSavedFlash(false), 2000);
+        }
         return true;
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to save this section");
@@ -621,11 +607,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
   const goToSection = useCallback(
     (sectionId: SpecSectionId) => {
-      if (sectionId === "courseInfo") {
-        setActiveTab("overview");
-        setCourseInfoDialogOpen(true);
-      } else if (sectionId === "references") {
+      if (sectionId === "references") {
         setActiveTab("resources");
+      } else if (sectionId === "courseInfo") {
+        setActiveTab("overview");
       } else {
         setActiveTab(sectionId);
       }
@@ -633,9 +618,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
     [setActiveTab],
   );
 
-  const breadcrumbLabel = course
-    ? `${course.code} – ${course.title}`
-    : "Course Specification";
+  const breadcrumbLabel = `${course.code} – ${course.title}`;
   const activeTabLabel = TABS.find((t) => t.id === activeTab)?.label;
 
   const courseDocument = useMemo(
@@ -712,222 +695,181 @@ export function SpecClient({ courseId }: { courseId: string }) {
       </header>
 
       {error ? (
-        <div className="rounded-lg border border-status-live/40 bg-status-live/10 px-3 py-2 text-sm text-status-live">
-          {error}
-        </div>
+        <CourseSpecNotice tone="error">{error}</CourseSpecNotice>
       ) : null}
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <>
-          {editingLocked ? (
-            <div className="rounded-lg border border-blue-200/70 bg-blue-50/60 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-200">
-              <span className="font-semibold">
-                {review?.status === "approved"
-                  ? "Course specification approved."
-                  : "Course specification locked."}
-              </span>{" "}
-              {review?.status === "approved"
-                ? "This approved version is read-only."
-                : "Editing is unavailable while the course specification is in the review workflow."}
-            </div>
-          ) : null}
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
-            <div className="rounded-xl border border-border bg-card p-1.5 shadow-sm">
-              <TabsList
-                variant="line"
-                className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      {editingLocked ? (
+        <CourseSpecNotice>
+          <span className="font-semibold">
+            {review?.status === "approved"
+              ? "Course specification approved."
+              : "Course specification locked."}
+          </span>{" "}
+          {review?.status === "approved"
+            ? "This approved version is read-only."
+            : "Editing is unavailable while the course specification is in the review workflow."}
+        </CourseSpecNotice>
+      ) : null}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
+        <div className="rounded-xl border border-border bg-card p-1.5 shadow-sm">
+          <TabsList
+            variant="line"
+            className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {TABS.map((t) => (
+              <TabsTrigger
+                key={t.id}
+                value={t.id}
+                className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-semibold data-[state=active]:shadow-sm"
               >
-                {TABS.map((t) => (
-                  <TabsTrigger
-                    key={t.id}
-                    value={t.id}
-                    className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-semibold data-[state=active]:shadow-sm"
-                  >
-                    {t.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
-            <TabsContent value="overview" className="mt-4">
-              <OverviewTab
-                courseInfo={courseInfo}
-                clos={clos}
-                weeklyPlan={weeklyPlan}
-                assessments={assessments}
-                status={status}
-                courseTotalSlt={courseTotalSlt}
-                onEditCourseInfo={() => {
-                  if (!editingLocked) setCourseInfoDialogOpen(true);
-                  else setError("This course specification is locked while it is in the review workflow.");
-                }}
-                onGoToTab={(id) => setActiveTab(id)}
-                readOnly={editingLocked}
-              />
-            </TabsContent>
+        <TabsContent value="overview" className="mt-4">
+          <OverviewTab
+            courseInfo={courseInfo}
+            clos={clos}
+            weeklyPlan={weeklyPlan}
+            assessments={assessments}
+            status={status}
+            courseTotalSlt={courseTotalSlt}
+            onSaveCourseDescription={persistCourseDescription}
+            savingCourseDescription={saving}
+            onGoToTab={(id) => setActiveTab(id)}
+            readOnly={editingLocked}
+          />
+        </TabsContent>
 
-            <TabsContent value="clos" className="mt-4">
-              <ClosSection
-                value={clos}
-                courseId={courseId}
-                lastSavedAt={closSavedAt}
-                programme={programme}
-                onPersist={persistClos}
-              />
-            </TabsContent>
-
-            <TabsContent value="teachingLearning" className="mt-4">
-              <TeachingLearningSection
-                value={clos}
-                teachingMethods={teachingMethods}
-                onPersist={persistClos}
-                onProfileSaved={setTeachingLearningProfile}
-              />
-            </TabsContent>
-
-            <TabsContent value="slt" className="mt-4">
-              <WeeklyPlanSectionForm
-                value={weeklyPlan}
-                onPersist={persistWeeklyPlan}
-                courseId={courseId}
-                courseName={course ? `${course.code} - ${course.title}` : undefined}
-                clos={clos}
-                teachingMethods={teachingMethods}
-                assessmentMethods={assessmentMethods}
-              />
-            </TabsContent>
-
-            <TabsContent value="assessmentPlan" className="mt-4">
-              <AssessmentSection
-                value={assessments}
-                clos={clos}
-                courseId={courseId}
-                onPersist={persistAssessments}
-              />
-            </TabsContent>
-
-            <TabsContent value="mapping" className="mt-4">
-              <MappingSection
-                clos={clos}
-                weeklyPlan={weeklyPlan}
-                assessments={assessments}
-                value={mapping}
-                onChange={setMapping}
-                courseName={course ? `${course.code} - ${course.title}` : undefined}
-              />
-            </TabsContent>
-
-            <TabsContent value="resources" className="mt-4">
-              <LearningResourcesSection
-                references={references}
-                resources={resources}
-                weeklyPlan={weeklyPlan}
-                onPersistReferences={persistReferences}
-                onPersistResources={persistResources}
-                onGoToWeeklyPlan={() => setActiveTab("slt")}
-              />
-            </TabsContent>
-
-            <TabsContent value="policy" className="mt-4">
-              <PoliciesResponsibilitiesSection
-                policy={policy}
-                responsibility={responsibility}
-                programPolicy={programme?.policy ?? null}
-                onPersistPolicy={persistPolicy}
-                onPersistResponsibility={persistResponsibility}
-                disabled={editingLocked}
-              />
-            </TabsContent>
-
-            <TabsContent value="documentPreview" className="mt-4" forceMount>
-              {course ? (
-                <DocumentPreview document={courseDocument} />
-              ) : (
-                <SectionPanel>
-                  <div className="py-10 text-center text-sm text-muted-foreground">
-                    Course information is not available.
-                  </div>
-                </SectionPanel>
-              )}
-            </TabsContent>
-
-            <TabsContent value="reviewSubmit" className="mt-4">
-              {course && review ? (
-                <ReviewSubmitSection
-                  course={course}
-                  status={status}
-                  review={review}
-                  cloReady={cloReady}
-                  teachingLearningReady={teachingLearningReady}
-                  specificationDate={specDate}
-                  onSaveSpecificationDate={persistDate}
-                  onSubmit={submitForReview}
-                  onPreview={() => setActiveTab("documentPreview")}
-                  onGoToSection={goToSection}
-                  saving={saving}
-                  canReview={canReview}
-                  onRequestChanges={handleRequestChanges}
-                  onApprove={handleApprove}
-                />
-              ) : null}
-            </TabsContent>
-
-            {canSaveActive ? (
-              <div className="mt-4 flex items-center justify-end gap-3">
-                {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
-                <Button
-                  variant="outline"
-                  onClick={() => saveSection("mapping")}
-                  disabled={saving}
-                >
-                  {saving ? "Saving…" : "Save"}
-                </Button>
-              </div>
-            ) : null}
-          </Tabs>
-        </>
-      )}
-
-      <Dialog
-        open={courseInfoDialogOpen && !editingLocked}
-        onOpenChange={(open) => {
-          if (!editingLocked) setCourseInfoDialogOpen(open);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Course Information</DialogTitle>
-          </DialogHeader>
+        {/* Kept as an internal compatibility surface for stale in-memory state;
+            Course Information is no longer exposed as a navigation tab. */}
+        <TabsContent value="courseInfo" className="mt-4">
           <CourseInfoSection
             value={courseInfo}
-            onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
+            onChange={(patch) => setCourseInfo((current) => ({ ...current, ...patch }))}
+            ready={status.courseInfo === "complete"}
+            saving={saving}
+            saved={courseInfoSavedFlash}
+            onSave={() => saveSection("courseInfo")}
           />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCourseInfoDialogOpen(false)}>
-              Cancel
-            </Button>
+        </TabsContent>
+
+        <TabsContent value="clos" className="mt-4">
+          <ClosSection
+            value={clos}
+            courseId={courseId}
+            lastSavedAt={closSavedAt}
+            programme={programme}
+            ready={cloReady}
+            onPersist={persistClos}
+          />
+        </TabsContent>
+
+        <TabsContent value="teachingLearning" className="mt-4">
+          <TeachingLearningSection
+            value={clos}
+            teachingMethods={teachingMethods}
+            onPersist={persistClos}
+            onProfileSaved={setTeachingLearningProfile}
+          />
+        </TabsContent>
+
+        <TabsContent value="slt" className="mt-4">
+          <WeeklyPlanSectionForm
+            value={weeklyPlan}
+            onPersist={persistWeeklyPlan}
+            courseId={courseId}
+            courseName={`${course.code} - ${course.title}`}
+            ready={status.slt === "complete"}
+            clos={clos}
+            teachingMethods={teachingMethods}
+            assessmentMethods={assessmentMethods}
+          />
+        </TabsContent>
+
+        <TabsContent value="assessmentPlan" className="mt-4">
+          <AssessmentSection
+            value={assessments}
+            clos={clos}
+            courseId={courseId}
+            ready={status.assessmentPlan === "complete"}
+            onPersist={persistAssessments}
+          />
+        </TabsContent>
+
+        <TabsContent value="mapping" className="mt-4">
+          <MappingSection
+            clos={clos}
+            weeklyPlan={weeklyPlan}
+            assessments={assessments}
+            value={mapping}
+            onChange={setMapping}
+            courseName={`${course.code} - ${course.title}`}
+          />
+        </TabsContent>
+
+        <TabsContent value="resources" className="mt-4">
+          <LearningResourcesSection
+            references={references}
+            resources={resources}
+            weeklyPlan={weeklyPlan}
+            onPersistReferences={persistReferences}
+            onPersistResources={persistResources}
+            onGoToWeeklyPlan={() => setActiveTab("slt")}
+          />
+        </TabsContent>
+
+        <TabsContent value="policy" className="mt-4">
+          <PoliciesResponsibilitiesSection
+            policy={policy}
+            responsibility={responsibility}
+            programPolicy={programme?.policy ?? null}
+            onPersistPolicy={persistPolicy}
+            onPersistResponsibility={persistResponsibility}
+            disabled={editingLocked}
+          />
+        </TabsContent>
+
+        <TabsContent value="documentPreview" className="mt-4" forceMount>
+          <DocumentPreview document={courseDocument} />
+        </TabsContent>
+
+        <TabsContent value="reviewSubmit" className="mt-4">
+          {review ? (
+            <ReviewSubmitSection
+              course={course}
+              status={status}
+              review={review}
+              cloReady={cloReady}
+              teachingLearningReady={teachingLearningReady}
+              specificationDate={specDate}
+              onSaveSpecificationDate={persistDate}
+              onSubmit={submitForReview}
+              onPreview={() => setActiveTab("documentPreview")}
+              onGoToSection={goToSection}
+              saving={saving}
+              canReview={canReview}
+              onRequestChanges={handleRequestChanges}
+              onApprove={handleApprove}
+            />
+          ) : null}
+        </TabsContent>
+
+        {canSaveActive ? (
+          <div className="mt-4 flex items-center justify-end gap-3">
+            {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
             <Button
-              onClick={async () => {
-                const ok = await saveSection("courseInfo");
-                if (ok) setCourseInfoDialogOpen(false);
-              }}
+              variant="outline"
+              onClick={() => void saveSection("mapping")}
               disabled={saving}
             >
               {saving ? "Saving…" : "Save"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        ) : null}
+      </Tabs>
     </div>
-  );
-}
-
-function SectionPanel({ children }: { children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-6">
-      {children}
-    </section>
   );
 }

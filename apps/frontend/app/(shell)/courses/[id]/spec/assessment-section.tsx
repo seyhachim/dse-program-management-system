@@ -22,6 +22,12 @@ import {
 } from "./assessment-model";
 import { type CloForm, withCodes } from "./clo-model";
 import { cloChip } from "./weekly-plan-model";
+import {
+  CourseSpecAuthoringHeader,
+  CourseSpecAuthoringStack,
+  CourseSpecEmptyState,
+  CourseSpecNotice,
+} from "./authoring-section-ui";
 
 export {
   EMPTY_ASSESSMENTS,
@@ -34,11 +40,13 @@ export function AssessmentSection({
   value,
   clos: cloValue,
   courseId,
+  ready,
   onPersist,
 }: {
   value: AssessmentForm[];
   clos: CloForm[];
   courseId: string;
+  ready: boolean;
   onPersist: (items: AssessmentForm[]) => Promise<boolean>;
 }) {
   const router = useRouter();
@@ -111,38 +119,29 @@ export function AssessmentSection({
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-foreground">Assessment</h2>
-          <p className="text-sm text-muted-foreground">
-            Define local course grading and CLO evidence independently. Course grade
-            weights calculate the class result; CLO mappings identify outcome evidence.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={openRubrics}>
-            <ClipboardList className="mr-1.5 h-4 w-4" />
-            Rubric Library
-          </Button>
-          <Button size="sm" onClick={openAdd}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add Assessment
-          </Button>
-        </div>
-      </div>
+    <CourseSpecAuthoringStack>
+      <CourseSpecAuthoringHeader
+        title="Assessment"
+        description="Define course grading and CLO evidence while keeping grade calculation and outcome evidence explicit."
+        ready={ready}
+        actions={
+          <>
+            <Button size="sm" variant="outline" onClick={openRubrics}>
+              <ClipboardList className="mr-1.5 h-4 w-4" />
+              Rubric Library
+            </Button>
+            <Button size="sm" onClick={openAdd}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Assessment
+            </Button>
+          </>
+        }
+      />
 
       {notice ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          <span>{notice}</span>
-          <button
-            type="button"
-            onClick={() => setNotice(null)}
-            className="shrink-0 text-xs font-medium hover:text-foreground"
-          >
-            Dismiss
-          </button>
-        </div>
+        <CourseSpecNotice onDismiss={() => setNotice(null)}>
+          {notice}
+        </CourseSpecNotice>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -164,9 +163,9 @@ export function AssessmentSection({
           </div>
 
           {clos.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-dashed border-border p-4">
-              <p className="text-sm text-muted-foreground">No CLOs are defined yet.</p>
-            </div>
+            <CourseSpecNotice tone="warning">
+              No CLOs are defined yet. Add CLOs before using assessment evidence coverage.
+            </CourseSpecNotice>
           ) : (
             <>
               <div className="mt-4 flex items-end justify-between gap-4">
@@ -281,16 +280,15 @@ export function AssessmentSection({
         </div>
 
         {value.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border py-12 text-center">
-            <p className="text-sm text-muted-foreground">No assessments yet.</p>
-            <button
-              type="button"
-              onClick={openAdd}
-              className="mt-1 text-sm font-medium text-accent-foreground hover:underline"
-            >
-              + Add your first assessment
-            </button>
-          </div>
+          <CourseSpecEmptyState
+            title="No assessments yet"
+            description="Add the first assessment to define grading, schedule, SLT, rubric use, and CLO evidence."
+            action={
+              <Button size="sm" onClick={openAdd}>
+                <Plus className="mr-1.5 h-4 w-4" /> Add your first assessment
+              </Button>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1240px] text-sm">
@@ -492,7 +490,7 @@ export function AssessmentSection({
           </div>
         ) : null}
       </section>
-    </div>
+    </CourseSpecAuthoringStack>
   );
 }
 

@@ -1,16 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MyActionResearchView,
   ResearchAssignmentRole,
+  ResearchProjectPage,
   ResearchProjectView,
   ResearchProtocolView,
 } from "@dse-pms/shared-types";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
+import {
+  invalidateProtectedQueryResources,
+  protectedQueryKey,
+  QUERY_STALE_MS,
+} from "@/lib/query-client";
 
 const PROGRAMME_ID = "dse";
+const PROJECT_PAGE_SIZE = 50;
 
 const inputClass =
   "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -110,9 +118,11 @@ function protocolState(protocol: ResearchProtocolView | null, project: ResearchP
 
 export function ActionResearchClient() {
   const { me, loading: meLoading } = useMe();
-  const [projects, setProjects] = useState<ResearchProjectView[]>([]);
+  const queryClient = useQueryClient();
   const [myWork, setMyWork] = useState<MyActionResearchView | null>(null);
   const [selectedProject, setSelectedProject] = useState<ResearchProjectView | null>(null);
+  const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
+  const [previousCursors, setPreviousCursors] = useState<Array<string | undefined>>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -123,6 +133,34 @@ export function ActionResearchClient() {
   const canReview = roles.some(
     (role) => role === "admin" || role === "program_coordinator" || role === "qa_reviewer",
   );
+
+  const projectPageQuery = useQuery({
+    queryKey: protectedQueryKey(
+      { userId: me?.id ?? "pending", programmeId: PROGRAMME_ID },
+      "action-research-projects",
+      "page",
+      pageCursor ?? "first",
+      PROJECT_PAGE_SIZE,
+    ),
+    queryFn: () => {
+      const params = new URLSearchParams({
+        programmeId: PROGRAMME_ID,
+        limit: String(PROJECT_PAGE_SIZE),
+      });
+      if (pageCursor) params.set("cursor", pageCursor);
+      return api.get<ResearchProjectPage>(`/api/qa/action-research/projects/page?${params}`);
+    },
+    enabled: Boolean(me?.id && canManage),
+    staleTime: QUERY_STALE_MS.operational,
+    placeholderData: keepPreviousData,
+  });
+
+  const projects = projectPageQuery.data?.items ?? [];
+  const canAdvanceProjectPage =
+    !projectPageQuery.isFetching &&
+    !projectPageQuery.isPlaceholderData &&
+    !projectPageQuery.isError &&
+    Boolean(projectPageQuery.data?.nextCursor);
 
   const [newProject, setNewProject] = useState({
     title: "",
@@ -163,18 +201,10 @@ export function ActionResearchClient() {
     setLoading(true);
     setError(null);
     try {
-      const [mine, managed] = await Promise.all([
-        api.get<MyActionResearchView>(
-          `/api/qa/action-research/my-work?programmeId=${encodeURIComponent(PROGRAMME_ID)}`,
-        ),
-        canManage
-          ? api.get<ResearchProjectView[]>(
-              `/api/qa/action-research/projects?programmeId=${encodeURIComponent(PROGRAMME_ID)}`,
-            )
-          : Promise.resolve([]),
-      ]);
+      const mine = await api.get<MyActionResearchView>(
+        `/api/qa/action-research/my-work?programmeId=${encodeURIComponent(PROGRAMME_ID)}`,
+      );
       setMyWork(mine);
-      setProjects(managed);
       if (selectedProject) {
         await loadSelected(selectedProject.id);
       }
@@ -183,7 +213,7 @@ export function ActionResearchClient() {
     } finally {
       setLoading(false);
     }
-  }, [canManage, loadSelected, me, selectedProject]);
+  }, [loadSelected, me, selectedProject]);
 
   useEffect(() => {
     if (!meLoading && me) void load();
@@ -209,6 +239,7 @@ export function ActionResearchClient() {
     try {
       await action();
       setNotice(success);
+      await invalidateProtectedQueryResources(queryClient, ["action-research-projects"]);
       await load();
     } catch (err) {
       setError(messageOf(err));
@@ -225,6 +256,8 @@ export function ActionResearchClient() {
         ...newProject,
       });
       setSelectedProject(created);
+      setPageCursor(undefined);
+      setPreviousCursors([]);
       setNewProject({
         title: "",
         problemStatement: "",
@@ -339,7 +372,24 @@ export function ActionResearchClient() {
     }, "Baseline locked for this research cycle.");
   }
 
-  if (meLoading || loading) {
+  function handleNextProjectPage() {
+    const nextCursor = projectPageQuery.data?.nextCursor;
+    if (!nextCursor || !canAdvanceProjectPage) return;
+    setSelectedProject(null);
+    setPreviousCursors((current) => [...current, pageCursor]);
+    setPageCursor(nextCursor);
+  }
+
+  function handlePreviousProjectPage() {
+    if (previousCursors.length === 0 || projectPageQuery.isFetching) return;
+    const previous = previousCursors[previousCursors.length - 1];
+    setSelectedProject(null);
+    setPreviousCursors((current) => current.slice(0, -1));
+    setPageCursor(previous);
+  }
+
+  const projectColdLoading = canManage && projectPageQuery.data === undefined && projectPageQuery.isPending;
+  if (meLoading || loading || projectColdLoading) {
     return <div className={cardClass}>Loading Action Research workspace…</div>;
   }
   if (!me) {
@@ -348,18 +398,23 @@ export function ActionResearchClient() {
 
   const cycle = selectedProject?.currentCycle ?? null;
   const currentProtocol = cycle?.currentProtocol ?? null;
+  const projectError =
+    canManage && projectPageQuery.data === undefined && projectPageQuery.isError
+      ? messageOf(projectPageQuery.error)
+      : null;
+  const visibleError = error ?? projectError;
 
   return (
     <div className="space-y-6">
-      {(error || notice) && (
+      {(visibleError || notice) && (
         <div
           className={`rounded-lg border px-4 py-3 text-sm ${
-            error
+            visibleError
               ? "border-red-200 bg-red-50 text-red-700"
               : "border-emerald-200 bg-emerald-50 text-emerald-700"
           }`}
         >
-          {error ?? notice}
+          {visibleError ?? notice}
         </div>
       )}
 
@@ -370,8 +425,11 @@ export function ActionResearchClient() {
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Programme research projects</h2>
                 <p className="text-sm text-slate-500">Assign an improvement problem, not a predetermined conclusion.</p>
+                {projectPageQuery.data && projectPageQuery.isFetching ? (
+                  <p role="status" className="mt-1 text-xs text-slate-400">Refreshing projects…</p>
+                ) : null}
               </div>
-              <span className="text-sm font-medium text-slate-500">{projects.length} total</span>
+              <span className="text-sm font-medium text-slate-500">{projects.length} on this page</span>
             </div>
             <div className="space-y-3">
               {projects.length === 0 && <p className="text-sm text-slate-500">No Action Research projects yet.</p>}
@@ -389,15 +447,33 @@ export function ActionResearchClient() {
                       <p className="font-medium text-slate-900">{project.title}</p>
                       <p className="mt-1 line-clamp-2 text-sm text-slate-600">{project.problemStatement}</p>
                     </div>
-                    <StatusPill value={project.currentCycle?.status ?? project.status} />
+                    <StatusPill value={project.currentCycleStatus ?? project.status} />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
                     <span>{project.academicYear || "Academic year not set"}</span>
                     <span>{project.semester || "Semester not set"}</span>
-                    <span>{project.assignments.length} assignment(s)</span>
+                    <span>{project.assignmentCount} assignment(s)</span>
                   </div>
                 </button>
               ))}
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                disabled={previousCursors.length === 0 || projectPageQuery.isFetching}
+                onClick={handlePreviousProjectPage}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={!canAdvanceProjectPage}
+                onClick={handleNextProjectPage}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
           </div>
 

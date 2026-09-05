@@ -10,8 +10,8 @@ export default async function ResponsibleLecturersPage({
   return (
     <>
       <Topbar
-        title="Responsible Lecturers"
-        subtitle="Assign equal responsibility for the current Course Specification version."
+        title="Manage Course Team"
+        subtitle="Assign the Responsible Lecturer and Co-Lecturers, or use shared responsibility."
       />
       <main className="flex-1 overflow-y-auto p-6">
         <ResponsibleLecturersClient courseId={id} />

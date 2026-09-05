@@ -11,12 +11,15 @@ import {
   specificationDateForSubmission,
 } from "./automatic-specification-date.ts";
 import { attachLatestCourseSpecReviewStatus } from "./course-list-review-status.ts";
+import { protectCourseInfoWrite } from "./course-info-write-boundary.ts";
+import { enrichCourseSpecProgress } from "./course-spec-progress-readiness.ts";
 import { createCourseRouter } from "./router.ts";
 import { createCourseSectionPresenceRouter } from "./section-presence-router.ts";
 import { createCourseSpecPeriodicReviewRouter } from "./periodic-review-router.ts";
 import { createResponsibleLecturersRouter } from "./responsible-lecturers-router.ts";
 import {
   courseIdsForResponsibleLecturer,
+  courseSpecTeamForVersion,
   mergeResponsibleCourses,
   responsibleLecturerCanAccess,
 } from "./responsible-lecturers.ts";
@@ -37,6 +40,8 @@ import { hasSpecificationDate } from "./specification-date-readiness.ts";
 const offeringScopedList = courseService.list.bind(courseService);
 const offeringScopedSpecProgress = courseService.listSpecProgress.bind(courseService);
 const offeringScopedAccess = courseService.lecturerCanAccess.bind(courseService);
+const canonicalGetCourseSpecVersion = courseService.getCourseSpecVersion.bind(courseService);
+const canonicalListApprovedSpecVersions = courseService.listApprovedSpecVersions.bind(courseService);
 const canonicalSaveSection = courseService.saveSection.bind(courseService);
 
 const CURRENT_SPEC_ORDER = [
@@ -60,29 +65,71 @@ courseService.list = async (query, lecturerScope) => {
 
 courseService.listSpecProgress = async (lecturerScope) => {
   const rows = await offeringScopedSpecProgress(lecturerScope);
-  if (!lecturerScope) return rows;
+  let scopedRows = rows;
 
-  const existingCourseIds = new Set(rows.map((row) => row.courseId));
-  const missingResponsibleCourseIds = (
-    await courseIdsForResponsibleLecturer(lecturerScope)
-  ).filter((courseId) => !existingCourseIds.has(courseId));
+  if (lecturerScope) {
+    const existingCourseIds = new Set(rows.map((row) => row.courseId));
+    const missingResponsibleCourseIds = (
+      await courseIdsForResponsibleLecturer(lecturerScope)
+    ).filter((courseId) => !existingCourseIds.has(courseId));
 
-  if (missingResponsibleCourseIds.length === 0) return rows;
+    if (missingResponsibleCourseIds.length > 0) {
+      const responsibleOnlyRows = await listSpecProgressForCourseIds(
+        missingResponsibleCourseIds,
+      );
+      scopedRows = [...rows, ...responsibleOnlyRows].sort((a, b) =>
+        a.code.localeCompare(b.code),
+      );
+    }
+  }
 
-  const responsibleOnlyRows = await listSpecProgressForCourseIds(
-    missingResponsibleCourseIds,
-  );
-
-  return [...rows, ...responsibleOnlyRows].sort((a, b) =>
-    a.code.localeCompare(b.code),
-  );
+  return enrichCourseSpecProgress(scopedRows);
 };
 
 courseService.lecturerCanAccess = async (courseId, lecturerId) =>
   (await offeringScopedAccess(courseId, lecturerId)) ||
   (await responsibleLecturerCanAccess(courseId, lecturerId));
 
+// Enrich exact CourseSpec version references with that same version's academic
+// Course Team. The resolver intentionally avoids Course.lecturerId so an Offering
+// selecting an older Approved version never inherits a lead from a newer Draft.
+courseService.getCourseSpecVersion = async (id) => {
+  const spec = await canonicalGetCourseSpecVersion(id);
+  if (!spec) return null;
+  const courseTeam = await courseSpecTeamForVersion(spec.id);
+  return courseTeam ? { ...spec, courseTeam } : spec;
+};
+
+courseService.listApprovedSpecVersions = async (courseId) => {
+  const specs = await canonicalListApprovedSpecVersions(courseId);
+  return Promise.all(
+    specs.map(async (spec) => {
+      const courseTeam = await courseSpecTeamForVersion(spec.id);
+      return courseTeam ? { ...spec, courseTeam } : spec;
+    }),
+  );
+};
+
 courseService.saveSection = async (courseId, sectionId, values) => {
+  if (sectionId === "courseInfo") {
+    const currentCourse = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { prerequisites: true },
+    });
+    if (!currentCourse) throw new ReferenceError("Course not found");
+
+    const protectedWrite = protectCourseInfoWrite(
+      values,
+      currentCourse.prerequisites,
+    );
+    if (protectedWrite.attemptedPrerequisiteWrite) {
+      throw new ReferenceError(
+        "Course prerequisites are read-only in Course Specification",
+      );
+    }
+    values = protectedWrite.values;
+  }
+
   const result = await canonicalSaveSection(courseId, sectionId, values);
   // The first successful Course Spec save creates the academic version. Snapshot
   // the programme style immediately so later default changes cannot restyle it.

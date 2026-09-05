@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { getTelegramConfig } from "./config.ts";
+import { getPmsTelegramConfig } from "./config.ts";
 
 const DEEP_LINK_TTL_SECONDS = 60 * 60;
 
@@ -12,7 +12,7 @@ function secret(): string {
 export function createTelegramDeepLink(path: string): string {
   if (!path.startsWith("/telegram/")) throw new Error("Telegram deep links must target the Mini App");
   const token = jwt.sign({ path, aud: "telegram-deep-link" }, secret(), { expiresIn: DEEP_LINK_TTL_SECONDS });
-  const config = getTelegramConfig();
+  const config = getPmsTelegramConfig();
   if (!config.miniAppUrl) throw new Error("TELEGRAM_MINI_APP_URL is not configured");
   const url = new URL(config.miniAppUrl);
   url.searchParams.set("startapp", token);

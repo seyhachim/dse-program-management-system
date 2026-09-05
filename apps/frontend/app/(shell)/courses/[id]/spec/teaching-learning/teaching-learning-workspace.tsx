@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -19,8 +19,15 @@ import {
 import { Button } from "@dse-pms/ui";
 import { ChipMultiSelect } from "../clos/chip-multiselect";
 import { withCodes, type CloForm } from "../clo-model";
+import {
+  CourseSpecAuthoringHeader,
+  CourseSpecAuthoringStack,
+  CourseSpecEmptyState,
+  CourseSpecNotice,
+} from "../authoring-section-ui";
 import { methodsApi } from "@/lib/methods";
 import {
+  EMPTY_TEACHING_LEARNING_PROFILE,
   teachingLearningApi,
   type TeachingLearningProfile,
 } from "@/lib/teaching-learning";
@@ -64,75 +71,50 @@ export function TeachingLearningWorkspace({
   const params = useParams<{ id: string }>();
   const courseId = params.id;
   const clos = withCodes(value);
+  const cachedProfile = teachingLearningApi.getCached(courseId);
+  const initialProfile = cachedProfile ?? EMPTY_TEACHING_LEARNING_PROFILE;
+  const cachedVocabulary = methodsApi.getCached();
+  const activeLearningClusters =
+    cachedVocabulary?.activeLearningClusters.length
+      ? cachedVocabulary.activeLearningClusters
+      : FALLBACK_ACTIVE_LEARNING_CLUSTERS;
 
   const [savingCloId, setSavingCloId] = useState<string | null>(null);
   const [savedCloId, setSavedCloId] = useState<string | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(() =>
+    cachedProfile
+      ? null
+      : "Could not load all saved Teaching & Learning settings. The default profile is shown as a fallback.",
+  );
   const [expanded, setExpanded] = useState<Set<SectionKey>>(
     () => new Set<SectionKey>(),
   );
 
-  const [philosophyTags, setPhilosophyTags] = useState<string[]>([]);
-  const [philosophyStatement, setPhilosophyStatement] = useState("");
-  const [courseMethodIds, setCourseMethodIds] = useState<string[]>([]);
-  const [strategyIds, setStrategyIds] = useState<string[]>([]);
-  const [activeLearningClusters, setActiveLearningClusters] = useState<
-    ActiveLearningCluster[]
-  >(FALLBACK_ACTIVE_LEARNING_CLUSTERS);
-  const [independentLearning, setIndependentLearning] = useState<string[]>([]);
+  const [philosophyTags, setPhilosophyTags] = useState<string[]>(() =>
+    initialProfile.philosophyTags,
+  );
+  const [philosophyStatement, setPhilosophyStatement] = useState(
+    initialProfile.philosophyStatement,
+  );
+  const [courseMethodIds, setCourseMethodIds] = useState<string[]>(() =>
+    initialProfile.teachingMethodIds.length > 0
+      ? initialProfile.teachingMethodIds
+      : [...new Set(clos.flatMap((clo) => clo.teachingMethodIds))],
+  );
+  const [strategyIds, setStrategyIds] = useState<string[]>(() =>
+    initialProfile.activeLearningStrategyIds,
+  );
+  const [independentLearning, setIndependentLearning] = useState<string[]>(() =>
+    initialProfile.independentLearningTypes,
+  );
   const [teachingLearningMaterials, setTeachingLearningMaterials] = useState<
     string[]
-  >([]);
+  >(() => initialProfile.resourceTypes);
   const [requiredDeliveryResources, setRequiredDeliveryResources] = useState<
     string[]
-  >([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadProfile() {
-      setProfileLoading(true);
-      setProfileError(null);
-      try {
-        const [profile, vocabulary] = await Promise.all([
-          teachingLearningApi.get(courseId),
-          methodsApi.list(),
-        ]);
-        if (cancelled) return;
-
-        setPhilosophyTags(profile.philosophyTags);
-        setPhilosophyStatement(profile.philosophyStatement);
-        setCourseMethodIds(
-          profile.teachingMethodIds.length > 0
-            ? profile.teachingMethodIds
-            : [...new Set(clos.flatMap((clo) => clo.teachingMethodIds))],
-        );
-        setStrategyIds(profile.activeLearningStrategyIds);
-        setActiveLearningClusters(vocabulary.activeLearningClusters);
-        setIndependentLearning(profile.independentLearningTypes);
-        setTeachingLearningMaterials(profile.resourceTypes);
-        setRequiredDeliveryResources(profile.technologyTypes);
-      } catch {
-        if (!cancelled) {
-          setProfileError(
-            "Could not load all saved Teaching & Learning settings. The default active-learning catalogue is shown as a fallback.",
-          );
-        }
-      } finally {
-        if (!cancelled) setProfileLoading(false);
-      }
-    }
-
-    void loadProfile();
-    return () => {
-      cancelled = true;
-    };
-    // CLO changes should not re-fetch and overwrite unsaved profile edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId]);
+  >(() => initialProfile.technologyTypes);
 
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
@@ -279,50 +261,64 @@ export function TeachingLearningWorkspace({
     }
   };
 
+  const header = (
+    <CourseSpecAuthoringHeader
+      title="Teaching & Learning"
+      description="Set the course-level teaching approach, active-learning strategy, learning support, and CLO teaching coverage."
+      ready={ready}
+      feedback={
+        profileSaving
+          ? { state: "saving", label: "Saving…" }
+          : profileSaved
+            ? { state: "saved", label: "Saved" }
+            : profileError
+              ? { state: "error", label: "Save failed" }
+              : undefined
+      }
+      meta={
+        <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+          {coveredClos}/{activeClos.length} active CLOs covered
+        </span>
+      }
+      actions={
+        clos.length > 0 ? (
+          <Button
+            size="sm"
+            onClick={() => void saveProfile()}
+            disabled={profileSaving}
+          >
+            {profileSaving ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-1.5 h-4 w-4" />
+            )}
+            Save changes
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+
   if (clos.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-        <p className="font-semibold">Define CLOs first</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Teaching &amp; Learning builds on the course learning outcomes.
-        </p>
-      </div>
+      <CourseSpecAuthoringStack className="pb-6">
+        {header}
+        <CourseSpecEmptyState
+          title="Define CLOs first"
+          description="Teaching & Learning builds on the course learning outcomes. Add at least one CLO before configuring this authoring area."
+        />
+      </CourseSpecAuthoringStack>
     );
   }
 
   return (
-    <div className="space-y-4 pb-6">
-      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-bold">Teaching &amp; Learning</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Set the course-level teaching approach. Expand a section only when
-              you need to review or edit it.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <StatusPill good={ready}>
-              {ready ? "Ready" : "Needs attention"}
-            </StatusPill>
-            <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1 font-medium text-muted-foreground">
-              {coveredClos}/{activeClos.length} active CLOs covered
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {profileLoading ? (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading saved Teaching &amp; Learning settings…
-        </div>
-      ) : null}
+    <CourseSpecAuthoringStack className="pb-6">
+      {header}
 
       {profileError ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <CourseSpecNotice tone="error">
           {profileError}
-        </div>
+        </CourseSpecNotice>
       ) : null}
 
       <ExpandableSection
@@ -564,37 +560,7 @@ export function TeachingLearningWorkspace({
           ))}
         </div>
       </ExpandableSection>
-
-      <div className="sticky bottom-3 flex flex-col gap-3 rounded-xl border border-border bg-background/95 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-end">
-        {!ready ? (
-          <span className="mr-auto text-xs text-amber-600 dark:text-amber-400">
-            Complete the course approach, active learning, learning support, and
-            teaching support for every active CLO.
-          </span>
-        ) : (
-          <span className="mr-auto text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            Teaching &amp; Learning is ready.
-          </span>
-        )}
-        {profileSaved ? (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <CircleCheck className="h-4 w-4" /> Saved to database
-          </span>
-        ) : null}
-        <Button
-          className="w-full sm:w-auto"
-          onClick={() => void saveProfile()}
-          disabled={profileLoading || profileSaving}
-        >
-          {profileSaving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Save Teaching &amp; Learning
-        </Button>
-      </div>
-    </div>
+    </CourseSpecAuthoringStack>
   );
 }
 
@@ -616,13 +582,13 @@ function ExpandableSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls={`${id}-content`}
         onClick={onToggle}
-        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-muted/20 sm:p-5"
+        className="flex w-full items-center gap-3 p-5 text-left transition-colors hover:bg-muted/20"
       >
         <span
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
@@ -651,7 +617,7 @@ function ExpandableSection({
       </button>
 
       {expanded ? (
-        <div id={`${id}-content`} className="border-t border-border p-4 sm:p-5">
+        <div id={`${id}-content`} className="border-t border-border p-5">
           {children}
         </div>
       ) : null}
@@ -730,27 +696,6 @@ function Group({
         ))}
       </div>
     </div>
-  );
-}
-
-function StatusPill({
-  good,
-  children,
-}: {
-  good: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold ${
-        good
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300"
-          : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
-      }`}
-    >
-      {good ? <CircleCheck className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
-      {children}
-    </span>
   );
 }
 

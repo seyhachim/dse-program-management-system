@@ -75,14 +75,45 @@ export type CourseSectionPresence = {
   hasSections: boolean;
 };
 
-export const SetCourseSpecResponsibleLecturersInputSchema = z.object({
-  lecturerIds: z
-    .array(z.string().uuid())
-    .max(20, "A Course Specification can have at most 20 responsible lecturers")
-    .refine((ids) => new Set(ids).size === ids.length, {
-      message: "Responsible lecturers must be unique",
-    }),
-});
+export const COURSE_SPEC_RESPONSIBILITY_MODES = ["LEAD_AND_CO", "SHARED"] as const;
+export const CourseSpecResponsibilityModeSchema = z.enum(COURSE_SPEC_RESPONSIBILITY_MODES);
+export type CourseSpecResponsibilityMode = z.infer<typeof CourseSpecResponsibilityModeSchema>;
+
+export const COURSE_SPEC_TEAM_ROLES = ["RESPONSIBLE", "CO_LECTURER", "SHARED"] as const;
+export const CourseSpecTeamRoleSchema = z.enum(COURSE_SPEC_TEAM_ROLES);
+export type CourseSpecTeamRole = z.infer<typeof CourseSpecTeamRoleSchema>;
+
+export const SetCourseSpecResponsibleLecturersInputSchema = z
+  .object({
+    lecturerIds: z
+      .array(z.string().uuid())
+      .max(20, "A Course Specification can have at most 20 lecturers")
+      .refine((ids) => new Set(ids).size === ids.length, {
+        message: "Course team lecturers must be unique",
+      }),
+    responsibilityMode: CourseSpecResponsibilityModeSchema.default("SHARED"),
+    leadLecturerId: z.string().uuid().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.responsibilityMode !== "LEAD_AND_CO" || value.lecturerIds.length === 0) {
+      return;
+    }
+    if (!value.leadLecturerId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["leadLecturerId"],
+        message: "Choose one Responsible Lecturer",
+      });
+      return;
+    }
+    if (!value.lecturerIds.includes(value.leadLecturerId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["leadLecturerId"],
+        message: "The Responsible Lecturer must be a member of the Course Team",
+      });
+    }
+  });
 export type SetCourseSpecResponsibleLecturersInput = z.infer<
   typeof SetCourseSpecResponsibleLecturersInputSchema
 >;
@@ -93,10 +124,20 @@ export type CourseSpecResponsibleLecturerRef = {
   email: string;
 };
 
-export type CourseSpecResponsibleLecturersView = {
+export type CourseSpecTeamMemberRef = CourseSpecResponsibleLecturerRef & {
+  role: CourseSpecTeamRole;
+};
+
+export type CourseSpecTeamSummary = {
+  responsibilityMode: CourseSpecResponsibilityMode;
+  leadLecturerId: string | null;
+  lecturers: CourseSpecTeamMemberRef[];
+};
+
+export type CourseSpecResponsibleLecturersView = CourseSpecTeamSummary & {
   courseId: string;
+  courseCode: string;
   courseSpecId: string | null;
   academicVersion: string;
   reviewStatus: string;
-  lecturers: CourseSpecResponsibleLecturerRef[];
 };

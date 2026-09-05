@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "../../core/db/prisma.ts";
-import { getTelegramConfig } from "./config.ts";
+import { getPmsTelegramConfig } from "./config.ts";
 import { createTelegramDeepLink } from "./deep-link.ts";
 
 type RecipientRow = {
@@ -33,10 +33,15 @@ async function eligibleStudentRecipient(studentId: string): Promise<RecipientRow
   return rows[0] ?? null;
 }
 
-async function sendTelegramMessage(chatId: string, text: string, url: string) {
-  const config = getTelegramConfig();
+export async function sendTelegramPmsMessage(
+  chatId: string,
+  text: string,
+  url: string,
+  fetchImpl: typeof fetch = fetch,
+) {
+  const config = getPmsTelegramConfig();
   if (!config.enabled || !config.botToken) throw new Error("Telegram notification delivery is disabled");
-  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+  const response = await fetchImpl(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -102,7 +107,7 @@ export const telegramNotificationService = {
     await Promise.allSettled(recipients.map(async (recipient) => {
       const deliveryId = await claimDelivery(recipient.identityId, eventKey, "announcement", input.announcementId);
       if (!deliveryId) return;
-      await finishDelivery(deliveryId, () => sendTelegramMessage(
+      await finishDelivery(deliveryId, () => sendTelegramPmsMessage(
         recipient.telegramUserId,
         `${offering.course.code}: ${input.title}\n\n${input.body}`,
         deepLink,
@@ -128,7 +133,7 @@ export const telegramNotificationService = {
     const deliveryId = await claimDelivery(recipient.identityId, eventKey, "permission_pending", input.permissionPendingId);
     if (!deliveryId) return;
     const deepLink = createTelegramDeepLink(`/telegram/attendance?offeringId=${encodeURIComponent(input.offeringId)}`);
-    await finishDelivery(deliveryId, () => sendTelegramMessage(
+    await finishDelivery(deliveryId, () => sendTelegramPmsMessage(
       recipient.telegramUserId,
       `Permission letter reminder\n\n${offering.course.code} · ${input.date}\nYour permission is still pending. Please give the paper permission letter to your lecturer, preferably before your next class.`,
       deepLink,
@@ -160,7 +165,7 @@ export const telegramNotificationService = {
     const text = input.warningKind === "punctuality"
       ? `Punctuality reminder\n\n${offering.course.code} · ${offering.course.title}\nYou have been late to your last 3 finalized classes. Try to arrive 10–15 minutes early, set a reminder, and check the room and schedule in advance. If the issue continues, speak with your lecturer or adviser.`
       : `Attendance reminder\n\n${offering.course.code} · ${offering.course.title}\nYour finalized record now includes ${input.absentCount} absent and ${input.excusedCount} permission / excused (${input.absentCount + input.excusedCount} combined). Please review missed learning and contact your lecturer or programme team if you need support.`;
-    await finishDelivery(deliveryId, () => sendTelegramMessage(recipient.telegramUserId, text, deepLink));
+    await finishDelivery(deliveryId, () => sendTelegramPmsMessage(recipient.telegramUserId, text, deepLink));
   },
 
   async preferences(identityId: string) {

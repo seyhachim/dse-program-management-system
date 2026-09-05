@@ -18,6 +18,7 @@ import {
 import { useMe } from "@/lib/auth";
 import { clearProtectedQueryCache } from "@/lib/query-client";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
+import { MOBILE_SHELL_LAYOUT } from "./mobile-shell-layout";
 
 /** First letter of each of the first two words in `name` (e.g. "Grace Hopper" → "GH"). */
 function initialsOf(name: string): string {
@@ -33,7 +34,7 @@ function rolesOf(roles: string[]): string {
   return roles.join(", ");
 }
 
-/** Profile pic (initials avatar), name, role title(s), and a dropdown with account info, theme and sign out. */
+/** Profile pic, identity, role title(s), and account menu. Identity collapses to the avatar on phones. */
 export function TopbarUser() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -60,16 +61,19 @@ export function TopbarUser() {
         render={
           <button
             type="button"
-            className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-accent"
+            aria-label={`Open account menu for ${me.name}`}
+            className={MOBILE_SHELL_LAYOUT.userTrigger}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
               {initialsOf(me.name)}
             </div>
-            <div className="text-left leading-tight">
-              <p className="text-sm font-medium text-foreground">{me.name}</p>
-              <p className="text-xs capitalize text-muted-foreground">{rolesOf(me.roles)}</p>
+            <div className={MOBILE_SHELL_LAYOUT.userDetails}>
+              <p className="max-w-40 truncate text-sm font-medium text-foreground">{me.name}</p>
+              <p className="max-w-40 truncate text-xs capitalize text-muted-foreground">
+                {rolesOf(me.roles)}
+              </p>
             </div>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className={MOBILE_SHELL_LAYOUT.userChevron} />
           </button>
         }
       />

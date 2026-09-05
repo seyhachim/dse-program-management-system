@@ -73,9 +73,67 @@ Start the backend directly with Bun:
 bun run --cwd apps/backend start
 ```
 
-The server validates authentication configuration before it begins listening. An unsafe or incomplete production auth configuration must terminate startup rather than silently falling back to development authentication.
+The server validates authentication and Telegram configuration before it begins listening. Unsafe or incomplete enabled integrations must terminate startup rather than silently falling back to another credential boundary.
 
-## 5. Frontend production environment
+## 5. Telegram bots (optional)
+
+DSE-PMS uses two separate Telegram bot identities. Do not reuse one BotFather token for both surfaces.
+
+### Public DSE Information Bot
+
+This bot is for prospective students/public visitors and serves only published programme information through the existing public webhook.
+
+```env
+TELEGRAM_PUBLIC_ENABLED=true
+TELEGRAM_PUBLIC_BOT_TOKEN=<public-information-bot-token>
+TELEGRAM_PUBLIC_BOT_USERNAME=<public-information-bot-username-without-@>
+TELEGRAM_PUBLIC_WEBHOOK_SECRET=<strong-random-webhook-secret>
+TELEGRAM_PUBLIC_PROGRAMME_ID=dse
+```
+
+Register that bot's webhook to:
+
+```text
+https://<backend-domain>/api/telegram/public/webhook
+```
+
+Configure Telegram's `secret_token` for the webhook to exactly match `TELEGRAM_PUBLIC_WEBHOOK_SECRET`.
+
+The public bot token is used only for public replies. It must never be used to verify Mini App `initData` or send authenticated PMS notifications.
+
+### Authenticated DSE PMS Bot
+
+This bot owns the Mini App launch identity, Telegram↔PMS account linking/session verification, protected student/lecturer workflows, and private PMS notifications.
+
+```env
+TELEGRAM_PMS_ENABLED=true
+TELEGRAM_PMS_BOT_TOKEN=<pms-bot-token>
+TELEGRAM_PMS_BOT_USERNAME=<pms-bot-username-without-@>
+TELEGRAM_MINI_APP_URL=https://<frontend-domain>/telegram
+TELEGRAM_MINI_APP_SHORT_NAME=pms
+TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=300
+TELEGRAM_INIT_DATA_MAX_FUTURE_SKEW_SECONDS=30
+```
+
+Configure the BotFather Mini App/menu button for this PMS bot to open the production `TELEGRAM_MINI_APP_URL` / short name.
+
+Existing deployments may temporarily use `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_BOT_USERNAME` as aliases for the **PMS bot only**. New deployments should use `TELEGRAM_PMS_*`. The public bot has no legacy credential fallback.
+
+If both bots are enabled and resolve to the same bot token, backend startup fails closed. This is intentional.
+
+Before deploying the two-bot split:
+
+1. Create or identify two distinct BotFather bots.
+2. Configure all `TELEGRAM_PUBLIC_*` values on the backend host.
+3. Configure all `TELEGRAM_PMS_*` values and the PMS Mini App settings.
+4. Confirm the two bot tokens are different.
+5. Register the public webhook with its dedicated secret.
+6. Deploy/restart the backend.
+7. Smoke the public bot and PMS Mini App independently before closing #483 or #265.
+
+Never put either bot token or the webhook secret in `NEXT_PUBLIC_*`, screenshots, repository files, or client-visible logs.
+
+## 6. Frontend production environment
 
 Configure the Vercel production environment with:
 
@@ -94,7 +152,7 @@ NEXT_PUBLIC_DEV_TOKEN
 
 The production Next.js build deliberately fails if a development token is present or if the auth mode is missing/not `supabase`.
 
-## 6. Supabase redirect configuration
+## 7. Supabase redirect configuration
 
 In Supabase Authentication URL Configuration:
 
@@ -104,13 +162,13 @@ In Supabase Authentication URL Configuration:
 
 `SUPABASE_INVITE_REDIRECT_URL` on the backend should match the deployed callback route.
 
-## 7. First production account
+## 8. First production account
 
 Provision the first administrator through the controlled Supabase/admin setup process and make sure the matching DSE-PMS `User` row has the intended role assignment.
 
 A successful Supabase login alone does not grant application access. The backend resolves the authenticated identity to a provisioned DSE-PMS user and returns `403` for unprovisioned identities.
 
-## 8. Retiring legacy development credentials
+## 9. Retiring legacy development credentials
 
 If a deployed environment ever used `NEXT_PUBLIC_DEV_TOKEN` or production development JWTs, perform all of the following when moving to Supabase Auth:
 
@@ -124,7 +182,7 @@ If a deployed environment ever used `NEXT_PUBLIC_DEV_TOKEN` or production develo
 
 Because production no longer accepts development JWT authentication, previously copied development tokens must become unusable even if somebody retained one.
 
-## 9. Production verification
+## 10. Production verification
 
 Before considering a deployment complete, verify:
 
@@ -148,8 +206,12 @@ Then verify application behavior:
 - An unprovisioned Supabase identity is denied.
 - Account invitation links resolve to the production `/auth/callback` route.
 - CORS accepts only the intended frontend origin.
+- Public DSE Information Bot `/start` works through the dedicated public webhook/token.
+- PMS Bot Mini App launches and verifies `initData` through the dedicated PMS bot token.
+- A private PMS notification is delivered by the PMS bot, not the public bot.
+- Wrong public webhook secret returns `401` and does not invoke public content processing.
 
-## 10. Local development
+## 11. Local development
 
 Local development may explicitly use development JWT authentication:
 

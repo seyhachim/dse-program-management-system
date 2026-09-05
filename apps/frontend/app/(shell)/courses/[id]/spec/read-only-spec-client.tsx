@@ -48,6 +48,7 @@ import {
   type CloForm,
 } from "./clos-section";
 import {
+  CourseInfoSection,
   EMPTY_COURSE_INFO,
   toCourseInfoForm,
   type CourseInfoForm,
@@ -152,6 +153,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
     const requested = normalizePoliciesResponsibilitiesTab(
       searchParams.get("tab"),
     );
+    if (requested === "courseInfo") return "overview";
     return TABS.some((tab) => tab.id === requested)
       ? (requested as TabId)
       : "overview";
@@ -189,7 +191,9 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
 
   const setActiveTab = useCallback(
     (id: TabId) => {
-      const normalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      const policyNormalizedId = normalizePoliciesResponsibilitiesTab(id) as TabId;
+      const normalizedId: TabId =
+        policyNormalizedId === "courseInfo" ? "overview" : policyNormalizedId;
       setActiveTabState(normalizedId);
       if (typeof window !== "undefined") {
         const url = new URL(window.location.href);
@@ -385,7 +389,11 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
 
   const goToSection = useCallback(
     (sectionId: SpecSectionId) => {
-      setActiveTab(sectionId === "courseInfo" ? "overview" : sectionId);
+      if (sectionId === "courseInfo") {
+        setActiveTab("overview");
+      } else {
+        setActiveTab(sectionId);
+      }
     },
     [setActiveTab],
   );
@@ -478,9 +486,26 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   assessments={assessments}
                   status={status}
                   courseTotalSlt={courseTotalSlt}
-                  onEditCourseInfo={() => undefined}
-                  onGoToTab={(id) => setActiveTab(id)}
+                  onSaveCourseDescription={() => Promise.resolve(false)}
+                  onGoToTab={(id) =>
+                    setActiveTab(id === "courseInfo" ? "overview" : id)
+                  }
                   readOnly
+                />
+              </CourseSpecReadOnlyBoundary>
+            </TabsContent>
+
+            {/* Internal compatibility surface only; Course Information is no longer
+                exposed in read-only navigation. */}
+            <TabsContent value="courseInfo" className="mt-4">
+              <CourseSpecReadOnlyBoundary>
+                <CourseInfoSection
+                  value={courseInfo}
+                  onChange={() => undefined}
+                  ready={status.courseInfo === "complete"}
+                  saving={false}
+                  saved={false}
+                  onSave={rejectMutation}
                 />
               </CourseSpecReadOnlyBoundary>
             </TabsContent>
@@ -492,6 +517,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   courseId={courseId}
                   lastSavedAt={null}
                   programme={programme}
+                  ready={cloReady}
                   onPersist={rejectMutation}
                 />
               </CourseSpecReadOnlyBoundary>
@@ -514,6 +540,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   value={assessments}
                   clos={clos}
                   courseId={courseId}
+                  ready={status.assessmentPlan === "complete"}
                   onPersist={rejectMutation}
                 />
               </CourseSpecReadOnlyBoundary>
@@ -526,6 +553,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   onPersist={rejectMutation}
                   courseId={courseId}
                   courseName={`${course.code} - ${course.title}`}
+                  ready={status.slt === "complete"}
                   clos={clos}
                   teachingMethods={teachingMethods}
                   assessmentMethods={assessmentMethods}

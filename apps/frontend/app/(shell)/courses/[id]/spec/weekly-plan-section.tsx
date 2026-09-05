@@ -32,6 +32,12 @@ import {
 import { duplicateWeeklyPlanWeek } from "./weekly-plan-duplicate";
 import { teachingResourceLabel } from "./weekly-plan/week-form-fields";
 import { WeekFormModal } from "./weekly-plan/week-form-modal";
+import {
+  CourseSpecAuthoringHeader,
+  CourseSpecAuthoringStack,
+  CourseSpecEmptyState,
+  CourseSpecNotice,
+} from "./authoring-section-ui";
 
 export {
   EMPTY_WEEKLY_PLAN,
@@ -45,6 +51,7 @@ export function WeeklyPlanSectionForm({
   onPersist,
   courseId,
   courseName,
+  ready,
   clos = [],
   teachingMethods = [],
   assessmentMethods = [],
@@ -53,6 +60,7 @@ export function WeeklyPlanSectionForm({
   onPersist: (v: WeeklyPlanForm) => Promise<boolean>;
   courseId: string;
   courseName?: string;
+  ready: boolean;
   clos?: CloForm[];
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
@@ -145,37 +153,29 @@ export function WeeklyPlanSectionForm({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-foreground">Weekly Plan</h2>
-          <p className="text-sm text-muted-foreground">
-            Plan the {MAX_INSTRUCTIONAL_WEEKS} instructional weeks, learning activities, SLT and CLO links
-            {courseName ? ` for ${courseName}` : ""}. Midterm and Final assessments are managed in Assessment.
-          </p>
-        </div>
-        <Button size="sm" onClick={openAdd} disabled={atLimit}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Add Week
-        </Button>
-      </div>
+    <CourseSpecAuthoringStack>
+      <CourseSpecAuthoringHeader
+        title="Weekly Plan"
+        description={`Plan the ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks, learning activities, SLT, and CLO links${courseName ? ` for ${courseName}` : ""}. Midterm and Final assessments are managed in Assessment.`}
+        ready={ready}
+        actions={
+          <Button size="sm" onClick={openAdd} disabled={atLimit}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Week
+          </Button>
+        }
+      />
 
       {preservedCount > 0 ? (
-        <div className="flex items-start gap-2 rounded-lg border border-blue-200/70 bg-blue-50/50 px-3 py-2 text-xs text-muted-foreground dark:border-blue-900/40 dark:bg-blue-950/20">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600" />
-          <span>
-            {preservedCount} legacy assessment-only {preservedCount === 1 ? "row is" : "rows are"} preserved for audit history but excluded from the instructional Weekly Plan and official teaching-week SLT. Manage Midterm and Final assessments in the Assessment tab.
-          </span>
-        </div>
+        <CourseSpecNotice>
+          {preservedCount} legacy assessment-only {preservedCount === 1 ? "row is" : "rows are"} preserved for audit history but excluded from the instructional Weekly Plan and official teaching-week SLT. Manage Midterm and Final assessments in the Assessment tab.
+        </CourseSpecNotice>
       ) : null}
 
       {notice ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          <span className="min-w-0">{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="shrink-0 text-xs font-medium hover:text-foreground">
-            Dismiss
-          </button>
-        </div>
+        <CourseSpecNotice onDismiss={() => setNotice(null)}>
+          {notice}
+        </CourseSpecNotice>
       ) : null}
 
       <WeeklyPlanDashboard plan={plan} cloCodes={cloCodes} />
@@ -248,8 +248,8 @@ export function WeeklyPlanSectionForm({
 
                     <div className="flex shrink-0 flex-col justify-center gap-1 border-l border-border bg-muted/15 px-1.5 sm:flex-row sm:items-center sm:border-l-0 sm:bg-transparent sm:px-3">
                       <IconButton label={`Edit week ${displayWeek}`} onClick={() => openEdit(week.id)}><Pencil className="h-4 w-4" /></IconButton>
-                      <IconButton label={`Duplicate week ${displayWeek}`} onClick={() => duplicate(week.id)}><Copy className="h-4 w-4" /></IconButton>
-                      <IconButton label={`Delete week ${displayWeek}`} danger onClick={() => remove(week.id)}><Trash2 className="h-4 w-4" /></IconButton>
+                      <IconButton label={`Duplicate week ${displayWeek}`} onClick={() => void duplicate(week.id)}><Copy className="h-4 w-4" /></IconButton>
+                      <IconButton label={`Delete week ${displayWeek}`} danger onClick={() => void remove(week.id)}><Trash2 className="h-4 w-4" /></IconButton>
                     </div>
                   </div>
 
@@ -311,18 +311,22 @@ export function WeeklyPlanSectionForm({
         assessmentMethods={assessmentMethods}
         onSave={persistInstructional}
       />
-    </div>
+    </CourseSpecAuthoringStack>
   );
 }
 
 function EmptyWeeklyPlan({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
-      <CalendarDays className="mx-auto h-9 w-9 text-muted-foreground/50" />
-      <p className="mt-3 text-sm font-medium text-foreground">No weeks planned yet</p>
-      <p className="mt-1 text-xs text-muted-foreground">Add the first instructional week to start building the weekly learning plan.</p>
-      <Button size="sm" className="mt-4" onClick={onAdd}><Plus className="mr-1.5 h-4 w-4" />Add Week</Button>
-    </div>
+    <CourseSpecEmptyState
+      icon={<CalendarDays className="h-9 w-9" />}
+      title="No weeks planned yet"
+      description="Add the first instructional week to start building the weekly learning plan."
+      action={
+        <Button size="sm" onClick={onAdd}>
+          <Plus className="mr-1.5 h-4 w-4" /> Add Week
+        </Button>
+      }
+    />
   );
 }
 

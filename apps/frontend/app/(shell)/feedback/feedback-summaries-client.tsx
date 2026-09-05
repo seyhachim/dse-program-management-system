@@ -1,33 +1,41 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { LockKeyhole, MessageSquareText, Star } from "lucide-react";
 import type { CourseDeliveryOffering } from "@dse-pms/shared-types";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
+import { useMe } from "@/lib/auth";
 import { courseDeliveryApi } from "@/lib/course-delivery";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 
 export function FeedbackSummariesClient() {
-  const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
+  const { me, loading: meLoading } = useMe();
   const [selectedId, setSelectedId] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryScope = { userId: me?.id ?? "pending" };
+  const deliveryKey = protectedQueryKey(queryScope, "course-delivery", "offerings");
+  const deliveryQuery = useQuery({
+    queryKey: deliveryKey,
+    queryFn: () => courseDeliveryApi.offerings(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const offerings: CourseDeliveryOffering[] = deliveryQuery.data ?? [];
+  const hasData = deliveryQuery.data !== undefined;
+  const loading = meLoading || (!hasData && deliveryQuery.isPending);
+  const error = !hasData && deliveryQuery.isError
+    ? deliveryQuery.error instanceof ApiError
+      ? deliveryQuery.error.message
+      : "Could not load feedback summaries"
+    : null;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await courseDeliveryApi.offerings();
-      setOfferings(rows);
-      setSelectedId((current) => rows.some((row) => row.offeringId === current) ? current : (rows[0]?.offeringId ?? ""));
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Could not load feedback summaries");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    setSelectedId((current) =>
+      offerings.some((row) => row.offeringId === current) ? current : (offerings[0]?.offeringId ?? ""),
+    );
+  }, [offerings]);
   const selected = offerings.find((row) => row.offeringId === selectedId) ?? null;
 
   return (
@@ -35,6 +43,13 @@ export function FeedbackSummariesClient() {
       <Topbar title="Feedback" subtitle="Review anonymous course feedback without exposing student identity." />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-6xl space-y-5">
+          <QueryRefreshStatus
+            hasData={hasData}
+            isPending={deliveryQuery.isPending}
+            isFetching={deliveryQuery.isFetching}
+            isError={deliveryQuery.isError}
+            label="Feedback"
+          />
           {loading ? <StateCard>Loading your course sections…</StateCard> : error ? <StateCard>{error}</StateCard> : !offerings.length ? <StateCard>No assigned course sections.</StateCard> : selected ? (
             <>
               <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">

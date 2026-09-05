@@ -26,4 +26,13 @@ describe("Course Spec progress query scoping", () => {
       "const allProgress = await offeringScopedSpecProgress();",
     );
   });
+
+  test("readiness enrichment is applied only after Offering/Responsible scoping", async () => {
+    const source = await Bun.file(new URL("./index.ts", import.meta.url)).text();
+    const scopePosition = source.indexOf("missingResponsibleCourseIds");
+    const enrichPosition = source.indexOf("enrichCourseSpecProgress(scopedRows)");
+
+    expect(scopePosition).toBeGreaterThanOrEqual(0);
+    expect(enrichPosition).toBeGreaterThan(scopePosition);
+  });
 });

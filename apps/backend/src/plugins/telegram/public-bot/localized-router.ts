@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import { purposeHmac } from "../../../core/security/public-abuse-protection.ts";
-import { getTelegramConfig } from "../config.ts";
+import { getPublicTelegramConfig } from "../config.ts";
 import {
   LANGUAGE_BUTTONS,
   isLanguageSwitch,
@@ -179,7 +179,7 @@ function preprocessLanguageSelection(
 export function createLocalizedPublicTelegramRouter(
   deps: PublicTelegramRouterDependencies = {},
 ) {
-  const config = deps.config ?? getTelegramConfig();
+  const config = deps.config ?? getPublicTelegramConfig();
   if (!config.botToken || !config.webhookSecret) {
     return createPublicTelegramRouter({ ...deps, config });
   }
