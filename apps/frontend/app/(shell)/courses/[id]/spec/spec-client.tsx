@@ -61,6 +61,13 @@ import {
   type MappingForm,
 } from "./mapping-model";
 import { OverviewTab } from "./overview-tab";
+import { FinalProjectOverviewTab } from "./final-project-overview-tab";
+import { FinalProjectSupervisionSection } from "./final-project-supervision-section";
+import { FinalProjectMilestoneSection } from "./final-project-milestone-section";
+import {
+  courseSpecTerminologyForCode,
+  type CourseSpecTerminology,
+} from "./course-spec-terminology";
 import { DocumentPreview } from "./document-preview";
 import { buildCourseDocument } from "./course-document-model";
 import { ReviewSubmitSection } from "./review-submit-section";
@@ -90,19 +97,23 @@ type TabId =
   | "reviewSubmit"
   | SpecSectionId;
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "courseInfo", label: "Course Information" },
-  { id: "clos", label: "CLOs" },
-  { id: "teachingLearning", label: "Teaching & Learning" },
-  { id: "assessmentPlan", label: "Assessment" },
-  { id: "slt", label: "Weekly Plan" },
-  { id: "mapping", label: "Constructive Alignment" },
-  { id: "resources", label: "Resources" },
-  { id: "policy", label: "Policies & Responsibilities" },
-  { id: "documentPreview", label: "Document Preview" },
-  { id: "reviewSubmit", label: "Review & Submit" },
-];
+type SpecTab = { id: TabId; label: string };
+
+function tabsForTerminology(terminology: CourseSpecTerminology): SpecTab[] {
+  return [
+    { id: "overview", label: "Overview" },
+    { id: "courseInfo", label: terminology.courseInformation },
+    { id: "clos", label: "CLOs" },
+    { id: "teachingLearning", label: terminology.teachingLearning },
+    { id: "assessmentPlan", label: "Assessment" },
+    { id: "slt", label: terminology.weeklyPlan },
+    { id: "mapping", label: "Constructive Alignment" },
+    { id: "resources", label: "Resources" },
+    { id: "policy", label: terminology.policy },
+    { id: "documentPreview", label: "Document Preview" },
+    { id: "reviewSubmit", label: "Review & Submit" },
+  ];
+}
 
 const EDITABLE_SPEC_TABS = new Set<TabId>([
   "courseInfo",
@@ -130,6 +141,8 @@ export function SpecClient({
   const searchParams = useSearchParams();
   const initialSpec = initialData.spec;
   const course = initialData.course;
+  const terminology = courseSpecTerminologyForCode(course.code);
+  const tabs = tabsForTerminology(terminology);
   const teachingMethods = initialData.methods.teaching;
   const assessmentMethods = initialData.methods.assessment;
   const rubrics = initialData.rubrics;
@@ -141,7 +154,7 @@ export function SpecClient({
       searchParams.get("tab"),
     );
     if (requested === "references") return "resources";
-    return TABS.some((t) => t.id === requested)
+    return tabs.some((t) => t.id === requested)
       ? (requested as TabId)
       : "overview";
   });
@@ -312,13 +325,13 @@ export function SpecClient({
         setTimeout(() => setSavedFlash(false), 2000);
         return true;
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to save weekly plan");
+        setError(err instanceof ApiError ? err.message : `Failed to save ${terminology.weeklyPlan.toLowerCase()}`);
         return false;
       } finally {
         setSaving(false);
       }
     },
-    [courseId, editingLocked],
+    [courseId, editingLocked, terminology.weeklyPlan],
   );
 
   const persistPolicy = useCallback(
@@ -577,7 +590,7 @@ export function SpecClient({
   );
 
   const breadcrumbLabel = `${course.code} – ${course.title}`;
-  const activeTabLabel = TABS.find((t) => t.id === activeTab)?.label;
+  const activeTabLabel = tabs.find((t) => t.id === activeTab)?.label;
 
   const courseDocument = useMemo(
     () =>
@@ -621,6 +634,14 @@ export function SpecClient({
     ],
   );
 
+  const editCourseInfo = () => {
+    if (!editingLocked) {
+      setActiveTab("courseInfo");
+      return;
+    }
+    setError("This course specification is locked while it is in the review workflow.");
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-4">
       <Breadcrumb>
@@ -649,8 +670,18 @@ export function SpecClient({
 
       <header>
         <h1 className="text-2xl font-bold text-foreground">Course Specification</h1>
-        <p className="text-sm text-muted-foreground">Design and manage your course in OBE format.</p>
+        <p className="text-sm text-muted-foreground">
+          {terminology.pageDescription}
+        </p>
       </header>
+
+      {terminology.projectBased ? (
+        <CourseSpecNotice>
+          Final Project uses the same approved OBE Course Specification workflow,
+          but this version documents supervised independent project work rather
+          than a lecture syllabus.
+        </CourseSpecNotice>
+      ) : null}
 
       {error ? (
         <CourseSpecNotice tone="error">{error}</CourseSpecNotice>
@@ -674,7 +705,7 @@ export function SpecClient({
             variant="line"
             className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <TabsTrigger
                 key={t.id}
                 value={t.id}
@@ -687,20 +718,31 @@ export function SpecClient({
         </div>
 
         <TabsContent value="overview" className="mt-4">
-          <OverviewTab
-            courseInfo={courseInfo}
-            clos={clos}
-            weeklyPlan={weeklyPlan}
-            assessments={assessments}
-            status={status}
-            courseTotalSlt={courseTotalSlt}
-            onEditCourseInfo={() => {
-              if (!editingLocked) setActiveTab("courseInfo");
-              else setError("This course specification is locked while it is in the review workflow.");
-            }}
-            onGoToTab={(id) => setActiveTab(id)}
-            readOnly={editingLocked}
-          />
+          {terminology.projectBased ? (
+            <FinalProjectOverviewTab
+              courseInfo={courseInfo}
+              clos={clos}
+              weeklyPlan={weeklyPlan}
+              assessments={assessments}
+              status={status}
+              teachingLearningReady={teachingLearningReady}
+              onEditCourseInfo={editCourseInfo}
+              onGoToTab={(id) => setActiveTab(id as TabId)}
+              readOnly={editingLocked}
+            />
+          ) : (
+            <OverviewTab
+              courseInfo={courseInfo}
+              clos={clos}
+              weeklyPlan={weeklyPlan}
+              assessments={assessments}
+              status={status}
+              courseTotalSlt={courseTotalSlt}
+              onEditCourseInfo={editCourseInfo}
+              onGoToTab={(id) => setActiveTab(id)}
+              readOnly={editingLocked}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="courseInfo" className="mt-4">
@@ -726,25 +768,47 @@ export function SpecClient({
         </TabsContent>
 
         <TabsContent value="teachingLearning" className="mt-4">
-          <TeachingLearningSection
-            value={clos}
-            teachingMethods={teachingMethods}
-            onPersist={persistClos}
-            onProfileSaved={setTeachingLearningProfile}
-          />
+          {terminology.projectBased ? (
+            <FinalProjectSupervisionSection
+              courseId={courseId}
+              value={clos}
+              teachingMethods={teachingMethods}
+              profile={teachingLearningProfile}
+              onPersist={persistClos}
+              onProfileSaved={setTeachingLearningProfile}
+            />
+          ) : (
+            <TeachingLearningSection
+              value={clos}
+              teachingMethods={teachingMethods}
+              onPersist={persistClos}
+              onProfileSaved={setTeachingLearningProfile}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="slt" className="mt-4">
-          <WeeklyPlanSectionForm
-            value={weeklyPlan}
-            onPersist={persistWeeklyPlan}
-            courseId={courseId}
-            courseName={`${course.code} - ${course.title}`}
-            ready={status.slt === "complete"}
-            clos={clos}
-            teachingMethods={teachingMethods}
-            assessmentMethods={assessmentMethods}
-          />
+          {terminology.projectBased ? (
+            <FinalProjectMilestoneSection
+              value={weeklyPlan}
+              onPersist={persistWeeklyPlan}
+              courseId={courseId}
+              ready={status.slt === "complete"}
+              clos={clos}
+              teachingMethods={teachingMethods}
+            />
+          ) : (
+            <WeeklyPlanSectionForm
+              value={weeklyPlan}
+              onPersist={persistWeeklyPlan}
+              courseId={courseId}
+              courseName={`${course.code} - ${course.title}`}
+              ready={status.slt === "complete"}
+              clos={clos}
+              teachingMethods={teachingMethods}
+              assessmentMethods={assessmentMethods}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="assessmentPlan" className="mt-4">

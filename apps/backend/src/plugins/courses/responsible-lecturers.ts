@@ -1,9 +1,10 @@
-import type {
-  CourseSpecResponsibleLecturersView,
-  CourseSpecTeamSummary,
-  LecturersServiceContract,
-  ListCoursesQuery,
-  SetCourseSpecResponsibleLecturersInput,
+import {
+  isFinalProjectCourseCode,
+  type CourseSpecResponsibleLecturersView,
+  type CourseSpecTeamSummary,
+  type LecturersServiceContract,
+  type ListCoursesQuery,
+  type SetCourseSpecResponsibleLecturersInput,
 } from "@dse-pms/shared-types";
 import { Prisma, type CourseSpecReviewStatus } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
@@ -36,14 +37,8 @@ type ResponsibleCourseRow = {
   courseId: string;
 };
 
-const SHARED_RESPONSIBILITY_COURSE_CODES = new Set(["FPR401", "FPR402"]);
-
 function lecturers(): LecturersServiceContract {
   return registry.get<LecturersServiceContract>("lecturers").service;
-}
-
-function isSharedResponsibilityCourse(code: string): boolean {
-  return SHARED_RESPONSIBILITY_COURSE_CODES.has(code.toUpperCase());
 }
 
 function courseTeamSummary(
@@ -54,7 +49,7 @@ function courseTeamSummary(
     course.lecturerId && team.some((lecturer) => lecturer.id === course.lecturerId),
   );
   const responsibilityMode =
-    isSharedResponsibilityCourse(course.code) || (team.length > 0 && !leadIsOnTeam)
+    isFinalProjectCourseCode(course.code) || (team.length > 0 && !leadIsOnTeam)
       ? ("SHARED" as const)
       : ("LEAD_AND_CO" as const);
   const leadLecturerId =
@@ -114,8 +109,8 @@ export async function responsibleLecturerCanAccess(
 
 /**
  * Attach the current Course Specification team to a course list in one query.
- * `Course.lecturerId` is the lead for Lead + Co-Lecturer teams; FPR401/FPR402
- * deliberately ignore a lead and always render equal shared responsibility.
+ * `Course.lecturerId` is the lead for Lead + Co-Lecturer teams; Final Project
+ * courses deliberately ignore a lead and always render equal shared responsibility.
  */
 export async function attachCourseSpecTeams<
   T extends { id: string; code: string; lecturerId?: string | null },
@@ -190,7 +185,7 @@ export async function setCourseSpecResponsibleLecturers(
   if (!course) throw new Error("Course not found");
 
   if (
-    isSharedResponsibilityCourse(course.code) &&
+    isFinalProjectCourseCode(course.code) &&
     input.responsibilityMode !== "SHARED"
   ) {
     throw new Error(`${course.code} uses shared responsibility for all Course Team members`);

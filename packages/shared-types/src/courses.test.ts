@@ -1,5 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { SetCourseSpecResponsibleLecturersInputSchema } from "./courses.ts";
+import {
+  isFinalProjectCourseCode,
+  SetCourseSpecResponsibleLecturersInputSchema,
+} from "./courses.ts";
+
+describe("Final Project course classification", () => {
+  test("recognizes FPR401 and FPR402 without depending on title casing", () => {
+    expect(isFinalProjectCourseCode("FPR401")).toBe(true);
+    expect(isFinalProjectCourseCode(" fpr402 ")).toBe(true);
+  });
+
+  test("does not classify ordinary or unknown courses as Final Project", () => {
+    expect(isFinalProjectCourseCode("DSS302")).toBe(false);
+    expect(isFinalProjectCourseCode("FPR403")).toBe(false);
+  });
+});
 
 describe("Course Spec responsible lecturers contract", () => {
   test("accepts multiple unique responsible lecturers", () => {

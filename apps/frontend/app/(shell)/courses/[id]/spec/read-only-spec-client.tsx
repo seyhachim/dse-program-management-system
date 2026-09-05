@@ -55,8 +55,13 @@ import {
 } from "./course-info-section";
 import { buildCourseDocument } from "./course-document-model";
 import { CourseSpecReadOnlyBoundary } from "./course-spec-readonly-boundary";
+import {
+  courseSpecTerminologyForCode,
+  type CourseSpecTerminology,
+} from "./course-spec-terminology";
 import { EMPTY_DATE } from "./date-section";
 import { DocumentPreview } from "./document-preview";
+import { FinalProjectOverviewTab } from "./final-project-overview-tab";
 import {
   EMPTY_MAPPING,
   toMappingForm,
@@ -107,7 +112,9 @@ type ReviewState = NonNullable<
   Awaited<ReturnType<typeof courseSpecApi.get>>["review"]
 >;
 
-const TABS: { id: TabId; label: string }[] = [
+type SpecTab = { id: TabId; label: string };
+
+const BASE_TABS: SpecTab[] = [
   { id: "overview", label: "Overview" },
   { id: "courseInfo", label: "Course Information" },
   { id: "clos", label: "CLOs" },
@@ -121,6 +128,24 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
+
+function tabsForTerminology(terminology: CourseSpecTerminology): SpecTab[] {
+  return BASE_TABS.map((tab) => {
+    if (tab.id === "courseInfo") {
+      return { ...tab, label: terminology.courseInformation };
+    }
+    if (tab.id === "teachingLearning") {
+      return { ...tab, label: terminology.teachingLearning };
+    }
+    if (tab.id === "slt") {
+      return { ...tab, label: terminology.weeklyPlan };
+    }
+    if (tab.id === "policy") {
+      return { ...tab, label: terminology.policy };
+    }
+    return tab;
+  });
+}
 
 const BANNER_COPY: Partial<
   Record<CourseSpecReviewStatus, { title: string; body: string }>
@@ -154,7 +179,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
     const requested = normalizePoliciesResponsibilitiesTab(
       searchParams.get("tab"),
     );
-    return TABS.some((tab) => tab.id === requested)
+    return BASE_TABS.some((tab) => tab.id === requested)
       ? (requested as TabId)
       : "overview";
   });
@@ -188,6 +213,12 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const terminology = useMemo(
+    () => courseSpecTerminologyForCode(course?.code ?? ""),
+    [course?.code],
+  );
+  const tabs = useMemo(() => tabsForTerminology(terminology), [terminology]);
 
   const setActiveTab = useCallback(
     (id: TabId) => {
@@ -395,7 +426,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
   const breadcrumbLabel = course
     ? `${course.code} – ${course.title}`
     : "Course Specification";
-  const activeTabLabel = TABS.find((tab) => tab.id === activeTab)?.label;
+  const activeTabLabel = tabs.find((tab) => tab.id === activeTab)?.label;
   const banner = review ? BANNER_COPY[review.status] : null;
 
   return (
@@ -429,7 +460,9 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
           Course Specification
         </h1>
         <p className="text-sm text-muted-foreground">
-          Review the complete course specification in OBE format.
+          {terminology.projectBased
+            ? "Review the approved supervised Final Project framework, milestones, assessment, and OBE alignment."
+            : "Review the complete course specification in OBE format."}
         </p>
       </header>
 
@@ -459,7 +492,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                 variant="line"
                 className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
-                {TABS.map((tab) => (
+                {tabs.map((tab) => (
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
@@ -473,17 +506,31 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
 
             <TabsContent value="overview" className="mt-4">
               <CourseSpecReadOnlyBoundary>
-                <OverviewTab
-                  courseInfo={courseInfo}
-                  clos={clos}
-                  weeklyPlan={weeklyPlan}
-                  assessments={assessments}
-                  status={status}
-                  courseTotalSlt={courseTotalSlt}
-                  onEditCourseInfo={() => undefined}
-                  onGoToTab={(id) => setActiveTab(id)}
-                  readOnly
-                />
+                {terminology.projectBased ? (
+                  <FinalProjectOverviewTab
+                    courseInfo={courseInfo}
+                    clos={clos}
+                    weeklyPlan={weeklyPlan}
+                    assessments={assessments}
+                    status={status}
+                    teachingLearningReady={teachingLearningReady}
+                    onEditCourseInfo={() => undefined}
+                    onGoToTab={(id) => setActiveTab(id as TabId)}
+                    readOnly
+                  />
+                ) : (
+                  <OverviewTab
+                    courseInfo={courseInfo}
+                    clos={clos}
+                    weeklyPlan={weeklyPlan}
+                    assessments={assessments}
+                    status={status}
+                    courseTotalSlt={courseTotalSlt}
+                    onEditCourseInfo={() => undefined}
+                    onGoToTab={(id) => setActiveTab(id)}
+                    readOnly
+                  />
+                )}
               </CourseSpecReadOnlyBoundary>
             </TabsContent>
 

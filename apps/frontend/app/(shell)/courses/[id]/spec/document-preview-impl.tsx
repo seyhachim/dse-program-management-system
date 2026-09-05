@@ -33,6 +33,7 @@ import { useMe } from "@/lib/auth";
 import { courseSpecDocumentThemeApi } from "@/lib/course-spec-document-theme";
 import type { CourseDocumentModel } from "./course-document-model";
 import { CourseSpecDocumentThemePanel } from "./course-spec-document-theme-panel";
+import { courseSpecTerminologyForCode } from "./course-spec-terminology";
 import { exportCourseSpecWord } from "./document-export";
 import { getCourseSpecPreviewLayout } from "./document-preview-layout";
 import { exportCourseSpecPdf } from "./document-pdf-export";
@@ -65,6 +66,27 @@ const DOCUMENT_CONTENTS = [
   ["rating-scale", "24. Rating Scale"],
   ["spec-date", "25. Date"],
 ] as const;
+
+function documentContentsForCourse(code: string): Array<readonly [string, string]> {
+  const terminology = courseSpecTerminologyForCode(code);
+  if (!terminology.projectBased) return [...DOCUMENT_CONTENTS];
+
+  return DOCUMENT_CONTENTS.map(([id, label]) => {
+    if (id === "course-information") {
+      return [id, `1–13. ${terminology.courseInformation}`] as const;
+    }
+    if (id === "lesson-plan") {
+      return [id, `18. ${terminology.detailedPlan}`] as const;
+    }
+    if (id === "resources") {
+      return [id, "19. Project Resources"] as const;
+    }
+    if (id === "policy") {
+      return [id, "23. Project Policy"] as const;
+    }
+    return [id, label] as const;
+  });
+}
 
 type DocumentPreviewProps = {
   document: CourseDocumentModel;
@@ -203,6 +225,11 @@ export function DocumentPreview({
   );
 
   const info = resolvedDocument.courseInformation;
+  const terminology = courseSpecTerminologyForCode(info.courseCode);
+  const documentContents = useMemo(
+    () => documentContentsForCourse(info.courseCode),
+    [info.courseCode],
+  );
   const gradingScaleReady = resolvedDocument.gradingScale !== null;
   const officialThemeReady = !themeLoading && !themeError;
   const exportDisabled =
@@ -223,9 +250,6 @@ export function DocumentPreview({
   }, []);
 
   useEffect(() => {
-    // The viewer mounts only after the async version theme is ready. Re-run this
-    // effect at that transition so the default is truly Fit Width instead of the
-    // initial 100% fallback used while no viewer element exists yet.
     if (!officialThemeReady) return;
 
     fitWidth();
@@ -322,7 +346,9 @@ export function DocumentPreview({
               AUN Course Specification Preview
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Official saved preview for the selected Course Specification version.
+              {terminology.projectBased
+                ? "Official saved Final Project specification for the selected academic version."
+                : "Official saved preview for the selected Course Specification version."}
             </p>
             {gradingScaleError ? (
               <p className="mt-2 max-w-2xl text-xs text-destructive">
@@ -466,7 +492,7 @@ export function DocumentPreview({
             <div className="rounded-lg border bg-card p-4">
               <h3 className="text-sm font-semibold">Contents</h3>
               <nav className="mt-3 space-y-1 text-sm">
-                {DOCUMENT_CONTENTS.map(([id, label]) => (
+                {documentContents.map(([id, label]) => (
                   <a
                     key={id}
                     href={`#${id}`}
