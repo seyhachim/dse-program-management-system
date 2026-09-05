@@ -5,6 +5,22 @@ import { z } from "zod";
  * registry.get('lecturers') — never by importing the lecturers plugin directly.
  */
 
+/**
+ * Final Project courses use the same auditable Course Specification workflow as
+ * taught courses, but their authoring vocabulary describes supervised project
+ * work, milestones, and deliverables instead of a lecture syllabus.
+ *
+ * Keep this list as the single source of truth until delivery mode becomes an
+ * explicit curriculum/course setting. Do not infer project mode from titles.
+ */
+export const FINAL_PROJECT_COURSE_CODES = ["FPR401", "FPR402"] as const;
+export type FinalProjectCourseCode = (typeof FINAL_PROJECT_COURSE_CODES)[number];
+
+export function isFinalProjectCourseCode(code: string): boolean {
+  const normalized = code.trim().toUpperCase();
+  return FINAL_PROJECT_COURSE_CODES.some((courseCode) => courseCode === normalized);
+}
+
 /** Syllabus §11 Course Type. */
 export const COURSE_TYPES = ["Basic", "Core", "Elective", "Specialization", "MoeysHeip"] as const;
 export const CourseTypeSchema = z.enum(COURSE_TYPES);
