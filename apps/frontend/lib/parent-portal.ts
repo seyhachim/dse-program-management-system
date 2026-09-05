@@ -43,6 +43,13 @@ export function relationshipLabel(type: GuardianLinkedStudentView["relationshipT
   }
 }
 
+export function projectionForRelationship<T extends { relationshipId: string }>(
+  projection: T | null,
+  relationshipId: string,
+): T | null {
+  return projection?.relationshipId === relationshipId ? projection : null;
+}
+
 export function academicStatusLabel(
   status: ParentAcademicProgressSummary["academicStatus"],
 ): string {
