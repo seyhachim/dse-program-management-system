@@ -34,7 +34,7 @@ export function CoursesPageClient() {
           title="Course Specifications"
           subtitle="Specification status, completeness, and follow-up for the courses you teach or are responsible for."
         />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm">
             <span className="font-medium text-foreground">
               Your Course Specifications
