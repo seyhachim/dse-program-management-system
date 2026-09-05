@@ -6,6 +6,7 @@ const PRECACHE_URLS = [
   "/dse-logo.svg",
   "/rupp-logo.png",
   "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
   "/pwa-icon.svg",
   "/pwa-maskable-icon.svg",
 ];
