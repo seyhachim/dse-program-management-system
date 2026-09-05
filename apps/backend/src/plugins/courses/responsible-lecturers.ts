@@ -47,7 +47,7 @@ function isSharedResponsibilityCourse(code: string): boolean {
 }
 
 function courseTeamSummary(
-  course: { code: string; lecturerId: string | null | undefined },
+  course: { code: string; lecturerId?: string | null },
   team: ResponsibleLecturerRow[],
 ): CourseSpecTeamSummary {
   const leadIsOnTeam = Boolean(
