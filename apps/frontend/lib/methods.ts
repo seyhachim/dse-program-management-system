@@ -9,19 +9,31 @@ import type {
 import { api } from "./api";
 
 let methodsListCache: Promise<MethodsResponse> | null = null;
+let methodsListValueCache: MethodsResponse | null = null;
 
 function invalidateMethodsList() {
   methodsListCache = null;
+  methodsListValueCache = null;
 }
 
 export const methodsApi = {
   list(): Promise<MethodsResponse> {
     if (methodsListCache) return methodsListCache;
-    methodsListCache = api.get<MethodsResponse>("/api/methods").catch((error) => {
-      methodsListCache = null;
-      throw error;
-    });
+    methodsListCache = api
+      .get<MethodsResponse>("/api/methods")
+      .then((value) => {
+        methodsListValueCache = value;
+        return value;
+      })
+      .catch((error) => {
+        methodsListCache = null;
+        methodsListValueCache = null;
+        throw error;
+      });
     return methodsListCache;
+  },
+  getCached(): MethodsResponse | undefined {
+    return methodsListValueCache ?? undefined;
   },
   catalog(): Promise<ManagedMethodsResponse> {
     return api.get<ManagedMethodsResponse>("/api/methods/catalog");
