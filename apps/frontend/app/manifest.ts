@@ -15,6 +15,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
+    orientation: "any",
     background_color: "#f8fafc",
     theme_color: "#0f1e3a",
     lang: "en",
@@ -28,7 +29,7 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
       {
-        src: "/rupp-logo.png",
+        src: "/pwa-icon-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
