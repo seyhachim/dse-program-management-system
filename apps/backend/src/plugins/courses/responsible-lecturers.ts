@@ -78,22 +78,37 @@ function courseTeamSummary(
   };
 }
 
-function courseInfoLeadProfileData(leadLecturer: LecturerRef | null) {
-  return leadLecturer
-    ? {
-        instructorName: leadLecturer.name,
-        instructorTitle: leadLecturer.title ?? "",
-        qualification: leadLecturer.qualification ?? "",
-        email: leadLecturer.email,
-        telephone: leadLecturer.phone ?? "",
-      }
-    : {
-        instructorName: "",
-        instructorTitle: "",
-        qualification: "",
-        email: "",
-        telephone: "",
-      };
+function courseInfoTeamData(
+  responsibilityMode: "LEAD_AND_CO" | "SHARED",
+  leadLecturer: LecturerRef | null,
+  teamLecturers: LecturerRef[],
+) {
+  const listedLecturers = (
+    responsibilityMode === "SHARED"
+      ? teamLecturers
+      : teamLecturers.filter((lecturer) => lecturer.id !== leadLecturer?.id)
+  )
+    .map((lecturer) => lecturer.name)
+    .sort((a, b) => a.localeCompare(b));
+
+  return {
+    ...(leadLecturer
+      ? {
+          instructorName: leadLecturer.name,
+          instructorTitle: leadLecturer.title ?? "",
+          qualification: leadLecturer.qualification ?? "",
+          email: leadLecturer.email,
+          telephone: leadLecturer.phone ?? "",
+        }
+      : {
+          instructorName: "",
+          instructorTitle: "",
+          qualification: "",
+          email: "",
+          telephone: "",
+        }),
+    otherLecturers: listedLecturers.join(", "),
+  };
 }
 
 async function currentSpec(courseId: string): Promise<CurrentSpecRow | null> {
@@ -236,6 +251,7 @@ export async function setCourseSpecResponsibleLecturers(
   const leadLecturer = leadLecturerId
     ? (lecturerById.get(leadLecturerId) ?? null)
     : null;
+  const teamLecturers = [...lecturerById.values()];
 
   let spec = await currentSpec(courseId);
   if (!spec) {
@@ -275,7 +291,11 @@ export async function setCourseSpecResponsibleLecturers(
     });
     await tx.courseSpecCourseInfo.update({
       where: { courseSpecId: spec!.id },
-      data: courseInfoLeadProfileData(leadLecturer),
+      data: courseInfoTeamData(
+        input.responsibilityMode,
+        leadLecturer,
+        teamLecturers,
+      ),
     });
   });
 
