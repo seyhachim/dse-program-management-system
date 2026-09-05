@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { useMe } from "@/lib/auth";
@@ -16,6 +16,11 @@ import {
   courseSpecCoreQueryKey,
 } from "@/lib/course-spec-query";
 import { SpecClient } from "./spec-client";
+
+type PinnedEditor = {
+  data: CourseSpecAuthoringData;
+  updatedAt: number;
+};
 
 export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
   const { me, loading: meLoading } = useMe();
@@ -43,18 +48,15 @@ export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
   // server data can continue updating the cache, but it cannot remount the form
   // and replace local input. The refreshed cache becomes visible on the next
   // route mount, while all writes remain server-authoritative in this session.
-  const [dirty, setDirty] = useState(false);
-  const pinnedDataRef = useRef<CourseSpecAuthoringData | null>(null);
-  const pinnedUpdatedAtRef = useRef(0);
+  const [pinnedEditor, setPinnedEditor] = useState<PinnedEditor | null>(null);
 
   const markDirty = useCallback(() => {
-    if (dirty) return;
-    if (authoringQuery.data) {
-      pinnedDataRef.current = authoringQuery.data;
-      pinnedUpdatedAtRef.current = authoringQuery.dataUpdatedAt;
-    }
-    setDirty(true);
-  }, [authoringQuery.data, authoringQuery.dataUpdatedAt, dirty]);
+    if (pinnedEditor || !authoringQuery.data) return;
+    setPinnedEditor({
+      data: authoringQuery.data,
+      updatedAt: authoringQuery.dataUpdatedAt,
+    });
+  }, [authoringQuery.data, authoringQuery.dataUpdatedAt, pinnedEditor]);
 
   const handleButtonInteraction = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
@@ -81,12 +83,8 @@ export function CourseSpecCachedEditor({ courseId }: { courseId: string }) {
     );
   }
 
-  const data = dirty
-    ? pinnedDataRef.current ?? authoringQuery.data
-    : authoringQuery.data;
-  const editorVersion = dirty
-    ? pinnedUpdatedAtRef.current || authoringQuery.dataUpdatedAt
-    : authoringQuery.dataUpdatedAt;
+  const data = pinnedEditor?.data ?? authoringQuery.data;
+  const editorVersion = pinnedEditor?.updatedAt ?? authoringQuery.dataUpdatedAt;
 
   return (
     <div
