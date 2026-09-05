@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   COURSE_SPEC_AUTHORING_SECTIONS,
   type SpecSectionStatus,
@@ -30,7 +31,11 @@ function display(value: string | number | null | undefined): string {
 }
 
 function statusLabel(status: SpecSectionStatus | undefined): string {
-  return status === "complete" ? "Ready" : status === "draft" ? "In progress" : "Not started";
+  return status === "complete"
+    ? "Ready"
+    : status === "draft"
+      ? "In progress"
+      : "Not started";
 }
 
 function SummaryCard({
@@ -39,8 +44,8 @@ function SummaryCard({
   children,
 }: {
   title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -57,7 +62,9 @@ function Field({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm text-foreground">{display(value as string | number | null | undefined)}</p>
+      <p className="mt-1 text-sm text-foreground">
+        {display(value as string | number | null | undefined)}
+      </p>
     </div>
   );
 }
@@ -95,12 +102,20 @@ export function FinalProjectOverviewTab({
     title: PROJECT_SECTION_LABELS[section.id] ?? section.title,
     status: effective[section.id],
   }));
-  const completed = sections.filter((section) => section.status === "complete").length;
-  const percentage = sections.length > 0 ? Math.round((completed / sections.length) * 100) : 0;
+  const completed = sections.filter(
+    (section) => section.status === "complete",
+  ).length;
+  const percentage =
+    sections.length > 0 ? Math.round((completed / sections.length) * 100) : 0;
   const next = sections.find((section) => section.status !== "complete");
   const activeClos = clos.filter((clo) => clo.status === "active");
-  const activeAssessments = assessments.filter((item) => item.status === "active");
-  const totalWeight = activeAssessments.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
+  const activeAssessments = assessments.filter(
+    (item) => item.status === "active",
+  );
+  const totalWeight = activeAssessments.reduce(
+    (sum, item) => sum + (Number(item.weight) || 0),
+    0,
+  );
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -131,7 +146,9 @@ export function FinalProjectOverviewTab({
               Supervised independent Final Project — no normal lecture syllabus
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              The Course Specification defines the shared academic framework. Individual project supervisor assignments remain separate project records.
+              The Course Specification defines the shared academic framework.
+              Individual project supervisor assignments remain separate project
+              records.
             </p>
           </div>
         </SummaryCard>
@@ -140,18 +157,26 @@ export function FinalProjectOverviewTab({
           <SummaryCard
             title="Course Learning Outcomes"
             action={
-              <Button size="sm" variant="ghost" onClick={() => onGoToTab("clos")}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onGoToTab("clos")}
+              >
                 Open
               </Button>
             }
           >
-            <p className="text-2xl font-bold text-foreground">{activeClos.length}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {activeClos.length}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">active CLOs</p>
             {activeClos.length > 0 ? (
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                 {activeClos.slice(0, 3).map((clo) => (
                   <li key={clo.id} className="line-clamp-2">
-                    <span className="font-semibold text-foreground">{clo.code}:</span>{" "}
+                    <span className="font-semibold text-foreground">
+                      {clo.code}:
+                    </span>{" "}
                     {clo.description || "No description yet"}
                   </li>
                 ))}
@@ -162,18 +187,30 @@ export function FinalProjectOverviewTab({
           <SummaryCard
             title="Milestone Plan"
             action={
-              <Button size="sm" variant="ghost" onClick={() => onGoToTab("slt")}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onGoToTab("slt")}
+              >
                 Open
               </Button>
             }
           >
-            <p className="text-2xl font-bold text-foreground">{weeklyPlan.length}</p>
-            <p className="mt-1 text-xs text-muted-foreground">planned project weeks / checkpoints</p>
+            <p className="text-2xl font-bold text-foreground">
+              {weeklyPlan.length}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              planned project weeks / checkpoints
+            </p>
             <div className="mt-3 space-y-1.5">
               {weeklyPlan.slice(0, 4).map((week) => (
                 <div key={week.id} className="flex gap-2 text-sm">
-                  <span className="w-8 shrink-0 font-medium text-foreground">W{week.week}</span>
-                  <span className="truncate text-muted-foreground">{week.topic || "Milestone not named"}</span>
+                  <span className="w-8 shrink-0 font-medium text-foreground">
+                    W{week.week}
+                  </span>
+                  <span className="truncate text-muted-foreground">
+                    {week.topic || "Milestone not named"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -182,28 +219,41 @@ export function FinalProjectOverviewTab({
           <SummaryCard
             title="Supervision & Learning"
             action={
-              <Button size="sm" variant="ghost" onClick={() => onGoToTab("teachingLearning")}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onGoToTab("teachingLearning")}
+              >
                 Open
               </Button>
             }
           >
             <p className="text-sm font-semibold text-foreground">
-              {teachingLearningReady ? "Supervision framework ready" : "Needs attention"}
+              {teachingLearningReady
+                ? "Supervision framework ready"
+                : "Needs attention"}
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Covers supervision approach, independent project work, support resources, and CLO learning-method coverage.
+              Covers supervision approach, independent project work, support
+              resources, and CLO learning-method coverage.
             </p>
           </SummaryCard>
 
           <SummaryCard
             title="Assessment"
             action={
-              <Button size="sm" variant="ghost" onClick={() => onGoToTab("assessmentPlan")}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onGoToTab("assessmentPlan")}
+              >
                 Open
               </Button>
             }
           >
-            <p className="text-2xl font-bold text-foreground">{activeAssessments.length}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {activeAssessments.length}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">
               active assessment components · {totalWeight}% total weight
             </p>
@@ -213,7 +263,9 @@ export function FinalProjectOverviewTab({
 
       <aside className="space-y-4">
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">Specification Readiness</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            Specification Readiness
+          </h2>
           <div className="mt-4 flex items-center gap-4">
             <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-[10px] border-muted text-2xl font-bold text-foreground">
               {percentage}%
@@ -223,7 +275,8 @@ export function FinalProjectOverviewTab({
                 {completed} of {sections.length} required sections ready
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Readiness rules are unchanged; only Final Project vocabulary is adapted.
+                Readiness rules are unchanged; only Final Project vocabulary is
+                adapted.
               </p>
             </div>
           </div>
@@ -233,7 +286,9 @@ export function FinalProjectOverviewTab({
               <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                 Recommended next step
               </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{next.title}</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {next.title}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Complete the academic requirements for this project-based section.
               </p>
