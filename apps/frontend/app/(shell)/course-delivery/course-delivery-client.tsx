@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   CalendarClock,
@@ -18,40 +19,49 @@ import type {
   CourseDeliveryResultRow,
 } from "@dse-pms/shared-types";
 import { Button, Input, StatusBadge, Tabs, TabsContent, TabsList, TabsTrigger } from "@dse-pms/ui";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
+import { useMe } from "@/lib/auth";
 import { courseDeliveryApi, toDateTimeLocal } from "@/lib/course-delivery";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 import { GroupAssessmentPanel } from "./group-assessment-panel";
 
 export function CourseDeliveryClient() {
-  const [offerings, setOfferings] = useState<CourseDeliveryOffering[]>([]);
+  const { me, loading: meLoading } = useMe();
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const queryScope = { userId: me?.id ?? "pending" };
+  const deliveryKey = protectedQueryKey(queryScope, "course-delivery", "offerings");
+  const deliveryQuery = useQuery({
+    queryKey: deliveryKey,
+    queryFn: () => courseDeliveryApi.offerings(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.review,
+  });
+  const offerings = deliveryQuery.data ?? [];
+  const hasData = deliveryQuery.data !== undefined;
+  const loading = meLoading || (!hasData && deliveryQuery.isPending);
+  const error = !hasData && deliveryQuery.isError
+    ? deliveryQuery.error instanceof ApiError
+      ? deliveryQuery.error.message
+      : "Could not load course delivery"
+    : null;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await courseDeliveryApi.offerings();
-      setOfferings(rows);
-      setSelectedId((current) =>
-        rows.some((row) => row.offeringId === current) ? current : (rows[0]?.offeringId ?? ""),
-      );
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Could not load course delivery");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    setSelectedId((current) =>
+      offerings.some((row) => row.offeringId === current) ? current : (offerings[0]?.offeringId ?? ""),
+    );
+  }, [offerings]);
 
   const selected = offerings.find((row) => row.offeringId === selectedId) ?? null;
   const changed = async (message: string) => {
     setNotice(message);
-    await load();
+    await queryClient.invalidateQueries({ queryKey: deliveryKey, exact: true });
+  };
+  const retry = async () => {
+    await deliveryQuery.refetch();
   };
 
   return (
@@ -62,7 +72,14 @@ export function CourseDeliveryClient() {
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-7xl space-y-5">
-          {loading ? <LoadingState /> : error ? <ErrorState message={error} retry={load} /> : !offerings.length ? (
+          <QueryRefreshStatus
+            hasData={hasData}
+            isPending={deliveryQuery.isPending}
+            isFetching={deliveryQuery.isFetching}
+            isError={deliveryQuery.isError}
+            label="Course delivery"
+          />
+          {loading ? <LoadingState /> : error ? <ErrorState message={error} retry={retry} /> : !offerings.length ? (
             <EmptyState />
           ) : selected ? (
             <>
@@ -239,7 +256,7 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
   const [assessmentId, setAssessmentId] = useState(offering.assessments[0]?.id ?? "");
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { setAssessmentId(offering.assessments[0]?.id ?? ""); }, [offering.offeringId, offering.assessments]);
+  useEffect(() => { setAssessmentId(offering.assessments[0]?.id ?? ""); }, [offering.offeringId]);
   const assessment = offering.assessments.find((item) => item.id === assessmentId) ?? offering.assessments[0];
   const publishedCount = assessment?.results.filter((row) => row.publishedAt).length ?? 0;
   const draftCount = assessment?.results.filter((row) => row.score !== null && !row.publishedAt).length ?? 0;
@@ -283,18 +300,18 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
           </div>
         ) : <Muted>Add active assessments to the course specification first.</Muted>}
         {assessment?.mode === "individual" ? (
-  <>
-    <div className="mt-4 flex flex-wrap gap-2">
-      <StatusBadge tone="neutral" label={`${draftCount} draft`} icon={false} />
-      <StatusBadge tone="success" label={`${publishedCount} published`} icon={false} />
-      <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
-    </div>
-    {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
-    {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-warning">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
-  </>
-) : assessment ? (
-  <p className="mt-3 text-sm text-muted-foreground">This assessment uses {assessment.mode === "group" ? "Group" : "Group + Individual"} scoring. Configure membership and source evidence in the group workspace below.</p>
-) : null}
+          <>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <StatusBadge tone="neutral" label={`${draftCount} draft`} icon={false} />
+              <StatusBadge tone="success" label={`${publishedCount} published`} icon={false} />
+              <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
+            </div>
+            {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
+            {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-warning">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
+          </>
+        ) : assessment ? (
+          <p className="mt-3 text-sm text-muted-foreground">This assessment uses {assessment.mode === "group" ? "Group" : "Group + Individual"} scoring. Configure membership and source evidence in the group workspace below.</p>
+        ) : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
       {assessment && assessment.mode !== "individual" ? (

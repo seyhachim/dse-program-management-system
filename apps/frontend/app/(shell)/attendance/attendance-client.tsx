@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, Play, Save, Search, UserCheck, UserMinus, UsersRound } from "lucide-react";
 import type {
   AttendanceRecordView,
@@ -10,8 +11,11 @@ import type {
   OfferingView,
 } from "@dse-pms/shared-types";
 import { ATTENDANCE_STATUSES } from "@dse-pms/shared-types";
+import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
+import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
+import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 import { RollCallDialog } from "./roll-call-dialog";
 import {
@@ -63,61 +67,80 @@ function attendanceStatusLabel(status: AttendanceStatus): string {
 }
 
 export function AttendanceClient() {
-  const [offerings, setOfferings] = useState<OfferingView[]>([]);
+  const { me, loading: meLoading } = useMe();
+  const queryClient = useQueryClient();
   const [offeringId, setOfferingId] = useState("");
   const [date, setDate] = useState(localDateValue());
-  const [session, setSession] = useState<AttendanceSessionView | null>(null);
-  const [history, setHistory] = useState<AttendanceSessionSummary[]>([]);
   const [records, setRecords] = useState<AttendanceRecordView[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [rollCallOpen, setRollCallOpen] = useState(false);
   const [rollCallSnapshot, setRollCallSnapshot] = useState<AttendanceRecordView[] | null>(null);
+  const hydratedContextRef = useRef("");
+  const baselineRecordsRef = useRef<AttendanceRecordView[]>([]);
+
+  const queryScope = { userId: me?.id ?? "pending" };
+  const offeringsKey = protectedQueryKey(queryScope, "offerings", "list");
+  const offeringsQuery = useQuery({
+    queryKey: offeringsKey,
+    queryFn: () => offeringsApi.list(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const offerings = offeringsQuery.data ?? [];
 
   useEffect(() => {
-    let cancelled = false;
-    offeringsApi.list().then((rows) => {
-      if (cancelled) return;
-      setOfferings(rows);
-      const firstActive = rows.find((row) => row.status === "Active") ?? rows[0];
-      setOfferingId(firstActive?.id ?? "");
-    }).catch((err) => {
-      if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load teaching classes");
-    }).finally(() => {
-      if (!cancelled) setLoading(false);
+    setOfferingId((current) => {
+      if (offerings.some((offering) => offering.id === current)) return current;
+      const firstActive = offerings.find((offering) => offering.status === "Active") ?? offerings[0];
+      return firstActive?.id ?? "";
     });
-    return () => { cancelled = true; };
-  }, []);
+  }, [offerings]);
+
+  const attendanceContext = offeringId && date ? `${offeringId}:${date}` : "";
+  const sessionKey = protectedQueryKey(queryScope, "attendance", "session", offeringId || "none", date || "none");
+  const historyKey = protectedQueryKey(queryScope, "attendance", "history", offeringId || "none");
+  const sessionQuery = useQuery({
+    queryKey: sessionKey,
+    queryFn: () => offeringsApi.attendance(offeringId, date),
+    enabled: Boolean(me?.id && offeringId && date),
+    staleTime: QUERY_STALE_MS.review,
+  });
+  const historyQuery = useQuery({
+    queryKey: historyKey,
+    queryFn: () => offeringsApi.attendanceSessions(offeringId),
+    enabled: Boolean(me?.id && offeringId),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+
+  const session: AttendanceSessionView | null = sessionQuery.data ?? null;
+  const history: AttendanceSessionSummary[] = historyQuery.data ?? [];
 
   useEffect(() => {
-    if (!offeringId || !date) {
-      setSession(null);
-      setRecords([]);
-      setHistory([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+    if (hydratedContextRef.current === attendanceContext) return;
+    hydratedContextRef.current = attendanceContext;
+    baselineRecordsRef.current = [];
+    setRecords([]);
     setSavedMessage(null);
+    setMutationError(null);
     setRollCallOpen(false);
     setRollCallSnapshot(null);
-    Promise.all([offeringsApi.attendance(offeringId, date), offeringsApi.attendanceSessions(offeringId)])
-      .then(([attendance, sessions]) => {
-        if (cancelled) return;
-        setSession(attendance);
-        setRecords(attendance.records);
-        setHistory(sessions);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load attendance");
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [offeringId, date]);
+  }, [attendanceContext]);
+
+  useEffect(() => {
+    if (!session || !attendanceContext) return;
+    if (session.offeringId !== offeringId || session.date !== date) return;
+    if (hydratedContextRef.current !== attendanceContext) return;
+
+    const dirty = !attendanceRecordsEqual(records, baselineRecordsRef.current);
+    if (dirty) return;
+
+    const nextRecords = cloneAttendanceRecords(session.records);
+    baselineRecordsRef.current = cloneAttendanceRecords(session.records);
+    setRecords(nextRecords);
+  }, [attendanceContext, date, offeringId, records, session]);
 
   const selectedOffering = offerings.find((offering) => offering.id === offeringId) ?? null;
   const teachingWeek = getTeachingWeek(selectedOffering?.startDate, selectedOffering?.endDate, date);
@@ -130,11 +153,30 @@ export function AttendanceClient() {
     );
   }, [records, search]);
 
+  const hasOfferings = offeringsQuery.data !== undefined;
+  const hasSession = !offeringId || sessionQuery.data !== undefined;
+  const hasHistory = !offeringId || historyQuery.data !== undefined;
+  const hasData = hasOfferings && hasSession && hasHistory;
+  const loading = meLoading || (!hasOfferings && offeringsQuery.isPending) || (Boolean(offeringId) && !hasSession && sessionQuery.isPending);
+  const queryError = offeringsQuery.error ?? sessionQuery.error ?? historyQuery.error;
+  const hardQueryError =
+    (!hasOfferings && offeringsQuery.isError) ||
+    (!hasSession && sessionQuery.isError) ||
+    (!hasHistory && historyQuery.isError);
+  const error = mutationError ?? (hardQueryError
+    ? queryError instanceof ApiError
+      ? queryError.message
+      : "Failed to load attendance"
+    : null);
+  const isFetching = offeringsQuery.isFetching || sessionQuery.isFetching || historyQuery.isFetching;
+  const isRefreshError = offeringsQuery.isError || sessionQuery.isError || historyQuery.isError;
+
   function updateRecord(
     studentId: string,
     patch: Partial<Pick<AttendanceRecordView, "status" | "permissionPending" | "permissionPendingSince" | "note">>,
   ) {
     setSavedMessage(null);
+    setMutationError(null);
     setRecords((current) => updateAttendanceRecord(current, studentId, patch));
   }
 
@@ -152,6 +194,7 @@ export function AttendanceClient() {
 
   function markAll(status: AttendanceStatus | null) {
     setSavedMessage(null);
+    setMutationError(null);
     setRecords((current) => current.map((record) => ({
       ...record,
       status,
@@ -163,17 +206,18 @@ export function AttendanceClient() {
   async function save(): Promise<boolean> {
     if (!offeringId) return false;
     setSaving(true);
-    setError(null);
+    setMutationError(null);
     setSavedMessage(null);
     try {
       const saved = await offeringsApi.saveAttendance(offeringId, date, { records: toSaveAttendanceRecords(records) });
-      setSession(saved);
-      setRecords(saved.records);
-      setHistory(await offeringsApi.attendanceSessions(offeringId));
+      queryClient.setQueryData(sessionKey, saved);
+      baselineRecordsRef.current = cloneAttendanceRecords(saved.records);
+      setRecords(cloneAttendanceRecords(saved.records));
+      await queryClient.invalidateQueries({ queryKey: historyKey, exact: true });
       setSavedMessage(`Attendance saved for ${formatSessionDate(date)}.`);
       return true;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to save attendance");
+      setMutationError(err instanceof ApiError ? err.message : "Failed to save attendance");
       return false;
     } finally {
       setSaving(false);
@@ -245,6 +289,13 @@ export function AttendanceClient() {
             </div>
           </section>
 
+          <QueryRefreshStatus
+            hasData={hasData}
+            isPending={!hasData && (offeringsQuery.isPending || sessionQuery.isPending || historyQuery.isPending)}
+            isFetching={isFetching}
+            isError={isRefreshError}
+            label="Attendance"
+          />
           {error ? <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
           {savedMessage ? <div className="rounded-xl border border-status-live/30 bg-status-live-bg px-4 py-3 text-sm text-status-live">{savedMessage}</div> : null}
 
