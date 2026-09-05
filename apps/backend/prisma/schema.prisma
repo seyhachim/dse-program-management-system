@@ -362,8 +362,9 @@ model User {
   name          String
   honorific     UserHonorific?
   title         String?
-  qualification String?
-  phone         String?
+  qualification   String?
+  phone           String?
+  profileImageUrl String?
   createdAt          DateTime @default(now())
   mustChangePassword Boolean  @default(false)
 
@@ -430,6 +431,8 @@ model LecturerProfile {
   employmentType        String?
   fieldOfSpecialization String?
   yearsOfExperience     Int?
+  shortBio              String?
+  programmeStartDate    DateTime? @db.Date
   legacyCoursesTaught   String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

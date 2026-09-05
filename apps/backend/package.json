@@ -15,6 +15,7 @@
     "seed": "bun prisma/seed.ts && bun prisma/sync-qa-permissions.ts",
     "course-spec:import": "bun scripts/course-spec-import.ts",
     "lecturer-profile:import": "bun scripts/lecturer-profile-import.ts",
+    "staff-information:import": "bun scripts/staff-information-import.ts",
     "student-roster:import": "bun scripts/student-roster-import.ts",
     "performance:http": "bun scripts/performance-benchmark.ts",
     "performance:db": "bun scripts/performance-db-latency.ts",

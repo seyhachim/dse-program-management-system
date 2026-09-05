@@ -54,6 +54,23 @@ export type LecturerPortfolioVerificationAction = z.infer<
   typeof LecturerPortfolioVerificationActionSchema
 >;
 
+export const LECTURER_EVIDENCE_PERIOD_CONTEXTS = [
+  "prior_to_dse",
+  "during_dse",
+  "unclassified",
+] as const;
+export const LecturerEvidencePeriodContextSchema = z.enum(LECTURER_EVIDENCE_PERIOD_CONTEXTS);
+export type LecturerEvidencePeriodContext = z.infer<typeof LecturerEvidencePeriodContextSchema>;
+
+/** Reporting classification is derived from dates, never manually authored. */
+export function classifyLecturerEvidencePeriod(
+  evidenceDate: string | null | undefined,
+  programmeStartDate: string | null | undefined,
+): LecturerEvidencePeriodContext {
+  if (!evidenceDate || !programmeStartDate) return "unclassified";
+  return evidenceDate < programmeStartDate ? "prior_to_dse" : "during_dse";
+}
+
 const DateOnlySchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
@@ -164,6 +181,7 @@ export interface LecturerAunQaEvidenceItem {
   source: string;
   sourceEntityId: string | null;
   verification: "authoritative_pms" | "verified_professional" | "self_declared";
+  periodContext: LecturerEvidencePeriodContext;
 }
 
 export interface LecturerAunQaEvidenceExport {
@@ -177,6 +195,7 @@ export interface LecturerAunQaEvidenceExport {
     employmentType: string | null;
     fieldOfSpecialization: string | null;
     yearsOfExperience: number | null;
+    programmeStartDate: string | null;
   };
   evidence: LecturerAunQaEvidenceItem[];
   note: string;
