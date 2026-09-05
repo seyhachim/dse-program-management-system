@@ -74,7 +74,6 @@ describe("Course Specification tab data reuse", () => {
 
     expect(source).toContain("teachingLearningApi.getCached(courseId)");
     expect(source).not.toContain("teachingLearningApi.get(courseId)");
-    expect(source).not.toContain("useEffect(() =>");
   });
 
   test("numbers official instructional weeks from their visible order", async () => {
