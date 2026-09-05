@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -27,6 +27,7 @@ import {
 } from "../authoring-section-ui";
 import { methodsApi } from "@/lib/methods";
 import {
+  EMPTY_TEACHING_LEARNING_PROFILE,
   teachingLearningApi,
   type TeachingLearningProfile,
 } from "@/lib/teaching-learning";
@@ -70,75 +71,50 @@ export function TeachingLearningWorkspace({
   const params = useParams<{ id: string }>();
   const courseId = params.id;
   const clos = withCodes(value);
+  const cachedProfile = teachingLearningApi.getCached(courseId);
+  const initialProfile = cachedProfile ?? EMPTY_TEACHING_LEARNING_PROFILE;
+  const cachedVocabulary = methodsApi.getCached();
+  const activeLearningClusters =
+    cachedVocabulary?.activeLearningClusters.length
+      ? cachedVocabulary.activeLearningClusters
+      : FALLBACK_ACTIVE_LEARNING_CLUSTERS;
 
   const [savingCloId, setSavingCloId] = useState<string | null>(null);
   const [savedCloId, setSavedCloId] = useState<string | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(() =>
+    cachedProfile
+      ? null
+      : "Could not load all saved Teaching & Learning settings. The default profile is shown as a fallback.",
+  );
   const [expanded, setExpanded] = useState<Set<SectionKey>>(
     () => new Set<SectionKey>(),
   );
 
-  const [philosophyTags, setPhilosophyTags] = useState<string[]>([]);
-  const [philosophyStatement, setPhilosophyStatement] = useState("");
-  const [courseMethodIds, setCourseMethodIds] = useState<string[]>([]);
-  const [strategyIds, setStrategyIds] = useState<string[]>([]);
-  const [activeLearningClusters, setActiveLearningClusters] = useState<
-    ActiveLearningCluster[]
-  >(FALLBACK_ACTIVE_LEARNING_CLUSTERS);
-  const [independentLearning, setIndependentLearning] = useState<string[]>([]);
+  const [philosophyTags, setPhilosophyTags] = useState<string[]>(() =>
+    initialProfile.philosophyTags,
+  );
+  const [philosophyStatement, setPhilosophyStatement] = useState(
+    initialProfile.philosophyStatement,
+  );
+  const [courseMethodIds, setCourseMethodIds] = useState<string[]>(() =>
+    initialProfile.teachingMethodIds.length > 0
+      ? initialProfile.teachingMethodIds
+      : [...new Set(clos.flatMap((clo) => clo.teachingMethodIds))],
+  );
+  const [strategyIds, setStrategyIds] = useState<string[]>(() =>
+    initialProfile.activeLearningStrategyIds,
+  );
+  const [independentLearning, setIndependentLearning] = useState<string[]>(() =>
+    initialProfile.independentLearningTypes,
+  );
   const [teachingLearningMaterials, setTeachingLearningMaterials] = useState<
     string[]
-  >([]);
+  >(() => initialProfile.resourceTypes);
   const [requiredDeliveryResources, setRequiredDeliveryResources] = useState<
     string[]
-  >([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadProfile() {
-      setProfileLoading(true);
-      setProfileError(null);
-      try {
-        const [profile, vocabulary] = await Promise.all([
-          teachingLearningApi.get(courseId),
-          methodsApi.list(),
-        ]);
-        if (cancelled) return;
-
-        setPhilosophyTags(profile.philosophyTags);
-        setPhilosophyStatement(profile.philosophyStatement);
-        setCourseMethodIds(
-          profile.teachingMethodIds.length > 0
-            ? profile.teachingMethodIds
-            : [...new Set(clos.flatMap((clo) => clo.teachingMethodIds))],
-        );
-        setStrategyIds(profile.activeLearningStrategyIds);
-        setActiveLearningClusters(vocabulary.activeLearningClusters);
-        setIndependentLearning(profile.independentLearningTypes);
-        setTeachingLearningMaterials(profile.resourceTypes);
-        setRequiredDeliveryResources(profile.technologyTypes);
-      } catch {
-        if (!cancelled) {
-          setProfileError(
-            "Could not load all saved Teaching & Learning settings. The default active-learning catalogue is shown as a fallback.",
-          );
-        }
-      } finally {
-        if (!cancelled) setProfileLoading(false);
-      }
-    }
-
-    void loadProfile();
-    return () => {
-      cancelled = true;
-    };
-    // CLO changes should not re-fetch and overwrite unsaved profile edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId]);
+  >(() => initialProfile.technologyTypes);
 
   const activeClos = useMemo(
     () => clos.filter((clo) => clo.status === "active"),
@@ -309,7 +285,7 @@ export function TeachingLearningWorkspace({
           <Button
             size="sm"
             onClick={() => void saveProfile()}
-            disabled={profileLoading || profileSaving}
+            disabled={profileSaving}
           >
             {profileSaving ? (
               <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -338,12 +314,6 @@ export function TeachingLearningWorkspace({
   return (
     <CourseSpecAuthoringStack className="pb-6">
       {header}
-
-      {profileLoading ? (
-        <CourseSpecNotice>
-          Loading saved Teaching &amp; Learning settings…
-        </CourseSpecNotice>
-      ) : null}
 
       {profileError ? (
         <CourseSpecNotice tone="error">
