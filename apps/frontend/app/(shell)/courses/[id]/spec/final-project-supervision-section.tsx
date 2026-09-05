@@ -37,6 +37,10 @@ function toggleValue(value: string, values: string[]): string[] {
     : [...values, value];
 }
 
+function ensureProjectWork(values: string[]): string[] {
+  return values.includes(PROJECT_WORK) ? values : [...values, PROJECT_WORK];
+}
+
 function ChoiceChips({
   label,
   description,
@@ -107,9 +111,7 @@ export function FinalProjectSupervisionSection({
   );
   const [methodIds, setMethodIds] = useState(profile.teachingMethodIds);
   const [independentLearning, setIndependentLearning] = useState(
-    profile.independentLearningTypes.includes(PROJECT_WORK)
-      ? profile.independentLearningTypes
-      : [...profile.independentLearningTypes, PROJECT_WORK],
+    ensureProjectWork(profile.independentLearningTypes),
   );
   const [materials, setMaterials] = useState(profile.resourceTypes);
   const [resources, setResources] = useState(profile.technologyTypes);
@@ -126,6 +128,7 @@ export function FinalProjectSupervisionSection({
     () => activeClos.filter((clo) => clo.teachingMethodIds.length > 0).length,
     [activeClos],
   );
+  const projectIndependentLearning = ensureProjectWork(independentLearning);
 
   const currentProfile: TeachingLearningProfile = {
     philosophyTags,
@@ -137,7 +140,7 @@ export function FinalProjectSupervisionSection({
         PROJECT_BASED_LEARNING_ID,
       ]),
     ],
-    independentLearningTypes: independentLearning,
+    independentLearningTypes: projectIndependentLearning,
     resourceTypes: materials,
     technologyTypes: resources,
   };
@@ -149,6 +152,7 @@ export function FinalProjectSupervisionSection({
     setError(null);
     try {
       const next = await teachingLearningApi.save(courseId, currentProfile);
+      setIndependentLearning(ensureProjectWork(next.independentLearningTypes));
       onProfileSaved(next);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2200);
@@ -287,10 +291,10 @@ export function FinalProjectSupervisionSection({
         <div className="mt-5 space-y-5">
           <ChoiceChips
             label="Independent project work"
-            description="Project work is required; select any additional independent learning formats used."
+            description="Project Work is required for Final Project; select any additional independent learning formats used."
             options={INDEPENDENT_LEARNING_OPTIONS}
-            values={independentLearning}
-            onChange={setIndependentLearning}
+            values={projectIndependentLearning}
+            onChange={(next) => setIndependentLearning(ensureProjectWork(next))}
           />
           <ChoiceChips
             label="Project learning materials"
