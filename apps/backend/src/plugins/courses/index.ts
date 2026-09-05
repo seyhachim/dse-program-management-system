@@ -18,6 +18,7 @@ import { createCourseSpecPeriodicReviewRouter } from "./periodic-review-router.t
 import { createResponsibleLecturersRouter } from "./responsible-lecturers-router.ts";
 import {
   courseIdsForResponsibleLecturer,
+  courseSpecTeamForVersion,
   mergeResponsibleCourses,
   responsibleLecturerCanAccess,
 } from "./responsible-lecturers.ts";
@@ -38,6 +39,8 @@ import { hasSpecificationDate } from "./specification-date-readiness.ts";
 const offeringScopedList = courseService.list.bind(courseService);
 const offeringScopedSpecProgress = courseService.listSpecProgress.bind(courseService);
 const offeringScopedAccess = courseService.lecturerCanAccess.bind(courseService);
+const canonicalGetCourseSpecVersion = courseService.getCourseSpecVersion.bind(courseService);
+const canonicalListApprovedSpecVersions = courseService.listApprovedSpecVersions.bind(courseService);
 const canonicalSaveSection = courseService.saveSection.bind(courseService);
 
 const CURRENT_SPEC_ORDER = [
@@ -85,6 +88,26 @@ courseService.listSpecProgress = async (lecturerScope) => {
 courseService.lecturerCanAccess = async (courseId, lecturerId) =>
   (await offeringScopedAccess(courseId, lecturerId)) ||
   (await responsibleLecturerCanAccess(courseId, lecturerId));
+
+// Enrich exact CourseSpec version references with that same version's academic
+// Course Team. The resolver intentionally avoids Course.lecturerId so an Offering
+// selecting an older Approved version never inherits a lead from a newer Draft.
+courseService.getCourseSpecVersion = async (id) => {
+  const spec = await canonicalGetCourseSpecVersion(id);
+  if (!spec) return null;
+  const courseTeam = await courseSpecTeamForVersion(spec.id);
+  return courseTeam ? { ...spec, courseTeam } : spec;
+};
+
+courseService.listApprovedSpecVersions = async (courseId) => {
+  const specs = await canonicalListApprovedSpecVersions(courseId);
+  return Promise.all(
+    specs.map(async (spec) => {
+      const courseTeam = await courseSpecTeamForVersion(spec.id);
+      return courseTeam ? { ...spec, courseTeam } : spec;
+    }),
+  );
+};
 
 courseService.saveSection = async (courseId, sectionId, values) => {
   const result = await canonicalSaveSection(courseId, sectionId, values);
