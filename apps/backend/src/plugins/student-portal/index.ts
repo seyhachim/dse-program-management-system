@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { studentPortalManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import { parentAcademicProjectionService } from "./parent-projection.ts";
 import { createStudentPortfolioCompleteRouter } from "./portfolio-complete-router.ts";
 import { createStudentPortfolioEvidenceRouter } from "./portfolio-evidence-router.ts";
 import { createStudentPortfolioPublicRouter } from "./portfolio-public-router.ts";
 import { createStudentPortfolioRouter } from "./portfolio-router.ts";
 import { createStudentPortalRouter } from "./router.ts";
-import { studentPortalService, type StudentPortalService } from "./service.ts";
+import { studentPortalService } from "./service.ts";
 
 const router = Router();
 // Public portfolio is intentionally mounted outside the authenticated Student Portal
@@ -19,8 +20,15 @@ router.use("/portfolio", createStudentPortfolioRouter());
 router.use("/portfolio/evidence", createStudentPortfolioEvidenceRouter());
 router.use("/portfolio", createStudentPortfolioCompleteRouter());
 
-export const studentPortalPlugin: BackendPlugin<StudentPortalService> = {
+export const studentPortalPluginService = {
+  ...studentPortalService,
+  parentProjection: parentAcademicProjectionService,
+};
+
+export type StudentPortalPluginService = typeof studentPortalPluginService;
+
+export const studentPortalPlugin: BackendPlugin<StudentPortalPluginService> = {
   manifest: studentPortalManifest,
   router,
-  service: studentPortalService,
+  service: studentPortalPluginService,
 };

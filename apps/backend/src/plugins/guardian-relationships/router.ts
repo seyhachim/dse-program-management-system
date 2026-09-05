@@ -3,11 +3,14 @@ import {
   CreateGuardianRelationshipInput,
   GuardianAccessScope,
   GuardianRelationshipListQuery,
+  ParentAcademicProgressSummarySchema,
+  ParentAttendanceSummarySchema,
   UpdateGuardianRelationshipInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
+import { parentProgressService } from "./parent-progress-service.ts";
 import {
   GuardianRelationshipError,
   guardianRelationshipService,
@@ -58,6 +61,32 @@ export function createGuardianRelationshipRouter(): Router {
   router.get("/me", async (req, res) => {
     if (!assertGuardian(req, res)) return;
     res.json(await guardianRelationshipService.listMine(req.user!.id));
+  });
+
+  router.get("/me/relationships/:relationshipId/attendance", async (req, res) => {
+    if (!assertGuardian(req, res)) return;
+    try {
+      const projection = await parentProgressService.attendance(
+        req.user!.id,
+        req.params.relationshipId!,
+      );
+      res.json(ParentAttendanceSummarySchema.parse(projection));
+    } catch (error) {
+      handleServiceError(error, res);
+    }
+  });
+
+  router.get("/me/relationships/:relationshipId/academic-progress", async (req, res) => {
+    if (!assertGuardian(req, res)) return;
+    try {
+      const projection = await parentProgressService.academicProgress(
+        req.user!.id,
+        req.params.relationshipId!,
+      );
+      res.json(ParentAcademicProgressSummarySchema.parse(projection));
+    } catch (error) {
+      handleServiceError(error, res);
+    }
   });
 
   router.get("/me/students/:studentId/access/:scope", async (req, res) => {

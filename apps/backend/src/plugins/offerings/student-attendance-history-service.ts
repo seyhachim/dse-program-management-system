@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import type { AttendanceStatus, TelegramStudentAttendanceHistory } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
@@ -21,6 +22,32 @@ type PendingRow = {
   createdAt: Date;
 };
 
+export type AttendanceAggregateSessionRow = {
+  id: string;
+  offeringId: string;
+  sessionDate: Date;
+};
+
+export type AttendanceAggregateRecordRow = {
+  sessionId: string;
+  status: AttendanceStatus;
+};
+
+export type AttendanceAggregatePendingRow = {
+  sessionId: string;
+};
+
+export type StudentAttendanceHealthSummary = {
+  offeringId: string;
+  history: {
+    totalSessions: number;
+    markedSessions: number;
+    attendanceRate: number | null;
+    counts: Record<AttendanceStatus, number> & { PermissionPending: number };
+  };
+  health: ReturnType<typeof evaluateAttendanceHealth>["health"];
+};
+
 type StudentLookup = {
   getByUserId(userId: string): Promise<{
     id: string;
@@ -33,6 +60,57 @@ const students = () => registry.get<StudentLookup>("students").service;
 
 function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: number } {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 };
+}
+
+export function summarizeStudentAttendanceHealthByOffering(
+  offeringIds: string[],
+  sessions: AttendanceAggregateSessionRow[],
+  records: AttendanceAggregateRecordRow[],
+  pendingRows: AttendanceAggregatePendingRow[],
+): StudentAttendanceHealthSummary[] {
+  const uniqueOfferingIds = [...new Set(offeringIds)];
+  const sessionsByOffering = new Map<string, AttendanceAggregateSessionRow[]>();
+  for (const session of sessions) {
+    const current = sessionsByOffering.get(session.offeringId) ?? [];
+    current.push(session);
+    sessionsByOffering.set(session.offeringId, current);
+  }
+
+  const recordBySession = new Map(records.map((record) => [record.sessionId, record]));
+  const pendingSessionIds = new Set(pendingRows.map((pending) => pending.sessionId));
+
+  return uniqueOfferingIds.map((offeringId) => {
+    const offeringSessions = sessionsByOffering.get(offeringId) ?? [];
+    const counts = emptyCounts();
+    const healthRecords: AttendanceHealthRecord[] = [];
+
+    for (const session of offeringSessions) {
+      const record = recordBySession.get(session.id);
+      const date = session.sessionDate.toISOString().slice(0, 10);
+      if (record) {
+        counts[record.status] += 1;
+        healthRecords.push({ sessionId: session.id, date, status: record.status });
+      } else if (pendingSessionIds.has(session.id)) {
+        counts.PermissionPending += 1;
+      }
+    }
+
+    const markedSessions = counts.Present + counts.Absent + counts.Late + counts.Excused;
+    const attended = counts.Present + counts.Late;
+    const { health } = evaluateAttendanceHealth(healthRecords, counts);
+    return {
+      offeringId,
+      history: {
+        totalSessions: offeringSessions.length,
+        markedSessions,
+        attendanceRate: markedSessions === 0
+          ? null
+          : Math.round((attended / markedSessions) * 10_000) / 100,
+        counts,
+      },
+      health,
+    };
+  });
 }
 
 async function historyForStudent(
@@ -129,6 +207,55 @@ export const studentAttendanceHistoryService = {
       .map((row) => ({ sessionId: row.sessionId, date: row.date, status: row.status }));
     const evaluation = evaluateAttendanceHealth(finalized, history.counts);
     return { history, ...evaluation };
+  },
+
+  async healthForStudentOfferings(
+    studentId: string,
+    offeringIds: string[],
+  ): Promise<StudentAttendanceHealthSummary[]> {
+    const uniqueOfferingIds = [...new Set(offeringIds)];
+    if (uniqueOfferingIds.length === 0) return [];
+
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true },
+    });
+    if (!student) return [];
+
+    const sessions = await prisma.$queryRaw<AttendanceAggregateSessionRow[]>(Prisma.sql`
+      SELECT "id", "offeringId", "sessionDate"
+      FROM "pms_attendance"."AttendanceSession"
+      WHERE "offeringId" IN (${Prisma.join(uniqueOfferingIds)})
+      ORDER BY "offeringId", "sessionDate" DESC
+    `);
+
+    if (sessions.length === 0) {
+      return summarizeStudentAttendanceHealthByOffering(uniqueOfferingIds, [], [], []);
+    }
+
+    const sessionIds = sessions.map((session) => session.id);
+    const [records, pendingRows] = await Promise.all([
+      prisma.$queryRaw<AttendanceAggregateRecordRow[]>(Prisma.sql`
+        SELECT "sessionId", "status"
+        FROM "pms_attendance"."AttendanceRecord"
+        WHERE "studentId" = ${studentId}
+          AND "sessionId" IN (${Prisma.join(sessionIds)})
+      `),
+      prisma.$queryRaw<AttendanceAggregatePendingRow[]>(Prisma.sql`
+        SELECT "sessionId"
+        FROM "pms_attendance"."AttendancePermissionPending"
+        WHERE "studentId" = ${studentId}
+          AND "sessionId" IN (${Prisma.join(sessionIds)})
+          AND "resolvedAt" IS NULL
+      `),
+    ]);
+
+    return summarizeStudentAttendanceHealthByOffering(
+      uniqueOfferingIds,
+      sessions,
+      records,
+      pendingRows,
+    );
   },
 
   async pendingForUser(userId: string) {

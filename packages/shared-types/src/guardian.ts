@@ -102,3 +102,70 @@ export interface GuardianLinkedStudentView {
   effectiveFrom: string;
   effectiveTo: string | null;
 }
+
+export const ParentAttendanceHealthState = z.enum([
+  "healthy",
+  "watch",
+  "warning",
+  "recovery",
+]);
+export type ParentAttendanceHealthState = z.infer<typeof ParentAttendanceHealthState>;
+
+export const ParentAttendanceWarningSchema = z.object({
+  offeringId: z.string().uuid(),
+  courseCode: z.string().min(1),
+  kind: z.enum(["attendance", "punctuality"]),
+  level: z.enum(["watch", "warning"]),
+  count: z.number().int().nonnegative(),
+  message: z.string().min(1),
+}).strict();
+export type ParentAttendanceWarning = z.infer<typeof ParentAttendanceWarningSchema>;
+
+export const ParentAttendanceSummarySchema = z.object({
+  relationshipId: z.string().uuid(),
+  studentId: z.string().uuid(),
+  programmeId: z.string().min(1),
+  totalSessions: z.number().int().nonnegative(),
+  markedSessions: z.number().int().nonnegative(),
+  attendanceRate: z.number().min(0).max(100).nullable(),
+  counts: z.object({
+    Present: z.number().int().nonnegative(),
+    Absent: z.number().int().nonnegative(),
+    Late: z.number().int().nonnegative(),
+    Excused: z.number().int().nonnegative(),
+    PermissionPending: z.number().int().nonnegative(),
+  }).strict(),
+  healthState: ParentAttendanceHealthState,
+  warnings: z.array(ParentAttendanceWarningSchema),
+}).strict();
+export type ParentAttendanceSummary = z.infer<typeof ParentAttendanceSummarySchema>;
+
+export const ParentAcademicStatus = z.enum([
+  "ON_TRACK",
+  "NEEDS_ATTENTION",
+  "UNAVAILABLE",
+]);
+export type ParentAcademicStatus = z.infer<typeof ParentAcademicStatus>;
+
+export const ParentOfficialCourseResultSchema = z.object({
+  offeringId: z.string().uuid(),
+  courseCode: z.string().min(1),
+  courseTitle: z.string().min(1),
+  term: z.string().min(1),
+  sectionCode: z.string().min(1),
+  totalGrade: z.number().min(0),
+  finalizedAt: z.string().datetime(),
+}).strict();
+export type ParentOfficialCourseResult = z.infer<typeof ParentOfficialCourseResultSchema>;
+
+export const ParentAcademicProgressSummarySchema = z.object({
+  relationshipId: z.string().uuid(),
+  studentId: z.string().uuid(),
+  programmeId: z.string().min(1),
+  academicStatus: ParentAcademicStatus,
+  progressionStatus: z.string().nullable(),
+  academicYear: z.string().nullable(),
+  programmeYear: z.number().int().positive().nullable(),
+  officialResults: z.array(ParentOfficialCourseResultSchema),
+}).strict();
+export type ParentAcademicProgressSummary = z.infer<typeof ParentAcademicProgressSummarySchema>;
