@@ -10,16 +10,16 @@ describe("mobile Results layout", () => {
     expect(MOBILE_RESULTS_LAYOUT.refresh).toContain("h-11");
   });
 
-  test("result and correction rows switch from cards to tables at md", () => {
+  test("student result rows switch from cards to the desktop table at md", () => {
     expect(MOBILE_RESULTS_LAYOUT.mobileRows).toContain("md:hidden");
     expect(MOBILE_RESULTS_LAYOUT.desktopRows).toContain("md:block");
-    expect(MOBILE_RESULTS_LAYOUT.mobileCorrectionRows).toContain("md:hidden");
-    expect(MOBILE_RESULTS_LAYOUT.desktopCorrectionRows).toContain("md:block");
   });
 
-  test("metrics use a compact phone grid", () => {
+  test("metrics use a compact phone grid and page gutters stay narrow", () => {
     expect(MOBILE_RESULTS_LAYOUT.metrics).toContain("grid-cols-2");
     expect(MOBILE_RESULTS_LAYOUT.metrics).toContain("xl:grid-cols-5");
     expect(MOBILE_RESULTS_LAYOUT.finalMetric).toContain("col-span-2");
+    expect(MOBILE_RESULTS_LAYOUT.main).toContain("p-3");
+    expect(MOBILE_RESULTS_LAYOUT.main).toContain("md:p-6");
   });
 });
