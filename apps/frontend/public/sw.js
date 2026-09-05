@@ -1,5 +1,7 @@
-const CACHE_PREFIX = "dse-pms-static-";
-const CACHE_NAME = `${CACHE_PREFIX}v1`;
+const STATIC_CACHE_PREFIX = "dse-pms-static-";
+const STATIC_CACHE_NAME = `${STATIC_CACHE_PREFIX}v1`;
+const PUBLIC_DATA_CACHE_PREFIX = "dse-pms-public-data-";
+const PUBLIC_DATA_CACHE_NAME = `${PUBLIC_DATA_CACHE_PREFIX}v1`;
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [
   OFFLINE_URL,
@@ -11,10 +13,25 @@ const PRECACHE_URLS = [
   "/pwa-maskable-icon.svg",
 ];
 
+const PUBLIC_PROGRAMME_DATA_PATH =
+  /^\/api\/programme\/public\/programmes\/[A-Za-z0-9_-]+(?:\/faqs|\/important-dates|\/curriculum\/(?:courses|totals))?$/;
+
+function isAllowlistedPublicDataRequest(request, url) {
+  if (!PUBLIC_PROGRAMME_DATA_PATH.test(url.pathname)) return false;
+  if (url.search !== "") return false;
+  if (request.credentials !== "omit") return false;
+  if (request.headers.has("authorization")) return false;
+  return true;
+}
+
+function canPersistPublicData(response) {
+  return Boolean(response && response.status === 200 && response.type === "basic");
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
-      .open(CACHE_NAME)
+      .open(STATIC_CACHE_NAME)
       .then((cache) => cache.addAll(PRECACHE_URLS))
       .then(() => self.skipWaiting()),
   );
@@ -27,7 +44,11 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+            .filter(
+              (key) =>
+                (key.startsWith(STATIC_CACHE_PREFIX) && key !== STATIC_CACHE_NAME) ||
+                (key.startsWith(PUBLIC_DATA_CACHE_PREFIX) && key !== PUBLIC_DATA_CACHE_NAME),
+            )
             .map((key) => caches.delete(key)),
         ),
       )
@@ -42,8 +63,34 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Protected API responses and other application data are never persisted in
-  // the service-worker cache. Authorization and freshness remain server-owned.
+  if (isAllowlistedPublicDataRequest(request, url)) {
+    const cachePromise = caches.open(PUBLIC_DATA_CACHE_NAME);
+    const cachedPromise = cachePromise.then((cache) => cache.match(request));
+    const networkPromise = fetch(request);
+
+    // Stale-while-revalidate: a repeat load gets the persisted public response
+    // immediately while a fresh anonymous projection updates the cache in the
+    // background. Failed refreshes never evict the last known public response.
+    const refreshPromise = networkPromise.then(async (response) => {
+      if (canPersistPublicData(response)) {
+        const cache = await cachePromise;
+        await cache.put(request, response.clone());
+      }
+      return response;
+    });
+
+    event.waitUntil(refreshPromise.catch(() => undefined));
+    event.respondWith(
+      cachedPromise.then((cached) => {
+        if (cached) return cached;
+        return refreshPromise;
+      }),
+    );
+    return;
+  }
+
+  // All other API responses remain deny-by-default. Protected academic data,
+  // account/session data and arbitrary GET requests are never persisted here.
   if (url.pathname.startsWith("/api/")) return;
 
   // Navigation is always network-first and is never written to cache. If the
@@ -77,7 +124,7 @@ self.addEventListener("fetch", (event) => {
 
         const copy = response.clone();
         caches
-          .open(CACHE_NAME)
+          .open(STATIC_CACHE_NAME)
           .then((cache) => cache.put(request, copy))
           .catch(() => undefined);
         return response;
