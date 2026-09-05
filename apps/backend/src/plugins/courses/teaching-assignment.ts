@@ -2,26 +2,14 @@ import type { CourseInfoSection } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 
 type TeachingAssignmentOffering = {
-  lecturer: {
-    name: string;
-    qualification: string | null;
-    email: string;
-    phone: string | null;
-  } | null;
-  coLecturers: Array<{
-    lecturer: {
-      name: string;
-    };
-  }>;
-  otherLecturers: string | null;
   semester: CourseInfoSection["semester"];
   programmeYear: CourseInfoSection["programmeYear"];
 };
 
 /**
- * Build the Offering filter used by the Course Specification Overview.
- * Lecturer-scoped requests must match either the primary lecturer assignment or
- * a normalized co-lecturer assignment. Programme-wide callers use the newest
+ * Build the Offering filter used to resolve delivery context for Course Information.
+ * Lecturer-scoped requests match either the primary lecturer assignment or a
+ * normalized co-lecturer assignment. Programme-wide callers use the newest
  * Offering for the course regardless of lecturer.
  */
 export function buildTeachingAssignmentWhere(
@@ -39,40 +27,29 @@ export function buildTeachingAssignmentWhere(
     : { courseId };
 }
 
-/** Convert a normalized Offering teaching team into Course Information fields. */
+/**
+ * Convert an Offering into delivery-only Course Information context.
+ *
+ * Lecturer identity and Course Team membership belong to the version-scoped
+ * CourseSpecCourseInfo snapshot. Never return those fields here, otherwise an
+ * Offering with a different delivery team can overwrite the Course Specification
+ * Responsible Lecturer / Co-Lecturers when the API response is assembled.
+ */
 export function courseInfoFromTeachingAssignment(
   offering: TeachingAssignmentOffering,
 ): Partial<CourseInfoSection> {
-  const primary = offering.lecturer;
-  const coLecturerNames = offering.coLecturers
-    .map(({ lecturer }) => lecturer.name.trim())
-    .filter(Boolean);
-
   return {
-    instructorName: primary?.name ?? "",
-    qualification: primary?.qualification ?? "",
-    email: primary?.email ?? "",
-    telephone: primary?.phone ?? "",
-    // Canonical assignments win. Keep the legacy free-text value only when an
-    // offering has no normalized co-lecturer assignments yet.
-    otherLecturers:
-      coLecturerNames.length > 0
-        ? coLecturerNames.join(", ")
-        : (offering.otherLecturers ?? ""),
     semester: offering.semester,
     programmeYear: offering.programmeYear,
   };
 }
 
 /**
- * Course Information is mostly derived data. For lecturer-scoped requests, use
- * the newest Offering of this course that actually contains the logged-in
- * lecturer (either as primary or co-lecturer). Programme-wide callers fall back
- * to the newest Offering for the course.
+ * Resolve delivery context for the Course Specification Overview.
  *
- * This keeps the Overview aligned with the same Offering-based assignment model
- * used by course access control instead of relying on Course.lecturerId or the
- * legacy free-text `otherLecturers` field.
+ * The Course Specification's lecturer/team fields remain authoritative from its
+ * own version-scoped snapshot. Offering data contributes only semester/year until
+ * those fields move to the authoritative curriculum-placement source.
  */
 export async function resolveCourseInfoTeachingAssignment(
   courseId: string,
@@ -81,27 +58,22 @@ export async function resolveCourseInfoTeachingAssignment(
   let offering = await prisma.offering.findFirst({
     where: buildTeachingAssignmentWhere(courseId, currentLecturerId),
     orderBy: { createdAt: "desc" },
-    include: {
-      lecturer: true,
-      coLecturers: {
-        include: { lecturer: true },
-        orderBy: { createdAt: "asc" },
-      },
+    select: {
+      semester: true,
+      programmeYear: true,
     },
   });
 
-  // Defensive fallback for old/inconsistent data. A lecturer who passed the
-  // course access guard should normally always match the first query.
+  // Defensive fallback for Course-Team-only access or old/inconsistent delivery
+  // assignments. This fallback may supply delivery context, but never lecturer
+  // identity or Course Team membership.
   if (!offering && currentLecturerId) {
     offering = await prisma.offering.findFirst({
       where: { courseId },
       orderBy: { createdAt: "desc" },
-      include: {
-        lecturer: true,
-        coLecturers: {
-          include: { lecturer: true },
-          orderBy: { createdAt: "asc" },
-        },
+      select: {
+        semester: true,
+        programmeYear: true,
       },
     });
   }
@@ -111,7 +83,7 @@ export async function resolveCourseInfoTeachingAssignment(
   return courseInfoFromTeachingAssignment(offering);
 }
 
-/** Overlay Offering-derived lecturer fields onto a Course Spec API envelope. */
+/** Overlay Offering-derived delivery context onto a Course Spec API envelope. */
 export async function overlayCourseSpecTeachingAssignment(
   spec: { data: Record<string, unknown> },
   courseId: string,
