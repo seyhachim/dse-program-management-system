@@ -34,7 +34,11 @@ import { courseSpecDocumentThemeApi } from "@/lib/course-spec-document-theme";
 import type { CourseDocumentModel } from "./course-document-model";
 import { CourseSpecDocumentThemePanel } from "./course-spec-document-theme-panel";
 import { exportCourseSpecWord } from "./document-export";
-import { getCourseSpecPreviewLayout } from "./document-preview-layout";
+import {
+  getCourseSpecFitWidthZoom,
+  getCourseSpecManualZoom,
+  getCourseSpecPreviewLayout,
+} from "./document-preview-layout";
 import { exportCourseSpecPdf } from "./document-pdf-export";
 import {
   PAGE_WIDTH,
@@ -215,11 +219,14 @@ export function DocumentPreview({
   const fitWidth = useCallback(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
-    const availableWidth = viewer.clientWidth - VIEWER_PADDING * 2;
-    if (availableWidth <= 0) return;
-    setZoom(
-      Math.max(MIN_ZOOM, Math.min(availableWidth / PAGE_WIDTH, MAX_ZOOM)),
+    const nextZoom = getCourseSpecFitWidthZoom(
+      viewer.clientWidth,
+      PAGE_WIDTH,
+      VIEWER_PADDING,
+      MAX_ZOOM,
     );
+    if (nextZoom === null) return;
+    setZoom(nextZoom);
   }, []);
 
   useEffect(() => {
@@ -488,9 +495,11 @@ export function DocumentPreview({
                 type="button"
                 onClick={() =>
                   setZoom((current) =>
-                    Math.max(
+                    getCourseSpecManualZoom(
+                      current,
+                      -ZOOM_STEP,
                       MIN_ZOOM,
-                      Number((current - ZOOM_STEP).toFixed(2)),
+                      MAX_ZOOM,
                     ),
                   )
                 }
@@ -506,9 +515,11 @@ export function DocumentPreview({
                 type="button"
                 onClick={() =>
                   setZoom((current) =>
-                    Math.min(
+                    getCourseSpecManualZoom(
+                      current,
+                      ZOOM_STEP,
+                      MIN_ZOOM,
                       MAX_ZOOM,
-                      Number((current + ZOOM_STEP).toFixed(2)),
                     ),
                   )
                 }

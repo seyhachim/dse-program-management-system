@@ -6,6 +6,27 @@ export type CourseSpecPreviewLayout = {
   showDocumentStyleControl: boolean;
 };
 
+export function getCourseSpecFitWidthZoom(
+  viewerWidth: number,
+  pageWidth: number,
+  viewerPadding: number,
+  maxZoom: number,
+): number | null {
+  const availableWidth = viewerWidth - viewerPadding * 2;
+  if (availableWidth <= 0 || pageWidth <= 0) return null;
+  return Math.min(availableWidth / pageWidth, maxZoom);
+}
+
+export function getCourseSpecManualZoom(
+  currentZoom: number,
+  delta: number,
+  minZoom: number,
+  maxZoom: number,
+): number {
+  const nextZoom = Number((currentZoom + delta).toFixed(2));
+  return Math.max(minZoom, Math.min(nextZoom, maxZoom));
+}
+
 /**
  * Role differences are controls only. The official document viewport must keep
  * the same geometry for governance and lecturer access so Fit Width resolves
