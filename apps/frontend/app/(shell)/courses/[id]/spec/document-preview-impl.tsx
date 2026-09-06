@@ -34,7 +34,15 @@ import { courseSpecDocumentThemeApi } from "@/lib/course-spec-document-theme";
 import type { CourseDocumentModel } from "./course-document-model";
 import { CourseSpecDocumentThemePanel } from "./course-spec-document-theme-panel";
 import { exportCourseSpecWord } from "./document-export";
-import { getCourseSpecPreviewLayout } from "./document-preview-layout";
+import {
+  COURSE_SPEC_PREVIEW_MANUAL_MIN_ZOOM,
+  COURSE_SPEC_PREVIEW_MAX_ZOOM,
+  COURSE_SPEC_PREVIEW_PADDING,
+  getCourseSpecFitWidthZoom,
+  getCourseSpecManualZoomIn,
+  getCourseSpecManualZoomOut,
+  getCourseSpecPreviewLayout,
+} from "./document-preview-layout";
 import { exportCourseSpecPdf } from "./document-pdf-export";
 import {
   PAGE_WIDTH,
@@ -42,9 +50,6 @@ import {
 } from "./document-preview-pages";
 import { ThemedDocumentPages } from "./themed-document-pages";
 
-const VIEWER_PADDING = 24;
-const MIN_ZOOM = 0.4;
-const MAX_ZOOM = 1.5;
 const ZOOM_STEP = 0.1;
 const EDITABLE_THEME_STATUSES = new Set(["Draft", "ChangesRequested"]);
 
@@ -215,11 +220,9 @@ export function DocumentPreview({
   const fitWidth = useCallback(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
-    const availableWidth = viewer.clientWidth - VIEWER_PADDING * 2;
-    if (availableWidth <= 0) return;
-    setZoom(
-      Math.max(MIN_ZOOM, Math.min(availableWidth / PAGE_WIDTH, MAX_ZOOM)),
-    );
+    const nextZoom = getCourseSpecFitWidthZoom(viewer.clientWidth, PAGE_WIDTH);
+    if (nextZoom === null) return;
+    setZoom(nextZoom);
   }, []);
 
   useEffect(() => {
@@ -488,13 +491,10 @@ export function DocumentPreview({
                 type="button"
                 onClick={() =>
                   setZoom((current) =>
-                    Math.max(
-                      MIN_ZOOM,
-                      Number((current - ZOOM_STEP).toFixed(2)),
-                    ),
+                    getCourseSpecManualZoomOut(current, ZOOM_STEP),
                   )
                 }
-                disabled={zoom <= MIN_ZOOM}
+                disabled={zoom <= COURSE_SPEC_PREVIEW_MANUAL_MIN_ZOOM}
                 className="flex h-7 w-7 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:opacity-40"
               >
                 <Minus className="h-3.5 w-3.5" />
@@ -506,13 +506,10 @@ export function DocumentPreview({
                 type="button"
                 onClick={() =>
                   setZoom((current) =>
-                    Math.min(
-                      MAX_ZOOM,
-                      Number((current + ZOOM_STEP).toFixed(2)),
-                    ),
+                    getCourseSpecManualZoomIn(current, ZOOM_STEP),
                   )
                 }
-                disabled={zoom >= MAX_ZOOM}
+                disabled={zoom >= COURSE_SPEC_PREVIEW_MAX_ZOOM}
                 className="flex h-7 w-7 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:opacity-40"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -532,8 +529,9 @@ export function DocumentPreview({
               ref={printRootRef}
               className="mx-auto"
               style={{
-                width: PAGE_WIDTH * zoom + VIEWER_PADDING * 2,
-                padding: VIEWER_PADDING,
+                width:
+                  PAGE_WIDTH * zoom + COURSE_SPEC_PREVIEW_PADDING * 2,
+                padding: COURSE_SPEC_PREVIEW_PADDING,
               }}
             >
               <ThemedDocumentPages
