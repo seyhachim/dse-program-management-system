@@ -193,6 +193,109 @@ export function ThemedDocumentPages({
           vertical-align: middle;
         }
 
+        .course-spec-theme-root #slt .section16-content-table,
+        .course-spec-theme-root #slt .section16-assessment-table {
+          table-layout: fixed !important;
+          margin-top: 3pt !important;
+          margin-bottom: 3pt !important;
+        }
+
+        .course-spec-theme-root #slt .section16-content-table th,
+        .course-spec-theme-root #slt .section16-content-table td,
+        .course-spec-theme-root #slt .section16-assessment-table th,
+        .course-spec-theme-root #slt .section16-assessment-table td {
+          padding: 1.25pt 1pt !important;
+          font-size: 7.5pt !important;
+          line-height: 1.05 !important;
+          vertical-align: middle !important;
+        }
+
+        .course-spec-theme-root #slt .section16-content-table th,
+        .course-spec-theme-root #slt .section16-assessment-table th {
+          background: #e2eedb !important;
+          text-align: center !important;
+          font-weight: 400 !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
+        .course-spec-theme-root #clos .section14-table > table {
+          width: 100% !important;
+          max-width: 100% !important;
+          min-width: 0 !important;
+          table-layout: fixed !important;
+          box-sizing: border-box !important;
+        }
+
+        .course-spec-theme-root #clos .section14-header-table,
+        .course-spec-theme-root #clos .section14-body-table {
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
+        }
+
+        .course-spec-theme-root #clos .section14-body-table {
+          margin-top: -1px !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(1) {
+          width: 7% !important;
+        }
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(2) {
+          width: 58% !important;
+        }
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(3) {
+          width: 8% !important;
+        }
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(4),
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(5),
+        .course-spec-theme-root #clos .section14-table colgroup col:nth-child(6) {
+          width: 9% !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table th,
+        .course-spec-theme-root #clos .section14-table td {
+          min-width: 0 !important;
+          max-width: 100%;
+          overflow: hidden;
+          overflow-wrap: anywhere !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table .section14-header-row:first-child {
+          height: 44px;
+        }
+
+        .course-spec-theme-root #clos .section14-table .section14-header-row:nth-child(2) {
+          height: 18px;
+        }
+
+        .course-spec-theme-root #clos .section14-table .section14-header-row th {
+          background: #e2eedb !important;
+          color: #000 !important;
+          vertical-align: middle !important;
+          text-align: center !important;
+          font-weight: 400 !important;
+          font-size: 8.5pt !important;
+          line-height: 1.08 !important;
+          white-space: normal !important;
+          overflow-wrap: anywhere !important;
+          word-break: normal !important;
+          padding: 3pt 2pt !important;
+        }
+
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(1),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(3),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(4),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(5),
+        .course-spec-theme-root #clos .section14-table tbody td:nth-child(6) {
+          text-align: center !important;
+          vertical-align: middle !important;
+        }
+
+
         .course-spec-theme-root article[data-doc-page] > div:not(#programme-overview) td {
           vertical-align: top;
         }
