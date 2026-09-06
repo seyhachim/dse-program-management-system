@@ -22,8 +22,6 @@ import {
   BreadcrumbSeparator,
   Tabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@dse-pms/ui";
 import { ApiError, api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
@@ -55,6 +53,7 @@ import {
 } from "./course-info-section";
 import { buildCourseDocument } from "./course-document-model";
 import { CourseSpecReadOnlyBoundary } from "./course-spec-readonly-boundary";
+import { CourseSpecSectionNavigation } from "./course-spec-section-navigation";
 import { EMPTY_DATE } from "./date-section";
 import { DocumentPreview } from "./document-preview";
 import {
@@ -65,9 +64,7 @@ import {
 import { MappingSection } from "./mapping-section";
 import { OverviewTab } from "./overview-tab";
 import { EMPTY_POLICY } from "./policy-section";
-import {
-  normalizePoliciesResponsibilitiesTab,
-} from "./policies-responsibilities-model";
+import { normalizePoliciesResponsibilitiesTab } from "./policies-responsibilities-model";
 import { PoliciesResponsibilitiesSection } from "./policies-responsibilities-section";
 import {
   EMPTY_REFERENCES,
@@ -161,27 +158,22 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
   const [course, setCourse] = useState<CourseView | null>(null);
   const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
   const [review, setReview] = useState<ReviewState | null>(null);
-  const [courseInfo, setCourseInfo] =
-    useState<CourseInfoForm>(EMPTY_COURSE_INFO);
+  const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
-  const [weeklyPlan, setWeeklyPlan] =
-    useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
-  const [assessments, setAssessments] =
-    useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
+  const [assessments, setAssessments] = useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [policy, setPolicy] = useState<PolicySectionValue>(EMPTY_POLICY);
   const [specDate, setSpecDate] = useState<DateSectionValue>(EMPTY_DATE);
   const [resources, setResources] = useState<ResourcesForm>(EMPTY_RESOURCES);
-  const [references, setReferences] =
-    useState<ReferencesForm>(EMPTY_REFERENCES);
-  const [responsibility, setResponsibility] =
-    useState<StudentResponsibilityValue>(EMPTY_STUDENT_RESPONSIBILITY);
+  const [references, setReferences] = useState<ReferencesForm>(EMPTY_REFERENCES);
+  const [responsibility, setResponsibility] = useState<StudentResponsibilityValue>(
+    EMPTY_STUDENT_RESPONSIBILITY,
+  );
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
-  const [programme, setProgramme] = useState<ProgrammeAcademicConfig | null>(
-    null,
-  );
+  const [programme, setProgramme] = useState<ProgrammeAcademicConfig | null>(null);
   const [teachingLearningProfile, setTeachingLearningProfile] =
     useState<TeachingLearningProfile>(EMPTY_TEACHING_LEARNING_PROFILE);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
@@ -460,22 +452,11 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as TabId)}
           >
-            <div className="rounded-xl border border-border bg-card p-1.5 shadow-sm">
-              <TabsList
-                variant="line"
-                className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              >
-                {TABS.map((tab) => (
-                  <TabsTrigger
-                    key={tab.id}
-                    value={tab.id}
-                    className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-                  >
-                    {tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
+            <CourseSpecSectionNavigation
+              items={TABS}
+              value={activeTab}
+              onValueChange={(value) => setActiveTab(value as TabId)}
+            />
 
             <TabsContent value="overview" className="mt-4">
               <CourseSpecReadOnlyBoundary>

@@ -19,15 +19,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Tabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import type { CourseSpecAuthoringData } from "@/lib/course-spec-authoring-data";
@@ -86,6 +79,7 @@ import { EMPTY_STUDENT_RESPONSIBILITY } from "./student-responsibility-section";
 import { PoliciesResponsibilitiesSection } from "./policies-responsibilities-section";
 import { normalizePoliciesResponsibilitiesTab } from "./policies-responsibilities-model";
 import { CourseSpecNotice } from "./authoring-section-ui";
+import { CourseSpecSectionNavigation } from "./course-spec-section-navigation";
 
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
 type TabId =
@@ -107,10 +101,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "documentPreview", label: "Document Preview" },
   { id: "reviewSubmit", label: "Review & Submit" },
 ];
-
-const TAB_ITEMS = Object.fromEntries(
-  TABS.map((tab) => [tab.id, tab.label]),
-);
 
 const EDITABLE_SPEC_TABS = new Set<TabId>([
   "clos",
@@ -720,49 +710,11 @@ export function SpecClient({
         </CourseSpecNotice>
       ) : null}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
-        <div className="rounded-xl border border-border bg-card p-3 shadow-sm md:hidden">
-          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Course Specification section
-          </label>
-          <Select
-            items={TAB_ITEMS}
-            value={activeTab}
-            onValueChange={(value) => {
-              if (value) setActiveTab(value as TabId);
-            }}
-          >
-            <SelectTrigger
-              aria-label="Course Specification section"
-              className="mt-2 h-11 w-full data-[size=default]:h-11"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TABS.map((tab) => (
-                <SelectItem key={tab.id} value={tab.id}>
-                  {tab.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="hidden rounded-xl border border-border bg-card p-1.5 shadow-sm md:block">
-          <TabsList
-            variant="line"
-            className="flex w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {TABS.map((t) => (
-              <TabsTrigger
-                key={t.id}
-                value={t.id}
-                className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-semibold data-[state=active]:shadow-sm"
-              >
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
+        <CourseSpecSectionNavigation
+          items={TABS}
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as TabId)}
+        />
 
         <TabsContent value="overview" className="mt-4">
           <OverviewTab

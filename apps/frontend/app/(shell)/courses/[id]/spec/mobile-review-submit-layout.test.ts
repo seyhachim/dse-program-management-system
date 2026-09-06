@@ -5,19 +5,28 @@ const specClientSource = readFileSync(
   new URL("./spec-client.tsx", import.meta.url),
   "utf8",
 );
+const readOnlySpecClientSource = readFileSync(
+  new URL("./read-only-spec-client.tsx", import.meta.url),
+  "utf8",
+);
+const navigationSource = readFileSync(
+  new URL("./course-spec-section-navigation.tsx", import.meta.url),
+  "utf8",
+);
 const reviewSubmitSource = readFileSync(
   new URL("./review-submit-section.tsx", import.meta.url),
   "utf8",
 );
 
 describe("Course Specification phone-safe review and submission layout", () => {
-  test("uses a touch-safe mobile section picker while preserving desktop tabs", () => {
-    expect(specClientSource).toContain("Course Specification section");
-    expect(specClientSource).toContain("items={TAB_ITEMS}");
-    expect(specClientSource).toContain("data-[size=default]:h-11");
-    expect(specClientSource).toContain("shadow-sm md:hidden");
-    expect(specClientSource).toContain("shadow-sm md:block");
-    expect(specClientSource).toContain("<TabsList");
+  test("shares a touch-safe mobile section picker across editable and read-only clients", () => {
+    expect(specClientSource).toContain("<CourseSpecSectionNavigation");
+    expect(readOnlySpecClientSource).toContain("<CourseSpecSectionNavigation");
+    expect(navigationSource).toContain("Course Specification section");
+    expect(navigationSource).toContain("data-[size=default]:h-11");
+    expect(navigationSource).toContain("shadow-sm md:hidden");
+    expect(navigationSource).toContain("shadow-sm md:block");
+    expect(navigationSource).toContain("<TabsList");
   });
 
   test("shows all workflow stages on phones without the desktop wide rail", () => {
