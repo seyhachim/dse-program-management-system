@@ -16,8 +16,8 @@ describe("Course Specification Part 2 continuation rows", () => {
       '<ValueCell colSpan={4} className="part-two-continuation-cell">',
     );
 
-    expect(source.match(/<PartTwoRow>/g)?.length).toBe(13);
-    expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(13);
+    expect(source.match(/<PartTwoRow>/g)?.length).toBe(14);
+    expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(14);
 
     expect(source).toContain(
       '<span>14.</span><span className="font-bold">Course Learning Outcomes</span>',
