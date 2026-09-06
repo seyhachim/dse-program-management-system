@@ -193,25 +193,25 @@ export function ThemedDocumentPages({
           vertical-align: middle;
         }
 
-        .course-spec-theme-root #slt .section16-content-table,
-        .course-spec-theme-root #slt .section16-assessment-table {
+        .course-spec-theme-root .section16-page .section16-content-table,
+        .course-spec-theme-root .section16-page .section16-assessment-table {
           table-layout: fixed !important;
           margin-top: 3pt !important;
           margin-bottom: 3pt !important;
         }
 
-        .course-spec-theme-root #slt .section16-content-table th,
-        .course-spec-theme-root #slt .section16-content-table td,
-        .course-spec-theme-root #slt .section16-assessment-table th,
-        .course-spec-theme-root #slt .section16-assessment-table td {
+        .course-spec-theme-root .section16-page .section16-content-table th,
+        .course-spec-theme-root .section16-page .section16-content-table td,
+        .course-spec-theme-root .section16-page .section16-assessment-table th,
+        .course-spec-theme-root .section16-page .section16-assessment-table td {
           padding: 1.25pt 1pt !important;
           font-size: 7.5pt !important;
           line-height: 1.05 !important;
           vertical-align: middle !important;
         }
 
-        .course-spec-theme-root #slt .section16-content-table th,
-        .course-spec-theme-root #slt .section16-assessment-table th {
+        .course-spec-theme-root .section16-page .section16-content-table th,
+        .course-spec-theme-root .section16-page .section16-assessment-table th {
           background: #e2eedb !important;
           text-align: center !important;
           font-weight: 400 !important;
