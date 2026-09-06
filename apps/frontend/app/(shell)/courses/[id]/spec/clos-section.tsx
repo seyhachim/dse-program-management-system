@@ -186,22 +186,22 @@ export function ClosSection({
           <h3 className="text-sm font-semibold text-foreground">
             Course Learning Outcomes (CLOs)
           </h3>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="relative w-full min-w-0 sm:w-auto">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search CLOs…"
-                className="h-9 w-44 rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="h-9 w-full min-w-0 rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:w-44"
               />
             </div>
-            <div className="relative">
+            <div className="relative w-full min-w-0 sm:w-auto">
               <ListFilter className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value as FilterKey)}
-                className="h-9 rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="h-9 w-full min-w-0 rounded-lg border border-border bg-card pl-8 pr-8 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:w-auto"
               >
                 {FILTERS.map((f) => (
                   <option key={f.key} value={f.key}>
