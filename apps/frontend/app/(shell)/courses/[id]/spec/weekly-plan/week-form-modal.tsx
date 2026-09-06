@@ -170,9 +170,16 @@ export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clo
             <WeekWizardSidebar draft={draft} step={step} teachingMethods={teachingMethods} assessmentMethods={assessmentMethods} lloRequired={lloRequired} />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
-          <div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={saveDraftNow} className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60">Save Draft</Button>{draftSavedAt ? <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" />Draft saved on this device</span> : null}</div>
-          <div className="flex items-center gap-2"><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>{step > 1 ? <Button variant="outline" onClick={() => goToStep(step - 1)}>Previous</Button> : null}{step < 5 ? <Button onClick={goNext}>Next</Button> : <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : "Save Week"}</Button>}</div>
+        <div className="flex flex-col gap-3 border-t border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={saveDraftNow} className="h-11 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 sm:h-9 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60">Save Draft</Button>
+            {draftSavedAt ? <span className="flex basis-full min-w-0 items-center gap-1 text-xs font-medium text-emerald-600 sm:basis-auto dark:text-emerald-400"><Check className="h-3.5 w-3.5 shrink-0" /><span className="break-words">Draft saved on this device</span></span> : null}
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="h-11 w-full sm:h-10 sm:w-auto">Cancel</Button>
+            {step > 1 ? <Button variant="outline" onClick={() => goToStep(step - 1)} className="h-11 w-full sm:h-10 sm:w-auto">Previous</Button> : null}
+            {step < 5 ? <Button onClick={goNext} className={`${step > 1 ? "col-span-2" : "col-span-1"} h-11 w-full sm:col-span-1 sm:h-10 sm:w-auto`}>Next</Button> : <Button onClick={submit} disabled={saving} className="col-span-2 h-11 w-full sm:col-span-1 sm:h-10 sm:w-auto">{saving ? "Saving…" : "Save Week"}</Button>}
+          </div>
         </div>
       </div> : null}
     </DialogContent>
