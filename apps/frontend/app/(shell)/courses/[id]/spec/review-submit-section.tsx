@@ -287,17 +287,22 @@ export function ReviewSubmitSection({
             Prepare and submit your course specification for review by the Head of Program.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid w-full gap-2 sm:flex sm:w-auto">
           {canReview && review.status === "approved" ? (
             <Button
               variant="outline"
               nativeButton={false}
               render={<Link href={`/courses/${course.id}/spec/revision`} />}
+              className="h-11 w-full sm:h-9 sm:w-auto"
             >
               Create Revision
             </Button>
           ) : null}
-          <Button variant="outline" onClick={onPreview}>
+          <Button
+            variant="outline"
+            onClick={onPreview}
+            className="h-11 w-full sm:h-9 sm:w-auto"
+          >
             <Eye className="mr-2 h-4 w-4" />
             Preview Document
           </Button>
@@ -306,18 +311,66 @@ export function ReviewSubmitSection({
 
       <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">Submission Status</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {STATUS_META[review.status].label}
             </p>
           </div>
-          <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+          <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
             Step {currentIndex + 1} of {FLOW.length}
           </span>
         </div>
 
-        <div className="mt-5 overflow-x-auto pb-1">
+        <div className="mt-5 md:hidden">
+          <div
+            className="flex w-full items-center"
+            aria-label={`Review workflow: step ${currentIndex + 1} of ${FLOW.length}, ${STATUS_META[review.status].label}`}
+          >
+            {FLOW.map((item, index) => {
+              const active = item === review.status;
+              const passed = index < currentIndex;
+
+              return (
+                <div
+                  key={item}
+                  className="flex min-w-0 flex-1 items-center last:flex-none"
+                >
+                  <span
+                    aria-current={active ? "step" : undefined}
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 bg-card text-[10px] font-semibold ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : passed
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {passed ? "✓" : index + 1}
+                  </span>
+                  {index < FLOW.length - 1 ? (
+                    <span
+                      aria-hidden="true"
+                      className={`mx-1 h-px min-w-0 flex-1 ${
+                        passed ? "bg-emerald-500" : "bg-border"
+                      }`}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 rounded-lg bg-muted/30 px-3 py-2.5">
+            <p className="text-xs font-semibold text-foreground">
+              {STATUS_META[review.status].label}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+              {STATUS_META[review.status].description}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 hidden overflow-x-auto pb-1 md:block">
           <div className="flex min-w-[780px]">
             {FLOW.map((item, index) => {
               const active = item === review.status;
@@ -377,18 +430,18 @@ export function ReviewSubmitSection({
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">Course Information</p>
               <h3 className="mt-4 text-2xl font-bold text-foreground">{course.code}</h3>
-              <p className="text-base font-medium text-foreground">{course.title}</p>
+              <p className="break-words text-base font-medium text-foreground">{course.title}</p>
               <p className="mt-1 text-xs text-muted-foreground">{course.credits ?? "—"} Credits</p>
             </div>
-            <FileCheck2 className="h-5 w-5 text-primary" />
+            <FileCheck2 className="h-5 w-5 shrink-0 text-primary" />
           </div>
           <div className="mt-5 space-y-2 border-t border-border pt-4 text-xs">
             <div className="flex justify-between gap-3">
               <span className="text-muted-foreground">Lecturer</span>
-              <span className="font-medium text-foreground">{course.lecturer?.name ?? "—"}</span>
+              <span className="min-w-0 break-words text-right font-medium text-foreground">{course.lecturer?.name ?? "—"}</span>
             </div>
             <div className="flex justify-between gap-3">
               <span className="text-muted-foreground">Version</span>
@@ -396,7 +449,7 @@ export function ReviewSubmitSection({
             </div>
             <div className="flex justify-between gap-3">
               <span className="text-muted-foreground">Last submitted</span>
-              <span className="font-medium text-foreground">
+              <span className="min-w-0 break-words text-right font-medium text-foreground">
                 {review.submittedAt ? new Date(review.submittedAt).toLocaleString() : "Not submitted"}
               </span>
             </div>
@@ -404,13 +457,13 @@ export function ReviewSubmitSection({
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-foreground">Course Specification Readiness</p>
               <p className="mt-1 text-xs text-muted-foreground">Authoring areas and validation</p>
             </div>
             <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+              className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
                 authoringReady ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
               }`}
             >
@@ -436,7 +489,7 @@ export function ReviewSubmitSection({
                     <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
                   )}
                   <span className="min-w-0 flex-1 text-xs text-foreground">{section.title}</span>
-                  <span className={`text-[11px] ${done ? "text-emerald-600" : "text-amber-600"}`}>
+                  <span className={`shrink-0 text-[11px] ${done ? "text-emerald-600" : "text-amber-600"}`}>
                     {done ? "Complete" : "Incomplete"}
                   </span>
                 </button>
@@ -478,7 +531,7 @@ export function ReviewSubmitSection({
                       {alignmentItem?.title ?? "Constructive Alignment"}
                     </span>
                     <span
-                      className={`text-[11px] ${
+                      className={`shrink-0 text-[11px] ${
                         alignmentLoading
                           ? "text-muted-foreground"
                           : constructiveAlignmentReady
@@ -512,9 +565,9 @@ export function ReviewSubmitSection({
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-foreground">Next Steps</p>
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="shrink-0 text-xs font-medium text-muted-foreground">
               {review.status === "draft"
                 ? incomplete.length
                   ? `${incomplete.length} required`
@@ -540,7 +593,7 @@ export function ReviewSubmitSection({
                 >
                   <span className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="flex-1">
+                    <span className="min-w-0 flex-1">
                       <span className="block font-semibold">Constructive Alignment needs attention.</span>
                       <span className="mt-1 block">
                         Every active CLO must be linked to at least one Weekly Plan item and at least one active Assessment before submission.
@@ -558,8 +611,8 @@ export function ReviewSubmitSection({
                   className="flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-left text-xs text-amber-900 transition-colors hover:bg-amber-50"
                 >
                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span className="flex-1">Complete {item.title}</span>
-                  <span aria-hidden="true">→</span>
+                  <span className="min-w-0 flex-1">Complete {item.title}</span>
+                  <span aria-hidden="true" className="shrink-0">→</span>
                 </button>
               ))}
               {otherIncomplete.length > 3 ? (
@@ -570,7 +623,7 @@ export function ReviewSubmitSection({
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-800">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <p className="font-semibold">All authoring areas are complete and Constructive Alignment passed.</p>
                   <p className="mt-1 text-emerald-700">Specification Date will be assigned automatically when you submit.</p>
                 </div>
@@ -606,7 +659,7 @@ export function ReviewSubmitSection({
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-800">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <p className="font-semibold">Course specification approved.</p>
                   <p className="mt-1 text-emerald-700">The approved version is locked for editing.</p>
                 </div>
@@ -651,7 +704,7 @@ export function ReviewSubmitSection({
         </div>
         <div className="mt-4 max-w-xl rounded-lg border border-border bg-muted/20 px-4 py-3">
           <p className="text-xs font-medium text-muted-foreground">Official document date</p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
+          <p className="mt-1 break-words text-sm font-semibold text-foreground">
             {specificationDate.date || "Will be set on first submission"}
           </p>
         </div>
@@ -674,7 +727,7 @@ export function ReviewSubmitSection({
               </div>
             </div>
           </div>
-          <Button variant="outline" className="mt-3 w-full" onClick={onPreview}>
+          <Button variant="outline" className="mt-3 h-11 w-full sm:h-9" onClick={onPreview}>
             <Eye className="mr-2 h-4 w-4" />
             View Full Document
           </Button>
@@ -688,7 +741,7 @@ export function ReviewSubmitSection({
 
           <div className="mt-4 rounded-lg bg-muted/30 p-4">
             <div className="flex items-start gap-3">
-              <div className="rounded-full bg-primary/10 p-2">
+              <div className="shrink-0 rounded-full bg-primary/10 p-2">
                 {review.status === "approved" ? (
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 ) : waitingForReview ? (
@@ -739,7 +792,7 @@ export function ReviewSubmitSection({
             <div className="mt-4 grid gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-xs sm:grid-cols-3">
               <div>
                 <p className="text-muted-foreground">Submitted</p>
-                <p className="mt-0.5 font-medium text-foreground">
+                <p className="mt-0.5 break-words font-medium text-foreground">
                   {new Date(review.submittedAt).toLocaleString()}
                 </p>
               </div>
@@ -749,21 +802,21 @@ export function ReviewSubmitSection({
               </div>
               <div>
                 <p className="text-muted-foreground">Status</p>
-                <p className="mt-0.5 font-medium text-foreground">{STATUS_META[review.status].label}</p>
+                <p className="mt-0.5 break-words font-medium text-foreground">{STATUS_META[review.status].label}</p>
               </div>
             </div>
           ) : null}
 
           <div className="mt-4 rounded-lg border border-border bg-background px-3 py-2.5">
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               {review.status === "draft" && !ready ? (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               ) : review.status === "approved" ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
               ) : (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
               )}
-              <p className="text-xs font-medium text-foreground">
+              <p className="min-w-0 text-xs font-medium text-foreground">
                 {review.status === "draft"
                   ? ready
                     ? "Ready to submit. Specification Date will be assigned automatically."
@@ -784,8 +837,8 @@ export function ReviewSubmitSection({
       {canReview && ["submitted", "resubmitted", "underReview"].includes(review.status) ? (
         <section className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <FileCheck2 className="h-4 w-4 text-primary" />
-            <div>
+            <FileCheck2 className="h-4 w-4 shrink-0 text-primary" />
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">Head of Program Review</p>
               <p className="text-xs text-muted-foreground">Review the submitted course specification before approving it for use.</p>
             </div>
@@ -802,9 +855,10 @@ export function ReviewSubmitSection({
             />
           </label>
 
-          <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <Button
               variant="outline"
+              className="h-11 w-full sm:h-9 sm:w-auto"
               onClick={async () => {
                 setReviewing(true);
                 const ok = await onRequestChanges(reviewNote);
@@ -816,6 +870,7 @@ export function ReviewSubmitSection({
               {reviewing ? "Saving…" : "Request Changes"}
             </Button>
             <Button
+              className="h-11 w-full sm:h-9 sm:w-auto"
               onClick={async () => {
                 setReviewing(true);
                 const ok = await onApprove(reviewNote);
@@ -839,7 +894,7 @@ export function ReviewSubmitSection({
           <div className="mt-4 space-y-3">
             {review.actions.map((action) => (
               <div key={action.id} className="rounded-lg border border-border bg-background p-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <p className="text-xs font-semibold text-foreground">
                     {action.action === "submitted"
                       ? "Submitted for review"
@@ -849,11 +904,11 @@ export function ReviewSubmitSection({
                           ? "Changes requested"
                           : "Approved"}
                   </p>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="break-words text-[11px] text-muted-foreground">
                     v{action.submissionVersion} · {new Date(action.createdAt).toLocaleString()}
                   </span>
                 </div>
-                {action.note ? <p className="mt-1 text-sm text-muted-foreground">{action.note}</p> : null}
+                {action.note ? <p className="mt-1 break-words text-sm text-muted-foreground">{action.note}</p> : null}
               </div>
             ))}
           </div>
@@ -882,7 +937,7 @@ export function ReviewSubmitSection({
               ) : (
                 <Clock3 className="h-4 w-4 shrink-0 text-primary" />
               )}
-              <p className="text-sm font-semibold text-foreground">
+              <p className="min-w-0 text-sm font-semibold text-foreground">
                 {review.status === "draft"
                   ? ready
                     ? "Ready to submit"
@@ -898,7 +953,7 @@ export function ReviewSubmitSection({
                       : STATUS_META[review.status].label}
               </p>
             </div>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className="mt-0.5 break-words text-[11px] text-muted-foreground">
               {review.status === "draft"
                 ? ready
                   ? `All ${authoringItems.length} authoring areas are complete and Constructive Alignment passed. Specification Date will be stamped when submitted.`
@@ -915,22 +970,30 @@ export function ReviewSubmitSection({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 sm:shrink-0">
+          <div className="grid w-full gap-2 sm:flex sm:w-auto sm:shrink-0 sm:items-center">
             {editingEnabled ? (
               <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${
                   authoringReady ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
                 }`}
               >
                 {completedAuthoring.length}/{authoringItems.length} authoring
               </span>
             ) : null}
-            <Button variant="outline" onClick={onPreview}>
+            <Button
+              variant="outline"
+              onClick={onPreview}
+              className="h-11 w-full sm:h-9 sm:w-auto"
+            >
               <Eye className="mr-2 h-4 w-4" />
               Preview
             </Button>
             {review.status === "draft" ? (
-              <Button onClick={submit} disabled={!canSubmit}>
+              <Button
+                onClick={submit}
+                disabled={!canSubmit}
+                className="h-11 w-full sm:h-9 sm:w-auto"
+              >
                 <Send className="mr-2 h-4 w-4" />
                 {submitting ? "Submitting…" : "Submit for Review"}
               </Button>
@@ -938,11 +1001,16 @@ export function ReviewSubmitSection({
               <Button
                 variant="default"
                 onClick={() => goToReadinessItem(incomplete[0]!)}
+                className="h-11 w-full sm:h-9 sm:w-auto"
               >
                 Continue Editing
               </Button>
             ) : review.status === "changesRequested" ? (
-              <Button onClick={submit} disabled={!canSubmit}>
+              <Button
+                onClick={submit}
+                disabled={!canSubmit}
+                className="h-11 w-full sm:h-9 sm:w-auto"
+              >
                 <Send className="mr-2 h-4 w-4" />
                 {submitting ? "Resubmitting…" : "Resubmit for Review"}
               </Button>
