@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { getCourseSpecPreviewLayout } from "./document-preview-layout";
+import {
+  getCourseSpecFitWidthZoom,
+  getCourseSpecManualZoom,
+  getCourseSpecPreviewLayout,
+} from "./document-preview-layout";
+
+const PAGE_WIDTH = 1123;
+const VIEWER_PADDING = 24;
+const MIN_ZOOM = 0.4;
+const MAX_ZOOM = 1.5;
+const ZOOM_STEP = 0.1;
 
 describe("Course Specification preview role parity", () => {
   test("keeps the official document viewport identical for governance and lecturer roles", () => {
@@ -40,6 +50,57 @@ describe("Course Specification preview role parity", () => {
 
     expect(classes).not.toContain("[&>main]:absolute");
     expect(classes).toContain("lg:[&>main]:absolute");
+  });
+
+  test("allows automatic Fit Width below the manual 40% floor on phone widths", () => {
+    for (const viewerWidth of [320, 360, 390, 430]) {
+      const zoom = getCourseSpecFitWidthZoom(
+        viewerWidth,
+        PAGE_WIDTH,
+        VIEWER_PADDING,
+        MAX_ZOOM,
+      );
+
+      expect(zoom).not.toBeNull();
+      expect(zoom!).toBeLessThan(MIN_ZOOM);
+      expect(PAGE_WIDTH * zoom! + VIEWER_PADDING * 2).toBeCloseTo(
+        viewerWidth,
+        8,
+      );
+    }
+  });
+
+  test("keeps desktop Fit Width equivalent when the calculated zoom is above 40%", () => {
+    const zoom = getCourseSpecFitWidthZoom(
+      900,
+      PAGE_WIDTH,
+      VIEWER_PADDING,
+      MAX_ZOOM,
+    );
+
+    expect(zoom).toBeCloseTo((900 - VIEWER_PADDING * 2) / PAGE_WIDTH, 8);
+    expect(zoom!).toBeGreaterThan(MIN_ZOOM);
+  });
+
+  test("retains the manual zoom floor after an automatic sub-40% fit", () => {
+    expect(
+      getCourseSpecManualZoom(0.24, ZOOM_STEP, MIN_ZOOM, MAX_ZOOM),
+    ).toBe(MIN_ZOOM);
+    expect(
+      getCourseSpecManualZoom(MIN_ZOOM, -ZOOM_STEP, MIN_ZOOM, MAX_ZOOM),
+    ).toBe(MIN_ZOOM);
+    expect(
+      getCourseSpecManualZoom(MAX_ZOOM, ZOOM_STEP, MIN_ZOOM, MAX_ZOOM),
+    ).toBe(MAX_ZOOM);
+  });
+
+  test("rejects unusable Fit Width geometry instead of producing an invalid zoom", () => {
+    expect(
+      getCourseSpecFitWidthZoom(40, PAGE_WIDTH, VIEWER_PADDING, MAX_ZOOM),
+    ).toBeNull();
+    expect(
+      getCourseSpecFitWidthZoom(320, 0, VIEWER_PADDING, MAX_ZOOM),
+    ).toBeNull();
   });
 
   test("re-runs Fit Width setup when the async official preview becomes ready", async () => {
