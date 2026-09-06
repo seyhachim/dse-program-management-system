@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { getCourseSpecPreviewLayout } from "./document-preview-layout";
+import {
+  COURSE_SPEC_PREVIEW_MANUAL_MIN_ZOOM,
+  COURSE_SPEC_PREVIEW_PADDING,
+  getCourseSpecFitWidthZoom,
+  getCourseSpecManualZoomIn,
+  getCourseSpecManualZoomOut,
+  getCourseSpecPreviewLayout,
+} from "./document-preview-layout";
 
 describe("Course Specification preview role parity", () => {
   test("keeps the official document viewport identical for governance and lecturer roles", () => {
@@ -49,5 +56,47 @@ describe("Course Specification preview role parity", () => {
 
     expect(source).toContain("if (!officialThemeReady) return;");
     expect(source).toContain("[fitWidth, officialThemeReady]");
+  });
+});
+
+describe("Course Specification preview zoom", () => {
+  const pageWidth = 1123;
+
+  test("lets Fit Width scale below the 40% manual floor on phone-sized viewers", () => {
+    for (const viewerWidth of [320, 360, 390, 430]) {
+      const zoom = getCourseSpecFitWidthZoom(viewerWidth, pageWidth);
+
+      expect(zoom).not.toBeNull();
+      expect(zoom!).toBeLessThan(COURSE_SPEC_PREVIEW_MANUAL_MIN_ZOOM);
+      expect(
+        pageWidth * zoom! + COURSE_SPEC_PREVIEW_PADDING * 2,
+      ).toBeLessThanOrEqual(viewerWidth + Number.EPSILON);
+    }
+  });
+
+  test("keeps desktop Fit Width equal to the available-width ratio", () => {
+    const viewerWidth = 1200;
+    const expected =
+      (viewerWidth - COURSE_SPEC_PREVIEW_PADDING * 2) / pageWidth;
+
+    expect(getCourseSpecFitWidthZoom(viewerWidth, pageWidth)).toBeCloseTo(
+      expected,
+      10,
+    );
+  });
+
+  test("keeps the existing manual zoom floor after a sub-40% auto-fit", () => {
+    expect(getCourseSpecManualZoomIn(0.24, 0.1)).toBe(
+      COURSE_SPEC_PREVIEW_MANUAL_MIN_ZOOM,
+    );
+    expect(
+      getCourseSpecManualZoomOut(COURSE_SPEC_PREVIEW_MANUAL_MIN_ZOOM, 0.1),
+    ).toBe(COURSE_SPEC_PREVIEW_MANUAL_MIN_ZOOM);
+  });
+
+  test("rejects unusable viewer or page widths instead of inventing a zoom", () => {
+    expect(getCourseSpecFitWidthZoom(0, pageWidth)).toBeNull();
+    expect(getCourseSpecFitWidthZoom(40, pageWidth)).toBeNull();
+    expect(getCourseSpecFitWidthZoom(320, 0)).toBeNull();
   });
 });
