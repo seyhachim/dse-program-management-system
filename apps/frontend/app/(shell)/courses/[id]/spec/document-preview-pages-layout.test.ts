@@ -94,9 +94,10 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source).toContain("physicalSltHours");
     expect(source).toContain("onlineSltHours");
     expect(source).toContain("independentSltHours");
+    expect(source).toContain("assessment?.totalSltHours");
+    expect(source).toContain("assessment?.weight");
     expect(source).toContain("document.totals.continuousAssessmentSlt");
     expect(source).toContain("document.totals.finalAssessmentSlt");
-    expect(source).toContain("document.totals.grandSlt");
     expect(source).not.toContain("Assessment SLT</p>");
   });
 
