@@ -82,17 +82,36 @@ export function usePortalPrefetch(
 
   useEffect(() => {
     if (!enabled || !me?.id) return;
+
     const scope = { userId: me.id };
-    for (const entry of entries) {
-      void queryClient.prefetchQuery({
-        queryKey: protectedQueryKey(
-          scope,
-          `student-portal-${entry.resource}`,
-        ),
-        queryFn: entry.loader,
-        staleTime: entry.staleTime ?? QUERY_STALE_MS.operational,
-      });
-    }
+    const homeKey = protectedQueryKey(scope, "student-portal-home");
+    let warmed = false;
+    let timer: number | undefined;
+
+    const warmDestinations = () => {
+      if (warmed || !queryClient.getQueryData(homeKey)) return;
+      warmed = true;
+      timer = window.setTimeout(() => {
+        for (const entry of entries) {
+          void queryClient.prefetchQuery({
+            queryKey: protectedQueryKey(
+              scope,
+              `student-portal-${entry.resource}`,
+            ),
+            queryFn: entry.loader,
+            staleTime: entry.staleTime ?? QUERY_STALE_MS.operational,
+          });
+        }
+      }, 0);
+    };
+
+    warmDestinations();
+    const unsubscribe = queryClient.getQueryCache().subscribe(warmDestinations);
+
+    return () => {
+      unsubscribe();
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [enabled, entries, me?.id, queryClient]);
 }
 
