@@ -1,0 +1,73 @@
+name: Apply Telegram concise-menu fix
+
+on:
+  push:
+    branches:
+      - fix/913-telegram-concise-topic-menus
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/913-telegram-concise-topic-menus
+      - name: Patch topic landing routes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/backend/src/plugins/telegram/public-bot/router.ts')
+          s = p.read_text()
+
+          old = '''  if (route === "admission") {
+            const admission = await publicRead.getAdmission(programmeId, locale);
+            const details = [
+              admission.applicationUrl && `Apply: ${admission.applicationUrl}`,
+              admission.admissionEmail && `Email: ${admission.admissionEmail}`,
+              admission.phone && `Phone: ${admission.phone}`,
+            ].filter(Boolean);
+            return {
+              text: `${formatFaqs("Admission", admission.faqs)}${details.length ? `\\n\\n${details.join("\\n")}` : ""}`,
+              replyMarkup: inlineKeyboard(route),
+            };
+          }
+          if (route === "fees" || route === "scholarships") {
+            const data = await publicRead.getFeesScholarships(programmeId, locale);
+            return {
+              text: formatFaqs("Fees & Scholarships", data.faqs),
+              replyMarkup: inlineKeyboard(route),
+            };
+          }
+          '''
+          new = '''  if (route === "admission" || route === "fees" || route === "scholarships") {
+            return {
+              text: `${MENUS[route].title}\\n\\nChoose an option below.`,
+              replyMarkup: inlineKeyboard(route),
+            };
+          }
+          '''
+          if old not in s:
+              raise SystemExit('admission/fees block not found')
+          s = s.replace(old, new, 1)
+
+          start_marker = '  const categoryByRoute: Partial<Record<RouteKey, ProgrammeFaqCategory>> = {'
+          end_marker = '  return {\n    text: `${MENUS[route].title}\\n\\nChoose an option below.`,'
+          start = s.index(start_marker)
+          end = s.index(end_marker, start)
+          s = s[:start] + s[end:]
+          p.write_text(s)
+          PY
+      - name: Commit root fix
+        shell: bash
+        run: |
+          git rm .github/workflows/temp-fix-913.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/backend/src/plugins/telegram/public-bot/router.ts
+          git commit -m "fix(telegram): keep topic landing menus concise"
+          git push origin HEAD:fix/913-telegram-concise-topic-menus
