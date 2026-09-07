@@ -274,12 +274,14 @@ function preprocessTelegramPresentation(
 
   const message = body.message;
   if (!message || typeof message.text !== "string") return requestContext;
+  let messageText = message.text;
 
-  if (isPrivateGroupDeepLink(message.text, botUsername)) {
-    message.text = "/start";
+  if (isPrivateGroupDeepLink(messageText, botUsername)) {
+    messageText = "/start";
+    message.text = messageText;
   }
 
-  const selected = localeFromSelection(message.text);
+  const selected = localeFromSelection(messageText);
   const key = localeKey(webhookSecret, context.chatId);
   if (selected) {
     localeStore.set(key, selected);
@@ -287,7 +289,7 @@ function preprocessTelegramPresentation(
     return requestContext;
   }
 
-  if (isLanguageSwitch(message.text)) {
+  if (isLanguageSwitch(messageText)) {
     localeStore.delete(key);
     message.text = "/start";
     return requestContext;
@@ -300,8 +302,8 @@ function preprocessTelegramPresentation(
   // If the user explicitly selected English, keep that preference while still
   // normalizing the stale Khmer keyboard label for typed routing.
   const storedLocale = localeStore.get(key);
-  const normalizedReplyText = toEnglishReplyText(message.text);
-  if (normalizedReplyText !== message.text) {
+  const normalizedReplyText = toEnglishReplyText(messageText);
+  if (normalizedReplyText !== messageText) {
     if (!storedLocale) localeStore.set(key, "km");
     message.text = normalizedReplyText;
     return requestContext;
