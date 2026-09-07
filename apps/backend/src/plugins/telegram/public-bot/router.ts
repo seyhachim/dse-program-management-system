@@ -453,22 +453,9 @@ async function renderRoute(
       replyMarkup: inlineKeyboard("home"),
     };
   }
-  if (route === "admission") {
-    const admission = await publicRead.getAdmission(programmeId, locale);
-    const details = [
-      admission.applicationUrl && `Apply: ${admission.applicationUrl}`,
-      admission.admissionEmail && `Email: ${admission.admissionEmail}`,
-      admission.phone && `Phone: ${admission.phone}`,
-    ].filter(Boolean);
+  if (route === "admission" || route === "fees" || route === "scholarships") {
     return {
-      text: `${formatFaqs("Admission", admission.faqs)}${details.length ? `\n\n${details.join("\n")}` : ""}`,
-      replyMarkup: inlineKeyboard(route),
-    };
-  }
-  if (route === "fees" || route === "scholarships") {
-    const data = await publicRead.getFeesScholarships(programmeId, locale);
-    return {
-      text: formatFaqs("Fees & Scholarships", data.faqs),
+      text: `${MENUS[route].title}\n\nChoose an option below.`,
       replyMarkup: inlineKeyboard(route),
     };
   }
@@ -496,24 +483,6 @@ async function renderRoute(
       replyMarkup: inlineKeyboard(route),
     };
   }
-  const categoryByRoute: Partial<Record<RouteKey, ProgrammeFaqCategory>> = {
-    about: "About",
-    curriculum: "Curriculum",
-    careers: "Careers",
-    studentLife: "StudentLife",
-    facilities: "Facilities",
-    lecturers: "Lecturers",
-  };
-  const category = categoryByRoute[route];
-  if (category) {
-    return {
-      text: formatFaqs(
-        MENUS[route].title,
-        await publicRead.listFaqs(programmeId, { category, locale }),
-      ),
-      replyMarkup: inlineKeyboard(route),
-    };
-  }
   return {
     text: `${MENUS[route].title}\n\nChoose an option below.`,
     replyMarkup: inlineKeyboard(route),
@@ -525,7 +494,8 @@ function callbackParentRoute(data: string): RouteKey {
   if (data.startsWith("admission:")) return "admission";
   if (data.startsWith("curriculum:")) return "curriculum";
   if (data.startsWith("career")) return "careers";
-  if (data.startsWith("fees:") || data.startsWith("scholarships:")) return "fees";
+  if (data.startsWith("fees:") || data.startsWith("scholarships:"))
+    return "fees";
   if (data.startsWith("studentlife:")) return "studentLife";
   if (data.startsWith("facility:")) return "facilities";
   if (data.startsWith("lecturers:")) return "lecturers";
@@ -577,7 +547,9 @@ async function renderStaticCallback(
 
   if (data === "curriculum:courses:page:1") {
     return {
-      text: formatCourseList(await publicCurriculumRead.listCourses(programmeId)),
+      text: formatCourseList(
+        await publicCurriculumRead.listCourses(programmeId),
+      ),
       replyMarkup: inlineKeyboard("curriculum"),
     };
   }
@@ -627,14 +599,18 @@ async function renderStaticCallback(
 
   if (data.startsWith("contact:")) {
     const contact = await publicRead.getContact(programmeId, locale);
-    const selected: Record<string, { label: string; value: string | null | undefined }> = {
+    const selected: Record<
+      string,
+      { label: string; value: string | null | undefined }
+    > = {
       "contact:location": { label: "Location", value: contact.campusAddress },
       "contact:phone": { label: "Phone", value: contact.phone },
       "contact:email": { label: "Email", value: contact.admissionEmail },
       "contact:website": { label: "Website", value: contact.websiteUrl },
       "contact:admissions": {
         label: "Admissions contact",
-        value: contact.applicationUrl ?? contact.admissionEmail ?? contact.phone,
+        value:
+          contact.applicationUrl ?? contact.admissionEmail ?? contact.phone,
       },
     };
     const item = selected[data];
@@ -682,7 +658,9 @@ async function renderStaticCallback(
   }
   if (data.startsWith("fit:")) {
     return {
-      text: formatMissingPublishedTopic(FAQ_SLUG_BY_CALLBACK[data] ?? "dse-suitability-guide"),
+      text: formatMissingPublishedTopic(
+        FAQ_SLUG_BY_CALLBACK[data] ?? "dse-suitability-guide",
+      ),
       replyMarkup: inlineKeyboard("fit"),
     };
   }

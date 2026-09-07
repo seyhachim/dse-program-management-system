@@ -313,15 +313,15 @@ describe("public Telegram webhook", () => {
     expect(keyboard.flat().map((item) => item.text)).toContain("❓ Ask DSE");
   });
 
-  test("primary Admission selection renders PMS-owned published FAQ content", async () => {
+  test("primary Admission selection renders a concise topic menu without batch FAQ answers", async () => {
     const response = await webhook({
       update_id: 3,
       message: { message_id: 3, chat: { id: 11 }, text: "📝 Admission" },
     });
     expect(response.status).toBe(200);
     const sent = client.sent.at(-1)!;
-    expect(sent.text).toContain("Published admission answer.");
-    expect(sent.text).toContain("https://example.edu/apply");
+    expect(sent.text).toBe("Admission\n\nChoose an option below.");
+    expect(sent.text).not.toContain("Published admission answer.");
     expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
   });
 
