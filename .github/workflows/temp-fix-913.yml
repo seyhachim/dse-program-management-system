@@ -24,41 +24,19 @@ jobs:
           p = Path('apps/backend/src/plugins/telegram/public-bot/router.ts')
           s = p.read_text()
 
-          old = '''  if (route === "admission") {
-            const admission = await publicRead.getAdmission(programmeId, locale);
-            const details = [
-              admission.applicationUrl && `Apply: ${admission.applicationUrl}`,
-              admission.admissionEmail && `Email: ${admission.admissionEmail}`,
-              admission.phone && `Phone: ${admission.phone}`,
-            ].filter(Boolean);
-            return {
-              text: `${formatFaqs("Admission", admission.faqs)}${details.length ? `\\n\\n${details.join("\\n")}` : ""}`,
-              replyMarkup: inlineKeyboard(route),
-            };
-          }
-          if (route === "fees" || route === "scholarships") {
-            const data = await publicRead.getFeesScholarships(programmeId, locale);
-            return {
-              text: formatFaqs("Fees & Scholarships", data.faqs),
-              replyMarkup: inlineKeyboard(route),
-            };
-          }
-          '''
-          new = '''  if (route === "admission" || route === "fees" || route === "scholarships") {
+          start = s.index('  if (route === "admission") {')
+          end = s.index('  if (route === "dates") {', start)
+          replacement = '''  if (route === "admission" || route === "fees" || route === "scholarships") {
             return {
               text: `${MENUS[route].title}\\n\\nChoose an option below.`,
               replyMarkup: inlineKeyboard(route),
             };
           }
           '''
-          if old not in s:
-              raise SystemExit('admission/fees block not found')
-          s = s.replace(old, new, 1)
+          s = s[:start] + replacement + s[end:]
 
-          start_marker = '  const categoryByRoute: Partial<Record<RouteKey, ProgrammeFaqCategory>> = {'
-          end_marker = '  return {\n    text: `${MENUS[route].title}\\n\\nChoose an option below.`,'
-          start = s.index(start_marker)
-          end = s.index(end_marker, start)
+          start = s.index('  const categoryByRoute: Partial<Record<RouteKey, ProgrammeFaqCategory>> = {')
+          end = s.index('  return {\n    text: `${MENUS[route].title}\\n\\nChoose an option below.`,', start)
           s = s[:start] + s[end:]
           p.write_text(s)
           PY
