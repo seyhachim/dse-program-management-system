@@ -454,11 +454,11 @@ async function renderRoute(
     };
   }
   if (route === "admission" || route === "fees" || route === "scholarships") {
-  return {
-    text: `${MENUS[route].title}\n\nChoose an option below.`,
-    replyMarkup: inlineKeyboard(route),
-  };
-}
+    return {
+      text: `${MENUS[route].title}\n\nChoose an option below.`,
+      replyMarkup: inlineKeyboard(route),
+    };
+  }
   if (route === "dates") {
     return {
       text: formatDates(
@@ -494,7 +494,8 @@ function callbackParentRoute(data: string): RouteKey {
   if (data.startsWith("admission:")) return "admission";
   if (data.startsWith("curriculum:")) return "curriculum";
   if (data.startsWith("career")) return "careers";
-  if (data.startsWith("fees:") || data.startsWith("scholarships:")) return "fees";
+  if (data.startsWith("fees:") || data.startsWith("scholarships:"))
+    return "fees";
   if (data.startsWith("studentlife:")) return "studentLife";
   if (data.startsWith("facility:")) return "facilities";
   if (data.startsWith("lecturers:")) return "lecturers";
@@ -546,7 +547,9 @@ async function renderStaticCallback(
 
   if (data === "curriculum:courses:page:1") {
     return {
-      text: formatCourseList(await publicCurriculumRead.listCourses(programmeId)),
+      text: formatCourseList(
+        await publicCurriculumRead.listCourses(programmeId),
+      ),
       replyMarkup: inlineKeyboard("curriculum"),
     };
   }
@@ -596,14 +599,18 @@ async function renderStaticCallback(
 
   if (data.startsWith("contact:")) {
     const contact = await publicRead.getContact(programmeId, locale);
-    const selected: Record<string, { label: string; value: string | null | undefined }> = {
+    const selected: Record<
+      string,
+      { label: string; value: string | null | undefined }
+    > = {
       "contact:location": { label: "Location", value: contact.campusAddress },
       "contact:phone": { label: "Phone", value: contact.phone },
       "contact:email": { label: "Email", value: contact.admissionEmail },
       "contact:website": { label: "Website", value: contact.websiteUrl },
       "contact:admissions": {
         label: "Admissions contact",
-        value: contact.applicationUrl ?? contact.admissionEmail ?? contact.phone,
+        value:
+          contact.applicationUrl ?? contact.admissionEmail ?? contact.phone,
       },
     };
     const item = selected[data];
@@ -651,7 +658,9 @@ async function renderStaticCallback(
   }
   if (data.startsWith("fit:")) {
     return {
-      text: formatMissingPublishedTopic(FAQ_SLUG_BY_CALLBACK[data] ?? "dse-suitability-guide"),
+      text: formatMissingPublishedTopic(
+        FAQ_SLUG_BY_CALLBACK[data] ?? "dse-suitability-guide",
+      ),
       replyMarkup: inlineKeyboard("fit"),
     };
   }
