@@ -16,8 +16,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/913-telegram-concise-topic-menus
-      - uses: oven-sh/setup-bun@v2
       - name: Update admission landing test
+        shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -40,8 +40,8 @@ jobs:
 '''
           p.write_text(s[:start] + replacement + s[end:])
           PY
-          bunx prettier --write apps/backend/src/plugins/telegram/public-bot/router.test.ts
       - name: Commit test update
+        shell: bash
         run: |
           git rm .github/workflows/temp-test-fix-913.yml
           git config user.name github-actions[bot]
