@@ -20,7 +20,7 @@ import {
   EmptyState,
   PortalError,
   PortalLoading,
-  usePortalData,
+  useCachedPortalData,
 } from "../portal-state";
 
 const labels: Record<PortalAssessmentDeadlineState, string> = {
@@ -32,7 +32,7 @@ const labels: Record<PortalAssessmentDeadlineState, string> = {
 
 export function PortalAssessments() {
   const load = useCallback(() => studentPortalApi.assessments(), []);
-  const { data, loading, error } = usePortalData(load);
+  const { data, loading, error } = useCachedPortalData("assessments", load);
 
   if (loading) return <PortalLoading />;
   if (error || !data) {

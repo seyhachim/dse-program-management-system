@@ -9,12 +9,12 @@ import {
   EmptyState,
   PortalError,
   PortalLoading,
-  usePortalData,
+  useCachedPortalData,
 } from "../portal-state";
 
 export function PortalAnnouncements() {
   const load = useCallback(() => studentPortalApi.announcements(), []);
-  const { data, loading, error } = usePortalData(load);
+  const { data, loading, error } = useCachedPortalData("announcements", load);
 
   if (loading) return <PortalLoading />;
   if (error || !data) {

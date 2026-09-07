@@ -26,12 +26,24 @@ import {
   EmptyState,
   PortalError,
   PortalLoading,
-  usePortalData,
+  useCachedPortalData,
+  usePortalPrefetch,
 } from "./portal-state";
+
+const HOME_PREFETCH = [
+  { resource: "courses", loader: studentPortalApi.courses },
+  { resource: "announcements", loader: studentPortalApi.announcements },
+  { resource: "assessments", loader: studentPortalApi.assessments },
+  { resource: "academic-calendar", loader: studentPortalApi.academicCalendar },
+] as const;
 
 export function PortalHome() {
   const load = useCallback(() => studentPortalApi.home(), []);
-  const { data, loading, error } = usePortalData(load);
+  const { data, loading, error, refreshError, refreshing } = useCachedPortalData(
+    "home",
+    load,
+  );
+  usePortalPrefetch(HOME_PREFETCH);
 
   if (loading) return <PortalLoading />;
   if (error || !data) {
@@ -53,6 +65,14 @@ export function PortalHome() {
     <div
       className={`mx-auto max-w-7xl ${MOBILE_STUDENT_PORTAL_LAYOUT.homeStack}`}
     >
+      {refreshError ? (
+        <div className="rounded-xl border border-status-upcoming bg-status-upcoming-bg px-4 py-3 text-sm text-status-upcoming">
+          Could not refresh right now. Showing your last available portal data.
+        </div>
+      ) : refreshing ? (
+        <p className="text-xs text-muted-foreground">Updating your portal…</p>
+      ) : null}
+
       <section className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}>
         <p className="text-sm opacity-80">Welcome back</p>
         <h2 className="mt-1 break-words text-2xl font-bold">

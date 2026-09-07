@@ -15,7 +15,7 @@ import {
 } from "@/lib/academic-calendar";
 import { studentPortalApi } from "@/lib/student-portal";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "../mobile-student-portal-layout";
-import { PortalError, PortalLoading, usePortalData } from "../portal-state";
+import { PortalError, PortalLoading, useCachedPortalData } from "../portal-state";
 
 type AvailableCalendar = Extract<
   StudentAcademicCalendarView,
@@ -243,7 +243,7 @@ function EventTimeline({
 
 export function PortalAcademicCalendar() {
   const load = useCallback(() => studentPortalApi.academicCalendar(), []);
-  const { data, loading, error } = usePortalData(load);
+  const { data, loading, error } = useCachedPortalData("academic-calendar", load);
 
   if (loading) return <PortalLoading />;
   if (error || !data) {
