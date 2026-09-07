@@ -16,24 +16,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/913-telegram-concise-topic-menus
+      - uses: oven-sh/setup-bun@v2
       - name: Update admission landing test
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('apps/backend/src/plugins/telegram/public-bot/router.test.ts')
           s = p.read_text()
-          old = '''  test("primary Admission selection renders PMS-owned published FAQ content", async () => {
-            const response = await webhook({
-              update_id: 3,
-              message: { message_id: 3, chat: { id: 11 }, text: "📝 Admission" },
-            });
-            expect(response.status).toBe(200);
-            const sent = client.sent.at(-1)!;
-            expect(sent.text).toContain("Published admission answer.");
-            expect(sent.text).toContain("https://example.edu/apply");
-            expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
-          });'''
-          new = '''  test("primary Admission selection renders a concise topic menu without batch FAQ answers", async () => {
+          start = s.index('  test("primary Admission selection renders PMS-owned published FAQ content"')
+          end = s.index('  test("/courses lists curriculum-backed published courses"', start)
+          replacement = '''  test("primary Admission selection renders a concise topic menu without batch FAQ answers", async () => {
             const response = await webhook({
               update_id: 3,
               message: { message_id: 3, chat: { id: 11 }, text: "📝 Admission" },
@@ -43,10 +35,10 @@ jobs:
             expect(sent.text).toBe("Admission\\n\\nChoose an option below.");
             expect(sent.text).not.toContain("Published admission answer.");
             expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
-          });'''
-          if old not in s:
-              raise SystemExit('target admission test not found')
-          p.write_text(s.replace(old, new, 1))
+          });
+
+'''
+          p.write_text(s[:start] + replacement + s[end:])
           PY
           bunx prettier --write apps/backend/src/plugins/telegram/public-bot/router.test.ts
       - name: Commit test update
