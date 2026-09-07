@@ -53,11 +53,11 @@ export const MENUS = {
     parent: "home",
     title: "Explore DSE",
     rows: [
-      [cb("1 · What is DSE?", "explore:step:1")],
-      [cb("2 · What will I study?", "explore:step:2")],
-      [cb("3 · What can I become?", "explore:step:3")],
-      [cb("4 · Is DSE right for me?", "explore:step:4")],
-      [cb("5 · Ready to apply?", "explore:step:5")],
+      [cb("1 · What is DSE?", "about:what_is_dse")],
+      [cb("2 · What will I study?", "curriculum:overview")],
+      [cb("3 · What can I become?", "careers:jobs")],
+      [cb("4 · Is DSE right for me?", "fit:start")],
+      [cb("5 · Ready to apply?", "admission:how_to_apply")],
     ],
   },
   "explore.step1": {

@@ -42,6 +42,21 @@ describe("public Telegram typed menu configuration", () => {
     expect(routeForReplyText("Unknown reply")).toBeNull();
   });
 
+  test("Explore choices route directly to canonical answers without intermediate step menus", () => {
+    expect(MENUS.explore.rows.flat().map((button) => button.callbackData)).toEqual([
+      "about:what_is_dse",
+      "curriculum:overview",
+      "careers:jobs",
+      "fit:start",
+      "admission:how_to_apply",
+    ]);
+    expect(
+      MENUS.explore.rows
+        .flat()
+        .some((button) => button.callbackData.startsWith("explore:step:")),
+    ).toBe(false);
+  });
+
   test("every non-home route has a valid logical parent and Home navigation", () => {
     const routes = Object.keys(MENUS) as RouteKey[];
     for (const route of routes) {
