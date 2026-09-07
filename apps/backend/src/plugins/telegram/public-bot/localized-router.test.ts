@@ -163,16 +163,16 @@ describe("localized public Telegram router", () => {
     expect(keyboard.flat().map((item) => item.text)).toContain("🌐 ភាសា");
   });
 
-  test("Khmer reply keyboard label routes to the existing Admission route", async () => {
+  test("Khmer reply keyboard label routes to a localized concise Admission menu", async () => {
     const response = await webhook({
       update_id: 9003,
       message: { message_id: 3, chat: { id: 7001 }, text: "📝 ការចូលរៀន" },
     });
     expect(response.status).toBe(200);
     const sent = client.sent.at(-1)!;
-    expect(sent.text).toContain("ការចូលរៀន");
-    expect(sent.text).toContain("Published admission answer.");
-    expect(sent.text).toContain("ដាក់ពាក្យ: https://example.edu/apply");
+    expect(sent.text).toBe("ការចូលរៀន\n\nសូមជ្រើសជម្រើសខាងក្រោម។");
+    expect(sent.text).not.toContain("Published admission answer.");
+    expect(sent.text).not.toContain("https://example.edu/apply");
   });
 
   test("localized inline labels keep callback data unchanged", async () => {
@@ -186,6 +186,7 @@ describe("localized public Telegram router", () => {
     });
     expect(response.status).toBe(200);
     const edited = client.edited.at(-1)!;
+    expect(edited.text).toBe("ការចូលរៀន\n\nសូមជ្រើសជម្រើសខាងក្រោម។");
     const keyboard = (edited.replyMarkup as { inline_keyboard: Array<Array<{ text: string; callback_data?: string }>> }).inline_keyboard;
     expect(keyboard.flat().map((item) => item.callback_data).filter(Boolean)).toContain("nav:home");
     expect(keyboard.flat().map((item) => item.text)).toContain("🏠 ទំព័រដើម");
