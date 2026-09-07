@@ -171,8 +171,15 @@ export function localizeReplyMarkup(
 
 function localizeHeading(line: string): string {
   const headings = new Map<string, string>([
+    ["About DSE", "អំពី DSE"],
     ["Admission", "ការចូលរៀន"],
+    ["Study & Curriculum", "ការសិក្សា និងកម្មវិធីសិក្សា"],
+    ["Careers", "អាជីព"],
     ["Fees & Scholarships", "ថ្លៃសិក្សា និងអាហារូបករណ៍"],
+    ["Scholarships", "អាហារូបករណ៍"],
+    ["Student Life", "ជីវិតនិស្សិត"],
+    ["Labs & Facilities", "មន្ទីរពិសោធន៍ និងបរិក្ខារ"],
+    ["Lecturers", "សាស្ត្រាចារ្យ"],
     ["Important Dates", "កាលបរិច្ឆេទសំខាន់ៗ"],
     ["Contact Us", "ទាក់ទងយើង"],
     ["Ask DSE", "សួរ DSE"],
@@ -220,6 +227,7 @@ export function localizeBotText(text: string, locale: TelegramLocale): string {
   }).join("\n");
 
   return localized
+    .replace("Choose an option below.", "សូមជ្រើសជម្រើសខាងក្រោម។")
     .replace("No published information is available yet.", "មិនទាន់មានព័ត៌មានដែលបានផ្សព្វផ្សាយទេ។")
     .replace("No official published dates are available yet.", "មិនទាន់មានកាលបរិច្ឆេទផ្លូវការដែលបានផ្សព្វផ្សាយទេ។")
     .replace("No published contact information is available yet.", "មិនទាន់មានព័ត៌មានទំនាក់ទំនងដែលបានផ្សព្វផ្សាយទេ។")
