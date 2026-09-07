@@ -453,25 +453,12 @@ async function renderRoute(
       replyMarkup: inlineKeyboard("home"),
     };
   }
-  if (route === "admission") {
-    const admission = await publicRead.getAdmission(programmeId, locale);
-    const details = [
-      admission.applicationUrl && `Apply: ${admission.applicationUrl}`,
-      admission.admissionEmail && `Email: ${admission.admissionEmail}`,
-      admission.phone && `Phone: ${admission.phone}`,
-    ].filter(Boolean);
-    return {
-      text: `${formatFaqs("Admission", admission.faqs)}${details.length ? `\n\n${details.join("\n")}` : ""}`,
-      replyMarkup: inlineKeyboard(route),
-    };
-  }
-  if (route === "fees" || route === "scholarships") {
-    const data = await publicRead.getFeesScholarships(programmeId, locale);
-    return {
-      text: formatFaqs("Fees & Scholarships", data.faqs),
-      replyMarkup: inlineKeyboard(route),
-    };
-  }
+  if (route === "admission" || route === "fees" || route === "scholarships") {
+  return {
+    text: `${MENUS[route].title}\n\nChoose an option below.`,
+    replyMarkup: inlineKeyboard(route),
+  };
+}
   if (route === "dates") {
     return {
       text: formatDates(
@@ -493,24 +480,6 @@ async function renderRoute(
     });
     return {
       text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nYou can also type a question directly.`,
-      replyMarkup: inlineKeyboard(route),
-    };
-  }
-  const categoryByRoute: Partial<Record<RouteKey, ProgrammeFaqCategory>> = {
-    about: "About",
-    curriculum: "Curriculum",
-    careers: "Careers",
-    studentLife: "StudentLife",
-    facilities: "Facilities",
-    lecturers: "Lecturers",
-  };
-  const category = categoryByRoute[route];
-  if (category) {
-    return {
-      text: formatFaqs(
-        MENUS[route].title,
-        await publicRead.listFaqs(programmeId, { category, locale }),
-      ),
       replyMarkup: inlineKeyboard(route),
     };
   }
