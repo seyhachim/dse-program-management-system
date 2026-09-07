@@ -36,6 +36,15 @@ describe("student portal mobile cache", () => {
     expect(home).not.toContain("usePortalData(load)");
   });
 
+  test("destination warming waits for the latency-critical home response", async () => {
+    const state = await source("portal-state.tsx");
+
+    expect(state).toContain('protectedQueryKey(scope, "student-portal-home")');
+    expect(state).toContain("queryClient.getQueryData(homeKey)");
+    expect(state).toContain("getQueryCache().subscribe(warmDestinations)");
+    expect(state).toContain("window.setTimeout");
+  });
+
   test("prefetched destinations reuse the exact protected resource keys", async () => {
     const checks = [
       ["courses/portal-courses.tsx", 'useCachedPortalData("courses", load)'],
