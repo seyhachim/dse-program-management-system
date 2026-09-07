@@ -16,7 +16,7 @@ import {
   EmptyState,
   PortalError,
   PortalLoading,
-  usePortalData,
+  useCachedPortalData,
 } from "../portal-state";
 
 function CourseCard({ course }: { course: PortalCourseSummary }) {
@@ -111,7 +111,7 @@ function CourseSection({
 
 export function PortalCourses() {
   const load = useCallback(() => studentPortalApi.courses(), []);
-  const { data, loading, error } = usePortalData(load);
+  const { data, loading, error } = useCachedPortalData("courses", load);
 
   if (loading) return <PortalLoading />;
   if (error || !data) {
