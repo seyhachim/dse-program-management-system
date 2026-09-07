@@ -1,0 +1,59 @@
+name: Align Telegram concise-menu test
+
+on:
+  push:
+    branches:
+      - fix/913-telegram-concise-topic-menus
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/913-telegram-concise-topic-menus
+      - name: Update admission landing test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/backend/src/plugins/telegram/public-bot/router.test.ts')
+          s = p.read_text()
+          old = '''  test("primary Admission selection renders PMS-owned published FAQ content", async () => {
+            const response = await webhook({
+              update_id: 3,
+              message: { message_id: 3, chat: { id: 11 }, text: "📝 Admission" },
+            });
+            expect(response.status).toBe(200);
+            const sent = client.sent.at(-1)!;
+            expect(sent.text).toContain("Published admission answer.");
+            expect(sent.text).toContain("https://example.edu/apply");
+            expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
+          });'''
+          new = '''  test("primary Admission selection renders a concise topic menu without batch FAQ answers", async () => {
+            const response = await webhook({
+              update_id: 3,
+              message: { message_id: 3, chat: { id: 11 }, text: "📝 Admission" },
+            });
+            expect(response.status).toBe(200);
+            const sent = client.sent.at(-1)!;
+            expect(sent.text).toBe("Admission\\n\\nChoose an option below.");
+            expect(sent.text).not.toContain("Published admission answer.");
+            expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
+          });'''
+          if old not in s:
+              raise SystemExit('target admission test not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          bunx prettier --write apps/backend/src/plugins/telegram/public-bot/router.test.ts
+      - name: Commit test update
+        run: |
+          git rm .github/workflows/temp-test-fix-913.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/backend/src/plugins/telegram/public-bot/router.test.ts
+          git commit -m "test(telegram): expect concise Admission landing menu"
+          git push origin HEAD:fix/913-telegram-concise-topic-menus
