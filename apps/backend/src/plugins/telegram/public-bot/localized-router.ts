@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Router, type Request } from "express";
 import { purposeHmac } from "../../../core/security/public-abuse-protection.ts";
 import { getPublicTelegramConfig } from "../config.ts";
@@ -18,9 +19,19 @@ import {
 import {
   createTelegramPublicBotClient,
   type TelegramPublicBotClient,
+  type TelegramReplyMarkup,
 } from "./telegram-client.ts";
 
 const MAX_LOCALE_ENTRIES = 10_000;
+const GROUP_START_PAYLOAD = "dse_group";
+const GROUP_LAUNCHER_TEXT =
+  "🎓 DSE Information Board\n\nសូមបើកបូតឯកជន ដើម្បីស្វែងយល់ព័ត៌មានកម្មវិធី DSE ដោយមិនរំខានក្រុម។\nOpen the private DSE information bot to browse without cluttering this group.";
+
+type TelegramChatType = "private" | "group" | "supergroup" | "channel";
+type TelegramPresentationContext = {
+  chatId?: number;
+  chatType?: TelegramChatType;
+};
 
 class TelegramLocaleStore {
   private readonly values = new Map<string, TelegramLocale>();
@@ -50,18 +61,33 @@ class TelegramLocaleStore {
 }
 
 const localeStore = new TelegramLocaleStore();
+const presentationContext =
+  new AsyncLocalStorage<TelegramPresentationContext>();
 
-function chatIdFromBody(body: unknown): number | undefined {
+function chatContextFromBody(
+  body: unknown,
+): { chatId: number; type?: TelegramChatType } | undefined {
   if (!body || typeof body !== "object") return undefined;
   const candidate = body as {
-    message?: { chat?: { id?: unknown } };
-    callback_query?: { message?: { chat?: { id?: unknown } } };
+    message?: { chat?: { id?: unknown; type?: unknown } };
+    callback_query?: {
+      message?: { chat?: { id?: unknown; type?: unknown } };
+    };
   };
-  const value =
-    candidate.message?.chat?.id ?? candidate.callback_query?.message?.chat?.id;
-  return typeof value === "number" && Number.isInteger(value)
-    ? value
-    : undefined;
+  const chat = candidate.message?.chat ?? candidate.callback_query?.message?.chat;
+  const value = chat?.id;
+  if (typeof value !== "number" || !Number.isInteger(value)) return undefined;
+  const type = chat?.type;
+  return {
+    chatId: value,
+    type:
+      type === "private" ||
+      type === "group" ||
+      type === "supergroup" ||
+      type === "channel"
+        ? type
+        : undefined,
+  };
 }
 
 function localeKey(webhookSecret: string, chatId: number): string {
@@ -72,16 +98,105 @@ function localeForChat(webhookSecret: string, chatId: number): TelegramLocale {
   return localeStore.get(localeKey(webhookSecret, chatId)) ?? "en";
 }
 
+function isGroupChat(type: TelegramChatType | undefined): boolean {
+  return type === "group" || type === "supergroup";
+}
+
+function normalizeBotUsername(botUsername: string | undefined): string | undefined {
+  const normalized = botUsername?.trim().replace(/^@/, "");
+  return normalized || undefined;
+}
+
+function parseTelegramCommand(
+  text: string,
+): { name: string; target?: string; argument?: string } | null {
+  const match = text
+    .trim()
+    .match(/^\/([a-z0-9_]+)(?:@([a-z0-9_]+))?(?:\s+(.+))?$/i);
+  if (!match) return null;
+  return {
+    name: match[1]!.toLowerCase(),
+    target: match[2]?.toLowerCase(),
+    argument: match[3]?.trim(),
+  };
+}
+
+function commandTargetsBot(
+  target: string | undefined,
+  botUsername: string | undefined,
+): boolean {
+  if (!target) return true;
+  const normalized = normalizeBotUsername(botUsername)?.toLowerCase();
+  return Boolean(normalized && target === normalized);
+}
+
+function isGroupLauncherCommand(
+  text: string,
+  botUsername: string | undefined,
+): boolean {
+  const command = parseTelegramCommand(text);
+  if (!command || !commandTargetsBot(command.target, botUsername)) return false;
+  return command.name === "start" || command.name === "dse";
+}
+
+function isPrivateGroupDeepLink(
+  text: string,
+  botUsername: string | undefined,
+): boolean {
+  const command = parseTelegramCommand(text);
+  return Boolean(
+    command &&
+      command.name === "start" &&
+      commandTargetsBot(command.target, botUsername) &&
+      command.argument === GROUP_START_PAYLOAD,
+  );
+}
+
+function buildGroupLauncherMarkup(
+  botUsername: string | undefined,
+): TelegramReplyMarkup | undefined {
+  const normalized = normalizeBotUsername(botUsername);
+  if (!normalized) return undefined;
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "🚀 Open DSE Information Board",
+          url: `https://t.me/${normalized}?start=${GROUP_START_PAYLOAD}`,
+        },
+      ],
+    ],
+  };
+}
+
 function localizedClient(
   base: TelegramPublicBotClient,
   webhookSecret: string,
+  botUsername: string | undefined,
 ): TelegramPublicBotClient {
   function localeFor(chatId: number): TelegramLocale {
     return localeStore.get(localeKey(webhookSecret, chatId)) ?? "en";
   }
 
+  function isCurrentRequestGroup(chatId: number): boolean {
+    const context = presentationContext.getStore();
+    return context?.chatId === chatId && isGroupChat(context.chatType);
+  }
+
   return {
     async sendMessage(input) {
+      if (
+        isCurrentRequestGroup(input.chatId) &&
+        input.text.startsWith("Welcome to the DSE Program Information Bot")
+      ) {
+        await base.sendMessage({
+          chatId: input.chatId,
+          text: GROUP_LAUNCHER_TEXT,
+          replyMarkup: buildGroupLauncherMarkup(botUsername),
+        });
+        return;
+      }
+
       const key = localeKey(webhookSecret, input.chatId);
       const selected = localeStore.get(key);
       if (
@@ -118,29 +233,66 @@ function localizedClient(
   };
 }
 
-function preprocessLanguageSelection(
+function preprocessTelegramPresentation(
   req: Request,
   webhookSecret: string,
-): void {
-  if (req.method !== "POST" || req.path !== "/webhook") return;
-  const chatId = chatIdFromBody(req.body);
-  if (chatId === undefined) return;
+  botUsername: string | undefined,
+): TelegramPresentationContext {
+  if (req.method !== "POST" || req.path !== "/webhook") return {};
+  const context = chatContextFromBody(req.body);
+  if (!context) return {};
 
-  const message = (req.body as { message?: { text?: unknown } }).message;
-  if (!message || typeof message.text !== "string") return;
+  const requestContext: TelegramPresentationContext = {
+    chatId: context.chatId,
+    chatType: context.type,
+  };
+  const body = req.body as {
+    message?: { text?: unknown };
+    callback_query?: { data?: unknown };
+  };
 
-  const selected = localeFromSelection(message.text);
-  const key = localeKey(webhookSecret, chatId);
+  if (isGroupChat(context.type)) {
+    if (body.callback_query) {
+      delete body.callback_query.data;
+      return requestContext;
+    }
+
+    const groupMessage = body.message;
+    if (!groupMessage || typeof groupMessage.text !== "string") {
+      return requestContext;
+    }
+    if (isGroupLauncherCommand(groupMessage.text, botUsername)) {
+      groupMessage.text = "/start";
+    } else {
+      // Keep group traffic out of the interactive information/search flow. The
+      // authenticated base webhook still receives the update, applies its normal
+      // abuse/rate limits, and acknowledges it without invoking Ask DSE.
+      delete groupMessage.text;
+    }
+    return requestContext;
+  }
+
+  const message = body.message;
+  if (!message || typeof message.text !== "string") return requestContext;
+  let messageText = message.text;
+
+  if (isPrivateGroupDeepLink(messageText, botUsername)) {
+    messageText = "/start";
+    message.text = messageText;
+  }
+
+  const selected = localeFromSelection(messageText);
+  const key = localeKey(webhookSecret, context.chatId);
   if (selected) {
     localeStore.set(key, selected);
     message.text = "/menu";
-    return;
+    return requestContext;
   }
 
-  if (isLanguageSwitch(message.text)) {
+  if (isLanguageSwitch(messageText)) {
     localeStore.delete(key);
     message.text = "/start";
-    return;
+    return requestContext;
   }
 
   // Telegram keeps a reply keyboard on the device across backend deploys, while
@@ -150,31 +302,31 @@ function preprocessLanguageSelection(
   // If the user explicitly selected English, keep that preference while still
   // normalizing the stale Khmer keyboard label for typed routing.
   const storedLocale = localeStore.get(key);
-  const normalizedReplyText = toEnglishReplyText(message.text);
-  if (normalizedReplyText !== message.text) {
+  const normalizedReplyText = toEnglishReplyText(messageText);
+  if (normalizedReplyText !== messageText) {
     if (!storedLocale) localeStore.set(key, "km");
     message.text = normalizedReplyText;
-    return;
+    return requestContext;
   }
 
   if (storedLocale === "km") {
     message.text = normalizedReplyText;
   }
+  return requestContext;
 }
 
 /**
- * Locale adapter around the existing typed public Telegram router.
+ * Presentation adapter around the existing typed public Telegram router.
  *
  * Routing/callback payloads, authorization, webhook verification, public PMS reads,
  * rate limiting and analytics remain owned by the existing router. This adapter
- * only localizes visible bot-owned text and maps localized reply-keyboard labels
- * back to the same English RouteKey inputs.
+ * localizes visible bot-owned text, maps localized reply-keyboard labels back to
+ * canonical RouteKey inputs, and keeps public group chats as launcher-only entry
+ * points into the private information bot.
  *
- * Locale preference is intentionally lightweight and process-local. It is stored
- * only under a purpose-separated HMAC key, never under a raw Telegram identifier.
- * After a process restart, a tap on an existing Khmer reply keyboard safely
- * rehydrates missing Khmer presentation state; an explicit English choice is
- * preserved. No authorization decision depends on this preference.
+ * Locale preference remains lightweight and process-local under a purpose-separated
+ * HMAC key. Chat type is request-scoped through AsyncLocalStorage and is never used
+ * for authorization. No raw Telegram identifier is persisted by this adapter.
  */
 export function createLocalizedPublicTelegramRouter(
   deps: PublicTelegramRouterDependencies = {},
@@ -188,14 +340,22 @@ export function createLocalizedPublicTelegramRouter(
     deps.client ?? createTelegramPublicBotClient(config.botToken);
   const router = Router();
   router.use((req, _res, next) => {
-    preprocessLanguageSelection(req, config.webhookSecret!);
-    next();
+    const context = preprocessTelegramPresentation(
+      req,
+      config.webhookSecret!,
+      config.botUsername,
+    );
+    presentationContext.run(context, next);
   });
   router.use(
     createPublicTelegramRouter({
       ...deps,
       config,
-      client: localizedClient(baseClient, config.webhookSecret),
+      client: localizedClient(
+        baseClient,
+        config.webhookSecret,
+        config.botUsername,
+      ),
       localeForChat:
         deps.localeForChat ??
         ((chatId) => localeForChat(config.webhookSecret!, chatId)),
