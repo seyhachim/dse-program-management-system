@@ -75,12 +75,13 @@ export function usePortalPrefetch(
     loader: () => Promise<unknown>;
     staleTime?: number;
   }[],
+  enabled = true,
 ) {
   const { me } = useMe();
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!me?.id) return;
+    if (!enabled || !me?.id) return;
     const scope = { userId: me.id };
     for (const entry of entries) {
       void queryClient.prefetchQuery({
@@ -92,7 +93,7 @@ export function usePortalPrefetch(
         staleTime: entry.staleTime ?? QUERY_STALE_MS.operational,
       });
     }
-  }, [entries, me?.id, queryClient]);
+  }, [enabled, entries, me?.id, queryClient]);
 }
 
 export function PortalLoading() {
