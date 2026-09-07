@@ -169,7 +169,7 @@ describe("localized public Telegram stale reply keyboard", () => {
     const keyboard = inlineKeyboardOf(sent);
     expect(
       keyboard.flat().map((item) => item.callback_data).filter(Boolean),
-    ).toContain("explore:step:1");
+    ).toContain("about:what_is_dse");
     expect(keyboard.flat().map((item) => item.text)).toContain("1 · DSE ជាអ្វី?");
   });
 
@@ -202,7 +202,7 @@ describe("localized public Telegram stale reply keyboard", () => {
     const keyboard = inlineKeyboardOf(sent);
     expect(
       keyboard.flat().map((item) => item.callback_data).filter(Boolean),
-    ).toContain("explore:step:1");
+    ).toContain("about:what_is_dse");
     expect(keyboard.flat().map((item) => item.text)).toContain("1 · What is DSE?");
     expect(keyboard.flat().map((item) => item.text)).not.toContain("1 · DSE ជាអ្វី?");
   });
