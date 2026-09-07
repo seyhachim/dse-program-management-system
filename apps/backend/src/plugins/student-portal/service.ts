@@ -67,6 +67,7 @@ const enrollmentInclude = {
 } satisfies Prisma.EnrollmentInclude;
 
 type EnrollmentRow = Awaited<ReturnType<typeof enrolledRows>>[number];
+type PortalStudent = Awaited<ReturnType<typeof studentForUser>>;
 
 async function studentForUser(userId: string) {
   const student = await prisma.student.findUnique({ where: { userId } });
@@ -88,8 +89,7 @@ interface ProgrammeCalendarReadContract {
   };
 }
 
-async function academicCalendarForStudent(userId: string): Promise<StudentAcademicCalendarView> {
-  const student = await studentForUser(userId);
+async function academicCalendarForStudentRecord(student: PortalStudent): Promise<StudentAcademicCalendarView> {
   const membership = await prisma.studentCohortMembership.findFirst({
     where: { studentId: student.id, exitedAt: null },
     include: {
@@ -130,14 +130,21 @@ async function academicCalendarForStudent(userId: string): Promise<StudentAcadem
   };
 }
 
-async function enrolledRows(userId: string) {
-  const student = await studentForUser(userId);
+async function academicCalendarForStudent(userId: string): Promise<StudentAcademicCalendarView> {
+  return academicCalendarForStudentRecord(await studentForUser(userId));
+}
+
+async function enrolledRowsForStudent(student: PortalStudent) {
   const rows = await prisma.enrollment.findMany({
     where: { studentId: student.id },
     include: enrollmentInclude,
     orderBy: { createdAt: "desc" },
   });
   return Object.assign(rows, { student });
+}
+
+async function enrolledRows(userId: string) {
+  return enrolledRowsForStudent(await studentForUser(userId));
 }
 
 function stringArray(value: unknown): string[] {
@@ -336,6 +343,61 @@ function toSummary(row: EnrollmentRow): PortalCourseSummary {
     })),
     specAvailable: spec !== null,
     nextAssessment,
+  };
+}
+
+function homeCourseSnapshot(row: EnrollmentRow) {
+  const spec = approvedSpec(row);
+  if (!spec) {
+    return {
+      overallAchievement: null,
+      upcomingAssessments: [] as StudentPortalHome["upcomingAssessments"],
+    };
+  }
+
+  const exactResults = row.results.filter((result) => result.courseSpecId === spec.id);
+  const resultAssessmentIds = new Set(exactResults.map((result) => result.assessmentItemId));
+  const deadlines = new Map(
+    row.offering.assessmentDeadlines
+      .filter((deadline) => deadline.courseSpecId === spec.id)
+      .map((deadline) => [deadline.assessmentItemId, deadline.dueAt]),
+  );
+  const criterionMappings = spec.assessmentItems.flatMap((assessment) =>
+    assessment.criterionCloMappings.map((mapping) => ({
+      assessmentItemId: assessment.id,
+      rubricId: mapping.rubricId,
+      criterionId: mapping.criterionId,
+      cloCode: mapping.cloCode,
+    })),
+  );
+  const achievements = calculateCloAchievements(
+    spec.clos,
+    spec.assessmentItems,
+    exactResults,
+    criterionMappings,
+  );
+  const measured = achievements.flatMap((item) =>
+    item.percentage === null ? [] : [item.percentage],
+  );
+
+  return {
+    overallAchievement: measured.length
+      ? Math.round(measured.reduce((sum, item) => sum + item, 0) / measured.length)
+      : null,
+    upcomingAssessments: spec.assessmentItems
+      .filter((item) => item.status === "Active" && !resultAssessmentIds.has(item.id))
+      .map((item) => ({
+        offeringId: row.offeringId,
+        courseCode: row.offering.course.code,
+        assessmentId: item.id,
+        name: item.name,
+        dueAt: deadlines.get(item.id)?.toISOString() ?? null,
+        dueWeek: item.dueWeek,
+        weight: item.weight,
+      })),
+  } satisfies {
+    overallAchievement: number | null;
+    upcomingAssessments: StudentPortalHome["upcomingAssessments"];
   };
 }
 
@@ -686,10 +748,15 @@ export const studentPortalService = {
   },
 
   async home(userId: string): Promise<StudentPortalHome> {
-    const rows = await enrolledRows(userId);
-    const details = await Promise.all(rows.map((row) => toDetail(row, userId)));
-    const measured = details.flatMap((course) => course.overallAchievement === null ? [] : [course.overallAchievement]);
-    const academicCalendar = await academicCalendarForStudent(userId);
+    const student = await studentForUser(userId);
+    const [rows, academicCalendar] = await Promise.all([
+      enrolledRowsForStudent(student),
+      academicCalendarForStudentRecord(student),
+    ]);
+    const snapshots = rows.map(homeCourseSnapshot);
+    const measured = snapshots.flatMap((course) =>
+      course.overallAchievement === null ? [] : [course.overallAchievement],
+    );
     return {
       student: {
         id: rows.student.id,
@@ -698,17 +765,8 @@ export const studentPortalService = {
         email: rows.student.email,
       },
       courses: rows.map(toSummary),
-      upcomingAssessments: details.flatMap((course) => course.assessments
-        .filter((assessment) => !assessment.result)
-        .map((assessment) => ({
-          offeringId: course.offeringId,
-          courseCode: course.code,
-          assessmentId: assessment.id,
-          name: assessment.name,
-          dueAt: assessment.dueAt,
-          dueWeek: assessment.dueWeek,
-          weight: assessment.weight,
-        })))
+      upcomingAssessments: snapshots
+        .flatMap((course) => course.upcomingAssessments)
         .sort((a, b) => (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999"))
         .slice(0, 6),
       announcements: announcementsFrom(rows).slice(0, 5),
