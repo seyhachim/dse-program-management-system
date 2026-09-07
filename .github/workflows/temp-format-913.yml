@@ -1,0 +1,29 @@
+name: Format Telegram concise-menu fix
+
+on:
+  push:
+    branches:
+      - fix/913-telegram-concise-topic-menus
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/913-telegram-concise-topic-menus
+      - uses: oven-sh/setup-bun@v2
+      - name: Format changed source
+        run: bunx prettier --write apps/backend/src/plugins/telegram/public-bot/router.ts apps/backend/src/plugins/telegram/public-bot/topic-menu-concise.test.ts
+      - name: Commit formatting
+        run: |
+          git rm .github/workflows/temp-format-913.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/backend/src/plugins/telegram/public-bot/router.ts apps/backend/src/plugins/telegram/public-bot/topic-menu-concise.test.ts
+          git commit -m "style(telegram): format concise menu fix"
+          git push origin HEAD:fix/913-telegram-concise-topic-menus
