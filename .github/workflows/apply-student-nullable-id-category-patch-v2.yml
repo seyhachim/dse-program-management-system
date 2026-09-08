@@ -1,0 +1,203 @@
+name: Apply student nullable ID/category patch v2
+
+on:
+  push:
+    branches:
+      - feat/student-nullable-id-category-roster
+
+permissions:
+  contents: write
+
+jobs:
+  apply-patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply patch
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          def sub(path, pattern, replacement, flags=0):
+              p = Path(path)
+              text = p.read_text()
+              new, n = re.subn(pattern, replacement, text, count=1, flags=flags)
+              if n != 1:
+                  raise SystemExit(f"Expected exactly one match in {path}: {pattern[:100]!r}; got {n}")
+              p.write_text(new)
+
+          schema = "apps/backend/prisma/schema.prisma"
+          sub(schema, r'enum StudentStatus \{\n  Active\n  Inactive\n  Pending\n\}', '''enum StudentStatus {
+            Active
+            Inactive
+            Pending
+          }
+
+          enum StudentCategory {
+            Regular
+            Scholarship
+          }''')
+          sub(schema, r'(\n  studentId\s+)String(\s+@unique\n  status\s+StudentStatus\s+@default\(Active\))', r'\1String?\2'.replace('String?\\2', 'String?\\2'))
+          # Add category immediately after the now-nullable studentId line.
+          sub(schema, r'(\n  studentId\s+String\?\s+@unique\n)', r'\1  category                         StudentCategory                          @default(Regular)\n')
+
+          shared = "packages/shared-types/src/students.ts"
+          sub(shared, r'(export type StudentStatus = z\.infer<typeof StudentStatusSchema>;)', r'''\1
+
+          export const STUDENT_CATEGORIES = ["Regular", "Scholarship"] as const;
+          export const StudentCategorySchema = z.enum(STUDENT_CATEGORIES);
+          export type StudentCategory = z.infer<typeof StudentCategorySchema>;''')
+          marker = '''/**
+           * Roster records may exist before a portal/login email is known. Blank form
+           * values normalize to null; any supplied value must still be a valid email.
+           */
+          export const StudentEmailSchema = z.preprocess('''
+          insert = '''/**
+           * Official institutional IDs may be unavailable when an initial roster is
+           * received. Blank values normalize to null and can be filled on the same
+           * student record later without changing its internal PMS identity.
+           */
+          export const StudentIdSchema = z.preprocess(
+            (value) => {
+              if (value === undefined || value === null) return null;
+              if (typeof value !== "string") return value;
+              const normalized = value.trim();
+              return normalized.length > 0 ? normalized : null;
+            },
+            z.string().min(1).nullable(),
+          );
+
+          ''' + marker
+          p = Path(shared); text = p.read_text()
+          if marker not in text: raise SystemExit("email marker missing")
+          p.write_text(text.replace(marker, insert, 1))
+          sub(shared, r'studentId: z\.string\(\)\.min\(1\),\n  status:', 'studentId: StudentIdSchema,\n  category: StudentCategorySchema,\n  status:')
+          sub(shared, r'studentId: z\.string\(\)\.trim\(\)\.min\(1, "Student ID is required"\),\n  status:', 'studentId: StudentIdSchema,\n  category: StudentCategorySchema.default("Regular"),\n  status:')
+
+          service = "apps/backend/src/plugins/students/service.ts"
+          p = Path(service); text = p.read_text()
+          text = text.replace('  studentId: true,\n  status: true,\n  createdAt: true,', '  studentId: true,\n  category: true,\n  status: true,\n  createdAt: true,', 1)
+          text = text.replace('  studentId: true,\n  status: true,\n} as const;', '  studentId: true,\n  category: true,\n  status: true,\n} as const;', 1)
+          if text == p.read_text(): raise SystemExit("service patch made no changes")
+          p.write_text(text)
+
+          form = "apps/frontend/app/(shell)/students/student-form.tsx"
+          p = Path(form); text = p.read_text()
+          text, n = re.subn(r'(  CreateStudentInput,\n)', r'\1  STUDENT_CATEGORIES,\n', text, count=1)
+          if n != 1: raise SystemExit("form import patch failed")
+          text = text.replace('      studentId: "",\n      status: "Active",', '      studentId: "",\n      category: "Regular",\n      status: "Active",', 1)
+          text = text.replace('            studentId: editing.studentId,\n            status: editing.status,', '            studentId: editing.studentId ?? "",\n            category: editing.category,\n            status: editing.status,', 1)
+          # second create/reset block
+          idx = text.find('            studentId: "",\n            status: "Active",')
+          if idx < 0: raise SystemExit("form reset default patch failed")
+          text = text[:idx] + text[idx:].replace('            studentId: "",\n            status: "Active",', '            studentId: "",\n            category: "Regular",\n            status: "Active",', 1)
+          text = text.replace('Create a student roster record. Email can be added later when portal access is provisioned.', 'Create a student roster record. Student ID and email can be added later when officially available.', 1)
+          old = '''            <Field label="Student ID" error={errors.studentId?.message} required>
+              <Input placeholder="Official student ID" {...register("studentId")} required />
+            </Field>
+            <Field label="Email (optional)" error={errors.email?.message}>'''
+          new = '''            <Field label="Student ID (optional)" error={errors.studentId?.message}>
+              <Input placeholder="Add when officially issued" {...register("studentId")} />
+            </Field>
+            <Field label="Category" error={errors.category?.message} required>
+              <Controller
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger aria-required="true">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STUDENT_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Email (optional)" error={errors.email?.message}>'''
+          if old not in text: raise SystemExit("form student-id field patch failed")
+          p.write_text(text.replace(old, new, 1))
+
+          client = "apps/frontend/app/(shell)/students/students-client.tsx"
+          p = Path(client); text = p.read_text()
+          old = '    { key: "studentId", header: "Student ID", render: (s) => s.studentId },\n'
+          new = '''    {
+              key: "studentId",
+              header: "Student ID",
+              render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
+            },
+            { key: "category", header: "Category", render: (s) => s.category },
+          '''
+          if old not in text: raise SystemExit("student table patch failed")
+          p.write_text(text.replace(old, new, 1))
+
+          migration = Path("apps/backend/prisma/migrations/20260908133000_student_nullable_id_category/migration.sql")
+          migration.parent.mkdir(parents=True, exist_ok=True)
+          migration.write_text('''-- Allow provisional roster records before official institutional IDs are issued.
+          CREATE TYPE "StudentCategory" AS ENUM ('Regular', 'Scholarship');
+
+          ALTER TABLE "Student"
+            ALTER COLUMN "studentId" DROP NOT NULL,
+            ADD COLUMN "category" "StudentCategory" NOT NULL DEFAULT 'Regular';
+          ''')
+
+          test = Path("apps/backend/src/plugins/students/student-schema.test.ts")
+          test.write_text('''import { describe, expect, test } from "bun:test";
+          import { CreateStudentInput, UpdateStudentInput } from "@dse-pms/shared-types";
+
+          describe("student roster schema", () => {
+            test("allows a provisional student without an official student ID", () => {
+              const parsed = CreateStudentInput.parse({
+                name: "Provisional Student",
+                email: "",
+                studentId: "",
+                status: "Pending",
+              });
+              expect(parsed.studentId).toBeNull();
+              expect(parsed.category).toBe("Regular");
+              expect(parsed.email).toBeNull();
+            });
+
+            test("accepts scholarship category", () => {
+              const parsed = CreateStudentInput.parse({
+                name: "Scholarship Student",
+                email: null,
+                studentId: null,
+                category: "Scholarship",
+                status: "Pending",
+              });
+              expect(parsed.studentId).toBeNull();
+              expect(parsed.category).toBe("Scholarship");
+            });
+
+            test("fills the official ID later on the same record", () => {
+              expect(UpdateStudentInput.parse({ studentId: "  202512345  " }).studentId).toBe("202512345");
+              expect(UpdateStudentInput.parse({ studentId: "" }).studentId).toBeNull();
+            });
+          });
+          ''')
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backend/prisma/schema.prisma \
+                  apps/backend/prisma/migrations/20260908133000_student_nullable_id_category/migration.sql \
+                  packages/shared-types/src/students.ts \
+                  apps/backend/src/plugins/students/service.ts \
+                  apps/backend/src/plugins/students/student-schema.test.ts \
+                  'apps/frontend/app/(shell)/students/student-form.tsx' \
+                  'apps/frontend/app/(shell)/students/students-client.tsx'
+          git commit -m "feat(students): support provisional IDs and categories"
+          git push origin HEAD:feat/student-nullable-id-category-roster
