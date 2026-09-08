@@ -21,15 +21,10 @@ function callbackButtons(route: RouteKey): CallbackButton[] {
 }
 
 describe("public Telegram typed menu configuration", () => {
-  test("persistent reply keyboard contains the seven agreed primary actions", () => {
+  test("persistent reply keyboard contains only global navigation utilities", () => {
     expect(MAIN_REPLY_KEYBOARD.flat().map((button) => button.text)).toEqual([
-      "🚀 Explore DSE",
-      "📝 Admission",
-      "📚 Study & Curriculum",
-      "💼 Careers",
-      "💰 Fees & Scholarships",
+      "🏠 Home",
       "❓ Ask DSE",
-      "☰ More",
     ]);
   });
 
@@ -40,6 +35,18 @@ describe("public Telegram typed menu configuration", () => {
       expect(routeForReplyText(button.text)).toBe(button.route);
     }
     expect(routeForReplyText("Unknown reply")).toBeNull();
+  });
+
+  test("Home remains the primary top-level content navigation", () => {
+    expect(MENUS.home.rows.flat().map((button) => button.text)).toEqual([
+      "🚀 Explore DSE",
+      "📝 Admission",
+      "📚 Study & Curriculum",
+      "💼 Careers",
+      "💰 Fees & Scholarships",
+      "❓ Ask DSE",
+      "☰ More",
+    ]);
   });
 
   test("Explore choices route directly to canonical answers without intermediate step menus", () => {
@@ -55,6 +62,28 @@ describe("public Telegram typed menu configuration", () => {
         .flat()
         .some((button) => button.callbackData.startsWith("explore:step:")),
     ).toBe(false);
+  });
+
+  test("curriculum and careers keep compact mobile menus", () => {
+    expect(MENUS.curriculum.rows.length).toBeLessThanOrEqual(5);
+    expect(MENUS.careers.rows.length).toBeLessThanOrEqual(5);
+    expect(MENUS.curriculum.rows.flat().map((button) => button.text)).toContain(
+      "All courses",
+    );
+    expect(MENUS.careers.rows.flat().map((button) => button.text)).toContain(
+      "Career explorer",
+    );
+  });
+
+  test("Important Dates and Contact render content first with only Back/Home controls", () => {
+    expect(getMenuKeyboard("dates").flat().map((button) => button.text)).toEqual([
+      "← Back",
+      "🏠 Home",
+    ]);
+    expect(getMenuKeyboard("contact").flat().map((button) => button.text)).toEqual([
+      "← Back",
+      "🏠 Home",
+    ]);
   });
 
   test("More exposes only the approved shortcuts and keeps Back/Home navigation", () => {
