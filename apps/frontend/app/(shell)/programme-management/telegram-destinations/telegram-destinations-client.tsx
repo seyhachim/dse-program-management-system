@@ -6,8 +6,10 @@ import { api, ApiError } from "@/lib/api";
 type Audience = "ALL_LECTURERS" | "ALL_STUDENTS" | "COHORT" | "CLASS_SECTION" | "CUSTOM";
 type CreateAudience = Exclude<Audience, "CLASS_SECTION">;
 type ChatType = "GROUP" | "SUPERGROUP" | "CHANNEL";
+type ManagedProgramme = { id: string };
 type Destination = {
   id: string;
+  programmeId: string;
   name: string;
   chatTitle?: string;
   chatType: ChatType;
@@ -57,6 +59,8 @@ function messageOf(error: unknown) {
 }
 
 export function TelegramDestinationsClient() {
+  const [programmes, setProgrammes] = useState<ManagedProgramme[]>([]);
+  const [selectedProgrammeId, setSelectedProgrammeId] = useState("");
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,33 +74,58 @@ export function TelegramDestinationsClient() {
   const [connection, setConnection] = useState<{ destinationId: string; registrationId: string; command: string; expiresInSeconds: number }>();
   const [deliveries, setDeliveries] = useState<Record<string, Delivery[]>>({});
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const result = await api.get<{ programmes: ManagedProgramme[] }>("/api/telegram/destinations/scopes/programmes");
+        setProgrammes(result.programmes);
+        setSelectedProgrammeId((current) => current || result.programmes[0]?.id || "");
+        if (result.programmes.length === 0) setLoading(false);
+      } catch (err) {
+        setError(messageOf(err));
+        setLoading(false);
+      }
+    })();
+  }, []);
+
   const load = useCallback(async () => {
+    if (!selectedProgrammeId) return;
+    setLoading(true);
     try {
+      const query = `?programmeId=${encodeURIComponent(selectedProgrammeId)}`;
       const [destinationResult, cohortResult] = await Promise.all([
-        api.get<{ destinations: Destination[] }>("/api/telegram/destinations"),
-        api.get<{ cohorts: Cohort[] }>("/api/telegram/destinations/scopes/cohorts"),
+        api.get<{ destinations: Destination[] }>(`/api/telegram/destinations${query}`),
+        api.get<{ cohorts: Cohort[] }>(`/api/telegram/destinations/scopes/cohorts${query}`),
       ]);
       setDestinations(destinationResult.destinations);
       setCohorts(cohortResult.cohorts);
+      setScopeId("");
+      setConnection(undefined);
+      setDeliveries({});
       setError(undefined);
     } catch (err) {
       setError(messageOf(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedProgrammeId]);
 
   useEffect(() => { void load(); }, [load]);
 
   async function createDestination(event: React.FormEvent) {
     event.preventDefault();
     setError(undefined);
+    if (!selectedProgrammeId) {
+      setError("Choose a programme before adding a Telegram destination.");
+      return;
+    }
     if (audienceType === "COHORT" && !scopeId) {
       setError("Choose a PMS cohort before adding this destination.");
       return;
     }
     try {
       await api.post<Destination>("/api/telegram/destinations", {
+        programmeId: selectedProgrammeId,
         name,
         audienceType,
         ...(audienceType === "COHORT" ? { scopeId } : {}),
@@ -124,7 +153,7 @@ export function TelegramDestinationsClient() {
     try {
       const registration = await api.get<Registration | null>(`/api/telegram/destinations/${destination.id}/registration`);
       if (!registration?.observed) {
-        setError("The PMS bot has not seen the registration command in that Telegram chat yet.");
+        setError("The PMS bot has not seen an unconfirmed registration command in that Telegram chat yet.");
         return;
       }
       await api.post<Destination>(`/api/telegram/destinations/${destination.id}/confirm`, { registrationId: registration.id });
@@ -159,9 +188,9 @@ export function TelegramDestinationsClient() {
     } catch (err) { setError(messageOf(err)); }
   }
 
-  const cohortName = (scopeId?: string) => {
-    if (!scopeId) return undefined;
-    const cohort = cohorts.find((item) => item.id === scopeId);
+  const cohortName = (cohortId?: string) => {
+    if (!cohortId) return undefined;
+    const cohort = cohorts.find((item) => item.id === cohortId);
     return cohort ? `${cohort.code} · ${cohort.name}` : "PMS cohort";
   };
 
@@ -171,6 +200,12 @@ export function TelegramDestinationsClient() {
         <h2 className="text-base font-semibold">Add Telegram destination</h2>
         <p className="mt-1 text-sm text-muted-foreground">Use semantic audiences so feature code never stores Telegram chat IDs.</p>
         <form onSubmit={createDestination} className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="grid gap-1 text-sm">Programme
+            <select required value={selectedProgrammeId} onChange={(e) => setSelectedProgrammeId(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3">
+              {programmes.map((programme) => <option key={programme.id} value={programme.id}>{programme.id}</option>)}
+            </select>
+            <span className="text-xs text-muted-foreground">Only programmes you are authorized to manage are listed.</span>
+          </label>
           <label className="grid gap-1 text-sm">Name
             <input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3" placeholder="DSE Lecturers" />
           </label>
@@ -196,7 +231,7 @@ export function TelegramDestinationsClient() {
             <input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3" placeholder="Staff operations and open teaching slots" />
           </label>
           <div className="md:col-span-2">
-            <button className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">Add destination</button>
+            <button disabled={!selectedProgrammeId} className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50">Add destination</button>
           </div>
         </form>
       </section>
@@ -218,10 +253,10 @@ export function TelegramDestinationsClient() {
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">
           <div><h2 className="text-lg font-semibold">Destinations</h2><p className="text-sm text-muted-foreground">Telegram membership is delivery routing only, never PMS authorization.</p></div>
-          <button onClick={() => void load()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
+          <button onClick={() => void load()} disabled={!selectedProgrammeId} className="rounded-md border border-input px-3 py-2 text-sm disabled:opacity-50">Refresh</button>
         </div>
         {loading ? <p className="text-sm text-muted-foreground">Loading destinations…</p> : destinations.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No Telegram destinations yet.</div>
+          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No Telegram destinations yet for this programme.</div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {destinations.map((destination) => (
