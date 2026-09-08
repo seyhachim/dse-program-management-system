@@ -1,0 +1,41 @@
+name: Temporary Issue 918 client type patch
+
+on:
+  push:
+    branches:
+      - feat/issue-918-public-info-archive-lifecycle
+
+permissions:
+  contents: write
+
+jobs:
+  patch-client:
+    if: ${{ !contains(github.event.head_commit.message, '[client-type-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-918-public-info-archive-lifecycle
+          fetch-depth: 0
+      - name: Widen status badge lifecycle type
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/frontend/app/(shell)/public-information/public-information-client.tsx')
+          text = p.read_text()
+          old = 'function statusBadge(status: "Draft" | "Published") {'
+          new = 'function statusBadge(status: "Draft" | "Published" | "Archived") {'
+          if new in text:
+              raise SystemExit(0)
+          if old not in text:
+              raise SystemExit('statusBadge signature not found')
+          p.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit type patch and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/tmp-issue-918-client-type-patch.yml
+          git add 'apps/frontend/app/(shell)/public-information/public-information-client.tsx'
+          git commit -m "fix(public-info): support archived status badge [client-type-patched]"
+          git push origin HEAD:feat/issue-918-public-info-archive-lifecycle
