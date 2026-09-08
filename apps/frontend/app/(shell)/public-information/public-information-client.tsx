@@ -607,7 +607,7 @@ export function PublicInformationClient() {
           if (!faqSaving) setFaqOpen(open);
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-6xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingFaq ? "Edit public FAQ" : "Create public FAQ"}
@@ -906,6 +906,39 @@ function FaqEditor({
 }) {
   return (
     <div className="space-y-5">
+      <div className="rounded-lg border border-border bg-muted/30 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold text-foreground">
+              Telegram visibility
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Publishing is still a separate explicit action. This setting only
+              controls whether a published FAQ is promoted into visible Telegram
+              question menus.
+            </p>
+          </div>
+          <label className="flex shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={draft.isFeatured}
+              onChange={(e) =>
+                setDraft((v) => ({ ...v, isFeatured: e.target.checked }))
+              }
+            />
+            Important / Show in Telegram
+          </label>
+        </div>
+        <div className="mt-3 space-y-1 text-xs leading-5 text-muted-foreground">
+          <p>Published + Important appears as a Telegram menu choice.</p>
+          <p>
+            Published without Important stays searchable in Ask DSE but is
+            hidden from visible Telegram question lists.
+          </p>
+          <p>Draft / Unpublished is never public.</p>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="faq-category">Category</Label>
@@ -1040,31 +1073,17 @@ function FaqEditor({
           />
         </div>
       </fieldset>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="faq-order">Sort order</Label>
-          <Input
-            id="faq-order"
-            type="number"
-            min="0"
-            value={draft.sortOrder}
-            onChange={(e) =>
-              setDraft((v) => ({ ...v, sortOrder: e.target.value }))
-            }
-          />
-        </div>
-        <div className="flex items-end">
-          <label className="flex items-center gap-2 pb-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={draft.isFeatured}
-              onChange={(e) =>
-                setDraft((v) => ({ ...v, isFeatured: e.target.checked }))
-              }
-            />
-            Feature this FAQ
-          </label>
-        </div>
+      <div className="space-y-2 sm:max-w-56">
+        <Label htmlFor="faq-order">Sort order</Label>
+        <Input
+          id="faq-order"
+          type="number"
+          min="0"
+          value={draft.sortOrder}
+          onChange={(e) =>
+            setDraft((v) => ({ ...v, sortOrder: e.target.value }))
+          }
+        />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
