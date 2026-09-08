@@ -97,6 +97,20 @@ export function createPublicProgrammeInfoRouter(): Router {
     },
   );
 
+  router.get(
+    "/programmes/:programmeId/faqs/lifecycle",
+    requirePermission("programme:read"),
+    async (req, res) => {
+      const programmeId = programmeIdOr400(req, res);
+      if (!programmeId) return;
+      try {
+        res.json(await publicProgrammeInfoService.listFaqLifecycle(programmeId));
+      } catch (error) {
+        sendMutationError(res, error, "Could not load FAQ lifecycle history");
+      }
+    },
+  );
+
   router.post(
     "/programmes/:programmeId/faqs",
     requirePermission("programme:write"),
@@ -163,6 +177,20 @@ export function createPublicProgrammeInfoRouter(): Router {
     },
   );
 
+  router.post(
+    "/programmes/:programmeId/faqs/:id/archive",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const programmeId = programmeIdOr400(req, res);
+      if (!programmeId) return;
+      try {
+        res.json(await publicProgrammeInfoService.archiveFaq(programmeId, req.params.id!));
+      } catch (error) {
+        sendMutationError(res, error, "Could not archive public FAQ");
+      }
+    },
+  );
+
   router.delete(
     "/programmes/:programmeId/faqs/:id",
     requirePermission("programme:write"),
@@ -188,6 +216,20 @@ export function createPublicProgrammeInfoRouter(): Router {
         res.json(await publicProgrammeInfoService.listImportantDates(programmeId));
       } catch (error) {
         sendMutationError(res, error, "Could not load important dates");
+      }
+    },
+  );
+
+  router.get(
+    "/programmes/:programmeId/important-dates/lifecycle",
+    requirePermission("programme:read"),
+    async (req, res) => {
+      const programmeId = programmeIdOr400(req, res);
+      if (!programmeId) return;
+      try {
+        res.json(await publicProgrammeInfoService.listImportantDateLifecycle(programmeId));
+      } catch (error) {
+        sendMutationError(res, error, "Could not load important-date lifecycle history");
       }
     },
   );
@@ -266,6 +308,22 @@ export function createPublicProgrammeInfoRouter(): Router {
         );
       } catch (error) {
         sendMutationError(res, error, "Could not unpublish important date");
+      }
+    },
+  );
+
+  router.post(
+    "/programmes/:programmeId/important-dates/:id/archive",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const programmeId = programmeIdOr400(req, res);
+      if (!programmeId) return;
+      try {
+        res.json(
+          await publicProgrammeInfoService.archiveImportantDate(programmeId, req.params.id!),
+        );
+      } catch (error) {
+        sendMutationError(res, error, "Could not archive important date");
       }
     },
   );
