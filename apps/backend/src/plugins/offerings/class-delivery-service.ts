@@ -131,6 +131,15 @@ function occurrenceView(row: OccurrenceRow): TeachingSessionOccurrenceView {
   };
 }
 
+function assertLegacyAddressable<T>(rows: T[]): T | undefined {
+  if (rows.length > 1) {
+    throw new TeachingSessionOccurrenceValidationError(
+      "Multiple class meetings exist for this offering/date; use an exact teaching session occurrence",
+    );
+  }
+  return rows[0];
+}
+
 async function readArrivalRow(offeringId: string, date: string): Promise<ArrivalRow | null> {
   const rows = await prisma.$queryRaw<ArrivalRow[]>`
     SELECT
@@ -140,10 +149,9 @@ async function readArrivalRow(offeringId: string, date: string): Promise<Arrival
     JOIN "User" u ON u."id" = c."recordedById"
     WHERE c."offeringId" = ${offeringId}
       AND c."date" = ${date}::date
-      AND c."occurrenceId" IS NULL
-    LIMIT 1
+    ORDER BY c."recordedAt" ASC
   `;
-  return rows[0] ?? null;
+  return assertLegacyAddressable(rows) ?? null;
 }
 
 async function readSessionRow(offeringId: string, date: string): Promise<SessionRow | null> {
@@ -155,10 +163,9 @@ async function readSessionRow(offeringId: string, date: string): Promise<Session
     JOIN "User" u ON u."id" = s."recordedById"
     WHERE s."offeringId" = ${offeringId}
       AND s."date" = ${date}::date
-      AND s."occurrenceId" IS NULL
-    LIMIT 1
+    ORDER BY s."recordedAt" ASC
   `;
-  return rows[0] ?? null;
+  return assertLegacyAddressable(rows) ?? null;
 }
 
 async function readOccurrenceRow(
@@ -305,9 +312,8 @@ export const classDeliveryService = {
       }
       if (!row) throw new Error("Teaching session occurrence was not persisted");
 
-      // Historical Offering+date evidence can be linked only when that date maps
-      // to exactly one recurring meeting. Multiple same-day meetings remain
-      // deliberately unresolved instead of being guessed.
+      // Link legacy Offering+date evidence only when exactly one recurring meeting
+      // exists on this weekday. Multiple same-day meetings stay unresolved.
       const matchingMeetings = await tx.$queryRaw<Array<{ count: bigint }>>`
         SELECT COUNT(*)::bigint AS count
         FROM "OfferingMeeting"
@@ -335,10 +341,7 @@ export const classDeliveryService = {
     });
   },
 
-  async getLecturerArrival(
-    offeringId: string,
-    date: string,
-  ): Promise<LecturerArrivalConfirmationView | null> {
+  async getLecturerArrival(offeringId: string, date: string): Promise<LecturerArrivalConfirmationView | null> {
     const row = await readArrivalRow(offeringId, date);
     return row ? arrivalView(row) : null;
   },
@@ -350,10 +353,7 @@ export const classDeliveryService = {
     return row ? arrivalView(row) : null;
   },
 
-  async getClassSessionStatus(
-    offeringId: string,
-    date: string,
-  ): Promise<ClassSessionStatusView | null> {
+  async getClassSessionStatus(offeringId: string, date: string): Promise<ClassSessionStatusView | null> {
     const row = await readSessionRow(offeringId, date);
     return row ? sessionView(row) : null;
   },
@@ -372,10 +372,7 @@ export const classDeliveryService = {
   ): Promise<SaveLecturerArrivalConfirmationResult> {
     const result = await prisma.$transaction(async (tx) => {
       const offerings = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT "id"
-        FROM "Offering"
-        WHERE "id" = ${offeringId}
-        FOR UPDATE
+        SELECT "id" FROM "Offering" WHERE "id" = ${offeringId} FOR UPDATE
       `;
       if (!offerings[0]) throw new ReferenceError("Offering not found");
 
@@ -385,28 +382,21 @@ export const classDeliveryService = {
           u."name" AS "recordedByName", c."recordedAt", c."updatedAt"
         FROM "pms_attendance"."LecturerArrivalConfirmation" c
         JOIN "User" u ON u."id" = c."recordedById"
-        WHERE c."offeringId" = ${offeringId}
-          AND c."date" = ${date}::date
-          AND c."occurrenceId" IS NULL
+        WHERE c."offeringId" = ${offeringId} AND c."date" = ${date}::date
+        ORDER BY c."recordedAt" ASC
         FOR UPDATE OF c
       `;
-      const current = existing[0];
-      if (current?.status === status && current.note === note) {
-        return { row: current, changed: false };
-      }
+      const current = assertLegacyAddressable(existing);
+      if (current?.status === status && current.note === note) return { row: current, changed: false };
 
       const now = new Date();
       const rows = current
         ? await tx.$queryRaw<ArrivalRow[]>`
             UPDATE "pms_attendance"."LecturerArrivalConfirmation" c
-            SET "status" = ${status},
-                "note" = ${note},
-                "recordedById" = ${actorId},
-                "recordedAt" = ${now},
-                "updatedAt" = ${now}
+            SET "status" = ${status}, "note" = ${note}, "recordedById" = ${actorId},
+                "recordedAt" = ${now}, "updatedAt" = ${now}
             FROM "User" u
-            WHERE c."id" = ${current.id}
-              AND u."id" = ${actorId}
+            WHERE c."id" = ${current.id} AND u."id" = ${actorId}
             RETURNING
               c."id", c."offeringId", c."date", c."status", c."note", c."recordedById",
               u."name" AS "recordedByName", c."recordedAt", c."updatedAt"
@@ -415,21 +405,17 @@ export const classDeliveryService = {
             WITH inserted AS (
               INSERT INTO "pms_attendance"."LecturerArrivalConfirmation" (
                 "id", "offeringId", "date", "status", "note", "recordedById", "recordedAt", "updatedAt"
-              ) VALUES (
-                ${randomUUID()}, ${offeringId}, ${date}::date, ${status}, ${note}, ${actorId}, ${now}, ${now}
-              )
+              ) VALUES (${randomUUID()}, ${offeringId}, ${date}::date, ${status}, ${note}, ${actorId}, ${now}, ${now})
               RETURNING *
             )
             SELECT
               i."id", i."offeringId", i."date", i."status", i."note", i."recordedById",
               u."name" AS "recordedByName", i."recordedAt", i."updatedAt"
-            FROM inserted i
-            JOIN "User" u ON u."id" = i."recordedById"
+            FROM inserted i JOIN "User" u ON u."id" = i."recordedById"
           `;
       if (!rows[0]) throw new Error("Lecturer arrival confirmation was not persisted");
       return { row: rows[0], changed: true };
     });
-
     return { confirmation: arrivalView(result.row), changed: result.changed };
   },
 
@@ -459,9 +445,7 @@ export const classDeliveryService = {
         FOR UPDATE OF c
       `;
       const current = existing[0];
-      if (current?.status === status && current.note === note) {
-        return { row: current, changed: false };
-      }
+      if (current?.status === status && current.note === note) return { row: current, changed: false };
 
       const now = new Date();
       const rows = current
@@ -493,7 +477,6 @@ export const classDeliveryService = {
       if (!rows[0]) throw new Error("Lecturer arrival confirmation was not persisted");
       return { row: rows[0], changed: true };
     });
-
     return { confirmation: arrivalView(result.row), changed: result.changed };
   },
 
@@ -506,10 +489,7 @@ export const classDeliveryService = {
   ): Promise<SaveClassSessionStatusResult> {
     const result = await prisma.$transaction(async (tx) => {
       const offerings = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT "id"
-        FROM "Offering"
-        WHERE "id" = ${offeringId}
-        FOR UPDATE
+        SELECT "id" FROM "Offering" WHERE "id" = ${offeringId} FOR UPDATE
       `;
       if (!offerings[0]) throw new ReferenceError("Offering not found");
 
@@ -519,28 +499,21 @@ export const classDeliveryService = {
           u."name" AS "recordedByName", s."recordedAt", s."updatedAt"
         FROM "pms_attendance"."ClassSessionStatus" s
         JOIN "User" u ON u."id" = s."recordedById"
-        WHERE s."offeringId" = ${offeringId}
-          AND s."date" = ${date}::date
-          AND s."occurrenceId" IS NULL
+        WHERE s."offeringId" = ${offeringId} AND s."date" = ${date}::date
+        ORDER BY s."recordedAt" ASC
         FOR UPDATE OF s
       `;
-      const current = existing[0];
-      if (current?.status === status && current.reason === reason) {
-        return { row: current, changed: false };
-      }
+      const current = assertLegacyAddressable(existing);
+      if (current?.status === status && current.reason === reason) return { row: current, changed: false };
 
       const now = new Date();
       const rows = current
         ? await tx.$queryRaw<SessionRow[]>`
             UPDATE "pms_attendance"."ClassSessionStatus" s
-            SET "status" = ${status},
-                "reason" = ${reason},
-                "recordedById" = ${actorId},
-                "recordedAt" = ${now},
-                "updatedAt" = ${now}
+            SET "status" = ${status}, "reason" = ${reason}, "recordedById" = ${actorId},
+                "recordedAt" = ${now}, "updatedAt" = ${now}
             FROM "User" u
-            WHERE s."id" = ${current.id}
-              AND u."id" = ${actorId}
+            WHERE s."id" = ${current.id} AND u."id" = ${actorId}
             RETURNING
               s."id", s."offeringId", s."date", s."status", s."reason", s."recordedById",
               u."name" AS "recordedByName", s."recordedAt", s."updatedAt"
@@ -549,21 +522,17 @@ export const classDeliveryService = {
             WITH inserted AS (
               INSERT INTO "pms_attendance"."ClassSessionStatus" (
                 "id", "offeringId", "date", "status", "reason", "recordedById", "recordedAt", "updatedAt"
-              ) VALUES (
-                ${randomUUID()}, ${offeringId}, ${date}::date, ${status}, ${reason}, ${actorId}, ${now}, ${now}
-              )
+              ) VALUES (${randomUUID()}, ${offeringId}, ${date}::date, ${status}, ${reason}, ${actorId}, ${now}, ${now})
               RETURNING *
             )
             SELECT
               i."id", i."offeringId", i."date", i."status", i."reason", i."recordedById",
               u."name" AS "recordedByName", i."recordedAt", i."updatedAt"
-            FROM inserted i
-            JOIN "User" u ON u."id" = i."recordedById"
+            FROM inserted i JOIN "User" u ON u."id" = i."recordedById"
           `;
       if (!rows[0]) throw new Error("Class session status was not persisted");
       return { row: rows[0], changed: true };
     });
-
     return { session: sessionView(result.row), changed: result.changed };
   },
 
@@ -593,9 +562,7 @@ export const classDeliveryService = {
         FOR UPDATE OF s
       `;
       const current = existing[0];
-      if (current?.status === status && current.reason === reason) {
-        return { row: current, changed: false };
-      }
+      if (current?.status === status && current.reason === reason) return { row: current, changed: false };
 
       const now = new Date();
       const rows = current
@@ -627,7 +594,6 @@ export const classDeliveryService = {
       if (!rows[0]) throw new Error("Class session status was not persisted");
       return { row: rows[0], changed: true };
     });
-
     return { session: sessionView(result.row), changed: result.changed };
   },
 };
