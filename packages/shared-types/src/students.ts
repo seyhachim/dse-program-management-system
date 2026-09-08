@@ -10,7 +10,26 @@ export const STUDENT_STATUSES = ["Active", "Inactive", "Pending"] as const;
 export const StudentStatusSchema = z.enum(STUDENT_STATUSES);
 export type StudentStatus = z.infer<typeof StudentStatusSchema>;
 
+export const STUDENT_CATEGORIES = ["Regular", "Scholarship"] as const;
+export const StudentCategorySchema = z.enum(STUDENT_CATEGORIES);
+export type StudentCategory = z.infer<typeof StudentCategorySchema>;
+
 const nullableText = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== "string") return value;
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  },
+  z.string().min(1).nullable(),
+);
+
+/**
+ * Official institutional IDs can be unavailable when the initial roster is
+ * received. Blank values normalize to null and can be filled later on the
+ * same internal PMS student record.
+ */
+export const StudentIdSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null) return null;
     if (typeof value !== "string") return value;
@@ -58,7 +77,8 @@ export const StudentSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   email: StudentEmailSchema,
-  studentId: z.string().min(1),
+  studentId: StudentIdSchema,
+  category: StudentCategorySchema,
   status: StudentStatusSchema,
   createdAt: z.string().datetime(),
   // Optional for compatibility with consumers that only need the core roster
@@ -70,7 +90,8 @@ export type Student = z.infer<typeof StudentSchema>;
 const StudentCoreWriteInput = z.object({
   name: z.string().trim().min(1, "Name is required"),
   email: StudentEmailSchema,
-  studentId: z.string().trim().min(1, "Student ID is required"),
+  studentId: StudentIdSchema,
+  category: StudentCategorySchema.default("Regular"),
   status: StudentStatusSchema.default("Active"),
 });
 

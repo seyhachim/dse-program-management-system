@@ -5,6 +5,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CreateStudentInput,
+  STUDENT_CATEGORIES,
   STUDENT_STATUSES,
   type Student,
 } from "@dse-pms/shared-types";
@@ -64,6 +65,7 @@ export function StudentForm({
       name: "",
       email: "",
       studentId: "",
+      category: "Regular",
       status: "Active",
       profile: emptyProfile,
     },
@@ -76,7 +78,8 @@ export function StudentForm({
         ? {
             name: editing.name,
             email: editing.email ?? "",
-            studentId: editing.studentId,
+            studentId: editing.studentId ?? "",
+            category: editing.category,
             status: editing.status,
             profile: {
               khmerFamilyName: editing.profile?.khmerFamilyName ?? "",
@@ -90,6 +93,7 @@ export function StudentForm({
             name: "",
             email: "",
             studentId: "",
+            category: "Regular",
             status: "Active",
             profile: emptyProfile,
           },
@@ -104,7 +108,7 @@ export function StudentForm({
           <DialogDescription>
             {editing
               ? "Update the student's roster identity and optional profile details."
-              : "Create a student roster record. Email can be added later when portal access is provisioned."}
+              : "Create a student roster record. Student ID and email can be added later when officially available."}
           </DialogDescription>
         </DialogHeader>
 
@@ -118,8 +122,50 @@ export function StudentForm({
             <Field label="Display name" error={errors.name?.message} required>
               <Input placeholder="Seng Kimhour" {...register("name")} required />
             </Field>
-            <Field label="Student ID" error={errors.studentId?.message} required>
-              <Input placeholder="Official student ID" {...register("studentId")} required />
+            <Field label="Student ID (optional)" error={errors.studentId?.message}>
+
+              <Input placeholder="Add when officially issued" {...register("studentId")} />
+
+            </Field>
+
+            <Field label="Category" error={errors.category?.message} required>
+
+              <Controller
+
+                control={control}
+
+                name="category"
+
+                render={({ field }) => (
+
+                  <Select value={field.value} onValueChange={field.onChange}>
+
+                    <SelectTrigger aria-required="true">
+
+                      <SelectValue />
+
+                    </SelectTrigger>
+
+                    <SelectContent>
+
+                      {STUDENT_CATEGORIES.map((category) => (
+
+                        <SelectItem key={category} value={category}>
+
+                          {category}
+
+                        </SelectItem>
+
+                      ))}
+
+                    </SelectContent>
+
+                  </Select>
+
+                )}
+
+              />
+
             </Field>
             <Field label="Email (optional)" error={errors.email?.message}>
               <Input type="email" placeholder="Add when officially available" {...register("email")} />
