@@ -8,6 +8,7 @@ import {
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { getPmsTelegramConfig } from "./config.ts";
+import { telegramDestinationDeleteService } from "./destination-delete-service.ts";
 import {
   TelegramDestinationError,
   telegramDestinationErrorStatus,
@@ -37,6 +38,10 @@ function telegramChatType(value: unknown): TelegramDestinationChatType | null {
   if (value === "supergroup") return "SUPERGROUP";
   if (value === "channel") return "CHANNEL";
   return null;
+}
+
+export function shouldAcknowledgeTelegramRegistrationError(error: unknown): boolean {
+  return error instanceof TelegramDestinationError;
 }
 
 type TelegramRegistrationUpdate = {
@@ -71,7 +76,14 @@ export function createTelegramDestinationRouter(): Router {
 
     const chat = message?.chat;
     const type = telegramChatType(chat?.type);
-    if (!chat?.id || !type) return void res.status(400).json({ error: "Registration must be sent from a group, supergroup, or channel" });
+    if (!chat?.id || !type) {
+      return void res.status(200).json({
+        ok: true,
+        observed: false,
+        ignored: true,
+        reason: "unsupported_chat_type",
+      });
+    }
 
     try {
       await telegramDestinationService.observeRegistration({
@@ -82,6 +94,18 @@ export function createTelegramDestinationRouter(): Router {
       });
       res.json({ ok: true, observed: true });
     } catch (error) {
+      if (shouldAcknowledgeTelegramRegistrationError(error)) {
+        console.warn(
+          "Telegram destination registration update was acknowledged without observation",
+          error instanceof TelegramDestinationError ? error.code : "UNKNOWN",
+        );
+        return void res.status(200).json({
+          ok: true,
+          observed: false,
+          ignored: true,
+          reason: error instanceof TelegramDestinationError ? error.code : "registration_rejected",
+        });
+      }
       sendDestinationError(res, error);
     }
   });
@@ -121,6 +145,12 @@ export function createTelegramDestinationRouter(): Router {
     if (!parsed.success) return void res.status(400).json({ error: "Invalid Telegram destination update", details: parsed.error.flatten() });
     try {
       res.json(await telegramDestinationService.update(req.user!, req.params.id!, parsed.data));
+    } catch (error) { sendDestinationError(res, error); }
+  });
+
+  router.delete("/destinations/:id", async (req, res) => {
+    try {
+      res.json(await telegramDestinationDeleteService.deleteUnusedPending(req.user!, req.params.id!));
     } catch (error) { sendDestinationError(res, error); }
   });
 
