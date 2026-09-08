@@ -7,13 +7,13 @@ export default function ProgrammeManagementPage() {
     <>
       <Topbar
         title="Programme Management"
-        subtitle="Programme profile, learning outcomes, competencies, policies, and teaching vocabulary"
+        subtitle="Programme profile, learning outcomes, competencies, policies, teaching vocabulary, and delivery channels"
       />
 
       <main className="flex-1 overflow-y-auto p-6">
-        <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <div className="mb-6 grid gap-4 lg:grid-cols-3">
           <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:block">
               <div>
                 <h2 className="font-semibold text-foreground">Teaching & Learning Vocabulary</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -22,7 +22,7 @@ export default function ProgrammeManagementPage() {
               </div>
               <Link
                 href="/programme-management/teaching-learning"
-                className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="mt-4 inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 Manage Vocabulary
               </Link>
@@ -30,7 +30,7 @@ export default function ProgrammeManagementPage() {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:block">
               <div>
                 <h2 className="font-semibold text-foreground">Student Progression</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -39,9 +39,26 @@ export default function ProgrammeManagementPage() {
               </div>
               <Link
                 href="/students/cohorts"
-                className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="mt-4 inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 Manage Progression
+              </Link>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:block">
+              <div>
+                <h2 className="font-semibold text-foreground">Telegram Destinations</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Connect lecturer, student, cohort, class, and operational Telegram groups without hard-coded chat IDs.
+                </p>
+              </div>
+              <Link
+                href="/programme-management/telegram-destinations"
+                className="mt-4 inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                Manage Destinations
               </Link>
             </div>
           </div>

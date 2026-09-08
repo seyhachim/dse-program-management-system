@@ -42,6 +42,7 @@ export * from "./student-portfolio-verification.ts";
 export * from "./result-corrections.ts";
 export * from "./telegram.ts";
 export * from "./telegram-phase2.ts";
+export * from "./telegram-destinations.ts";
 export * from "./document-content.ts";
 export * from "./qa.ts";
 export * from "./qa-knowledge.ts";
