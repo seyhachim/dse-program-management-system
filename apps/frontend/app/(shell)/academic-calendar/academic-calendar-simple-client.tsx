@@ -50,7 +50,8 @@ type CalendarDraft = {
   sourceNote: string;
 };
 
-type AcademicYearDraft = { startYear: string; setCurrent: boolean };
+type AcademicYearFormat = "two-year" | "single-year";
+type AcademicYearDraft = { startYear: string; format: AcademicYearFormat; setCurrent: boolean };
 
 type CoveragePreset = "1" | "2" | "3" | "4" | "3-4" | "all" | "custom";
 
@@ -62,14 +63,15 @@ function message(error: unknown, fallback: string): string {
 function suggestedAcademicYearDraft(years: AcademicYearView[] = []): AcademicYearDraft {
   const currentYear = new Date().getFullYear();
   const latestEndYear = years.reduce((latest, year) => Math.max(latest, year.endYear), currentYear);
-  return { startYear: String(latestEndYear), setCurrent: years.length === 0 };
+  return { startYear: String(latestEndYear), format: "two-year", setCurrent: years.length === 0 };
 }
 
-function academicYearValues(startYearText: string): { startYear: number; endYear: number; label: string } | null {
+function academicYearValues(startYearText: string, format: AcademicYearFormat): { startYear: number; endYear: number; label: string } | null {
   const startYear = Number(startYearText);
   if (!Number.isInteger(startYear) || startYear < 1900 || startYear > 2200) return null;
-  const endYear = startYear + 1;
-  return { startYear, endYear, label: `${startYear}–${endYear}` };
+  const endYear = format === "single-year" ? startYear : startYear + 1;
+  const label = format === "single-year" ? String(startYear) : `${startYear}–${endYear}`;
+  return { startYear, endYear, label };
 }
 
 function emptyPeriod(semester: "First" | "Second"): PeriodDraft {
@@ -439,7 +441,7 @@ export function AcademicCalendarSimpleClient() {
   const [showNewYear, setShowNewYear] = useState(false);
 
   const selectedYear = years.find((year) => year.id === selectedYearId) ?? null;
-  const newYearValues = academicYearValues(newYear.startYear);
+  const newYearValues = academicYearValues(newYear.startYear, newYear.format);
   const calendarForStudyYear = useMemo(() => {
     const candidates = calendars.filter((calendar) => calendar.studyYears.includes(selectedStudyYear));
     return candidates.find((calendar) => calendar.status === "Published") ?? candidates.find((calendar) => calendar.status === "Draft") ?? candidates[0] ?? null;
@@ -488,8 +490,8 @@ export function AcademicCalendarSimpleClient() {
 
   const createAcademicYear = async () => {
     if (!programmeId) return;
-    const values = academicYearValues(newYear.startYear);
-    if (!values) { setError("Enter a valid four-digit start year, for example 2027."); return; }
+    const values = academicYearValues(newYear.startYear, newYear.format);
+    if (!values) { setError("Enter a valid four-digit year, for example 2027."); return; }
     if (years.some((year) => year.startYear === values.startYear && year.endYear === values.endYear)) {
       setError(`Academic year ${values.label} already exists.`);
       return;
@@ -595,16 +597,33 @@ export function AcademicCalendarSimpleClient() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-xl flex-1">
                 <h3 className="font-semibold">Add Academic Year</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Enter only the first year. PMS automatically creates the next year and academic-year label.</p>
-                <div className="mt-4 max-w-xs space-y-1.5">
-                  <Label htmlFor="new-year-start"><FormFieldLabel required>Start year</FormFieldLabel></Label>
-                  <Input required id="new-year-start" inputMode="numeric" autoComplete="off" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="2027" />
+                <p className="mt-1 text-sm text-muted-foreground">Choose whether the official academic year uses one calendar year (for example 2027) or spans two calendar years (for example 2027–2028).</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-year-format"><FormFieldLabel required>Format</FormFieldLabel></Label>
+                    <select
+                      id="new-year-format"
+                      required
+                      aria-required="true"
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={newYear.format}
+                      onChange={(e) => setNewYear({ ...newYear, format: e.target.value as AcademicYearFormat })}
+                    >
+                      <option value="two-year">Two calendar years</option>
+                      <option value="single-year">Single calendar year</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-year-start"><FormFieldLabel required>{newYear.format === "single-year" ? "Year" : "Start year"}</FormFieldLabel></Label>
+                    <Input required id="new-year-start" inputMode="numeric" autoComplete="off" value={newYear.startYear} onChange={(e) => setNewYear({ ...newYear, startYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="2027" />
+                  </div>
                 </div>
                 <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
                   <span className="text-muted-foreground">Academic Year</span>
                   <span className="ml-2 font-semibold">{newYearValues?.label ?? "—"}</span>
                   {newYearValues ? <span className="ml-2 text-muted-foreground">({newYearValues.startYear} → {newYearValues.endYear})</span> : null}
                 </div>
+                <p className="mt-2 text-xs text-muted-foreground">This only defines the academic-year identity. Semester teaching and exam dates are still entered separately in the calendar.</p>
                 <label className="mt-3 flex items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-0.5" checked={newYear.setCurrent} onChange={(e) => setNewYear({ ...newYear, setCurrent: e.target.checked })} />
                   <span><span className="font-medium">Set as current academic year</span><span className="block text-xs text-muted-foreground">Use this only when this is the active academic year for the programme.</span></span>
