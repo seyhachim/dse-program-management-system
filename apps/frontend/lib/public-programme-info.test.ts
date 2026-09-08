@@ -67,13 +67,30 @@ describe("public programme information frontend API", () => {
     expect(body.publishedAt).toBeUndefined();
   });
 
-  test("uses explicit lifecycle endpoints for publication", async () => {
-    const getRequest = mockJson({ id: "faq-1", status: "Published" });
+  test("uses explicit lifecycle endpoints for publication and archive", async () => {
+    let getRequest = mockJson({ id: "faq-1", status: "Published" });
     await publicProgrammeInfoApi.publishFaq("dse", "faq-1");
-    const request = getRequest();
+    let request = getRequest();
     expect(String(request?.input)).toBe(
       "http://localhost:4000/api/programme/public-information/programmes/dse/faqs/faq-1/publish",
     );
     expect(request?.init?.method).toBe("POST");
+
+    getRequest = mockJson({ id: "faq-1", status: "Archived" });
+    await publicProgrammeInfoApi.archiveFaq("dse", "faq-1");
+    request = getRequest();
+    expect(String(request?.input)).toBe(
+      "http://localhost:4000/api/programme/public-information/programmes/dse/faqs/faq-1/archive",
+    );
+    expect(request?.init?.method).toBe("POST");
+  });
+
+  test("loads lifecycle history separately from the active authoring list", async () => {
+    const getRequest = mockJson([]);
+    await publicProgrammeInfoApi.listFaqLifecycle("dse");
+    const request = getRequest();
+    expect(String(request?.input)).toBe(
+      "http://localhost:4000/api/programme/public-information/programmes/dse/faqs/lifecycle",
+    );
   });
 });
