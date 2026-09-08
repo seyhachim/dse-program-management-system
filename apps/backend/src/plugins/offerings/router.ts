@@ -6,6 +6,7 @@ import {
   EnrollInput,
   ListLecturerWorkloadQuery,
   ListOfferingsQuery,
+  ResolveTeachingSessionOccurrenceInputSchema,
   RevokeClassResponsibilityInput,
   SaveAttendanceInput,
   UpdateOfferingInput,
@@ -20,6 +21,11 @@ import {
   ClassResponsibilityNotFoundError,
   classResponsibilityService,
 } from "./class-responsibility-service.ts";
+import {
+  classDeliveryService,
+  TeachingSessionOccurrenceReferenceError,
+  TeachingSessionOccurrenceValidationError,
+} from "./class-delivery-service.ts";
 import { CapacityError, offeringService, ReferenceError } from "./service.ts";
 
 export function createOfferingRouter(): Router {
@@ -143,6 +149,36 @@ export function createOfferingRouter(): Router {
       handleError(err, res, "Could not save attendance");
     }
   });
+
+  // Idempotently materialize one concrete recurring meeting occurrence. This is
+  // derived schedule state, so it uses offerings:read but still enforces exact
+  // offering ownership/programme scope server-side.
+  router.put(
+    "/:id/meetings/:meetingId/occurrences/:date",
+    requirePermission("offerings:read"),
+    async (req, res) => {
+      if (!(await assertOwnOfferingOrAdmin(req, res, "resolve teaching sessions for"))) return;
+      const parsed = ResolveTeachingSessionOccurrenceInputSchema.safeParse({
+        offeringMeetingId: req.params.meetingId,
+        date: req.params.date,
+      });
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid teaching session occurrence", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.json(
+          await classDeliveryService.resolveTeachingSessionOccurrence(
+            req.params.id!,
+            parsed.data.offeringMeetingId,
+            parsed.data.date,
+          ),
+        );
+      } catch (err) {
+        handleTeachingSessionOccurrenceError(err, res);
+      }
+    },
+  );
 
   router.get("/:id", requirePermission("offerings:read"), async (req, res) => {
     const offering = await offeringService.getById(req.params.id!);
@@ -308,6 +344,19 @@ function handleClassResponsibilityError(err: unknown, res: import("express").Res
   }
   console.error("Class responsibility request failed", err);
   res.status(500).json({ error: "Could not complete the class responsibility request" });
+}
+
+function handleTeachingSessionOccurrenceError(err: unknown, res: import("express").Response): void {
+  if (err instanceof TeachingSessionOccurrenceReferenceError) {
+    res.status(404).json({ error: err.message });
+    return;
+  }
+  if (err instanceof TeachingSessionOccurrenceValidationError) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  console.error("Teaching session occurrence request failed", err);
+  res.status(500).json({ error: "Could not resolve teaching session occurrence" });
 }
 
 function handleError(err: unknown, res: import("express").Response, fallback: string): void {

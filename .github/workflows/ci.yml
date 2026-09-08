@@ -192,6 +192,11 @@ jobs:
         env:
           CLASS_DELIVERY_DB_TESTS: "1"
 
+      - name: Verify exact teaching session occurrence integrity
+        run: bun test apps/backend/src/plugins/offerings/teaching-session-occurrence-db.test.ts
+        env:
+          CLASS_DELIVERY_DB_TESTS: "1"
+
       - name: Verify historical attendance correction
         run: bun test apps/backend/src/plugins/offerings/attendance-service-db.test.ts
         env:
