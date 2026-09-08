@@ -17,10 +17,29 @@ export function CurriculumWorkflowActions() {
   const [versionId, setVersionId] = useState("");
   const [workflow, setWorkflow] = useState<CurriculumWorkflowState | null>(null);
   const [comment, setComment] = useState("");
+  const [cohortLabel, setCohortLabel] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const versions = useMemo(() => curricula.flatMap((curriculum) => curriculum.versions), [curricula]);
+  const selectedVersion = useMemo(
+    () => versions.find((version) => version.id === versionId) ?? null,
+    [versions, versionId],
+  );
+
+  useEffect(() => {
+    setCohortLabel(selectedVersion?.cohortLabel ?? "");
+    setAcademicYear(selectedVersion?.academicYear ?? "");
+  }, [selectedVersion?.id, selectedVersion?.cohortLabel, selectedVersion?.academicYear]);
+
+  const metadataMissing = !cohortLabel.trim() || !academicYear.trim();
+  const metadataDirty = Boolean(
+    selectedVersion &&
+      (cohortLabel.trim() !== selectedVersion.cohortLabel ||
+        academicYear.trim() !== selectedVersion.academicYear),
+  );
 
   const loadState = useCallback(async (id: string) => {
     if (!id) return;
@@ -49,15 +68,58 @@ export function CurriculumWorkflowActions() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const persistMetadata = async () => {
+    if (!versionId) return false;
+    const nextCohortLabel = cohortLabel.trim();
+    const nextAcademicYear = academicYear.trim();
+    if (!nextCohortLabel || !nextAcademicYear) {
+      setError("Enter both the cohort label and academic year before review.");
+      return false;
+    }
+
+    const next = await curriculumApi.updateWorkflowMetadata(versionId, {
+      cohortLabel: nextCohortLabel,
+      academicYear: nextAcademicYear,
+    });
+    setWorkflow(next);
+    setCurricula(await curriculumApi.list());
+    return true;
+  };
+
+  const saveMetadata = async () => {
+    if (!metadataDirty || metadataMissing) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (await persistMetadata()) {
+        setNotice("Curriculum review metadata saved.");
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save curriculum review metadata");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const run = async (action: CurriculumWorkflowAction) => {
     if (!versionId) return;
     if (action === "requestChanges" && !comment.trim()) {
       setError("A reason is required when requesting changes.");
       return;
     }
+    if (action === "submit" && metadataMissing) {
+      setError("Enter both the cohort label and academic year before submitting for review.");
+      return;
+    }
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
+      if (action === "submit" && metadataDirty) {
+        if (!(await persistMetadata())) return;
+      }
+
       const next =
         action === "submit" ? await curriculumApi.submit(versionId, comment.trim()) :
         action === "requestChanges" ? await curriculumApi.requestChanges(versionId, comment.trim()) :
@@ -66,6 +128,12 @@ export function CurriculumWorkflowActions() {
       setWorkflow(next);
       setComment("");
       setCurricula(await curriculumApi.list());
+      setNotice(
+        action === "submit" ? "Curriculum submitted for review." :
+        action === "requestChanges" ? "Changes requested." :
+        action === "approve" ? "Curriculum approved." :
+        "Curriculum activated.",
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not update curriculum workflow");
     } finally {
@@ -87,11 +155,62 @@ export function CurriculumWorkflowActions() {
           <p className="mt-1 text-sm text-muted-foreground">Actions are returned by the backend for the selected lifecycle state; the client does not invent approval rights.</p>
         </div>
         <label className="text-sm font-medium">Workflow version
-          <select value={versionId} onChange={(event) => { setVersionId(event.target.value); void loadState(event.target.value); }} className="mt-1 block h-10 rounded-md border border-input bg-background px-3 text-sm">
+          <select
+            value={versionId}
+            onChange={(event) => {
+              setVersionId(event.target.value);
+              setError(null);
+              setNotice(null);
+              void loadState(event.target.value);
+            }}
+            className="mt-1 block h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
             {versions.map((version) => <option key={version.id} value={version.id}>{curriculumVersionLabel(version)} · {curriculumStatusLabel(version.status)}</option>)}
           </select>
         </label>
       </div>
+
+      {workflow?.status === "Draft" && (
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-medium">Cohort label
+              <input
+                value={cohortLabel}
+                onChange={(event) => setCohortLabel(event.target.value)}
+                maxLength={120}
+                placeholder="e.g. Cohort 2026"
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              />
+            </label>
+            <label className="block text-sm font-medium">Academic year
+              <input
+                value={academicYear}
+                onChange={(event) => setAcademicYear(event.target.value)}
+                maxLength={40}
+                placeholder="e.g. 2026-2027"
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              />
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy || metadataMissing || !metadataDirty}
+              onClick={() => void saveMetadata()}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent disabled:opacity-50"
+            >
+              Save review metadata
+            </button>
+            <p className={metadataMissing ? "text-xs font-medium text-destructive" : "text-xs text-muted-foreground"}>
+              {metadataMissing
+                ? "Cohort label and academic year are required before review."
+                : metadataDirty
+                  ? "Unsaved changes will also be saved automatically when you submit for review."
+                  : "Review metadata is complete."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {workflow && workflow.allowedActions.length > 0 && (
         <div className="mt-4 space-y-3 border-t border-border pt-4">
@@ -108,6 +227,7 @@ export function CurriculumWorkflowActions() {
         </div>
       )}
       {workflow?.lastComment && <p className="mt-3 text-xs text-muted-foreground">Latest review note: {workflow.lastComment}</p>}
+      {notice && <p className="mt-3 text-sm text-emerald-700">{notice}</p>}
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
     </section>
   );
