@@ -72,6 +72,7 @@ export function TelegramDestinationsClient() {
   const [chatType, setChatType] = useState<ChatType>("SUPERGROUP");
   const [busyId, setBusyId] = useState<string>();
   const [connection, setConnection] = useState<{ destinationId: string; registrationId: string; command: string; expiresInSeconds: number }>();
+  const [copiedCommand, setCopiedCommand] = useState(false);
   const [deliveries, setDeliveries] = useState<Record<string, Delivery[]>>({});
 
   useEffect(() => {
@@ -101,6 +102,7 @@ export function TelegramDestinationsClient() {
       setCohorts(cohortResult.cohorts);
       setScopeId("");
       setConnection(undefined);
+      setCopiedCommand(false);
       setDeliveries({});
       setError(undefined);
     } catch (err) {
@@ -138,7 +140,7 @@ export function TelegramDestinationsClient() {
   }
 
   async function beginRegistration(destination: Destination) {
-    setBusyId(destination.id); setError(undefined);
+    setBusyId(destination.id); setError(undefined); setCopiedCommand(false);
     try {
       const result = await api.post<{ registrationId: string; command: string; expiresInSeconds: number }>(
         `/api/telegram/destinations/${destination.id}/registration`, {},
@@ -146,6 +148,18 @@ export function TelegramDestinationsClient() {
       setConnection({ destinationId: destination.id, ...result });
     } catch (err) { setError(messageOf(err)); }
     finally { setBusyId(undefined); }
+  }
+
+  async function copyRegistrationCommand() {
+    if (!connection) return;
+    setError(undefined);
+    try {
+      await navigator.clipboard.writeText(connection.command);
+      setCopiedCommand(true);
+    } catch {
+      setCopiedCommand(false);
+      setError("Could not copy the registration command automatically. Select the command and copy it manually.");
+    }
   }
 
   async function checkAndConfirm(destination: Destination) {
@@ -158,6 +172,7 @@ export function TelegramDestinationsClient() {
       }
       await api.post<Destination>(`/api/telegram/destinations/${destination.id}/confirm`, { registrationId: registration.id });
       setConnection(undefined);
+      setCopiedCommand(false);
       await load();
     } catch (err) { setError(messageOf(err)); }
     finally { setBusyId(undefined); }
@@ -180,6 +195,20 @@ export function TelegramDestinationsClient() {
         name: trimmedName,
         purpose: nextPurpose.trim(),
       });
+      await load();
+    } catch (err) { setError(messageOf(err)); }
+    finally { setBusyId(undefined); }
+  }
+
+  async function deleteDestination(destination: Destination) {
+    if (!window.confirm(`Delete the unused pending destination “${destination.name}”? This cannot be undone.`)) return;
+    setBusyId(destination.id); setError(undefined);
+    try {
+      await api.delete<{ id: string; deleted: true }>(`/api/telegram/destinations/${destination.id}`);
+      if (connection?.destinationId === destination.id) {
+        setConnection(undefined);
+        setCopiedCommand(false);
+      }
       await load();
     } catch (err) { setError(messageOf(err)); }
     finally { setBusyId(undefined); }
@@ -268,7 +297,16 @@ export function TelegramDestinationsClient() {
             <li>Send the one-time command below in that Telegram chat within {Math.round(connection.expiresInSeconds / 60)} minutes.</li>
             <li>Return here and choose <strong>Check & confirm</strong>. Observation alone never grants PMS access.</li>
           </ol>
-          <code className="mt-3 block overflow-x-auto rounded-md border bg-background p-3 text-sm">{connection.command}</code>
+          <div className="mt-3 flex items-stretch gap-2">
+            <code className="min-w-0 flex-1 overflow-x-auto rounded-md border bg-background p-3 text-sm">{connection.command}</code>
+            <button
+              type="button"
+              onClick={() => void copyRegistrationCommand()}
+              className="rounded-md border border-input bg-background px-3 text-sm font-medium"
+            >
+              {copiedCommand ? "Copied" : "Copy"}
+            </button>
+          </div>
         </section>
       )}
 
@@ -298,6 +336,15 @@ export function TelegramDestinationsClient() {
                   {destination.connected && <button disabled={busyId === destination.id} onClick={() => void sendTest(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Test message</button>}
                   <button disabled={busyId === destination.id} onClick={() => void editDestination(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Edit</button>
                   <button disabled={busyId === destination.id} onClick={() => void toggle(destination)} className="rounded-md border border-input px-3 py-2 text-sm">{destination.enabled ? "Disable" : "Enable"}</button>
+                  {destination.status === "PENDING" && !destination.verifiedAt && (
+                    <button
+                      disabled={busyId === destination.id}
+                      onClick={() => void deleteDestination(destination)}
+                      className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
+                    >
+                      Delete
+                    </button>
+                  )}
                   <button onClick={() => void showDeliveries(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Deliveries</button>
                 </div>
                 {deliveries[destination.id] && <div className="mt-4 border-t pt-3"><h4 className="text-sm font-medium">Recent deliveries</h4><div className="mt-2 space-y-2">{deliveries[destination.id]!.length === 0 ? <p className="text-xs text-muted-foreground">No deliveries yet.</p> : deliveries[destination.id]!.slice(0, 5).map((delivery) => <div key={delivery.id} className="flex justify-between gap-3 text-xs"><span>{delivery.kind} · {new Date(delivery.updatedAt).toLocaleString()}</span><span className={delivery.status === "failed" ? "text-destructive" : "text-muted-foreground"}>{delivery.status}{delivery.status === "failed" ? ` · ${delivery.lastError ?? "retry available"}` : ""}</span></div>)}</div></div>}
