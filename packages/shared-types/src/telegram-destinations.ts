@@ -39,7 +39,7 @@ export const TelegramDestinationSchema = z.object({
   verifiedAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-});
+}).strict();
 export type TelegramDestination = z.infer<typeof TelegramDestinationSchema>;
 
 export const TelegramDestinationCreateRequestSchema = z.object({
@@ -49,7 +49,7 @@ export const TelegramDestinationCreateRequestSchema = z.object({
   scopeId: z.string().trim().min(1).optional(),
   purpose: z.string().trim().max(500).optional(),
   chatType: TelegramDestinationChatTypeSchema.default("SUPERGROUP"),
-}).superRefine((value, context) => {
+}).strict().superRefine((value, context) => {
   if (value.audienceType === "COHORT" && !value.scopeId) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["scopeId"], message: "Cohort destinations require a PMS cohort" });
   }
@@ -69,7 +69,7 @@ export type TelegramDestinationUpdateRequest = z.infer<typeof TelegramDestinatio
 export const TelegramDestinationListResponseSchema = z.object({
   programmeId: z.string().min(1),
   destinations: z.array(TelegramDestinationSchema),
-});
+}).strict();
 export type TelegramDestinationListResponse = z.infer<typeof TelegramDestinationListResponseSchema>;
 
 export const TelegramDestinationCohortOptionSchema = z.object({
@@ -78,13 +78,13 @@ export const TelegramDestinationCohortOptionSchema = z.object({
   name: z.string().min(1),
   intakeYear: z.number().int(),
   status: z.string().min(1),
-});
+}).strict();
 export type TelegramDestinationCohortOption = z.infer<typeof TelegramDestinationCohortOptionSchema>;
 
 export const TelegramDestinationCohortsResponseSchema = z.object({
   programmeId: z.string().min(1),
   cohorts: z.array(TelegramDestinationCohortOptionSchema),
-});
+}).strict();
 export type TelegramDestinationCohortsResponse = z.infer<typeof TelegramDestinationCohortsResponseSchema>;
 
 export const TelegramDestinationRegistrationStartSchema = z.object({
@@ -93,7 +93,7 @@ export const TelegramDestinationRegistrationStartSchema = z.object({
   expiresInSeconds: z.number().int().positive(),
   command: z.string().min(1),
   destination: TelegramDestinationSchema,
-});
+}).strict();
 export type TelegramDestinationRegistrationStart = z.infer<typeof TelegramDestinationRegistrationStartSchema>;
 
 export const TelegramDestinationRegistrationPendingSchema = z.object({
@@ -103,7 +103,7 @@ export const TelegramDestinationRegistrationPendingSchema = z.object({
   observedChatTitle: z.string().optional(),
   observedChatType: TelegramDestinationChatTypeSchema.optional(),
   observedAt: z.string().datetime().optional(),
-});
+}).strict();
 export type TelegramDestinationRegistrationPending = z.infer<typeof TelegramDestinationRegistrationPendingSchema>;
 
 export const TelegramDestinationConfirmRequestSchema = z.object({ registrationId: z.string().min(1) }).strict();
@@ -120,5 +120,5 @@ export const TelegramDestinationDeliverySchema = z.object({
   telegramMessageId: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-});
+}).strict();
 export type TelegramDestinationDelivery = z.infer<typeof TelegramDestinationDeliverySchema>;
