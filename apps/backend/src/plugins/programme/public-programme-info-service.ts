@@ -9,6 +9,8 @@ import { prisma } from "../../core/db/prisma.ts";
 export class PublicProgrammeInfoNotFoundError extends Error {}
 export class PublicProgrammeInfoConflictError extends Error {}
 
+export const MAX_PUBLIC_FEATURED_FAQS = 30;
+
 function nullable(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -102,6 +104,27 @@ function requireDraft(
   }
 }
 
+async function assertFeaturedPublishCapacity(
+  programmeId: string,
+  faqId: string,
+  isFeatured: boolean,
+): Promise<void> {
+  if (!isFeatured) return;
+  const publishedFeatured = await prisma.programmeFaq.count({
+    where: {
+      programmeId,
+      isFeatured: true,
+      status: ProgrammePublicPublicationStatus.Published,
+      id: { not: faqId },
+    },
+  });
+  if (publishedFeatured >= MAX_PUBLIC_FEATURED_FAQS) {
+    throw new PublicProgrammeInfoConflictError(
+      `Only ${MAX_PUBLIC_FEATURED_FAQS} important FAQs can be published at a time. Unmark or unpublish another important FAQ first.`,
+    );
+  }
+}
+
 export const publicProgrammeInfoService = {
   async overview(programmeId: string) {
     await assertProgramme(programmeId);
@@ -175,7 +198,8 @@ export const publicProgrammeInfoService = {
   },
 
   async publishFaq(programmeId: string, id: string) {
-    await getFaq(programmeId, id);
+    const faq = await getFaq(programmeId, id);
+    await assertFeaturedPublishCapacity(programmeId, id, faq.isFeatured);
     return prisma.programmeFaq.update({
       where: { id },
       data: {
