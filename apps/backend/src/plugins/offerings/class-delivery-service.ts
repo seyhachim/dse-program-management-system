@@ -64,6 +64,11 @@ interface OccurrenceRow {
   updatedAt: Date;
 }
 
+interface LegacyAddressingCounts {
+  meetingCount: bigint;
+  occurrenceCount: bigint;
+}
+
 export class TeachingSessionOccurrenceReferenceError extends Error {}
 export class TeachingSessionOccurrenceValidationError extends Error {}
 
@@ -87,6 +92,11 @@ function parseDateOnly(value: string): Date {
     throw new TeachingSessionOccurrenceValidationError("Use a valid YYYY-MM-DD session date");
   }
   return parsed;
+}
+
+function dayForDate(value: string): MeetingDay {
+  const parsed = parseDateOnly(value);
+  return WEEK_DAYS[parsed.getUTCDay()]!;
 }
 
 function arrivalView(row: ArrivalRow): LecturerArrivalConfirmationView {
@@ -131,7 +141,7 @@ function occurrenceView(row: OccurrenceRow): TeachingSessionOccurrenceView {
   };
 }
 
-function assertLegacyAddressable<T>(rows: T[]): T | undefined {
+function assertLegacyEvidenceAddressable<T>(rows: T[]): T | undefined {
   if (rows.length > 1) {
     throw new TeachingSessionOccurrenceValidationError(
       "Multiple class meetings exist for this offering/date; use an exact teaching session occurrence",
@@ -140,7 +150,36 @@ function assertLegacyAddressable<T>(rows: T[]): T | undefined {
   return rows[0];
 }
 
+function assertLegacyScheduleCounts(counts: LegacyAddressingCounts | undefined): void {
+  if (Number(counts?.meetingCount ?? 0n) > 1 || Number(counts?.occurrenceCount ?? 0n) > 1) {
+    throw new TeachingSessionOccurrenceValidationError(
+      "Multiple class meetings exist for this offering/date; use an exact teaching session occurrence",
+    );
+  }
+}
+
+async function assertLegacyScheduleAddressable(offeringId: string, date: string): Promise<void> {
+  const dayOfWeek = dayForDate(date);
+  const counts = await prisma.$queryRaw<LegacyAddressingCounts[]>`
+    SELECT
+      (
+        SELECT COUNT(*)::bigint
+        FROM "OfferingMeeting"
+        WHERE "offeringId" = ${offeringId}
+          AND "dayOfWeek" = ${dayOfWeek}
+      ) AS "meetingCount",
+      (
+        SELECT COUNT(*)::bigint
+        FROM "pms_attendance"."TeachingSessionOccurrence"
+        WHERE "offeringId" = ${offeringId}
+          AND "sessionDate" = ${date}::date
+      ) AS "occurrenceCount"
+  `;
+  assertLegacyScheduleCounts(counts[0]);
+}
+
 async function readArrivalRow(offeringId: string, date: string): Promise<ArrivalRow | null> {
+  await assertLegacyScheduleAddressable(offeringId, date);
   const rows = await prisma.$queryRaw<ArrivalRow[]>`
     SELECT
       c."id", c."offeringId", c."date", c."status", c."note", c."recordedById",
@@ -151,10 +190,11 @@ async function readArrivalRow(offeringId: string, date: string): Promise<Arrival
       AND c."date" = ${date}::date
     ORDER BY c."recordedAt" ASC
   `;
-  return assertLegacyAddressable(rows) ?? null;
+  return assertLegacyEvidenceAddressable(rows) ?? null;
 }
 
 async function readSessionRow(offeringId: string, date: string): Promise<SessionRow | null> {
+  await assertLegacyScheduleAddressable(offeringId, date);
   const rows = await prisma.$queryRaw<SessionRow[]>`
     SELECT
       s."id", s."offeringId", s."date", s."status", s."reason", s."recordedById",
@@ -165,7 +205,7 @@ async function readSessionRow(offeringId: string, date: string): Promise<Session
       AND s."date" = ${date}::date
     ORDER BY s."recordedAt" ASC
   `;
-  return assertLegacyAddressable(rows) ?? null;
+  return assertLegacyEvidenceAddressable(rows) ?? null;
 }
 
 async function readOccurrenceRow(
@@ -173,6 +213,7 @@ async function readOccurrenceRow(
   offeringMeetingId: string,
   date: string,
 ): Promise<OccurrenceRow | null> {
+  parseDateOnly(date);
   const rows = await prisma.$queryRaw<OccurrenceRow[]>`
     SELECT
       "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
@@ -188,8 +229,7 @@ async function readOccurrenceRow(
 }
 
 function validateOccurrenceDate(meeting: OfferingMeetingRow, date: string): void {
-  const parsed = parseDateOnly(date);
-  const actualDay = WEEK_DAYS[parsed.getUTCDay()];
+  const actualDay = dayForDate(date);
   if (actualDay !== meeting.dayOfWeek) {
     throw new TeachingSessionOccurrenceValidationError(
       `Session date is ${actualDay}; this meeting is scheduled for ${meeting.dayOfWeek}`,
@@ -247,7 +287,24 @@ export const classDeliveryService = {
     offeringMeetingId: string,
     date: string,
   ): Promise<TeachingSessionOccurrenceView> {
+    parseDateOnly(date);
     return prisma.$transaction(async (tx) => {
+      // Historical occurrences are immutable schedule snapshots. Return one before
+      // consulting today's live timetable/period so later legitimate schedule edits
+      // cannot make an already materialized occurrence unreadable.
+      const existing = await tx.$queryRaw<OccurrenceRow[]>`
+        SELECT
+          "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
+          "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
+          "createdAt", "updatedAt"
+        FROM "pms_attendance"."TeachingSessionOccurrence"
+        WHERE "offeringId" = ${offeringId}
+          AND "offeringMeetingId" = ${offeringMeetingId}
+          AND "sessionDate" = ${date}::date
+        FOR UPDATE
+      `;
+      if (existing[0]) return occurrenceView(existing[0]);
+
       const meetings = await tx.$queryRaw<OfferingMeetingRow[]>`
         SELECT
           m."id", m."offeringId", m."dayOfWeek", m."startTime", m."endTime", m."room", m."activityType",
@@ -266,49 +323,36 @@ export const classDeliveryService = {
       }
       validateOccurrenceDate(meeting, date);
 
-      const existing = await tx.$queryRaw<OccurrenceRow[]>`
-        SELECT
+      const now = new Date();
+      const inserted = await tx.$queryRaw<OccurrenceRow[]>`
+        INSERT INTO "pms_attendance"."TeachingSessionOccurrence" (
           "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
           "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
           "createdAt", "updatedAt"
-        FROM "pms_attendance"."TeachingSessionOccurrence"
-        WHERE "offeringMeetingId" = ${offeringMeetingId}
-          AND "sessionDate" = ${date}::date
-        FOR UPDATE
+        ) VALUES (
+          ${randomUUID()}, ${offeringId}, ${offeringMeetingId}, ${date}::date, ${meeting.dayOfWeek},
+          ${meeting.startTime}, ${meeting.endTime}, ${meeting.room}, ${meeting.activityType},
+          ${now}, ${now}
+        )
+        ON CONFLICT ("offeringMeetingId", "sessionDate") DO NOTHING
+        RETURNING
+          "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
+          "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
+          "createdAt", "updatedAt"
       `;
-      let row = existing[0];
-
+      let row = inserted[0];
       if (!row) {
-        const now = new Date();
-        const inserted = await tx.$queryRaw<OccurrenceRow[]>`
-          INSERT INTO "pms_attendance"."TeachingSessionOccurrence" (
+        const concurrent = await tx.$queryRaw<OccurrenceRow[]>`
+          SELECT
             "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
             "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
             "createdAt", "updatedAt"
-          ) VALUES (
-            ${randomUUID()}, ${offeringId}, ${offeringMeetingId}, ${date}::date, ${meeting.dayOfWeek},
-            ${meeting.startTime}, ${meeting.endTime}, ${meeting.room}, ${meeting.activityType},
-            ${now}, ${now}
-          )
-          ON CONFLICT ("offeringMeetingId", "sessionDate") DO NOTHING
-          RETURNING
-            "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
-            "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
-            "createdAt", "updatedAt"
+          FROM "pms_attendance"."TeachingSessionOccurrence"
+          WHERE "offeringId" = ${offeringId}
+            AND "offeringMeetingId" = ${offeringMeetingId}
+            AND "sessionDate" = ${date}::date
         `;
-        row = inserted[0];
-        if (!row) {
-          const concurrent = await tx.$queryRaw<OccurrenceRow[]>`
-            SELECT
-              "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
-              "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
-              "createdAt", "updatedAt"
-            FROM "pms_attendance"."TeachingSessionOccurrence"
-            WHERE "offeringMeetingId" = ${offeringMeetingId}
-              AND "sessionDate" = ${date}::date
-          `;
-          row = concurrent[0];
-        }
+        row = concurrent[0];
       }
       if (!row) throw new Error("Teaching session occurrence was not persisted");
 
@@ -376,6 +420,20 @@ export const classDeliveryService = {
       `;
       if (!offerings[0]) throw new ReferenceError("Offering not found");
 
+      const dayOfWeek = dayForDate(date);
+      const counts = await tx.$queryRaw<LegacyAddressingCounts[]>`
+        SELECT
+          (
+            SELECT COUNT(*)::bigint FROM "OfferingMeeting"
+            WHERE "offeringId" = ${offeringId} AND "dayOfWeek" = ${dayOfWeek}
+          ) AS "meetingCount",
+          (
+            SELECT COUNT(*)::bigint FROM "pms_attendance"."TeachingSessionOccurrence"
+            WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${date}::date
+          ) AS "occurrenceCount"
+      `;
+      assertLegacyScheduleCounts(counts[0]);
+
       const existing = await tx.$queryRaw<ArrivalRow[]>`
         SELECT
           c."id", c."offeringId", c."date", c."status", c."note", c."recordedById",
@@ -386,7 +444,7 @@ export const classDeliveryService = {
         ORDER BY c."recordedAt" ASC
         FOR UPDATE OF c
       `;
-      const current = assertLegacyAddressable(existing);
+      const current = assertLegacyEvidenceAddressable(existing);
       if (current?.status === status && current.note === note) return { row: current, changed: false };
 
       const now = new Date();
@@ -493,6 +551,20 @@ export const classDeliveryService = {
       `;
       if (!offerings[0]) throw new ReferenceError("Offering not found");
 
+      const dayOfWeek = dayForDate(date);
+      const counts = await tx.$queryRaw<LegacyAddressingCounts[]>`
+        SELECT
+          (
+            SELECT COUNT(*)::bigint FROM "OfferingMeeting"
+            WHERE "offeringId" = ${offeringId} AND "dayOfWeek" = ${dayOfWeek}
+          ) AS "meetingCount",
+          (
+            SELECT COUNT(*)::bigint FROM "pms_attendance"."TeachingSessionOccurrence"
+            WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${date}::date
+          ) AS "occurrenceCount"
+      `;
+      assertLegacyScheduleCounts(counts[0]);
+
       const existing = await tx.$queryRaw<SessionRow[]>`
         SELECT
           s."id", s."offeringId", s."date", s."status", s."reason", s."recordedById",
@@ -503,7 +575,7 @@ export const classDeliveryService = {
         ORDER BY s."recordedAt" ASC
         FOR UPDATE OF s
       `;
-      const current = assertLegacyAddressable(existing);
+      const current = assertLegacyEvidenceAddressable(existing);
       if (current?.status === status && current.reason === reason) return { row: current, changed: false };
 
       const now = new Date();
