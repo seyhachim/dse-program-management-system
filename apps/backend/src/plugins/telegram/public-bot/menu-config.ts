@@ -18,18 +18,9 @@ function cb(text: string, callbackData: CallbackData): CallbackButton {
 
 export const MAIN_REPLY_KEYBOARD = [
   [
-    { text: "🚀 Explore DSE", route: "explore" },
-    { text: "📝 Admission", route: "admission" },
-  ],
-  [
-    { text: "📚 Study & Curriculum", route: "curriculum" },
-    { text: "💼 Careers", route: "careers" },
-  ],
-  [
-    { text: "💰 Fees & Scholarships", route: "fees" },
+    { text: "🏠 Home", route: "home" },
     { text: "❓ Ask DSE", route: "ask" },
   ],
-  [{ text: "☰ More", route: "more" }],
 ] as const satisfies ReadonlyArray<ReadonlyArray<ReplyButton>>;
 
 export const REPLY_TEXT_TO_ROUTE = Object.fromEntries(
@@ -132,10 +123,7 @@ export const MENUS = {
       [cb("Overview", "curriculum:overview")],
       [cb("Year 1", "curriculum:year:1"), cb("Year 2", "curriculum:year:2")],
       [cb("Year 3", "curriculum:year:3"), cb("Year 4", "curriculum:year:4")],
-      [cb("Programming", "curriculum:topic:programming"), cb("Data", "curriculum:topic:data")],
-      [cb("AI & ML", "curriculum:topic:ai_ml"), cb("Math & Statistics", "curriculum:topic:math")],
       [cb("Projects", "curriculum:projects"), cb("Internship", "curriculum:internship")],
-      [cb("Final-year project", "curriculum:final_project")],
       [cb("All courses", "curriculum:courses:page:1")],
     ],
   },
@@ -147,7 +135,6 @@ export const MENUS = {
       [cb("Jobs overview", "careers:jobs"), cb("Career explorer", "careers:explorer")],
       [cb("Data Analyst", "career:data_analyst"), cb("Data Scientist", "career:data_scientist")],
       [cb("ML Engineer", "career:ml_engineer"), cb("Data Engineer", "career:data_engineer")],
-      [cb("Software Engineer", "career:software_engineer"), cb("BI Analyst", "career:bi_analyst")],
       [cb("Research", "career:research"), cb("Government", "career:government")],
       [cb("Agriculture & Technology", "career:agritech")],
     ],
@@ -217,22 +204,13 @@ export const MENUS = {
     route: "dates",
     parent: "more",
     title: "Important Dates",
-    rows: [
-      [cb("Application opens", "dates:application_open"), cb("Application deadline", "dates:application_deadline")],
-      [cb("Entrance exam", "dates:exam"), cb("Interview", "dates:interview")],
-      [cb("Results", "dates:results"), cb("Registration", "dates:registration")],
-      [cb("Semester start", "dates:semester_start")],
-    ],
+    rows: [],
   },
   contact: {
     route: "contact",
     parent: "more",
     title: "Contact Us",
-    rows: [
-      [cb("Location", "contact:location"), cb("Phone", "contact:phone")],
-      [cb("Email", "contact:email"), cb("Website", "contact:website")],
-      [cb("Admissions contact", "contact:admissions")],
-    ],
+    rows: [],
   },
   ask: {
     route: "ask",
