@@ -65,8 +65,8 @@ jobs:
       - name: Seed isolated database
         run: bun run seed
 
-      - name: Verify monitor delivery database integrity
-        run: bun test apps/backend/src/plugins/offerings/teaching-session-delivery-db.test.ts
+      - name: Verify monitor and sub-class-monitor delivery database integrity
+        run: bun test apps/backend/src/plugins/offerings/teaching-session-delivery-db.test.ts apps/backend/src/plugins/offerings/teaching-session-delivery-submonitor-db.test.ts
 
       - name: Verify database security inventory and grants
         run: bun run --cwd apps/backend db:security:verify
