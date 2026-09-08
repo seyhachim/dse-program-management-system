@@ -14,7 +14,6 @@ const AUDIENCES = new Set<TelegramDestinationAudience>([
   "ALL_LECTURERS",
   "ALL_STUDENTS",
   "COHORT",
-  "CLASS_SECTION",
   "CUSTOM",
 ]);
 const CHAT_TYPES = new Set<TelegramDestinationChatType>(["GROUP", "SUPERGROUP", "CHANNEL"]);
@@ -99,6 +98,13 @@ export function createTelegramDestinationRouter(): Router {
     try {
       const programmeId = typeof req.query.programmeId === "string" ? req.query.programmeId : undefined;
       res.json(await telegramDestinationService.list(req.user!, programmeId));
+    } catch (error) { sendDestinationError(res, error); }
+  });
+
+  router.get("/destinations/scopes/cohorts", async (req, res) => {
+    try {
+      const programmeId = typeof req.query.programmeId === "string" ? req.query.programmeId : undefined;
+      res.json(await telegramDestinationService.listCohorts(req.user!, programmeId));
     } catch (error) { sendDestinationError(res, error); }
   });
 
