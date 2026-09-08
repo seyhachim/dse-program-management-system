@@ -177,9 +177,8 @@ export const MENUS = {
     parent: "home",
     title: "More",
     rows: [
-      [cb("🎓 About DSE", "about:menu"), cb("🏫 Student Life", "studentlife:menu")],
-      [cb("🧪 Labs & Facilities", "facility:menu"), cb("👩‍🏫 Lecturers", "lecturers:menu")],
-      [cb("📅 Important Dates", "dates:menu"), cb("📍 Contact Us", "contact:menu")],
+      [cb("🎓 About DSE", "about:menu"), cb("📅 Important Dates", "dates:menu")],
+      [cb("📍 Contact Us", "contact:menu")],
     ],
   },
   studentLife: {
