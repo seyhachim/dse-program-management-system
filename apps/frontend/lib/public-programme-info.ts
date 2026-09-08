@@ -20,6 +20,9 @@ export const publicProgrammeInfoApi = {
   listFaqs(programmeId: string): Promise<ProgrammeFaqRecord[]> {
     return api.get(`${base(programmeId)}/faqs`);
   },
+  listFaqLifecycle(programmeId: string): Promise<ProgrammeFaqRecord[]> {
+    return api.get(`${base(programmeId)}/faqs/lifecycle`);
+  },
   createFaq(programmeId: string, input: ProgrammeFaqAdminWrite): Promise<ProgrammeFaqRecord> {
     return api.post(`${base(programmeId)}/faqs`, input);
   },
@@ -36,11 +39,17 @@ export const publicProgrammeInfoApi = {
   unpublishFaq(programmeId: string, id: string): Promise<ProgrammeFaqRecord> {
     return api.post(`${base(programmeId)}/faqs/${encodeURIComponent(id)}/unpublish`, {});
   },
+  archiveFaq(programmeId: string, id: string): Promise<ProgrammeFaqRecord> {
+    return api.post(`${base(programmeId)}/faqs/${encodeURIComponent(id)}/archive`, {});
+  },
   removeFaq(programmeId: string, id: string): Promise<void> {
     return api.delete(`${base(programmeId)}/faqs/${encodeURIComponent(id)}`);
   },
   listImportantDates(programmeId: string): Promise<ProgrammeImportantDateRecord[]> {
     return api.get(`${base(programmeId)}/important-dates`);
+  },
+  listImportantDateLifecycle(programmeId: string): Promise<ProgrammeImportantDateRecord[]> {
+    return api.get(`${base(programmeId)}/important-dates/lifecycle`);
   },
   createImportantDate(
     programmeId: string,
@@ -64,6 +73,15 @@ export const publicProgrammeInfoApi = {
   unpublishImportantDate(programmeId: string, id: string): Promise<ProgrammeImportantDateRecord> {
     return api.post(
       `${base(programmeId)}/important-dates/${encodeURIComponent(id)}/unpublish`,
+      {},
+    );
+  },
+  archiveImportantDate(
+    programmeId: string,
+    id: string,
+  ): Promise<ProgrammeImportantDateRecord> {
+    return api.post(
+      `${base(programmeId)}/important-dates/${encodeURIComponent(id)}/archive`,
       {},
     );
   },
