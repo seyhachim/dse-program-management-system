@@ -26,7 +26,7 @@ async function createProgramme() {
 }
 
 describeDb("public programme information admin service", () => {
-  test("FAQ create -> edit -> publish -> unpublish -> delete round trip", async () => {
+  test("previously published FAQ retains provenance, cannot be deleted, and can be archived", async () => {
     const programme = await createProgramme();
     const slug = `can-i-apply-${token()}`;
 
@@ -65,6 +65,7 @@ describeDb("public programme information admin service", () => {
     const published = await publicProgrammeInfoService.publishFaq(programme.id, created.id);
     expect(published.status).toBe("Published");
     expect(published.publishedAt).toBeInstanceOf(Date);
+    const firstPublishedAt = published.publishedAt;
 
     await expect(
       publicProgrammeInfoService.deleteFaq(programme.id, created.id),
@@ -72,13 +73,44 @@ describeDb("public programme information admin service", () => {
 
     const unpublished = await publicProgrammeInfoService.unpublishFaq(programme.id, created.id);
     expect(unpublished.status).toBe("Draft");
-    expect(unpublished.publishedAt).toBeNull();
+    expect(unpublished.publishedAt?.toISOString()).toBe(firstPublishedAt?.toISOString());
 
+    await expect(
+      publicProgrammeInfoService.deleteFaq(programme.id, created.id),
+    ).rejects.toBeInstanceOf(PublicProgrammeInfoConflictError);
+
+    const archived = await publicProgrammeInfoService.archiveFaq(programme.id, created.id);
+    expect(archived.status).toBe("Archived");
+    expect(archived.publishedAt?.toISOString()).toBe(firstPublishedAt?.toISOString());
+    await expect(
+      publicProgrammeInfoService.publishFaq(programme.id, created.id),
+    ).rejects.toBeInstanceOf(PublicProgrammeInfoConflictError);
+    await expect(
+      publicProgrammeInfoService.deleteFaq(programme.id, created.id),
+    ).rejects.toBeInstanceOf(PublicProgrammeInfoConflictError);
+    expect(await prisma.programmeFaq.findUnique({ where: { id: created.id } })).not.toBeNull();
+  });
+
+  test("never-published draft FAQ can still be permanently deleted", async () => {
+    const programme = await createProgramme();
+    const created = await publicProgrammeInfoService.createFaq(programme.id, {
+      category: "About",
+      slug: `delete-draft-${token()}`,
+      question: "Temporary draft?",
+      answer: "Temporary answer.",
+      shortAnswer: null,
+      keywords: [],
+      sortOrder: 0,
+      isFeatured: false,
+      sourceLabel: null,
+      sourceUrl: null,
+      reviewedAt: null,
+    });
     await publicProgrammeInfoService.deleteFaq(programme.id, created.id);
     expect(await prisma.programmeFaq.findUnique({ where: { id: created.id } })).toBeNull();
   });
 
-  test("important date lifecycle preserves typed date range", async () => {
+  test("important date publication history is retained and archived instead of deleted", async () => {
     const programme = await createProgramme();
     const item = await publicProgrammeInfoService.createImportantDate(programme.id, {
       kind: "ApplicationDeadline",
@@ -93,10 +125,21 @@ describeDb("public programme information admin service", () => {
     const published = await publicProgrammeInfoService.publishImportantDate(programme.id, item.id);
     expect(published.status).toBe("Published");
     expect(published.publishedAt).toBeInstanceOf(Date);
+    const firstPublishedAt = published.publishedAt;
 
     const unpublished = await publicProgrammeInfoService.unpublishImportantDate(programme.id, item.id);
     expect(unpublished.status).toBe("Draft");
-    await publicProgrammeInfoService.deleteImportantDate(programme.id, item.id);
+    expect(unpublished.publishedAt?.toISOString()).toBe(firstPublishedAt?.toISOString());
+    await expect(
+      publicProgrammeInfoService.deleteImportantDate(programme.id, item.id),
+    ).rejects.toBeInstanceOf(PublicProgrammeInfoConflictError);
+
+    const archived = await publicProgrammeInfoService.archiveImportantDate(programme.id, item.id);
+    expect(archived.status).toBe("Archived");
+    expect(archived.publishedAt?.toISOString()).toBe(firstPublishedAt?.toISOString());
+    expect(
+      await prisma.programmeImportantDate.findUnique({ where: { id: item.id } }),
+    ).not.toBeNull();
   });
 
   test("public profile upserts official contact information", async () => {
