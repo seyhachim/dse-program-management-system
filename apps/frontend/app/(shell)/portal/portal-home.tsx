@@ -37,6 +37,12 @@ const HOME_PREFETCH = [
   { resource: "academic-calendar", loader: studentPortalApi.academicCalendar },
 ] as const;
 
+const QUICK_ACTIONS = [
+  { href: "/portal/courses", label: "Courses", Icon: BookOpen },
+  { href: "/portal/schedule", label: "Schedule", Icon: CalendarDays },
+  { href: "/portal/results", label: "Results", Icon: Target },
+] as const;
+
 export function PortalHome() {
   const load = useCallback(() => studentPortalApi.home(), []);
   const { data, loading, error, refreshError, refreshing } = useCachedPortalData(
@@ -74,32 +80,56 @@ export function PortalHome() {
       ) : null}
 
       <section className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}>
-        <p className="text-sm opacity-80">Welcome back</p>
-        <h2 className="mt-1 break-words text-2xl font-bold">
-          {data.student.name}
-        </h2>
-        <p className="mt-1 break-words text-sm opacity-80">
-          {data.student.studentId} · Stay focused on what comes next.
-        </p>
+        <p className="text-xs font-medium text-primary">Welcome back</p>
+        <div className="mt-1 flex min-w-0 items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="break-words text-xl font-bold sm:text-2xl">
+              {data.student.name}
+            </h2>
+            <p className="mt-0.5 break-words text-xs text-muted-foreground sm:text-sm">
+              {data.student.studentId}
+            </p>
+          </div>
+          <p className="hidden max-w-xs text-right text-xs text-muted-foreground sm:block">
+            Stay focused on what comes next.
+          </p>
+        </div>
       </section>
 
+      <nav aria-label="Student portal quick actions" className="grid grid-cols-3 gap-2">
+        {QUICK_ACTIONS.map(({ href, label, Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className={MOBILE_STUDENT_PORTAL_LAYOUT.quickAction}
+          >
+            <Icon className="h-4 w-4 shrink-0 text-primary" />
+            <span className="min-w-0 truncate">{label}</span>
+          </Link>
+        ))}
+      </nav>
+
       <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
-        <section
-          className={`${MOBILE_STUDENT_PORTAL_LAYOUT.compactCard} min-w-0 lg:col-span-2`}
+        <Link
+          href="/portal/schedule"
+          className={`${MOBILE_STUDENT_PORTAL_LAYOUT.homePrimaryCard} lg:col-span-2`}
         >
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <h3 className="font-semibold">Next class</h3>
-            <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+            <span className="flex items-center gap-1 text-xs font-medium text-primary">
+              Schedule
+              <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+            </span>
           </div>
           {nextMeeting ? (
-            <div className="min-w-0">
-              <p className="break-words text-lg font-semibold">
+            <div className="mt-3 min-w-0">
+              <p className="break-words text-base font-semibold sm:text-lg">
                 {nextMeeting.course.code} · {nextMeeting.course.title}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
                 Section {nextMeeting.course.sectionCode}
               </p>
-              <div className="mt-4 grid gap-2 text-sm sm:flex sm:flex-wrap sm:gap-4">
+              <div className="mt-3 grid gap-2 text-sm sm:flex sm:flex-wrap sm:gap-4">
                 <span className="flex min-w-0 items-start gap-2">
                   <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <span className="break-words">
@@ -115,72 +145,112 @@ export function PortalHome() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-3 text-sm text-muted-foreground">
               No class schedule is available yet.
             </p>
           )}
-        </section>
+        </Link>
 
-        <section className={MOBILE_STUDENT_PORTAL_LAYOUT.compactCard}>
+        <Link
+          href="/portal/results"
+          className={MOBILE_STUDENT_PORTAL_LAYOUT.homeProgressCard}
+        >
           <div className="flex items-center justify-between gap-3">
             <h3 className="font-semibold">CLO achievement</h3>
-            <Target className="h-5 w-5 shrink-0 text-primary" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
           </div>
-          <p className="mt-4 text-3xl font-bold sm:mt-5">
-            {data.overallAchievement === null
-              ? "—"
-              : `${data.overallAchievement}%`}
-          </p>
-          <Progress className="mt-3" value={data.overallAchievement ?? 0} />
+          <div className="mt-3 flex items-end justify-between gap-3">
+            <p className="text-3xl font-bold">
+              {data.overallAchievement === null
+                ? "—"
+                : `${data.overallAchievement}%`}
+            </p>
+            <Target className="mb-1 h-5 w-5 shrink-0 text-primary" />
+          </div>
+          <Progress className="mt-2" value={data.overallAchievement ?? 0} />
           <p className="mt-2 text-xs text-muted-foreground">
-            Calculated from published assessment evidence.
+            From published assessment evidence.
           </p>
-        </section>
+        </Link>
       </div>
 
       <Link
         href="/portal/academic-calendar"
-        className="group block min-h-11 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-5"
+        className={MOBILE_STUDENT_PORTAL_LAYOUT.calendarLink}
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
-              <h3 className="font-semibold">Academic Calendar</h3>
+              <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
+              <h3 className="text-sm font-semibold">Academic Calendar</h3>
             </div>
             {calendar.status === "available" && firstCalendarPeriod ? (
               <>
-                <p className="mt-2 break-words text-sm font-medium">
+                <p className="mt-1.5 break-words text-sm font-medium">
                   {academicSemesterLabel(firstCalendarPeriod.semester)} ·{" "}
                   {formatAcademicDate(firstCalendarPeriod.teachingStart)} –{" "}
                   {formatAcademicDate(firstCalendarPeriod.teachingEnd)}
                 </p>
-                <p className="mt-1 break-words text-xs text-muted-foreground">
+                <p className="mt-0.5 break-words text-xs text-muted-foreground">
                   {calendar.nextEvent
                     ? `Next: ${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}`
                     : "No upcoming event is currently published."}
                 </p>
               </>
             ) : (
-              <>
-                <p className="mt-2 text-sm font-medium">
-                  Calendar not available yet
-                </p>
-                <p className="mt-1 break-words text-xs text-muted-foreground">
-                  {unavailableCalendarMessage}
-                </p>
-              </>
+              <p className="mt-1.5 break-words text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  Not available yet.
+                </span>{" "}
+                {unavailableCalendarMessage}
+              </p>
             )}
           </div>
-          <span className="flex min-h-11 shrink-0 items-center gap-1 self-start text-sm font-medium text-primary sm:self-auto">
-            View full calendar
-            <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
-          </span>
+          <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
         </div>
       </Link>
 
       <div className="grid gap-5 lg:grid-cols-5 lg:gap-6">
-        <section className="space-y-3 lg:col-span-3">
+        <section className="space-y-3 lg:order-2 lg:col-span-2">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold">Upcoming assessments</h3>
+            <Link
+              className="flex min-h-11 items-center text-sm font-medium text-primary"
+              href="/portal/assessments"
+            >
+              View all
+            </Link>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-2">
+            {data.upcomingAssessments.length ? (
+              data.upcomingAssessments.slice(0, 3).map((item) => (
+                <Link
+                  key={`${item.offeringId}-${item.assessmentId}`}
+                  href={`/portal/courses/${item.offeringId}`}
+                  className="flex min-h-11 min-w-0 items-start gap-3 rounded-xl p-3 hover:bg-accent"
+                >
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-medium">
+                      {item.name}
+                    </p>
+                    <p className="break-words text-xs text-muted-foreground">
+                      {item.courseCode} ·{" "}
+                      {assessmentDeadline(item.dueAt, item.dueWeek)}
+                      {item.weight ? ` · ${item.weight}%` : ""}
+                    </p>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <p className="p-4 text-sm text-muted-foreground">
+                No upcoming assessments.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="space-y-3 lg:order-1 lg:col-span-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold">My courses</h3>
             <Link
@@ -223,37 +293,6 @@ export function PortalHome() {
             />
           )}
         </section>
-
-        <section className="space-y-3 lg:col-span-2">
-          <h3 className="text-lg font-semibold">Upcoming assessments</h3>
-          <div className="rounded-2xl border border-border bg-card p-2">
-            {data.upcomingAssessments.length ? (
-              data.upcomingAssessments.map((item) => (
-                <Link
-                  key={`${item.offeringId}-${item.assessmentId}`}
-                  href={`/portal/courses/${item.offeringId}`}
-                  className="flex min-h-11 min-w-0 items-start gap-3 rounded-xl p-3 hover:bg-accent"
-                >
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-medium">
-                      {item.name}
-                    </p>
-                    <p className="break-words text-xs text-muted-foreground">
-                      {item.courseCode} ·{" "}
-                      {assessmentDeadline(item.dueAt, item.dueWeek)}
-                      {item.weight ? ` · ${item.weight}%` : ""}
-                    </p>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <p className="p-4 text-sm text-muted-foreground">
-                No upcoming assessments.
-              </p>
-            )}
-          </div>
-        </section>
       </div>
 
       <section>
@@ -271,7 +310,7 @@ export function PortalHome() {
         </div>
         <div className="divide-y divide-border rounded-2xl border border-border bg-card">
           {data.announcements.length ? (
-            data.announcements.map((item) => (
+            data.announcements.slice(0, 3).map((item) => (
               <div key={item.id} className="min-w-0 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="break-words text-xs font-semibold text-primary">
