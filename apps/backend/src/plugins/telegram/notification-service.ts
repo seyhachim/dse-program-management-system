@@ -33,26 +33,56 @@ async function eligibleStudentRecipient(studentId: string): Promise<RecipientRow
   return rows[0] ?? null;
 }
 
-export async function sendTelegramPmsMessage(
+async function sendTelegramPmsPayload(
   chatId: string,
   text: string,
-  url: string,
-  fetchImpl: typeof fetch = fetch,
+  replyMarkup: unknown,
+  fetchImpl: typeof fetch,
 ) {
   const config = getPmsTelegramConfig();
   if (!config.enabled || !config.botToken) throw new Error("Telegram notification delivery is disabled");
   const response = await fetchImpl(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      reply_markup: { inline_keyboard: [[{ text: "Open in DSE PMS", web_app: { url } }]] },
-    }),
+    body: JSON.stringify({ chat_id: chatId, text, reply_markup: replyMarkup }),
   });
   const payload = await response.json() as { ok?: boolean; result?: { message_id?: number }; description?: string };
   if (!response.ok || !payload.ok) throw new Error(payload.description ?? `Telegram API ${response.status}`);
   return String(payload.result?.message_id ?? "");
+}
+
+/** Private linked-user delivery: Telegram Web App buttons are valid in private chats. */
+export async function sendTelegramPmsMessage(
+  chatId: string,
+  text: string,
+  url: string,
+  fetchImpl: typeof fetch = fetch,
+) {
+  return sendTelegramPmsPayload(
+    chatId,
+    text,
+    { inline_keyboard: [[{ text: "Open in DSE PMS", web_app: { url } }]] },
+    fetchImpl,
+  );
+}
+
+/**
+ * Group/supergroup/channel delivery. Use an ordinary HTTPS URL button rather
+ * than Telegram's private-chat-only Web App button. Authorization is still
+ * re-checked by PMS when the destination link is opened.
+ */
+export async function sendTelegramPmsDestinationMessage(
+  chatId: string,
+  text: string,
+  url: string,
+  fetchImpl: typeof fetch = fetch,
+) {
+  return sendTelegramPmsPayload(
+    chatId,
+    text,
+    { inline_keyboard: [[{ text: "Open DSE PMS", url }]] },
+    fetchImpl,
+  );
 }
 
 async function claimDelivery(identityId: string, eventKey: string, kind: string, resourceId: string) {
