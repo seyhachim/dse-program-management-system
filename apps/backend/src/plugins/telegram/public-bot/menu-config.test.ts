@@ -57,6 +57,21 @@ describe("public Telegram typed menu configuration", () => {
     ).toBe(false);
   });
 
+  test("More exposes only the approved shortcuts and keeps Back/Home navigation", () => {
+    const labels = getMenuKeyboard("more").flat().map((button) => button.text);
+
+    expect(labels).toEqual([
+      "🎓 About DSE",
+      "📅 Important Dates",
+      "📍 Contact Us",
+      "← Back",
+      "🏠 Home",
+    ]);
+    expect(labels).not.toContain("🏫 Student Life");
+    expect(labels).not.toContain("🧪 Labs & Facilities");
+    expect(labels).not.toContain("👩‍🏫 Lecturers");
+  });
+
   test("every non-home route has a valid logical parent and Home navigation", () => {
     const routes = Object.keys(MENUS) as RouteKey[];
     for (const route of routes) {
