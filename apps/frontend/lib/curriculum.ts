@@ -14,6 +14,7 @@ import type {
   ProgrammeCurriculumRead,
   ReorderCurriculumCoursesInput,
   UpdateCurriculumCourseInput,
+  UpdateCurriculumWorkflowMetadataInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
@@ -71,6 +72,12 @@ export const curriculumApi = {
   },
   workflow(versionId: string): Promise<CurriculumWorkflowState> {
     return api.get<CurriculumWorkflowState>(workflowPath(versionId));
+  },
+  updateWorkflowMetadata(
+    versionId: string,
+    input: UpdateCurriculumWorkflowMetadataInput,
+  ): Promise<CurriculumWorkflowState> {
+    return api.patch<CurriculumWorkflowState>(`${workflowPath(versionId)}/metadata`, input);
   },
   submit(versionId: string, comment = ""): Promise<CurriculumWorkflowState> {
     return api.post<CurriculumWorkflowState>(`${workflowPath(versionId)}/submit`, { comment });

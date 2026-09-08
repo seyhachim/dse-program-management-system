@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import type {
   CurriculumWorkflowAction,
   CurriculumWorkflowState,
+  UpdateCurriculumWorkflowMetadataInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { findInvalidCurriculumCourseSpecBindings } from "./curriculum-course-spec-integrity.ts";
@@ -122,6 +123,51 @@ async function appendReviewMarker(
 
 export const curriculumWorkflowService = {
   state: getCurriculumWorkflowState,
+
+  async updateMetadata(
+    versionId: string,
+    actorId: string,
+    input: UpdateCurriculumWorkflowMetadataInput,
+  ) {
+    const version = await loadVersion(versionId);
+    const state = await getCurriculumWorkflowState(versionId);
+    if (state.status !== "Draft") {
+      throw new CurriculumWorkflowTransitionError(
+        "Curriculum review metadata can only be edited while the version is Draft",
+      );
+    }
+
+    if (
+      version.cohortLabel === input.cohortLabel &&
+      version.academicYear === input.academicYear
+    ) {
+      return state;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.programmeCurriculumVersion.update({
+        where: { id: versionId },
+        data: {
+          cohortLabel: input.cohortLabel,
+          academicYear: input.academicYear,
+        },
+      });
+      await tx.programmeCurriculumAuditAction.create({
+        data: {
+          curriculumVersionId: versionId,
+          actorId,
+          action: "MetadataUpdated",
+          note: "Curriculum review metadata updated",
+          details: {
+            cohortLabel: { from: version.cohortLabel, to: input.cohortLabel },
+            academicYear: { from: version.academicYear, to: input.academicYear },
+          },
+        },
+      });
+    });
+
+    return getCurriculumWorkflowState(versionId);
+  },
 
   async submit(versionId: string, actorId: string, comment: string) {
     const version = await loadVersion(versionId);

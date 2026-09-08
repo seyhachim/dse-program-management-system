@@ -29,6 +29,14 @@ export const CurriculumRequestChangesSchema = z.object({
 }).strict();
 export type CurriculumRequestChangesInput = z.infer<typeof CurriculumRequestChangesSchema>;
 
+export const UpdateCurriculumWorkflowMetadataSchema = z.object({
+  cohortLabel: z.string().trim().min(1, "Cohort label is required").max(120),
+  academicYear: z.string().trim().min(1, "Academic year is required").max(40),
+}).strict();
+export type UpdateCurriculumWorkflowMetadataInput = z.infer<
+  typeof UpdateCurriculumWorkflowMetadataSchema
+>;
+
 export const CurriculumWorkflowStateSchema = z.object({
   curriculumId: z.string().uuid(),
   versionId: z.string().uuid(),
