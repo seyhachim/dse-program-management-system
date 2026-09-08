@@ -1,6 +1,9 @@
 CREATE TABLE "pms_attendance"."TeachingSessionOccurrence" (
   "id" TEXT NOT NULL,
   "offeringId" TEXT NOT NULL,
+  -- Immutable source-meeting identifier snapshot. Intentionally not a foreign key:
+  -- Offering updates currently replace recurring OfferingMeeting rows. Historical
+  -- occurrences must survive those schedule edits without freezing the timetable.
   "offeringMeetingId" TEXT NOT NULL,
   "sessionDate" DATE NOT NULL,
   "scheduledDayOfWeek" TEXT NOT NULL,
@@ -13,9 +16,7 @@ CREATE TABLE "pms_attendance"."TeachingSessionOccurrence" (
 
   CONSTRAINT "TeachingSessionOccurrence_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "TeachingSessionOccurrence_offeringId_fkey"
-    FOREIGN KEY ("offeringId") REFERENCES "public"."Offering"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "TeachingSessionOccurrence_offeringMeetingId_fkey"
-    FOREIGN KEY ("offeringMeetingId") REFERENCES "public"."OfferingMeeting"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    FOREIGN KEY ("offeringId") REFERENCES "public"."Offering"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE UNIQUE INDEX "TeachingSessionOccurrence_meeting_date_key"
