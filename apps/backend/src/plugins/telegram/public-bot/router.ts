@@ -273,6 +273,7 @@ function replyKeyboard(): TelegramReplyMarkup {
 function inlineKeyboard(
   route: RouteKey,
   visibleFaqSlugs?: ReadonlySet<string>,
+  excludedCallbackData?: ReadonlySet<string>,
 ): TelegramReplyMarkup {
   const toButton = (button: InlineButton) =>
     button.type === "callback"
@@ -281,6 +282,12 @@ function inlineKeyboard(
   const rows = getMenuKeyboard(route)
     .map((row) =>
       row.filter((button) => {
+        if (
+          button.type === "callback" &&
+          excludedCallbackData?.has(button.callbackData)
+        ) {
+          return false;
+        }
         if (!visibleFaqSlugs || button.type !== "callback") return true;
         const faqSlug = FAQ_SLUG_BY_CALLBACK[button.callbackData];
         return !faqSlug || visibleFaqSlugs.has(faqSlug);
@@ -568,7 +575,11 @@ async function renderStaticCallback(
         "Popular Questions",
         await publicRead.listFaqs(programmeId, { featured: true, locale }),
       ),
-      replyMarkup: inlineKeyboard("ask"),
+      replyMarkup: inlineKeyboard(
+        "ask",
+        undefined,
+        new Set(["faq:popular"]),
+      ),
     };
   }
 

@@ -407,6 +407,20 @@ describe("public Telegram webhook", () => {
     const text = client.edited.at(-1)?.text ?? "";
     expect(text).toContain("What is DSE?");
     expect(text).not.toContain("Published DSE answer.");
+    const replyMarkup = client.edited.at(-1)?.replyMarkup;
+    expect(replyMarkup && "inline_keyboard" in replyMarkup).toBe(true);
+    if (replyMarkup && "inline_keyboard" in replyMarkup) {
+      const callbacks = replyMarkup.inline_keyboard
+        .flatMap((row) => row)
+        .flatMap((button) =>
+          "callback_data" in button ? [button.callback_data] : [],
+        );
+      expect(callbacks).not.toContain("faq:popular");
+      expect(callbacks).toContain("faq:category:admission");
+      expect(callbacks).toContain("faq:category:curriculum");
+      expect(callbacks).toContain("faq:category:careers");
+      expect(callbacks).toContain("faq:category:fees");
+    }
     expect(client.edited.at(-1)?.messageId).toBe(44);
     expect(client.answered.at(-1)).toEqual({ callbackQueryId: "cb-1" });
   });
