@@ -127,15 +127,39 @@ async function destinationForManager(user: AuthUser, id: string): Promise<Destin
   return row;
 }
 
+async function validateScope(programmeId: string, audienceType: TelegramDestinationAudience, scopeId?: string) {
+  if (audienceType === "CLASS_SECTION") {
+    throw new TelegramDestinationError(
+      "INVALID_INPUT",
+      "Class-section destinations are not enabled until PMS has a canonical class-section record",
+    );
+  }
+  if (audienceType === "COHORT") {
+    const id = scopeId?.trim();
+    if (!id) throw new TelegramDestinationError("INVALID_INPUT", "Choose a PMS cohort for this destination");
+    const cohort = await prisma.studentCohort.findFirst({
+      where: { id, programmeId },
+      select: { id: true },
+    });
+    if (!cohort) throw new TelegramDestinationError("INVALID_INPUT", "The selected cohort does not belong to this programme");
+    return id;
+  }
+  if (scopeId?.trim()) throw new TelegramDestinationError("INVALID_INPUT", "This audience does not accept a scope");
+  return undefined;
+}
+
 async function claimDestinationDelivery(destinationId: string, eventKey: string, kind: string, resourceId: string) {
   const id = randomUUID();
-  const inserted = await prisma.$executeRaw`
-    INSERT INTO "telegram_security"."TelegramDestinationDelivery"
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    INSERT INTO "telegram_security"."TelegramDestinationDelivery" AS delivery
       ("id", "destinationId", "eventKey", "kind", "resourceId", "status", "attempts")
     VALUES (${id}, ${destinationId}, ${eventKey}, ${kind}, ${resourceId}, 'pending', 0)
-    ON CONFLICT ("destinationId", "eventKey") DO NOTHING
+    ON CONFLICT ("destinationId", "eventKey") DO UPDATE
+      SET "status"='pending', "lastError"=NULL, "updatedAt"=CURRENT_TIMESTAMP
+      WHERE delivery."status"='failed'
+    RETURNING "id"
   `;
-  return inserted > 0 ? id : null;
+  return rows[0]?.id ?? null;
 }
 
 async function finishDestinationDelivery(deliveryId: string, chatId: string, text: string, url: string) {
@@ -170,6 +194,16 @@ export const telegramDestinationService = {
     return { programmeId, destinations: rows.map(view) };
   },
 
+  async listCohorts(user: AuthUser, requestedProgrammeId?: string) {
+    const programmeId = resolveProgrammeId(user, requestedProgrammeId);
+    const cohorts = await prisma.studentCohort.findMany({
+      where: { programmeId },
+      orderBy: [{ intakeYear: "desc" }, { code: "asc" }],
+      select: { id: true, code: true, name: true, intakeYear: true, status: true },
+    });
+    return { programmeId, cohorts };
+  },
+
   async create(user: AuthUser, input: {
     programmeId?: string;
     name: string;
@@ -181,15 +215,12 @@ export const telegramDestinationService = {
     const programmeId = resolveProgrammeId(user, input.programmeId);
     const name = input.name.trim();
     if (!name || name.length > 120) throw new TelegramDestinationError("INVALID_INPUT", "Destination name must be 1–120 characters");
-    const needsScope = input.audienceType === "COHORT" || input.audienceType === "CLASS_SECTION";
-    if (needsScope !== Boolean(input.scopeId?.trim())) {
-      throw new TelegramDestinationError("INVALID_INPUT", needsScope ? "This audience requires a canonical scope" : "This audience does not accept a scope");
-    }
+    const scopeId = await validateScope(programmeId, input.audienceType, input.scopeId);
     const id = randomUUID();
     const rows = await prisma.$queryRaw<DestinationRow[]>`
       INSERT INTO "telegram_security"."TelegramDestination"
         ("id","programmeId","name","chatType","botKind","audienceType","scopeId","purpose","status","enabled","createdBy")
-      VALUES (${id},${programmeId},${name},${input.chatType ?? "SUPERGROUP"},'PMS',${input.audienceType},${input.scopeId?.trim() || null},${input.purpose?.trim() || null},'PENDING',TRUE,${user.id})
+      VALUES (${id},${programmeId},${name},${input.chatType ?? "SUPERGROUP"},'PMS',${input.audienceType},${scopeId ?? null},${input.purpose?.trim() || null},'PENDING',TRUE,${user.id})
       RETURNING *
     `;
     return view(rows[0]!);
@@ -200,23 +231,33 @@ export const telegramDestinationService = {
     if (input.name !== undefined && (!input.name.trim() || input.name.trim().length > 120)) {
       throw new TelegramDestinationError("INVALID_INPUT", "Destination name must be 1–120 characters");
     }
-    const rows = await prisma.$queryRaw<DestinationRow[]>`
-      UPDATE "telegram_security"."TelegramDestination"
-      SET "name"=COALESCE(${input.name?.trim() ?? null}, "name"),
-          "purpose"=CASE WHEN ${input.purpose !== undefined} THEN ${input.purpose?.trim() || null} ELSE "purpose" END,
-          "enabled"=COALESCE(${input.enabled ?? null}, "enabled"),
-          "status"=CASE WHEN ${input.enabled === false} THEN 'DISABLED'
-                        WHEN ${input.enabled === true} AND "chatId" IS NOT NULL THEN 'CONNECTED'
-                        ELSE "status" END,
-          "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${id}
-      RETURNING *
-    `;
-    return view(rows[0]!);
+    try {
+      const rows = await prisma.$queryRaw<DestinationRow[]>`
+        UPDATE "telegram_security"."TelegramDestination"
+        SET "name"=COALESCE(${input.name?.trim() ?? null}, "name"),
+            "purpose"=CASE WHEN ${input.purpose !== undefined} THEN ${input.purpose?.trim() || null} ELSE "purpose" END,
+            "enabled"=COALESCE(${input.enabled ?? null}, "enabled"),
+            "status"=CASE WHEN ${input.enabled === false} THEN 'DISABLED'
+                          WHEN ${input.enabled === true} AND "chatId" IS NOT NULL THEN 'CONNECTED'
+                          ELSE "status" END,
+            "updatedAt"=CURRENT_TIMESTAMP
+        WHERE "id"=${id}
+        RETURNING *
+      `;
+      return view(rows[0]!);
+    } catch (error) {
+      if (String(error).toLowerCase().includes("unique")) {
+        throw new TelegramDestinationError("CONFLICT", "That audience already has an enabled Telegram destination");
+      }
+      throw error;
+    }
   },
 
   async beginRegistration(user: AuthUser, id: string) {
     const destination = await destinationForManager(user, id);
+    if (destination.botKind !== "PMS") {
+      throw new TelegramDestinationError("CONFLICT", "Protected destination registration must use the DSE PMS bot");
+    }
     const code = randomBytes(18).toString("base64url");
     const digest = digestRegistrationCode(code);
     const registrationId = randomUUID();
@@ -250,12 +291,24 @@ export const telegramDestinationService = {
       const registration = rows[0];
       if (!registration) throw new TelegramDestinationError("INVALID_REGISTRATION", "Connection code is invalid, expired, or already used");
       const destinations = await tx.$queryRaw<DestinationRow[]>`
+        SELECT * FROM "telegram_security"."TelegramDestination"
+        WHERE "id"=${registration.destinationId} FOR UPDATE
+      `;
+      const destination = destinations[0];
+      if (!destination || !["PENDING", "OBSERVED", "DISABLED"].includes(destination.status)) {
+        throw new TelegramDestinationError("CONFLICT", "Destination can no longer be connected with this code");
+      }
+      if (destination.chatType !== input.chatType) {
+        throw new TelegramDestinationError(
+          "CONFLICT",
+          `Expected a ${destination.chatType.toLowerCase()} but Telegram reported a ${input.chatType.toLowerCase()}. Generate a new connection code for the correct chat type.`,
+        );
+      }
+      await tx.$executeRaw`
         UPDATE "telegram_security"."TelegramDestination"
         SET "status"='OBSERVED', "updatedAt"=CURRENT_TIMESTAMP
-        WHERE "id"=${registration.destinationId} AND "status" IN ('PENDING','OBSERVED','DISABLED')
-        RETURNING *
+        WHERE "id"=${destination.id}
       `;
-      if (!destinations[0]) throw new TelegramDestinationError("CONFLICT", "Destination can no longer be connected with this code");
       return { registrationId: registration.id, observed: true };
     });
   },
@@ -291,12 +344,15 @@ export const telegramDestinationService = {
     if (!registration?.observedChatId || !registration.observedChatType || !registration.observedAt) {
       throw new TelegramDestinationError("CONFLICT", "Telegram has not observed this connection yet");
     }
+    if (registration.observedChatType !== destination.chatType) {
+      throw new TelegramDestinationError("CONFLICT", "Observed Telegram chat type does not match this destination");
+    }
     try {
       const updated = await prisma.$transaction(async (tx) => {
         const destinationRows = await tx.$queryRaw<DestinationRow[]>`
           UPDATE "telegram_security"."TelegramDestination"
           SET "chatId"=${registration.observedChatId}, "chatTitle"=${registration.observedChatTitle},
-              "chatType"=${registration.observedChatType}, "status"='CONNECTED', "enabled"=TRUE,
+              "status"='CONNECTED', "enabled"=TRUE,
               "verifiedAt"=CURRENT_TIMESTAMP, "verifiedBy"=${user.id}, "updatedAt"=CURRENT_TIMESTAMP
           WHERE "id"=${destination.id}
           RETURNING *
@@ -310,7 +366,7 @@ export const telegramDestinationService = {
       });
       return view(updated);
     } catch (error) {
-      if (String(error).includes("unique")) throw new TelegramDestinationError("CONFLICT", "That Telegram chat or audience is already connected");
+      if (String(error).toLowerCase().includes("unique")) throw new TelegramDestinationError("CONFLICT", "That Telegram chat or audience is already connected");
       throw error;
     }
   },
