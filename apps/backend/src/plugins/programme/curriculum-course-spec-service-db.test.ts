@@ -299,6 +299,7 @@ describeDb("curriculum CourseSpec binding", () => {
       code: `MISS-${token}`,
       name: `Missing ${token}`,
       cohortLabel: "2026 intake",
+      intakeYear: 2026,
       academicYear: "2026-2027",
     });
     await curriculumDraftService.addCourse(initial.selectedVersion.id, actor.id, {
