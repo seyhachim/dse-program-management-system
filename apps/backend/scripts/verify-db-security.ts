@@ -166,6 +166,9 @@ const EXPECTED_TELEGRAM_SECURITY_TABLES = [
   "TelegramAuditEvent",
   "TelegramNotificationPreference",
   "TelegramNotificationDelivery",
+  "TelegramDestination",
+  "TelegramDestinationRegistration",
+  "TelegramDestinationDelivery",
 ] as const;
 
 const EXPECTED_QA_SECURITY_TABLES = [
