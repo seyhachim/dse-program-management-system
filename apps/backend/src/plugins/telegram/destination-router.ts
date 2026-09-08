@@ -53,8 +53,6 @@ type TelegramRegistrationUpdate = {
 export function createTelegramDestinationRouter(): Router {
   const router = Router();
 
-  // Dedicated authenticated-PMS-bot webhook. Telegram chat membership never
-  // authenticates a PMS actor; this endpoint only observes a one-time code.
   router.post("/pms/webhook", async (req, res) => {
     const config = getPmsTelegramConfig();
     if (!config.enabled || !config.webhookSecret) {
@@ -89,6 +87,12 @@ export function createTelegramDestinationRouter(): Router {
   });
 
   router.use("/destinations", requireAuth);
+
+  router.get("/destinations/scopes/programmes", async (req, res) => {
+    try {
+      res.json(await telegramDestinationService.listManagedProgrammes(req.user!));
+    } catch (error) { sendDestinationError(res, error); }
+  });
 
   router.get("/destinations", async (req, res) => {
     try {
