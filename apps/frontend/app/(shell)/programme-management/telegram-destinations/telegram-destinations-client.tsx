@@ -163,6 +163,28 @@ export function TelegramDestinationsClient() {
     finally { setBusyId(undefined); }
   }
 
+  async function editDestination(destination: Destination) {
+    const nextName = window.prompt("Destination name", destination.name);
+    if (nextName === null) return;
+    const trimmedName = nextName.trim();
+    if (!trimmedName) {
+      setError("Destination name cannot be empty.");
+      return;
+    }
+    const nextPurpose = window.prompt("Purpose / description", destination.purpose ?? "");
+    if (nextPurpose === null) return;
+
+    setBusyId(destination.id); setError(undefined);
+    try {
+      await api.patch<Destination>(`/api/telegram/destinations/${destination.id}`, {
+        name: trimmedName,
+        purpose: nextPurpose.trim(),
+      });
+      await load();
+    } catch (err) { setError(messageOf(err)); }
+    finally { setBusyId(undefined); }
+  }
+
   async function toggle(destination: Destination) {
     setBusyId(destination.id); setError(undefined);
     try {
@@ -274,6 +296,7 @@ export function TelegramDestinationsClient() {
                   {!destination.connected && <button disabled={busyId === destination.id} onClick={() => void beginRegistration(destination)} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">{destination.status === "OBSERVED" ? "Reconnect" : "Connect"}</button>}
                   {!destination.connected && <button disabled={busyId === destination.id} onClick={() => void checkAndConfirm(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Check & confirm</button>}
                   {destination.connected && <button disabled={busyId === destination.id} onClick={() => void sendTest(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Test message</button>}
+                  <button disabled={busyId === destination.id} onClick={() => void editDestination(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Edit</button>
                   <button disabled={busyId === destination.id} onClick={() => void toggle(destination)} className="rounded-md border border-input px-3 py-2 text-sm">{destination.enabled ? "Disable" : "Enable"}</button>
                   <button onClick={() => void showDeliveries(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Deliveries</button>
                 </div>
