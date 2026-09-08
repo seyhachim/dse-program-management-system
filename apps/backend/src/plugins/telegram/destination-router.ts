@@ -1,22 +1,18 @@
 import { timingSafeEqual } from "node:crypto";
 import { Router, type Response } from "express";
+import {
+  TelegramDestinationConfirmRequestSchema,
+  TelegramDestinationCreateRequestSchema,
+  TelegramDestinationUpdateRequestSchema,
+  type TelegramDestinationChatType,
+} from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { getPmsTelegramConfig } from "./config.ts";
 import {
   TelegramDestinationError,
   telegramDestinationErrorStatus,
   telegramDestinationService,
-  type TelegramDestinationAudience,
-  type TelegramDestinationChatType,
 } from "./destination-service.ts";
-
-const AUDIENCES = new Set<TelegramDestinationAudience>([
-  "ALL_LECTURERS",
-  "ALL_STUDENTS",
-  "COHORT",
-  "CUSTOM",
-]);
-const CHAT_TYPES = new Set<TelegramDestinationChatType>(["GROUP", "SUPERGROUP", "CHANNEL"]);
 
 function sendDestinationError(res: Response, error: unknown) {
   const status = telegramDestinationErrorStatus(error);
@@ -109,33 +105,18 @@ export function createTelegramDestinationRouter(): Router {
   });
 
   router.post("/destinations", async (req, res) => {
-    const audienceType = req.body?.audienceType as TelegramDestinationAudience;
-    const chatType = (req.body?.chatType ?? "SUPERGROUP") as TelegramDestinationChatType;
-    if (typeof req.body?.name !== "string" || !AUDIENCES.has(audienceType) || !CHAT_TYPES.has(chatType)) {
-      return void res.status(400).json({ error: "Invalid Telegram destination" });
-    }
+    const parsed = TelegramDestinationCreateRequestSchema.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid Telegram destination", details: parsed.error.flatten() });
     try {
-      res.status(201).json(await telegramDestinationService.create(req.user!, {
-        programmeId: typeof req.body.programmeId === "string" ? req.body.programmeId : undefined,
-        name: req.body.name,
-        audienceType,
-        scopeId: typeof req.body.scopeId === "string" ? req.body.scopeId : undefined,
-        purpose: typeof req.body.purpose === "string" ? req.body.purpose : undefined,
-        chatType,
-      }));
+      res.status(201).json(await telegramDestinationService.create(req.user!, parsed.data));
     } catch (error) { sendDestinationError(res, error); }
   });
 
   router.patch("/destinations/:id", async (req, res) => {
-    if (req.body?.name !== undefined && typeof req.body.name !== "string") return void res.status(400).json({ error: "Invalid destination name" });
-    if (req.body?.purpose !== undefined && typeof req.body.purpose !== "string") return void res.status(400).json({ error: "Invalid destination purpose" });
-    if (req.body?.enabled !== undefined && typeof req.body.enabled !== "boolean") return void res.status(400).json({ error: "Invalid destination state" });
+    const parsed = TelegramDestinationUpdateRequestSchema.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid Telegram destination update", details: parsed.error.flatten() });
     try {
-      res.json(await telegramDestinationService.update(req.user!, req.params.id!, {
-        name: req.body?.name,
-        purpose: req.body?.purpose,
-        enabled: req.body?.enabled,
-      }));
+      res.json(await telegramDestinationService.update(req.user!, req.params.id!, parsed.data));
     } catch (error) { sendDestinationError(res, error); }
   });
 
@@ -150,8 +131,9 @@ export function createTelegramDestinationRouter(): Router {
   });
 
   router.post("/destinations/:id/confirm", async (req, res) => {
-    if (typeof req.body?.registrationId !== "string") return void res.status(400).json({ error: "Registration id is required" });
-    try { res.json(await telegramDestinationService.confirmRegistration(req.user!, req.params.id!, req.body.registrationId)); }
+    const parsed = TelegramDestinationConfirmRequestSchema.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Registration id is required" });
+    try { res.json(await telegramDestinationService.confirmRegistration(req.user!, req.params.id!, parsed.data.registrationId)); }
     catch (error) { sendDestinationError(res, error); }
   });
 
