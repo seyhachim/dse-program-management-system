@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   CurriculumRequestChangesSchema,
   CurriculumWorkflowCommentSchema,
+  UpdateCurriculumWorkflowMetadataSchema,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type AuthUser, type Role } from "../../core/auth/token.ts";
@@ -63,6 +64,28 @@ export function createCurriculumWorkflowRouter(): Router {
       if (!(await authorize(req, res, versionId))) return;
       try {
         res.json(await curriculumWorkflowService.state(versionId));
+      } catch (error) {
+        sendError(res, error);
+      }
+    },
+  );
+
+  router.patch(
+    "/curricula/versions/:versionId/workflow/metadata",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const versionId = req.params.versionId;
+      if (!versionId || !req.user) return void res.status(400).json({ error: "Curriculum version id is required" });
+      const parsed = UpdateCurriculumWorkflowMetadataSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return void res.status(400).json({
+          error: "Cohort label and academic year are required",
+          details: parsed.error.flatten(),
+        });
+      }
+      if (!(await authorize(req, res, versionId))) return;
+      try {
+        res.json(await curriculumWorkflowService.updateMetadata(versionId, req.user.id, parsed.data));
       } catch (error) {
         sendError(res, error);
       }
