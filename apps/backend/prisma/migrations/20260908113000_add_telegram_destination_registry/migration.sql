@@ -28,9 +28,11 @@ CREATE TABLE "telegram_security"."TelegramDestination" (
   CONSTRAINT "TelegramDestination_scope_check" CHECK (("audienceType" IN ('COHORT','CLASS_SECTION')) = ("scopeId" IS NOT NULL))
 );
 
+-- One canonical destination per semantic audience/scope. CUSTOM destinations are
+-- intentionally exempt because a programme may have several operational groups.
 CREATE UNIQUE INDEX "TelegramDestination_programme_audience_scope_bot_key"
   ON "telegram_security"."TelegramDestination" ("programmeId", "audienceType", COALESCE("scopeId", ''), "botKind")
-  WHERE "enabled" = TRUE AND "status" = 'CONNECTED';
+  WHERE "enabled" = TRUE AND "status" = 'CONNECTED' AND "audienceType" <> 'CUSTOM';
 CREATE UNIQUE INDEX "TelegramDestination_bot_chat_key"
   ON "telegram_security"."TelegramDestination" ("botKind", "chatId") WHERE "chatId" IS NOT NULL AND "status" = 'CONNECTED';
 CREATE INDEX "TelegramDestination_programme_status_idx"
