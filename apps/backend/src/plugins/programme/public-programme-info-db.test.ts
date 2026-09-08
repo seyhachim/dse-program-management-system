@@ -108,7 +108,23 @@ describeDb("public programme information database invariants", () => {
     ).rejects.toThrow("ProgrammeFaq_publication_state_check");
   });
 
-  test("database rejects Draft FAQ with publishedAt", async () => {
+  test("database allows hidden Draft FAQ to retain first-publication provenance", async () => {
+    const programme = await createProgramme();
+    const publishedAt = new Date();
+
+    const hidden = await prisma.programmeFaq.create({
+      data: {
+        ...faqData(programme.id),
+        status: ProgrammePublicPublicationStatus.Draft,
+        publishedAt,
+      },
+    });
+
+    expect(hidden.status).toBe(ProgrammePublicPublicationStatus.Draft);
+    expect(hidden.publishedAt?.getTime()).toBe(publishedAt.getTime());
+  });
+
+  test("database requires publication provenance for Archived FAQ", async () => {
     const programme = await createProgramme();
 
     await expect(
@@ -116,12 +132,21 @@ describeDb("public programme information database invariants", () => {
         prisma.programmeFaq.create({
           data: {
             ...faqData(programme.id),
-            status: ProgrammePublicPublicationStatus.Draft,
-            publishedAt: new Date(),
+            status: ProgrammePublicPublicationStatus.Archived,
           },
         }),
       ),
     ).rejects.toThrow("ProgrammeFaq_publication_state_check");
+
+    const publishedAt = new Date();
+    const archived = await prisma.programmeFaq.create({
+      data: {
+        ...faqData(programme.id),
+        status: ProgrammePublicPublicationStatus.Archived,
+        publishedAt,
+      },
+    });
+    expect(archived.publishedAt?.getTime()).toBe(publishedAt.getTime());
   });
 
   test("publishes an FAQ only with an explicit publication timestamp", async () => {
