@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 
 type Audience = "ALL_LECTURERS" | "ALL_STUDENTS" | "COHORT" | "CLASS_SECTION" | "CUSTOM";
+type CreateAudience = Exclude<Audience, "CLASS_SECTION">;
+type ChatType = "GROUP" | "SUPERGROUP" | "CHANNEL";
 type Destination = {
   id: string;
   name: string;
   chatTitle?: string;
-  chatType: "GROUP" | "SUPERGROUP" | "CHANNEL";
+  chatType: ChatType;
   botKind: "PMS" | "PUBLIC_INFO";
   audienceType: Audience;
   scopeId?: string;
@@ -19,6 +21,7 @@ type Destination = {
   verifiedAt?: string;
   updatedAt: string;
 };
+type Cohort = { id: string; code: string; name: string; intakeYear: number; status: string };
 type Registration = {
   id: string;
   observed: boolean;
@@ -42,6 +45,12 @@ const audienceLabels: Record<Audience, string> = {
   CLASS_SECTION: "Class / section",
   CUSTOM: "Custom operational group",
 };
+const createAudiences: CreateAudience[] = ["ALL_LECTURERS", "ALL_STUDENTS", "COHORT", "CUSTOM"];
+const chatTypeLabels: Record<ChatType, string> = {
+  GROUP: "Group",
+  SUPERGROUP: "Supergroup",
+  CHANNEL: "Channel",
+};
 
 function messageOf(error: unknown) {
   return error instanceof ApiError || error instanceof Error ? error.message : "Something went wrong";
@@ -49,20 +58,26 @@ function messageOf(error: unknown) {
 
 export function TelegramDestinationsClient() {
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [name, setName] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [audienceType, setAudienceType] = useState<Audience>("ALL_LECTURERS");
+  const [audienceType, setAudienceType] = useState<CreateAudience>("ALL_LECTURERS");
   const [scopeId, setScopeId] = useState("");
+  const [chatType, setChatType] = useState<ChatType>("SUPERGROUP");
   const [busyId, setBusyId] = useState<string>();
   const [connection, setConnection] = useState<{ destinationId: string; registrationId: string; command: string; expiresInSeconds: number }>();
   const [deliveries, setDeliveries] = useState<Record<string, Delivery[]>>({});
 
   const load = useCallback(async () => {
     try {
-      const result = await api.get<{ destinations: Destination[] }>("/api/telegram/destinations");
-      setDestinations(result.destinations);
+      const [destinationResult, cohortResult] = await Promise.all([
+        api.get<{ destinations: Destination[] }>("/api/telegram/destinations"),
+        api.get<{ cohorts: Cohort[] }>("/api/telegram/destinations/scopes/cohorts"),
+      ]);
+      setDestinations(destinationResult.destinations);
+      setCohorts(cohortResult.cohorts);
       setError(undefined);
     } catch (err) {
       setError(messageOf(err));
@@ -76,15 +91,19 @@ export function TelegramDestinationsClient() {
   async function createDestination(event: React.FormEvent) {
     event.preventDefault();
     setError(undefined);
+    if (audienceType === "COHORT" && !scopeId) {
+      setError("Choose a PMS cohort before adding this destination.");
+      return;
+    }
     try {
       await api.post<Destination>("/api/telegram/destinations", {
         name,
         audienceType,
-        ...(audienceType === "COHORT" || audienceType === "CLASS_SECTION" ? { scopeId } : {}),
+        ...(audienceType === "COHORT" ? { scopeId } : {}),
         purpose,
-        chatType: "SUPERGROUP",
+        chatType,
       });
-      setName(""); setPurpose(""); setScopeId("");
+      setName(""); setPurpose(""); setScopeId(""); setChatType("SUPERGROUP");
       await load();
     } catch (err) { setError(messageOf(err)); }
   }
@@ -140,7 +159,11 @@ export function TelegramDestinationsClient() {
     } catch (err) { setError(messageOf(err)); }
   }
 
-  const needsScope = audienceType === "COHORT" || audienceType === "CLASS_SECTION";
+  const cohortName = (scopeId?: string) => {
+    if (!scopeId) return undefined;
+    const cohort = cohorts.find((item) => item.id === scopeId);
+    return cohort ? `${cohort.code} · ${cohort.name}` : "PMS cohort";
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -152,13 +175,22 @@ export function TelegramDestinationsClient() {
             <input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3" placeholder="DSE Lecturers" />
           </label>
           <label className="grid gap-1 text-sm">Audience
-            <select value={audienceType} onChange={(e) => setAudienceType(e.target.value as Audience)} className="h-10 rounded-md border border-input bg-background px-3">
-              {Object.entries(audienceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            <select value={audienceType} onChange={(e) => { setAudienceType(e.target.value as CreateAudience); setScopeId(""); }} className="h-10 rounded-md border border-input bg-background px-3">
+              {createAudiences.map((value) => <option key={value} value={value}>{audienceLabels[value]}</option>)}
             </select>
           </label>
-          {needsScope && <label className="grid gap-1 text-sm">Canonical scope ID
-            <input required value={scopeId} onChange={(e) => setScopeId(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3" placeholder={audienceType === "COHORT" ? "Cohort ID" : "Class / section ID"} />
-            <span className="text-xs text-muted-foreground">References the existing PMS cohort/class context; it does not create a Telegram-owned class.</span>
+          <label className="grid gap-1 text-sm">Telegram chat type
+            <select value={chatType} onChange={(e) => setChatType(e.target.value as ChatType)} className="h-10 rounded-md border border-input bg-background px-3">
+              {(Object.keys(chatTypeLabels) as ChatType[]).map((value) => <option key={value} value={value}>{chatTypeLabels[value]}</option>)}
+            </select>
+            <span className="text-xs text-muted-foreground">Choose the type Telegram reports for the target chat. A mismatch is rejected rather than silently connected.</span>
+          </label>
+          {audienceType === "COHORT" && <label className="grid gap-1 text-sm">PMS cohort
+            <select required value={scopeId} onChange={(e) => setScopeId(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3">
+              <option value="">Choose cohort…</option>
+              {cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.code} · {cohort.name} · Intake {cohort.intakeYear}</option>)}
+            </select>
+            <span className="text-xs text-muted-foreground">Uses the canonical PMS cohort record. Telegram does not create or own cohort membership.</span>
           </label>}
           <label className="grid gap-1 text-sm">Purpose
             <input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3" placeholder="Staff operations and open teaching slots" />
@@ -195,13 +227,13 @@ export function TelegramDestinationsClient() {
             {destinations.map((destination) => (
               <article key={destination.id} className="rounded-xl border border-border bg-card p-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div><h3 className="font-semibold">{destination.name}</h3><p className="mt-1 text-sm text-muted-foreground">{audienceLabels[destination.audienceType]} · {destination.chatTitle ?? destination.chatType.toLowerCase()}</p></div>
+                  <div><h3 className="font-semibold">{destination.name}</h3><p className="mt-1 text-sm text-muted-foreground">{audienceLabels[destination.audienceType]}{destination.audienceType === "COHORT" ? ` · ${cohortName(destination.scopeId)}` : ""} · {destination.chatTitle ?? chatTypeLabels[destination.chatType]}</p></div>
                   <span className="rounded-full border px-2.5 py-1 text-xs font-medium">{destination.status}</span>
                 </div>
                 {destination.purpose && <p className="mt-3 text-sm">{destination.purpose}</p>}
                 <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                   <div><dt>Bot</dt><dd className="font-medium text-foreground">DSE PMS Bot</dd></div>
-                  <div><dt>Type</dt><dd className="font-medium text-foreground">{destination.chatType}</dd></div>
+                  <div><dt>Type</dt><dd className="font-medium text-foreground">{chatTypeLabels[destination.chatType]}</dd></div>
                 </dl>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {!destination.connected && <button disabled={busyId === destination.id} onClick={() => void beginRegistration(destination)} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">{destination.status === "OBSERVED" ? "Reconnect" : "Connect"}</button>}
@@ -210,7 +242,7 @@ export function TelegramDestinationsClient() {
                   <button disabled={busyId === destination.id} onClick={() => void toggle(destination)} className="rounded-md border border-input px-3 py-2 text-sm">{destination.enabled ? "Disable" : "Enable"}</button>
                   <button onClick={() => void showDeliveries(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Deliveries</button>
                 </div>
-                {deliveries[destination.id] && <div className="mt-4 border-t pt-3"><h4 className="text-sm font-medium">Recent deliveries</h4><div className="mt-2 space-y-2">{deliveries[destination.id]!.length === 0 ? <p className="text-xs text-muted-foreground">No deliveries yet.</p> : deliveries[destination.id]!.slice(0, 5).map((delivery) => <div key={delivery.id} className="flex justify-between gap-3 text-xs"><span>{delivery.kind} · {new Date(delivery.updatedAt).toLocaleString()}</span><span className={delivery.status === "failed" ? "text-destructive" : "text-muted-foreground"}>{delivery.status}{delivery.status === "failed" ? ` · ${delivery.lastError ?? "retry required"}` : ""}</span></div>)}</div></div>}
+                {deliveries[destination.id] && <div className="mt-4 border-t pt-3"><h4 className="text-sm font-medium">Recent deliveries</h4><div className="mt-2 space-y-2">{deliveries[destination.id]!.length === 0 ? <p className="text-xs text-muted-foreground">No deliveries yet.</p> : deliveries[destination.id]!.slice(0, 5).map((delivery) => <div key={delivery.id} className="flex justify-between gap-3 text-xs"><span>{delivery.kind} · {new Date(delivery.updatedAt).toLocaleString()}</span><span className={delivery.status === "failed" ? "text-destructive" : "text-muted-foreground"}>{delivery.status}{delivery.status === "failed" ? ` · ${delivery.lastError ?? "retry available"}` : ""}</span></div>)}</div></div>}
               </article>
             ))}
           </div>
