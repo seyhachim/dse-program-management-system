@@ -125,11 +125,32 @@ describeDb("teaching session occurrence persistence", () => {
     ).toEqual(first);
   });
 
-  test("rejects wrong weekday, outside teaching period, and meeting from another offering", async () => {
+  test("serializes concurrent exact occurrence resolution", async () => {
+    const offering = await createOffering("concurrent");
+    const meeting = offering.meetings[0]!;
+
+    const occurrences = await Promise.all([
+      classDeliveryService.resolveTeachingSessionOccurrence(offering.id, meeting.id, "2026-09-08"),
+      classDeliveryService.resolveTeachingSessionOccurrence(offering.id, meeting.id, "2026-09-08"),
+    ]);
+
+    expect(new Set(occurrences.map((occurrence) => occurrence.id)).size).toBe(1);
+    const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "pms_attendance"."TeachingSessionOccurrence"
+      WHERE "offeringMeetingId" = ${meeting.id} AND "sessionDate" = '2026-09-08'::date
+    `;
+    expect(Number(rows[0]?.count ?? 0n)).toBe(1);
+  });
+
+  test("rejects invalid dates, wrong weekday, outside teaching period, and meeting from another offering", async () => {
     const offering = await createOffering("validation");
     const other = await createOffering("validation-other");
     const meeting = offering.meetings[0]!;
 
+    await expect(
+      classDeliveryService.resolveTeachingSessionOccurrence(offering.id, meeting.id, "2026-02-30"),
+    ).rejects.toThrow("valid YYYY-MM-DD session date");
     await expect(
       classDeliveryService.resolveTeachingSessionOccurrence(offering.id, meeting.id, "2026-09-09"),
     ).rejects.toThrow("scheduled for Tuesday");
@@ -167,7 +188,7 @@ describeDb("teaching session occurrence persistence", () => {
     expect(Number(rows[0]?.count ?? 0n)).toBe(2);
   });
 
-  test("links unambiguous legacy evidence but leaves same-day ambiguity unresolved", async () => {
+  test("links unambiguous legacy evidence and rejects ambiguous legacy addressing", async () => {
     const actor = await createUser("legacy-link");
     const unambiguous = await createOffering("legacy-unambiguous");
     const date = "2026-09-08";
@@ -195,24 +216,56 @@ describeDb("teaching session occurrence persistence", () => {
       { dayOfWeek: "Tuesday", startTime: "08:00", endTime: "09:00" },
       { dayOfWeek: "Tuesday", startTime: "10:00", endTime: "11:00" },
     ]);
-    await classDeliveryService.saveLecturerArrival(
-      ambiguous.id,
-      date,
-      "NotYet",
-      "Ambiguous legacy evidence",
-      actor.id,
-    );
+    await expect(
+      classDeliveryService.saveLecturerArrival(
+        ambiguous.id,
+        date,
+        "NotYet",
+        "Ambiguous legacy evidence",
+        actor.id,
+      ),
+    ).rejects.toThrow("Multiple class meetings exist for this offering/date");
+
+    const ambiguousLegacyRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "pms_attendance"."LecturerArrivalConfirmation"
+      WHERE "offeringId" = ${ambiguous.id} AND "date" = ${date}::date AND "occurrenceId" IS NULL
+    `;
+    expect(Number(ambiguousLegacyRows[0]?.count ?? 0n)).toBe(0);
+
     await classDeliveryService.resolveTeachingSessionOccurrence(
       ambiguous.id,
       ambiguous.meetings[0]!.id,
       date,
     );
-    const unresolved = await prisma.$queryRaw<Array<{ occurrenceId: string | null }>>`
-      SELECT "occurrenceId"
-      FROM "pms_attendance"."LecturerArrivalConfirmation"
-      WHERE "offeringId" = ${ambiguous.id} AND "date" = ${date}::date
-    `;
-    expect(unresolved[0]?.occurrenceId).toBeNull();
+    await expect(classDeliveryService.getLecturerArrival(ambiguous.id, date)).rejects.toThrow(
+      "Multiple class meetings exist for this offering/date",
+    );
+  });
+
+  test("returns an existing historical snapshot even after the live teaching period changes", async () => {
+    const offering = await createOffering("historical-snapshot");
+    const meeting = offering.meetings[0]!;
+    const original = await classDeliveryService.resolveTeachingSessionOccurrence(
+      offering.id,
+      meeting.id,
+      "2026-09-08",
+    );
+
+    await prisma.offering.update({
+      where: { id: offering.id },
+      data: {
+        startDate: new Date("2026-09-15T00:00:00.000Z"),
+        endDate: new Date("2026-09-30T00:00:00.000Z"),
+      },
+    });
+
+    const reloaded = await classDeliveryService.resolveTeachingSessionOccurrence(
+      offering.id,
+      meeting.id,
+      "2026-09-08",
+    );
+    expect(reloaded).toEqual(original);
   });
 
   test("occurrence-aware arrival/status allow separate evidence for two same-day meetings", async () => {
