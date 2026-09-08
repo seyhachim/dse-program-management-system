@@ -1,0 +1,72 @@
+name: Class Delivery Monitor Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/scripts/verify-db-security.ts"
+      - "apps/backend/src/plugins/offerings/**"
+      - "apps/frontend/app/(shell)/portal/schedule/**"
+      - "apps/frontend/lib/monitor-delivery.ts"
+      - "packages/shared-types/src/teaching-session-delivery.ts"
+      - "packages/shared-types/src/teaching-session-delivery.test.ts"
+      - ".github/workflows/class-delivery-monitor-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  monitor-delivery:
+    name: Exact occurrence, monitor auth, audit, and DB security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_class_delivery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_class_delivery"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_class_delivery?schema=public
+      TEACHING_SESSION_DELIVERY_DB_TESTS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies and generate Prisma Client
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client explicitly
+        run: bun run db:generate
+
+      - name: Validate Prisma schema
+        run: bunx prisma validate --schema apps/backend/prisma/schema.prisma
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+      - name: Seed isolated database
+        run: bun run seed
+
+      - name: Verify monitor delivery database integrity
+        run: bun test apps/backend/src/plugins/offerings/teaching-session-delivery-db.test.ts
+
+      - name: Verify database security inventory and grants
+        run: bun run --cwd apps/backend db:security:verify
