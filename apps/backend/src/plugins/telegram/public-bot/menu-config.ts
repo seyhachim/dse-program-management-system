@@ -23,9 +23,23 @@ export const MAIN_REPLY_KEYBOARD = [
   ],
 ] as const satisfies ReadonlyArray<ReadonlyArray<ReplyButton>>;
 
-export const REPLY_TEXT_TO_ROUTE = Object.fromEntries(
-  MAIN_REPLY_KEYBOARD.flatMap((row) => row.map((button) => [button.text, button.route])),
-) as Record<(typeof MAIN_REPLY_KEYBOARD)[number][number]["text"], RouteKey>;
+const LEGACY_REPLY_TEXT_TO_ROUTE: Readonly<Record<string, RouteKey>> = {
+  "🚀 Explore DSE": "explore",
+  "📝 Admission": "admission",
+  "📚 Study & Curriculum": "curriculum",
+  "💼 Careers": "careers",
+  "💰 Fees & Scholarships": "fees",
+  "☰ More": "more",
+};
+
+export const REPLY_TEXT_TO_ROUTE: Readonly<Record<string, RouteKey>> = {
+  ...LEGACY_REPLY_TEXT_TO_ROUTE,
+  ...Object.fromEntries(
+    MAIN_REPLY_KEYBOARD.flatMap((row) =>
+      row.map((button) => [button.text, button.route]),
+    ),
+  ),
+};
 
 export const MENUS = {
   home: {
@@ -256,5 +270,5 @@ export function getParentRoute(route: RouteKey): RouteKey | null {
 }
 
 export function routeForReplyText(text: string): RouteKey | null {
-  return REPLY_TEXT_TO_ROUTE[text as keyof typeof REPLY_TEXT_TO_ROUTE] ?? null;
+  return REPLY_TEXT_TO_ROUTE[text] ?? null;
 }
