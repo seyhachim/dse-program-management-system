@@ -37,6 +37,16 @@ const config: TelegramConfig = {
 };
 
 function makePublicRead() {
+  const featuredFaq = {
+    slug: "what-is-dse",
+    category: "About" as const,
+    question: "What is DSE?",
+    answer: "Published DSE answer.",
+    shortAnswer: "Published DSE answer.",
+    isFeatured: true,
+    sourceLabel: null,
+    sourceUrl: null,
+  };
   return {
     async getProgramme() {
       return {
@@ -53,18 +63,7 @@ function makePublicRead() {
       };
     },
     async listFaqs(_programmeId: string, filters?: { category?: string; featured?: boolean }) {
-      if (filters?.featured) {
-        return [{
-          slug: "what-is-dse",
-          category: "About" as const,
-          question: "What is DSE?",
-          answer: "Published DSE answer.",
-          shortAnswer: "Published DSE answer.",
-          isFeatured: true,
-          sourceLabel: null,
-          sourceUrl: null,
-        }];
-      }
+      if (filters?.featured) return [featuredFaq];
       return [{
         slug: "admission-requirements",
         category: (filters?.category ?? "Admission") as "Admission",
@@ -75,6 +74,10 @@ function makePublicRead() {
         sourceLabel: null,
         sourceUrl: null,
       }];
+    },
+    async getFaqBySlug(_programmeId: string, slug: string) {
+      if (slug === featuredFaq.slug) return featuredFaq;
+      throw new Error("not found");
     },
     async getAdmission() {
       return {
@@ -301,7 +304,7 @@ describe("public Telegram webhook", () => {
     expect(client.sent.length).toBe(before);
   });
 
-  test("/start sends the persistent seven-action reply keyboard without PMS login", async () => {
+  test("/start sends only the persistent global utility reply keyboard without PMS login", async () => {
     const response = await webhook({ update_id: 2, message: { message_id: 2, chat: { id: 10 }, text: "/start" } });
     expect(response.status).toBe(200);
     const sent = client.sent.at(-1)!;
@@ -309,8 +312,7 @@ describe("public Telegram webhook", () => {
     expect(sent.text).toContain("DSE Program Information Bot");
     expect(sent.replyMarkup).toHaveProperty("keyboard");
     const keyboard = (sent.replyMarkup as { keyboard: Array<Array<{ text: string }>> }).keyboard;
-    expect(keyboard.flat()).toHaveLength(7);
-    expect(keyboard.flat().map((item) => item.text)).toContain("❓ Ask DSE");
+    expect(keyboard.flat().map((item) => item.text)).toEqual(["🏠 Home", "❓ Ask DSE"]);
   });
 
   test("primary Admission selection renders a concise topic menu without batch FAQ answers", async () => {
@@ -392,7 +394,7 @@ describe("public Telegram webhook", () => {
     expect(client.sent.at(-1)?.text).toContain("couldn't find a confirmed answer");
   });
 
-  test("FAQ callback edits the existing message and answers the callback query", async () => {
+  test("FAQ list callback shows questions only and not batch answers", async () => {
     const response = await webhook({
       update_id: 4,
       callback_query: {
@@ -402,9 +404,26 @@ describe("public Telegram webhook", () => {
       },
     });
     expect(response.status).toBe(200);
-    expect(client.edited.at(-1)?.text).toContain("Published DSE answer.");
+    const text = client.edited.at(-1)?.text ?? "";
+    expect(text).toContain("What is DSE?");
+    expect(text).not.toContain("Published DSE answer.");
     expect(client.edited.at(-1)?.messageId).toBe(44);
     expect(client.answered.at(-1)).toEqual({ callbackQueryId: "cb-1" });
+  });
+
+  test("selected FAQ callback renders one approved answer", async () => {
+    const response = await webhook({
+      update_id: 41,
+      callback_query: {
+        id: "cb-faq",
+        data: "about:what_is_dse",
+        message: { message_id: 45, chat: { id: 12 } },
+      },
+    });
+    expect(response.status).toBe(200);
+    const text = client.edited.at(-1)?.text ?? "";
+    expect(text).toContain("What is DSE?");
+    expect(text).toContain("Published DSE answer.");
   });
 
   test("malformed callback fails safely without editing content", async () => {
