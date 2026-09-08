@@ -4,9 +4,18 @@ export const MOBILE_STUDENT_PORTAL_LAYOUT = {
   compactCard: "rounded-2xl border border-border bg-card p-4 md:p-5",
   courseCard:
     "group flex min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md md:min-h-64 md:p-5 md:hover:-translate-y-0.5",
-  scheduleSection: "grid gap-2 md:grid-cols-[130px_minmax(0,1fr)] md:gap-3",
+  scheduleSurface: "mx-auto w-full max-w-3xl space-y-4 md:space-y-5",
+  scheduleToolbar:
+    "rounded-[1.75rem] border border-border/70 bg-muted/30 p-3 shadow-sm sm:p-4",
+  scheduleDateStrip: "grid grid-cols-5 gap-2",
+  scheduleDateButton:
+    "flex min-h-16 min-w-0 flex-col items-center justify-center rounded-2xl border border-border bg-card px-1.5 py-2 text-foreground transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+  scheduleDateButtonSelected:
+    "border-primary bg-primary text-primary-foreground shadow-sm",
   scheduleMeeting:
-    "grid min-w-0 gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 sm:grid-cols-[110px_minmax(0,1fr)_auto]",
+    "group block min-w-0 rounded-[1.75rem] border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5",
+  scheduleMeetingCurrent:
+    "border-primary/40 bg-primary/10 ring-1 ring-primary/20",
   resultMetrics: "grid grid-cols-2 gap-2 sm:gap-3",
   resultMetricCard:
     "flex min-w-0 items-center gap-2 rounded-xl border border-border px-3 py-2 sm:gap-3",

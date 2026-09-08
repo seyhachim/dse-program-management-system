@@ -9,10 +9,12 @@ describe("mobile Student Portal layout", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("md:p-5");
   });
 
-  test("schedule and result layouts do not require fixed phone widths", () => {
+  test("schedule uses a five-day touch strip and viewport-safe meeting cards", () => {
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleDateStrip).toContain("grid-cols-5");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleDateButton).toContain("min-h-16");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeeting).toContain("min-w-0");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeeting).toContain(
-      "minmax(0,1fr)",
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeetingCurrent).toContain(
+      "ring-primary/20",
     );
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.resultMetrics).toContain("grid-cols-2");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.resultMetricCard).toContain("min-w-0");
