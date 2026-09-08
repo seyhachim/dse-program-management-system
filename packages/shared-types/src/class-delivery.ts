@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MeetingActivityTypeSchema, MeetingDaySchema } from "./offerings.ts";
 
 export const LecturerArrivalStatusSchema = z.enum(["Present", "NotYet"]);
 export type LecturerArrivalStatus = z.infer<typeof LecturerArrivalStatusSchema>;
@@ -17,6 +18,38 @@ export type ClassDeliveryNote = z.infer<typeof ClassDeliveryNoteSchema>;
 
 export const LecturerArrivalDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export type LecturerArrivalDate = z.infer<typeof LecturerArrivalDateSchema>;
+
+/** Exact calendar date for one concrete recurring OfferingMeeting occurrence. */
+export const TeachingSessionOccurrenceDateSchema = LecturerArrivalDateSchema;
+export type TeachingSessionOccurrenceDate = z.infer<typeof TeachingSessionOccurrenceDateSchema>;
+
+export const TeachingSessionOccurrenceIdSchema = z.string().uuid();
+export type TeachingSessionOccurrenceId = z.infer<typeof TeachingSessionOccurrenceIdSchema>;
+
+export const ResolveTeachingSessionOccurrenceInputSchema = z.object({
+  offeringMeetingId: z.string().uuid(),
+  date: TeachingSessionOccurrenceDateSchema,
+});
+export type ResolveTeachingSessionOccurrenceInput = z.infer<
+  typeof ResolveTeachingSessionOccurrenceInputSchema
+>;
+
+const SessionTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+export const TeachingSessionOccurrenceViewSchema = z.object({
+  id: TeachingSessionOccurrenceIdSchema,
+  offeringId: z.string().uuid(),
+  offeringMeetingId: z.string().uuid(),
+  date: TeachingSessionOccurrenceDateSchema,
+  scheduledDayOfWeek: MeetingDaySchema,
+  scheduledStartTime: SessionTimeSchema,
+  scheduledEndTime: SessionTimeSchema,
+  scheduledRoom: z.string().nullable(),
+  scheduledActivityType: MeetingActivityTypeSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type TeachingSessionOccurrenceView = z.infer<typeof TeachingSessionOccurrenceViewSchema>;
 
 export const SaveLecturerArrivalConfirmationInputSchema = z.object({
   status: LecturerArrivalStatusSchema,
