@@ -4,8 +4,11 @@ import type {
   ClassSessionStatusView,
   LecturerArrivalConfirmationView,
   LecturerArrivalStatus,
+  MeetingActivityType,
+  MeetingDay,
   SaveClassSessionStatusResult,
   SaveLecturerArrivalConfirmationResult,
+  TeachingSessionOccurrenceView,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 
@@ -33,8 +36,57 @@ interface SessionRow {
   updatedAt: Date;
 }
 
+interface OfferingMeetingRow {
+  id: string;
+  offeringId: string;
+  dayOfWeek: MeetingDay;
+  startTime: string;
+  endTime: string;
+  room: string | null;
+  activityType: MeetingActivityType;
+  teachingStart: Date | null;
+  teachingEnd: Date | null;
+  legacyStartDate: Date | null;
+  legacyEndDate: Date | null;
+}
+
+interface OccurrenceRow {
+  id: string;
+  offeringId: string;
+  offeringMeetingId: string;
+  sessionDate: Date;
+  scheduledDayOfWeek: MeetingDay;
+  scheduledStartTime: string;
+  scheduledEndTime: string;
+  scheduledRoom: string | null;
+  scheduledActivityType: MeetingActivityType;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export class TeachingSessionOccurrenceReferenceError extends Error {}
+export class TeachingSessionOccurrenceValidationError extends Error {}
+
+const WEEK_DAYS: MeetingDay[] = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
 function dateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function parseDateOnly(value: string): Date {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || dateOnly(parsed) !== value) {
+    throw new TeachingSessionOccurrenceValidationError("Use a valid YYYY-MM-DD session date");
+  }
+  return parsed;
 }
 
 function arrivalView(row: ArrivalRow): LecturerArrivalConfirmationView {
@@ -63,6 +115,22 @@ function sessionView(row: SessionRow): ClassSessionStatusView {
   };
 }
 
+function occurrenceView(row: OccurrenceRow): TeachingSessionOccurrenceView {
+  return {
+    id: row.id,
+    offeringId: row.offeringId,
+    offeringMeetingId: row.offeringMeetingId,
+    date: dateOnly(row.sessionDate),
+    scheduledDayOfWeek: row.scheduledDayOfWeek,
+    scheduledStartTime: row.scheduledStartTime,
+    scheduledEndTime: row.scheduledEndTime,
+    scheduledRoom: row.scheduledRoom,
+    scheduledActivityType: row.scheduledActivityType,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 async function readArrivalRow(offeringId: string, date: string): Promise<ArrivalRow | null> {
   const rows = await prisma.$queryRaw<ArrivalRow[]>`
     SELECT
@@ -72,6 +140,7 @@ async function readArrivalRow(offeringId: string, date: string): Promise<Arrival
     JOIN "User" u ON u."id" = c."recordedById"
     WHERE c."offeringId" = ${offeringId}
       AND c."date" = ${date}::date
+      AND c."occurrenceId" IS NULL
     LIMIT 1
   `;
   return rows[0] ?? null;
@@ -86,12 +155,186 @@ async function readSessionRow(offeringId: string, date: string): Promise<Session
     JOIN "User" u ON u."id" = s."recordedById"
     WHERE s."offeringId" = ${offeringId}
       AND s."date" = ${date}::date
+      AND s."occurrenceId" IS NULL
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+async function readOccurrenceRow(
+  offeringId: string,
+  offeringMeetingId: string,
+  date: string,
+): Promise<OccurrenceRow | null> {
+  const rows = await prisma.$queryRaw<OccurrenceRow[]>`
+    SELECT
+      "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
+      "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
+      "createdAt", "updatedAt"
+    FROM "pms_attendance"."TeachingSessionOccurrence"
+    WHERE "offeringId" = ${offeringId}
+      AND "offeringMeetingId" = ${offeringMeetingId}
+      AND "sessionDate" = ${date}::date
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+function validateOccurrenceDate(meeting: OfferingMeetingRow, date: string): void {
+  const parsed = parseDateOnly(date);
+  const actualDay = WEEK_DAYS[parsed.getUTCDay()];
+  if (actualDay !== meeting.dayOfWeek) {
+    throw new TeachingSessionOccurrenceValidationError(
+      `Session date is ${actualDay}; this meeting is scheduled for ${meeting.dayOfWeek}`,
+    );
+  }
+
+  const periodStart = meeting.teachingStart ?? meeting.legacyStartDate;
+  const periodEnd = meeting.teachingEnd ?? meeting.legacyEndDate;
+  if (!periodStart || !periodEnd) {
+    throw new TeachingSessionOccurrenceValidationError("Offering has no usable teaching period");
+  }
+  if (date < dateOnly(periodStart) || date > dateOnly(periodEnd)) {
+    throw new TeachingSessionOccurrenceValidationError("Session date is outside the offering teaching period");
+  }
+}
+
+async function readArrivalForOccurrence(occurrenceId: string): Promise<ArrivalRow | null> {
+  const rows = await prisma.$queryRaw<ArrivalRow[]>`
+    SELECT
+      c."id", c."offeringId", c."date", c."status", c."note", c."recordedById",
+      u."name" AS "recordedByName", c."recordedAt", c."updatedAt"
+    FROM "pms_attendance"."LecturerArrivalConfirmation" c
+    JOIN "User" u ON u."id" = c."recordedById"
+    WHERE c."occurrenceId" = ${occurrenceId}
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+async function readSessionForOccurrence(occurrenceId: string): Promise<SessionRow | null> {
+  const rows = await prisma.$queryRaw<SessionRow[]>`
+    SELECT
+      s."id", s."offeringId", s."date", s."status", s."reason", s."recordedById",
+      u."name" AS "recordedByName", s."recordedAt", s."updatedAt"
+    FROM "pms_attendance"."ClassSessionStatus" s
+    JOIN "User" u ON u."id" = s."recordedById"
+    WHERE s."occurrenceId" = ${occurrenceId}
     LIMIT 1
   `;
   return rows[0] ?? null;
 }
 
 export const classDeliveryService = {
+  async getTeachingSessionOccurrence(
+    offeringId: string,
+    offeringMeetingId: string,
+    date: string,
+  ): Promise<TeachingSessionOccurrenceView | null> {
+    const row = await readOccurrenceRow(offeringId, offeringMeetingId, date);
+    return row ? occurrenceView(row) : null;
+  },
+
+  async resolveTeachingSessionOccurrence(
+    offeringId: string,
+    offeringMeetingId: string,
+    date: string,
+  ): Promise<TeachingSessionOccurrenceView> {
+    return prisma.$transaction(async (tx) => {
+      const meetings = await tx.$queryRaw<OfferingMeetingRow[]>`
+        SELECT
+          m."id", m."offeringId", m."dayOfWeek", m."startTime", m."endTime", m."room", m."activityType",
+          p."teachingStart", p."teachingEnd",
+          o."startDate" AS "legacyStartDate", o."endDate" AS "legacyEndDate"
+        FROM "OfferingMeeting" m
+        JOIN "Offering" o ON o."id" = m."offeringId"
+        LEFT JOIN "AcademicCalendarPeriod" p ON p."id" = o."academicCalendarPeriodId"
+        WHERE m."id" = ${offeringMeetingId}
+          AND m."offeringId" = ${offeringId}
+        FOR SHARE OF m, o
+      `;
+      const meeting = meetings[0];
+      if (!meeting) {
+        throw new TeachingSessionOccurrenceReferenceError("Offering meeting not found for this offering");
+      }
+      validateOccurrenceDate(meeting, date);
+
+      const existing = await tx.$queryRaw<OccurrenceRow[]>`
+        SELECT
+          "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
+          "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
+          "createdAt", "updatedAt"
+        FROM "pms_attendance"."TeachingSessionOccurrence"
+        WHERE "offeringMeetingId" = ${offeringMeetingId}
+          AND "sessionDate" = ${date}::date
+        FOR UPDATE
+      `;
+      let row = existing[0];
+
+      if (!row) {
+        const now = new Date();
+        const inserted = await tx.$queryRaw<OccurrenceRow[]>`
+          INSERT INTO "pms_attendance"."TeachingSessionOccurrence" (
+            "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
+            "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
+            "createdAt", "updatedAt"
+          ) VALUES (
+            ${randomUUID()}, ${offeringId}, ${offeringMeetingId}, ${date}::date, ${meeting.dayOfWeek},
+            ${meeting.startTime}, ${meeting.endTime}, ${meeting.room}, ${meeting.activityType},
+            ${now}, ${now}
+          )
+          ON CONFLICT ("offeringMeetingId", "sessionDate") DO NOTHING
+          RETURNING
+            "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
+            "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
+            "createdAt", "updatedAt"
+        `;
+        row = inserted[0];
+        if (!row) {
+          const concurrent = await tx.$queryRaw<OccurrenceRow[]>`
+            SELECT
+              "id", "offeringId", "offeringMeetingId", "sessionDate", "scheduledDayOfWeek",
+              "scheduledStartTime", "scheduledEndTime", "scheduledRoom", "scheduledActivityType",
+              "createdAt", "updatedAt"
+            FROM "pms_attendance"."TeachingSessionOccurrence"
+            WHERE "offeringMeetingId" = ${offeringMeetingId}
+              AND "sessionDate" = ${date}::date
+          `;
+          row = concurrent[0];
+        }
+      }
+      if (!row) throw new Error("Teaching session occurrence was not persisted");
+
+      // Historical Offering+date evidence can be linked only when that date maps
+      // to exactly one recurring meeting. Multiple same-day meetings remain
+      // deliberately unresolved instead of being guessed.
+      const matchingMeetings = await tx.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM "OfferingMeeting"
+        WHERE "offeringId" = ${offeringId}
+          AND "dayOfWeek" = ${meeting.dayOfWeek}
+      `;
+      if (Number(matchingMeetings[0]?.count ?? 0n) === 1) {
+        await tx.$executeRaw`
+          UPDATE "pms_attendance"."LecturerArrivalConfirmation"
+          SET "occurrenceId" = ${row.id}
+          WHERE "offeringId" = ${offeringId}
+            AND "date" = ${date}::date
+            AND "occurrenceId" IS NULL
+        `;
+        await tx.$executeRaw`
+          UPDATE "pms_attendance"."ClassSessionStatus"
+          SET "occurrenceId" = ${row.id}
+          WHERE "offeringId" = ${offeringId}
+            AND "date" = ${date}::date
+            AND "occurrenceId" IS NULL
+        `;
+      }
+
+      return occurrenceView(row);
+    });
+  },
+
   async getLecturerArrival(
     offeringId: string,
     date: string,
@@ -100,11 +343,23 @@ export const classDeliveryService = {
     return row ? arrivalView(row) : null;
   },
 
+  async getLecturerArrivalForOccurrence(
+    occurrenceId: string,
+  ): Promise<LecturerArrivalConfirmationView | null> {
+    const row = await readArrivalForOccurrence(occurrenceId);
+    return row ? arrivalView(row) : null;
+  },
+
   async getClassSessionStatus(
     offeringId: string,
     date: string,
   ): Promise<ClassSessionStatusView | null> {
     const row = await readSessionRow(offeringId, date);
+    return row ? sessionView(row) : null;
+  },
+
+  async getClassSessionStatusForOccurrence(occurrenceId: string): Promise<ClassSessionStatusView | null> {
+    const row = await readSessionForOccurrence(occurrenceId);
     return row ? sessionView(row) : null;
   },
 
@@ -132,6 +387,7 @@ export const classDeliveryService = {
         JOIN "User" u ON u."id" = c."recordedById"
         WHERE c."offeringId" = ${offeringId}
           AND c."date" = ${date}::date
+          AND c."occurrenceId" IS NULL
         FOR UPDATE OF c
       `;
       const current = existing[0];
@@ -177,6 +433,70 @@ export const classDeliveryService = {
     return { confirmation: arrivalView(result.row), changed: result.changed };
   },
 
+  async saveLecturerArrivalForOccurrence(
+    occurrenceId: string,
+    status: LecturerArrivalStatus,
+    note: string,
+    actorId: string,
+  ): Promise<SaveLecturerArrivalConfirmationResult> {
+    const result = await prisma.$transaction(async (tx) => {
+      const occurrences = await tx.$queryRaw<Array<{ id: string; offeringId: string; sessionDate: Date }>>`
+        SELECT "id", "offeringId", "sessionDate"
+        FROM "pms_attendance"."TeachingSessionOccurrence"
+        WHERE "id" = ${occurrenceId}
+        FOR UPDATE
+      `;
+      const occurrence = occurrences[0];
+      if (!occurrence) throw new TeachingSessionOccurrenceReferenceError("Teaching session occurrence not found");
+
+      const existing = await tx.$queryRaw<ArrivalRow[]>`
+        SELECT
+          c."id", c."offeringId", c."date", c."status", c."note", c."recordedById",
+          u."name" AS "recordedByName", c."recordedAt", c."updatedAt"
+        FROM "pms_attendance"."LecturerArrivalConfirmation" c
+        JOIN "User" u ON u."id" = c."recordedById"
+        WHERE c."occurrenceId" = ${occurrenceId}
+        FOR UPDATE OF c
+      `;
+      const current = existing[0];
+      if (current?.status === status && current.note === note) {
+        return { row: current, changed: false };
+      }
+
+      const now = new Date();
+      const rows = current
+        ? await tx.$queryRaw<ArrivalRow[]>`
+            UPDATE "pms_attendance"."LecturerArrivalConfirmation" c
+            SET "status" = ${status}, "note" = ${note}, "recordedById" = ${actorId},
+                "recordedAt" = ${now}, "updatedAt" = ${now}
+            FROM "User" u
+            WHERE c."id" = ${current.id} AND u."id" = ${actorId}
+            RETURNING
+              c."id", c."offeringId", c."date", c."status", c."note", c."recordedById",
+              u."name" AS "recordedByName", c."recordedAt", c."updatedAt"
+          `
+        : await tx.$queryRaw<ArrivalRow[]>`
+            WITH inserted AS (
+              INSERT INTO "pms_attendance"."LecturerArrivalConfirmation" (
+                "id", "offeringId", "date", "occurrenceId", "status", "note", "recordedById", "recordedAt", "updatedAt"
+              ) VALUES (
+                ${randomUUID()}, ${occurrence.offeringId}, ${occurrence.sessionDate}, ${occurrenceId},
+                ${status}, ${note}, ${actorId}, ${now}, ${now}
+              )
+              RETURNING *
+            )
+            SELECT
+              i."id", i."offeringId", i."date", i."status", i."note", i."recordedById",
+              u."name" AS "recordedByName", i."recordedAt", i."updatedAt"
+            FROM inserted i JOIN "User" u ON u."id" = i."recordedById"
+          `;
+      if (!rows[0]) throw new Error("Lecturer arrival confirmation was not persisted");
+      return { row: rows[0], changed: true };
+    });
+
+    return { confirmation: arrivalView(result.row), changed: result.changed };
+  },
+
   async saveClassSessionStatus(
     offeringId: string,
     date: string,
@@ -201,6 +521,7 @@ export const classDeliveryService = {
         JOIN "User" u ON u."id" = s."recordedById"
         WHERE s."offeringId" = ${offeringId}
           AND s."date" = ${date}::date
+          AND s."occurrenceId" IS NULL
         FOR UPDATE OF s
       `;
       const current = existing[0];
@@ -238,6 +559,70 @@ export const classDeliveryService = {
               u."name" AS "recordedByName", i."recordedAt", i."updatedAt"
             FROM inserted i
             JOIN "User" u ON u."id" = i."recordedById"
+          `;
+      if (!rows[0]) throw new Error("Class session status was not persisted");
+      return { row: rows[0], changed: true };
+    });
+
+    return { session: sessionView(result.row), changed: result.changed };
+  },
+
+  async saveClassSessionStatusForOccurrence(
+    occurrenceId: string,
+    status: ClassSessionStatus,
+    reason: string,
+    actorId: string,
+  ): Promise<SaveClassSessionStatusResult> {
+    const result = await prisma.$transaction(async (tx) => {
+      const occurrences = await tx.$queryRaw<Array<{ id: string; offeringId: string; sessionDate: Date }>>`
+        SELECT "id", "offeringId", "sessionDate"
+        FROM "pms_attendance"."TeachingSessionOccurrence"
+        WHERE "id" = ${occurrenceId}
+        FOR UPDATE
+      `;
+      const occurrence = occurrences[0];
+      if (!occurrence) throw new TeachingSessionOccurrenceReferenceError("Teaching session occurrence not found");
+
+      const existing = await tx.$queryRaw<SessionRow[]>`
+        SELECT
+          s."id", s."offeringId", s."date", s."status", s."reason", s."recordedById",
+          u."name" AS "recordedByName", s."recordedAt", s."updatedAt"
+        FROM "pms_attendance"."ClassSessionStatus" s
+        JOIN "User" u ON u."id" = s."recordedById"
+        WHERE s."occurrenceId" = ${occurrenceId}
+        FOR UPDATE OF s
+      `;
+      const current = existing[0];
+      if (current?.status === status && current.reason === reason) {
+        return { row: current, changed: false };
+      }
+
+      const now = new Date();
+      const rows = current
+        ? await tx.$queryRaw<SessionRow[]>`
+            UPDATE "pms_attendance"."ClassSessionStatus" s
+            SET "status" = ${status}, "reason" = ${reason}, "recordedById" = ${actorId},
+                "recordedAt" = ${now}, "updatedAt" = ${now}
+            FROM "User" u
+            WHERE s."id" = ${current.id} AND u."id" = ${actorId}
+            RETURNING
+              s."id", s."offeringId", s."date", s."status", s."reason", s."recordedById",
+              u."name" AS "recordedByName", s."recordedAt", s."updatedAt"
+          `
+        : await tx.$queryRaw<SessionRow[]>`
+            WITH inserted AS (
+              INSERT INTO "pms_attendance"."ClassSessionStatus" (
+                "id", "offeringId", "date", "occurrenceId", "status", "reason", "recordedById", "recordedAt", "updatedAt"
+              ) VALUES (
+                ${randomUUID()}, ${occurrence.offeringId}, ${occurrence.sessionDate}, ${occurrenceId},
+                ${status}, ${reason}, ${actorId}, ${now}, ${now}
+              )
+              RETURNING *
+            )
+            SELECT
+              i."id", i."offeringId", i."date", i."status", i."reason", i."recordedById",
+              u."name" AS "recordedByName", i."recordedAt", i."updatedAt"
+            FROM inserted i JOIN "User" u ON u."id" = i."recordedById"
           `;
       if (!rows[0]) throw new Error("Class session status was not persisted");
       return { row: rows[0], changed: true };
