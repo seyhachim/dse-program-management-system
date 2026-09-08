@@ -56,6 +56,10 @@ function preferred(
  * `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME` remain
  * temporary PMS-only aliases so an existing Mini App deployment can migrate
  * without an outage. The public bot never falls back to these legacy values.
+ *
+ * The PMS webhook secret is deliberately dedicated and has no legacy alias.
+ * Existing Mini App deployments may omit it; only inbound PMS-bot webhook
+ * features (such as destination registration) are unavailable until it is set.
  */
 export function getPmsTelegramConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -79,7 +83,7 @@ export function getPmsTelegramConfig(
     botUsername: usernameInput.value?.trim() || undefined,
     miniAppUrl: env.TELEGRAM_MINI_APP_URL?.trim() || undefined,
     miniAppShortName: env.TELEGRAM_MINI_APP_SHORT_NAME?.trim() || undefined,
-    webhookSecret: undefined,
+    webhookSecret: env.TELEGRAM_PMS_WEBHOOK_SECRET?.trim() || undefined,
     publicProgrammeId: DEFAULT_PUBLIC_PROGRAMME_ID,
     initDataMaxAgeSeconds: readPositiveInteger(
       "TELEGRAM_INIT_DATA_MAX_AGE_SECONDS",
