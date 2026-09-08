@@ -88,6 +88,20 @@ ALTER TABLE "telegram_security"."TelegramDestinationDelivery" ENABLE ROW LEVEL S
 REVOKE ALL ON TABLE "telegram_security"."TelegramDestination" FROM PUBLIC;
 REVOKE ALL ON TABLE "telegram_security"."TelegramDestinationRegistration" FROM PUBLIC;
 REVOKE ALL ON TABLE "telegram_security"."TelegramDestinationDelivery" FROM PUBLIC;
-REVOKE ALL ON TABLE "telegram_security"."TelegramDestination" FROM anon, authenticated, service_role;
-REVOKE ALL ON TABLE "telegram_security"."TelegramDestinationRegistration" FROM anon, authenticated, service_role;
-REVOKE ALL ON TABLE "telegram_security"."TelegramDestinationDelivery" FROM anon, authenticated, service_role;
+
+-- Supabase exposes anon/authenticated/service_role roles, while isolated CI uses
+-- plain PostgreSQL. Revoke from each Data API role only when that role exists.
+DO $$
+DECLARE
+  role_name TEXT;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated', 'service_role']
+  LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL ON TABLE "telegram_security"."TelegramDestination" FROM %I', role_name);
+      EXECUTE format('REVOKE ALL ON TABLE "telegram_security"."TelegramDestinationRegistration" FROM %I', role_name);
+      EXECUTE format('REVOKE ALL ON TABLE "telegram_security"."TelegramDestinationDelivery" FROM %I', role_name);
+    END IF;
+  END LOOP;
+END
+$$;
