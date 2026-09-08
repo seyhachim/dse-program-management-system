@@ -337,10 +337,8 @@ function formatMissingPublishedTopic(slug: string): string {
 function formatFaqs(title: string, faqs: PublicProgrammeFaq[]): string {
   if (!faqs.length)
     return `${title}\n\nNo published information is available yet.`;
-  const items = faqs
-    .slice(0, 8)
-    .map((faq) => `• ${faq.question}\n${faq.shortAnswer || faq.answer}`);
-  return `${title}\n\n${items.join("\n\n")}`;
+  const items = faqs.slice(0, 8).map((faq) => `• ${faq.question}`);
+  return `${title}\n\n${items.join("\n")}`;
 }
 
 function formatDates(dates: PublicProgrammeImportantDate[]): string {
