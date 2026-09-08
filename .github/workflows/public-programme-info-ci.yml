@@ -65,6 +65,8 @@ jobs:
         run: bun test apps/backend/src/plugins/programme/public-programme-info-db.test.ts
       - name: Verify admin public information lifecycle
         run: bun test apps/backend/src/plugins/programme/public-programme-info-service-db.test.ts
+      - name: Verify important FAQ publish limit
+        run: bun test apps/backend/src/plugins/programme/public-programme-info-featured-limit-db.test.ts
       - name: Verify management scope rules
         run: bun test apps/backend/src/plugins/programme/public-programme-info-router.test.ts
       - name: Verify published-only public read service

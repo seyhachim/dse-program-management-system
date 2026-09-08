@@ -158,6 +158,18 @@ const CATEGORY_BY_PREFIX: Array<[string, ProgrammeFaqCategory]> = [
   ["lecturer:", "Lecturers"],
 ];
 
+const FAQ_CATEGORY_BY_ROUTE: Partial<Record<RouteKey, ProgrammeFaqCategory>> = {
+  about: "About",
+  admission: "Admission",
+  curriculum: "Curriculum",
+  careers: "Careers",
+  fees: "FeesScholarships",
+  scholarships: "FeesScholarships",
+  studentLife: "StudentLife",
+  facilities: "Facilities",
+  lecturers: "Lecturers",
+};
+
 const FAQ_SLUG_BY_CALLBACK: Record<string, string> = {
   "about:what_is_dse": "what-is-dse",
   "about:why_dse": "why-dse",
@@ -258,18 +270,49 @@ function replyKeyboard(): TelegramReplyMarkup {
   };
 }
 
-function inlineKeyboard(route: RouteKey): TelegramReplyMarkup {
+function inlineKeyboard(
+  route: RouteKey,
+  visibleFaqSlugs?: ReadonlySet<string>,
+): TelegramReplyMarkup {
   const toButton = (button: InlineButton) =>
     button.type === "callback"
       ? { text: button.text, callback_data: button.callbackData }
       : { text: button.text, url: button.url };
+  const rows = getMenuKeyboard(route)
+    .map((row) =>
+      row.filter((button) => {
+        if (!visibleFaqSlugs || button.type !== "callback") return true;
+        const faqSlug = FAQ_SLUG_BY_CALLBACK[button.callbackData];
+        return !faqSlug || visibleFaqSlugs.has(faqSlug);
+      }),
+    )
+    .filter((row) => row.length > 0);
   return {
-    inline_keyboard: getMenuKeyboard(route).map((row) => row.map(toButton)),
+    inline_keyboard: rows.map((row) => row.map(toButton)),
   };
 }
 
 function resolveProgrammeService(): ProgrammeRegistryService {
   return registry.get<ProgrammeRegistryService>("programme").service;
+}
+
+async function menuKeyboardForRoute(
+  route: RouteKey,
+  programmeId: string,
+  publicRead: PublicReadService,
+  locale: PublicProgrammeLocale,
+): Promise<TelegramReplyMarkup> {
+  const category = FAQ_CATEGORY_BY_ROUTE[route];
+  if (!category) return inlineKeyboard(route);
+  const visibleFaqs = await publicRead.listFaqs(programmeId, {
+    category,
+    featured: true,
+    locale,
+  });
+  return inlineKeyboard(
+    route,
+    new Set(visibleFaqs.map((faq) => faq.slug)),
+  );
 }
 
 async function observeAskDseBestEffort(
@@ -453,10 +496,16 @@ async function renderRoute(
       replyMarkup: inlineKeyboard("home"),
     };
   }
-  if (route === "admission" || route === "fees" || route === "scholarships") {
+  const faqCategory = FAQ_CATEGORY_BY_ROUTE[route];
+  if (faqCategory) {
     return {
       text: `${MENUS[route].title}\n\nChoose an option below.`,
-      replyMarkup: inlineKeyboard(route),
+      replyMarkup: await menuKeyboardForRoute(
+        route,
+        programmeId,
+        publicRead,
+        locale,
+      ),
     };
   }
   if (route === "dates") {
@@ -538,6 +587,7 @@ async function renderStaticCallback(
         "DSE Information",
         await publicRead.listFaqs(programmeId, {
           category: explicitCategory,
+          featured: true,
           locale,
         }),
       ),
@@ -550,7 +600,12 @@ async function renderStaticCallback(
       text: formatCourseList(
         await publicCurriculumRead.listCourses(programmeId),
       ),
-      replyMarkup: inlineKeyboard("curriculum"),
+      replyMarkup: await menuKeyboardForRoute(
+        "curriculum",
+        programmeId,
+        publicRead,
+        locale,
+      ),
     };
   }
 
@@ -563,23 +618,39 @@ async function renderStaticCallback(
     ]);
     return {
       text: `${formatStudyPlan(first)}\n\n${formatStudyPlan(second)}`,
-      replyMarkup: inlineKeyboard("curriculum"),
+      replyMarkup: await menuKeyboardForRoute(
+        "curriculum",
+        programmeId,
+        publicRead,
+        locale,
+      ),
     };
   }
 
   const faqSlug = FAQ_SLUG_BY_CALLBACK[data];
   if (faqSlug && publicRead.getFaqBySlug) {
+    const parentRoute = callbackParentRoute(data);
     try {
       return {
         text: formatFaq(
           await publicRead.getFaqBySlug(programmeId, faqSlug, locale),
         ),
-        replyMarkup: inlineKeyboard(callbackParentRoute(data)),
+        replyMarkup: await menuKeyboardForRoute(
+          parentRoute,
+          programmeId,
+          publicRead,
+          locale,
+        ),
       };
     } catch {
       return {
         text: formatMissingPublishedTopic(faqSlug),
-        replyMarkup: inlineKeyboard(callbackParentRoute(data)),
+        replyMarkup: await menuKeyboardForRoute(
+          parentRoute,
+          programmeId,
+          publicRead,
+          locale,
+        ),
       };
     }
   }
@@ -642,12 +713,19 @@ async function renderStaticCallback(
                   : category === "Facilities"
                     ? "facilities"
                     : "lecturers";
+    const faqs = await publicRead.listFaqs(programmeId, {
+      category,
+      featured: true,
+      locale,
+    });
     return {
-      text: formatFaqs(
-        MENUS[routeForCategory].title,
-        await publicRead.listFaqs(programmeId, { category, locale }),
+      text: formatFaqs(MENUS[routeForCategory].title, faqs),
+      replyMarkup: await menuKeyboardForRoute(
+        routeForCategory,
+        programmeId,
+        publicRead,
+        locale,
       ),
-      replyMarkup: inlineKeyboard(routeForCategory),
     };
   }
 
@@ -963,9 +1041,6 @@ export function createPublicTelegramRouter(
             text: "This action is unavailable.",
           });
         } else {
-          // Telegram's client keeps a visible waiting state until the callback is
-          // acknowledged. Do this before any PMS read/render work so a slow DB or
-          // message edit does not make a valid button tap feel unresponsive.
           await client.answerCallbackQuery({ callbackQueryId: callback.id });
 
           let rendered;
@@ -986,7 +1061,12 @@ export function createPublicTelegramRouter(
                     parsedCallback.code,
                   ),
                 ),
-                replyMarkup: inlineKeyboard("curriculum"),
+                replyMarkup: await menuKeyboardForRoute(
+                  "curriculum",
+                  programmeId,
+                  publicRead,
+                  locale,
+                ),
               };
             } catch {
               rendered = {
@@ -994,10 +1074,16 @@ export function createPublicTelegramRouter(
                   "DSE Curriculum",
                   await publicRead.listFaqs(programmeId, {
                     category: "Curriculum",
+                    featured: true,
                     locale,
                   }),
                 ),
-                replyMarkup: inlineKeyboard("curriculum"),
+                replyMarkup: await menuKeyboardForRoute(
+                  "curriculum",
+                  programmeId,
+                  publicRead,
+                  locale,
+                ),
               };
             }
           } else {
@@ -1006,10 +1092,16 @@ export function createPublicTelegramRouter(
                 "DSE Lecturers",
                 await publicRead.listFaqs(programmeId, {
                   category: "Lecturers",
+                  featured: true,
                   locale,
                 }),
               ),
-              replyMarkup: inlineKeyboard("lecturers"),
+              replyMarkup: await menuKeyboardForRoute(
+                "lecturers",
+                programmeId,
+                publicRead,
+                locale,
+              ),
             };
           }
           await client.editMessage({
