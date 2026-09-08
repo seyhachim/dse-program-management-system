@@ -158,6 +158,8 @@ const EXPECTED_ATTENDANCE_TABLES = [
   "LecturerArrivalConfirmation",
   "ClassSessionStatus",
   "TeachingSessionOccurrence",
+  "TeachingSessionDelivery",
+  "TeachingSessionDeliveryAuditEvent",
 ] as const;
 
 const EXPECTED_TELEGRAM_SECURITY_TABLES = [
