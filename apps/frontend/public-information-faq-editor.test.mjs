@@ -29,15 +29,16 @@ describe("Public Information FAQ editor UX", () => {
 
   test("explains the existing Featured flag as Telegram visibility", async () => {
     const source = await readPublicInformationClient();
+    const normalizedSource = source.replace(/\s+/g, " ");
 
-    expect(source).toContain("Important / Show in Telegram");
-    expect(source).toContain(
+    expect(normalizedSource).toContain("Important / Show in Telegram");
+    expect(normalizedSource).toContain(
       "Published + Important appears as a Telegram menu choice.",
     );
-    expect(source).toContain(
+    expect(normalizedSource).toContain(
       "Published without Important stays searchable in Ask DSE but is hidden from visible Telegram question lists.",
     );
-    expect(source).toContain("Draft / Unpublished is never public.");
-    expect(source).not.toContain("Feature this FAQ");
+    expect(normalizedSource).toContain("Draft / Unpublished is never public.");
+    expect(normalizedSource).not.toContain("Feature this FAQ");
   });
 });
