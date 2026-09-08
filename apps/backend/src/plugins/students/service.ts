@@ -17,6 +17,7 @@ export const STUDENT_LIST_SELECT = {
   name: true,
   email: true,
   studentId: true,
+  category: true,
   status: true,
   createdAt: true,
 } as const;
@@ -27,6 +28,7 @@ export const STUDENT_REF_SELECT = {
   name: true,
   email: true,
   studentId: true,
+  category: true,
   status: true,
 } as const;
 
