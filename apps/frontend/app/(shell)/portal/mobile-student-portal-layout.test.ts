@@ -2,6 +2,16 @@ import { describe, expect, test } from "bun:test";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 
 describe("mobile Student Portal layout", () => {
+  test("home identity and quick actions stay compact and touch friendly", () => {
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("p-4");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("sm:p-5");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.quickAction).toContain("min-h-14");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.quickAction).toContain("min-w-0");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homePrimaryCard).toContain("min-w-0");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeProgressCard).toContain("min-w-0");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.calendarLink).toContain("min-h-11");
+  });
+
   test("course cards are compact on phones and restore desktop card height at md", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("min-h-0");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("md:min-h-64");
