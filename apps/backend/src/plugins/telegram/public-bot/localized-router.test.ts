@@ -150,7 +150,7 @@ describe("localized public Telegram router", () => {
     ]);
   });
 
-  test("Khmer selection renders localized menu labels while preserving English route keys", async () => {
+  test("Khmer selection renders only localized global utilities plus Language", async () => {
     const response = await webhook({
       update_id: 9002,
       message: { message_id: 2, chat: { id: 7001 }, text: "🇰🇭 ភាសាខ្មែរ" },
@@ -159,20 +159,24 @@ describe("localized public Telegram router", () => {
     const sent = client.sent.at(-1)!;
     expect(sent.text).toContain("សូមស្វាគមន៍មកកាន់បូតព័ត៌មានកម្មវិធី DSE");
     const keyboard = (sent.replyMarkup as { keyboard: Array<Array<{ text: string }>> }).keyboard;
-    expect(keyboard.flat().map((item) => item.text)).toContain("📝 ការចូលរៀន");
-    expect(keyboard.flat().map((item) => item.text)).toContain("🌐 ភាសា");
+    expect(keyboard.flat().map((item) => item.text)).toEqual([
+      "🏠 ទំព័រដើម",
+      "❓ សួរ DSE",
+      "🌐 ភាសា",
+    ]);
   });
 
-  test("Khmer reply keyboard label routes to a localized concise Admission menu", async () => {
+  test("Khmer Home utility opens localized primary inline navigation", async () => {
     const response = await webhook({
       update_id: 9003,
-      message: { message_id: 3, chat: { id: 7001 }, text: "📝 ការចូលរៀន" },
+      message: { message_id: 3, chat: { id: 7001 }, text: "🏠 ទំព័រដើម" },
     });
     expect(response.status).toBe(200);
     const sent = client.sent.at(-1)!;
-    expect(sent.text).toBe("ការចូលរៀន\n\nសូមជ្រើសជម្រើសខាងក្រោម។");
-    expect(sent.text).not.toContain("Published admission answer.");
-    expect(sent.text).not.toContain("https://example.edu/apply");
+    expect(sent.replyMarkup).toHaveProperty("inline_keyboard");
+    const keyboard = (sent.replyMarkup as { inline_keyboard: Array<Array<{ text: string; callback_data?: string }>> }).inline_keyboard;
+    expect(keyboard.flat().map((item) => item.text)).toContain("📝 ការចូលរៀន");
+    expect(keyboard.flat().map((item) => item.text)).toContain("🚀 ស្វែងយល់អំពី DSE");
   });
 
   test("localized inline labels keep callback data unchanged", async () => {
@@ -206,7 +210,10 @@ describe("localized public Telegram router", () => {
     const sent = client.sent.at(-1)!;
     expect(sent.text).toContain("Welcome to the DSE Program Information Bot");
     const keyboard = (sent.replyMarkup as { keyboard: Array<Array<{ text: string }>> }).keyboard;
-    expect(keyboard.flat().map((item) => item.text)).toContain("📝 Admission");
-    expect(keyboard.flat().map((item) => item.text)).toContain("🌐 Language");
+    expect(keyboard.flat().map((item) => item.text)).toEqual([
+      "🏠 Home",
+      "❓ Ask DSE",
+      "🌐 Language",
+    ]);
   });
 });
