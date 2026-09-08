@@ -334,13 +334,11 @@ function formatMissingPublishedTopic(slug: string): string {
   return `DSE Information\n\nNo published information is available yet for “${slug.replaceAll("-", " ")}”.`;
 }
 
-function formatFaqs(title: string, faqs: PublicProgrammeFaq[]): string {
+function formatFaqQuestions(title: string, faqs: PublicProgrammeFaq[]): string {
   if (!faqs.length)
     return `${title}\n\nNo published information is available yet.`;
-  const items = faqs
-    .slice(0, 8)
-    .map((faq) => `• ${faq.question}\n${faq.shortAnswer || faq.answer}`);
-  return `${title}\n\n${items.join("\n\n")}`;
+  const questions = faqs.slice(0, 8).map((faq) => `• ${faq.question}`);
+  return `${title}\n\n${questions.join("\n")}\n\nType one of these questions directly, or choose a topic below.`;
 }
 
 function formatDates(dates: PublicProgrammeImportantDate[]): string {
@@ -528,7 +526,7 @@ async function renderRoute(
       locale,
     });
     return {
-      text: `${formatFaqs("Ask DSE · Popular Questions", faqs)}\n\nYou can also type a question directly.`,
+      text: `${formatFaqQuestions("Ask DSE · Popular Questions", faqs)}\n\nYou can also type a question directly.`,
       replyMarkup: inlineKeyboard(route),
     };
   }
@@ -566,7 +564,7 @@ async function renderStaticCallback(
 
   if (data === "faq:popular") {
     return {
-      text: formatFaqs(
+      text: formatFaqQuestions(
         "Popular Questions",
         await publicRead.listFaqs(programmeId, { featured: true, locale }),
       ),
@@ -583,7 +581,7 @@ async function renderStaticCallback(
   const explicitCategory = faqCategoryCallbacks[data];
   if (explicitCategory) {
     return {
-      text: formatFaqs(
+      text: formatFaqQuestions(
         "DSE Information",
         await publicRead.listFaqs(programmeId, {
           category: explicitCategory,
@@ -719,7 +717,7 @@ async function renderStaticCallback(
       locale,
     });
     return {
-      text: formatFaqs(MENUS[routeForCategory].title, faqs),
+      text: formatFaqQuestions(MENUS[routeForCategory].title, faqs),
       replyMarkup: await menuKeyboardForRoute(
         routeForCategory,
         programmeId,
@@ -1070,7 +1068,7 @@ export function createPublicTelegramRouter(
               };
             } catch {
               rendered = {
-                text: formatFaqs(
+                text: formatFaqQuestions(
                   "DSE Curriculum",
                   await publicRead.listFaqs(programmeId, {
                     category: "Curriculum",
@@ -1088,7 +1086,7 @@ export function createPublicTelegramRouter(
             }
           } else {
             rendered = {
-              text: formatFaqs(
+              text: formatFaqQuestions(
                 "DSE Lecturers",
                 await publicRead.listFaqs(programmeId, {
                   category: "Lecturers",

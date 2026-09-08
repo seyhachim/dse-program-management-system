@@ -392,7 +392,7 @@ describe("public Telegram webhook", () => {
     expect(client.sent.at(-1)?.text).toContain("couldn't find a confirmed answer");
   });
 
-  test("FAQ callback edits the existing message and answers the callback query", async () => {
+  test("Popular Questions lists titles without dumping FAQ answers", async () => {
     const response = await webhook({
       update_id: 4,
       callback_query: {
@@ -402,7 +402,10 @@ describe("public Telegram webhook", () => {
       },
     });
     expect(response.status).toBe(200);
-    expect(client.edited.at(-1)?.text).toContain("Published DSE answer.");
+    const text = client.edited.at(-1)?.text ?? "";
+    expect(text).toContain("• What is DSE?");
+    expect(text).toContain("Type one of these questions directly");
+    expect(text).not.toContain("Published DSE answer.");
     expect(client.edited.at(-1)?.messageId).toBe(44);
     expect(client.answered.at(-1)).toEqual({ callbackQueryId: "cb-1" });
   });

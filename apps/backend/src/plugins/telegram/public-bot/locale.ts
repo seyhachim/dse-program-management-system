@@ -228,6 +228,7 @@ export function localizeBotText(text: string, locale: TelegramLocale): string {
 
   return localized
     .replace("Choose an option below.", "សូមជ្រើសជម្រើសខាងក្រោម។")
+    .replace("Type one of these questions directly, or choose a topic below.", "សូមវាយសំណួរមួយក្នុងចំណោមសំណួរទាំងនេះដោយផ្ទាល់ ឬជ្រើសប្រធានបទខាងក្រោម។")
     .replace("No published information is available yet.", "មិនទាន់មានព័ត៌មានដែលបានផ្សព្វផ្សាយទេ។")
     .replace("No official published dates are available yet.", "មិនទាន់មានកាលបរិច្ឆេទផ្លូវការដែលបានផ្សព្វផ្សាយទេ។")
     .replace("No published contact information is available yet.", "មិនទាន់មានព័ត៌មានទំនាក់ទំនងដែលបានផ្សព្វផ្សាយទេ។")
