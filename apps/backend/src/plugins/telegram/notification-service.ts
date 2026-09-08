@@ -51,26 +51,24 @@ async function sendTelegramPmsPayload(
   return String(payload.result?.message_id ?? "");
 }
 
-/** Private linked-user delivery: Telegram Web App buttons are valid in private chats. */
+/**
+ * PMS delivery boundary. Positive Telegram user ids use a Web App button;
+ * groups/supergroups/channels use negative chat ids and therefore receive an
+ * ordinary URL button (Web App buttons are private-chat only).
+ */
 export async function sendTelegramPmsMessage(
   chatId: string,
   text: string,
   url: string,
   fetchImpl: typeof fetch = fetch,
 ) {
-  return sendTelegramPmsPayload(
-    chatId,
-    text,
-    { inline_keyboard: [[{ text: "Open in DSE PMS", web_app: { url } }]] },
-    fetchImpl,
-  );
+  const replyMarkup = chatId.startsWith("-")
+    ? { inline_keyboard: [[{ text: "Open DSE PMS", url }]] }
+    : { inline_keyboard: [[{ text: "Open in DSE PMS", web_app: { url } }]] };
+  return sendTelegramPmsPayload(chatId, text, replyMarkup, fetchImpl);
 }
 
-/**
- * Group/supergroup/channel delivery. Use an ordinary HTTPS URL button rather
- * than Telegram's private-chat-only Web App button. Authorization is still
- * re-checked by PMS when the destination link is opened.
- */
+/** Explicit group/channel sender for callers that already know the chat kind. */
 export async function sendTelegramPmsDestinationMessage(
   chatId: string,
   text: string,
