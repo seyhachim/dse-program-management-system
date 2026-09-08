@@ -21,22 +21,31 @@ describe("curriculum workflow contracts", () => {
     expect(CurriculumRequestChangesSchema.safeParse({ comment: "" }).success).toBe(false);
   });
 
-  test("requires cohort label and academic year when saving review metadata", () => {
+  test("requires cohort, intake year, and academic year when saving review metadata", () => {
     expect(
       UpdateCurriculumWorkflowMetadataSchema.safeParse({
         cohortLabel: "",
+        intakeYear: 2026,
         academicYear: "2026-2027",
       }).success,
     ).toBe(false);
     expect(
       UpdateCurriculumWorkflowMetadataSchema.safeParse({
         cohortLabel: "Cohort 2026",
+        academicYear: "2026-2027",
+      }).success,
+    ).toBe(false);
+    expect(
+      UpdateCurriculumWorkflowMetadataSchema.safeParse({
+        cohortLabel: "Cohort 2026",
+        intakeYear: 2026,
         academicYear: "",
       }).success,
     ).toBe(false);
     expect(
       UpdateCurriculumWorkflowMetadataSchema.safeParse({
         cohortLabel: "  Cohort 2026  ",
+        intakeYear: 2026,
         academicYear: "  2026-2027  ",
       }).success,
     ).toBe(true);

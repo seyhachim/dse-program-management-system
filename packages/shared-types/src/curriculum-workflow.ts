@@ -31,6 +31,7 @@ export type CurriculumRequestChangesInput = z.infer<typeof CurriculumRequestChan
 
 export const UpdateCurriculumWorkflowMetadataSchema = z.object({
   cohortLabel: z.string().trim().min(1, "Cohort label is required").max(120),
+  intakeYear: z.number().int().min(1900).max(2200),
   academicYear: z.string().trim().min(1, "Academic year is required").max(40),
 }).strict();
 export type UpdateCurriculumWorkflowMetadataInput = z.infer<

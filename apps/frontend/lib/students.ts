@@ -1,6 +1,7 @@
 import type {
   CreateStudentInput,
   Student,
+  StudentCohortSummaryView,
   StudentPage,
   StudentStatus,
   UpdateStudentInput,
@@ -16,6 +17,11 @@ export const studentsApi = {
     if (params.activeOnly) qs.set("activeOnly", "true");
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return api.get<Student[]>(`/api/students${suffix}`);
+  },
+  /** Programme cohort master data used by cohort-aware admin workflows. */
+  cohorts(programmeId: string): Promise<StudentCohortSummaryView[]> {
+    const query = new URLSearchParams({ programmeId });
+    return api.get<StudentCohortSummaryView[]>(`/api/students/cohorts?${query.toString()}`);
   },
   /** Bounded cursor page for the interactive roster. */
   listPage(params: {

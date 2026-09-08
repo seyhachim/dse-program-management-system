@@ -1,9 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CurriculumWorkflowAction, CurriculumWorkflowState } from "@dse-pms/shared-types";
+import type {
+  AcademicYearView,
+  CurriculumWorkflowAction,
+  CurriculumWorkflowState,
+  StudentCohortSummaryView,
+} from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
+import { academicCalendarApi } from "@/lib/academic-calendar";
 import { curriculumApi, curriculumStatusLabel, curriculumVersionLabel, type ProgrammeCurriculumListItem } from "@/lib/curriculum";
+import { studentsApi } from "@/lib/students";
+
+const CURRENT_PROGRAMME_ID = "dse";
 
 const ACTION_LABEL: Record<CurriculumWorkflowAction, string> = {
   submit: "Submit for review",
@@ -14,11 +23,13 @@ const ACTION_LABEL: Record<CurriculumWorkflowAction, string> = {
 
 export function CurriculumWorkflowActions() {
   const [curricula, setCurricula] = useState<ProgrammeCurriculumListItem[]>([]);
+  const [cohorts, setCohorts] = useState<StudentCohortSummaryView[]>([]);
+  const [academicYears, setAcademicYears] = useState<AcademicYearView[]>([]);
   const [versionId, setVersionId] = useState("");
   const [workflow, setWorkflow] = useState<CurriculumWorkflowState | null>(null);
   const [comment, setComment] = useState("");
-  const [cohortLabel, setCohortLabel] = useState("");
-  const [academicYear, setAcademicYear] = useState("");
+  const [cohortId, setCohortId] = useState("");
+  const [academicYearId, setAcademicYearId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -28,17 +39,45 @@ export function CurriculumWorkflowActions() {
     () => versions.find((version) => version.id === versionId) ?? null,
     [versions, versionId],
   );
+  const selectedCohort = useMemo(
+    () => cohorts.find((cohort) => cohort.id === cohortId) ?? null,
+    [cohorts, cohortId],
+  );
+  const selectedAcademicYear = useMemo(
+    () => academicYears.find((year) => year.id === academicYearId) ?? null,
+    [academicYears, academicYearId],
+  );
 
   useEffect(() => {
-    setCohortLabel(selectedVersion?.cohortLabel ?? "");
-    setAcademicYear(selectedVersion?.academicYear ?? "");
-  }, [selectedVersion?.id, selectedVersion?.cohortLabel, selectedVersion?.academicYear]);
+    if (!selectedVersion) {
+      setCohortId("");
+      setAcademicYearId("");
+      return;
+    }
 
-  const metadataMissing = !cohortLabel.trim() || !academicYear.trim();
+    const cohort = cohorts.find(
+      (item) => item.name === selectedVersion.cohortLabel && item.intakeYear === selectedVersion.intakeYear,
+    );
+    const year = academicYears.find((item) => item.label === selectedVersion.academicYear);
+    setCohortId(cohort?.id ?? "");
+    setAcademicYearId(year?.id ?? "");
+  }, [
+    selectedVersion?.id,
+    selectedVersion?.cohortLabel,
+    selectedVersion?.intakeYear,
+    selectedVersion?.academicYear,
+    cohorts,
+    academicYears,
+  ]);
+
+  const metadataMissing = !selectedCohort || !selectedAcademicYear;
   const metadataDirty = Boolean(
     selectedVersion &&
-      (cohortLabel.trim() !== selectedVersion.cohortLabel ||
-        academicYear.trim() !== selectedVersion.academicYear),
+      selectedCohort &&
+      selectedAcademicYear &&
+      (selectedCohort.name !== selectedVersion.cohortLabel ||
+        selectedCohort.intakeYear !== selectedVersion.intakeYear ||
+        selectedAcademicYear.label !== selectedVersion.academicYear),
   );
 
   const loadState = useCallback(async (id: string) => {
@@ -54,8 +93,18 @@ export function CurriculumWorkflowActions() {
 
   const load = useCallback(async () => {
     try {
-      const list = await curriculumApi.list();
+      const [list, cohortList, yearList] = await Promise.all([
+        curriculumApi.list(),
+        studentsApi.cohorts(CURRENT_PROGRAMME_ID),
+        academicCalendarApi.years(CURRENT_PROGRAMME_ID),
+      ]);
       setCurricula(list);
+      setCohorts(
+        cohortList
+          .filter((cohort) => cohort.status !== "Archived")
+          .sort((a, b) => a.intakeYear - b.intakeYear),
+      );
+      setAcademicYears([...yearList].sort((a, b) => a.startYear - b.startYear));
       const firstVersion = list[0]?.versions[0];
       if (firstVersion) {
         setVersionId(firstVersion.id);
@@ -70,16 +119,15 @@ export function CurriculumWorkflowActions() {
 
   const persistMetadata = async () => {
     if (!versionId) return false;
-    const nextCohortLabel = cohortLabel.trim();
-    const nextAcademicYear = academicYear.trim();
-    if (!nextCohortLabel || !nextAcademicYear) {
-      setError("Enter both the cohort label and academic year before review.");
+    if (!selectedCohort || !selectedAcademicYear) {
+      setError("Select both the cohort and academic year before review.");
       return false;
     }
 
     const next = await curriculumApi.updateWorkflowMetadata(versionId, {
-      cohortLabel: nextCohortLabel,
-      academicYear: nextAcademicYear,
+      cohortLabel: selectedCohort.name,
+      intakeYear: selectedCohort.intakeYear,
+      academicYear: selectedAcademicYear.label,
     });
     setWorkflow(next);
     setCurricula(await curriculumApi.list());
@@ -109,7 +157,7 @@ export function CurriculumWorkflowActions() {
       return;
     }
     if (action === "submit" && metadataMissing) {
-      setError("Enter both the cohort label and academic year before submitting for review.");
+      setError("Select both the cohort and academic year before submitting for review.");
       return;
     }
     setBusy(true);
@@ -172,24 +220,39 @@ export function CurriculumWorkflowActions() {
 
       {workflow?.status === "Draft" && (
         <div className="mt-4 border-t border-border pt-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium">Cohort label
-              <input
-                value={cohortLabel}
-                onChange={(event) => setCohortLabel(event.target.value)}
-                maxLength={120}
-                placeholder="e.g. Cohort 2026"
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block text-sm font-medium">Cohort
+              <select
+                value={cohortId}
+                onChange={(event) => setCohortId(event.target.value)}
                 className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Select cohort</option>
+                {cohorts.map((cohort) => (
+                  <option key={cohort.id} value={cohort.id}>{cohort.name} · Intake {cohort.intakeYear}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-medium">Intake year
+              <input
+                value={selectedCohort?.intakeYear ?? ""}
+                readOnly
+                aria-readonly="true"
+                placeholder="Auto-filled"
+                className="mt-1 h-10 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground"
               />
             </label>
             <label className="block text-sm font-medium">Academic year
-              <input
-                value={academicYear}
-                onChange={(event) => setAcademicYear(event.target.value)}
-                maxLength={40}
-                placeholder="e.g. 2026-2027"
+              <select
+                value={academicYearId}
+                onChange={(event) => setAcademicYearId(event.target.value)}
                 className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              />
+              >
+                <option value="">Select academic year</option>
+                {academicYears.map((year) => (
+                  <option key={year.id} value={year.id}>{year.label}{year.isCurrent ? " · Current" : ""}</option>
+                ))}
+              </select>
             </label>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -203,7 +266,7 @@ export function CurriculumWorkflowActions() {
             </button>
             <p className={metadataMissing ? "text-xs font-medium text-destructive" : "text-xs text-muted-foreground"}>
               {metadataMissing
-                ? "Cohort label and academic year are required before review."
+                ? "Cohort, intake year, and academic year are required before review."
                 : metadataDirty
                   ? "Unsaved changes will also be saved automatically when you submit for review."
                   : "Review metadata is complete."}

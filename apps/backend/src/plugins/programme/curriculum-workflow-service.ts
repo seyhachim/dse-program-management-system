@@ -49,6 +49,7 @@ async function loadVersion(versionId: string) {
       revisionReason: true,
       changeSummary: true,
       cohortLabel: true,
+      intakeYear: true,
       academicYear: true,
       effectiveFrom: true,
       curriculum: { select: { programmeId: true } },
@@ -86,8 +87,8 @@ function validateSubmission(version: Awaited<ReturnType<typeof loadVersion>>) {
   if (version._count.courses === 0) {
     throw new CurriculumWorkflowValidationError("A curriculum must contain at least one course before review");
   }
-  if (!version.cohortLabel.trim() || !version.academicYear.trim()) {
-    throw new CurriculumWorkflowValidationError("Cohort label and academic year are required before review");
+  if (!version.cohortLabel.trim() || version.intakeYear === null || !version.academicYear.trim()) {
+    throw new CurriculumWorkflowValidationError("Cohort, intake year, and academic year are required before review");
   }
   if (
     version.revisionType !== "Initial" &&
@@ -139,6 +140,7 @@ export const curriculumWorkflowService = {
 
     if (
       version.cohortLabel === input.cohortLabel &&
+      version.intakeYear === input.intakeYear &&
       version.academicYear === input.academicYear
     ) {
       return state;
@@ -149,6 +151,7 @@ export const curriculumWorkflowService = {
         where: { id: versionId },
         data: {
           cohortLabel: input.cohortLabel,
+          intakeYear: input.intakeYear,
           academicYear: input.academicYear,
         },
       });
@@ -160,6 +163,7 @@ export const curriculumWorkflowService = {
           note: "Curriculum review metadata updated",
           details: {
             cohortLabel: { from: version.cohortLabel, to: input.cohortLabel },
+            intakeYear: { from: version.intakeYear, to: input.intakeYear },
             academicYear: { from: version.academicYear, to: input.academicYear },
           },
         },
