@@ -3,6 +3,7 @@ import {
   attendanceWarningEventKey,
   sendTelegramPmsMessage,
   teachingLeaveRequesterPath,
+  teachingLeaveStudentPath,
 } from "./notification-service.ts";
 
 const original = {
@@ -94,6 +95,12 @@ describe("Telegram PMS notifications", () => {
   test("routes teaching leave requester notifications to the request detail surface", () => {
     expect(teachingLeaveRequesterPath("request/with spaces")).toBe(
       "/telegram/teaching-leave?requestId=request%2Fwith%20spaces",
+    );
+  });
+
+  test("routes student teaching leave updates to an exact occurrence impact surface", () => {
+    expect(teachingLeaveStudentPath("occurrence/with spaces")).toBe(
+      "/telegram/schedule-impact?occurrenceId=occurrence%2Fwith%20spaces",
     );
   });
 });
