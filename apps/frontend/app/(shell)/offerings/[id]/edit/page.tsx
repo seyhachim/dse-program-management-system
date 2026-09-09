@@ -1,4 +1,4 @@
-import { OfferingFormPage } from "../../offering-form-page";
+import { CurriculumBoundOfferingFormPage } from "../../curriculum-bound-offering-form-page";
 
 export default async function EditOfferingPage({
   params,
@@ -6,5 +6,5 @@ export default async function EditOfferingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <OfferingFormPage offeringId={id} />;
+  return <CurriculumBoundOfferingFormPage offeringId={id} />;
 }
