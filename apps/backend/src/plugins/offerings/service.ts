@@ -472,7 +472,7 @@ export const offeringService = {
     const assignments = await prisma.offering.findMany({
       where: {
         ...(query.term ? { term: query.term } : {}),
-        OR: [{ lecturerId }, { coLecturers: { some: { lecturerId } }],
+        OR: [{ lecturerId }, { coLecturers: { some: { lecturerId } } }],
       },
       select: {
         id: true,
