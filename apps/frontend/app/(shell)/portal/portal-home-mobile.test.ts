@@ -20,6 +20,15 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
   });
 
+  test("shows published-calendar teaching context without a CourseSpec dependency", () => {
+    expect(portalHomeSource).toContain("resolveStudentTeachingContext(calendar, now)");
+    expect(portalHomeSource).toContain('aria-label="Current teaching week"');
+    expect(portalHomeSource).toContain("Week {teachingContext.week} of {teachingContext.totalWeeks}");
+    expect(portalHomeSource).toContain("Semester break");
+    expect(portalHomeSource).toContain("resumes");
+    expect(portalHomeSource).not.toContain("CourseSpec");
+  });
+
   test("removes the redundant four-box shortcut grid from home", () => {
     expect(portalHomeSource).not.toContain("QUICK_ACTIONS");
     expect(portalHomeSource).not.toContain('aria-label="Student shortcuts"');
@@ -38,7 +47,7 @@ describe("Student Portal mobile home contract", () => {
     expect(nextClassLinkIndex).toBeGreaterThan(-1);
     expect(assessmentsIndex).toBeGreaterThan(-1);
     expect(nextClassLinkIndex).toBeLessThan(assessmentsIndex);
-    expect(portalHomeSource).toContain("nextScheduledMeeting(data.courses, new Date())");
+    expect(portalHomeSource).toContain("nextScheduledMeeting(data.courses, now)");
     expect(portalHomeSource).toContain("nextMeeting.course.lecturer?.name");
     expect(portalHomeSource).toContain("View schedule");
     expect(portalHomeSource).toContain("Time");
@@ -46,7 +55,14 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("Lecturer");
   });
 
-  test("places assessments directly before secondary home information", () => {
+  test("omits lecturer-created sections when there is no data", () => {
+    expect(portalHomeSource).toContain("data.upcomingAssessments.length > 0 ? (");
+    expect(portalHomeSource).toContain("data.announcements.length > 0 ? (");
+    expect(portalHomeSource).not.toContain("No upcoming assessments.");
+    expect(portalHomeSource).not.toContain("No announcements yet.");
+  });
+
+  test("keeps optional feed ordering and academic calendar", () => {
     const assessmentsIndex = portalHomeSource.indexOf("Upcoming work");
     const announcementsIndex = portalHomeSource.indexOf("Latest announcements");
     const calendarIndex = portalHomeSource.indexOf("Academic calendar");
