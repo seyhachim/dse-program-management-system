@@ -47,13 +47,16 @@ const LeaveOccurrenceInputSchema = z.object({
 }).strict();
 export type TeachingLeaveOccurrenceInput = z.infer<typeof LeaveOccurrenceInputSchema>;
 
-export const SubmitTeachingLeaveRequestSchema = z.object({
-  occurrences: z.array(LeaveOccurrenceInputSchema).min(1).max(20),
+const TeachingLeaveEditableFieldsSchema = z.object({
   leaveType: TeachingLeaveTypeSchema,
   confidentialReason: z.string().trim().min(1, "Reason is required").max(2000),
   attachmentRef: z.string().trim().max(500).optional(),
   proposedHandling: TeachingLeaveHandlingSchema,
   proposedNote: z.string().trim().max(1000).optional(),
+}).strict();
+
+export const SubmitTeachingLeaveRequestSchema = TeachingLeaveEditableFieldsSchema.extend({
+  occurrences: z.array(LeaveOccurrenceInputSchema).min(1).max(20),
 }).strict().superRefine((value, ctx) => {
   const keys = value.occurrences.map((item) => `${item.offeringMeetingId}:${item.date}`);
   if (new Set(keys).size !== keys.length) {
@@ -61,6 +64,10 @@ export const SubmitTeachingLeaveRequestSchema = z.object({
   }
 });
 export type SubmitTeachingLeaveRequest = z.infer<typeof SubmitTeachingLeaveRequestSchema>;
+
+/** Requester-only edit after a reviewer explicitly requests changes. Exact session scope stays immutable. */
+export const ReviseTeachingLeaveRequestSchema = TeachingLeaveEditableFieldsSchema;
+export type ReviseTeachingLeaveRequest = z.infer<typeof ReviseTeachingLeaveRequestSchema>;
 
 export const ReviewTeachingLeaveRequestSchema = z.object({
   decision: TeachingLeaveReviewDecisionSchema,
