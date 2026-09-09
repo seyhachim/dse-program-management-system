@@ -12,29 +12,48 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).not.toContain("CourseSpec");
   });
 
-  test("surfaces Courses, Schedule, and Results as primary shortcuts", () => {
-    expect(portalHomeSource).toContain('label: "Courses", href: "/portal/courses"');
+  test("surfaces four high-frequency student shortcuts", () => {
     expect(portalHomeSource).toContain('label: "Schedule", href: "/portal/schedule"');
+    expect(portalHomeSource).toContain('label: "Courses", href: "/portal/courses"');
+    expect(portalHomeSource).toContain(
+      'label: "Assessments", href: "/portal/assessments"',
+    );
     expect(portalHomeSource).toContain('label: "Results", href: "/portal/results"');
   });
 
-  test("makes the next class card open the schedule", () => {
-    const nextClassIndex = portalHomeSource.indexOf("Next class");
-    const scheduleLinkIndex = portalHomeSource.lastIndexOf(
+  test("makes schedule context the primary home card", () => {
+    const returnIndex = portalHomeSource.indexOf("return (");
+    const nextClassLinkIndex = portalHomeSource.indexOf(
       'href="/portal/schedule"',
-      nextClassIndex,
+      returnIndex,
+    );
+    const shortcutsIndex = portalHomeSource.indexOf(
+      'aria-label="Student shortcuts"',
+      returnIndex,
     );
 
-    expect(nextClassIndex).toBeGreaterThan(-1);
-    expect(scheduleLinkIndex).toBeGreaterThan(-1);
+    expect(nextClassLinkIndex).toBeGreaterThan(-1);
+    expect(shortcutsIndex).toBeGreaterThan(-1);
+    expect(nextClassLinkIndex).toBeLessThan(shortcutsIndex);
+    expect(portalHomeSource).toContain("nextScheduledMeeting(data.courses, new Date())");
+    expect(portalHomeSource).toContain("nextMeeting.course.lecturer?.name");
   });
 
-  test("puts upcoming assessments before course browsing", () => {
-    const assessmentsIndex = portalHomeSource.indexOf("Upcoming assessments");
-    const coursesIndex = portalHomeSource.indexOf("My courses");
+  test("keeps upcoming assessments ahead of secondary information", () => {
+    const assessmentsIndex = portalHomeSource.indexOf("Coming up");
+    const announcementsIndex = portalHomeSource.indexOf("Latest announcements");
+    const calendarIndex = portalHomeSource.indexOf("Academic calendar");
 
     expect(assessmentsIndex).toBeGreaterThan(-1);
-    expect(coursesIndex).toBeGreaterThan(-1);
-    expect(assessmentsIndex).toBeLessThan(coursesIndex);
+    expect(announcementsIndex).toBeGreaterThan(-1);
+    expect(calendarIndex).toBeGreaterThan(-1);
+    expect(assessmentsIndex).toBeLessThan(announcementsIndex);
+    expect(announcementsIndex).toBeLessThan(calendarIndex);
+  });
+
+  test("keeps the home feed concise and removes redundant course browsing", () => {
+    expect(portalHomeSource).toContain("upcomingAssessments.slice(0, 3)");
+    expect(portalHomeSource).toContain("announcements.slice(0, 2)");
+    expect(portalHomeSource).not.toContain("My courses");
   });
 });
