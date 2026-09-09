@@ -4,7 +4,7 @@ import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { createTelegramDestinationRouter } from "./destination-router.ts";
 import { telegramDestinationService } from "./destination-service.ts";
 import { telegramNotificationService } from "./notification-service.ts";
-import { createProgressivePublicTelegramRouter } from "./public-bot/progressive-curriculum-router.ts";
+import { createEnhancedPublicTelegramRouter } from "./public-bot/ask-dse-enhanced-router.ts";
 import { createTelegramRouter } from "./router.ts";
 import { telegramService } from "./service.ts";
 
@@ -17,7 +17,7 @@ export const telegramBackendService = {
 export type TelegramBackendService = typeof telegramBackendService;
 
 const telegramRouter = Router();
-telegramRouter.use("/public", createProgressivePublicTelegramRouter());
+telegramRouter.use("/public", createEnhancedPublicTelegramRouter());
 telegramRouter.use(createTelegramDestinationRouter());
 telegramRouter.use(createTelegramRouter());
 
