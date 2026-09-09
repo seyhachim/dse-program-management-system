@@ -2,14 +2,31 @@ import { describe, expect, test } from "bun:test";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 
 describe("mobile Student Portal layout", () => {
-  test("student home keeps identity compact and four quick actions phone-friendly", () => {
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("py-3");
+  test("student home uses a strong branded hero and phone-friendly quick actions", () => {
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("rounded-[2rem]");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("bg-primary");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("overflow-hidden");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions).toContain("grid-cols-2");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions).toContain("sm:grid-cols-4");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("min-h-20");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("min-w-0");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("ring-border/60");
+  });
+
+  test("next class remains the strongest content card without a hard border", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("min-h-11");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("bg-primary/5");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("rounded-[2rem]");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("shadow-md");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("ring-primary/15");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).not.toContain("border border");
+  });
+
+  test("secondary home surfaces stay visually lighter than the class card", () => {
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeSectionCard).toContain("shadow-sm");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementCard).toContain("ring-border/60");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementList).toContain("space-y-2");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeCalendar).toContain("bg-muted/40");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeCalendar).toContain("min-h-11");
   });
 
   test("course cards are compact on phones and restore desktop card height at md", () => {
