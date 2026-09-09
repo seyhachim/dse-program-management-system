@@ -12,6 +12,8 @@ const integrationDescribe = runIntegration ? describe : describe.skip;
 
 const SESSION_DATE = "2099-01-05"; // Monday, intentionally far-future for a stable integration fixture.
 const REVISION_SESSION_DATE = "2099-01-12"; // Monday, separate exact occurrence for resubmission coverage.
+const CONCURRENT_SESSION_DATE = "2099-01-19"; // Monday, separate occurrence for concurrent-submit coverage.
+const EXPIRED_REVIEW_SESSION_DATE = "2099-01-26"; // Monday, moved to the past after submission to test delayed review.
 
 type HttpResult = { status: number; body: any };
 
@@ -101,6 +103,82 @@ integrationDescribe("Teaching leave authorization and approval", () => {
       releaseForReuse: true,
     });
     requestId = submitted.body.id;
+  });
+
+  test("concurrent retries create only one active leave request for the same lecturer and occurrence", async () => {
+    const input = leaveInput(CONCURRENT_SESSION_DATE);
+    const token = signToken(lecturer);
+    const [first, second] = await Promise.all([
+      request("/api/offerings/teaching-leave/requests", { method: "POST", token, body: input }),
+      request("/api/offerings/teaching-leave/requests", { method: "POST", token, body: input }),
+    ]);
+
+    expect([first.status, second.status].sort((a, b) => a - b)).toEqual([201, 409]);
+    const created = first.status === 201 ? first : second;
+    const occurrenceId = created.body.occurrences[0].occurrenceId as string;
+    const active = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "pms_attendance"."TeachingLeaveRequestOccurrence" link
+      JOIN "pms_attendance"."TeachingLeaveRequest" leave ON leave."id" = link."requestId"
+      WHERE link."occurrenceId" = ${occurrenceId}
+        AND leave."requesterId" = ${lecturer.id}
+        AND leave."status" IN ('PENDING','CHANGES_REQUESTED','APPROVED')
+    `;
+    expect(Number(active[0]?.count ?? 0n)).toBe(1);
+
+    const cleanup = await request(`/api/offerings/teaching-leave/requests/${created.body.id}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "REJECT", comment: "Close concurrent integration fixture" },
+    });
+    expect(cleanup.status).toBe(200);
+  });
+
+  test("approval fails closed when the affected teaching session has ended before review", async () => {
+    const submitted = await request("/api/offerings/teaching-leave/requests", {
+      method: "POST",
+      token: signToken(lecturer),
+      body: leaveInput(EXPIRED_REVIEW_SESSION_DATE),
+    });
+    expect(submitted.status).toBe(201);
+    const expiredRequestId = submitted.body.id as string;
+    const occurrenceId = submitted.body.occurrences[0].occurrenceId as string;
+
+    await prisma.$executeRaw`
+      UPDATE "pms_attendance"."TeachingSessionOccurrence"
+      SET "sessionDate" = '2000-01-03'::date, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${occurrenceId}
+    `;
+
+    const approval = await request(`/api/offerings/teaching-leave/requests/${expiredRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "APPROVE", comment: "This should be rejected as expired" },
+    });
+    expect(approval.status).toBe(409);
+
+    const state = await prisma.$queryRaw<Array<{ status: string; approvedLeaveRequestId: string | null }>>`
+      SELECT leave."status", occurrence."approvedLeaveRequestId"
+      FROM "pms_attendance"."TeachingLeaveRequest" leave
+      JOIN "pms_attendance"."TeachingLeaveRequestOccurrence" link ON link."requestId" = leave."id"
+      JOIN "pms_attendance"."TeachingSessionOccurrence" occurrence ON occurrence."id" = link."occurrenceId"
+      WHERE leave."id" = ${expiredRequestId}
+    `;
+    expect(state[0]).toMatchObject({ status: "PENDING", approvedLeaveRequestId: null });
+
+    const audits = await prisma.$queryRaw<Array<{ action: string }>>`
+      SELECT "action" FROM "pms_attendance"."TeachingLeaveAuditEvent"
+      WHERE "requestId" = ${expiredRequestId}
+      ORDER BY "createdAt","id"
+    `;
+    expect(audits.map((item) => item.action)).toEqual(["SUBMITTED"]);
+
+    const cleanup = await request(`/api/offerings/teaching-leave/requests/${expiredRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "REJECT", comment: "Close expired integration fixture" },
+    });
+    expect(cleanup.status).toBe(200);
   });
 
   test("self-review and cross-programme review fail closed", async () => {
