@@ -335,6 +335,10 @@ export const offeringService = {
       include: { coLecturers: { select: { lecturerId: true } } },
     });
     if (!existing) throw new ReferenceError("Offering not found");
+    const unboundLegacyOffering = !existing.courseSpecId && !existing.academicCalendarPeriodId;
+    if (unboundLegacyOffering && !offeringInput.courseSpecId) {
+      throw new ReferenceError("Offering must be bound to an Approved CourseSpec version before it can be updated");
+    }
     if (offeringInput.courseSpecId === null && existing.courseSpecId) {
       throw new ReferenceError("The bound Approved CourseSpec version cannot be removed");
     }
@@ -468,7 +472,7 @@ export const offeringService = {
     const assignments = await prisma.offering.findMany({
       where: {
         ...(query.term ? { term: query.term } : {}),
-        OR: [{ lecturerId }, { coLecturers: { some: { lecturerId } } }],
+        OR: [{ lecturerId }, { coLecturers: { some: { lecturerId } }],
       },
       select: {
         id: true,
