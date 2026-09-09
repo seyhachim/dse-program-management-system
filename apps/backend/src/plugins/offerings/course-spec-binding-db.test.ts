@@ -6,6 +6,7 @@ import { coursesPlugin } from "../courses/index.ts";
 import { lecturersPlugin } from "../lecturers/index.ts";
 import { programmePlugin } from "../programme/index.ts";
 import { academicCalendarService } from "../programme/academic-calendar-service.ts";
+import { gradingScaleService } from "../programme/grading-scale-service.ts";
 import { studentsPlugin } from "../students/index.ts";
 import { studentPortalService } from "../student-portal/service.ts";
 import { resultsLifecycleService } from "../student-portal/results-lifecycle.ts";
@@ -202,6 +203,41 @@ dbDescribe("Offering exact CourseSpec version integrity", () => {
         name: "Provisional Offering Programme",
         status: "active",
       },
+    });
+    const gradingDraft = await gradingScaleService.create(actor.id, {
+      programmeId,
+      code: "standard",
+      name: "Standard Grading Scale",
+      description: "Provisional Offering test grading policy",
+      effectiveFrom: "2020-01-01",
+      changeSummary: "Initial test grading policy",
+      grades: [
+        {
+          sortOrder: 1,
+          letterGrade: "P",
+          gradePoint: 1,
+          minScore: 50,
+          maxScore: 100,
+          minInclusive: true,
+          maxInclusive: true,
+          explanation: "Pass",
+          isPassing: true,
+        },
+        {
+          sortOrder: 2,
+          letterGrade: "F",
+          gradePoint: 0,
+          minScore: 0,
+          maxScore: 50,
+          minInclusive: true,
+          maxInclusive: false,
+          explanation: "Fail",
+          isPassing: false,
+        },
+      ],
+    });
+    await gradingScaleService.approve(gradingDraft.id, actor.id, {
+      note: "Approve provisional Offering test grading policy",
     });
     const course = await prisma.course.create({
       data: {
