@@ -5,6 +5,7 @@ import type {
   ProgrammePublicProfileAdminWrite,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { invalidatePublicProgrammeReadCache } from "./public-programme-read-service.ts";
 
 export class PublicProgrammeInfoNotFoundError extends Error {}
 export class PublicProgrammeInfoConflictError extends Error {}
@@ -200,24 +201,28 @@ export const publicProgrammeInfoService = {
   async publishFaq(programmeId: string, id: string) {
     const faq = await getFaq(programmeId, id);
     await assertFeaturedPublishCapacity(programmeId, id, faq.isFeatured);
-    return prisma.programmeFaq.update({
+    const updated = await prisma.programmeFaq.update({
       where: { id },
       data: {
         status: ProgrammePublicPublicationStatus.Published,
         publishedAt: new Date(),
       },
     });
+    invalidatePublicProgrammeReadCache(programmeId);
+    return updated;
   },
 
   async unpublishFaq(programmeId: string, id: string) {
     await getFaq(programmeId, id);
-    return prisma.programmeFaq.update({
+    const updated = await prisma.programmeFaq.update({
       where: { id },
       data: {
         status: ProgrammePublicPublicationStatus.Draft,
         publishedAt: null,
       },
     });
+    invalidatePublicProgrammeReadCache(programmeId);
+    return updated;
   },
 
   async deleteFaq(programmeId: string, id: string) {
@@ -264,24 +269,28 @@ export const publicProgrammeInfoService = {
 
   async publishImportantDate(programmeId: string, id: string) {
     await getImportantDate(programmeId, id);
-    return prisma.programmeImportantDate.update({
+    const updated = await prisma.programmeImportantDate.update({
       where: { id },
       data: {
         status: ProgrammePublicPublicationStatus.Published,
         publishedAt: new Date(),
       },
     });
+    invalidatePublicProgrammeReadCache(programmeId);
+    return updated;
   },
 
   async unpublishImportantDate(programmeId: string, id: string) {
     await getImportantDate(programmeId, id);
-    return prisma.programmeImportantDate.update({
+    const updated = await prisma.programmeImportantDate.update({
       where: { id },
       data: {
         status: ProgrammePublicPublicationStatus.Draft,
         publishedAt: null,
       },
     });
+    invalidatePublicProgrammeReadCache(programmeId);
+    return updated;
   },
 
   async deleteImportantDate(programmeId: string, id: string) {
@@ -301,10 +310,12 @@ export const publicProgrammeInfoService = {
   ) {
     await assertProgramme(programmeId);
     const data = profileData(input);
-    return prisma.programmePublicProfile.upsert({
+    const updated = await prisma.programmePublicProfile.upsert({
       where: { programmeId },
       create: { programmeId, ...data },
       update: data,
     });
+    invalidatePublicProgrammeReadCache(programmeId);
+    return updated;
   },
 };
