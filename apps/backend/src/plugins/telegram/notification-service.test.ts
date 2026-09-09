@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   attendanceWarningEventKey,
   sendTelegramPmsMessage,
+  teachingLeaveRequesterPath,
 } from "./notification-service.ts";
 
 const original = {
@@ -88,6 +89,12 @@ describe("Telegram PMS notifications", () => {
       url: "https://dse-pms.vercel.app/programme-management/telegram-destinations",
     });
     expect(body.reply_markup.inline_keyboard[0][0].web_app).toBeUndefined();
+  });
+
+  test("routes teaching leave requester notifications to the request detail surface", () => {
+    expect(teachingLeaveRequesterPath("request/with spaces")).toBe(
+      "/telegram/teaching-leave?requestId=request%2Fwith%20spaces",
+    );
   });
 });
 
