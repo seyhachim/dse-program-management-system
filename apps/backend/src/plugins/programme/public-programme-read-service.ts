@@ -16,8 +16,16 @@ import type {
   PublicProgrammeProfile,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { createAsyncTtlCache } from "./public-programme-read-cache.ts";
 
 export class PublicProgrammeReadNotFoundError extends Error {}
+
+const PUBLIC_PROGRAMME_READ_CACHE_TTL_MS = 5 * 60 * 1_000;
+const ACTIVE_PROGRAMME_CACHE_TTL_MS = 30 * 1_000;
+const publicReadCache = createAsyncTtlCache({
+  defaultTtlMs: PUBLIC_PROGRAMME_READ_CACHE_TTL_MS,
+  maxEntries: 512,
+});
 
 const publicFaqSelect = {
   slug: true,
@@ -73,6 +81,14 @@ export type SearchablePublicProgrammeFaq = PublicProgrammeFaq & {
   keywords: string[];
 };
 
+function cacheScope(programmeId: string): string {
+  return `programme:${programmeId}`;
+}
+
+export function invalidatePublicProgrammeReadCache(programmeId: string): void {
+  publicReadCache.invalidateScope(cacheScope(programmeId));
+}
+
 function localeOrEnglish(
   locale?: PublicProgrammeLocale,
 ): PublicProgrammeLocale {
@@ -98,12 +114,20 @@ function nullableTranslatedOrEnglish(
 }
 
 async function assertActiveProgramme(programmeId: string): Promise<void> {
-  const programme = await prisma.programme.findFirst({
-    where: { id: programmeId, status: "active" },
-    select: { id: true },
-  });
-  if (!programme)
-    throw new PublicProgrammeReadNotFoundError("Programme not found");
+  await publicReadCache.get(
+    cacheScope(programmeId),
+    "active-programme",
+    async () => {
+      const programme = await prisma.programme.findFirst({
+        where: { id: programmeId, status: "active" },
+        select: { id: true },
+      });
+      if (!programme)
+        throw new PublicProgrammeReadNotFoundError("Programme not found");
+      return true;
+    },
+    ACTIVE_PROGRAMME_CACHE_TTL_MS,
+  );
 }
 
 function faqDto(
@@ -138,6 +162,13 @@ function searchableFaqDto(
         ? row.keywordsKm
         : row.keywords,
   };
+}
+
+function publicFaqDto(
+  faq: SearchablePublicProgrammeFaq,
+): PublicProgrammeFaq {
+  const { keywords: _keywords, ...publicFaq } = faq;
+  return { ...publicFaq };
 }
 
 function dateDto(
@@ -187,14 +218,78 @@ async function profileOrNull(
   programmeId: string,
   locale?: PublicProgrammeLocale,
 ): Promise<PublicProgrammeProfile | null> {
-  const row = await prisma.programmePublicProfile.findUnique({
-    where: { programmeId },
-    select: publicProfileSelect,
-  });
-  return row ? profileDto(row, locale) : null;
+  const resolvedLocale = localeOrEnglish(locale);
+  return publicReadCache.get(
+    cacheScope(programmeId),
+    `profile:${resolvedLocale}`,
+    async () => {
+      const row = await prisma.programmePublicProfile.findUnique({
+        where: { programmeId },
+        select: publicProfileSelect,
+      });
+      return row ? profileDto(row, resolvedLocale) : null;
+    },
+  );
+}
+
+async function faqSnapshot(
+  programmeId: string,
+  locale?: PublicProgrammeLocale,
+): Promise<SearchablePublicProgrammeFaq[]> {
+  await assertActiveProgramme(programmeId);
+  const resolvedLocale = localeOrEnglish(locale);
+  return publicReadCache.get(
+    cacheScope(programmeId),
+    `faqs:${resolvedLocale}`,
+    async () => {
+      const rows = await prisma.programmeFaq.findMany({
+        where: {
+          programmeId,
+          status: ProgrammePublicPublicationStatus.Published,
+        },
+        select: publicFaqSelect,
+        orderBy: [
+          { category: "asc" },
+          { sortOrder: "asc" },
+          { question: "asc" },
+        ],
+      });
+      return rows.map((row) => searchableFaqDto(row, resolvedLocale));
+    },
+  );
+}
+
+async function importantDateSnapshot(
+  programmeId: string,
+  locale?: PublicProgrammeLocale,
+): Promise<PublicProgrammeImportantDate[]> {
+  await assertActiveProgramme(programmeId);
+  const resolvedLocale = localeOrEnglish(locale);
+  return publicReadCache.get(
+    cacheScope(programmeId),
+    `important-dates:${resolvedLocale}`,
+    async () => {
+      const rows = await prisma.programmeImportantDate.findMany({
+        where: {
+          programmeId,
+          status: ProgrammePublicPublicationStatus.Published,
+        },
+        select: publicImportantDateSelect,
+        orderBy: [{ date: "asc" }, { sortOrder: "asc" }, { title: "asc" }],
+      });
+      return rows.map((row) => dateDto(row, resolvedLocale));
+    },
+  );
 }
 
 export const publicProgrammeReadService = {
+  async warm(
+    programmeId: string,
+    locale: PublicProgrammeLocale = "en",
+  ): Promise<void> {
+    await faqSnapshot(programmeId, locale);
+  },
+
   async getProgramme(
     programmeId: string,
     locale?: PublicProgrammeLocale,
@@ -205,43 +300,30 @@ export const publicProgrammeReadService = {
       throw new PublicProgrammeReadNotFoundError(
         "Public programme profile not found",
       );
-    return profile;
+    return { ...profile };
   },
 
   async listFaqs(
     programmeId: string,
     filters: PublicProgrammeFaqQuery = {},
   ): Promise<PublicProgrammeFaq[]> {
-    await assertActiveProgramme(programmeId);
-    const rows = await prisma.programmeFaq.findMany({
-      where: {
-        programmeId,
-        status: ProgrammePublicPublicationStatus.Published,
-        ...(filters.category ? { category: filters.category } : {}),
-        ...(filters.featured === undefined
-          ? {}
-          : { isFeatured: filters.featured }),
-      },
-      select: publicFaqSelect,
-      orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { question: "asc" }],
-    });
-    return rows.map((row) => faqDto(row, filters.locale));
+    const rows = await faqSnapshot(programmeId, filters.locale);
+    return rows
+      .filter(
+        (faq) =>
+          (!filters.category || faq.category === filters.category) &&
+          (filters.featured === undefined ||
+            faq.isFeatured === filters.featured),
+      )
+      .map(publicFaqDto);
   },
 
   async listFaqsForSearch(
     programmeId: string,
     locale?: PublicProgrammeLocale,
   ): Promise<SearchablePublicProgrammeFaq[]> {
-    await assertActiveProgramme(programmeId);
-    const rows = await prisma.programmeFaq.findMany({
-      where: {
-        programmeId,
-        status: ProgrammePublicPublicationStatus.Published,
-      },
-      select: publicFaqSelect,
-      orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { question: "asc" }],
-    });
-    return rows.map((row) => searchableFaqDto(row, locale));
+    const rows = await faqSnapshot(programmeId, locale);
+    return rows.map((faq) => ({ ...faq, keywords: [...faq.keywords] }));
   },
 
   async getFaqBySlug(
@@ -249,36 +331,24 @@ export const publicProgrammeReadService = {
     slug: string,
     locale?: PublicProgrammeLocale,
   ): Promise<PublicProgrammeFaq> {
-    await assertActiveProgramme(programmeId);
-    const row = await prisma.programmeFaq.findFirst({
-      where: {
-        programmeId,
-        slug,
-        status: ProgrammePublicPublicationStatus.Published,
-      },
-      select: publicFaqSelect,
-    });
-    if (!row) throw new PublicProgrammeReadNotFoundError("FAQ not found");
-    return faqDto(row, locale);
+    const faq = (await faqSnapshot(programmeId, locale)).find(
+      (item) => item.slug === slug,
+    );
+    if (!faq) throw new PublicProgrammeReadNotFoundError("FAQ not found");
+    return publicFaqDto(faq);
   },
 
   async listFaqCategories(
     programmeId: string,
   ): Promise<PublicProgrammeFaqCategorySummary[]> {
-    await assertActiveProgramme(programmeId);
-    const grouped = await prisma.programmeFaq.groupBy({
-      by: ["category"],
-      where: {
-        programmeId,
-        status: ProgrammePublicPublicationStatus.Published,
-      },
-      _count: { _all: true },
-      orderBy: { category: "asc" },
-    });
-    return grouped.map((item) => ({
-      category: item.category,
-      count: item._count._all,
-    }));
+    const rows = await faqSnapshot(programmeId, "en");
+    const counts = new Map<ProgrammeFaqCategory, number>();
+    for (const faq of rows) {
+      counts.set(faq.category, (counts.get(faq.category) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([category, count]) => ({ category, count }));
   },
 
   async getAdmission(
@@ -316,17 +386,10 @@ export const publicProgrammeReadService = {
     programmeId: string,
     filters: PublicProgrammeImportantDateQuery = {},
   ): Promise<PublicProgrammeImportantDate[]> {
-    await assertActiveProgramme(programmeId);
-    const rows = await prisma.programmeImportantDate.findMany({
-      where: {
-        programmeId,
-        status: ProgrammePublicPublicationStatus.Published,
-        ...(filters.kind ? { kind: filters.kind } : {}),
-      },
-      select: publicImportantDateSelect,
-      orderBy: [{ date: "asc" }, { sortOrder: "asc" }, { title: "asc" }],
-    });
-    return rows.map((row) => dateDto(row, filters.locale));
+    const rows = await importantDateSnapshot(programmeId, filters.locale);
+    return rows
+      .filter((item) => !filters.kind || item.kind === filters.kind)
+      .map((item) => ({ ...item }));
   },
 
   async getContact(
