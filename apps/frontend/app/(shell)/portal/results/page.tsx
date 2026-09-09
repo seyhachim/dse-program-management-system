@@ -6,7 +6,7 @@ export default function PortalResultsPage() {
     <>
       <Topbar
         title="Results"
-        subtitle="Published assessment results and CLO achievement"
+        subtitle="Published assessment results and course grades"
       />
       <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
         <PortalResults />
