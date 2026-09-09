@@ -20,35 +20,24 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
   });
 
-  test("surfaces four high-frequency student shortcuts", () => {
-    for (const label of ["Schedule", "Courses", "Assessments", "Results"]) {
-      expect(portalHomeSource).toContain(`label: "${label}"`);
-    }
-    for (const href of [
-      "/portal/schedule",
-      "/portal/courses",
-      "/portal/assessments",
-      "/portal/results",
-    ]) {
-      expect(portalHomeSource).toContain(`href: "${href}"`);
-    }
-    expect(portalHomeSource).toContain('aria-label="Student shortcuts"');
+  test("removes the redundant four-box shortcut grid from home", () => {
+    expect(portalHomeSource).not.toContain("QUICK_ACTIONS");
+    expect(portalHomeSource).not.toContain('aria-label="Student shortcuts"');
+    expect(portalHomeSource).not.toContain("homeQuickActions");
+    expect(portalHomeSource).not.toContain("homeQuickAction");
   });
 
-  test("makes schedule context the primary home card", () => {
+  test("keeps schedule context as the primary home action", () => {
     const returnIndex = portalHomeSource.indexOf("return (");
     const nextClassLinkIndex = portalHomeSource.indexOf(
       'href="/portal/schedule"',
       returnIndex,
     );
-    const shortcutsIndex = portalHomeSource.indexOf(
-      'aria-label="Student shortcuts"',
-      returnIndex,
-    );
+    const assessmentsIndex = portalHomeSource.indexOf("Upcoming work", returnIndex);
 
     expect(nextClassLinkIndex).toBeGreaterThan(-1);
-    expect(shortcutsIndex).toBeGreaterThan(-1);
-    expect(nextClassLinkIndex).toBeLessThan(shortcutsIndex);
+    expect(assessmentsIndex).toBeGreaterThan(-1);
+    expect(nextClassLinkIndex).toBeLessThan(assessmentsIndex);
     expect(portalHomeSource).toContain("nextScheduledMeeting(data.courses, new Date())");
     expect(portalHomeSource).toContain("nextMeeting.course.lecturer?.name");
     expect(portalHomeSource).toContain("View schedule");
@@ -57,7 +46,7 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("Lecturer");
   });
 
-  test("keeps assessments ahead of secondary information and improves scanability", () => {
+  test("places assessments directly before secondary home information", () => {
     const assessmentsIndex = portalHomeSource.indexOf("Upcoming work");
     const announcementsIndex = portalHomeSource.indexOf("Latest announcements");
     const calendarIndex = portalHomeSource.indexOf("Academic calendar");

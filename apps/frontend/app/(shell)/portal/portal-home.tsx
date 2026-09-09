@@ -5,13 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Bell,
-  BookOpen,
   CalendarClock,
   CalendarDays,
   ChevronRight,
   ClipboardList,
   Clock3,
-  FileText,
   GraduationCap,
   MapPin,
 } from "lucide-react";
@@ -37,33 +35,6 @@ const HOME_PREFETCH = [
   { resource: "announcements", loader: studentPortalApi.announcements },
   { resource: "assessments", loader: studentPortalApi.assessments },
   { resource: "academic-calendar", loader: studentPortalApi.academicCalendar },
-] as const;
-
-const QUICK_ACTIONS = [
-  {
-    label: "Schedule",
-    hint: "This week",
-    href: "/portal/schedule",
-    icon: CalendarDays,
-  },
-  {
-    label: "Courses",
-    hint: "My classes",
-    href: "/portal/courses",
-    icon: BookOpen,
-  },
-  {
-    label: "Assessments",
-    hint: "Deadlines",
-    href: "/portal/assessments",
-    icon: ClipboardList,
-  },
-  {
-    label: "Results",
-    hint: "My grades",
-    href: "/portal/results",
-    icon: FileText,
-  },
 ] as const;
 
 const WEEKDAY_INDEX = new Map(
@@ -280,32 +251,6 @@ export function PortalHome() {
           </span>
         </div>
       </Link>
-
-      <nav
-        aria-label="Student shortcuts"
-        className={MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions}
-      >
-        {QUICK_ACTIONS.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              key={action.href}
-              href={action.href}
-              className={MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction}
-            >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary transition duration-200 group-hover:bg-primary group-hover:text-primary-foreground">
-                <Icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate font-semibold">{action.label}</span>
-                <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">
-                  {action.hint}
-                </span>
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3 px-1">

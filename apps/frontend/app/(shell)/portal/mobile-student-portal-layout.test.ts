@@ -2,15 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 
 describe("mobile Student Portal layout", () => {
-  test("student home uses a strong branded hero and phone-friendly quick actions", () => {
+  test("student home keeps a strong branded hero without duplicate quick-action layout", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("rounded-[2rem]");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("bg-primary");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("overflow-hidden");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions).toContain("grid-cols-2");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions).toContain("sm:grid-cols-4");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("min-h-20");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("min-w-0");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("ring-border/60");
+    expect("homeQuickActions" in MOBILE_STUDENT_PORTAL_LAYOUT).toBe(false);
+    expect("homeQuickAction" in MOBILE_STUDENT_PORTAL_LAYOUT).toBe(false);
   });
 
   test("next class remains the strongest content card without a hard border", () => {
