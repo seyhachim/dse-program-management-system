@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  ReviseTeachingLeaveRequestSchema,
   ReviewTeachingLeaveRequestSchema,
   SubmitTeachingLeaveRequestSchema,
 } from "@dse-pms/shared-types";
@@ -52,6 +53,19 @@ export function createTeachingLeaveRouter(): Router {
   router.get("/teaching-leave/requests/:requestId", async (req, res) => {
     try {
       res.json(await teachingLeaveService.get(req.user!, req.params.requestId!));
+    } catch (error) {
+      handleTeachingLeaveError(error, res);
+    }
+  });
+
+  router.post("/teaching-leave/requests/:requestId/resubmit", async (req, res) => {
+    const parsed = ReviseTeachingLeaveRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid teaching leave revision", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await teachingLeaveService.revise(req.user!, req.params.requestId!, parsed.data));
     } catch (error) {
       handleTeachingLeaveError(error, res);
     }

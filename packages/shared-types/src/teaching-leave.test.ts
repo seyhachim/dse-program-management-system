@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  ReviseTeachingLeaveRequestSchema,
+  ReviewTeachingLeaveRequestSchema,
   SubmitTeachingLeaveRequestSchema,
   TeachingLeaveOperationalImpactSchema,
   TeachingLeaveRequestViewSchema,
@@ -23,6 +25,37 @@ describe("teaching leave contracts", () => {
       proposedHandling: "OPEN_SLOT",
     });
     expect(result.success).toBe(false);
+  });
+
+  test("requester revision keeps exact-session scope out of the editable contract", () => {
+    const valid = ReviseTeachingLeaveRequestSchema.safeParse({
+      leaveType: "OFFICIAL_DUTY",
+      confidentialReason: "Updated private reason",
+      proposedHandling: "MAKE_UP",
+      proposedNote: "Updated recovery plan",
+    });
+    expect(valid.success).toBe(true);
+
+    const withOccurrenceMutation = ReviseTeachingLeaveRequestSchema.safeParse({
+      leaveType: "OFFICIAL_DUTY",
+      confidentialReason: "Updated private reason",
+      proposedHandling: "MAKE_UP",
+      occurrences: [{
+        offeringId: id,
+        offeringMeetingId: otherId,
+        date: "2026-09-21",
+        releaseForReuse: false,
+      }],
+    });
+    expect(withOccurrenceMutation.success).toBe(false);
+  });
+
+  test("request changes requires reviewer guidance", () => {
+    expect(ReviewTeachingLeaveRequestSchema.safeParse({ decision: "REQUEST_CHANGES" }).success).toBe(false);
+    expect(ReviewTeachingLeaveRequestSchema.safeParse({
+      decision: "REQUEST_CHANGES",
+      comment: "Please clarify the recovery plan.",
+    }).success).toBe(true);
   });
 
   test("safe operational impact rejects confidential leave fields", () => {

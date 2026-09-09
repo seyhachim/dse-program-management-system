@@ -1,4 +1,5 @@
 import type {
+  ReviseTeachingLeaveRequest,
   ReviewTeachingLeaveRequest,
   SubmitTeachingLeaveRequest,
   TeachingLeaveRequestView,
@@ -18,6 +19,9 @@ export const teachingLeaveApi = {
   },
   submit(input: SubmitTeachingLeaveRequest): Promise<TeachingLeaveRequestView> {
     return api.post<TeachingLeaveRequestView>("/api/offerings/teaching-leave/requests", input);
+  },
+  resubmit(id: string, input: ReviseTeachingLeaveRequest): Promise<TeachingLeaveRequestView> {
+    return api.post<TeachingLeaveRequestView>(`/api/offerings/teaching-leave/requests/${id}/resubmit`, input);
   },
   review(id: string, input: ReviewTeachingLeaveRequest): Promise<TeachingLeaveReviewResult> {
     return api.post<TeachingLeaveReviewResult>(`/api/offerings/teaching-leave/requests/${id}/review`, input);

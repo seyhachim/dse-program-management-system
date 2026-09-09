@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
+  ReviseTeachingLeaveRequest,
   SubmitTeachingLeaveRequest,
   TeachingLeaveOperationalImpact,
   TeachingLeaveRequestView,
@@ -367,6 +368,77 @@ export const teachingLeaveService = {
     return request;
   },
 
+  async revise(user: AuthUser, id: string, input: ReviseTeachingLeaveRequest): Promise<TeachingLeaveRequestView> {
+    const before = await readRequest(id);
+    if (before.requester.id !== user.id) {
+      throw new TeachingLeaveAuthorizationError("Only the requesting lecturer can revise this teaching leave request");
+    }
+    if (before.status !== "CHANGES_REQUESTED") {
+      throw new TeachingLeaveConflictError("Teaching leave can be revised only after a reviewer requests changes");
+    }
+    if (before.occurrences.length === 0) {
+      throw new TeachingLeaveConflictError("This teaching leave request has no affected teaching sessions");
+    }
+    for (const occurrence of before.occurrences) {
+      if (scheduledInstant(occurrence.sessionDate, occurrence.scheduledEndTime).getTime() <= Date.now()) {
+        throw new TeachingLeaveValidationError("This teaching leave request can no longer be resubmitted because an affected session has ended");
+      }
+    }
+    const nowLate = before.occurrences.some((occurrence) =>
+      isTeachingLeaveLate(occurrence.sessionDate, occurrence.scheduledStartTime, before.noticeHours));
+
+    await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{
+        requesterId: string;
+        status: TeachingLeaveStatus;
+        submittedLate: boolean;
+        noticeHours: number;
+      }>>`
+        SELECT "requesterId","status","submittedLate","noticeHours"
+        FROM "pms_attendance"."TeachingLeaveRequest"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `;
+      const current = rows[0];
+      if (!current) throw new TeachingLeaveNotFoundError("Teaching leave request not found");
+      if (current.requesterId !== user.id) {
+        throw new TeachingLeaveAuthorizationError("Only the requesting lecturer can revise this teaching leave request");
+      }
+      if (current.status !== "CHANGES_REQUESTED") {
+        throw new TeachingLeaveConflictError("Teaching leave can be revised only after a reviewer requests changes");
+      }
+      const submittedLate = current.submittedLate || nowLate;
+
+      await tx.$executeRaw`
+        UPDATE "pms_attendance"."TeachingLeaveRequest"
+        SET "leaveType"=${input.leaveType},
+            "confidentialReason"=${input.confidentialReason},
+            "attachmentRef"=${input.attachmentRef ?? null},
+            "proposedHandling"=${input.proposedHandling},
+            "proposedNote"=${input.proposedNote ?? ""},
+            "submittedLate"=${submittedLate},
+            "status"='PENDING',
+            "updatedAt"=CURRENT_TIMESTAMP
+        WHERE "id"=${id}
+      `;
+      await tx.$executeRaw`
+        INSERT INTO "pms_attendance"."TeachingLeaveAuditEvent"
+          ("id","requestId","actorId","action","previousStatus","newStatus","details")
+        VALUES (
+          ${randomUUID()},${id},${user.id},'SUBMITTED','CHANGES_REQUESTED','PENDING',
+          ${JSON.stringify({
+            resubmitted: true,
+            leaveType: input.leaveType,
+            proposedHandling: input.proposedHandling,
+            submittedLate,
+          })}::jsonb
+        )
+      `;
+    });
+
+    return readRequest(id);
+  },
+
   async mine(user: AuthUser): Promise<TeachingLeaveRequestView[]> {
     const ids = await prisma.$queryRaw<Array<{ id: string }>>`
       SELECT "id" FROM "pms_attendance"."TeachingLeaveRequest"
@@ -390,14 +462,14 @@ export const teachingLeaveService = {
     if (globalAdmin) {
       ids = await prisma.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "pms_attendance"."TeachingLeaveRequest"
-        WHERE "status" IN ('PENDING','CHANGES_REQUESTED')
+        WHERE "status" = 'PENDING'
         ORDER BY "submittedAt" ASC
       `;
     } else {
       for (const programmeId of programmeIds) {
         const scoped = await prisma.$queryRaw<Array<{ id: string }>>`
           SELECT "id" FROM "pms_attendance"."TeachingLeaveRequest"
-          WHERE "programmeId" = ${programmeId} AND "status" IN ('PENDING','CHANGES_REQUESTED')
+          WHERE "programmeId" = ${programmeId} AND "status" = 'PENDING'
           ORDER BY "submittedAt" ASC
         `;
         ids.push(...scoped);
@@ -423,6 +495,9 @@ export const teachingLeaveService = {
     if (before.requester.id === user.id) {
       throw new TeachingLeaveAuthorizationError("A lecturer cannot review their own teaching leave request");
     }
+    if (input.decision === "REQUEST_CHANGES" && !input.comment?.trim()) {
+      throw new TeachingLeaveValidationError("Reviewer guidance is required when requesting changes");
+    }
     const target: TeachingLeaveStatus = input.decision === "APPROVE"
       ? "APPROVED"
       : input.decision === "REJECT"
@@ -442,7 +517,10 @@ export const teachingLeaveService = {
       if (current.requesterId === user.id) throw new TeachingLeaveAuthorizationError("A lecturer cannot review their own teaching leave request");
       if (!isManager(user, current.programmeId)) throw new TeachingLeaveAuthorizationError("You cannot review teaching leave for this programme");
       if (current.status === target) return;
-      if (!["PENDING", "CHANGES_REQUESTED"].includes(current.status)) {
+      if (current.status === "CHANGES_REQUESTED") {
+        throw new TeachingLeaveConflictError("Waiting for the requesting lecturer to revise and resubmit this teaching leave request");
+      }
+      if (current.status !== "PENDING") {
         throw new TeachingLeaveConflictError("This teaching leave request already has a final decision");
       }
 

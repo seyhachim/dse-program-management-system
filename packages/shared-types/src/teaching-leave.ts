@@ -72,7 +72,15 @@ export type ReviseTeachingLeaveRequest = z.infer<typeof ReviseTeachingLeaveReque
 export const ReviewTeachingLeaveRequestSchema = z.object({
   decision: TeachingLeaveReviewDecisionSchema,
   comment: z.string().trim().max(1500).optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.decision === "REQUEST_CHANGES" && !value.comment) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["comment"],
+      message: "Reviewer guidance is required when requesting changes",
+    });
+  }
+});
 export type ReviewTeachingLeaveRequest = z.infer<typeof ReviewTeachingLeaveRequestSchema>;
 
 export const TeachingLeaveOccurrenceViewSchema = z.object({

@@ -11,6 +11,7 @@ const runIntegration = process.env.BACKEND_INTEGRATION_TESTS === "1";
 const integrationDescribe = runIntegration ? describe : describe.skip;
 
 const SESSION_DATE = "2099-01-05"; // Monday, intentionally far-future for a stable integration fixture.
+const REVISION_SESSION_DATE = "2099-01-12"; // Monday, separate exact occurrence for resubmission coverage.
 
 type HttpResult = { status: number; body: any };
 
@@ -19,6 +20,7 @@ integrationDescribe("Teaching leave authorization and approval", () => {
   let baseUrl = "";
   let lecturer: AuthUser;
   let coordinator: AuthUser;
+  let outsider: AuthUser;
   let offeringId = "";
   let meetingId = "";
   let requestId = "";
@@ -28,6 +30,7 @@ integrationDescribe("Teaching leave authorization and approval", () => {
     process.env.TEACHING_LEAVE_NOTICE_HOURS = "24";
     lecturer = await loadAuthUser("lecturer@dse.dev");
     coordinator = await loadAuthUser("coordinator@dse.dev");
+    outsider = await loadAuthUser("hopper.lecturer@dse.dev");
 
     const course = await prisma.course.create({
       data: {
@@ -73,8 +76,7 @@ integrationDescribe("Teaching leave authorization and approval", () => {
   });
 
   test("assigned lecturer submits exact-session leave and unrelated lecturer cannot submit it", async () => {
-    const outsider = await loadAuthUser("hopper.lecturer@dse.dev");
-    const input = leaveInput();
+    const input = leaveInput(SESSION_DATE);
 
     const denied = await request("/api/offerings/teaching-leave/requests", {
       method: "POST",
@@ -130,6 +132,100 @@ integrationDescribe("Teaching leave authorization and approval", () => {
     expect(crossProgramme.status).toBe(403);
   });
 
+  test("request-changes is guided, requester-only, auditable, and requires resubmission before more review", async () => {
+    const submitted = await request("/api/offerings/teaching-leave/requests", {
+      method: "POST",
+      token: signToken(lecturer),
+      body: leaveInput(REVISION_SESSION_DATE),
+    });
+    expect(submitted.status).toBe(201);
+    const revisionRequestId = submitted.body.id as string;
+    const occurrenceId = submitted.body.occurrences[0].occurrenceId as string;
+
+    const unguided = await request(`/api/offerings/teaching-leave/requests/${revisionRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "REQUEST_CHANGES" },
+    });
+    expect(unguided.status).toBe(400);
+
+    const changes = await request(`/api/offerings/teaching-leave/requests/${revisionRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "REQUEST_CHANGES", comment: "Clarify how the original course will be recovered." },
+    });
+    expect(changes.status).toBe(200);
+    expect(changes.body.request.status).toBe("CHANGES_REQUESTED");
+    expect(changes.body.notifications.students.sent).toBe(0);
+    expect(changes.body.notifications.lecturerGroup).toEqual([]);
+
+    const prematureApproval = await request(`/api/offerings/teaching-leave/requests/${revisionRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "APPROVE" },
+    });
+    expect(prematureApproval.status).toBe(409);
+
+    const queueWhileWaiting = await request("/api/offerings/teaching-leave/review-queue", {
+      token: signToken(coordinator),
+    });
+    expect(queueWhileWaiting.status).toBe(200);
+    expect(queueWhileWaiting.body.some((item: { id: string }) => item.id === revisionRequestId)).toBe(false);
+
+    const outsiderRevision = await request(`/api/offerings/teaching-leave/requests/${revisionRequestId}/resubmit`, {
+      method: "POST",
+      token: signToken(outsider),
+      body: revisedLeaveInput(),
+    });
+    expect(outsiderRevision.status).toBe(403);
+
+    const revised = await request(`/api/offerings/teaching-leave/requests/${revisionRequestId}/resubmit`, {
+      method: "POST",
+      token: signToken(lecturer),
+      body: revisedLeaveInput(),
+    });
+    expect(revised.status).toBe(200);
+    expect(revised.body.status).toBe("PENDING");
+    expect(revised.body.confidentialReason).toBe("Updated private integration reason");
+    expect(revised.body.occurrences).toHaveLength(1);
+    expect(revised.body.occurrences[0]).toMatchObject({
+      occurrenceId,
+      offeringId,
+      offeringMeetingId: meetingId,
+      sessionDate: REVISION_SESSION_DATE,
+      releaseForReuse: true,
+    });
+
+    const queueAfterResubmit = await request("/api/offerings/teaching-leave/review-queue", {
+      token: signToken(coordinator),
+    });
+    expect(queueAfterResubmit.status).toBe(200);
+    expect(queueAfterResubmit.body.some((item: { id: string }) => item.id === revisionRequestId)).toBe(true);
+
+    const audits = await prisma.$queryRaw<Array<{
+      action: string;
+      previousStatus: string | null;
+      newStatus: string | null;
+      details: Record<string, unknown> | null;
+    }>>`
+      SELECT "action","previousStatus","newStatus","details"
+      FROM "pms_attendance"."TeachingLeaveAuditEvent"
+      WHERE "requestId"=${revisionRequestId}
+      ORDER BY "createdAt","id"
+    `;
+    expect(audits.map((item) => item.action)).toEqual(["SUBMITTED", "CHANGES_REQUESTED", "SUBMITTED"]);
+    expect(audits[2]).toMatchObject({ previousStatus: "CHANGES_REQUESTED", newStatus: "PENDING" });
+    expect(audits[2]?.details).toMatchObject({ resubmitted: true });
+
+    const rejected = await request(`/api/offerings/teaching-leave/requests/${revisionRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "REJECT", comment: "Close integration fixture" },
+    });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.request.status).toBe("REJECTED");
+  });
+
   test("programme coordinator approval is auditable, occurrence-linked, idempotent, and tolerates missing Telegram destinations", async () => {
     const first = await request(`/api/offerings/teaching-leave/requests/${requestId}/review`, {
       method: "POST",
@@ -173,12 +269,12 @@ integrationDescribe("Teaching leave authorization and approval", () => {
     expect(Number(auditCount[0]?.count ?? 0n)).toBe(2);
   });
 
-  function leaveInput() {
+  function leaveInput(date: string) {
     return {
       occurrences: [{
         offeringId,
         offeringMeetingId: meetingId,
-        date: SESSION_DATE,
+        date,
         releaseForReuse: true,
       }],
       leaveType: "OFFICIAL_DUTY",
@@ -186,6 +282,16 @@ integrationDescribe("Teaching leave authorization and approval", () => {
       attachmentRef: "private://reference-only",
       proposedHandling: "OPEN_SLOT",
       proposedNote: "Recover the original course separately",
+    };
+  }
+
+  function revisedLeaveInput() {
+    return {
+      leaveType: "OFFICIAL_DUTY",
+      confidentialReason: "Updated private integration reason",
+      attachmentRef: "private://updated-reference-only",
+      proposedHandling: "MAKE_UP",
+      proposedNote: "Updated recovery plan after reviewer guidance",
     };
   }
 
