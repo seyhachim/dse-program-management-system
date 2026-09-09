@@ -119,7 +119,7 @@ export interface AcademicCalendarAuditView { id: string; calendarId: string; act
 export interface AcademicCalendarPeriodView { id: string; calendarId: string; semester: AcademicCalendarSemester; teachingStart: string; teachingEnd: string; examStart: string | null; examEnd: string | null; breakStart: string | null; breakEnd: string | null; }
 export interface AcademicCalendarEventView { id: string; calendarId: string; title: string; type: AcademicCalendarEventType; semester: AcademicCalendarSemester | null; startDate: string; endDate: string | null; note: string; sortOrder: number; }
 export interface AcademicCalendarView { id: string; academicYear: AcademicYearView; seriesKey: string; revision: number; status: AcademicCalendarStatus; studyYears: number[]; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; source: AcademicCalendarSourceView; revisionReason: string; supersedesCalendarId: string | null; publishedAt: string | null; createdAt: string; updatedAt: string; }
-export interface AcademicCalendarCourseOption { id: string; code: string; title: string; credits: number | null; courseType: string | null; curriculumVersionId: string; }
+export interface AcademicCalendarCourseOption { id: string; code: string; title: string; credits: number | null; courseType: string | null; /** Null only when curriculum is pending and this is a programme Course Catalog planning option. */ curriculumVersionId: string | null; }
 export type AcademicCalendarCurriculumContext =
   | { status: "confirmed" }
   | { status: "pending"; message: string };
