@@ -9,6 +9,8 @@ import {
 } from "@dse-pms/shared-types";
 import { Router, type Response } from "express";
 import { requireAuth } from "../../core/auth/middleware.ts";
+import { registry } from "../../core/plugins/registry.ts";
+import type { OfferingsService } from "../offerings/index.ts";
 import {
   telegramClassDeliveryErrorStatus,
   telegramClassDeliveryService,
@@ -65,9 +67,18 @@ function sendMiniAppError(res: Response, error: unknown) {
   const miniStatus = telegramMiniErrorStatus(error);
   if (miniStatus) return res.status(miniStatus).json({ error: error instanceof Error ? error.message : "Request denied" });
   const name = error instanceof Error ? error.constructor.name : "";
-  if (name === "PortalNotFoundError") return res.status(404).json({ error: (error as Error).message });
-  if (name === "PortalConflictError") return res.status(409).json({ error: (error as Error).message });
-  if (name === "PortalAccessError") return res.status(403).json({ error: (error as Error).message });
+  if (name === "PortalNotFoundError" || name === "TeachingLeaveNotFoundError") {
+    return res.status(404).json({ error: (error as Error).message });
+  }
+  if (name === "PortalConflictError" || name === "TeachingLeaveConflictError") {
+    return res.status(409).json({ error: (error as Error).message });
+  }
+  if (name === "PortalAccessError" || name === "TeachingLeaveAuthorizationError") {
+    return res.status(403).json({ error: (error as Error).message });
+  }
+  if (name === "TeachingLeaveValidationError") {
+    return res.status(400).json({ error: (error as Error).message });
+  }
   console.error("Telegram Mini App request failed", error);
   return res.status(500).json({ error: "Could not complete the Telegram Mini App request" });
 }
@@ -143,6 +154,12 @@ export function createTelegramRouter(service: TelegramService = telegramService)
   });
   router.get("/mini/schedule", async (req, res) => {
     try { res.json({ courses: await telegramMiniAppService.courses(req.telegramUser!) }); } catch (error) { sendMiniAppError(res, error); }
+  });
+  router.get("/mini/teaching-leave/:requestId", async (req, res) => {
+    try {
+      const offerings = registry.get<OfferingsService>("offerings").service;
+      res.json(await offerings.teachingLeave.get(req.telegramUser!, req.params.requestId!));
+    } catch (error) { sendMiniAppError(res, error); }
   });
   router.get("/mini/classes/:offeringId", async (req, res) => {
     try { res.json(await telegramMiniAppService.course(req.telegramUser!, req.params.offeringId!)); } catch (error) { sendMiniAppError(res, error); }
