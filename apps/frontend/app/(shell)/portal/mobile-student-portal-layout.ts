@@ -1,11 +1,11 @@
 export const MOBILE_STUDENT_PORTAL_LAYOUT = {
-  homeStack: "space-y-4 md:space-y-6",
+  homeStack: "space-y-4 md:space-y-5",
   hero: "rounded-2xl border border-border bg-card px-4 py-3 shadow-sm sm:px-5 sm:py-4",
-  homeQuickActions: "grid grid-cols-3 gap-2 sm:gap-3",
+  homeQuickActions: "grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3",
   homeQuickAction:
-    "flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border border-border bg-card px-2 py-2.5 text-center text-sm font-medium text-foreground shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    "flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card px-3 py-3 text-center text-sm font-medium text-foreground shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
   homeNextClass:
-    "group block min-h-11 min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-5",
+    "group block min-h-11 min-w-0 rounded-[1.75rem] border border-primary/20 bg-primary/5 p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-6",
   compactCard: "rounded-2xl border border-border bg-card p-4 md:p-5",
   courseCard:
     "group flex min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md md:min-h-64 md:p-5 md:hover:-translate-y-0.5",
