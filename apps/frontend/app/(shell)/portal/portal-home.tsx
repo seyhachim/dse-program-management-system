@@ -16,6 +16,8 @@ import {
 import {
   academicSemesterLabel,
   formatAcademicDate,
+  formatAcademicShortDateRange,
+  resolveStudentTeachingContext,
 } from "@/lib/academic-calendar";
 import {
   assessmentDeadline,
@@ -99,10 +101,24 @@ export function PortalHome() {
     return <PortalError message={error ?? "Could not load your portal"} />;
   }
 
-  const nextMeeting = nextScheduledMeeting(data.courses, new Date());
+  const now = new Date();
+  const nextMeeting = nextScheduledMeeting(data.courses, now);
   const calendar = data.academicCalendar;
-  const firstCalendarPeriod =
-    calendar.status === "available" ? (calendar.periods[0] ?? null) : null;
+  const teachingContext = resolveStudentTeachingContext(calendar, now);
+  const contextSemester =
+    teachingContext?.kind === "teaching" ||
+    teachingContext?.kind === "break" ||
+    teachingContext?.kind === "upcoming"
+      ? teachingContext.semester
+      : teachingContext?.kind === "between"
+        ? teachingContext.nextSemester
+        : null;
+  const calendarPeriod =
+    calendar.status === "available"
+      ? (calendar.periods.find((period) => period.semester === contextSemester) ??
+        calendar.periods[0] ??
+        null)
+      : null;
   const unavailableCalendarMessage =
     calendar.status === "unavailable"
       ? calendar.message
@@ -157,6 +173,49 @@ export function PortalHome() {
               Student ID · {data.student.studentId}
             </p>
           </div>
+
+          {teachingContext ? (
+            <div
+              aria-label="Current teaching week"
+              className="inline-flex max-w-full flex-col rounded-2xl bg-primary-foreground/10 px-3.5 py-2.5 ring-1 ring-primary-foreground/15"
+            >
+              {teachingContext.kind === "teaching" ? (
+                <>
+                  <span className="text-sm font-semibold">
+                    Week {teachingContext.week} of {teachingContext.totalWeeks}
+                  </span>
+                  <span className="mt-0.5 text-xs text-primary-foreground/75">
+                    {academicSemesterLabel(teachingContext.semester)} · {formatAcademicShortDateRange(teachingContext.startDate, teachingContext.endDate)}
+                  </span>
+                </>
+              ) : teachingContext.kind === "break" ? (
+                <>
+                  <span className="text-sm font-semibold">Semester break</span>
+                  <span className="mt-0.5 text-xs text-primary-foreground/75">
+                    {teachingContext.resumeDate
+                      ? `Week ${teachingContext.nextWeek} resumes ${formatAcademicDate(teachingContext.resumeDate)}`
+                      : `${academicSemesterLabel(teachingContext.semester)} teaching is complete`}
+                  </span>
+                </>
+              ) : teachingContext.kind === "upcoming" ? (
+                <>
+                  <span className="text-sm font-semibold">Teaching starts soon</span>
+                  <span className="mt-0.5 text-xs text-primary-foreground/75">
+                    {academicSemesterLabel(teachingContext.semester)} · {formatAcademicDate(teachingContext.startDate)}
+                  </span>
+                </>
+              ) : teachingContext.kind === "between" ? (
+                <>
+                  <span className="text-sm font-semibold">Between semesters</span>
+                  <span className="mt-0.5 text-xs text-primary-foreground/75">
+                    {academicSemesterLabel(teachingContext.nextSemester)} starts {formatAcademicDate(teachingContext.resumeDate)}
+                  </span>
+                </>
+              ) : (
+                <span className="text-sm font-semibold">Teaching period complete</span>
+              )}
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -195,9 +254,7 @@ export function PortalHome() {
                       <Clock3 className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Time
-                      </p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Time</p>
                       <p className="mt-0.5 break-words text-sm font-medium text-foreground">
                         {meetingLabel(nextMeeting.meeting)}
                       </p>
@@ -208,9 +265,7 @@ export function PortalHome() {
                       <MapPin className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Room
-                      </p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Room</p>
                       <p className="mt-0.5 break-words text-sm font-medium text-foreground">
                         {nextMeeting.meeting.room || "Room TBA"}
                       </p>
@@ -221,9 +276,7 @@ export function PortalHome() {
                       <GraduationCap className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Lecturer
-                      </p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Lecturer</p>
                       <p className="mt-0.5 break-words text-sm font-medium text-foreground">
                         {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
                       </p>
@@ -252,26 +305,22 @@ export function PortalHome() {
         </div>
       </Link>
 
-      <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3 px-1">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
-              Upcoming work
-            </p>
-            <h3 className="mt-0.5 text-xl font-semibold tracking-tight">
-              Assessments
-            </h3>
+      {data.upcomingAssessments.length > 0 ? (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3 px-1">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Upcoming work</p>
+              <h3 className="mt-0.5 text-xl font-semibold tracking-tight">Assessments</h3>
+            </div>
+            <Link
+              className="flex min-h-11 shrink-0 items-center rounded-full px-2 text-sm font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href="/portal/assessments"
+            >
+              View all
+            </Link>
           </div>
-          <Link
-            className="flex min-h-11 shrink-0 items-center rounded-full px-2 text-sm font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href="/portal/assessments"
-          >
-            View all
-          </Link>
-        </div>
-        <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeSectionCard}>
-          {data.upcomingAssessments.length ? (
-            data.upcomingAssessments.slice(0, 3).map((item) => (
+          <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeSectionCard}>
+            {data.upcomingAssessments.slice(0, 3).map((item) => (
               <Link
                 key={`${item.offeringId}-${item.assessmentId}`}
                 href={`/portal/courses/${item.offeringId}`}
@@ -281,85 +330,58 @@ export function PortalHome() {
                   <ClipboardList className="h-4.5 w-4.5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="break-words text-sm font-semibold leading-5 text-foreground">
-                    {item.name}
-                  </p>
+                  <p className="break-words text-sm font-semibold leading-5 text-foreground">{item.name}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] text-muted-foreground">
-                    <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground">
-                      {item.courseCode}
-                    </span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground">{item.courseCode}</span>
                     <span className="inline-flex min-w-0 items-center gap-1">
                       <CalendarClock className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                      <span className="break-words">
-                        {assessmentDeadline(item.dueAt, item.dueWeek)}
-                      </span>
+                      <span className="break-words">{assessmentDeadline(item.dueAt, item.dueWeek)}</span>
                     </span>
-                    {item.weight != null ? (
-                      <span className="font-medium">{item.weight}% weight</span>
-                    ) : null}
+                    {item.weight != null ? <span className="font-medium">{item.weight}% weight</span> : null}
                   </div>
                 </div>
                 <ChevronRight className="mt-3 h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" aria-hidden="true" />
               </Link>
-            ))
-          ) : (
-            <p className="p-4 text-sm text-muted-foreground">
-              No upcoming assessments.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3 px-1">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
-              Course updates
-            </p>
-            <h3 className="mt-0.5 flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight">
-              <Bell className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-              <span className="break-words">Latest announcements</span>
-            </h3>
+            ))}
           </div>
-          <Link
-            className="flex min-h-11 shrink-0 items-center rounded-full px-2 text-sm font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href="/portal/announcements"
-          >
-            View all
-          </Link>
-        </div>
-        <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementList}>
-          {data.announcements.length ? (
-            data.announcements.slice(0, 2).map((item) => (
-              <article
-                key={item.id}
-                className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementCard}
-              >
+        </section>
+      ) : null}
+
+      {data.announcements.length > 0 ? (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3 px-1">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Course updates</p>
+              <h3 className="mt-0.5 flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight">
+                <Bell className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                <span className="break-words">Latest announcements</span>
+              </h3>
+            </div>
+            <Link
+              className="flex min-h-11 shrink-0 items-center rounded-full px-2 text-sm font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href="/portal/announcements"
+            >
+              View all
+            </Link>
+          </div>
+          <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementList}>
+            {data.announcements.slice(0, 2).map((item) => (
+              <article key={item.id} className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementCard}>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="break-words text-[11px] font-semibold uppercase tracking-wide text-primary">
                     {item.courseCode} · {item.sectionCode}
                   </span>
                   {item.pinned ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                      Pinned
-                    </span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Pinned</span>
                   ) : null}
                 </div>
-                <p className="mt-2 break-words text-sm font-semibold leading-5 text-foreground">
-                  {item.title}
-                </p>
-                <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-muted-foreground">
-                  {item.body}
-                </p>
+                <p className="mt-2 break-words text-sm font-semibold leading-5 text-foreground">{item.title}</p>
+                <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-muted-foreground">{item.body}</p>
               </article>
-            ))
-          ) : (
-            <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementCard}>
-              <p className="text-sm text-muted-foreground">No announcements yet.</p>
-            </div>
-          )}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <Link
         href="/portal/academic-calendar"
@@ -372,34 +394,30 @@ export function PortalHome() {
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Dates & semester
-                </p>
-                <h3 className="mt-0.5 font-semibold text-foreground">
-                  Academic calendar
-                </h3>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Dates & semester</p>
+                <h3 className="mt-0.5 font-semibold text-foreground">Academic calendar</h3>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" aria-hidden="true" />
             </div>
-            {calendar.status === "available" && firstCalendarPeriod ? (
+            {calendar.status === "available" && calendarPeriod ? (
               <>
                 <p className="mt-2 break-words text-sm font-medium text-foreground">
-                  {calendar.nextEvent
-                    ? `${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}`
-                    : `${academicSemesterLabel(firstCalendarPeriod.semester)} · ${formatAcademicDate(firstCalendarPeriod.teachingStart)} – ${formatAcademicDate(firstCalendarPeriod.teachingEnd)}`}
+                  {teachingContext?.kind === "teaching"
+                    ? `Week ${teachingContext.week} of ${teachingContext.totalWeeks} · ${formatAcademicShortDateRange(teachingContext.startDate, teachingContext.endDate)}`
+                    : teachingContext?.kind === "break"
+                      ? "Semester break"
+                      : calendar.nextEvent
+                        ? `${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}`
+                        : `${academicSemesterLabel(calendarPeriod.semester)} · ${formatAcademicDate(calendarPeriod.teachingStart)} – ${formatAcademicDate(calendarPeriod.teachingEnd)}`}
                 </p>
                 <p className="mt-1 break-words text-xs text-muted-foreground">
-                  {academicSemesterLabel(firstCalendarPeriod.semester)} · Academic year {calendar.academicYear?.label ?? "current"}
+                  {academicSemesterLabel(calendarPeriod.semester)} · Academic year {calendar.academicYear.label}
                 </p>
               </>
             ) : (
               <>
-                <p className="mt-2 text-sm font-medium text-foreground">
-                  Calendar not available yet
-                </p>
-                <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">
-                  {unavailableCalendarMessage}
-                </p>
+                <p className="mt-2 text-sm font-medium text-foreground">Calendar not available yet</p>
+                <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">{unavailableCalendarMessage}</p>
               </>
             )}
           </div>
