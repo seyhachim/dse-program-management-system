@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, MapPin } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Clock3, MapPin } from "lucide-react";
+import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { studentPortalApi } from "@/lib/student-portal";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "../mobile-student-portal-layout";
 import {
@@ -29,7 +30,13 @@ function lecturerInitials(name: string): string {
 }
 
 export function PortalSchedule() {
-  const load = useCallback(() => studentPortalApi.courses(), []);
+  const load = useCallback(async () => {
+    const [courses, monitorAssignments] = await Promise.all([
+      studentPortalApi.courses(),
+      monitorDeliveryApi.assignments(),
+    ]);
+    return { courses, monitorAssignments };
+  }, []);
   const { data, loading, error } = usePortalData(load);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dateStripAnchor, setDateStripAnchor] = useState<Date | null>(null);
@@ -55,7 +62,10 @@ export function PortalSchedule() {
     return <PortalError message={error ?? "Could not load schedule"} />;
   }
 
-  const entries = data.flatMap((course) =>
+  const monitorOfferingIds = new Set(
+    data.monitorAssignments.map((assignment) => assignment.offeringId),
+  );
+  const entries = data.courses.flatMap((course) =>
     course.meetings.map((meeting) => ({ course, meeting })),
   );
   if (!entries.length) {
@@ -184,70 +194,92 @@ export function PortalSchedule() {
                   )
                 : false;
               const lecturerName = course.lecturer?.name ?? "Lecturer TBA";
+              const canRecordDelivery = monitorOfferingIds.has(course.offeringId);
+              const courseLabel = `${course.code} ${course.title}, ${formatMeetingTime(
+                meeting.startTime,
+              )} to ${formatMeetingTime(meeting.endTime)}${
+                current ? ", happening now" : ""
+              }`;
 
               return (
-                <Link
+                <article
                   key={meeting.id}
-                  href={`/portal/courses/${course.offeringId}`}
-                  aria-label={`${course.code} ${course.title}, ${formatMeetingTime(
-                    meeting.startTime,
-                  )} to ${formatMeetingTime(meeting.endTime)}${
-                    current ? ", happening now" : ""
-                  }`}
                   className={`${MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeeting} ${
                     current
                       ? MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeetingCurrent
                       : ""
                   }`}
                 >
-                  {current ? (
-                    <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-primary">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
-                      <span>Now</span>
+                  <Link
+                    href={`/portal/courses/${course.offeringId}`}
+                    aria-label={courseLabel}
+                    className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {current ? (
+                      <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-primary">
+                        <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
+                        <span>Now</span>
+                      </div>
+                    ) : null}
+
+                    <div className="grid min-w-0 grid-cols-[5.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-4">
+                      <div className="relative min-w-0 border-r border-border/80 pr-3 sm:pr-4">
+                        <Clock3 className="mb-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <p className="text-sm font-semibold tabular-nums text-foreground">
+                          {formatMeetingTime(meeting.startTime)}
+                        </p>
+                        <div className="my-2 h-5 border-l border-dashed border-border" />
+                        <p className="text-xs font-medium tabular-nums text-muted-foreground">
+                          {formatMeetingTime(meeting.endTime)}
+                        </p>
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="break-words text-base font-semibold leading-snug text-foreground sm:text-lg">
+                          {course.title}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">
+                          {course.code} · Section {course.sectionCode} · {meeting.activityType}
+                        </p>
+
+                        <div className="mt-4 flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                          <span className="break-words">
+                            {meeting.room || "Room TBA"}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex min-w-0 items-center gap-2.5">
+                          <span
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-foreground"
+                            aria-hidden="true"
+                          >
+                            {lecturerInitials(lecturerName)}
+                          </span>
+                          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                            {lecturerName}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+
+                  {canRecordDelivery ? (
+                    <div className="mt-4 border-t border-border/80 pt-3">
+                      <Link
+                        href={`/portal/schedule/delivery?offeringId=${encodeURIComponent(
+                          course.offeringId,
+                        )}&meetingId=${encodeURIComponent(meeting.id)}&date=${encodeURIComponent(
+                          selectedDateKey,
+                        )}`}
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm"
+                      >
+                        <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+                        Record class delivery
+                      </Link>
                     </div>
                   ) : null}
-
-                  <div className="grid min-w-0 grid-cols-[5.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-4">
-                    <div className="relative min-w-0 border-r border-border/80 pr-3 sm:pr-4">
-                      <Clock3 className="mb-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                      <p className="text-sm font-semibold tabular-nums text-foreground">
-                        {formatMeetingTime(meeting.startTime)}
-                      </p>
-                      <div className="my-2 h-5 border-l border-dashed border-border" />
-                      <p className="text-xs font-medium tabular-nums text-muted-foreground">
-                        {formatMeetingTime(meeting.endTime)}
-                      </p>
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="break-words text-base font-semibold leading-snug text-foreground sm:text-lg">
-                        {course.title}
-                      </p>
-                      <p className="mt-1 text-xs font-medium text-muted-foreground">
-                        {course.code} · Section {course.sectionCode} · {meeting.activityType}
-                      </p>
-
-                      <div className="mt-4 flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
-                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                        <span className="break-words">
-                          {meeting.room || "Room TBA"}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 flex min-w-0 items-center gap-2.5">
-                        <span
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-foreground"
-                          aria-hidden="true"
-                        >
-                          {lecturerInitials(lecturerName)}
-                        </span>
-                        <span className="min-w-0 truncate text-sm font-medium text-foreground">
-                          {lecturerName}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                </article>
               );
             })}
           </div>
