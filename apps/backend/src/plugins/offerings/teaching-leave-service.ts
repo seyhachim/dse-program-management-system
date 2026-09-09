@@ -324,17 +324,19 @@ export const teachingLeaveService = {
     const requestId = randomUUID();
 
     await prisma.$transaction(async (tx) => {
-      for (const item of resolved) {
-        const occurrenceLock = await tx.$queryRaw<Array<{ id: string }>>`
-          SELECT "id"
-          FROM "pms_attendance"."TeachingSessionOccurrence"
-          WHERE "id" = ${item.occurrenceId}
-          FOR UPDATE
-        `;
-        if (!occurrenceLock[0]) {
-          throw new TeachingLeaveConflictError("An affected teaching session no longer exists");
-        }
+      const lockIds = [...new Set(resolved.map((item) => item.occurrenceId))].sort();
+      const lockedOccurrences = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "pms_attendance"."TeachingSessionOccurrence"
+        WHERE "id" = ANY(${lockIds}::text[])
+        ORDER BY "id"
+        FOR UPDATE
+      `;
+      if (lockedOccurrences.length !== lockIds.length) {
+        throw new TeachingLeaveConflictError("An affected teaching session no longer exists");
+      }
 
+      for (const item of resolved) {
         const duplicate = await tx.$queryRaw<Array<{ id: string }>>`
           SELECT r."id"
           FROM "pms_attendance"."TeachingLeaveRequestOccurrence" link
