@@ -33,9 +33,11 @@ describe("mobile Student Portal layout", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("md:p-5");
   });
 
-  test("schedule uses a five-day touch strip and viewport-safe meeting cards", () => {
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleDateStrip).toContain("grid-cols-5");
+  test("schedule fits a six-day touch strip and viewport-safe meeting cards", () => {
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleDateStrip).toContain("grid-cols-6");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleDateStrip).toContain("gap-1.5");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleDateButton).toContain("min-h-16");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleDateButton).toContain("min-w-0");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeeting).toContain("min-w-0");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeetingCurrent).toContain(
       "ring-primary/20",
