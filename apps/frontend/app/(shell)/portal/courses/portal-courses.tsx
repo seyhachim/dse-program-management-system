@@ -68,8 +68,8 @@ function CourseCard({ course }: { course: PortalCourseSummary }) {
           }
         >
           {course.specAvailable
-            ? "Approved specification"
-            : "Specification pending"}
+            ? "Learning details available"
+            : "Learning details pending"}
         </span>
         <ChevronRight className="h-5 w-5 shrink-0 transition group-hover:translate-x-1" />
       </div>
@@ -150,7 +150,7 @@ export function PortalCourses() {
       {historicalCourses.length ? (
         <CourseSection
           title="Course archive"
-          description="Completed offerings remain available for approved specifications and published academic records."
+          description="Completed offerings remain available for published learning information and academic records."
           courses={historicalCourses}
         />
       ) : null}
