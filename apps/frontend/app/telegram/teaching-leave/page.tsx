@@ -14,6 +14,7 @@ function handlingLabel(value: TeachingLeaveRequestView["proposedHandling"]): str
   if (value === "OPEN_SLOT") return "Release as open teaching slot";
   if (value === "MAKE_UP") return "Make up later";
   if (value === "RESCHEDULE") return "Reschedule";
+  if (value === "OTHER") return "Other arrangement";
   return "Cancel session";
 }
 
