@@ -302,7 +302,7 @@ export const teachingLeaveService = {
         requested.offeringMeetingId,
         requested.date,
       );
-      if (scheduledInstant(occurrence.sessionDate, occurrence.scheduledEndTime).getTime() <= Date.now()) {
+      if (scheduledInstant(occurrence.date, occurrence.scheduledEndTime).getTime() <= Date.now()) {
         throw new TeachingLeaveValidationError("Teaching leave can be requested only for a current or future session");
       }
       resolved.push({
@@ -310,7 +310,7 @@ export const teachingLeaveService = {
         offeringId: occurrence.offeringId,
         programmeId: offering.course.programmeId,
         releaseForReuse: requested.releaseForReuse,
-        sessionDate: occurrence.sessionDate,
+        sessionDate: occurrence.date,
         startTime: occurrence.scheduledStartTime,
         endTime: occurrence.scheduledEndTime,
       });
