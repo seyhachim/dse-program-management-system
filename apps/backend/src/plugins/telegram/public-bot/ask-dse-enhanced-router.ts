@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { Router } from "express";
 import type {
   PublicProgrammeFaq,
   PublicProgrammeLocale,
@@ -342,7 +343,7 @@ export function createEnhancedPublicTelegramRouter(
     client: enhancedClient(baseClient, resolveFaq),
   });
 
-  const outer = (await import("express")).Router();
+  const outer = Router();
   outer.use((req, _res, next) => {
     const context = preprocessAskDsePresentation(req);
     presentationContext.run(context, next);
