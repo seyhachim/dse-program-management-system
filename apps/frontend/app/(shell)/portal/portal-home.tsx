@@ -82,7 +82,7 @@ function nextScheduledMeeting<
           course,
           meeting,
           dayOffset,
-          sortMinutes: dayOffset * 24 * 60 + Math.max(start - nowMinutes, 0),
+          sortMinutes: dayOffset * 24 * 60 + start - nowMinutes,
         };
       }),
     )
