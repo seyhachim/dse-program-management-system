@@ -4,7 +4,7 @@ import type {
   OfferingCurriculumVersionRef,
   Semester,
 } from "@dse-pms/shared-types";
-import { Prisma, type ProgrammeCurriculumStatus } from "@prisma/client";
+import { Semester as PrismaSemester, type ProgrammeCurriculumStatus } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 
 const DELIVERY_STATUSES: ProgrammeCurriculumStatus[] = ["Approved", "Active", "Superseded"];
@@ -97,7 +97,7 @@ export const offeringCurriculumService: OfferingCurriculumServiceContract = {
       where: {
         curriculumVersionId,
         yearLevel: studyYear,
-        semester: semester as Prisma.EnumSemesterFilter["equals"],
+        semester: semester as PrismaSemester,
       },
       include: { course: { select: { code: true, title: true } } },
       orderBy: [{ sortOrder: "asc" }, { course: { code: "asc" } }],
