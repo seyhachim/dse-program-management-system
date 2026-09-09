@@ -221,10 +221,12 @@ describeDb("monitor teaching session delivery integrity", () => {
     expect(history.every((entry) => entry.actor.id === monitor.user.id)).toBe(true);
 
     await expect(
-      prisma.$executeRawUnsafe(
-        `UPDATE "pms_attendance"."TeachingSessionDeliveryAuditEvent" SET "revision" = 99 WHERE "id" = $1`,
-        history[0]!.id,
-      ),
+      (async () => {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "pms_attendance"."TeachingSessionDeliveryAuditEvent" SET "revision" = 99 WHERE "id" = $1`,
+          history[0]!.id,
+        );
+      })(),
     ).rejects.toThrow("append-only");
   });
 
