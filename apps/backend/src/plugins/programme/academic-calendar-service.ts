@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import type {
   AcademicCalendarContextQuery, AcademicCalendarContextView, AcademicCalendarOfferingPeriodRef,
   AcademicCalendarPeriodInput, AcademicCalendarPeriodView, AcademicCalendarEventInput, AcademicCalendarEventView,
-  AcademicCalendarView, AcademicYearView, AcademicCalendarAuditView, AcademicCalendarProgrammeRef, CreateAcademicCalendarInput, CreateAcademicYearInput,
+  AcademicCalendarView, AcademicYearView, AcademicCalendarAuditView, AcademicCalendarProgrammeRef, AcademicCalendarCourseOption,
+  AcademicCalendarCoursePlacementResolution, CreateAcademicCalendarInput, CreateAcademicYearInput,
   PublishedAcademicCalendarProjection, UpdateAcademicCalendarDraftInput, AcademicCalendarTimelineEvent,
 } from "@dse-pms/shared-types";
 import { Prisma, type AcademicCalendarEventType, type Semester } from "@prisma/client";
@@ -16,6 +17,7 @@ export class AcademicCalendarImmutableError extends Error {}
 const calendarInclude = { academicYear: true, studyYears: true, periods: { orderBy: { semester: "asc" as const } }, events: { orderBy: [{ startDate: "asc" as const }, { sortOrder: "asc" as const }] } } satisfies Prisma.AcademicCalendarInclude;
 type CalendarRow = Prisma.AcademicCalendarGetPayload<{ include: typeof calendarInclude }>;
 
+const CURRICULUM_PENDING_MESSAGE = "No active or uniquely approved curriculum version is available for this academic year";
 const dbDate = (value: string | null | undefined) => value ? new Date(`${value}T00:00:00.000Z`) : null;
 const dateOnly = (value: Date | null | undefined) => value ? value.toISOString().slice(0, 10) : null;
 const iso = (value: Date) => value.toISOString();
@@ -62,6 +64,9 @@ function requirePublishable(row: CalendarRow) {
   if (!row.sourceTitle.trim()) throw new AcademicCalendarValidationError("Official source title is required before publishing");
   if (!(row.sourceUrl?.trim() || row.sourceFileRef?.trim() || row.sourceNote.trim())) throw new AcademicCalendarValidationError("Add a source URL, managed file reference, or source note before publishing");
   if (row.studyYears.length === 0 || row.periods.length === 0) throw new AcademicCalendarValidationError("A published calendar needs at least one study year and semester period");
+}
+function isCurriculumPending(error: unknown): error is AcademicCalendarNotFoundError {
+  return error instanceof AcademicCalendarNotFoundError && error.message === CURRICULUM_PENDING_MESSAGE;
 }
 
 export function buildAcademicCalendarTimeline(periods: AcademicCalendarPeriodView[], events: AcademicCalendarEventView[], today = new Date().toISOString().slice(0, 10)): AcademicCalendarTimelineEvent[] {
@@ -237,7 +242,7 @@ export const academicCalendarService = {
       const approved = await prisma.programmeCurriculumVersion.findMany({ where: { status: "Approved", academicYear: year.label, curriculum: { programmeId } }, select: { id: true, academicYear: true } });
       if (approved.length === 1) chosen = approved[0]!;
       else if (approved.length > 1) throw new AcademicCalendarConflictError("Multiple approved curriculum versions match this academic year");
-      else throw new AcademicCalendarNotFoundError("No active or uniquely approved curriculum version is available for this academic year");
+      else throw new AcademicCalendarNotFoundError(CURRICULUM_PENDING_MESSAGE);
     }
     const placements = await prisma.programmeCurriculumCourse.findMany({ where: { curriculumVersionId: chosen.id, yearLevel: studyYear, semester: semester as Semester }, include: { course: { select: { id: true, code: true, title: true, credits: true, courseType: true } } }, orderBy: [{ sortOrder: "asc" }, { course: { code: "asc" } }] });
     return placements.map((placement) => ({ ...placement.course, curriculumVersionId: chosen!.id }));
@@ -245,13 +250,31 @@ export const academicCalendarService = {
   async context(programmeId: string, query: AcademicCalendarContextQuery): Promise<AcademicCalendarContextView> {
     const year = await requireYear(programmeId, query.academicYearId); const resolved = await this.resolvePublishedPeriod(programmeId, query);
     if (!resolved) throw new AcademicCalendarNotFoundError("No published academic calendar exists for Year " + query.studyYear + ", " + (query.semester === "First" ? "Semester 1" : "Semester 2") + ", " + year.label);
-    const courses = await this.listCurriculumCourseOptions(programmeId, query.academicYearId, query.studyYear, query.semester);
-    return { academicYear: yearView(year), studyYear: query.studyYear, semester: query.semester, calendar: calendarView(resolved.calendar), period: periodView(resolved.period), courses };
+    let courses: AcademicCalendarCourseOption[] = [];
+    let curriculum: AcademicCalendarContextView["curriculum"] = { status: "confirmed" };
+    try {
+      courses = await this.listCurriculumCourseOptions(programmeId, query.academicYearId, query.studyYear, query.semester);
+    } catch (error) {
+      if (!isCurriculumPending(error)) throw error;
+      curriculum = { status: "pending", message: error.message };
+    }
+    return { academicYear: yearView(year), studyYear: query.studyYear, semester: query.semester, calendar: calendarView(resolved.calendar), period: periodView(resolved.period), curriculum, courses };
   },
   async getPublishedPeriodForOffering(periodId: string, programmeId: string, studyYear: number): Promise<AcademicCalendarOfferingPeriodRef | null> {
     const period = await prisma.academicCalendarPeriod.findFirst({ where: { id: periodId, calendar: { status: "Published", academicYear: { programmeId }, studyYears: { some: { studyYear } } } }, include: { calendar: { include: { academicYear: true, studyYears: true } } } });
     if (!period) return null;
     return { id: period.id, calendarId: period.calendarId, programmeId, academicYearId: period.calendar.academicYearId, academicYearLabel: period.calendar.academicYear.label, studyYears: period.calendar.studyYears.map((item) => item.studyYear), semester: period.semester, teachingStart: dateOnly(period.teachingStart)!, teachingEnd: dateOnly(period.teachingEnd)!, revision: period.calendar.revision };
+  },
+  async resolveCoursePlacement(programmeId: string, academicYearId: string, studyYear: number, semester: "First" | "Second", courseId: string): Promise<AcademicCalendarCoursePlacementResolution> {
+    try {
+      const options = await this.listCurriculumCourseOptions(programmeId, academicYearId, studyYear, semester);
+      return options.some((course) => course.id === courseId)
+        ? { status: "confirmed" }
+        : { status: "course-not-placed", message: "The selected course is not placed in the applicable curriculum year and semester" };
+    } catch (error) {
+      if (isCurriculumPending(error)) return { status: "curriculum-pending", message: error.message };
+      throw error;
+    }
   },
   async assertCoursePlacement(programmeId: string, academicYearId: string, studyYear: number, semester: "First" | "Second", courseId: string): Promise<void> {
     const options = await this.listCurriculumCourseOptions(programmeId, academicYearId, studyYear, semester);
