@@ -325,6 +325,16 @@ export const teachingLeaveService = {
 
     await prisma.$transaction(async (tx) => {
       for (const item of resolved) {
+        const occurrenceLock = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id"
+          FROM "pms_attendance"."TeachingSessionOccurrence"
+          WHERE "id" = ${item.occurrenceId}
+          FOR UPDATE
+        `;
+        if (!occurrenceLock[0]) {
+          throw new TeachingLeaveConflictError("An affected teaching session no longer exists");
+        }
+
         const duplicate = await tx.$queryRaw<Array<{ id: string }>>`
           SELECT r."id"
           FROM "pms_attendance"."TeachingLeaveRequestOccurrence" link
@@ -531,14 +541,21 @@ export const teachingLeaveService = {
       `;
       if (target === "APPROVED") {
         for (const link of links) {
-          const occurrences = await tx.$queryRaw<Array<{ approvedLeaveRequestId: string | null }>>`
-            SELECT "approvedLeaveRequestId"
+          const occurrences = await tx.$queryRaw<Array<{
+            approvedLeaveRequestId: string | null;
+            sessionDate: Date;
+            scheduledEndTime: string;
+          }>>`
+            SELECT "approvedLeaveRequestId","sessionDate","scheduledEndTime"
             FROM "pms_attendance"."TeachingSessionOccurrence"
             WHERE "id" = ${link.occurrenceId}
             FOR UPDATE
           `;
           const occurrence = occurrences[0];
           if (!occurrence) throw new TeachingLeaveConflictError("An affected teaching session no longer exists");
+          if (scheduledInstant(dateOnly(occurrence.sessionDate), occurrence.scheduledEndTime).getTime() <= Date.now()) {
+            throw new TeachingLeaveConflictError("An affected teaching session has already ended and can no longer be approved as leave");
+          }
           if (occurrence.approvedLeaveRequestId && occurrence.approvedLeaveRequestId !== id) {
             throw new TeachingLeaveConflictError("An affected teaching session already has another approved leave request");
           }
