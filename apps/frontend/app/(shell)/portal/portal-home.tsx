@@ -6,11 +6,13 @@ import Link from "next/link";
 import {
   Bell,
   BookOpen,
+  CalendarClock,
   CalendarDays,
   ChevronRight,
   ClipboardList,
   Clock3,
   FileText,
+  GraduationCap,
   MapPin,
 } from "lucide-react";
 import {
@@ -38,10 +40,30 @@ const HOME_PREFETCH = [
 ] as const;
 
 const QUICK_ACTIONS = [
-  { label: "Schedule", href: "/portal/schedule", icon: CalendarDays },
-  { label: "Courses", href: "/portal/courses", icon: BookOpen },
-  { label: "Assessments", href: "/portal/assessments", icon: ClipboardList },
-  { label: "Results", href: "/portal/results", icon: FileText },
+  {
+    label: "Schedule",
+    hint: "This week",
+    href: "/portal/schedule",
+    icon: CalendarDays,
+  },
+  {
+    label: "Courses",
+    hint: "My classes",
+    href: "/portal/courses",
+    icon: BookOpen,
+  },
+  {
+    label: "Assessments",
+    hint: "Deadlines",
+    href: "/portal/assessments",
+    icon: ClipboardList,
+  },
+  {
+    label: "Results",
+    hint: "My grades",
+    href: "/portal/results",
+    icon: FileText,
+  },
 ] as const;
 
 const WEEKDAY_INDEX = new Map(
@@ -120,34 +142,48 @@ export function PortalHome() {
       className={`mx-auto max-w-5xl ${MOBILE_STUDENT_PORTAL_LAYOUT.homeStack}`}
     >
       {refreshError ? (
-        <div className="rounded-xl border border-status-upcoming bg-status-upcoming-bg px-4 py-3 text-sm text-status-upcoming">
+        <div className="rounded-2xl border border-status-upcoming/30 bg-status-upcoming-bg px-4 py-3 text-sm text-status-upcoming shadow-sm">
           Could not refresh right now. Showing your last available portal data.
         </div>
       ) : refreshing ? (
-        <p className="text-xs text-muted-foreground">Updating your portal…</p>
+        <p className="px-1 text-xs text-muted-foreground">Updating your portal…</p>
       ) : null}
 
-      <section className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}>
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-          <span className="inline-flex h-12 w-[5.75rem] shrink-0 items-center justify-center rounded-xl bg-primary px-2.5 shadow-sm">
+      <section
+        className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}
+        aria-label="Student identity"
+      >
+        <span
+          className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-primary-foreground/10"
+          aria-hidden="true"
+        />
+        <span
+          className="pointer-events-none absolute -bottom-16 right-16 h-28 w-28 rounded-full bg-primary-foreground/5"
+          aria-hidden="true"
+        />
+        <div className="relative z-10 space-y-5">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <Image
               src="/dse-logo.svg"
               alt="DSE logo"
               width={92}
               height={30}
               priority
-              className="h-auto w-full"
+              className="h-auto w-[5.75rem] shrink-0 sm:w-[6.25rem]"
             />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+            <span className="shrink-0 rounded-full bg-primary-foreground/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-foreground/80 ring-1 ring-primary-foreground/15">
               DSE Student Portal
+            </span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-primary-foreground/75">
+              Welcome back
             </p>
-            <h2 className="mt-0.5 truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+            <h2 className="mt-0.5 truncate text-2xl font-semibold tracking-tight sm:text-3xl">
               {data.student.name}
             </h2>
-            <p className="truncate text-xs text-muted-foreground">
-              {data.student.studentId}
+            <p className="mt-1 truncate text-xs font-medium text-primary-foreground/70">
+              Student ID · {data.student.studentId}
             </p>
           </div>
         </div>
@@ -159,49 +195,89 @@ export function PortalHome() {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              {nextMeeting
-                ? relativeMeetingDay(nextMeeting.dayOffset, nextMeeting.meeting.dayOfWeek)
-                : "Schedule"}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                {nextMeeting
+                  ? relativeMeetingDay(
+                      nextMeeting.dayOffset,
+                      nextMeeting.meeting.dayOfWeek,
+                    )
+                  : "Schedule"}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {nextMeeting ? "Next class" : "Class schedule"}
+              </span>
+            </div>
+
             {nextMeeting ? (
               <>
-                <p className="mt-1 break-words text-xl font-semibold leading-tight text-foreground">
+                <p className="mt-3 break-words text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
                   {nextMeeting.course.title}
                 </p>
-                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                <p className="mt-1.5 break-words text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {nextMeeting.course.code} · Section {nextMeeting.course.sectionCode}
                 </p>
-                <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                  <span className="flex min-w-0 items-start gap-2">
-                    <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="break-words">
-                      {meetingLabel(nextMeeting.meeting)}
+
+                <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
+                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-3">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
+                      <Clock3 className="h-4 w-4" aria-hidden="true" />
                     </span>
-                  </span>
-                  <span className="flex min-w-0 items-start gap-2">
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="break-words">
-                      {nextMeeting.meeting.room || "Room TBA"}
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Time
+                      </p>
+                      <p className="mt-0.5 break-words text-sm font-medium text-foreground">
+                        {meetingLabel(nextMeeting.meeting)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-3">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
+                      <MapPin className="h-4 w-4" aria-hidden="true" />
                     </span>
-                  </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Room
+                      </p>
+                      <p className="mt-0.5 break-words text-sm font-medium text-foreground">
+                        {nextMeeting.meeting.room || "Room TBA"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-3">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
+                      <GraduationCap className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Lecturer
+                      </p>
+                      <p className="mt-0.5 break-words text-sm font-medium text-foreground">
+                        {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-3 text-sm font-medium text-foreground">
-                  {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
-                </p>
               </>
             ) : (
               <>
-                <p className="mt-1 text-lg font-semibold text-foreground">
+                <p className="mt-3 text-xl font-semibold tracking-tight text-foreground">
                   No class scheduled yet
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
                   Open your schedule to check published class times.
                 </p>
               </>
             )}
           </div>
-          <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+        </div>
+
+        <div className="mt-5 flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-4">
+          <span className="text-sm font-semibold text-primary">View schedule</span>
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition group-hover:translate-x-0.5">
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </span>
         </div>
       </Link>
 
@@ -217,47 +293,68 @@ export function PortalHome() {
               href={action.href}
               className={MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction}
             >
-              <Icon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-              <span className="max-w-full truncate">{action.label}</span>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary transition duration-200 group-hover:bg-primary group-hover:text-primary-foreground">
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{action.label}</span>
+                <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">
+                  {action.hint}
+                </span>
+              </span>
             </Link>
           );
         })}
       </nav>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3 px-1">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Coming up
+        <div className="flex items-end justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+              Upcoming work
             </p>
-            <h3 className="text-lg font-semibold">Assessments</h3>
+            <h3 className="mt-0.5 text-xl font-semibold tracking-tight">
+              Assessments
+            </h3>
           </div>
           <Link
-            className="flex min-h-11 shrink-0 items-center text-sm font-medium text-primary"
+            className="flex min-h-11 shrink-0 items-center rounded-full px-2 text-sm font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             href="/portal/assessments"
           >
             View all
           </Link>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-2 shadow-sm">
+        <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeSectionCard}>
           {data.upcomingAssessments.length ? (
             data.upcomingAssessments.slice(0, 3).map((item) => (
               <Link
                 key={`${item.offeringId}-${item.assessmentId}`}
                 href={`/portal/courses/${item.offeringId}`}
-                className="flex min-h-14 min-w-0 items-start gap-3 rounded-xl p-3 transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex min-h-16 min-w-0 items-start gap-3 rounded-[1.35rem] p-3 transition duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
+                <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <ClipboardList className="h-4.5 w-4.5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="break-words text-sm font-semibold">{item.name}</p>
-                  <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                    {item.courseCode} · {assessmentDeadline(item.dueAt, item.dueWeek)}
-                    {item.weight ? ` · ${item.weight}%` : ""}
+                  <p className="break-words text-sm font-semibold leading-5 text-foreground">
+                    {item.name}
                   </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground">
+                      {item.courseCode}
+                    </span>
+                    <span className="inline-flex min-w-0 items-center gap-1">
+                      <CalendarClock className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span className="break-words">
+                        {assessmentDeadline(item.dueAt, item.dueWeek)}
+                      </span>
+                    </span>
+                    {item.weight != null ? (
+                      <span className="font-medium">{item.weight}% weight</span>
+                    ) : null}
+                  </div>
                 </div>
-                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <ChevronRight className="mt-3 h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" aria-hidden="true" />
               </Link>
             ))
           ) : (
@@ -269,59 +366,79 @@ export function PortalHome() {
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3 px-1">
-          <h3 className="flex min-w-0 items-center gap-2 text-lg font-semibold">
-            <Bell className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-            <span className="break-words">Latest announcements</span>
-          </h3>
+        <div className="flex items-end justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+              Course updates
+            </p>
+            <h3 className="mt-0.5 flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight">
+              <Bell className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="break-words">Latest announcements</span>
+            </h3>
+          </div>
           <Link
-            className="flex min-h-11 shrink-0 items-center text-sm font-medium text-primary"
+            className="flex min-h-11 shrink-0 items-center rounded-full px-2 text-sm font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             href="/portal/announcements"
           >
             View all
           </Link>
         </div>
-        <div className="divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
+        <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementList}>
           {data.announcements.length ? (
             data.announcements.slice(0, 2).map((item) => (
-              <div key={item.id} className="min-w-0 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="break-words text-xs font-semibold text-primary">
+              <article
+                key={item.id}
+                className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementCard}
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="break-words text-[11px] font-semibold uppercase tracking-wide text-primary">
                     {item.courseCode} · {item.sectionCode}
                   </span>
                   {item.pinned ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                       Pinned
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 break-words font-medium">{item.title}</p>
-                <p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">
+                <p className="mt-2 break-words text-sm font-semibold leading-5 text-foreground">
+                  {item.title}
+                </p>
+                <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-muted-foreground">
                   {item.body}
                 </p>
-              </div>
+              </article>
             ))
           ) : (
-            <p className="p-5 text-sm text-muted-foreground">
-              No announcements yet.
-            </p>
+            <div className={MOBILE_STUDENT_PORTAL_LAYOUT.homeAnnouncementCard}>
+              <p className="text-sm text-muted-foreground">No announcements yet.</p>
+            </div>
           )}
         </div>
       </section>
 
       <Link
         href="/portal/academic-calendar"
-        className="group block min-h-11 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={MOBILE_STUDENT_PORTAL_LAYOUT.homeCalendar}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-              <h3 className="font-semibold">Academic calendar</h3>
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-background text-primary shadow-sm ring-1 ring-border/60">
+            <CalendarDays className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Dates & semester
+                </p>
+                <h3 className="mt-0.5 font-semibold text-foreground">
+                  Academic calendar
+                </h3>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" aria-hidden="true" />
             </div>
             {calendar.status === "available" && firstCalendarPeriod ? (
               <>
-                <p className="mt-2 break-words text-sm font-medium">
+                <p className="mt-2 break-words text-sm font-medium text-foreground">
                   {calendar.nextEvent
                     ? `${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}`
                     : `${academicSemesterLabel(firstCalendarPeriod.semester)} · ${formatAcademicDate(firstCalendarPeriod.teachingStart)} – ${formatAcademicDate(firstCalendarPeriod.teachingEnd)}`}
@@ -332,7 +449,7 @@ export function PortalHome() {
               </>
             ) : (
               <>
-                <p className="mt-2 text-sm font-medium">
+                <p className="mt-2 text-sm font-medium text-foreground">
                   Calendar not available yet
                 </p>
                 <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">
@@ -341,7 +458,6 @@ export function PortalHome() {
               </>
             )}
           </div>
-          <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
         </div>
       </Link>
     </div>
