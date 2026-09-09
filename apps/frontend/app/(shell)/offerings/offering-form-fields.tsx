@@ -48,6 +48,8 @@ interface OfferingFormFieldsProps {
   courses: CourseView[];
   courseSpecVersions: CourseSpecVersionRef[];
   courseSpecLoading: boolean;
+  courseSpecId: string;
+  status: OfferingFormValues["status"];
   lecturers: Lecturer[];
   lecturerId: string | null;
   academicYears: AcademicYearView[];
@@ -69,6 +71,8 @@ export function OfferingFormFields({
   courses,
   courseSpecVersions,
   courseSpecLoading,
+  courseSpecId,
+  status,
   lecturers,
   lecturerId,
   academicYears,
@@ -97,6 +101,8 @@ export function OfferingFormFields({
     MEETING_ACTIVITY_TYPES.map((activity) => [activity, activity]),
   );
   const meetingsError = (errors.meetings as { message?: string } | undefined)?.message;
+  const curriculumPending = calendarContext?.curriculum.status === "pending";
+  const deliveryReady = Boolean(calendarContext?.curriculum.status === "confirmed" && courseSpecId);
 
   return (
     <div className="space-y-5">
@@ -104,7 +110,7 @@ export function OfferingFormFields({
         <div>
           <legend className="text-sm font-semibold text-foreground"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">1</span>Academic context</legend>
           <p className="text-xs text-muted-foreground">
-            Teaching dates come from the published Academic Calendar. Course choices come from the applicable curriculum.
+            Teaching dates always come from the published Academic Calendar. A Planned offering may be prepared while curriculum confirmation is still pending.
           </p>
         </div>
 
@@ -180,15 +186,23 @@ export function OfferingFormFields({
                 <Link href="/academic-calendar" className="mt-2 inline-block font-medium underline underline-offset-4">Manage Academic Calendar</Link>
               </div>
             ) : calendarContext ? (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Calendar resolved automatically</p>
-                    <p className="mt-1 font-semibold">{formatAcademicDate(calendarContext.period.teachingStart)} – {formatAcademicDate(calendarContext.period.teachingEnd)}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Years {calendarContext.calendar.studyYears.join("–")} · {academicSemesterLabel(calendarContext.semester)} · Revision {calendarContext.calendar.revision}</p>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Calendar resolved automatically</p>
+                      <p className="mt-1 font-semibold">{formatAcademicDate(calendarContext.period.teachingStart)} – {formatAcademicDate(calendarContext.period.teachingEnd)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Years {calendarContext.calendar.studyYears.join("–")} · {academicSemesterLabel(calendarContext.semester)} · Revision {calendarContext.calendar.revision}</p>
+                    </div>
+                    <Link href="/academic-calendar" className="text-sm font-medium text-primary underline-offset-4 hover:underline">View calendar</Link>
                   </div>
-                  <Link href="/academic-calendar" className="text-sm font-medium text-primary underline-offset-4 hover:underline">View calendar</Link>
                 </div>
+                {curriculumPending ? (
+                  <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                    <p className="font-semibold">Curriculum pending</p>
+                    <p className="mt-1">You can prepare this delivery as Planned using the programme Course Catalog. Confirm curriculum placement before changing the offering to Active or Completed.</p>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <p className="rounded-lg bg-muted/30 p-3 text-sm text-muted-foreground">Select Academic Year, Study Year, and Semester to resolve the official teaching period.</p>
@@ -197,16 +211,30 @@ export function OfferingFormFields({
         )}
       </fieldset>
 
-      <SectionHeading number="2" title="Course & specification" description="Only courses placed in the applicable active curriculum are available." />
+      <SectionHeading
+        number="2"
+        title="Course & specification"
+        description={curriculumPending
+          ? "Curriculum is pending, so programme Course Catalog courses are available for provisional planning."
+          : "Courses follow the applicable confirmed curriculum. The exact Approved CourseSpec governs delivery once bound."}
+      />
       <Field label="Course" error={errors.courseId?.message} required>
         <CoursePickerField control={control} courses={courses} disabled={courseLocked || (!legacyTeachingPeriod && !calendarContext)} />
-        {!legacyTeachingPeriod && calendarContext ? <p className="mt-1 text-xs text-muted-foreground">{courses.length} curriculum course{courses.length === 1 ? "" : "s"} available for this period.</p> : null}
+        {!legacyTeachingPeriod && calendarContext ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {courses.length} {curriculumPending ? "programme catalog" : "curriculum"} course{courses.length === 1 ? "" : "s"} available for this period.
+          </p>
+        ) : null}
         {!legacyTeachingPeriod && calendarContext && courses.length === 0 ? (
-          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">No course is available in the applicable active curriculum for this study year and semester.</p>
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+            {curriculumPending
+              ? "No programme Course Catalog course is available for provisional planning."
+              : "No course is available in the applicable confirmed curriculum for this study year and semester."}
+          </p>
         ) : null}
       </Field>
 
-      <Field label="Approved CourseSpec version" error={errors.courseSpecId?.message} required>
+      <Field label="Approved CourseSpec version" error={errors.courseSpecId?.message} required={status !== "Planned"} optional={status === "Planned"}>
         <Controller
           control={control}
           name="courseSpecId"
@@ -224,14 +252,18 @@ export function OfferingFormFields({
             </Select>
           )}
         />
-        {!courseSpecLoading && courses.length > 0 && courseSpecVersions.length === 0 ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">This course has no Approved CourseSpec version yet.</p> : null}
+        {!courseSpecLoading && courses.length > 0 && courseSpecVersions.length === 0 ? (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Approved CourseSpec pending. This offering can remain Planned, but an Approved version is required before delivery becomes Active or Completed.</p>
+        ) : status === "Planned" && !courseSpecId ? (
+          <p className="mt-1 text-xs text-muted-foreground">Optional while Planned. Bind the exact Approved CourseSpec when it becomes available.</p>
+        ) : null}
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Term" error={errors.term?.message} required>
           <Input readOnly className="bg-muted/30" placeholder="Resolved from Academic Calendar" {...register("term")} />
         </Field>
-        <Field label="Class / Section" error={errors.sectionCode?.message} required>
+        <Field label="Class" error={errors.sectionCode?.message} required>
           <Input placeholder="A" maxLength={12} {...register("sectionCode")} />
         </Field>
       </div>
@@ -257,11 +289,16 @@ export function OfferingFormFields({
         ))}
       </fieldset>
 
-      <SectionHeading number="4" title="Teaching team & delivery status" description="Assign the lecturer responsible for this section and confirm operational details." />
+      <SectionHeading number="4" title="Teaching team & delivery status" description="Assign the lecturer responsible for this class and confirm operational details." />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Capacity" error={errors.capacity?.message}><Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} /></Field>
-        <Field label="Status" error={errors.status?.message}><Controller control={control} name="status" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{OFFERING_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select>} /></Field>
+        <Field label="Status" error={errors.status?.message}><Controller control={control} name="status" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{OFFERING_STATUSES.map((offeringStatus) => <SelectItem key={offeringStatus} value={offeringStatus}>{offeringStatus}</SelectItem>)}</SelectContent></Select>} /></Field>
       </div>
+      {status !== "Planned" && !deliveryReady && !legacyTeachingPeriod ? (
+        <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+          Keep this offering Planned until the curriculum is confirmed and an exact Approved CourseSpec is selected.
+        </div>
+      ) : null}
 
       <Field label="Primary Lecturer" error={errors.lecturerId?.message} required>
         <Controller control={control} name="lecturerId" render={({ field }) => <Select items={lecturerItems} value={field.value || null} onValueChange={(value) => field.onChange(value ?? null)}><SelectTrigger className="w-full"><SelectValue placeholder="— Select primary lecturer —" /></SelectTrigger><SelectContent>{lecturers.map((lecturer) => <SelectItem key={lecturer.id} value={lecturer.id}>{lecturer.name}</SelectItem>)}</SelectContent></Select>} />
