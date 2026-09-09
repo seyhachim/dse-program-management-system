@@ -263,7 +263,7 @@ export function OfferingFormFields({
         <Field label="Term" error={errors.term?.message} required>
           <Input readOnly className="bg-muted/30" placeholder="Resolved from Academic Calendar" {...register("term")} />
         </Field>
-        <Field label="Class / Section" error={errors.sectionCode?.message} required>
+        <Field label="Class" error={errors.sectionCode?.message} required>
           <Input placeholder="A" maxLength={12} {...register("sectionCode")} />
         </Field>
       </div>
@@ -289,7 +289,7 @@ export function OfferingFormFields({
         ))}
       </fieldset>
 
-      <SectionHeading number="4" title="Teaching team & delivery status" description="Assign the lecturer responsible for this section and confirm operational details." />
+      <SectionHeading number="4" title="Teaching team & delivery status" description="Assign the lecturer responsible for this class and confirm operational details." />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Capacity" error={errors.capacity?.message}><Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} /></Field>
         <Field label="Status" error={errors.status?.message}><Controller control={control} name="status" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{OFFERING_STATUSES.map((offeringStatus) => <SelectItem key={offeringStatus} value={offeringStatus}>{offeringStatus}</SelectItem>)}</SelectContent></Select>} /></Field>
