@@ -138,17 +138,22 @@ export function TeachingScheduleClient() {
               </p>
             </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Term</span>
-              <select
-                value={term}
-                onChange={(event) => setTerm(event.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value={ALL_TERMS}>All terms</option>
-                {terms.map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/teaching-schedule/leave-requests" className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent">
+                My leave requests
+              </Link>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Term</span>
+                <select
+                  value={term}
+                  onChange={(event) => setTerm(event.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value={ALL_TERMS}>All terms</option>
+                  {terms.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+            </div>
           </div>
 
           {leaveMessage ? <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">{leaveMessage}</div> : null}
