@@ -28,8 +28,8 @@ export const DateOnlySchema = z
 export const SectionCodeSchema = z
   .string()
   .trim()
-  .min(1, "Class / section is required")
-  .max(12, "Class / section must be 12 characters or fewer")
+  .min(1, "Class is required")
+  .max(12, "Class must be 12 characters or fewer")
   .regex(/^[A-Za-z0-9-]+$/, "Use letters, numbers, or hyphens only")
   .transform((value) => value.toUpperCase());
 export type SectionCode = z.infer<typeof SectionCodeSchema>;
