@@ -106,6 +106,10 @@ export function isTeachingLeaveLate(date: string, startTime: string, hours: numb
   return scheduledInstant(date, startTime).getTime() - now.getTime() < hours * 60 * 60 * 1000;
 }
 
+export function isTeachingLeaveOccurrenceExpired(date: string, endTime: string, now = new Date()): boolean {
+  return scheduledInstant(date, endTime).getTime() <= now.getTime();
+}
+
 function dateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
@@ -227,6 +231,11 @@ async function approvedNotifications(request: TeachingLeaveRequestView): Promise
   const lecturerGroup: TeachingLeaveReviewResult["notifications"]["lecturerGroup"] = [];
 
   for (const occurrence of request.occurrences) {
+    // An idempotent approval retry may happen after a previously approved session
+    // has ended. Preserve requester status delivery, but never advertise or send a
+    // fresh schedule-impact notification for an expired teaching period.
+    if (isTeachingLeaveOccurrenceExpired(occurrence.sessionDate, occurrence.scheduledEndTime)) continue;
+
     const impact = impactFor(request, occurrence);
     try {
       const result = await telegram().notifications.deliverTeachingLeaveStudents(impact);
@@ -302,7 +311,7 @@ export const teachingLeaveService = {
         requested.offeringMeetingId,
         requested.date,
       );
-      if (scheduledInstant(occurrence.date, occurrence.scheduledEndTime).getTime() <= Date.now()) {
+      if (isTeachingLeaveOccurrenceExpired(occurrence.date, occurrence.scheduledEndTime)) {
         throw new TeachingLeaveValidationError("Teaching leave can be requested only for a current or future session");
       }
       resolved.push({
@@ -342,12 +351,13 @@ export const teachingLeaveService = {
           FROM "pms_attendance"."TeachingLeaveRequestOccurrence" link
           JOIN "pms_attendance"."TeachingLeaveRequest" r ON r."id" = link."requestId"
           WHERE link."occurrenceId" = ${item.occurrenceId}
-            AND r."requesterId" = ${user.id}
             AND r."status" IN ('PENDING','CHANGES_REQUESTED','APPROVED')
           LIMIT 1
           FOR UPDATE OF r
         `;
-        if (duplicate[0]) throw new TeachingLeaveConflictError("You already have an active leave request for one of these sessions");
+        if (duplicate[0]) {
+          throw new TeachingLeaveConflictError("An active teaching leave request already exists for one of these sessions");
+        }
       }
 
       await tx.$executeRaw`
@@ -392,7 +402,7 @@ export const teachingLeaveService = {
       throw new TeachingLeaveConflictError("This teaching leave request has no affected teaching sessions");
     }
     for (const occurrence of before.occurrences) {
-      if (scheduledInstant(occurrence.sessionDate, occurrence.scheduledEndTime).getTime() <= Date.now()) {
+      if (isTeachingLeaveOccurrenceExpired(occurrence.sessionDate, occurrence.scheduledEndTime)) {
         throw new TeachingLeaveValidationError("This teaching leave request can no longer be resubmitted because an affected session has ended");
       }
     }
@@ -405,8 +415,14 @@ export const teachingLeaveService = {
         status: TeachingLeaveStatus;
         submittedLate: boolean;
         noticeHours: number;
+        leaveType: TeachingLeaveRequestView["leaveType"];
+        confidentialReason: string;
+        attachmentRef: string | null;
+        proposedHandling: TeachingLeaveRequestView["proposedHandling"];
+        proposedNote: string;
       }>>`
-        SELECT "requesterId","status","submittedLate","noticeHours"
+        SELECT "requesterId","status","submittedLate","noticeHours",
+               "leaveType","confidentialReason","attachmentRef","proposedHandling","proposedNote"
         FROM "pms_attendance"."TeachingLeaveRequest"
         WHERE "id" = ${id}
         FOR UPDATE
@@ -420,6 +436,22 @@ export const teachingLeaveService = {
         throw new TeachingLeaveConflictError("Teaching leave can be revised only after a reviewer requests changes");
       }
       const submittedLate = current.submittedLate || nowLate;
+      const previousSubmission = {
+        leaveType: current.leaveType,
+        confidentialReason: current.confidentialReason,
+        attachmentRef: current.attachmentRef,
+        proposedHandling: current.proposedHandling,
+        proposedNote: current.proposedNote,
+        submittedLate: current.submittedLate,
+      };
+      const newSubmission = {
+        leaveType: input.leaveType,
+        confidentialReason: input.confidentialReason,
+        attachmentRef: input.attachmentRef ?? null,
+        proposedHandling: input.proposedHandling,
+        proposedNote: input.proposedNote ?? "",
+        submittedLate,
+      };
 
       await tx.$executeRaw`
         UPDATE "pms_attendance"."TeachingLeaveRequest"
@@ -438,12 +470,7 @@ export const teachingLeaveService = {
           ("id","requestId","actorId","action","previousStatus","newStatus","details")
         VALUES (
           ${randomUUID()},${id},${user.id},'SUBMITTED','CHANGES_REQUESTED','PENDING',
-          ${JSON.stringify({
-            resubmitted: true,
-            leaveType: input.leaveType,
-            proposedHandling: input.proposedHandling,
-            submittedLate,
-          })}::jsonb
+          ${JSON.stringify({ resubmitted: true, previousSubmission, newSubmission })}::jsonb
         )
       `;
     });
@@ -459,6 +486,67 @@ export const teachingLeaveService = {
     `;
     const rows = await requestRowsByIds(ids.map((item) => item.id));
     return Promise.all(rows.map(toView));
+  },
+
+  async studentImpact(user: AuthUser, occurrenceId: string): Promise<TeachingLeaveOperationalImpact> {
+    const rows = await prisma.$queryRaw<Array<{
+      requestId: string;
+      occurrenceId: string;
+      offeringId: string;
+      programmeId: string;
+      courseCode: string;
+      courseTitle: string;
+      sectionCode: string;
+      sessionDate: Date;
+      startTime: string;
+      endTime: string;
+      room: string | null;
+      releaseForReuse: boolean;
+      proposedHandling: TeachingLeaveRequestView["proposedHandling"];
+    }>>`
+      SELECT leave."id" AS "requestId",
+             occurrence."id" AS "occurrenceId",
+             occurrence."offeringId",
+             course."programmeId",
+             course."code" AS "courseCode",
+             course."title" AS "courseTitle",
+             offering."sectionCode",
+             occurrence."sessionDate",
+             occurrence."scheduledStartTime" AS "startTime",
+             occurrence."scheduledEndTime" AS "endTime",
+             occurrence."scheduledRoom" AS "room",
+             link."releaseForReuse",
+             leave."proposedHandling"
+      FROM "pms_attendance"."TeachingSessionOccurrence" occurrence
+      JOIN "pms_attendance"."TeachingLeaveRequest" leave
+        ON leave."id" = occurrence."approvedLeaveRequestId" AND leave."status" = 'APPROVED'
+      JOIN "pms_attendance"."TeachingLeaveRequestOccurrence" link
+        ON link."requestId" = leave."id" AND link."occurrenceId" = occurrence."id"
+      JOIN "Offering" offering ON offering."id" = occurrence."offeringId"
+      JOIN "Course" course ON course."id" = offering."courseId"
+      JOIN "Student" student ON student."userId" = ${user.id}
+      JOIN "Enrollment" enrollment
+        ON enrollment."studentId" = student."id" AND enrollment."offeringId" = occurrence."offeringId"
+      WHERE occurrence."id" = ${occurrenceId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row) throw new TeachingLeaveNotFoundError("Teaching schedule impact not found");
+    return {
+      requestId: row.requestId,
+      occurrenceId: row.occurrenceId,
+      offeringId: row.offeringId,
+      programmeId: row.programmeId,
+      courseCode: row.courseCode,
+      courseTitle: row.courseTitle,
+      sectionCode: row.sectionCode,
+      sessionDate: dateOnly(row.sessionDate),
+      startTime: row.startTime,
+      endTime: row.endTime,
+      room: row.room,
+      releaseForReuse: row.releaseForReuse,
+      proposedHandling: row.proposedHandling,
+    };
   },
 
   async reviewQueue(user: AuthUser): Promise<TeachingLeaveRequestView[]> {
@@ -555,7 +643,7 @@ export const teachingLeaveService = {
           `;
           const occurrence = occurrences[0];
           if (!occurrence) throw new TeachingLeaveConflictError("An affected teaching session no longer exists");
-          if (scheduledInstant(dateOnly(occurrence.sessionDate), occurrence.scheduledEndTime).getTime() <= Date.now()) {
+          if (isTeachingLeaveOccurrenceExpired(dateOnly(occurrence.sessionDate), occurrence.scheduledEndTime)) {
             throw new TeachingLeaveConflictError("An affected teaching session has already ended and can no longer be approved as leave");
           }
           if (occurrence.approvedLeaveRequestId && occurrence.approvedLeaveRequestId !== id) {
