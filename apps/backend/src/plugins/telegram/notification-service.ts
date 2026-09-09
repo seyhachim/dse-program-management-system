@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { TeachingLeaveOperationalImpact, TeachingLeaveStatus } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { getPmsTelegramConfig } from "./config.ts";
 import { createTelegramDeepLink } from "./deep-link.ts";
@@ -7,6 +8,14 @@ type RecipientRow = {
   identityId: string;
   telegramUserId: string;
 };
+
+type TeachingLeaveRecipientRow = {
+  studentId: string;
+  identityId: string | null;
+  telegramUserId: string | null;
+};
+
+type DeliveryStatus = "sent" | "failed" | "duplicate";
 
 async function eligibleAnnouncementRecipients(offeringId: string): Promise<RecipientRow[]> {
   return prisma.$queryRaw<RecipientRow[]>`
@@ -21,6 +30,28 @@ async function eligibleAnnouncementRecipients(offeringId: string): Promise<Recip
   `;
 }
 
+/**
+ * Teaching-leave approvals are operational schedule changes, not optional course
+ * announcements. Return every enrollment and attach at most one active Telegram
+ * identity so unlinked students remain visible as missing delivery evidence.
+ */
+async function teachingLeaveRecipients(offeringId: string): Promise<TeachingLeaveRecipientRow[]> {
+  return prisma.$queryRaw<TeachingLeaveRecipientRow[]>`
+    SELECT e."studentId", ti."identityId", ti."telegramUserId"
+    FROM "Enrollment" e
+    JOIN "Student" s ON s."id" = e."studentId"
+    LEFT JOIN LATERAL (
+      SELECT identity."id" AS "identityId", identity."telegramUserId"
+      FROM "telegram_security"."TelegramIdentity" identity
+      WHERE identity."userId" = s."userId" AND identity."revokedAt" IS NULL
+      ORDER BY identity."linkedAt" DESC
+      LIMIT 1
+    ) ti ON TRUE
+    WHERE e."offeringId" = ${offeringId}
+    ORDER BY e."studentId"
+  `;
+}
+
 async function eligibleStudentRecipient(studentId: string): Promise<RecipientRow | null> {
   const rows = await prisma.$queryRaw<RecipientRow[]>`
     SELECT ti."id" AS "identityId", ti."telegramUserId"
@@ -28,6 +59,17 @@ async function eligibleStudentRecipient(studentId: string): Promise<RecipientRow
     JOIN "telegram_security"."TelegramIdentity" ti ON ti."userId" = s."userId"
     WHERE s."id" = ${studentId}
       AND ti."revokedAt" IS NULL
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+async function eligibleUserRecipient(userId: string): Promise<RecipientRow | null> {
+  const rows = await prisma.$queryRaw<RecipientRow[]>`
+    SELECT ti."id" AS "identityId", ti."telegramUserId"
+    FROM "telegram_security"."TelegramIdentity" ti
+    WHERE ti."userId" = ${userId} AND ti."revokedAt" IS NULL
+    ORDER BY ti."linkedAt" DESC
     LIMIT 1
   `;
   return rows[0] ?? null;
@@ -83,33 +125,57 @@ export async function sendTelegramPmsDestinationMessage(
   );
 }
 
+/**
+ * Claim one logical private delivery. Sent/pending events stay idempotent; a
+ * failed event is reclaimed so an authoritative PMS action can retry delivery
+ * without creating a second logical row.
+ */
 async function claimDelivery(identityId: string, eventKey: string, kind: string, resourceId: string) {
   const id = randomUUID();
-  const inserted = await prisma.$executeRaw`
-    INSERT INTO "telegram_security"."TelegramNotificationDelivery"
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    INSERT INTO "telegram_security"."TelegramNotificationDelivery" AS delivery
       ("id", "identityId", "eventKey", "kind", "resourceId", "status", "attempts")
     VALUES (${id}, ${identityId}, ${eventKey}, ${kind}, ${resourceId}, 'pending', 0)
-    ON CONFLICT ("identityId", "eventKey") DO NOTHING
+    ON CONFLICT ("identityId", "eventKey") DO UPDATE
+      SET "status"='pending', "lastError"=NULL, "updatedAt"=CURRENT_TIMESTAMP
+      WHERE delivery."status"='failed'
+    RETURNING "id"
   `;
-  return inserted > 0 ? id : null;
+  return rows[0]?.id ?? null;
 }
 
-async function finishDelivery(deliveryId: string, work: () => Promise<string>) {
+async function finishDelivery(deliveryId: string, work: () => Promise<string>): Promise<"sent" | "failed"> {
   try {
     const messageId = await work();
     await prisma.$executeRaw`
       UPDATE "telegram_security"."TelegramNotificationDelivery"
-      SET "status" = 'sent', "attempts" = 1, "telegramMessageId" = ${messageId}, "updatedAt" = CURRENT_TIMESTAMP
+      SET "status" = 'sent', "attempts" = "attempts" + 1, "lastError" = NULL,
+          "telegramMessageId" = ${messageId}, "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${deliveryId}
     `;
+    return "sent";
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 1000) : "Unknown Telegram delivery failure";
     await prisma.$executeRaw`
       UPDATE "telegram_security"."TelegramNotificationDelivery"
-      SET "status" = 'failed', "attempts" = 1, "lastError" = ${message}, "updatedAt" = CURRENT_TIMESTAMP
+      SET "status" = 'failed', "attempts" = "attempts" + 1, "lastError" = ${message}, "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${deliveryId}
     `;
+    return "failed";
   }
+}
+
+async function deliverToRecipient(
+  recipient: RecipientRow,
+  eventKey: string,
+  kind: string,
+  resourceId: string,
+  text: string,
+  url: string,
+): Promise<DeliveryStatus> {
+  const deliveryId = await claimDelivery(recipient.identityId, eventKey, kind, resourceId);
+  if (!deliveryId) return "duplicate";
+  return finishDelivery(deliveryId, () => sendTelegramPmsMessage(recipient.telegramUserId, text, url));
 }
 
 export function attendanceWarningEventKey(input: {
@@ -121,7 +187,89 @@ export function attendanceWarningEventKey(input: {
   return `attendance-warning:${input.studentId}:${input.offeringId}:${input.warningKind}:3:${input.eventSessionId}`;
 }
 
+export function teachingLeaveRequesterPath(requestId: string): string {
+  return `/telegram/teaching-leave?requestId=${encodeURIComponent(requestId)}`;
+}
+
+export function teachingLeaveStudentPath(occurrenceId: string): string {
+  return `/telegram/schedule-impact?occurrenceId=${encodeURIComponent(occurrenceId)}`;
+}
+
+function leaveDecisionLabel(status: TeachingLeaveStatus): string {
+  if (status === "APPROVED") return "approved";
+  if (status === "REJECTED") return "rejected";
+  if (status === "CHANGES_REQUESTED") return "needs changes";
+  if (status === "WITHDRAWN") return "withdrawn";
+  return "submitted";
+}
+
 export const telegramNotificationService = {
+  workflowUrl(path: string) {
+    return createTelegramDeepLink(path);
+  },
+
+  async deliverTeachingLeaveRequester(input: {
+    requestId: string;
+    userId: string;
+    status: TeachingLeaveStatus;
+    firstOccurrence: TeachingLeaveOperationalImpact;
+  }): Promise<"sent" | "missing" | "failed" | "duplicate"> {
+    const recipient = await eligibleUserRecipient(input.userId);
+    if (!recipient) return "missing";
+    const impact = input.firstOccurrence;
+    const eventKey = `teaching-leave:${input.requestId}:requester:${input.status}`;
+    const link = createTelegramDeepLink(teachingLeaveRequesterPath(input.requestId));
+    return deliverToRecipient(
+      recipient,
+      eventKey,
+      "teaching_leave_requester",
+      input.requestId,
+      [
+        `Teaching leave ${leaveDecisionLabel(input.status)}`,
+        "",
+        `${impact.courseCode} · Class ${impact.sectionCode}`,
+        `${impact.sessionDate} · ${impact.startTime}–${impact.endTime}`,
+        "Open DSE PMS for the current request status and any reviewer guidance.",
+      ].join("\n"),
+      link,
+    );
+  },
+
+  async deliverTeachingLeaveStudents(input: TeachingLeaveOperationalImpact): Promise<{
+    sent: number;
+    failed: number;
+    duplicate: number;
+    missing: number;
+  }> {
+    const recipients = await teachingLeaveRecipients(input.offeringId);
+    const summary = { sent: 0, failed: 0, duplicate: 0, missing: 0 };
+    if (recipients.length === 0) return summary;
+    const eventKey = `teaching-leave:${input.requestId}:${input.occurrenceId}:students`;
+    const link = createTelegramDeepLink(teachingLeaveStudentPath(input.occurrenceId));
+    const text = [
+      "Teaching schedule update",
+      "",
+      `${input.courseCode} · ${input.courseTitle} · Class ${input.sectionCode}`,
+      `${input.sessionDate} · ${input.startTime}–${input.endTime}`,
+      input.room ? `Room: ${input.room}` : "Room: not set",
+      "This scheduled session is affected by an approved teaching availability change. Check DSE PMS for the confirmed recovery or updated schedule.",
+    ].join("\n");
+
+    const linked: RecipientRow[] = [];
+    for (const recipient of recipients) {
+      if (!recipient.identityId || !recipient.telegramUserId) {
+        summary.missing += 1;
+        continue;
+      }
+      linked.push({ identityId: recipient.identityId, telegramUserId: recipient.telegramUserId });
+    }
+
+    const statuses = await Promise.all(linked.map((recipient) =>
+      deliverToRecipient(recipient, eventKey, "teaching_leave_student", input.requestId, text, link)));
+    for (const status of statuses) summary[status] += 1;
+    return summary;
+  },
+
   async deliverAnnouncement(input: { announcementId: string; offeringId: string; title: string; body: string }) {
     const offering = await prisma.offering.findUnique({
       where: { id: input.offeringId },
