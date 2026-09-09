@@ -36,6 +36,8 @@ import {
 
 const BACK_HREF = "/offerings";
 
+type ProgrammeCourseView = CourseView & { programmeId?: string };
+
 const emptyDefaults: OfferingFormValues = {
   courseId: "",
   courseSpecId: "",
@@ -91,6 +93,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const studyYear = useWatch({ control, name: "programmeYear" }) ?? null;
   const semester = useWatch({ control, name: "semester" }) ?? null;
   const courseSpecId = useWatch({ control, name: "courseSpecId" }) ?? "";
+  const status = useWatch({ control, name: "status" }) ?? "Planned";
   const meetings = useWatch({ control, name: "meetings" }) ?? [];
 
   const legacyOffering = Boolean(loadedOffering && !loadedOffering.academicCalendarPeriodId);
@@ -212,9 +215,12 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
         if (cancelled) return;
         setCalendarContext(context);
         setValue("academicCalendarPeriodId", context.period.id, { shouldDirty: true });
-        const allowedIds = new Set(context.courses.map((course) => course.id));
-        let filtered = allCourses.filter((course) => allowedIds.has(course.id));
         const currentCourseId = getValues("courseId");
+        const curriculumPending = context.curriculum.status === "pending";
+        const allowedIds = new Set(context.courses.map((course) => course.id));
+        let filtered = curriculumPending
+          ? allCourses.filter((course) => (course as ProgrammeCourseView).programmeId === programmeId)
+          : allCourses.filter((course) => allowedIds.has(course.id));
         if (editing && currentCourseId && !filtered.some((course) => course.id === currentCourseId)) {
           const current = allCourses.find((course) => course.id === currentCourseId);
           if (current) filtered = [current, ...filtered];
@@ -223,7 +229,10 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
         const originalPeriodId = loadedOffering?.academicCalendarPeriodId ?? null;
         if (!editing || originalPeriodId !== context.period.id) {
           setValue("term", `${context.academicYear.label}-${context.semester === "First" ? "S1" : "S2"}`, { shouldDirty: true });
-          if (!editing && currentCourseId && !allowedIds.has(currentCourseId)) setValue("courseId", "");
+          const allowedForNew = curriculumPending
+            ? filtered.some((course) => course.id === currentCourseId)
+            : allowedIds.has(currentCourseId);
+          if (!editing && currentCourseId && !allowedForNew) setValue("courseId", "");
         }
       })
       .catch((reason) => {
@@ -246,10 +255,15 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const onSubmit = handleSubmit(async (values) => {
     setSaving(true); setError(null);
     try {
+      if (!legacyOffering && values.status !== "Planned" && (!values.courseSpecId || calendarContext?.curriculum.status !== "confirmed")) {
+        setError("Keep this offering Planned until the curriculum is confirmed and an Approved CourseSpec is selected.");
+        return;
+      }
       if (offeringId) {
         const { courseId: _courseId, term: _term, ...candidate } = values;
         const payload: Record<string, unknown> = {
           ...candidate,
+          courseSpecId: values.courseSpecId || null,
           lecturerId: values.lecturerId || null,
           coLecturerIds: values.coLecturerIds ?? [],
         };
@@ -269,6 +283,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
       } else {
         const payload = {
           ...values,
+          courseSpecId: values.courseSpecId || null,
           lecturerId: values.lecturerId || null,
           coLecturerIds: values.coLecturerIds ?? [],
         };
@@ -291,7 +306,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
   const createBlocked = !editing && (!calendarContext || calendarLoading || courses.length === 0);
   const setupSteps = [
     { label: "Academic period", complete: legacyOffering || Boolean(calendarContext) },
-    { label: "Course & spec", complete: Boolean(courseId && courseSpecId) },
+    { label: "Course", complete: Boolean(courseId) },
     { label: "Weekly schedule", complete: meetings.length > 0 },
     { label: "Teaching team", complete: Boolean(lecturerId) },
   ];
@@ -303,7 +318,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
 
   return (
     <>
-      <Topbar title={pageTitle} subtitle="Course delivery is bound to the official Academic Calendar and applicable curriculum." />
+      <Topbar title={pageTitle} subtitle="Plan delivery against the published Academic Calendar; confirmed curriculum and an Approved CourseSpec are required before activation." />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-5xl space-y-4">
           <Breadcrumb><BreadcrumbList><BreadcrumbItem><BreadcrumbLink render={<Link href={BACK_HREF}>Course Offerings</Link>} /></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{pageTitle}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
@@ -352,6 +367,8 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 courses={courses}
                 courseSpecVersions={courseSpecVersions}
                 courseSpecLoading={courseSpecLoading}
+                courseSpecId={courseSpecId}
+                status={status}
                 lecturers={lecturers}
                 lecturerId={lecturerId}
                 academicYears={academicYears}
