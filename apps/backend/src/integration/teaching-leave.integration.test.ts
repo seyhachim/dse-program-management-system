@@ -14,6 +14,7 @@ const SESSION_DATE = "2099-01-05"; // Monday, intentionally far-future for a sta
 const REVISION_SESSION_DATE = "2099-01-12"; // Monday, separate exact occurrence for resubmission coverage.
 const CONCURRENT_SESSION_DATE = "2099-01-19"; // Monday, separate occurrence for concurrent-submit coverage.
 const EXPIRED_REVIEW_SESSION_DATE = "2099-01-26"; // Monday, moved to the past after submission to test delayed review.
+const EXPIRED_CHANGES_SESSION_DATE = "2099-02-02"; // Monday, moved to the past after requested changes to test safe final closure.
 
 type HttpResult = { status: number; body: any };
 
@@ -302,6 +303,78 @@ integrationDescribe("Teaching leave authorization and approval", () => {
     });
     expect(rejected.status).toBe(200);
     expect(rejected.body.request.status).toBe("REJECTED");
+  });
+
+  test("requested changes can be rejected after the affected session expires", async () => {
+    const submitted = await request("/api/offerings/teaching-leave/requests", {
+      method: "POST",
+      token: signToken(lecturer),
+      body: leaveInput(EXPIRED_CHANGES_SESSION_DATE),
+    });
+    expect(submitted.status).toBe(201);
+    const changesRequestId = submitted.body.id as string;
+    const occurrenceId = submitted.body.occurrences[0].occurrenceId as string;
+
+    const changes = await request(`/api/offerings/teaching-leave/requests/${changesRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "REQUEST_CHANGES", comment: "Please clarify the recovery plan." },
+    });
+    expect(changes.status).toBe(200);
+    expect(changes.body.request.status).toBe("CHANGES_REQUESTED");
+
+    await prisma.$executeRaw`
+      UPDATE "pms_attendance"."TeachingSessionOccurrence"
+      SET "sessionDate" = '2000-01-10'::date, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${occurrenceId}
+    `;
+
+    const resubmit = await request(`/api/offerings/teaching-leave/requests/${changesRequestId}/resubmit`, {
+      method: "POST",
+      token: signToken(lecturer),
+      body: revisedLeaveInput(),
+    });
+    expect(resubmit.status).toBe(400);
+
+    const approval = await request(`/api/offerings/teaching-leave/requests/${changesRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "APPROVE", comment: "Should remain blocked until resubmission" },
+    });
+    expect(approval.status).toBe(409);
+
+    const rejected = await request(`/api/offerings/teaching-leave/requests/${changesRequestId}/review`, {
+      method: "POST",
+      token: signToken(coordinator),
+      body: { decision: "REJECT", comment: "Close expired request safely" },
+    });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.changed).toBe(true);
+    expect(rejected.body.request.status).toBe("REJECTED");
+    expect(rejected.body.notifications.students.sent).toBe(0);
+    expect(rejected.body.notifications.lecturerGroup).toEqual([]);
+
+    const state = await prisma.$queryRaw<Array<{ status: string; approvedLeaveRequestId: string | null }>>`
+      SELECT leave."status", occurrence."approvedLeaveRequestId"
+      FROM "pms_attendance"."TeachingLeaveRequest" leave
+      JOIN "pms_attendance"."TeachingLeaveRequestOccurrence" link ON link."requestId" = leave."id"
+      JOIN "pms_attendance"."TeachingSessionOccurrence" occurrence ON occurrence."id" = link."occurrenceId"
+      WHERE leave."id" = ${changesRequestId}
+    `;
+    expect(state[0]).toMatchObject({ status: "REJECTED", approvedLeaveRequestId: null });
+
+    const audits = await prisma.$queryRaw<Array<{
+      action: string;
+      previousStatus: string | null;
+      newStatus: string | null;
+    }>>`
+      SELECT "action","previousStatus","newStatus"
+      FROM "pms_attendance"."TeachingLeaveAuditEvent"
+      WHERE "requestId" = ${changesRequestId}
+      ORDER BY "createdAt","id"
+    `;
+    expect(audits.map((item) => item.action)).toEqual(["SUBMITTED", "CHANGES_REQUESTED", "REJECTED"]);
+    expect(audits[2]).toMatchObject({ previousStatus: "CHANGES_REQUESTED", newStatus: "REJECTED" });
   });
 
   test("programme coordinator approval is auditable, occurrence-linked, idempotent, and tolerates missing Telegram destinations", async () => {
