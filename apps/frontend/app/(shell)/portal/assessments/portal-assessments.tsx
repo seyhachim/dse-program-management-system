@@ -180,14 +180,6 @@ function AssessmentCard({
         </div>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-1">
-        {item.cloCodes.map((code) => (
-          <span key={code} className="rounded bg-muted px-2 py-1 text-xs">
-            {code}
-          </span>
-        ))}
-      </div>
-
       {item.rubricName ? (
         <details className="mt-4 min-w-0 rounded-xl border border-border p-3">
           <summary className="cursor-pointer break-words text-sm font-semibold">
@@ -203,11 +195,6 @@ function AssessmentCard({
                   <p className="break-words text-sm font-medium">
                     {criterion.name}
                   </p>
-                  {criterion.cloCodes.length ? (
-                    <p className="mt-1 break-words text-xs text-muted-foreground">
-                      {criterion.cloCodes.join(", ")}
-                    </p>
-                  ) : null}
                   {criterion.levels.length ? (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {criterion.levels.map((level) => (

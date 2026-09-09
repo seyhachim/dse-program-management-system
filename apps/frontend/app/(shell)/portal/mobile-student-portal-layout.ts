@@ -1,6 +1,11 @@
 export const MOBILE_STUDENT_PORTAL_LAYOUT = {
   homeStack: "space-y-4 md:space-y-6",
-  hero: "rounded-2xl bg-gradient-to-br from-primary to-primary/80 p-4 text-primary-foreground shadow-sm sm:p-6",
+  hero: "rounded-2xl border border-border bg-card px-4 py-3 shadow-sm sm:px-5 sm:py-4",
+  homeQuickActions: "grid grid-cols-3 gap-2 sm:gap-3",
+  homeQuickAction:
+    "flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border border-border bg-card px-2 py-2.5 text-center text-sm font-medium text-foreground shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+  homeNextClass:
+    "group block min-h-11 min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-5",
   compactCard: "rounded-2xl border border-border bg-card p-4 md:p-5",
   courseCard:
     "group flex min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md md:min-h-64 md:p-5 md:hover:-translate-y-0.5",
