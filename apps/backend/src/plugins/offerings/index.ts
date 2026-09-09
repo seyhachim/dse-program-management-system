@@ -5,6 +5,8 @@ import { attendanceService } from "./attendance-service.ts";
 import { classDeliveryService } from "./class-delivery-service.ts";
 import { classResponsibilityService } from "./class-responsibility-service.ts";
 import { courseSectionPresenceService } from "./course-section-presence-service.ts";
+import { curriculumBoundOfferingService } from "./curriculum-bound-service.ts";
+import { createCurriculumBoundOfferingRouter } from "./curriculum-bound-router.ts";
 import { portfolioTeachingEvidenceService } from "./portfolio-evidence-service.ts";
 import { createOfferingRouter } from "./router.ts";
 import { offeringService } from "./service.ts";
@@ -24,16 +26,17 @@ export const offeringsService = {
   classDelivery: classDeliveryService,
   teachingSessionDelivery: teachingSessionDeliveryService,
   teachingLeave: teachingLeaveService,
+  curriculumBound: curriculumBoundOfferingService,
 };
 
 export type OfferingsService = typeof offeringsService;
 
 const router = Router();
-// Static class-delivery workflow routes must be mounted before the legacy /:id
-// offering router so paths such as /teaching-leave/review-queue are not treated
-// as offering ids.
+// Static class-delivery and curriculum-bound workflow routes must be mounted
+// before the legacy /:id offering router so they are not treated as offering ids.
 router.use(createTeachingLeaveRouter());
 router.use(createTeachingSessionDeliveryRouter());
+router.use(createCurriculumBoundOfferingRouter());
 router.use(createOfferingRouter());
 
 export const offeringsPlugin: BackendPlugin<OfferingsService> = {

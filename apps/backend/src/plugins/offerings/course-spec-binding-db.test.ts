@@ -11,6 +11,7 @@ import { curriculumWorkflowService } from "../programme/curriculum-workflow-serv
 import { studentsPlugin } from "../students/index.ts";
 import { studentPortalService } from "../student-portal/service.ts";
 import { resultsLifecycleService } from "../student-portal/results-lifecycle.ts";
+import "./curriculum-bound-offering-db.test.ts";
 import { offeringService } from "./service.ts";
 
 process.env.JWT_SECRET ??= "issue-211-course-spec-binding-test-secret-at-least-32-characters";
