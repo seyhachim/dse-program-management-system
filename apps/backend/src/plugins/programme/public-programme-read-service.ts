@@ -167,8 +167,16 @@ function searchableFaqDto(
 function publicFaqDto(
   faq: SearchablePublicProgrammeFaq,
 ): PublicProgrammeFaq {
-  const { keywords: _keywords, ...publicFaq } = faq;
-  return { ...publicFaq };
+  return {
+    slug: faq.slug,
+    category: faq.category,
+    question: faq.question,
+    answer: faq.answer,
+    shortAnswer: faq.shortAnswer,
+    isFeatured: faq.isFeatured,
+    sourceLabel: faq.sourceLabel,
+    sourceUrl: faq.sourceUrl,
+  };
 }
 
 function dateDto(
