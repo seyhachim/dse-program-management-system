@@ -8,10 +8,9 @@ import {
   CalendarDays,
   ChevronRight,
   Clock3,
+  FileText,
   MapPin,
-  Target,
 } from "lucide-react";
-import { Progress } from "@dse-pms/ui";
 import {
   academicSemesterLabel,
   formatAcademicDate,
@@ -35,6 +34,12 @@ const HOME_PREFETCH = [
   { resource: "announcements", loader: studentPortalApi.announcements },
   { resource: "assessments", loader: studentPortalApi.assessments },
   { resource: "academic-calendar", loader: studentPortalApi.academicCalendar },
+] as const;
+
+const QUICK_ACTIONS = [
+  { label: "Courses", href: "/portal/courses", icon: BookOpen },
+  { label: "Schedule", href: "/portal/schedule", icon: CalendarDays },
+  { label: "Results", href: "/portal/results", icon: FileText },
 ] as const;
 
 export function PortalHome() {
@@ -74,78 +79,120 @@ export function PortalHome() {
       ) : null}
 
       <section className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}>
-        <p className="text-sm opacity-80">Welcome back</p>
-        <h2 className="mt-1 break-words text-2xl font-bold">
+        <p className="text-xs font-medium text-muted-foreground">Welcome back</p>
+        <h2 className="mt-1 break-words text-xl font-semibold tracking-tight text-foreground">
           {data.student.name}
         </h2>
-        <p className="mt-1 break-words text-sm opacity-80">
-          {data.student.studentId} · Stay focused on what comes next.
+        <p className="mt-0.5 break-words text-xs text-muted-foreground">
+          {data.student.studentId}
         </p>
       </section>
 
-      <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
-        <section
-          className={`${MOBILE_STUDENT_PORTAL_LAYOUT.compactCard} min-w-0 lg:col-span-2`}
-        >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="font-semibold">Next class</h3>
-            <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
-          </div>
-          {nextMeeting ? (
-            <div className="min-w-0">
-              <p className="break-words text-lg font-semibold">
-                {nextMeeting.course.code} · {nextMeeting.course.title}
-              </p>
+      <nav
+        aria-label="Student shortcuts"
+        className={MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions}
+      >
+        {QUICK_ACTIONS.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction}
+            >
+              <Icon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="max-w-full truncate">{action.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <Link
+        href="/portal/schedule"
+        className={MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Next class
+            </p>
+            {nextMeeting ? (
+              <>
+                <p className="mt-1 break-words text-lg font-semibold text-foreground">
+                  {nextMeeting.course.code} · {nextMeeting.course.title}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Section {nextMeeting.course.sectionCode}
+                </p>
+                <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:flex sm:flex-wrap sm:gap-4">
+                  <span className="flex min-w-0 items-start gap-2">
+                    <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="break-words">
+                      {meetingLabel(nextMeeting.meeting)}
+                    </span>
+                  </span>
+                  <span className="flex min-w-0 items-start gap-2">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="break-words">
+                      {nextMeeting.meeting.room || "Room TBA"}
+                    </span>
+                  </span>
+                </div>
+              </>
+            ) : (
               <p className="mt-1 text-sm text-muted-foreground">
-                Section {nextMeeting.course.sectionCode}
+                No class schedule is available yet.
               </p>
-              <div className="mt-4 grid gap-2 text-sm sm:flex sm:flex-wrap sm:gap-4">
-                <span className="flex min-w-0 items-start gap-2">
-                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span className="break-words">
-                    {meetingLabel(nextMeeting.meeting)}
-                  </span>
-                </span>
-                <span className="flex min-w-0 items-start gap-2">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span className="break-words">
-                    {nextMeeting.meeting.room || "Room TBA"}
-                  </span>
-                </span>
-              </div>
-            </div>
+            )}
+          </div>
+          <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+        </div>
+      </Link>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">Upcoming assessments</h3>
+          <Link
+            className="flex min-h-11 shrink-0 items-center text-sm font-medium text-primary"
+            href="/portal/assessments"
+          >
+            View all
+          </Link>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-2 shadow-sm">
+          {data.upcomingAssessments.length ? (
+            data.upcomingAssessments.map((item) => (
+              <Link
+                key={`${item.offeringId}-${item.assessmentId}`}
+                href={`/portal/courses/${item.offeringId}`}
+                className="flex min-h-11 min-w-0 items-start gap-3 rounded-xl p-3 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-medium">{item.name}</p>
+                  <p className="break-words text-xs text-muted-foreground">
+                    {item.courseCode} · {assessmentDeadline(item.dueAt, item.dueWeek)}
+                    {item.weight ? ` · ${item.weight}%` : ""}
+                  </p>
+                </div>
+              </Link>
+            ))
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No class schedule is available yet.
+            <p className="p-4 text-sm text-muted-foreground">
+              No upcoming assessments.
             </p>
           )}
-        </section>
-
-        <section className={MOBILE_STUDENT_PORTAL_LAYOUT.compactCard}>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="font-semibold">CLO achievement</h3>
-            <Target className="h-5 w-5 shrink-0 text-primary" />
-          </div>
-          <p className="mt-4 text-3xl font-bold sm:mt-5">
-            {data.overallAchievement === null
-              ? "—"
-              : `${data.overallAchievement}%`}
-          </p>
-          <Progress className="mt-3" value={data.overallAchievement ?? 0} />
-          <p className="mt-2 text-xs text-muted-foreground">
-            Calculated from published assessment evidence.
-          </p>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <Link
         href="/portal/academic-calendar"
-        className="group block min-h-11 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-5"
+        className="group block min-h-11 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+              <CalendarDays className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
               <h3 className="font-semibold">Academic Calendar</h3>
             </div>
             {calendar.status === "available" && firstCalendarPeriod ? (
@@ -166,100 +213,62 @@ export function PortalHome() {
                 <p className="mt-2 text-sm font-medium">
                   Calendar not available yet
                 </p>
-                <p className="mt-1 break-words text-xs text-muted-foreground">
+                <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">
                   {unavailableCalendarMessage}
                 </p>
               </>
             )}
           </div>
-          <span className="flex min-h-11 shrink-0 items-center gap-1 self-start text-sm font-medium text-primary sm:self-auto">
-            View full calendar
-            <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
-          </span>
+          <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
         </div>
       </Link>
 
-      <div className="grid gap-5 lg:grid-cols-5 lg:gap-6">
-        <section className="space-y-3 lg:col-span-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold">My courses</h3>
-            <Link
-              className="flex min-h-11 items-center text-sm font-medium text-primary"
-              href="/portal/courses"
-            >
-              View all
-            </Link>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">My courses</h3>
+          <Link
+            className="flex min-h-11 items-center text-sm font-medium text-primary"
+            href="/portal/courses"
+          >
+            View all
+          </Link>
+        </div>
+        {data.courses.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {data.courses.slice(0, 4).map((course) => (
+              <Link
+                key={course.offeringId}
+                href={`/portal/courses/${course.offeringId}`}
+                className="group min-w-0 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md md:p-5 md:hover:-translate-y-0.5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="rounded-lg bg-primary/10 p-2 text-primary">
+                    <BookOpen className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+                </div>
+                <p className="mt-4 break-words text-xs font-semibold uppercase tracking-wide text-primary">
+                  {course.code} · Section {course.sectionCode}
+                </p>
+                <h4 className="mt-1 break-words font-semibold">{course.title}</h4>
+                <p className="mt-2 break-words text-sm text-muted-foreground">
+                  {course.lecturer?.name ?? "Lecturer TBA"}
+                </p>
+              </Link>
+            ))}
           </div>
-          {data.courses.length ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {data.courses.slice(0, 4).map((course) => (
-                <Link
-                  key={course.offeringId}
-                  href={`/portal/courses/${course.offeringId}`}
-                  className="group min-w-0 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md md:p-5 md:hover:-translate-y-0.5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="rounded-lg bg-primary/10 p-2 text-primary">
-                      <BookOpen className="h-5 w-5" />
-                    </span>
-                    <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
-                  </div>
-                  <p className="mt-4 break-words text-xs font-semibold uppercase tracking-wide text-primary">
-                    {course.code} · Section {course.sectionCode}
-                  </p>
-                  <h4 className="mt-1 break-words font-semibold">
-                    {course.title}
-                  </h4>
-                  <p className="mt-2 break-words text-sm text-muted-foreground">
-                    {course.lecturer?.name ?? "Lecturer TBA"}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="No enrolled courses"
-              description="Your courses will appear after enrollment."
-            />
-          )}
-        </section>
-
-        <section className="space-y-3 lg:col-span-2">
-          <h3 className="text-lg font-semibold">Upcoming assessments</h3>
-          <div className="rounded-2xl border border-border bg-card p-2">
-            {data.upcomingAssessments.length ? (
-              data.upcomingAssessments.map((item) => (
-                <Link
-                  key={`${item.offeringId}-${item.assessmentId}`}
-                  href={`/portal/courses/${item.offeringId}`}
-                  className="flex min-h-11 min-w-0 items-start gap-3 rounded-xl p-3 hover:bg-accent"
-                >
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-medium">
-                      {item.name}
-                    </p>
-                    <p className="break-words text-xs text-muted-foreground">
-                      {item.courseCode} ·{" "}
-                      {assessmentDeadline(item.dueAt, item.dueWeek)}
-                      {item.weight ? ` · ${item.weight}%` : ""}
-                    </p>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <p className="p-4 text-sm text-muted-foreground">
-                No upcoming assessments.
-              </p>
-            )}
-          </div>
-        </section>
-      </div>
+        ) : (
+          <EmptyState
+            title="No enrolled courses"
+            description="Your courses will appear after enrollment."
+          />
+        )}
+      </section>
 
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="flex min-w-0 items-center gap-2 text-lg font-semibold">
-            <Bell className="h-5 w-5 shrink-0 text-primary" />
+            <Bell className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
             <span className="break-words">Recent announcements</span>
           </h3>
           <Link
