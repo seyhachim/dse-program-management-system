@@ -56,9 +56,15 @@ test("coLecturerViolation flags the primary lecturer also listed as a co-lecture
   expect(coLecturerViolation({ lecturerId: A, coLecturerIds: [A, B] })).toBe("primaryIsCoLecturer");
 });
 
-test("CreateOfferingInput requires an exact CourseSpec version", () => {
-  const result = CreateOfferingInput.safeParse(validCreate({ courseSpecId: undefined }));
-  expect(result.success).toBe(false);
+test("CreateOfferingInput allows a Planned offering while CourseSpec is pending", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({ courseSpecId: undefined, status: "Planned" })).success).toBe(true);
+  expect(CreateOfferingInput.safeParse(validCreate({ courseSpecId: null, status: "Planned" })).success).toBe(true);
+});
+
+test("CreateOfferingInput requires an Approved CourseSpec reference for non-Planned delivery", () => {
+  expect(CreateOfferingInput.safeParse(validCreate({ courseSpecId: undefined, status: "Active" })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ courseSpecId: null, status: "Completed" })).success).toBe(false);
+  expect(CreateOfferingInput.safeParse(validCreate({ courseSpecId: COURSE_SPEC, status: "Active" })).success).toBe(true);
 });
 
 test("CreateOfferingInput requires a primary lecturer", () => {
@@ -103,6 +109,7 @@ test("UpdateOfferingInput remains backward-compatible for partial historical pat
   expect(UpdateOfferingInput.safeParse({ lecturerId: A, coLecturerIds: [A] }).success).toBe(false);
   expect(UpdateOfferingInput.safeParse({ coLecturerIds: [B] }).success).toBe(true);
   expect(UpdateOfferingInput.safeParse({ lecturerId: null }).success).toBe(true);
+  expect(UpdateOfferingInput.safeParse({ courseSpecId: null }).success).toBe(true);
   expect(UpdateOfferingInput.safeParse({ meetings: [] }).success).toBe(true);
   expect(UpdateOfferingInput.safeParse({ startDate: null, endDate: null }).success).toBe(true);
   expect(UpdateOfferingInput.safeParse({}).success).toBe(true);

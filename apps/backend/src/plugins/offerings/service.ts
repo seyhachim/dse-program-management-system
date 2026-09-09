@@ -1,6 +1,7 @@
 import {
   coLecturerViolation,
   teachingPeriodViolation,
+  type AcademicCalendarCoursePlacementResolution,
   type AcademicCalendarServiceContract,
   type CoursesServiceContract,
   type CourseWeeklyContactHoursRef,
@@ -46,6 +47,49 @@ async function assertApprovedCourseSpec(courseId: string, courseSpecId: string):
 async function assertLecturersExist(lecturerIds: string[]): Promise<void> {
   const found = await Promise.all(lecturerIds.map((id) => lecturers().getById(id)));
   if (found.some((l) => l === null)) throw new ReferenceError("One or more co-lecturers do not exist");
+}
+
+async function resolveCoursePlacement(
+  programmeId: string,
+  academicYearId: string,
+  programmeYear: number,
+  semester: "First" | "Second",
+  courseId: string,
+): Promise<AcademicCalendarCoursePlacementResolution> {
+  try {
+    return await academicCalendars().resolveCoursePlacement(
+      programmeId,
+      academicYearId,
+      programmeYear,
+      semester,
+      courseId,
+    );
+  } catch (error) {
+    throw new ReferenceError(
+      error instanceof Error ? error.message : "Could not resolve curriculum placement",
+    );
+  }
+}
+
+function assertAcademicReadinessForStatus(
+  status: OfferingView["status"],
+  courseSpecId: string | null | undefined,
+  placement: AcademicCalendarCoursePlacementResolution,
+): void {
+  if (placement.status === "course-not-placed") {
+    throw new ReferenceError(placement.message);
+  }
+  if (status === "Planned") return;
+  if (!courseSpecId) {
+    throw new ReferenceError(
+      "An Approved CourseSpec version is required before delivery can become active or completed",
+    );
+  }
+  if (placement.status !== "confirmed") {
+    throw new ReferenceError(
+      "Confirm the applicable curriculum before delivery can become active or completed",
+    );
+  }
 }
 
 /** Fetch the lecturer lookup map once for a batch of `toView` calls. */
@@ -226,7 +270,9 @@ export const offeringService = {
     const { coLecturerIds, meetings, ...offeringInput } = input;
     const course = await courses().getById(offeringInput.courseId);
     if (!course) throw new ReferenceError("Course does not exist");
-    await assertApprovedCourseSpec(offeringInput.courseId, offeringInput.courseSpecId);
+    if (offeringInput.courseSpecId) {
+      await assertApprovedCourseSpec(offeringInput.courseId, offeringInput.courseSpecId);
+    }
     if (offeringInput.lecturerId && !(await lecturers().getById(offeringInput.lecturerId))) {
       throw new ReferenceError("Assigned lecturer does not exist");
     }
@@ -241,22 +287,19 @@ export const offeringService = {
     );
     if (!period) throw new ReferenceError("The selected Academic Calendar period is not published for this programme and study year");
     if (period.semester !== offeringInput.semester) throw new ReferenceError("The selected semester does not match the published Academic Calendar period");
-    try {
-      await academicCalendars().assertCoursePlacement(
-        course.programmeId,
-        period.academicYearId,
-        offeringInput.programmeYear,
-        period.semester,
-        offeringInput.courseId,
-      );
-    } catch (error) {
-      throw new ReferenceError(error instanceof Error ? error.message : "The selected course is not in the applicable curriculum");
-    }
+    const placement = await resolveCoursePlacement(
+      course.programmeId,
+      period.academicYearId,
+      offeringInput.programmeYear,
+      period.semester,
+      offeringInput.courseId,
+    );
+    assertAcademicReadinessForStatus(offeringInput.status, offeringInput.courseSpecId, placement);
 
     const offering = await prisma.offering.create({
       data: {
         courseId: offeringInput.courseId,
-        courseSpecId: offeringInput.courseSpecId,
+        courseSpecId: offeringInput.courseSpecId ?? null,
         // Term is a canonical display key derived from the published calendar, never trusted from the client.
         term: `${period.academicYearLabel}-${period.semester === "First" ? "S1" : "S2"}`,
         sectionCode: offeringInput.sectionCode,
@@ -292,10 +335,14 @@ export const offeringService = {
       include: { coLecturers: { select: { lecturerId: true } } },
     });
     if (!existing) throw new ReferenceError("Offering not found");
-    if (!existing.courseSpecId && offeringInput.courseSpecId === undefined) {
+    const unboundLegacyOffering = !existing.courseSpecId && !existing.academicCalendarPeriodId;
+    if (unboundLegacyOffering && !offeringInput.courseSpecId) {
       throw new ReferenceError("Offering must be bound to an Approved CourseSpec version before it can be updated");
     }
-    if (offeringInput.courseSpecId !== undefined) {
+    if (offeringInput.courseSpecId === null && existing.courseSpecId) {
+      throw new ReferenceError("The bound Approved CourseSpec version cannot be removed");
+    }
+    if (offeringInput.courseSpecId) {
       await assertApprovedCourseSpec(existing.courseId, offeringInput.courseSpecId);
       if (existing.courseSpecId && offeringInput.courseSpecId !== existing.courseSpecId) {
         const [deadlineCount, resultCount] = await Promise.all([
@@ -308,6 +355,10 @@ export const offeringService = {
       }
     }
 
+    const nextStatus = offeringInput.status ?? existing.status;
+    const nextCourseSpecId = offeringInput.courseSpecId !== undefined
+      ? offeringInput.courseSpecId
+      : existing.courseSpecId;
     const nextLecturerId = offeringInput.lecturerId !== undefined ? offeringInput.lecturerId : existing.lecturerId;
     const nextCoLecturerIds = coLecturerIds !== undefined ? coLecturerIds : existing.coLecturers.map((item) => item.lecturerId);
     if (coLecturerViolation({ lecturerId: nextLecturerId, coLecturerIds: nextCoLecturerIds })) {
@@ -345,17 +396,14 @@ export const offeringService = {
       if (offeringInput.semester !== undefined && offeringInput.semester !== resolvedPeriod.semester) {
         throw new ReferenceError("The selected semester does not match the Academic Calendar period");
       }
-      try {
-        await academicCalendars().assertCoursePlacement(
-          course.programmeId,
-          resolvedPeriod.academicYearId,
-          nextProgrammeYear,
-          resolvedPeriod.semester,
-          existing.courseId,
-        );
-      } catch (error) {
-        throw new ReferenceError(error instanceof Error ? error.message : "The course is not in the applicable curriculum");
-      }
+      const placement = await resolveCoursePlacement(
+        course.programmeId,
+        resolvedPeriod.academicYearId,
+        nextProgrammeYear,
+        resolvedPeriod.semester,
+        existing.courseId,
+      );
+      assertAcademicReadinessForStatus(nextStatus, nextCourseSpecId, placement);
     } else if (!requestedPeriodId) {
       const nextStartDate = offeringInput.startDate !== undefined ? offeringInput.startDate : dateOnly(existing.startDate);
       const nextEndDate = offeringInput.endDate !== undefined ? offeringInput.endDate : dateOnly(existing.endDate);

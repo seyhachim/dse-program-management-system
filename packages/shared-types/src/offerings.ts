@@ -173,7 +173,10 @@ function refineTeachingPeriod(
 
 const OfferingInputShape = z.object({
   courseId: z.string().uuid("A course is required"),
-  courseSpecId: z.string().uuid("An Approved CourseSpec version is required"),
+  // Planned offerings may be prepared before an Approved CourseSpec exists.
+  // A non-null id always means the exact Approved version governing delivery;
+  // Draft/Submitted versions are still rejected by the backend service.
+  courseSpecId: z.string().uuid("Select a valid Approved CourseSpec version").nullable().optional(),
   term: z.string().min(1, "Term is required"),
   // Default keeps older API clients compatible while the database migration
   // backfills every existing offering as Class A.
@@ -199,6 +202,13 @@ const OfferingInputShape = z.object({
 export const CreateOfferingInput = OfferingInputShape.superRefine((data, ctx) => {
   refineCoLecturers(data, ctx);
 
+  if (data.status !== "Planned" && !data.courseSpecId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "An Approved CourseSpec version is required before delivery can become active or completed",
+      path: ["courseSpecId"],
+    });
+  }
   if (!data.lecturerId) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A primary lecturer is required", path: ["lecturerId"] });
   }
@@ -273,7 +283,7 @@ export interface OfferingView {
   // not otherwise used by the frontend today. Every Course has exactly one
   // programme (issue #150 phase C); only the whole `course` object is nullable.
   course: { id: string; code: string; title: string; programmeId: string } | null;
-  /** Exact approved CourseSpec version used for this delivery. Null only for unresolved legacy rows. */
+  /** Exact Approved CourseSpec governing delivery; null is valid while an Offering remains Planned. */
   courseSpec: CourseSpecVersionRef | null;
   lecturer: {
     id: string;

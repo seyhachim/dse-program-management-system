@@ -209,4 +209,64 @@ dbDescribe("Academic Calendar revision integrity", () => {
       expect("fileRef" in projection.sources[0]!).toBe(false);
     }
   });
+
+  test("keeps a published teaching period usable for Planned setup while curriculum is pending", async () => {
+    const suffix = randomUUID();
+    const programmeId = `calendar-pending-${suffix}`;
+    await prisma.programme.create({
+      data: {
+        id: programmeId,
+        code: `CP-${suffix.slice(0, 8)}`,
+        name: "Pending Curriculum Programme",
+        status: "active",
+      },
+    });
+    const actor = await prisma.user.create({
+      data: { email: `calendar-pending-${suffix}@dse.invalid`, name: "Pending Curriculum Coordinator" },
+    });
+    const course = await prisma.course.create({
+      data: {
+        programmeId,
+        code: `PC-${suffix.slice(0, 8)}`,
+        title: "Provisional planning course",
+      },
+    });
+    const academicYear = await academicCalendarService.createAcademicYear(programmeId, {
+      label: `2197-2198-${suffix.slice(0, 8)}`,
+      startYear: 2197,
+      endYear: 2198,
+      isCurrent: false,
+    });
+    const draft = await academicCalendarService.createCalendar(programmeId, actor.id, {
+      academicYearId: academicYear.id,
+      revisionReason: "Official calendar before curriculum confirmation",
+      studyYears: [3],
+      periods: [{ semester: "First", teachingStart: "2197-09-01", teachingEnd: "2198-01-15" }],
+      events: [],
+      sourceTitle: "Official pending-curriculum calendar",
+      sourcePublishedAt: "2197-08-01",
+      sourceUrl: null,
+      sourceFileRef: null,
+      sourceNote: "Official test source",
+    });
+    await academicCalendarService.publishCalendar(programmeId, draft.id, actor.id);
+
+    const context = await academicCalendarService.context(programmeId, {
+      academicYearId: academicYear.id,
+      studyYear: 3,
+      semester: "First",
+    });
+    expect(context.period.semester).toBe("First");
+    expect(context.curriculum.status).toBe("pending");
+    expect(context.courses).toEqual([]);
+
+    const resolution = await academicCalendarService.resolveCoursePlacement(
+      programmeId,
+      academicYear.id,
+      3,
+      "First",
+      course.id,
+    );
+    expect(resolution.status).toBe("curriculum-pending");
+  });
 });
