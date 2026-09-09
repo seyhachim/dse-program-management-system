@@ -59,7 +59,7 @@ export const AcademicCalendarEventInputSchema = z.object({
   note: z.string().trim().max(2000).default(""),
   sortOrder: z.coerce.number().int().min(0).max(10000).default(0),
 }).superRefine((value, ctx) => {
-  if (value.endDate && value.endDate < value.startDate) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endDate"], message: "End date cannot precede start date" });
+  if (value.endDate && value.endDate < value.startDate) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endDate"], message: "End date cannot precede start" });
 });
 export type AcademicCalendarEventInput = z.infer<typeof AcademicCalendarEventInputSchema>;
 
@@ -120,7 +120,10 @@ export interface AcademicCalendarPeriodView { id: string; calendarId: string; se
 export interface AcademicCalendarEventView { id: string; calendarId: string; title: string; type: AcademicCalendarEventType; semester: AcademicCalendarSemester | null; startDate: string; endDate: string | null; note: string; sortOrder: number; }
 export interface AcademicCalendarView { id: string; academicYear: AcademicYearView; seriesKey: string; revision: number; status: AcademicCalendarStatus; studyYears: number[]; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; source: AcademicCalendarSourceView; revisionReason: string; supersedesCalendarId: string | null; publishedAt: string | null; createdAt: string; updatedAt: string; }
 export interface AcademicCalendarCourseOption { id: string; code: string; title: string; credits: number | null; courseType: string | null; curriculumVersionId: string; }
-export interface AcademicCalendarContextView { academicYear: AcademicYearView; studyYear: number; semester: AcademicCalendarSemester; calendar: AcademicCalendarView; period: AcademicCalendarPeriodView; courses: AcademicCalendarCourseOption[]; }
+export type AcademicCalendarCurriculumContext =
+  | { status: "confirmed" }
+  | { status: "pending"; message: string };
+export interface AcademicCalendarContextView { academicYear: AcademicYearView; studyYear: number; semester: AcademicCalendarSemester; calendar: AcademicCalendarView; period: AcademicCalendarPeriodView; curriculum: AcademicCalendarCurriculumContext; courses: AcademicCalendarCourseOption[]; }
 export interface AcademicCalendarTimelineEvent { key: string; title: string; type: AcademicCalendarEventType; semester: AcademicCalendarSemester | null; startDate: string; endDate: string | null; note: string; }
 export type PublishedAcademicCalendarProjection =
   | { status: "available"; academicYear: AcademicYearView; studyYear: number; periods: AcademicCalendarPeriodView[]; events: AcademicCalendarEventView[]; sources: PublicAcademicCalendarSourceView[]; nextEvent: AcademicCalendarTimelineEvent | null; }
@@ -134,7 +137,12 @@ export type StudentAcademicCalendarView =
   | { status: "unavailable"; academicYear: AcademicYearView | null; studyYear: number | null; reason: "student-context-unavailable" | "academic-year-unavailable" | "calendar-unpublished"; message: string; };
 
 export interface AcademicCalendarOfferingPeriodRef { id: string; calendarId: string; programmeId: string; academicYearId: string; academicYearLabel: string; studyYears: number[]; semester: AcademicCalendarSemester; teachingStart: string; teachingEnd: string; revision: number; }
+export type AcademicCalendarCoursePlacementResolution =
+  | { status: "confirmed" }
+  | { status: "curriculum-pending"; message: string }
+  | { status: "course-not-placed"; message: string };
 export interface AcademicCalendarServiceContract {
   getPublishedPeriodForOffering(periodId: string, programmeId: string, studyYear: number): Promise<AcademicCalendarOfferingPeriodRef | null>;
+  resolveCoursePlacement(programmeId: string, academicYearId: string, studyYear: number, semester: AcademicCalendarSemester, courseId: string): Promise<AcademicCalendarCoursePlacementResolution>;
   assertCoursePlacement(programmeId: string, academicYearId: string, studyYear: number, semester: AcademicCalendarSemester, courseId: string): Promise<void>;
 }
