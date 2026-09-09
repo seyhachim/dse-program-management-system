@@ -159,6 +159,10 @@ export function attendanceWarningEventKey(input: {
   return `attendance-warning:${input.studentId}:${input.offeringId}:${input.warningKind}:3:${input.eventSessionId}`;
 }
 
+export function teachingLeaveRequesterPath(requestId: string): string {
+  return `/telegram/teaching-leave?requestId=${encodeURIComponent(requestId)}`;
+}
+
 function leaveDecisionLabel(status: TeachingLeaveStatus): string {
   if (status === "APPROVED") return "approved";
   if (status === "REJECTED") return "rejected";
@@ -182,7 +186,7 @@ export const telegramNotificationService = {
     if (!recipient) return "missing";
     const impact = input.firstOccurrence;
     const eventKey = `teaching-leave:${input.requestId}:requester:${input.status}`;
-    const link = createTelegramDeepLink(`/telegram/schedule?offeringId=${encodeURIComponent(impact.offeringId)}`);
+    const link = createTelegramDeepLink(teachingLeaveRequesterPath(input.requestId));
     return deliverToRecipient(
       recipient,
       eventKey,
