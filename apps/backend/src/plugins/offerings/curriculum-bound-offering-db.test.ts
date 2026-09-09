@@ -220,4 +220,38 @@ dbDescribe("curriculum-bound Offerings", () => {
 
     expect(await programmePlugin.service.offeringCurriculum.getPlacement(programmeId, placement.id)).toBeNull();
   });
+
+  test("keeps the curriculum binding outside Supabase Data API access", async () => {
+    const rls = await prisma.$queryRaw<{ rls_enabled: boolean }[]>`
+      SELECT c.relrowsecurity AS rls_enabled
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'offering_governance'
+        AND c.relname = 'OfferingCurriculumBinding'
+    `;
+    expect(rls[0]?.rls_enabled).toBe(true);
+
+    const forbiddenTableGrants = await prisma.$queryRaw<{
+      grantee: string;
+      privilege_type: string;
+    }[]>`
+      SELECT grantee, privilege_type
+      FROM information_schema.table_privileges
+      WHERE table_schema = 'offering_governance'
+        AND table_name = 'OfferingCurriculumBinding'
+        AND grantee IN ('PUBLIC', 'anon', 'authenticated', 'service_role')
+    `;
+    expect(forbiddenTableGrants).toEqual([]);
+
+    const forbiddenSchemaUsage = await prisma.$queryRaw<{
+      role_name: string;
+      has_usage: boolean;
+    }[]>`
+      SELECT rolname AS role_name,
+             has_schema_privilege(rolname, 'offering_governance', 'USAGE') AS has_usage
+      FROM pg_roles
+      WHERE rolname IN ('anon', 'authenticated', 'service_role')
+    `;
+    expect(forbiddenSchemaUsage.every((row) => row.has_usage === false)).toBe(true);
+  });
 });
