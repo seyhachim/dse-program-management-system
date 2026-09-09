@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { AuthUser, Role } from "../core/auth/token.ts";
 import { prisma } from "../core/db/prisma.ts";
@@ -15,6 +15,16 @@ const REVISION_DATE = "2099-02-09";
 const STUDENT_IMPACT_DATE = "2099-02-16";
 const IDEMPOTENT_EXPIRY_DATE = "2099-02-23";
 
+type SubmissionSnapshot = {
+  confidentialReason?: string;
+  attachmentRef?: string | null;
+  proposedHandling?: string;
+};
+type ResubmissionAuditDetails = {
+  previousSubmission?: SubmissionSnapshot;
+  newSubmission?: SubmissionSnapshot;
+};
+
 integrationDescribe("Teaching leave review hardening", () => {
   let lecturer: AuthUser;
   let coLecturer: AuthUser;
@@ -23,6 +33,12 @@ integrationDescribe("Teaching leave review hardening", () => {
   let meetingId = "";
   let enrolledStudent: AuthUser;
   let unrelatedStudent: AuthUser;
+  const originalEnv = {
+    TELEGRAM_PMS_ENABLED: process.env.TELEGRAM_PMS_ENABLED,
+    TELEGRAM_ENABLED: process.env.TELEGRAM_ENABLED,
+    JWT_SECRET: process.env.JWT_SECRET,
+    TELEGRAM_MINI_APP_URL: process.env.TELEGRAM_MINI_APP_URL,
+  };
 
   beforeAll(async () => {
     process.env.TELEGRAM_PMS_ENABLED = "false";
@@ -72,6 +88,13 @@ integrationDescribe("Teaching leave review hardening", () => {
     await prisma.enrollment.create({ data: { offeringId, studentId: enrolledRecord.id } });
   });
 
+  afterAll(() => {
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
   test("one active occurrence leave prevents a co-lecturer request from becoming unapprovable", async () => {
     const first = await teachingLeaveService.submit(lecturer, leaveInput(CO_LECTURER_DATE));
     await expect(teachingLeaveService.submit(coLecturer, leaveInput(CO_LECTURER_DATE)))
@@ -102,7 +125,7 @@ integrationDescribe("Teaching leave review hardening", () => {
       proposedNote: "Updated recovery plan",
     });
 
-    const rows = await prisma.$queryRaw<Array<{ details: Record<string, any> }>>`
+    const rows = await prisma.$queryRaw<Array<{ details: ResubmissionAuditDetails }>>`
       SELECT "details"
       FROM "pms_attendance"."TeachingLeaveAuditEvent"
       WHERE "requestId"=${request.id} AND "action"='SUBMITTED'
