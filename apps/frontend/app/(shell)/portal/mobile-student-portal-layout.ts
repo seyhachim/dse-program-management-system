@@ -2,9 +2,6 @@ export const MOBILE_STUDENT_PORTAL_LAYOUT = {
   homeStack: "space-y-5 pb-2 md:space-y-6",
   hero:
     "relative overflow-hidden rounded-[2rem] bg-primary px-5 py-5 text-primary-foreground shadow-md sm:px-6 sm:py-6",
-  homeQuickActions: "grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3",
-  homeQuickAction:
-    "group flex min-h-20 min-w-0 flex-col items-start justify-between gap-3 rounded-[1.5rem] bg-card p-3.5 text-left text-sm font-medium text-foreground shadow-sm ring-1 ring-border/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4",
   homeNextClass:
     "group block min-h-11 min-w-0 rounded-[2rem] bg-card p-5 shadow-md ring-1 ring-primary/15 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-6",
   homeSectionCard:
