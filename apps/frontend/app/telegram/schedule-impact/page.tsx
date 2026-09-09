@@ -3,7 +3,7 @@
 import type { TeachingLeaveOperationalImpact } from "@dse-pms/shared-types";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { telegramApi } from "../telegram-client";
 
 function handlingLabel(value: TeachingLeaveOperationalImpact["proposedHandling"]): string {
@@ -16,7 +16,7 @@ function handlingLabel(value: TeachingLeaveOperationalImpact["proposedHandling"]
   }
 }
 
-export default function TelegramScheduleImpactPage() {
+function TelegramScheduleImpactContent() {
   const searchParams = useSearchParams();
   const occurrenceId = searchParams.get("occurrenceId")?.trim() ?? "";
   const [impact, setImpact] = useState<TeachingLeaveOperationalImpact | null>(null);
@@ -68,5 +68,13 @@ export default function TelegramScheduleImpactPage() {
         </article>
       ) : null}
     </section>
+  );
+}
+
+export default function TelegramScheduleImpactPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-slate-500">Loading schedule update…</p>}>
+      <TelegramScheduleImpactContent />
+    </Suspense>
   );
 }
