@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import {
   BookOpen,
   CalendarDays,
-  Download,
   ExternalLink,
   FileCheck2,
   MessageSquareText,
@@ -28,7 +27,6 @@ import {
 } from "@dse-pms/ui";
 import {
   assessmentDeadline,
-  downloadApprovedCourseDocument,
   meetingLabel,
   studentPortalApi,
 } from "@/lib/student-portal";
@@ -41,7 +39,6 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
   );
   const { data, loading, error, setData } = usePortalData(load);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   if (loading) return <PortalLoading />;
   if (error || !data) {
@@ -69,32 +66,14 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
               {data.description || "No course description has been published."}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setFeedbackOpen(true)}
-              disabled={data.feedbackSubmitted}
-            >
-              <MessageSquareText />
-              {data.feedbackSubmitted ? "Feedback submitted" : "Course feedback"}
-            </Button>
-            <Button
-              onClick={() => {
-                setDownloadError(null);
-                void downloadApprovedCourseDocument(offeringId).catch((reason) =>
-                  setDownloadError(
-                    reason instanceof Error
-                      ? reason.message
-                      : "Could not download course document",
-                  ),
-                );
-              }}
-              disabled={!data.specAvailable}
-            >
-              <Download />
-              Download approved document
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => setFeedbackOpen(true)}
+            disabled={data.feedbackSubmitted}
+          >
+            <MessageSquareText />
+            {data.feedbackSubmitted ? "Feedback submitted" : "Course feedback"}
+          </Button>
         </div>
 
         <div className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -115,12 +94,6 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
           />
         </div>
       </section>
-
-      {downloadError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {downloadError}
-        </p>
-      ) : null}
 
       {!data.specAvailable ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
