@@ -9,6 +9,12 @@ type RecipientRow = {
   telegramUserId: string;
 };
 
+type TeachingLeaveRecipientRow = {
+  studentId: string;
+  identityId: string | null;
+  telegramUserId: string | null;
+};
+
 type DeliveryStatus = "sent" | "failed" | "duplicate";
 
 async function eligibleAnnouncementRecipients(offeringId: string): Promise<RecipientRow[]> {
@@ -21,6 +27,28 @@ async function eligibleAnnouncementRecipients(offeringId: string): Promise<Recip
     WHERE e."offeringId" = ${offeringId}
       AND ti."revokedAt" IS NULL
       AND COALESCE(pref."announcementsEnabled", TRUE) = TRUE
+  `;
+}
+
+/**
+ * Teaching-leave approvals are operational schedule changes, not optional course
+ * announcements. Return every enrollment and attach at most one active Telegram
+ * identity so unlinked students remain visible as missing delivery evidence.
+ */
+async function teachingLeaveRecipients(offeringId: string): Promise<TeachingLeaveRecipientRow[]> {
+  return prisma.$queryRaw<TeachingLeaveRecipientRow[]>`
+    SELECT e."studentId", ti."identityId", ti."telegramUserId"
+    FROM "Enrollment" e
+    JOIN "Student" s ON s."id" = e."studentId"
+    LEFT JOIN LATERAL (
+      SELECT identity."id" AS "identityId", identity."telegramUserId"
+      FROM "telegram_security"."TelegramIdentity" identity
+      WHERE identity."userId" = s."userId" AND identity."revokedAt" IS NULL
+      ORDER BY identity."linkedAt" DESC
+      LIMIT 1
+    ) ti ON TRUE
+    WHERE e."offeringId" = ${offeringId}
+    ORDER BY e."studentId"
   `;
 }
 
@@ -163,6 +191,10 @@ export function teachingLeaveRequesterPath(requestId: string): string {
   return `/telegram/teaching-leave?requestId=${encodeURIComponent(requestId)}`;
 }
 
+export function teachingLeaveStudentPath(occurrenceId: string): string {
+  return `/telegram/schedule-impact?occurrenceId=${encodeURIComponent(occurrenceId)}`;
+}
+
 function leaveDecisionLabel(status: TeachingLeaveStatus): string {
   if (status === "APPROVED") return "approved";
   if (status === "REJECTED") return "rejected";
@@ -209,11 +241,11 @@ export const telegramNotificationService = {
     duplicate: number;
     missing: number;
   }> {
-    const recipients = await eligibleAnnouncementRecipients(input.offeringId);
+    const recipients = await teachingLeaveRecipients(input.offeringId);
     const summary = { sent: 0, failed: 0, duplicate: 0, missing: 0 };
     if (recipients.length === 0) return summary;
     const eventKey = `teaching-leave:${input.requestId}:${input.occurrenceId}:students`;
-    const link = createTelegramDeepLink(`/telegram/schedule?offeringId=${encodeURIComponent(input.offeringId)}`);
+    const link = createTelegramDeepLink(teachingLeaveStudentPath(input.occurrenceId));
     const text = [
       "Teaching schedule update",
       "",
@@ -222,7 +254,17 @@ export const telegramNotificationService = {
       input.room ? `Room: ${input.room}` : "Room: not set",
       "This scheduled session is affected by an approved teaching availability change. Check DSE PMS for the confirmed recovery or updated schedule.",
     ].join("\n");
-    const statuses = await Promise.all(recipients.map((recipient) =>
+
+    const linked: RecipientRow[] = [];
+    for (const recipient of recipients) {
+      if (!recipient.identityId || !recipient.telegramUserId) {
+        summary.missing += 1;
+        continue;
+      }
+      linked.push({ identityId: recipient.identityId, telegramUserId: recipient.telegramUserId });
+    }
+
+    const statuses = await Promise.all(linked.map((recipient) =>
       deliverToRecipient(recipient, eventKey, "teaching_leave_student", input.requestId, text, link)));
     for (const status of statuses) summary[status] += 1;
     return summary;
