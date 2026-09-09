@@ -161,6 +161,12 @@ export function createTelegramRouter(service: TelegramService = telegramService)
       res.json(await offerings.teachingLeave.get(req.telegramUser!, req.params.requestId!));
     } catch (error) { sendMiniAppError(res, error); }
   });
+  router.get("/mini/teaching-leave-impact/:occurrenceId", async (req, res) => {
+    try {
+      const offerings = registry.get<OfferingsService>("offerings").service;
+      res.json(await offerings.teachingLeave.studentImpact(req.telegramUser!, req.params.occurrenceId!));
+    } catch (error) { sendMiniAppError(res, error); }
+  });
   router.get("/mini/classes/:offeringId", async (req, res) => {
     try { res.json(await telegramMiniAppService.course(req.telegramUser!, req.params.offeringId!)); } catch (error) { sendMiniAppError(res, error); }
   });
