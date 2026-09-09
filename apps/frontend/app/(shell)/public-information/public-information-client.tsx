@@ -254,7 +254,7 @@ function message(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
-function statusBadge(status: "Draft" | "Published") {
+function statusBadge(status: "Draft" | "Published" | "Archived") {
   return status === "Published"
     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
     : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300";

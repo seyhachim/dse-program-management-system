@@ -3,6 +3,7 @@ import { z } from "zod";
 export const ProgrammePublicPublicationStatusSchema = z.enum([
   "Draft",
   "Published",
+  "Archived",
 ]);
 export type ProgrammePublicPublicationStatus = z.infer<
   typeof ProgrammePublicPublicationStatusSchema
@@ -51,6 +52,8 @@ const optionalTrimmedUrl = z.string().trim().url().nullable().optional();
 
 const publicationFields = {
   status: ProgrammePublicPublicationStatusSchema.default("Draft"),
+  /** First publication timestamp. It remains populated after unpublish/archive
+   * so management screens can distinguish never-published drafts from history. */
   publishedAt: z.coerce.date().nullable().optional(),
 };
 
@@ -61,18 +64,14 @@ function validatePublicationState(
   },
   ctx: z.RefinementCtx,
 ) {
-  if (value.status === "Published" && !value.publishedAt) {
+  if (
+    (value.status === "Published" || value.status === "Archived") &&
+    !value.publishedAt
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["publishedAt"],
-      message: "publishedAt is required when status is Published",
-    });
-  }
-  if (value.status === "Draft" && value.publishedAt) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["publishedAt"],
-      message: "publishedAt must be empty while status is Draft",
+      message: `publishedAt is required when status is ${value.status}`,
     });
   }
 }
@@ -145,7 +144,7 @@ export type ProgrammePublicProfileInput = z.infer<
 >;
 
 /** Admin writes do not control lifecycle timestamps directly. Publish/unpublish
- * are explicit actions so the backend remains authoritative for `publishedAt`. */
+ * and archive are explicit actions so the backend remains authoritative. */
 export const ProgrammeFaqAdminWriteSchema = z.object({
   category: ProgrammeFaqCategorySchema,
   slug: slugSchema,
@@ -219,6 +218,7 @@ export type ProgrammeFaqRecord = ProgrammeFaqAdminWrite & {
   id: string;
   programmeId: string;
   status: ProgrammePublicPublicationStatus;
+  /** First time this record was published; retained after unpublish/archive. */
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -233,6 +233,7 @@ export type ProgrammeImportantDateRecord = Omit<
   date: string;
   endDate: string | null;
   status: ProgrammePublicPublicationStatus;
+  /** First time this record was published; retained after unpublish/archive. */
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;

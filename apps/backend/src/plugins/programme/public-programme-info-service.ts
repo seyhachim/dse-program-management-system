@@ -97,9 +97,61 @@ function requireDraft(
   status: ProgrammePublicPublicationStatus,
   label: string,
 ): void {
+  if (status !== ProgrammePublicPublicationStatus.Draft) {
+    throw new PublicProgrammeInfoConflictError(
+      status === ProgrammePublicPublicationStatus.Archived
+        ? `Archived ${label} are retained as history and cannot be edited.`
+        : `Published ${label} must be unpublished before editing.`,
+    );
+  }
+}
+
+function requirePublished(
+  status: ProgrammePublicPublicationStatus,
+  label: string,
+): void {
+  if (status !== ProgrammePublicPublicationStatus.Published) {
+    throw new PublicProgrammeInfoConflictError(
+      status === ProgrammePublicPublicationStatus.Archived
+        ? `Archived ${label} cannot be unpublished.`
+        : `${label} is not currently published.`,
+    );
+  }
+}
+
+function requireArchiveCandidate(
+  status: ProgrammePublicPublicationStatus,
+  publishedAt: Date | null,
+  label: string,
+): void {
+  if (status === ProgrammePublicPublicationStatus.Archived) {
+    throw new PublicProgrammeInfoConflictError(`${label} is already archived.`);
+  }
   if (status === ProgrammePublicPublicationStatus.Published) {
     throw new PublicProgrammeInfoConflictError(
-      `Published ${label} must be unpublished before editing or deletion.`,
+      `Published ${label} must be unpublished before archiving.`,
+    );
+  }
+  if (!publishedAt) {
+    throw new PublicProgrammeInfoConflictError(
+      `Never-published ${label} can be deleted instead of archived.`,
+    );
+  }
+}
+
+function requireHardDeleteCandidate(
+  status: ProgrammePublicPublicationStatus,
+  publishedAt: Date | null,
+  label: string,
+): void {
+  if (status === ProgrammePublicPublicationStatus.Published) {
+    throw new PublicProgrammeInfoConflictError(
+      `Published ${label} must be unpublished before removal.`,
+    );
+  }
+  if (status === ProgrammePublicPublicationStatus.Archived || publishedAt) {
+    throw new PublicProgrammeInfoConflictError(
+      `Previously published ${label} are retained for audit history and cannot be permanently deleted. Archive the hidden record instead.`,
     );
   }
 }
@@ -167,11 +219,27 @@ export const publicProgrammeInfoService = {
     };
   },
 
+  /** Active authoring list. Historical hidden/archived records live in the
+   * lifecycle view so the existing editor never misrepresents them as drafts. */
   async listFaqs(programmeId: string) {
     await assertProgramme(programmeId);
     return prisma.programmeFaq.findMany({
-      where: { programmeId },
+      where: {
+        programmeId,
+        OR: [
+          { status: ProgrammePublicPublicationStatus.Published },
+          { status: ProgrammePublicPublicationStatus.Draft, publishedAt: null },
+        ],
+      },
       orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { question: "asc" }],
+    });
+  },
+
+  async listFaqLifecycle(programmeId: string) {
+    await assertProgramme(programmeId);
+    return prisma.programmeFaq.findMany({
+      where: { programmeId },
+      orderBy: [{ updatedAt: "desc" }, { category: "asc" }, { question: "asc" }],
     });
   },
 
@@ -199,38 +267,64 @@ export const publicProgrammeInfoService = {
 
   async publishFaq(programmeId: string, id: string) {
     const faq = await getFaq(programmeId, id);
+    if (faq.status === ProgrammePublicPublicationStatus.Archived) {
+      throw new PublicProgrammeInfoConflictError(
+        "Archived FAQs are retained as history and cannot be republished. Create a new FAQ instead.",
+      );
+    }
     await assertFeaturedPublishCapacity(programmeId, id, faq.isFeatured);
     return prisma.programmeFaq.update({
       where: { id },
       data: {
         status: ProgrammePublicPublicationStatus.Published,
-        publishedAt: new Date(),
+        publishedAt: faq.publishedAt ?? new Date(),
       },
     });
   },
 
   async unpublishFaq(programmeId: string, id: string) {
-    await getFaq(programmeId, id);
+    const faq = await getFaq(programmeId, id);
+    requirePublished(faq.status, "FAQ");
     return prisma.programmeFaq.update({
       where: { id },
-      data: {
-        status: ProgrammePublicPublicationStatus.Draft,
-        publishedAt: null,
-      },
+      data: { status: ProgrammePublicPublicationStatus.Draft },
+    });
+  },
+
+  async archiveFaq(programmeId: string, id: string) {
+    const faq = await getFaq(programmeId, id);
+    requireArchiveCandidate(faq.status, faq.publishedAt, "FAQ");
+    return prisma.programmeFaq.update({
+      where: { id },
+      data: { status: ProgrammePublicPublicationStatus.Archived },
     });
   },
 
   async deleteFaq(programmeId: string, id: string) {
     const faq = await getFaq(programmeId, id);
-    requireDraft(faq.status, "FAQs");
+    requireHardDeleteCandidate(faq.status, faq.publishedAt, "FAQs");
     await prisma.programmeFaq.delete({ where: { id } });
   },
 
   async listImportantDates(programmeId: string) {
     await assertProgramme(programmeId);
     return prisma.programmeImportantDate.findMany({
-      where: { programmeId },
+      where: {
+        programmeId,
+        OR: [
+          { status: ProgrammePublicPublicationStatus.Published },
+          { status: ProgrammePublicPublicationStatus.Draft, publishedAt: null },
+        ],
+      },
       orderBy: [{ date: "asc" }, { sortOrder: "asc" }, { title: "asc" }],
+    });
+  },
+
+  async listImportantDateLifecycle(programmeId: string) {
+    await assertProgramme(programmeId);
+    return prisma.programmeImportantDate.findMany({
+      where: { programmeId },
+      orderBy: [{ updatedAt: "desc" }, { date: "desc" }, { title: "asc" }],
     });
   },
 
@@ -263,30 +357,42 @@ export const publicProgrammeInfoService = {
   },
 
   async publishImportantDate(programmeId: string, id: string) {
-    await getImportantDate(programmeId, id);
+    const item = await getImportantDate(programmeId, id);
+    if (item.status === ProgrammePublicPublicationStatus.Archived) {
+      throw new PublicProgrammeInfoConflictError(
+        "Archived important dates are retained as history and cannot be republished. Create a new date instead.",
+      );
+    }
     return prisma.programmeImportantDate.update({
       where: { id },
       data: {
         status: ProgrammePublicPublicationStatus.Published,
-        publishedAt: new Date(),
+        publishedAt: item.publishedAt ?? new Date(),
       },
     });
   },
 
   async unpublishImportantDate(programmeId: string, id: string) {
-    await getImportantDate(programmeId, id);
+    const item = await getImportantDate(programmeId, id);
+    requirePublished(item.status, "Important date");
     return prisma.programmeImportantDate.update({
       where: { id },
-      data: {
-        status: ProgrammePublicPublicationStatus.Draft,
-        publishedAt: null,
-      },
+      data: { status: ProgrammePublicPublicationStatus.Draft },
+    });
+  },
+
+  async archiveImportantDate(programmeId: string, id: string) {
+    const item = await getImportantDate(programmeId, id);
+    requireArchiveCandidate(item.status, item.publishedAt, "important date");
+    return prisma.programmeImportantDate.update({
+      where: { id },
+      data: { status: ProgrammePublicPublicationStatus.Archived },
     });
   },
 
   async deleteImportantDate(programmeId: string, id: string) {
     const item = await getImportantDate(programmeId, id);
-    requireDraft(item.status, "important dates");
+    requireHardDeleteCandidate(item.status, item.publishedAt, "important dates");
     await prisma.programmeImportantDate.delete({ where: { id } });
   },
 

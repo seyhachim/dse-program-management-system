@@ -308,6 +308,7 @@ enum QaSarReviewDecision {
 enum ProgrammePublicPublicationStatus {
   Draft
   Published
+  Archived
 }
 
 enum ProgrammeFaqCategory {
