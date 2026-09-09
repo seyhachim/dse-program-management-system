@@ -9,6 +9,7 @@ import { createCurriculumHistoryRouter } from "./curriculum-history-router.ts";
 import { createCurriculumImportRouter } from "./curriculum-import-router.ts";
 import { createCurriculumWorkflowRouter } from "./curriculum-workflow-router.ts";
 import { createGradingScaleRouter } from "./grading-scale-router.ts";
+import { offeringCurriculumService } from "./offering-curriculum-service.ts";
 import { publicCurriculumReadService } from "./public-curriculum-read-service.ts";
 import { createPublicProgrammeInfoRouter } from "./public-programme-info-router.ts";
 import { createPublicProgrammeReadRouter } from "./public-programme-read-router.ts";
@@ -45,6 +46,7 @@ export const programmeBackendService = {
   publicSearch: publicProgrammeSearchService,
   publicQuestionAnalytics: publicQuestionAnalyticsService,
   academicCalendar: academicCalendarService,
+  offeringCurriculum: offeringCurriculumService,
 };
 
 export type ProgrammeBackendService = typeof programmeBackendService;
