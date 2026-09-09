@@ -9,18 +9,8 @@
 CREATE SCHEMA IF NOT EXISTS offering_governance;
 
 REVOKE ALL ON SCHEMA offering_governance FROM PUBLIC;
-REVOKE ALL ON SCHEMA offering_governance FROM anon;
-REVOKE ALL ON SCHEMA offering_governance FROM authenticated;
-REVOKE ALL ON SCHEMA offering_governance FROM service_role;
-
 ALTER DEFAULT PRIVILEGES IN SCHEMA offering_governance
   REVOKE ALL ON TABLES FROM PUBLIC;
-ALTER DEFAULT PRIVILEGES IN SCHEMA offering_governance
-  REVOKE ALL ON TABLES FROM anon;
-ALTER DEFAULT PRIVILEGES IN SCHEMA offering_governance
-  REVOKE ALL ON TABLES FROM authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA offering_governance
-  REVOKE ALL ON TABLES FROM service_role;
 
 CREATE TABLE offering_governance."OfferingCurriculumBinding" (
   "offeringId" TEXT NOT NULL,
@@ -57,6 +47,25 @@ CREATE INDEX "OfferingCurriculumBinding_curriculumVersionId_idx"
 ALTER TABLE offering_governance."OfferingCurriculumBinding" ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON ALL TABLES IN SCHEMA offering_governance FROM PUBLIC;
-REVOKE ALL ON ALL TABLES IN SCHEMA offering_governance FROM anon;
-REVOKE ALL ON ALL TABLES IN SCHEMA offering_governance FROM authenticated;
-REVOKE ALL ON ALL TABLES IN SCHEMA offering_governance FROM service_role;
+
+-- Local/integration PostgreSQL may not define Supabase Data API roles. Revoke
+-- them conditionally so the same migration is safe in CI/local and Supabase.
+DO $offering_governance_roles$
+DECLARE
+  role_name TEXT;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL ON SCHEMA offering_governance FROM %I', role_name);
+      EXECUTE format(
+        'ALTER DEFAULT PRIVILEGES IN SCHEMA offering_governance REVOKE ALL ON TABLES FROM %I',
+        role_name
+      );
+      EXECUTE format(
+        'REVOKE ALL ON ALL TABLES IN SCHEMA offering_governance FROM %I',
+        role_name
+      );
+    END IF;
+  END LOOP;
+END
+$offering_governance_roles$;
