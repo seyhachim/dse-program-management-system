@@ -67,7 +67,7 @@ export function createAsyncTtlCache(
       if (current) entries.delete(fullKey);
 
       evictOldestIfNeeded();
-      const promise = Promise.resolve().then(loader);
+      const promise = loader();
       const entry: CacheEntry = {
         scope,
         expiresAt: currentTime + ttlMs,
