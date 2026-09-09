@@ -12,20 +12,27 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).not.toContain("CourseSpec");
   });
 
-  test("uses the existing official DSE logo in a compact branded header", () => {
+  test("keeps official DSE branding and student identity in the hero", () => {
     expect(portalHomeSource).toContain('src="/dse-logo.svg"');
     expect(portalHomeSource).toContain('alt="DSE logo"');
     expect(portalHomeSource).toContain("DSE Student Portal");
-    expect(portalHomeSource).not.toContain("UserRound");
+    expect(portalHomeSource).toContain('aria-label="Student identity"');
+    expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
   });
 
   test("surfaces four high-frequency student shortcuts", () => {
-    expect(portalHomeSource).toContain('label: "Schedule", href: "/portal/schedule"');
-    expect(portalHomeSource).toContain('label: "Courses", href: "/portal/courses"');
-    expect(portalHomeSource).toContain(
-      'label: "Assessments", href: "/portal/assessments"',
-    );
-    expect(portalHomeSource).toContain('label: "Results", href: "/portal/results"');
+    for (const label of ["Schedule", "Courses", "Assessments", "Results"]) {
+      expect(portalHomeSource).toContain(`label: "${label}"`);
+    }
+    for (const href of [
+      "/portal/schedule",
+      "/portal/courses",
+      "/portal/assessments",
+      "/portal/results",
+    ]) {
+      expect(portalHomeSource).toContain(`href: "${href}"`);
+    }
+    expect(portalHomeSource).toContain('aria-label="Student shortcuts"');
   });
 
   test("makes schedule context the primary home card", () => {
@@ -44,10 +51,14 @@ describe("Student Portal mobile home contract", () => {
     expect(nextClassLinkIndex).toBeLessThan(shortcutsIndex);
     expect(portalHomeSource).toContain("nextScheduledMeeting(data.courses, new Date())");
     expect(portalHomeSource).toContain("nextMeeting.course.lecturer?.name");
+    expect(portalHomeSource).toContain("View schedule");
+    expect(portalHomeSource).toContain("Time");
+    expect(portalHomeSource).toContain("Room");
+    expect(portalHomeSource).toContain("Lecturer");
   });
 
-  test("keeps upcoming assessments ahead of secondary information", () => {
-    const assessmentsIndex = portalHomeSource.indexOf("Coming up");
+  test("keeps assessments ahead of secondary information and improves scanability", () => {
+    const assessmentsIndex = portalHomeSource.indexOf("Upcoming work");
     const announcementsIndex = portalHomeSource.indexOf("Latest announcements");
     const calendarIndex = portalHomeSource.indexOf("Academic calendar");
 
@@ -56,11 +67,15 @@ describe("Student Portal mobile home contract", () => {
     expect(calendarIndex).toBeGreaterThan(-1);
     expect(assessmentsIndex).toBeLessThan(announcementsIndex);
     expect(announcementsIndex).toBeLessThan(calendarIndex);
+    expect(portalHomeSource).toContain("CalendarClock");
+    expect(portalHomeSource).toContain("% weight");
   });
 
-  test("keeps the home feed concise and removes redundant course browsing", () => {
+  test("keeps the home feed concise and long content viewport-safe", () => {
     expect(portalHomeSource).toContain("upcomingAssessments.slice(0, 3)");
     expect(portalHomeSource).toContain("announcements.slice(0, 2)");
+    expect(portalHomeSource).toContain("min-w-0");
+    expect(portalHomeSource).toContain("break-words");
     expect(portalHomeSource).not.toContain("My courses");
   });
 });
