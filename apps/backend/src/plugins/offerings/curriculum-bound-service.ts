@@ -3,7 +3,6 @@ import {
   type AcademicCalendarServiceContract,
   type CoursesServiceContract,
   type CreateCurriculumBoundOfferingInput,
-  type LecturerRef,
   type LecturersServiceContract,
   type OfferingCurriculumBindingView,
   type OfferingCurriculumPlacementRef,
@@ -29,7 +28,6 @@ interface ProgrammeOfferingContextService {
 type BindingRow = {
   offeringId: string;
   curriculumCourseId: string;
-  curriculumVersionId: string;
   boundByUserId: string;
   boundAt: Date;
   updatedByUserId: string;
@@ -79,7 +77,6 @@ async function bindingRow(offeringId: string): Promise<BindingRow | null> {
     SELECT
       "offeringId",
       "curriculumCourseId",
-      "curriculumVersionId",
       "boundByUserId",
       "boundAt",
       "updatedByUserId",
@@ -91,19 +88,33 @@ async function bindingRow(offeringId: string): Promise<BindingRow | null> {
   return rows[0] ?? null;
 }
 
-async function bindingView(offeringId: string, programmeId: string): Promise<OfferingCurriculumBindingView | null> {
+async function bindingView(
+  offeringId: string,
+  programmeId: string,
+): Promise<OfferingCurriculumBindingView | null> {
   const row = await bindingRow(offeringId);
   if (!row) return null;
-  const [placement, version] = await Promise.all([
-    programme().offeringCurriculum.getPlacement(programmeId, row.curriculumCourseId),
-    programme().offeringCurriculum.getVersion(programmeId, row.curriculumVersionId),
-  ]);
-  if (!placement || !version) {
-    throw new CurriculumBoundOfferingReferenceError("Offering curriculum provenance is no longer resolvable");
+  const placement = await programme().offeringCurriculum.getPlacement(
+    programmeId,
+    row.curriculumCourseId,
+  );
+  if (!placement) {
+    throw new CurriculumBoundOfferingReferenceError("Offering curriculum placement is no longer resolvable");
+  }
+  const version = await programme().offeringCurriculum.getVersion(
+    programmeId,
+    placement.curriculumVersionId,
+  );
+  if (!version) {
+    throw new CurriculumBoundOfferingReferenceError("Offering curriculum version is no longer resolvable");
   }
   return {
-    ...row,
+    offeringId: row.offeringId,
+    curriculumCourseId: row.curriculumCourseId,
+    curriculumVersionId: placement.curriculumVersionId,
+    boundByUserId: row.boundByUserId,
     boundAt: row.boundAt.toISOString(),
+    updatedByUserId: row.updatedByUserId,
     updatedAt: row.updatedAt.toISOString(),
     version,
     placement,
@@ -241,13 +252,11 @@ export const curriculumBoundOfferingService = {
           INSERT INTO offering_governance."OfferingCurriculumBinding" (
             "offeringId",
             "curriculumCourseId",
-            "curriculumVersionId",
             "boundByUserId",
             "updatedByUserId"
           ) VALUES (
             ${created.id},
             ${placement.id},
-            ${placement.curriculumVersionId},
             ${actorId},
             ${actorId}
           )
@@ -303,6 +312,11 @@ export const curriculumBoundOfferingService = {
     if (existing.status === "Completed") {
       throw new CurriculumBoundOfferingReferenceError(
         "Completed Offering academic context is historical and cannot be edited",
+      );
+    }
+    if (patch.startDate !== undefined || patch.endDate !== undefined) {
+      throw new CurriculumBoundOfferingReferenceError(
+        "Teaching dates for curriculum-bound Offerings come from the Academic Calendar",
       );
     }
     if (!nextProgrammeYear || !nextPeriodId) {
