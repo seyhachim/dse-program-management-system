@@ -7,6 +7,7 @@ import { lecturersPlugin } from "../lecturers/index.ts";
 import { programmePlugin } from "../programme/index.ts";
 import { academicCalendarService } from "../programme/academic-calendar-service.ts";
 import { gradingScaleService } from "../programme/grading-scale-service.ts";
+import { curriculumWorkflowService } from "../programme/curriculum-workflow-service.ts";
 import { studentsPlugin } from "../students/index.ts";
 import { studentPortalService } from "../student-portal/service.ts";
 import { resultsLifecycleService } from "../student-portal/results-lifecycle.ts";
@@ -192,7 +193,7 @@ dbDescribe("Offering exact CourseSpec version integrity", () => {
     const suffix = randomUUID();
     const actor = await prisma.user.findFirstOrThrow({ select: { id: true } });
     const lecturer = await prisma.user.findFirstOrThrow({
-      where: { roleAssignments: { some: { role: { slug: "lecturer" } } } },
+      where: { roleAssignments: { some: { role: { slug: "lecturer" } } }, },
       select: { id: true },
     });
     const programmeId = `offering-pending-${suffix}`;
@@ -310,10 +311,10 @@ dbDescribe("Offering exact CourseSpec version integrity", () => {
     const curriculumVersion = await prisma.programmeCurriculumVersion.create({
       data: {
         curriculumId: curriculum.id,
-        status: "Approved",
         revisionTriggers: [],
+        cohortLabel: "Fixture cohort",
+        intakeYear: 2196,
         academicYear: academicYear.label,
-        approvedAt: new Date(),
         createdById: actor.id,
       },
     });
@@ -329,6 +330,16 @@ dbDescribe("Offering exact CourseSpec version integrity", () => {
         sortOrder: 0,
       },
     });
+    await curriculumWorkflowService.submit(
+      curriculumVersion.id,
+      actor.id,
+      "Submit provisional Offering fixture curriculum",
+    );
+    await curriculumWorkflowService.approve(
+      curriculumVersion.id,
+      actor.id,
+      "Approve provisional Offering fixture curriculum",
+    );
 
     const active = await offeringService.update(planned.id, {
       courseSpecId: approvedSpec.id,
