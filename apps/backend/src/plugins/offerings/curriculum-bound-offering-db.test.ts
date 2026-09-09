@@ -7,6 +7,7 @@ import { coursesPlugin } from "../courses/index.ts";
 import { lecturersPlugin } from "../lecturers/index.ts";
 import { programmePlugin } from "../programme/index.ts";
 import { academicCalendarService } from "../programme/academic-calendar-service.ts";
+import { curriculumWorkflowService } from "../programme/curriculum-workflow-service.ts";
 import { studentsPlugin } from "../students/index.ts";
 import { curriculumBoundOfferingService } from "./curriculum-bound-service.ts";
 import { offeringService } from "./service.ts";
@@ -67,16 +68,17 @@ dbDescribe("curriculum-bound Offerings", () => {
         courseType: CourseType.Core,
       },
     });
+
+    // Build both curriculum versions through the canonical Draft → submit → approve
+    // workflow. The database correctly prevents adding placements after approval.
     const olderVersion = await prisma.programmeCurriculumVersion.create({
       data: {
         curriculumId: curriculum.id,
         versionMajor: 1,
         versionMinor: 0,
-        status: "Approved",
         cohortLabel: "Cohort 2025",
         intakeYear: 2025,
         academicYear: "2025-2026",
-        approvedAt: new Date(),
         createdById: actor.id,
       },
     });
@@ -90,16 +92,30 @@ dbDescribe("curriculum-bound Offerings", () => {
         courseTypeSnapshot: CourseType.Core,
       },
     });
+    await curriculumWorkflowService.submit(
+      olderVersion.id,
+      actor.id,
+      "Submit older curriculum fixture for issue 968",
+    );
+    await curriculumWorkflowService.approve(
+      olderVersion.id,
+      actor.id,
+      "Approve older curriculum fixture for issue 968",
+    );
+
     const newerVersion = await prisma.programmeCurriculumVersion.create({
       data: {
         curriculumId: curriculum.id,
         versionMajor: 2,
         versionMinor: 0,
-        status: "Approved",
+        revisionType: "Major",
+        revisionTriggers: ["ProgrammeCoordinator"],
+        revisionReason: "Issue 968 fixture newer curriculum",
+        changeSummary: "Replace the Year III example course",
+        basedOnVersionId: olderVersion.id,
         cohortLabel: "Cohort 2026",
         intakeYear: 2026,
         academicYear: "2026-2027",
-        approvedAt: new Date(),
         createdById: actor.id,
       },
     });
@@ -113,6 +129,16 @@ dbDescribe("curriculum-bound Offerings", () => {
         courseTypeSnapshot: CourseType.Core,
       },
     });
+    await curriculumWorkflowService.submit(
+      newerVersion.id,
+      actor.id,
+      "Submit newer curriculum fixture for issue 968",
+    );
+    await curriculumWorkflowService.approve(
+      newerVersion.id,
+      actor.id,
+      "Approve newer curriculum fixture for issue 968",
+    );
 
     const academicYear = await academicCalendarService.createAcademicYear(programmeId, {
       label: "2026-2027",
