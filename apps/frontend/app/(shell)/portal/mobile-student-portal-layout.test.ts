@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 
 describe("mobile Student Portal layout", () => {
-  test("student home keeps identity compact and quick actions phone-friendly", () => {
+  test("student home keeps identity compact and four quick actions phone-friendly", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.hero).toContain("py-3");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions).toContain("grid-cols-3");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("min-h-16");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions).toContain("grid-cols-2");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickActions).toContain("sm:grid-cols-4");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("min-h-20");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeQuickAction).toContain("min-w-0");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("min-h-11");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("bg-primary/5");
   });
 
   test("course cards are compact on phones and restore desktop card height at md", () => {
