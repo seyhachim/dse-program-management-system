@@ -7,9 +7,11 @@ import {
   BookOpen,
   CalendarDays,
   ChevronRight,
+  ClipboardList,
   Clock3,
   FileText,
   MapPin,
+  UserRound,
 } from "lucide-react";
 import {
   academicSemesterLabel,
@@ -22,7 +24,6 @@ import {
 } from "@/lib/student-portal";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 import {
-  EmptyState,
   PortalError,
   PortalLoading,
   useCachedPortalData,
@@ -37,10 +38,60 @@ const HOME_PREFETCH = [
 ] as const;
 
 const QUICK_ACTIONS = [
-  { label: "Courses", href: "/portal/courses", icon: BookOpen },
   { label: "Schedule", href: "/portal/schedule", icon: CalendarDays },
+  { label: "Courses", href: "/portal/courses", icon: BookOpen },
+  { label: "Assessments", href: "/portal/assessments", icon: ClipboardList },
   { label: "Results", href: "/portal/results", icon: FileText },
 ] as const;
+
+const WEEKDAY_INDEX = new Map(
+  ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
+    (day, index) => [day, index],
+  ),
+);
+
+type HomeMeeting = Parameters<typeof meetingLabel>[0];
+
+function timeMinutes(value: string): number {
+  const [hours = "0", minutes = "0"] = value.split(":");
+  return Number(hours) * 60 + Number(minutes);
+}
+
+function nextScheduledMeeting<TCourse extends { meetings: HomeMeeting[] }>(
+  courses: TCourse[],
+  now: Date,
+) {
+  const nowDay = now.getDay();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return courses
+    .flatMap((course) =>
+      course.meetings.map((meeting) => {
+        const meetingDay = WEEKDAY_INDEX.get(meeting.dayOfWeek);
+        if (meetingDay === undefined) return null;
+
+        let dayOffset = (meetingDay - nowDay + 7) % 7;
+        const start = timeMinutes(meeting.startTime);
+        const end = timeMinutes(meeting.endTime);
+        if (dayOffset === 0 && nowMinutes >= end) dayOffset = 7;
+
+        return {
+          course,
+          meeting,
+          dayOffset,
+          sortMinutes: dayOffset * 24 * 60 + start - nowMinutes,
+        };
+      }),
+    )
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => a.sortMinutes - b.sortMinutes)[0] ?? null;
+}
+
+function relativeMeetingDay(dayOffset: number, dayOfWeek: string): string {
+  if (dayOffset === 0) return "Today";
+  if (dayOffset === 1) return "Tomorrow";
+  return dayOfWeek;
+}
 
 export function PortalHome() {
   const load = useCallback(() => studentPortalApi.home(), []);
@@ -55,9 +106,7 @@ export function PortalHome() {
     return <PortalError message={error ?? "Could not load your portal"} />;
   }
 
-  const nextMeeting = data.courses.flatMap((course) =>
-    course.meetings.map((meeting) => ({ course, meeting })),
-  )[0];
+  const nextMeeting = nextScheduledMeeting(data.courses, new Date());
   const calendar = data.academicCalendar;
   const firstCalendarPeriod =
     calendar.status === "available" ? (calendar.periods[0] ?? null) : null;
@@ -68,7 +117,7 @@ export function PortalHome() {
 
   return (
     <div
-      className={`mx-auto max-w-7xl ${MOBILE_STUDENT_PORTAL_LAYOUT.homeStack}`}
+      className={`mx-auto max-w-5xl ${MOBILE_STUDENT_PORTAL_LAYOUT.homeStack}`}
     >
       {refreshError ? (
         <div className="rounded-xl border border-status-upcoming bg-status-upcoming-bg px-4 py-3 text-sm text-status-upcoming">
@@ -79,14 +128,73 @@ export function PortalHome() {
       ) : null}
 
       <section className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}>
-        <p className="text-xs font-medium text-muted-foreground">Welcome back</p>
-        <h2 className="mt-1 break-words text-xl font-semibold tracking-tight text-foreground">
-          {data.student.name}
-        </h2>
-        <p className="mt-0.5 break-words text-xs text-muted-foreground">
-          {data.student.studentId}
-        </p>
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <UserRound className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">Welcome back</p>
+            <h2 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+              {data.student.name}
+            </h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {data.student.studentId}
+            </p>
+          </div>
+        </div>
       </section>
+
+      <Link
+        href="/portal/schedule"
+        className={MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              {nextMeeting
+                ? relativeMeetingDay(nextMeeting.dayOffset, nextMeeting.meeting.dayOfWeek)
+                : "Schedule"}
+            </p>
+            {nextMeeting ? (
+              <>
+                <p className="mt-1 break-words text-xl font-semibold leading-tight text-foreground">
+                  {nextMeeting.course.title}
+                </p>
+                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                  {nextMeeting.course.code} · Section {nextMeeting.course.sectionCode}
+                </p>
+                <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                  <span className="flex min-w-0 items-start gap-2">
+                    <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="break-words">
+                      {meetingLabel(nextMeeting.meeting)}
+                    </span>
+                  </span>
+                  <span className="flex min-w-0 items-start gap-2">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="break-words">
+                      {nextMeeting.meeting.room || "Room TBA"}
+                    </span>
+                  </span>
+                </div>
+                <p className="mt-3 text-sm font-medium text-foreground">
+                  {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-lg font-semibold text-foreground">
+                  No class scheduled yet
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Open your schedule to check published class times.
+                </p>
+              </>
+            )}
+          </div>
+          <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+        </div>
+      </Link>
 
       <nav
         aria-label="Student shortcuts"
@@ -107,51 +215,14 @@ export function PortalHome() {
         })}
       </nav>
 
-      <Link
-        href="/portal/schedule"
-        className={MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              Next class
-            </p>
-            {nextMeeting ? (
-              <>
-                <p className="mt-1 break-words text-lg font-semibold text-foreground">
-                  {nextMeeting.course.code} · {nextMeeting.course.title}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Section {nextMeeting.course.sectionCode}
-                </p>
-                <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:flex sm:flex-wrap sm:gap-4">
-                  <span className="flex min-w-0 items-start gap-2">
-                    <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="break-words">
-                      {meetingLabel(nextMeeting.meeting)}
-                    </span>
-                  </span>
-                  <span className="flex min-w-0 items-start gap-2">
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="break-words">
-                      {nextMeeting.meeting.room || "Room TBA"}
-                    </span>
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">
-                No class schedule is available yet.
-              </p>
-            )}
-          </div>
-          <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
-        </div>
-      </Link>
-
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold">Upcoming assessments</h3>
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Coming up
+            </p>
+            <h3 className="text-lg font-semibold">Assessments</h3>
+          </div>
           <Link
             className="flex min-h-11 shrink-0 items-center text-sm font-medium text-primary"
             href="/portal/assessments"
@@ -161,20 +232,23 @@ export function PortalHome() {
         </div>
         <div className="rounded-2xl border border-border bg-card p-2 shadow-sm">
           {data.upcomingAssessments.length ? (
-            data.upcomingAssessments.map((item) => (
+            data.upcomingAssessments.slice(0, 3).map((item) => (
               <Link
                 key={`${item.offeringId}-${item.assessmentId}`}
                 href={`/portal/courses/${item.offeringId}`}
-                className="flex min-h-11 min-w-0 items-start gap-3 rounded-xl p-3 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-14 min-w-0 items-start gap-3 rounded-xl p-3 transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                <div className="min-w-0">
-                  <p className="break-words text-sm font-medium">{item.name}</p>
-                  <p className="break-words text-xs text-muted-foreground">
+                <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm font-semibold">{item.name}</p>
+                  <p className="mt-0.5 break-words text-xs text-muted-foreground">
                     {item.courseCode} · {assessmentDeadline(item.dueAt, item.dueWeek)}
                     {item.weight ? ` · ${item.weight}%` : ""}
                   </p>
                 </div>
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               </Link>
             ))
           ) : (
@@ -185,91 +259,11 @@ export function PortalHome() {
         </div>
       </section>
 
-      <Link
-        href="/portal/academic-calendar"
-        className="group block min-h-11 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-              <h3 className="font-semibold">Academic Calendar</h3>
-            </div>
-            {calendar.status === "available" && firstCalendarPeriod ? (
-              <>
-                <p className="mt-2 break-words text-sm font-medium">
-                  {academicSemesterLabel(firstCalendarPeriod.semester)} ·{" "}
-                  {formatAcademicDate(firstCalendarPeriod.teachingStart)} –{" "}
-                  {formatAcademicDate(firstCalendarPeriod.teachingEnd)}
-                </p>
-                <p className="mt-1 break-words text-xs text-muted-foreground">
-                  {calendar.nextEvent
-                    ? `Next: ${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}`
-                    : "No upcoming event is currently published."}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="mt-2 text-sm font-medium">
-                  Calendar not available yet
-                </p>
-                <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">
-                  {unavailableCalendarMessage}
-                </p>
-              </>
-            )}
-          </div>
-          <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
-        </div>
-      </Link>
-
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold">My courses</h3>
-          <Link
-            className="flex min-h-11 items-center text-sm font-medium text-primary"
-            href="/portal/courses"
-          >
-            View all
-          </Link>
-        </div>
-        {data.courses.length ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {data.courses.slice(0, 4).map((course) => (
-              <Link
-                key={course.offeringId}
-                href={`/portal/courses/${course.offeringId}`}
-                className="group min-w-0 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md md:p-5 md:hover:-translate-y-0.5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="rounded-lg bg-primary/10 p-2 text-primary">
-                    <BookOpen className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
-                </div>
-                <p className="mt-4 break-words text-xs font-semibold uppercase tracking-wide text-primary">
-                  {course.code} · Section {course.sectionCode}
-                </p>
-                <h4 className="mt-1 break-words font-semibold">{course.title}</h4>
-                <p className="mt-2 break-words text-sm text-muted-foreground">
-                  {course.lecturer?.name ?? "Lecturer TBA"}
-                </p>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="No enrolled courses"
-            description="Your courses will appear after enrollment."
-          />
-        )}
-      </section>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 px-1">
           <h3 className="flex min-w-0 items-center gap-2 text-lg font-semibold">
             <Bell className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-            <span className="break-words">Recent announcements</span>
+            <span className="break-words">Latest announcements</span>
           </h3>
           <Link
             className="flex min-h-11 shrink-0 items-center text-sm font-medium text-primary"
@@ -278,9 +272,9 @@ export function PortalHome() {
             View all
           </Link>
         </div>
-        <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+        <div className="divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
           {data.announcements.length ? (
-            data.announcements.map((item) => (
+            data.announcements.slice(0, 2).map((item) => (
               <div key={item.id} className="min-w-0 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="break-words text-xs font-semibold text-primary">
@@ -305,6 +299,42 @@ export function PortalHome() {
           )}
         </div>
       </section>
+
+      <Link
+        href="/portal/academic-calendar"
+        className="group block min-h-11 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+              <h3 className="font-semibold">Academic calendar</h3>
+            </div>
+            {calendar.status === "available" && firstCalendarPeriod ? (
+              <>
+                <p className="mt-2 break-words text-sm font-medium">
+                  {calendar.nextEvent
+                    ? `${calendar.nextEvent.title} · ${formatAcademicDate(calendar.nextEvent.startDate)}`
+                    : `${academicSemesterLabel(firstCalendarPeriod.semester)} · ${formatAcademicDate(firstCalendarPeriod.teachingStart)} – ${formatAcademicDate(firstCalendarPeriod.teachingEnd)}`}
+                </p>
+                <p className="mt-1 break-words text-xs text-muted-foreground">
+                  {academicSemesterLabel(firstCalendarPeriod.semester)} · Academic year {calendar.academicYear?.label ?? "current"}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm font-medium">
+                  Calendar not available yet
+                </p>
+                <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">
+                  {unavailableCalendarMessage}
+                </p>
+              </>
+            )}
+          </div>
+          <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+        </div>
+      </Link>
     </div>
   );
 }
