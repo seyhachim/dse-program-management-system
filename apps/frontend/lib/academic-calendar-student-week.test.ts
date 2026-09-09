@@ -5,10 +5,13 @@ import {
   resolveStudentTeachingContext,
 } from "./academic-calendar";
 
+type AvailableStudentCalendar = Extract<
+  StudentAcademicCalendarView,
+  { status: "available" }
+>;
+
 function calendarWithPeriods(
-  periods: StudentAcademicCalendarView extends { status: "available"; periods: infer T }
-    ? T
-    : never,
+  periods: AvailableStudentCalendar["periods"],
 ): StudentAcademicCalendarView {
   return {
     status: "available",
