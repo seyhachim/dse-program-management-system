@@ -50,20 +50,17 @@ const WEEKDAY_INDEX = new Map(
   ),
 );
 
+type HomeMeeting = Parameters<typeof meetingLabel>[0];
+
 function timeMinutes(value: string): number {
   const [hours = "0", minutes = "0"] = value.split(":");
   return Number(hours) * 60 + Number(minutes);
 }
 
-function nextScheduledMeeting<
-  TCourse extends {
-    meetings: Array<{
-      dayOfWeek: string;
-      startTime: string;
-      endTime: string;
-    }>;
-  },
->(courses: TCourse[], now: Date) {
+function nextScheduledMeeting<TCourse extends { meetings: HomeMeeting[] }>(
+  courses: TCourse[],
+  now: Date,
+) {
   const nowDay = now.getDay();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
