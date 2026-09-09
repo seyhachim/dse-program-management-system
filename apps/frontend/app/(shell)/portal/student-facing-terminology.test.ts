@@ -4,9 +4,13 @@ import { readFileSync } from "node:fs";
 const STUDENT_SURFACES = [
   ["home", "./portal-home.tsx"],
   ["courses", "./courses/portal-courses.tsx"],
+  ["courses page", "./courses/page.tsx"],
   ["course detail", "./courses/[offeringId]/portal-course.tsx"],
+  ["course detail page", "./courses/[offeringId]/page.tsx"],
   ["assessments", "./assessments/portal-assessments.tsx"],
+  ["assessments page", "./assessments/page.tsx"],
   ["results", "./results/portal-results.tsx"],
+  ["results page", "./results/page.tsx"],
 ] as const;
 
 function source(path: string): string {
@@ -32,7 +36,7 @@ describe("core Student Portal terminology", () => {
     expect(contents).toContain("Learning details pending");
   });
 
-  test("course detail keeps student-useful learning content without outcome-code UI", () => {
+  test("course detail keeps student-useful learning content without spec document or outcome-code UI", () => {
     const contents = source("./courses/[offeringId]/portal-course.tsx");
 
     expect(contents).toContain('Card title="Weekly topics"');
@@ -40,6 +44,8 @@ describe("core Student Portal terminology", () => {
     expect(contents).toContain('Card title="Published results"');
     expect(contents).toContain('Card title="Learning resources"');
     expect(contents).not.toContain("cloCodes");
+    expect(contents).not.toContain("downloadApprovedCourseDocument");
+    expect(contents).not.toContain("Download approved document");
   });
 
   test("assessment and result screens do not render outcome-code metadata", () => {
