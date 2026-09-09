@@ -617,10 +617,10 @@ export const teachingLeaveService = {
       if (current.requesterId === user.id) throw new TeachingLeaveAuthorizationError("A lecturer cannot review their own teaching leave request");
       if (!isManager(user, current.programmeId)) throw new TeachingLeaveAuthorizationError("You cannot review teaching leave for this programme");
       if (current.status === target) return;
-      if (current.status === "CHANGES_REQUESTED") {
+      if (current.status === "CHANGES_REQUESTED" && input.decision !== "REJECT") {
         throw new TeachingLeaveConflictError("Waiting for the requesting lecturer to revise and resubmit this teaching leave request");
       }
-      if (current.status !== "PENDING") {
+      if (current.status !== "PENDING" && !(current.status === "CHANGES_REQUESTED" && input.decision === "REJECT")) {
         throw new TeachingLeaveConflictError("This teaching leave request already has a final decision");
       }
 
