@@ -1,25 +1,49 @@
 import { describe, expect, test } from "bun:test";
 import {
-  buildScheduleDateOptions,
+  buildTeachingWeekDateOptions,
   formatMeetingTime,
+  formatTeachingWeekRange,
   isMeetingInProgress,
+  normalizeTeachingDate,
   parseLocalDateKey,
+  teachingWeekStart,
   toLocalDateKey,
 } from "./portal-schedule-utils";
 
-describe("Student Portal daily schedule helpers", () => {
-  test("builds five nearby calendar dates around the selected day", () => {
-    const options = buildScheduleDateOptions(new Date(2026, 8, 8));
+describe("Student Portal schedule helpers", () => {
+  test("builds a fixed Monday through Saturday teaching week", () => {
+    const options = buildTeachingWeekDateOptions(new Date(2026, 8, 9));
 
-    expect(options).toHaveLength(5);
+    expect(options).toHaveLength(6);
+    expect(options.map((option) => option.weekdayLong)).toEqual([
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ]);
     expect(options.map((option) => option.key)).toEqual([
-      "2026-09-06",
       "2026-09-07",
       "2026-09-08",
       "2026-09-09",
       "2026-09-10",
+      "2026-09-11",
+      "2026-09-12",
     ]);
-    expect(options[2]?.weekdayLong).toBe("Tuesday");
+    expect(formatTeachingWeekRange(options)).toBe("7–12 Sep");
+  });
+
+  test("normalizes Sunday to the next teaching Monday", () => {
+    const sunday = new Date(2026, 8, 13);
+    expect(toLocalDateKey(normalizeTeachingDate(sunday))).toBe("2026-09-14");
+    expect(toLocalDateKey(teachingWeekStart(sunday))).toBe("2026-09-14");
+  });
+
+  test("moves to the correct Monday-Saturday week for a selected date", () => {
+    const options = buildTeachingWeekDateOptions(new Date(2026, 8, 22));
+    expect(options[0]?.key).toBe("2026-09-21");
+    expect(options.at(-1)?.key).toBe("2026-09-26");
   });
 
   test("round-trips local date input values without UTC shifting", () => {
