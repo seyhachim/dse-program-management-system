@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   Bell,
@@ -11,7 +12,6 @@ import {
   Clock3,
   FileText,
   MapPin,
-  UserRound,
 } from "lucide-react";
 import {
   academicSemesterLabel,
@@ -128,13 +128,22 @@ export function PortalHome() {
       ) : null}
 
       <section className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}>
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <UserRound className="h-5 w-5" aria-hidden="true" />
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="inline-flex h-12 w-[5.75rem] shrink-0 items-center justify-center rounded-xl bg-primary px-2.5 shadow-sm">
+            <Image
+              src="/dse-logo.svg"
+              alt="DSE logo"
+              width={92}
+              height={30}
+              priority
+              className="h-auto w-full"
+            />
           </span>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">Welcome back</p>
-            <h2 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+              DSE Student Portal
+            </p>
+            <h2 className="mt-0.5 truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
               {data.student.name}
             </h2>
             <p className="truncate text-xs text-muted-foreground">

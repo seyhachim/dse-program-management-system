@@ -12,6 +12,13 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).not.toContain("CourseSpec");
   });
 
+  test("uses the existing official DSE logo in a compact branded header", () => {
+    expect(portalHomeSource).toContain('src="/dse-logo.svg"');
+    expect(portalHomeSource).toContain('alt="DSE logo"');
+    expect(portalHomeSource).toContain("DSE Student Portal");
+    expect(portalHomeSource).not.toContain("UserRound");
+  });
+
   test("surfaces four high-frequency student shortcuts", () => {
     expect(portalHomeSource).toContain('label: "Schedule", href: "/portal/schedule"');
     expect(portalHomeSource).toContain('label: "Courses", href: "/portal/courses"');
