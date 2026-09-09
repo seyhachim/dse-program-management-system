@@ -9,6 +9,8 @@ import { portfolioTeachingEvidenceService } from "./portfolio-evidence-service.t
 import { createOfferingRouter } from "./router.ts";
 import { offeringService } from "./service.ts";
 import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
+import { createTeachingLeaveRouter } from "./teaching-leave-router.ts";
+import { teachingLeaveService } from "./teaching-leave-service.ts";
 import { createTeachingSessionDeliveryRouter } from "./teaching-session-delivery-router.ts";
 import { teachingSessionDeliveryService } from "./teaching-session-delivery-service.ts";
 
@@ -21,13 +23,16 @@ export const offeringsService = {
   classResponsibilities: classResponsibilityService,
   classDelivery: classDeliveryService,
   teachingSessionDelivery: teachingSessionDeliveryService,
+  teachingLeave: teachingLeaveService,
 };
 
 export type OfferingsService = typeof offeringsService;
 
 const router = Router();
-// Monitor-delivery routes must be mounted before the legacy /:id offering route
-// so static paths such as /monitor-assignments/me are never interpreted as ids.
+// Static class-delivery workflow routes must be mounted before the legacy /:id
+// offering router so paths such as /teaching-leave/review-queue are not treated
+// as offering ids.
+router.use(createTeachingLeaveRouter());
 router.use(createTeachingSessionDeliveryRouter());
 router.use(createOfferingRouter());
 
