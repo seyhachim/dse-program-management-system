@@ -1,0 +1,162 @@
+from pathlib import Path
+
+p = Path("apps/backend/scripts/student-roster-import.ts")
+t = p.read_text()
+marker = '''      if (!cohortCodes.has(student.cohortCode.toLowerCase())) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Unknown cohortCode '${student.cohortCode}'`,
+          path: ["students", index, "cohortCode"],
+        });
+      }
+'''
+addition = marker + '''
+      if (!student.studentId) {
+        if (!student.email) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Institutional email is required while official Student ID is pending", path: ["students", index, "email"] });
+        }
+        if (student.status !== "Pending") {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Students without an official Student ID must be Pending", path: ["students", index, "status"] });
+        }
+      }
+'''
+if marker not in t:
+    raise SystemExit("schema marker missing")
+t = t.replace(marker, addition, 1)
+
+old = '    patch: { email?: string; profile?: Partial<ProfileData> },'
+if old not in t:
+    raise SystemExit("store patch type marker missing")
+t = t.replace(old, '    patch: { studentId?: string; email?: string; profile?: Partial<ProfileData> },', 1)
+old = '  emailPatch?: string;\n  profilePatch?: Partial<ProfileData>;'
+if old not in t:
+    raise SystemExit("result patch marker missing")
+t = t.replace(old, '  studentIdPatch?: string;\n  emailPatch?: string;\n  profilePatch?: Partial<ProfileData>;', 1)
+
+start = t.index('  for (const row of document.students) {', t.index('export async function planStudentRosterImport'))
+end = t.index('\n  return { document, globalErrors, cohorts: cohortResults, students: studentResults };', start)
+loop = '''  for (const row of document.students) {
+    const warnings: string[] = [];
+    const blockers: string[] = [...globalErrors];
+    const cohortSource = document.cohorts.find((cohort) => cohort.code.toLowerCase() === row.cohortCode.toLowerCase())!;
+    const cohortPlan = cohortByCode.get(row.cohortCode.toLowerCase())!;
+    if (cohortPlan.action === "blocked") blockers.push(`Cohort '${row.cohortCode}' is blocked`);
+    if (row.studentId && duplicateStudentIds.has(row.studentId.toLowerCase())) blockers.push(`Duplicate studentId '${row.studentId}' in import source`);
+    if (row.email && duplicateEmails.has(row.email.toLowerCase())) blockers.push(`Duplicate email '${row.email}' in import source`);
+
+    let existing: ExistingRosterStudent | null = null;
+    let studentIdPatch: string | undefined;
+    let emailPatch: string | undefined;
+    let profilePatch: Partial<ProfileData> | undefined;
+    let membershipExists = false;
+
+    const idMatch = row.studentId ? await store.findStudentByStudentId(row.studentId) : null;
+    const emailMatches = row.email ? await store.findStudentsByEmail(row.email) : [];
+    if (emailMatches.length > 1) blockers.push(`Database contains multiple case-insensitive matches for email '${row.email}'`);
+    const emailMatch = emailMatches.length === 1 ? emailMatches[0]! : null;
+
+    if (idMatch && emailMatch && idMatch.id !== emailMatch.id) {
+      blockers.push(`Official studentId '${row.studentId}' and email '${row.email}' resolve to different Student records`);
+    } else if (idMatch) {
+      existing = idMatch;
+    } else if (emailMatch) {
+      if (row.studentId && emailMatch.studentId && emailMatch.studentId !== row.studentId) {
+        blockers.push(`Email '${row.email}' already belongs to studentId '${emailMatch.studentId}'`);
+      } else {
+        existing = emailMatch;
+        if (row.studentId && emailMatch.studentId === null) studentIdPatch = row.studentId;
+      }
+    }
+
+    if (existing) {
+      if (comparable(existing.name) !== comparable(row.name)) blockers.push(`Existing name '${existing.name}' conflicts with source name '${row.name}'`);
+      if (existing.email && row.email && comparable(existing.email) !== comparable(row.email)) blockers.push(`Existing email '${existing.email}' conflicts with source email '${row.email}'`);
+      else if (!existing.email && row.email) emailPatch = row.email;
+      if (existing.status !== row.status) warnings.push(`Existing student status '${existing.status}' is preserved instead of source status '${row.status}'`);
+      if (!row.studentId && existing.studentId) warnings.push(`Official studentId '${existing.studentId}' is preserved for email '${row.email}'`);
+
+      const incomingProfile = normalizedProfile(row);
+      const patch: Partial<ProfileData> = {};
+      for (const key of Object.keys(incomingProfile) as Array<keyof ProfileData>) {
+        const incoming = incomingProfile[key];
+        if (incoming === null) continue;
+        const current = existing.profile?.[key] ?? null;
+        if (current === null) patch[key] = incoming;
+        else if (comparable(current) !== comparable(incoming)) blockers.push(`Existing profile ${key} '${current}' conflicts with source value '${incoming}'`);
+      }
+      if (Object.keys(patch).length > 0) profilePatch = patch;
+
+      const memberships = await store.findMembershipsForStudent(existing.id);
+      const exact = memberships.find((membership) => membership.cohort.code.toLowerCase() === row.cohortCode.toLowerCase() && sameDate(membership.joinedAt, cohortSource.joinedAt));
+      membershipExists = Boolean(exact);
+      if (!exact) {
+        const overlap = memberships.find((membership) => hasMembershipOverlap(membership, cohortSource.joinedAt));
+        if (overlap) blockers.push(`Target membership from ${cohortSource.joinedAt} overlaps existing cohort '${overlap.cohort.code}' membership`);
+      }
+    }
+
+    const action: StudentImportResult["action"] = blockers.length > 0 ? "blocked" : existing ? (studentIdPatch || emailPatch || profilePatch || !membershipExists ? "would_update" : "unchanged") : "would_create";
+    studentResults.push({ sourceRef: row.sourceRef, cohortCode: row.cohortCode, studentId: row.studentId, name: row.name, action, warnings, blockers, ...(existing ? { existingStudentRecordId: existing.id } : {}), ...(studentIdPatch ? { studentIdPatch } : {}), ...(emailPatch ? { emailPatch } : {}), ...(profilePatch ? { profilePatch } : {}), membershipExists });
+  }
+'''
+t = t[:start] + loop + t[end:]
+
+old = '({ existingStudentRecordId: _id, emailPatch: _email, profilePatch: _profile, membershipExists: _membership, ...publicResult }) =>'
+if old not in t:
+    raise SystemExit("summary marker missing")
+t = t.replace(old, '({ existingStudentRecordId: _id, studentIdPatch: _sid, emailPatch: _email, profilePatch: _profile, membershipExists: _membership, ...publicResult }) =>', 1)
+
+old = '    if (result.existingStudentRecordId && (result.emailPatch || result.profilePatch)) {\n      await store.fillStudentMissingFields(studentRecordId, {\n        ...(result.emailPatch ? { email: result.emailPatch } : {}),'
+new = '    if (result.existingStudentRecordId && (result.studentIdPatch || result.emailPatch || result.profilePatch)) {\n      await store.fillStudentMissingFields(studentRecordId, {\n        ...(result.studentIdPatch ? { studentId: result.studentIdPatch } : {}),\n        ...(result.emailPatch ? { email: result.emailPatch } : {}),'
+if old not in t:
+    raise SystemExit("apply patch marker missing")
+t = t.replace(old, new, 1)
+old = '          studentId: row.studentId!,'
+if old not in t:
+    raise SystemExit("create student marker missing")
+t = t.replace(old, '          studentId: row.studentId,', 1)
+old = '        data: {\n          ...(patch.email ? { email: patch.email } : {}),'
+if old not in t:
+    raise SystemExit("fill student marker missing")
+t = t.replace(old, '        data: {\n          ...(patch.studentId ? { studentId: patch.studentId } : {}),\n          ...(patch.email ? { email: patch.email } : {}),', 1)
+p.write_text(t)
+
+p = Path("apps/backend/scripts/student-roster-import.test.ts")
+t = p.read_text()
+start = t.index('  test("missing official studentId blocks the whole apply before any write"')
+end = t.index('\n  test("fills only missing email/profile data and blocks an identity conflict"', start)
+replacement = '''  test("email-keyed provisional student is accepted as Pending", async () => {
+    const store = new MemoryStore();
+    const document = manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: null, name: "Pending Student", email: "pending@rupp.edu.kh", status: "Pending" }]);
+    const plan = await planStudentRosterImport(store, document);
+    expect(plan.students[0]?.action).toBe("would_create");
+    expect(plan.students[0]?.blockers).toEqual([]);
+    expect(store.writes).toBe(0);
+  });
+
+  test("provisional creation requires institutional email and Pending status", () => {
+    expect(() => manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: null, name: "Missing Email", email: null, status: "Pending" }])).toThrow();
+    expect(() => manifest([{ sourceRef: "G5/M1/row-3", cohortCode: "DSE-G5", studentId: null, name: "Not Pending", email: "active@rupp.edu.kh", status: "Active" }])).toThrow();
+  });
+
+  test("official ID attaches to the same provisional Student resolved by email", async () => {
+    const store = new MemoryStore();
+    store.cohort = { id: "cohort-1", programmeId: "dse", code: "DSE-G5", name: "DSE Generation 5", intakeYear: 2025, expectedGraduationYear: 2029, status: "Active" };
+    store.students.set("provisional", { id: "student-1", studentId: null, name: "Pending Student", email: "pending@rupp.edu.kh", status: "Pending", userId: null, profile: null });
+    store.memberships.set("student-1", [{ id: "membership-1", cohortId: "cohort-1", joinedAt: new Date("2025-11-01T00:00:00.000Z"), exitedAt: null, cohort: { id: "cohort-1", code: "DSE-G5", programmeId: "dse" } }]);
+    const plan = await planStudentRosterImport(store, manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: "RUPP-001", name: "Pending Student", email: "pending@rupp.edu.kh", status: "Pending" }]));
+    expect(plan.students[0]?.existingStudentRecordId).toBe("student-1");
+    expect(plan.students[0]?.studentIdPatch).toBe("RUPP-001");
+    expect(plan.students[0]?.action).toBe("would_update");
+  });
+
+  test("email and official ID resolving to different students fails closed", async () => {
+    const store = new MemoryStore();
+    store.students.set("RUPP-001", { id: "student-1", studentId: "RUPP-001", name: "One", email: "one@rupp.edu.kh", status: "Active", userId: null, profile: null });
+    store.students.set("RUPP-002", { id: "student-2", studentId: "RUPP-002", name: "Two", email: "two@rupp.edu.kh", status: "Active", userId: null, profile: null });
+    const plan = await planStudentRosterImport(store, manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: "RUPP-001", name: "One", email: "two@rupp.edu.kh", status: "Active" }]));
+    expect(plan.students[0]?.action).toBe("blocked");
+    expect(plan.students[0]?.blockers.join(" ")).toContain("resolve to different Student records");
+  });
+'''
+p.write_text(t[:start] + replacement + t[end:])
