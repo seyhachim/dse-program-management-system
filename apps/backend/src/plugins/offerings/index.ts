@@ -1,6 +1,8 @@
 import { offeringsManifest } from "@dse-pms/shared-types";
 import { Router } from "express";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import { offeringActivationExceptionService } from "./activation-exception-service.ts";
+import { createOfferingActivationExceptionRouter } from "./activation-exception-router.ts";
 import { attendanceService } from "./attendance-service.ts";
 import { classDeliveryService } from "./class-delivery-service.ts";
 import { classResponsibilityService } from "./class-responsibility-service.ts";
@@ -27,16 +29,18 @@ export const offeringsService = {
   teachingSessionDelivery: teachingSessionDeliveryService,
   teachingLeave: teachingLeaveService,
   curriculumBound: curriculumBoundOfferingService,
+  activationExceptions: offeringActivationExceptionService,
 };
 
 export type OfferingsService = typeof offeringsService;
 
 const router = Router();
-// Static class-delivery and curriculum-bound workflow routes must be mounted
-// before the legacy /:id offering router so they are not treated as offering ids.
+// Static workflow routes are mounted before the legacy /:id offering router so
+// reserved route segments are never interpreted as Offering ids.
 router.use(createTeachingLeaveRouter());
 router.use(createTeachingSessionDeliveryRouter());
 router.use(createCurriculumBoundOfferingRouter());
+router.use(createOfferingActivationExceptionRouter());
 router.use(createOfferingRouter());
 
 export const offeringsPlugin: BackendPlugin<OfferingsService> = {
