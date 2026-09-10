@@ -761,7 +761,7 @@ export const studentPortalService = {
       student: {
         id: rows.student.id,
         name: rows.student.name,
-        studentId: rows.student.studentId,
+        studentId: student.studentId,
         email: rows.student.email,
       },
       courses: rows.map(toSummary),

@@ -201,7 +201,7 @@ export const studentAttendanceHistoryService = {
       select: { id: true, studentId: true },
     });
     if (!student?.studentId) return null;
-    const history = await historyForStudent(student, offeringId);
+    const history = await historyForStudent({ id: student.id, studentId: student.studentId }, offeringId);
     const finalized = history.history
       .filter((row): row is typeof row & { status: AttendanceStatus } => row.status !== null)
       .map((row) => ({ sessionId: row.sessionId, date: row.date, status: row.status }));

@@ -31,7 +31,7 @@ export function requirePortfolioStudent(row: PortfolioStudentRow | null): assert
   }
 }
 
-function toProfile(row: PortfolioStudentRow & { email: string }): StudentPortfolioProfile {
+function toProfile(row: PortfolioStudentRow & { email: string; studentId: string }): StudentPortfolioProfile {
   const profile = row.portfolioProfile;
   return {
     identity: {
