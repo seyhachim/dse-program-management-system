@@ -19,6 +19,7 @@ const VALID_MEETING = {
   dayOfWeek: "Monday" as const,
   startTime: "08:00",
   endTime: "10:00",
+  building: "STEM Building",
   room: "A203",
   activityType: "Lecture" as const,
 };
@@ -129,10 +130,17 @@ test("class section rejects spaces and punctuation", () => {
   expect(SectionCodeSchema.safeParse("B!").success).toBe(false);
 });
 
-test("meeting validation accepts room/time and derives no user-entered duration", () => {
+test("meeting validation accepts building/room/time and derives no user-entered duration", () => {
   const meeting = OfferingMeetingInput.parse(VALID_MEETING);
+  expect(meeting.building).toBe("STEM Building");
   expect(meeting.room).toBe("A203");
   expect("duration" in meeting).toBe(false);
+});
+
+test("meeting building is optional, trimmed, and length-limited", () => {
+  expect(OfferingMeetingInput.parse({ ...VALID_MEETING, building: undefined }).building).toBeUndefined();
+  expect(OfferingMeetingInput.parse({ ...VALID_MEETING, building: "  STEM Building  " }).building).toBe("STEM Building");
+  expect(OfferingMeetingInput.safeParse({ ...VALID_MEETING, building: "B".repeat(121) }).success).toBe(false);
 });
 
 test("meeting validation rejects invalid and reversed times", () => {

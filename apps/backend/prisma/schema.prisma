@@ -2476,6 +2476,7 @@ model OfferingMeeting {
   dayOfWeek    String
   startTime    String
   endTime      String
+  building     String?
   room         String?
   activityType String   @default("Lecture")
 

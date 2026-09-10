@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CreateCurriculumBoundOfferingInputSchema,
+  DEFAULT_OFFERING_BUILDING,
   UpdateCurriculumBoundOfferingInputSchema,
   type AcademicCalendarPeriodView,
   type AcademicCalendarView,
@@ -44,6 +45,7 @@ const EMPTY_MEETING: OfferingMeetingInput = {
   dayOfWeek: "Monday",
   startTime: "08:00",
   endTime: "09:00",
+  building: DEFAULT_OFFERING_BUILDING,
   room: "",
   activityType: "Lecture",
 };
@@ -167,8 +169,9 @@ export function CurriculumBoundOfferingFormPage({ offeringId }: { offeringId: st
         setCapacity(offering.capacity);
         setStatus(offering.status);
         setMeetings(
-          offering.meetings.map(({ id: _id, durationHours: _duration, room, ...meeting }) => ({
+          offering.meetings.map(({ id: _id, durationHours: _duration, building, room, ...meeting }) => ({
             ...meeting,
+            building: building ?? "",
             room: room ?? "",
           })),
         );
@@ -486,12 +489,13 @@ export function CurriculumBoundOfferingFormPage({ offeringId }: { offeringId: st
                   <Button type="button" variant="outline" size="sm" onClick={() => setMeetings((items) => [...items, { ...EMPTY_MEETING }])}>Add session</Button>
                 </div>
                 {meetings.map((meeting, index) => (
-                  <div key={index} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-6">
+                  <div key={index} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-7">
                     <select className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={meeting.dayOfWeek} onChange={(event) => changeMeeting(index, { dayOfWeek: event.target.value as OfferingMeetingInput["dayOfWeek"] })}>
                       {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => <option key={day} value={day}>{day}</option>)}
                     </select>
                     <Input type="time" value={meeting.startTime} onChange={(event) => changeMeeting(index, { startTime: event.target.value })} />
                     <Input type="time" value={meeting.endTime} onChange={(event) => changeMeeting(index, { endTime: event.target.value })} />
+                    <Input aria-label="Building" placeholder="STEM Building" maxLength={120} value={meeting.building ?? ""} onChange={(event) => changeMeeting(index, { building: event.target.value })} />
                     <Input placeholder="Room" value={meeting.room ?? ""} onChange={(event) => changeMeeting(index, { room: event.target.value })} />
                     <select className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={meeting.activityType} onChange={(event) => changeMeeting(index, { activityType: event.target.value as OfferingMeetingInput["activityType"] })}>
                       {["Lecture", "Tutorial", "Practice", "Lab", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}
