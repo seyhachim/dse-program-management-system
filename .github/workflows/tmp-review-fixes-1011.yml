@@ -1,0 +1,77 @@
+name: TEMP Review Fixes 1011
+
+on:
+  push:
+    branches:
+      - feat/issue-1011-provisional-email-students
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[skip review-fixes-1011]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-1011-provisional-email-students
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Apply review fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Fix provisional schema fixtures so they satisfy the email-keyed invariant.
+          p = Path("apps/backend/src/plugins/students/student-schema.test.ts")
+          t = p.read_text()
+          t = t.replace('email: "",\n      studentId: "",', 'email: "provisional@rupp.edu.kh",\n      studentId: "",', 1)
+          t = t.replace('expect(parsed.email).toBeNull();', 'expect(parsed.email).toBe("provisional@rupp.edu.kh");', 1)
+          t = t.replace('email: null,\n      studentId: null,\n      category: "Scholarship",', 'email: "scholarship@rupp.edu.kh",\n      studentId: null,\n      category: "Scholarship",', 1)
+          p.write_text(t)
+
+          # Keep exact compact projection tests aligned with the new category field.
+          p = Path("apps/backend/src/plugins/students/list-projection.test.ts")
+          t = p.read_text()
+          t = t.replace('    expect(selectedKeys(STUDENT_LIST_SELECT)).toEqual([\n      "createdAt",', '    expect(selectedKeys(STUDENT_LIST_SELECT)).toEqual([\n      "category",\n      "createdAt",', 1)
+          t = t.replace('    expect(selectedKeys(STUDENT_REF_SELECT)).toEqual([\n      "email",', '    expect(selectedKeys(STUDENT_REF_SELECT)).toEqual([\n      "category",\n      "email",', 1)
+          p.write_text(t)
+
+          # Interactive/manual offering enrollment remains official-ID-only. The dedicated
+          # operator class importer is the explicitly reviewed provisional enrollment path.
+          p = Path("apps/backend/src/plugins/offerings/service.ts")
+          t = p.read_text()
+          marker = 'export class ReferenceError extends Error {}\nexport class CapacityError extends Error {}\n'
+          helper = '''export class ReferenceError extends Error {}\nexport class CapacityError extends Error {}\n\nexport function assertOfferingEnrollmentStudentsEligible(\n  found: Array<{ studentId: string | null; status: string }>,\n): void {\n  const ineligible = found.find((student) => student.status !== "Active" || !student.studentId);\n  if (ineligible) {\n    throw new ReferenceError(\n      "Official Student ID and Active status are required before interactive offering enrollment",\n    );\n  }\n}\n'''
+          if marker not in t:
+              raise SystemExit("offering service class marker missing")
+          t = t.replace(marker, helper, 1)
+          old = '''    if (found.length !== input.studentIds.length) {\n      throw new ReferenceError("One or more students do not exist");\n    }\n\n    // Capacity check against not-yet-enrolled students.'''
+          new = '''    if (found.length !== input.studentIds.length) {\n      throw new ReferenceError("One or more students do not exist");\n    }\n    assertOfferingEnrollmentStudentsEligible(found);\n\n    // Capacity check against not-yet-enrolled students.'''
+          if old not in t:
+              raise SystemExit("offering enroll marker missing")
+          p.write_text(t.replace(old, new, 1))
+
+          # Unit regression for the interactive enrollment boundary.
+          p = Path("apps/backend/src/plugins/offerings/enrollment-eligibility.test.ts")
+          p.write_text('''import { describe, expect, test } from "bun:test";\nimport { assertOfferingEnrollmentStudentsEligible, ReferenceError } from "./service.ts";\n\ndescribe("interactive offering enrollment eligibility", () => {\n  test("allows active students with an official ID", () => {\n    expect(() =>\n      assertOfferingEnrollmentStudentsEligible([{ studentId: "DSE-001", status: "Active" }]),\n    ).not.toThrow();\n  });\n\n  test("blocks provisional or inactive students", () => {\n    expect(() =>\n      assertOfferingEnrollmentStudentsEligible([{ studentId: null, status: "Pending" }]),\n    ).toThrow(ReferenceError);\n    expect(() =>\n      assertOfferingEnrollmentStudentsEligible([{ studentId: "DSE-002", status: "Inactive" }]),\n    ).toThrow("Official Student ID and Active status are required");\n  });\n});\n''')
+          PY
+          git diff --check
+      - name: Verify review regressions and typecheck
+        run: |
+          bun install --frozen-lockfile
+          bun run db:generate
+          bun test apps/backend/src/plugins/students/student-schema.test.ts apps/backend/src/plugins/students/list-projection.test.ts apps/backend/src/plugins/offerings/enrollment-eligibility.test.ts apps/backend/scripts/student-roster-import.test.ts apps/backend/scripts/student-class-enrollment-import.test.ts
+          bun run typecheck
+      - name: Commit review fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backend/src/plugins/students/student-schema.test.ts apps/backend/src/plugins/students/list-projection.test.ts apps/backend/src/plugins/offerings/service.ts apps/backend/src/plugins/offerings/enrollment-eligibility.test.ts
+          git commit -m "fix(student): close provisional enrollment review gaps (#1011) [skip review-fixes-1011]"
+          git push origin HEAD:feat/issue-1011-provisional-email-students
