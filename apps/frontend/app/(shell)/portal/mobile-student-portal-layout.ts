@@ -17,9 +17,9 @@ export const MOBILE_STUDENT_PORTAL_LAYOUT = {
   scheduleSurface: "mx-auto w-full max-w-3xl space-y-4 md:space-y-5",
   scheduleToolbar:
     "rounded-[1.75rem] border border-border/70 bg-muted/30 p-3 shadow-sm sm:p-4",
-  scheduleDateStrip: "grid grid-cols-5 gap-2",
+  scheduleDateStrip: "grid grid-cols-6 gap-1.5 sm:gap-2",
   scheduleDateButton:
-    "flex min-h-16 min-w-0 flex-col items-center justify-center rounded-2xl border border-border bg-card px-1.5 py-2 text-foreground transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    "flex min-h-16 min-w-0 flex-col items-center justify-center rounded-2xl border border-border bg-card px-0.5 py-2 text-foreground transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-1.5",
   scheduleDateButtonSelected:
     "border-primary bg-primary text-primary-foreground shadow-sm",
   scheduleMeeting:
