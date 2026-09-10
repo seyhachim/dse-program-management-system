@@ -24,6 +24,7 @@ import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
+import { MobileCourseAssignmentList } from "./mobile-course-assignment-list";
 import { LECTURER_OVERVIEW_LAYOUT } from "./mobile-layout";
 
 function formatHours(hours: number): string {
@@ -196,7 +197,8 @@ export function LecturerOverviewClient() {
                 <span className="flex items-center justify-between gap-3 text-xs font-medium text-primary-foreground/75">
                   <span>Academic period</span>
                   <span className="tabular-nums">
-                    {visibleOfferings.length} {visibleOfferings.length === 1 ? "section" : "sections"}
+                    {visibleOfferings.length}{" "}
+                    {visibleOfferings.length === 1 ? "class" : "classes"}
                   </span>
                 </span>
                 <select
@@ -272,8 +274,11 @@ export function LecturerOverviewClient() {
                     Your teaching
                   </h2>
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-right text-xs leading-5 text-muted-foreground">
                   {uniqueCourses} {uniqueCourses === 1 ? "course" : "courses"}
+                  <span aria-hidden="true"> · </span>
+                  {visibleOfferings.length}{" "}
+                  {visibleOfferings.length === 1 ? "class" : "classes"}
                 </span>
               </div>
 
@@ -323,15 +328,10 @@ export function LecturerOverviewClient() {
                   </div>
                 ) : (
                   <>
-                    <div className={LECTURER_OVERVIEW_LAYOUT.mobileAssignments}>
-                      {visibleOfferings.map((offering) => (
-                        <MobileOfferingCard
-                          key={offering.id}
-                          offering={offering}
-                          isPrimary={offering.lecturer?.id === me?.id}
-                        />
-                      ))}
-                    </div>
+                    <MobileCourseAssignmentList
+                      offerings={visibleOfferings}
+                      lecturerId={me?.id}
+                    />
 
                     <div className={LECTURER_OVERVIEW_LAYOUT.desktopAssignments}>
                       <table className="w-full min-w-[1120px] text-sm">
@@ -472,103 +472,6 @@ function SummaryCard({
       <p className="text-2xl font-semibold tracking-tight text-foreground">
         {value}
       </p>
-    </div>
-  );
-}
-
-function MobileOfferingCard({
-  offering,
-  isPrimary,
-}: {
-  offering: OfferingView;
-  isPrimary: boolean;
-}) {
-  return (
-    <article className="p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          {offering.course ? (
-            <Link
-              href={`/courses/${offering.course.id}/spec`}
-              className="block min-h-11 py-1 font-semibold text-foreground"
-            >
-              <span className="block">{offering.course.code}</span>
-              <span className="mt-0.5 block text-sm font-normal leading-5 text-muted-foreground">
-                {offering.course.title}
-              </span>
-            </Link>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              Course unavailable
-            </span>
-          )}
-        </div>
-        <OfferingStatus status={offering.status} />
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground">
-          Class {offering.sectionCode}
-        </span>
-        <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
-          {isPrimary ? "Primary Lecturer" : "Co-Lecturer"}
-        </span>
-      </div>
-
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
-        <MobileDetail
-          label="Academic period"
-          value={`${offering.term} · ${
-            offering.programmeYear
-              ? `Year ${offering.programmeYear}`
-              : "Year not set"
-          } · ${semesterLabel(offering.semester)}`}
-        />
-        <MobileDetail
-          label="Students"
-          value={`${offering.enrolledCount} / ${offering.capacity}`}
-        />
-        <MobileDetail
-          className="col-span-2"
-          icon={<CalendarDays className="h-4 w-4" />}
-          label="Teaching dates"
-          value={teachingPeriodLabel(offering)}
-        />
-        <MobileDetail
-          className="col-span-2"
-          icon={<Clock3 className="h-4 w-4" />}
-          label="Schedule"
-          value={scheduleLabel(offering)}
-        />
-        <MobileDetail
-          className="col-span-2"
-          icon={<MapPin className="h-4 w-4" />}
-          label="Room"
-          value={roomsLabel(offering)}
-        />
-      </dl>
-    </article>
-  );
-}
-
-function MobileDetail({
-  label,
-  value,
-  icon,
-  className = "",
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {icon}
-        {label}
-      </dt>
-      <dd className="mt-1 break-words leading-5 text-foreground">{value}</dd>
     </div>
   );
 }
