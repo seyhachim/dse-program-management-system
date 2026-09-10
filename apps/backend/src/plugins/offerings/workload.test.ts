@@ -59,6 +59,7 @@ test("scheduled weekly workload is calculated from class meeting duration", () =
       dayOfWeek: "Monday",
       startTime: "08:00",
       endTime: "10:00",
+      building: "STEM Building",
       room: "A203",
       activityType: "Lecture",
     },
@@ -70,6 +71,7 @@ test("scheduled weekly workload is calculated from class meeting duration", () =
       dayOfWeek: "Tuesday",
       startTime: "13:00",
       endTime: "14:30",
+      building: "Engineering Building",
       room: "B105",
       activityType: "Practice",
     },
@@ -78,6 +80,7 @@ test("scheduled weekly workload is calculated from class meeting duration", () =
   const result = summarizeLecturerWorkload(LECTURER_ID, [classA, classB]);
   expect(result.scheduledWeeklyHours).toBe(3.5);
   expect(result.scheduleRows.map((row) => row.durationHours)).toEqual([2, 1.5]);
+  expect(result.scheduleRows.map((row) => row.building)).toEqual(["STEM Building", "Engineering Building"]);
   expect(result.scheduleRows.map((row) => row.room)).toEqual(["A203", "B105"]);
 });
 

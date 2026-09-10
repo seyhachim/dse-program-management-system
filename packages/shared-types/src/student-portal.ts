@@ -14,6 +14,7 @@ export interface PortalMeeting {
   dayOfWeek: MeetingDay;
   startTime: string;
   endTime: string;
+  building: string | null;
   room: string | null;
   activityType: MeetingActivityType;
 }

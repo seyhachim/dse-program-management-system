@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Controller, useFieldArray, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
 import {
+  DEFAULT_OFFERING_BUILDING,
   MEETING_ACTIVITY_TYPES,
   MEETING_DAYS,
   OFFERING_STATUSES,
@@ -271,16 +272,17 @@ export function OfferingFormFields({
       <fieldset className="space-y-3 rounded-2xl border border-border p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
           <div><legend className="text-sm font-semibold text-foreground"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">3</span>Weekly class schedule <span className="ml-1 text-status-live" aria-label="required">*</span></legend><p className="text-xs text-muted-foreground">Academic Calendar defines the semester boundary; these rows define the recurring class timetable.</p></div>
-          <Button type="button" variant="outline" size="sm" onClick={() => appendMeeting({ dayOfWeek: "Monday", startTime: "08:00", endTime: "09:00", room: "", activityType: "Lecture" })}>Add session</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => appendMeeting({ dayOfWeek: "Monday", startTime: "08:00", endTime: "09:00", building: DEFAULT_OFFERING_BUILDING, room: "", activityType: "Lecture" })}>Add session</Button>
         </div>
         {meetingFields.length === 0 ? <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Add at least one weekly session before saving this offering.</p> : null}
         {meetingsError ? <p className="text-xs text-status-live">{meetingsError}</p> : null}
         {meetingFields.map((meeting, index) => (
           <div key={meeting.id} className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
               <Field label="Day" error={errors.meetings?.[index]?.dayOfWeek?.message} required><Controller control={control} name={`meetings.${index}.dayOfWeek`} render={({ field }) => <Select items={dayItems} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{MEETING_DAYS.map((day) => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select>} /></Field>
               <Field label="Start" error={errors.meetings?.[index]?.startTime?.message} required><Input type="time" {...register(`meetings.${index}.startTime`)} /></Field>
               <Field label="End" error={errors.meetings?.[index]?.endTime?.message} required><Input type="time" {...register(`meetings.${index}.endTime`)} /></Field>
+              <Field label="Building" error={errors.meetings?.[index]?.building?.message} optional><Input placeholder="STEM Building" maxLength={120} {...register(`meetings.${index}.building`)} /></Field>
               <Field label="Room" error={errors.meetings?.[index]?.room?.message} optional><Input placeholder="A203" maxLength={80} {...register(`meetings.${index}.room`)} /></Field>
               <Field label="Activity" error={errors.meetings?.[index]?.activityType?.message}><Controller control={control} name={`meetings.${index}.activityType`} render={({ field }) => <Select items={activityItems} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{MEETING_ACTIVITY_TYPES.map((activity) => <SelectItem key={activity} value={activity}>{activity}</SelectItem>)}</SelectContent></Select>} /></Field>
             </div>

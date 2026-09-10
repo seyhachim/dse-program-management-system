@@ -188,7 +188,7 @@ export function PortalSchedule() {
 
               <div className="mt-4 flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="break-words">{meeting.room || "Room TBA"}</span>
+                <span className="break-words">{[meeting.building, meeting.room ? `Room ${meeting.room}` : null].filter(Boolean).join(" · ") || "Location TBA"}</span>
               </div>
 
               <div className="mt-3 flex min-w-0 items-center gap-2.5">

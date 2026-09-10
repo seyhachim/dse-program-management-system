@@ -19,6 +19,7 @@ export type OfferingScheduleEntry = {
   dayOfWeek: string;
   startTime: string;
   endTime: string;
+  building: string | null;
   room: string | null;
 };
 
@@ -96,6 +97,7 @@ export function offeringScheduleEntries(
         dayOfWeek: meeting.dayOfWeek,
         startTime: meeting.startTime,
         endTime: meeting.endTime,
+        building: meeting.building,
         room: meeting.room,
       })),
     )

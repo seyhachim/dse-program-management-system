@@ -136,7 +136,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
             courseSpecId: offering.courseSpec?.id ?? "",
             term: offering.term,
             sectionCode: offering.sectionCode,
-            meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, room, ...meeting }) => ({ ...meeting, room: room ?? "" })),
+            meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, building, room, ...meeting }) => ({ ...meeting, building: building ?? "", room: room ?? "" })),
             lecturerId: offering.lecturer?.id ?? null,
             coLecturerIds: offering.coLecturers.map((lecturer) => lecturer.id),
             capacity: offering.capacity,

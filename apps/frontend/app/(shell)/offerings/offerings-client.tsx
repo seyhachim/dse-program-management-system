@@ -214,6 +214,7 @@ export function OfferingsClient() {
                   {entry.dayOfWeek.slice(0, 3)}
                 </span>{" "}
                 {entry.startTime}–{entry.endTime}
+                {entry.building ? ` · ${entry.building}` : ""}
                 {entry.room ? ` · Room ${entry.room}` : ""}
               </div>
             ))}
@@ -365,6 +366,7 @@ export function OfferingsClient() {
                           {meeting.dayOfWeek.slice(0, 3)}
                         </span>{" "}
                         {meeting.startTime}–{meeting.endTime}
+                        {meeting.building ? ` · ${meeting.building}` : ""}
                         {meeting.room ? ` · Room ${meeting.room}` : ""}
                       </div>
                     ))}

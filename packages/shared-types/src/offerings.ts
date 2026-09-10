@@ -60,12 +60,16 @@ const MeetingTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid 24-hour time");
 
+/** UI default for newly added DSE teaching sessions; never used as a database default/backfill. */
+export const DEFAULT_OFFERING_BUILDING = "STEM Building" as const;
+
 /** One recurring weekly timetable entry for a class offering. */
 export const OfferingMeetingInput = z
   .object({
     dayOfWeek: MeetingDaySchema,
     startTime: MeetingTimeSchema,
     endTime: MeetingTimeSchema,
+    building: z.string().trim().max(120, "Building must be 120 characters or fewer").optional(),
     room: z.string().trim().max(80, "Room must be 80 characters or fewer").optional(),
     activityType: MeetingActivityTypeSchema.default("Lecture"),
   })
@@ -85,6 +89,7 @@ export interface OfferingMeetingView {
   dayOfWeek: MeetingDay;
   startTime: string;
   endTime: string;
+  building: string | null;
   room: string | null;
   activityType: MeetingActivityType;
   /** Derived from start/end time; callers never enter duration separately. */
@@ -322,6 +327,7 @@ export interface LecturerScheduleRow {
   dayOfWeek: MeetingDay;
   startTime: string;
   endTime: string;
+  building: string | null;
   room: string | null;
   activityType: MeetingActivityType;
   durationHours: number;

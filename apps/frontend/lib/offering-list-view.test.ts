@@ -137,6 +137,7 @@ describe("Course Offerings list view", () => {
               dayOfWeek: "Thursday",
               startTime: "08:30",
               endTime: "10:00",
+              building: "STEM Building",
               room: "305",
             },
             {
@@ -144,6 +145,7 @@ describe("Course Offerings list view", () => {
               dayOfWeek: "Thursday",
               startTime: "07:00",
               endTime: "08:30",
+              building: "STEM Building",
               room: "305",
             },
           ],
@@ -157,6 +159,7 @@ describe("Course Offerings list view", () => {
               dayOfWeek: "Friday",
               startTime: "07:00",
               endTime: "08:30",
+              building: null,
               room: "306",
             },
             {
@@ -164,6 +167,7 @@ describe("Course Offerings list view", () => {
               dayOfWeek: "Friday",
               startTime: "08:30",
               endTime: "10:00",
+              building: "STEM Building",
               room: "306",
             },
           ],
@@ -178,6 +182,7 @@ describe("Course Offerings list view", () => {
         dayOfWeek: "Friday",
         startTime: "07:00",
         endTime: "08:30",
+        building: null,
         room: "306",
       },
       {
@@ -186,6 +191,7 @@ describe("Course Offerings list view", () => {
         dayOfWeek: "Friday",
         startTime: "08:30",
         endTime: "10:00",
+        building: "STEM Building",
         room: "306",
       },
       {
@@ -194,6 +200,7 @@ describe("Course Offerings list view", () => {
         dayOfWeek: "Thursday",
         startTime: "07:00",
         endTime: "08:30",
+        building: "STEM Building",
         room: "305",
       },
       {
@@ -202,6 +209,7 @@ describe("Course Offerings list view", () => {
         dayOfWeek: "Thursday",
         startTime: "08:30",
         endTime: "10:00",
+        building: "STEM Building",
         room: "305",
       },
     ]);

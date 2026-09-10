@@ -165,6 +165,7 @@ async function toView(
       dayOfWeek: string;
       startTime: string;
       endTime: string;
+      building: string | null;
       room: string | null;
       activityType: string;
     }[];
@@ -316,7 +317,7 @@ export const offeringService = {
           ? { create: coLecturerIds.map((lecturerId) => ({ lecturerId })) }
           : undefined,
         meetings: meetings.length
-          ? { create: meetings.map((meeting) => ({ ...meeting, room: meeting.room || null })) }
+          ? { create: meetings.map((meeting) => ({ ...meeting, building: meeting.building || null, room: meeting.room || null })) }
           : undefined,
       },
       include: withRelations,
@@ -419,7 +420,7 @@ export const offeringService = {
       }
       if (meetings !== undefined) {
         await tx.offeringMeeting.deleteMany({ where: { offeringId: id } });
-        if (meetings.length) await tx.offeringMeeting.createMany({ data: meetings.map((meeting) => ({ offeringId: id, ...meeting, room: meeting.room || null })) });
+        if (meetings.length) await tx.offeringMeeting.createMany({ data: meetings.map((meeting) => ({ offeringId: id, ...meeting, building: meeting.building || null, room: meeting.room || null })) });
       }
       return tx.offering.update({
         where: { id },
@@ -487,6 +488,7 @@ export const offeringService = {
             dayOfWeek: true,
             startTime: true,
             endTime: true,
+            building: true,
             room: true,
             activityType: true,
           },
