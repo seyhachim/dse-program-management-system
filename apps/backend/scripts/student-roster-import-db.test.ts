@@ -196,12 +196,24 @@ describeDb("student roster import database integrity", () => {
         }),
       ).toBeNull();
     } finally {
-      await prisma.studentCohortMembership.deleteMany({
-        where: { student: { studentId: { in: studentIds } } },
+      const testStudents = await prisma.student.findMany({
+        where: {
+          OR: [
+            { studentId: { in: [...studentIds, provisionalOfficialId] } },
+            { email: provisionalEmail },
+          ],
+        },
+        select: { id: true },
       });
-      await prisma.student.deleteMany({
-        where: { OR: [{ studentId: { in: [...studentIds, provisionalOfficialId] } }, { email: provisionalEmail }] },
-      });
+      const testStudentRecordIds = testStudents.map((student) => student.id);
+      if (testStudentRecordIds.length > 0) {
+        await prisma.studentCohortMembership.deleteMany({
+          where: { studentId: { in: testStudentRecordIds } },
+        });
+        await prisma.student.deleteMany({
+          where: { id: { in: testStudentRecordIds } },
+        });
+      }
       await prisma.studentCohort.deleteMany({
         where: { programmeId: "dse", code: { in: [cohortCode, blockedCohortCode] } },
       });
