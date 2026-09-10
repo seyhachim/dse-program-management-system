@@ -24,7 +24,7 @@ export function lecturerOfferingRole(
   offering: OfferingView,
   lecturerId: string | null | undefined,
 ): LecturerOfferingRole {
-  return offering.lecturer?.id === lecturerId
+  return lecturerId && offering.lecturer?.id === lecturerId
     ? "Primary Lecturer"
     : "Co-Lecturer";
 }
@@ -49,8 +49,9 @@ function offeringGroupKey(offering: OfferingView): string {
 }
 
 function commonValue<T>(values: T[]): T | null {
-  if (values.length === 0) return null;
-  return values.every((value) => value === values[0]) ? values[0] : null;
+  const first = values[0];
+  if (first === undefined) return null;
+  return values.every((value) => value === first) ? first : null;
 }
 
 export function groupLecturerOfferings(
@@ -82,7 +83,7 @@ export function groupLecturerOfferings(
     const commonStatus = commonValue(
       sortedOfferings.map((offering) => offering.status),
     );
-    const first = sortedOfferings[0];
+    const first = sortedOfferings[0]!;
     const hasCommonTeachingPeriod = sortedOfferings.every(
       (offering) =>
         offering.startDate === first.startDate && offering.endDate === first.endDate,
