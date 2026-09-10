@@ -8,7 +8,7 @@ This operator-only importer assigns **existing canonical PMS students** to **exi
 
 The importer:
 
-- requires an official institutional `studentId` for every student;
+- accepts either an official institutional `studentId` or an institutional `studentEmail`; the email path is for canonical provisional/Pending students whose official ID is not yet collected;
 - never creates or updates Student identity/profile data;
 - requires an existing active Student and active membership in the declared programme cohort;
 - resolves only existing Offerings by programme + term + programmeYear + class (`Offering.sectionCode`);
@@ -35,13 +35,15 @@ Do not commit real roster manifests containing student PII to this repository.
       "cohortCode": "DSE-2024",
       "programmeYear": 3,
       "classCode": "M1",
-      "studentIds": ["OFFICIAL-STUDENT-ID-001"]
+      "studentIds": ["OFFICIAL-STUDENT-ID-001"],
+      "studentEmails": []
     },
     {
       "cohortCode": "DSE-2024",
       "programmeYear": 3,
       "classCode": "M2",
-      "studentIds": ["OFFICIAL-STUDENT-ID-002"]
+      "studentIds": [],
+      "studentEmails": ["student@rupp.edu.kh"]
     },
     {
       "cohortCode": "DSE-2023",
@@ -55,7 +57,7 @@ Do not commit real roster manifests containing student PII to this repository.
 
 `classCode` uses the same normalization as Offering classes: trim, uppercase, maximum 12 characters, and letters/numbers/hyphens only.
 
-A student ID may appear only once in a manifest. A repeated ID across classes is rejected before database planning.
+A student ID or institutional email may appear only once in a manifest. Repeated identities are rejected before database planning. Email values are normalized to lowercase. The importer never copies an email into `Student.studentId`.
 
 ## Dry-run first
 
@@ -86,4 +88,4 @@ The commit repeats the complete plan inside one Serializable transaction before 
 
 ## Current production gate
 
-For the current survey-derived M1/M2/E1 roster, do **not** run `--commit` until official Student IDs have been collected and the canonical Student + cohort-membership records exist. Email addresses or Microsoft Forms response numbers must not be substituted for institutional Student IDs.
+For the current survey-derived M1/M2/E1 roster, first create/reconcile canonical provisional Students and cohort memberships through `student-roster-import.ts`. Then use `studentEmails` for the reviewed class-enrollment import. Microsoft Forms response numbers must never be used as student identity, and email must never be copied into `Student.studentId`.

@@ -14,9 +14,16 @@ const ClassAssignmentSchema = z
     classCode: SectionCodeSchema,
     studentIds: z
       .array(z.string().trim().min(1, "Official student ID is required"))
-      .min(1, "At least one official student ID is required"),
+      .default([]),
+    studentEmails: z
+      .array(z.string().trim().toLowerCase().email("Valid institutional email is required"))
+      .default([]),
   })
-  .strict();
+  .strict()
+  .refine((assignment) => assignment.studentIds.length + assignment.studentEmails.length > 0, {
+    message: "At least one official student ID or institutional email is required",
+    path: ["studentIds"],
+  });
 
 export const StudentClassEnrollmentImportDocumentSchema = z
   .object({
@@ -30,6 +37,7 @@ export const StudentClassEnrollmentImportDocumentSchema = z
   .superRefine((document, ctx) => {
     const classKeys = new Set<string>();
     const studentIds = new Map<string, { classIndex: number; studentIndex: number }>();
+    const studentEmails = new Map<string, { classIndex: number; studentIndex: number }>();
 
     for (const [classIndex, assignment] of document.classes.entries()) {
       const classKey = [
@@ -59,6 +67,20 @@ export const StudentClassEnrollmentImportDocumentSchema = z
         }
         studentIds.set(key, { classIndex, studentIndex });
       }
+
+      for (const [studentIndex, studentEmail] of assignment.studentEmails.entries()) {
+        const key = studentEmail.toLocaleLowerCase();
+        const previous = studentEmails.get(key);
+        if (previous) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Institutional email '${studentEmail}' appears more than once in the import`,
+            path: ["classes", classIndex, "studentEmails", studentIndex],
+          });
+          continue;
+        }
+        studentEmails.set(key, { classIndex, studentIndex });
+      }
     }
   });
 
@@ -70,6 +92,7 @@ export type StudentClassAssignment = StudentClassEnrollmentImportDocument["class
 export type ExistingClassEnrollmentStudent = {
   id: string;
   studentId: string | null;
+  email: string | null;
   name: string;
   status: (typeof STUDENT_STATUSES)[number];
 };
@@ -115,6 +138,7 @@ export type StudentClassEnrollmentImportStore = {
   programmeExists(programmeId: string): Promise<boolean>;
   findCohort(programmeId: string, cohortCode: string): Promise<ExistingClassEnrollmentCohort | null>;
   findStudentByStudentId(studentId: string): Promise<ExistingClassEnrollmentStudent | null>;
+  findStudentsByEmail(email: string): Promise<ExistingClassEnrollmentStudent[]>;
   findMembershipsForStudent(studentRecordId: string): Promise<ExistingClassEnrollmentMembership[]>;
   findTargetOfferings(input: {
     programmeId: string;
@@ -154,7 +178,8 @@ type EnrollmentToCreate = {
 };
 
 export type StudentClassImportResult = {
-  studentId: string;
+  studentId: string | null;
+  studentEmail: string | null;
   name: string | null;
   cohortCode: string;
   programmeYear: number;
@@ -243,7 +268,7 @@ export function summarizeStudentClassEnrollmentImport(
     term: plan.document.term,
     totalClasses: plan.document.classes.length,
     totalStudents: plan.document.classes.reduce(
-      (count, assignment) => count + assignment.studentIds.length,
+      (count, assignment) => count + assignment.studentIds.length + assignment.studentEmails.length,
       0,
     ),
     targetOfferings: uniqueOfferingIds.size,
@@ -351,37 +376,66 @@ export async function planStudentClassEnrollmentImport(
   }
 
   const studentResults: StudentClassImportResult[] = [];
+  const resolvedStudentIds = new Set<string>();
 
   for (const assignment of document.classes) {
     const key = `${assignment.cohortCode.toLocaleLowerCase()}|${assignment.programmeYear}|${assignment.classCode.toLocaleLowerCase()}`;
     const context = classContext.get(key)!;
+    const identities = [
+      ...assignment.studentIds.map((studentId) => ({ studentId, studentEmail: null as string | null })),
+      ...assignment.studentEmails.map((studentEmail) => ({ studentId: null as string | null, studentEmail })),
+    ];
 
-    for (const officialStudentId of assignment.studentIds) {
+    for (const identity of identities) {
       const warnings: string[] = [];
       const blockers = [...context.result.blockers];
-      const student = await store.findStudentByStudentId(officialStudentId);
+      const identityLabel = identity.studentId
+        ? `Student '${identity.studentId}'`
+        : `Student email '${identity.studentEmail}'`;
+
+      let student: ExistingClassEnrollmentStudent | null = null;
+      if (identity.studentId) {
+        student = await store.findStudentByStudentId(identity.studentId);
+      } else if (identity.studentEmail) {
+        const matches = await store.findStudentsByEmail(identity.studentEmail);
+        if (matches.length > 1) {
+          blockers.push(`Database contains multiple case-insensitive matches for email '${identity.studentEmail}'`);
+        } else if (matches.length === 1) {
+          student = matches[0]!;
+        }
+      }
+
       let existingEnrollmentCount = 0;
       const plannedEnrollments: EnrollmentToCreate[] = [];
 
       if (!student) {
-        blockers.push(`Student '${officialStudentId}' does not exist in PMS`);
+        blockers.push(`${identityLabel} does not exist in PMS`);
       } else {
-        if (student.status !== "Active") {
-          blockers.push(
-            `Student '${officialStudentId}' is '${student.status}', not Active`,
-          );
+        if (resolvedStudentIds.has(student.id)) {
+          blockers.push(`${identityLabel} resolves to a Student already listed elsewhere in this import`);
+        } else {
+          resolvedStudentIds.add(student.id);
+        }
+
+        if (identity.studentId && student.status !== "Active") {
+          blockers.push(`${identityLabel} is '${student.status}', not Active`);
+        } else if (identity.studentEmail && student.status === "Inactive") {
+          blockers.push(`${identityLabel} is Inactive`);
+        } else if (identity.studentEmail && student.status === "Pending" && student.studentId !== null) {
+          warnings.push(`${identityLabel} is Pending even though an official Student ID already exists`);
+        }
+
+        if (identity.studentEmail && student.studentId === null && student.status !== "Pending") {
+          blockers.push(`${identityLabel} has no official Student ID but is not Pending`);
         }
 
         if (context.result.cohortId) {
           const memberships = await store.findMembershipsForStudent(student.id);
           const exactActiveMembership = memberships.find(
-            (membership) =>
-              membership.cohortId === context.result.cohortId && membership.exitedAt === null,
+            (membership) => membership.cohortId === context.result.cohortId && membership.exitedAt === null,
           );
           if (!exactActiveMembership) {
-            blockers.push(
-              `Student '${officialStudentId}' has no active membership in cohort '${assignment.cohortCode}'`,
-            );
+            blockers.push(`${identityLabel} has no active membership in cohort '${assignment.cohortCode}'`);
           }
 
           const otherActiveProgrammeMembership = memberships.find(
@@ -391,17 +445,13 @@ export async function planStudentClassEnrollmentImport(
               membership.cohortId !== context.result.cohortId,
           );
           if (otherActiveProgrammeMembership) {
-            blockers.push(
-              `Student '${officialStudentId}' also has active cohort '${otherActiveProgrammeMembership.cohort.code}' in programme '${document.programmeId}'`,
-            );
+            blockers.push(`${identityLabel} also has active cohort '${otherActiveProgrammeMembership.cohort.code}' in programme '${document.programmeId}'`);
           }
         }
 
         const existingEnrollments = await store.findEnrollmentsForStudent(student.id, document.term);
         for (const targetOffering of context.offerings) {
-          const exact = existingEnrollments.find(
-            (enrollment) => enrollment.offeringId === targetOffering.id,
-          );
+          const exact = existingEnrollments.find((enrollment) => enrollment.offeringId === targetOffering.id);
           if (exact) {
             existingEnrollmentCount += 1;
             continue;
@@ -411,13 +461,10 @@ export async function planStudentClassEnrollmentImport(
             (enrollment) =>
               enrollment.offering.course.id === targetOffering.course.id &&
               enrollment.offering.term === document.term &&
-              enrollment.offering.sectionCode.toLocaleUpperCase() !==
-                assignment.classCode.toLocaleUpperCase(),
+              enrollment.offering.sectionCode.toLocaleUpperCase() !== assignment.classCode.toLocaleUpperCase(),
           );
           if (conflictingClass) {
-            blockers.push(
-              `Student '${officialStudentId}' is already enrolled in ${targetOffering.course.code} Class '${conflictingClass.offering.sectionCode}' for term '${document.term}'`,
-            );
+            blockers.push(`${identityLabel} is already enrolled in ${targetOffering.course.code} Class '${conflictingClass.offering.sectionCode}' for term '${document.term}'`);
             continue;
           }
 
@@ -432,17 +479,13 @@ export async function planStudentClassEnrollmentImport(
       }
 
       const result: StudentClassImportResult = {
-        studentId: officialStudentId,
+        studentId: identity.studentId,
+        studentEmail: identity.studentEmail,
         name: student?.name ?? null,
         cohortCode: assignment.cohortCode,
         programmeYear: assignment.programmeYear,
         classCode: assignment.classCode,
-        action:
-          blockers.length > 0
-            ? "blocked"
-            : plannedEnrollments.length > 0
-              ? "would_enroll"
-              : "unchanged",
+        action: blockers.length > 0 ? "blocked" : plannedEnrollments.length > 0 ? "would_enroll" : "unchanged",
         matchingOfferingCount: context.offerings.length,
         enrollmentsToCreate: plannedEnrollments.length,
         existingEnrollments: existingEnrollmentCount,
@@ -533,7 +576,14 @@ export function createPrismaStudentClassEnrollmentImportStore(
     findStudentByStudentId(studentId) {
       return db.student.findUnique({
         where: { studentId },
-        select: { id: true, studentId: true, name: true, status: true },
+        select: { id: true, studentId: true, email: true, name: true, status: true },
+      });
+    },
+    findStudentsByEmail(email) {
+      return db.student.findMany({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select: { id: true, studentId: true, email: true, name: true, status: true },
+        take: 2,
       });
     },
     findMembershipsForStudent(studentRecordId) {

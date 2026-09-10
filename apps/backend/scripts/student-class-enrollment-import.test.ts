@@ -71,6 +71,7 @@ class MemoryStore implements StudentClassEnrollmentImportStore {
       id: recordId,
       studentId,
       name: `Student ${studentId}`,
+      email: null,
       status: "Active",
     });
     this.memberships.set(recordId, [
@@ -93,6 +94,9 @@ class MemoryStore implements StudentClassEnrollmentImportStore {
   }
   async findStudentByStudentId(studentId: string) {
     return this.students.get(studentId) ?? null;
+  }
+  async findStudentsByEmail(email: string) {
+    return [...this.students.values()].filter((student) => student.email?.toLowerCase() === email.toLowerCase());
   }
   async findMembershipsForStudent(studentRecordId: string) {
     return this.memberships.get(studentRecordId) ?? [];
@@ -176,6 +180,80 @@ describe("student class enrollment importer", () => {
     const inactivePlan = await planStudentClassEnrollmentImport(inactiveStore, document());
     expect(inactivePlan.students[0]?.blockers.join(" ")).toContain("not Active");
     expect(inactivePlan.students[0]?.blockers.join(" ")).toContain("no active membership");
+  });
+
+  test("enrolls a Pending provisional student resolved by institutional email", async () => {
+    const store = new MemoryStore();
+    const recordId = "student-pending";
+    store.students.set("pending-key", {
+      id: recordId,
+      studentId: null,
+      email: "pending@rupp.edu.kh",
+      name: "Pending Student",
+      status: "Pending",
+    });
+    store.memberships.set(recordId, [{
+      id: "membership-pending",
+      cohortId: "cohort-2024",
+      joinedAt: new Date("2024-11-01T00:00:00.000Z"),
+      exitedAt: null,
+      cohort: { id: "cohort-2024", code: "DSE-2024", programmeId: "dse" },
+    }]);
+    const parsed = parseStudentClassEnrollmentImportDocument({
+      schemaVersion: 1,
+      source: "pending-email.json",
+      programmeId: "dse",
+      term: "2026-2027-S1",
+      classes: [{
+        cohortCode: "DSE-2024",
+        programmeYear: 3,
+        classCode: "M1",
+        studentEmails: [" PENDING@RUPP.EDU.KH "],
+      }],
+    });
+    expect(parsed.classes[0]?.studentEmails).toEqual(["pending@rupp.edu.kh"]);
+    const plan = await planStudentClassEnrollmentImport(store, parsed);
+    expect(plan.students[0]?.studentId).toBeNull();
+    expect(plan.students[0]?.studentEmail).toBe("pending@rupp.edu.kh");
+    expect(plan.students[0]?.action).toBe("would_enroll");
+    await applyStudentClassEnrollmentImportPlan(store, plan);
+    expect(store.writes).toHaveLength(2);
+    expect(store.writes.every((write) => write.studentRecordId === recordId)).toBe(true);
+  });
+
+  test("rejects duplicate emails and blocks missing or inactive email identities", async () => {
+    expect(() => parseStudentClassEnrollmentImportDocument({
+      schemaVersion: 1,
+      source: "duplicate-email.json",
+      programmeId: "dse",
+      term: "2026-2027-S1",
+      classes: [{ cohortCode: "DSE-2024", programmeYear: 3, classCode: "M1", studentEmails: ["same@rupp.edu.kh", "SAME@RUPP.EDU.KH"] }],
+    })).toThrow("appears more than once");
+
+    const missingStore = new MemoryStore();
+    const missing = parseStudentClassEnrollmentImportDocument({
+      schemaVersion: 1,
+      source: "missing-email.json",
+      programmeId: "dse",
+      term: "2026-2027-S1",
+      classes: [{ cohortCode: "DSE-2024", programmeYear: 3, classCode: "M1", studentEmails: ["missing@rupp.edu.kh"] }],
+    });
+    const missingPlan = await planStudentClassEnrollmentImport(missingStore, missing);
+    expect(missingPlan.students[0]?.action).toBe("blocked");
+    expect(missingPlan.students[0]?.blockers.join(" ")).toContain("does not exist in PMS");
+
+    const inactiveStore = new MemoryStore();
+    inactiveStore.students.set("inactive-key", { id: "student-inactive", studentId: null, email: "inactive@rupp.edu.kh", name: "Inactive", status: "Inactive" });
+    inactiveStore.memberships.set("student-inactive", []);
+    const inactive = parseStudentClassEnrollmentImportDocument({
+      schemaVersion: 1,
+      source: "inactive-email.json",
+      programmeId: "dse",
+      term: "2026-2027-S1",
+      classes: [{ cohortCode: "DSE-2024", programmeYear: 3, classCode: "M1", studentEmails: ["inactive@rupp.edu.kh"] }],
+    });
+    const inactivePlan = await planStudentClassEnrollmentImport(inactiveStore, inactive);
+    expect(inactivePlan.students[0]?.blockers.join(" ")).toContain("Inactive");
   });
 
   test("keeps exact enrollments idempotent and blocks a conflicting parallel class", async () => {
