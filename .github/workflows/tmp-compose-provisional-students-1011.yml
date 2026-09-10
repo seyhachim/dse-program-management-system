@@ -1,0 +1,42 @@
+name: TEMP Compose Provisional Students #1011
+
+on:
+  push:
+    branches:
+      - feat/issue-1011-provisional-email-students
+
+permissions:
+  contents: write
+
+jobs:
+  compose:
+    if: ${{ !contains(github.event.head_commit.message, '[skip compose-1011]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-1011-provisional-email-students
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Fetch source branches
+        run: |
+          git fetch origin feat/student-nullable-id-category-roster
+          git fetch origin feat/issue-1008-class-enrollment-import
+      - name: Cherry-pick provisional student foundation
+        run: |
+          base=$(git merge-base origin/main origin/feat/student-nullable-id-category-roster)
+          commits=$(git rev-list --reverse "$base"..origin/feat/student-nullable-id-category-roster)
+          if [ -n "$commits" ]; then git cherry-pick $commits; fi
+      - name: Cherry-pick safe class-enrollment importer
+        run: |
+          base=$(git merge-base origin/main origin/feat/issue-1008-class-enrollment-import)
+          commits=$(git rev-list --reverse "$base"..origin/feat/issue-1008-class-enrollment-import)
+          if [ -n "$commits" ]; then git cherry-pick $commits; fi
+      - name: Push composed branch
+        run: |
+          git commit --allow-empty -m "chore: compose #953 and #1009 foundations for #1011 [skip compose-1011]"
+          git push origin HEAD:feat/issue-1011-provisional-email-students
