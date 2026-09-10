@@ -55,6 +55,46 @@ describe("Course Offerings list view", () => {
     ]);
   });
 
+  test("narrows a mixed-year group to only the selected year's classes", () => {
+    const mixed = {
+      id: "mixed",
+      term: "2026-2027-S1",
+      course: {
+        id: "course-elective",
+        code: "ELE301",
+        title: "Shared Elective",
+        programmeId: "programme-1",
+      },
+      offerings: [
+        {
+          id: "year-2-class",
+          sectionCode: "M1",
+          programmeYear: 2,
+          lecturer: { id: "lecturer-2", name: "Year Two Lecturer" },
+          coLecturers: [],
+          meetings: [],
+        },
+        {
+          id: "year-3-class",
+          sectionCode: "M2",
+          programmeYear: 3,
+          lecturer: { id: "lecturer-3", name: "Year Three Lecturer" },
+          coLecturers: [],
+          meetings: [],
+        },
+      ],
+    } as unknown as OfferingGroup;
+
+    const result = filterOfferingGroups([mixed], "", "3");
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.offerings.map((offering) => offering.id)).toEqual([
+      "year-3-class",
+    ]);
+    expect(filterOfferingGroups([mixed], "Year Two Lecturer", "3")).toEqual([]);
+    expect(filterOfferingGroups([mixed], "Year Three Lecturer", "3")).toHaveLength(1);
+  });
+
   test("composes the year filter with the existing text search", () => {
     const groups = [
       group({
