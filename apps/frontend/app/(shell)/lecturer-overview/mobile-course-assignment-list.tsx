@@ -19,7 +19,10 @@ function formatDate(value: string | null): string {
   }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
-function teachingPeriodLabel(startDate: string | null, endDate: string | null): string {
+function teachingPeriodLabel(
+  startDate: string | null,
+  endDate: string | null,
+): string {
   if (!startDate || !endDate) return "Dates not set";
   return `${formatDate(startDate)} – ${formatDate(endDate)}`;
 }
@@ -60,7 +63,7 @@ function MobileCourseAssignmentCard({
   group: LecturerCourseOfferingGroup;
   lecturerId: string | null | undefined;
 }) {
-  const first = group.offerings[0];
+  const first = group.offerings[0]!;
   const course = first.course;
   const showPerClassRole = group.commonRole === null;
   const showPerClassStatus = group.commonStatus === null;
@@ -91,7 +94,8 @@ function MobileCourseAssignmentCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
-          {group.offerings.length} {group.offerings.length === 1 ? "class" : "classes"}
+          {group.offerings.length}{" "}
+          {group.offerings.length === 1 ? "class" : "classes"}
         </span>
         {group.commonRole ? (
           <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
@@ -163,7 +167,9 @@ function CompactClassRow({
           </p>
           <p className="mt-1 flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-            <span className="min-w-0 break-words">{roomsLabel(offering.meetings)}</span>
+            <span className="min-w-0 break-words">
+              {roomsLabel(offering.meetings)}
+            </span>
           </p>
         </div>
         <span className="flex shrink-0 items-center gap-1 text-xs font-medium tabular-nums text-muted-foreground">
@@ -179,7 +185,9 @@ function CompactClassRow({
               {lecturerOfferingRole(offering, lecturerId)}
             </span>
           ) : null}
-          {showStatus ? <CompactOfferingStatus status={offering.status} compact /> : null}
+          {showStatus ? (
+            <CompactOfferingStatus status={offering.status} compact />
+          ) : null}
           {showDates ? (
             <span className="inline-flex items-center gap-1">
               <CalendarDays className="h-3.5 w-3.5" />
