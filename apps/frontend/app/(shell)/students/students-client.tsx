@@ -21,6 +21,12 @@ import { authApi, useMe } from "@/lib/auth";
 
 const PAGE_SIZE = 50;
 
+function fundingCategoryLabel(student: Student): string {
+  if (student.fundingCategory === "SCHOLARSHIP") return "Scholarship";
+  if (student.fundingCategory === "FEE_PAYING") return "Fee-paying";
+  return "Not set";
+}
+
 export function StudentsClient() {
   const { me } = useMe();
   const [search, setSearch] = useState("");
@@ -176,6 +182,16 @@ export function StudentsClient() {
       key: "email",
       header: "Email",
       render: (s) => s.email ?? <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: "fundingCategory",
+      header: "Funding",
+      render: (s) =>
+        s.fundingCategory ? (
+          fundingCategoryLabel(s)
+        ) : (
+          <span className="text-muted-foreground">Not set</span>
+        ),
     },
     {
       key: "status",
