@@ -1,3 +1,5 @@
+import type { StudentFundingCategory } from "@dse-pms/shared-types";
+
 const EPSILON = 1e-9;
 
 export const FDY_2025_YEAR1_POLICY = {
@@ -45,7 +47,8 @@ export const FDY_2025_YEAR1_POLICY = {
   },
 } as const;
 
-export type Year1FundingCategory = "SCHOLARSHIP" | "FEE_PAYING";
+/** Backwards-compatible alias; Student is the canonical funding-category domain. */
+export type Year1FundingCategory = StudentFundingCategory;
 export type Year1PolicyStatus =
   | "NOT_APPLICABLE"
   | "COMPLIANT"
