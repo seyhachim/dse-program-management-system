@@ -18,15 +18,22 @@ describe("mobile PWA layout", () => {
     expect(MOBILE_SHELL_LAYOUT.userDetails).toContain("md:block");
   });
 
-  test("uses a compact two-column lecturer summary on phones", () => {
+  test("uses two compact lecturer summary surfaces on phones", () => {
     expect(LECTURER_OVERVIEW_LAYOUT.main).toContain("p-3");
-    expect(LECTURER_OVERVIEW_LAYOUT.summaryGrid).toContain("grid-cols-2");
+    expect(LECTURER_OVERVIEW_LAYOUT.mobileSummaryGrid).toContain("grid-cols-2");
+    expect(LECTURER_OVERVIEW_LAYOUT.mobileSummaryGrid).toContain("md:hidden");
+    expect(LECTURER_OVERVIEW_LAYOUT.mobileSummaryCard).toContain("p-3");
+    expect(LECTURER_OVERVIEW_LAYOUT.summaryGrid).toContain("hidden");
+    expect(LECTURER_OVERVIEW_LAYOUT.summaryGrid).toContain("md:grid");
     expect(LECTURER_OVERVIEW_LAYOUT.summaryGrid).toContain("xl:grid-cols-5");
-    expect(LECTURER_OVERVIEW_LAYOUT.summaryFinalCard).toContain("col-span-2");
+    expect(LECTURER_OVERVIEW_LAYOUT.summaryFinalCard).toContain("md:col-span-2");
     expect(LECTURER_OVERVIEW_LAYOUT.summaryFinalCard).toContain("xl:col-span-1");
   });
 
-  test("keeps the period filter and assignments native to the viewport", () => {
+  test("keeps the teaching-term filter and assignments native to the viewport", () => {
+    expect(LECTURER_OVERVIEW_LAYOUT.mobileTermField).toContain("bg-card");
+    expect(LECTURER_OVERVIEW_LAYOUT.mobileTermField).toContain("md:hidden");
+    expect(LECTURER_OVERVIEW_LAYOUT.mobileTermSelect).toContain("h-10");
     expect(LECTURER_OVERVIEW_LAYOUT.periodField).toContain("w-full");
     expect(LECTURER_OVERVIEW_LAYOUT.periodSelect).toContain("h-11");
     expect(LECTURER_OVERVIEW_LAYOUT.mobileAssignments).toContain("md:hidden");

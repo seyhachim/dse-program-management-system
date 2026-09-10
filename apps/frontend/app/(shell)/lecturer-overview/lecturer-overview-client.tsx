@@ -181,7 +181,7 @@ export function LecturerOverviewClient() {
               className="pointer-events-none absolute -bottom-16 right-16 h-28 w-28 rounded-full bg-primary-foreground/5"
               aria-hidden="true"
             />
-            <div className="relative z-10 space-y-5">
+            <div className="relative z-10 space-y-4">
               <div className="flex min-w-0 items-center justify-between gap-3">
                 <Image
                   src="/dse-logo.svg"
@@ -207,31 +207,31 @@ export function LecturerOverviewClient() {
                   Teaching workspace
                 </p>
               </div>
-
-              <label className={LECTURER_OVERVIEW_LAYOUT.mobilePeriodField}>
-                <span className="flex items-center justify-between gap-3 text-xs font-medium text-primary-foreground/75">
-                  <span>Academic period</span>
-                  <span className="tabular-nums">
-                    {visibleOfferings.length}{" "}
-                    {visibleOfferings.length === 1 ? "section" : "sections"}
-                  </span>
-                </span>
-                <select
-                  value={term}
-                  onChange={(event) => setTerm(event.target.value)}
-                  className={LECTURER_OVERVIEW_LAYOUT.mobilePeriodSelect}
-                  aria-label="Academic period"
-                >
-                  <option value="__all__">All periods</option>
-                  {terms.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
           </section>
+
+          <label className={LECTURER_OVERVIEW_LAYOUT.mobileTermField}>
+            <span className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+              <span>Teaching term</span>
+              <span className="tabular-nums">
+                {visibleOfferings.length}{" "}
+                {visibleOfferings.length === 1 ? "class" : "classes"}
+              </span>
+            </span>
+            <select
+              value={term}
+              onChange={(event) => setTerm(event.target.value)}
+              className={LECTURER_OVERVIEW_LAYOUT.mobileTermSelect}
+              aria-label="Teaching term"
+            >
+              <option value="__all__">All terms</option>
+              {terms.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <section className={LECTURER_OVERVIEW_LAYOUT.intro}>
             <div className="min-w-0">
@@ -245,14 +245,15 @@ export function LecturerOverviewClient() {
             </div>
             <label className={LECTURER_OVERVIEW_LAYOUT.periodField}>
               <span className="font-medium text-muted-foreground">
-                Academic period
+                Teaching term
               </span>
               <select
                 value={term}
                 onChange={(event) => setTerm(event.target.value)}
                 className={LECTURER_OVERVIEW_LAYOUT.periodSelect}
+                aria-label="Teaching term"
               >
-                <option value="__all__">All periods</option>
+                <option value="__all__">All terms</option>
                 {terms.map((value) => (
                   <option key={value} value={value}>
                     {value}
@@ -280,19 +281,34 @@ export function LecturerOverviewClient() {
             </div>
           ) : (
             <>
-              <div className="flex items-end justify-between gap-3 px-1 md:hidden">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    At a glance
-                  </p>
-                  <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
-                    Your teaching
-                  </h2>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {uniqueCourses} {uniqueCourses === 1 ? "course" : "courses"}
-                </span>
-              </div>
+              <section
+                className={LECTURER_OVERVIEW_LAYOUT.mobileSummaryGrid}
+                aria-label="Teaching summary"
+              >
+                <CompactSummaryCard
+                  icon={<BookOpen className="h-4 w-4" />}
+                  title="Teaching"
+                  metrics={[
+                    { label: "Courses", value: String(uniqueCourses) },
+                    { label: "Classes", value: String(visibleOfferings.length) },
+                    { label: "Students", value: String(enrolledStudents) },
+                  ]}
+                />
+                <CompactSummaryCard
+                  icon={<Clock3 className="h-4 w-4" />}
+                  title="Role & load"
+                  metrics={[
+                    {
+                      label: "Primary / Co",
+                      value: `${primarySections} / ${coLecturerSections}`,
+                    },
+                    {
+                      label: "Hours / week",
+                      value: `${formatHours(scheduledHours)} h`,
+                    },
+                  ]}
+                />
+              </section>
 
               <section className={LECTURER_OVERVIEW_LAYOUT.summaryGrid}>
                 <SummaryCard
@@ -302,7 +318,7 @@ export function LecturerOverviewClient() {
                 />
                 <SummaryCard
                   icon={<Presentation className="h-4 w-4" />}
-                  label="Sections"
+                  label="Classes"
                   value={String(visibleOfferings.length)}
                 />
                 <SummaryCard
@@ -329,17 +345,17 @@ export function LecturerOverviewClient() {
                     Teaching assignments
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground md:hidden">
-                    Next class first · sections grouped by course.
+                    Next class first · classes grouped by course.
                   </p>
                   <p className="mt-1 hidden text-sm leading-5 text-muted-foreground md:block">
                     Delivery dates, timetable, room, enrolment, and current status
-                    for each class section.
+                    for each class.
                   </p>
                 </div>
 
                 {visibleOfferings.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground sm:p-10">
-                    No teaching assignments are available for this period.
+                    No teaching assignments are available for this term.
                   </div>
                 ) : (
                   <>
@@ -362,7 +378,7 @@ export function LecturerOverviewClient() {
                             <th className="px-4 py-3">Course</th>
                             <th className="px-4 py-3">Class</th>
                             <th className="px-4 py-3">Role</th>
-                            <th className="px-4 py-3">Academic Period</th>
+                            <th className="px-4 py-3">Teaching Term</th>
                             <th className="px-4 py-3">Teaching Dates</th>
                             <th className="px-4 py-3">Schedule</th>
                             <th className="px-4 py-3">Room</th>
@@ -456,7 +472,15 @@ export function LecturerOverviewClient() {
 
 function LecturerOverviewLoading() {
   return (
-    <div className="space-y-4 sm:space-y-6" aria-label="Loading lecturer overview">
+    <div className="space-y-3 sm:space-y-6" aria-label="Loading lecturer overview">
+      <div className={LECTURER_OVERVIEW_LAYOUT.mobileSummaryGrid}>
+        {Array.from({ length: 2 }).map((_, index) => (
+          <Skeleton
+            key={index}
+            className={`${LECTURER_OVERVIEW_LAYOUT.mobileSummaryCard} h-32`}
+          />
+        ))}
+      </div>
       <div className={LECTURER_OVERVIEW_LAYOUT.summaryGrid}>
         {Array.from({ length: 5 }).map((_, index) => (
           <Skeleton
@@ -469,6 +493,38 @@ function LecturerOverviewLoading() {
       </div>
       <Skeleton className="h-64 w-full rounded-xl" />
     </div>
+  );
+}
+
+function CompactSummaryCard({
+  icon,
+  title,
+  metrics,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  metrics: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <article className={LECTURER_OVERVIEW_LAYOUT.mobileSummaryCard}>
+      <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+        <span className="rounded-lg bg-primary/8 p-1.5 text-primary">{icon}</span>
+        <span>{title}</span>
+      </div>
+      <dl className="mt-2.5 space-y-1.5">
+        {metrics.map((metric) => (
+          <div
+            key={metric.label}
+            className="flex items-baseline justify-between gap-2 text-xs"
+          >
+            <dt className="min-w-0 text-muted-foreground">{metric.label}</dt>
+            <dd className="shrink-0 font-semibold tabular-nums text-foreground">
+              {metric.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </article>
   );
 }
 
@@ -485,13 +541,11 @@ function SummaryCard({
 }) {
   return (
     <div className={`${LECTURER_OVERVIEW_LAYOUT.summaryCard} ${className}`}>
-      <div className="mb-2 flex items-start gap-2 text-[11px] leading-4 text-muted-foreground md:mb-3 md:text-xs">
-        <span className="mt-px shrink-0 rounded-lg bg-primary/8 p-1.5 text-primary md:bg-transparent md:p-0 md:text-muted-foreground">
-          {icon}
-        </span>
+      <div className="mb-3 flex items-start gap-2 text-xs leading-4 text-muted-foreground">
+        <span className="mt-px shrink-0 text-muted-foreground">{icon}</span>
         <span>{label}</span>
       </div>
-      <p className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+      <p className="text-2xl font-semibold tracking-tight text-foreground">
         {value}
       </p>
     </div>
@@ -596,7 +650,11 @@ function MobileCourseGroupCard({
                   className="mt-0.5 h-4 w-4 shrink-0 text-primary"
                   aria-hidden="true"
                 />
-                <span className={next ? "font-medium text-foreground" : "text-muted-foreground"}>
+                <span
+                  className={
+                    next ? "font-medium text-foreground" : "text-muted-foreground"
+                  }
+                >
                   {next ? upcomingTeachingLabel(next, now) : "No upcoming class"}
                 </span>
               </div>
