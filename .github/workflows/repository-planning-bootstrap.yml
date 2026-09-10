@@ -1,0 +1,204 @@
+name: Repository planning metadata bootstrap
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/repository-planning-bootstrap.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bootstrap:
+    name: Sync labels and milestones
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create and reconcile repository planning metadata
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const labels = [
+              {
+                name: "security",
+                color: "B60205",
+                description: "Security, authorization, privacy, or credential boundary requires explicit review.",
+              },
+              {
+                name: "data-integrity",
+                color: "D93F0B",
+                description: "Historical, academic, QA, or operational data integrity requires explicit protection.",
+              },
+              {
+                name: "migration",
+                color: "5319E7",
+                description: "Includes or requires a database/schema migration and migration verification.",
+              },
+              {
+                name: "blocked",
+                color: "000000",
+                description: "Cannot proceed until a named dependency, decision, or external condition is resolved.",
+              },
+              {
+                name: "needs-browser-smoke",
+                color: "FBCA04",
+                description: "Automated checks are not enough; authenticated browser/UI smoke evidence is still required.",
+              },
+              {
+                name: "needs-production-uat",
+                color: "1D76DB",
+                description: "Requires deployed production/real-device UAT before the release gate can close.",
+              },
+              {
+                name: "needs-policy-decision",
+                color: "D4C5F9",
+                description: "Implementation depends on a programme/university policy or governance decision.",
+              },
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: label.name });
+                await github.rest.issues.updateLabel({
+                  owner,
+                  repo,
+                  name: label.name,
+                  new_name: label.name,
+                  color: label.color,
+                  description: label.description,
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ owner, repo, ...label });
+              }
+            }
+
+            const milestoneDefinitions = [
+              {
+                title: "Student Mobile Portal v1",
+                description:
+                  "Student Mobile Portal v1 release: adaptive Home, schedule, own attendance, weekly notes, feedback, and real-device hardening. Parent epic #982.",
+                items: [982, 983, 984, 985, 986, 987, 988, 989, 992],
+              },
+              {
+                title: "Teaching Delivery v1",
+                description:
+                  "Canonical class delivery, lecturer leave/open-slot, monitor evidence, audit, recovery, and programme analytics. Parent epic #254.",
+                items: [254, 931, 932, 933, 934, 935, 936, 937, 938],
+              },
+              {
+                title: "AUN-QA SAR Book v1",
+                description:
+                  "Complete AUN-QA v4 SAR Book from authoring through immutable official release and DOCX/PDF export. Parent epic #659.",
+                items: [659, 660, 661, 662, 663, 664, 665, 666, 667, 670, 671, 719],
+              },
+              {
+                title: "Semester 1 2026–27 Operational Readiness",
+                description:
+                  "Operational readiness for AY 2026–27 Semester 1: safe planned offerings, activation readiness, exact curriculum placement, and timetable/location usability.",
+                items: [958, 963, 968, 993, 998, 999],
+              },
+            ];
+
+            const existingMilestones = await github.paginate(
+              github.rest.issues.listMilestones,
+              { owner, repo, state: "all", per_page: 100 },
+            );
+
+            for (const definition of milestoneDefinitions) {
+              let milestone = existingMilestones.find(
+                (candidate) => candidate.title === definition.title,
+              );
+
+              if (milestone) {
+                const response = await github.rest.issues.updateMilestone({
+                  owner,
+                  repo,
+                  milestone_number: milestone.number,
+                  title: definition.title,
+                  state: "open",
+                  description: definition.description,
+                });
+                milestone = response.data;
+              } else {
+                const response = await github.rest.issues.createMilestone({
+                  owner,
+                  repo,
+                  title: definition.title,
+                  state: "open",
+                  description: definition.description,
+                });
+                milestone = response.data;
+                existingMilestones.push(milestone);
+              }
+
+              for (const issue_number of definition.items) {
+                try {
+                  await github.rest.issues.update({
+                    owner,
+                    repo,
+                    issue_number,
+                    milestone: milestone.number,
+                  });
+                } catch (error) {
+                  if (error.status === 404) {
+                    core.warning(
+                      `Skipping #${issue_number}: issue/PR does not exist in ${owner}/${repo}.`,
+                    );
+                    continue;
+                  }
+                  throw error;
+                }
+              }
+            }
+
+            const labelAssignments = new Map([
+              [860, ["blocked", "needs-policy-decision"]],
+              [858, ["blocked", "needs-policy-decision"]],
+              [719, ["needs-browser-smoke"]],
+              [822, ["needs-browser-smoke"]],
+              [826, ["needs-browser-smoke", "security", "data-integrity"]],
+              [656, ["needs-browser-smoke"]],
+              [877, ["needs-production-uat"]],
+              [878, ["needs-production-uat"]],
+              [483, ["needs-production-uat", "security"]],
+              [994, ["migration", "data-integrity"]],
+              [993, ["migration", "data-integrity"]],
+              [963, ["migration", "data-integrity"]],
+              [931, ["migration", "data-integrity"]],
+              [945, ["security", "data-integrity"]],
+              [918, ["migration", "data-integrity"]],
+            ]);
+
+            for (const [issue_number, names] of labelAssignments) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number,
+                  labels: names,
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  core.warning(
+                    `Skipping labels for #${issue_number}: issue/PR does not exist in ${owner}/${repo}.`,
+                  );
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            core.summary
+              .addHeading("DSE PMS repository planning metadata")
+              .addRaw(`Labels reconciled: ${labels.length}\n`)
+              .addRaw(`Milestones reconciled: ${milestoneDefinitions.length}\n`)
+              .addRaw(`Targeted label assignments: ${labelAssignments.size}\n`)
+              .addRaw("Project v2 is intentionally not created here because repository GITHUB_TOKEN does not provide user-level Projects v2 authorization.\n")
+              .write();
