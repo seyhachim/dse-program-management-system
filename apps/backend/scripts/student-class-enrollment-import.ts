@@ -69,7 +69,7 @@ export type StudentClassAssignment = StudentClassEnrollmentImportDocument["class
 
 export type ExistingClassEnrollmentStudent = {
   id: string;
-  studentId: string;
+  studentId: string | null;
   name: string;
   status: (typeof STUDENT_STATUSES)[number];
 };

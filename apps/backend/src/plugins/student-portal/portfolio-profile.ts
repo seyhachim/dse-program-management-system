@@ -8,7 +8,7 @@ import { PortalAccessError, PortalConflictError } from "./service.ts";
 type PortfolioStudentRow = {
   id: string;
   name: string;
-  studentId: string;
+  studentId: string | null;
   email: string | null;
   status: string;
   portfolioProfile: {
@@ -22,8 +22,8 @@ type PortfolioStudentRow = {
   } | null;
 };
 
-export function requirePortfolioStudent(row: PortfolioStudentRow | null): asserts row is PortfolioStudentRow & { email: string } {
-  if (!row || row.status !== "Active") {
+export function requirePortfolioStudent(row: PortfolioStudentRow | null): asserts row is PortfolioStudentRow & { email: string; studentId: string } {
+  if (!row || row.status !== "Active" || !row.studentId) {
     throw new PortalAccessError("No active student profile is linked to this account");
   }
   if (!row.email) {
@@ -50,7 +50,7 @@ function toProfile(row: PortfolioStudentRow & { email: string }): StudentPortfol
   };
 }
 
-async function studentForPortfolio(userId: string): Promise<PortfolioStudentRow & { email: string }> {
+async function studentForPortfolio(userId: string): Promise<PortfolioStudentRow & { email: string; studentId: string }> {
   const row = await prisma.student.findUnique({
     where: { userId },
     select: {

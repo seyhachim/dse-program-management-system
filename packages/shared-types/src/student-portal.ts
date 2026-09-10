@@ -394,7 +394,7 @@ export interface CourseDeliveryCriterionScore {
 export interface CourseDeliveryResultRow {
   enrollmentId: string;
   studentId: string;
-  studentCode: string;
+  studentCode: string | null;
   studentName: string;
   score: number | null;
   maxScore: number | null;
@@ -564,7 +564,7 @@ export interface GroupAssessmentWorkspace {
   mode: "group" | "group_individual";
   groupWeight: number | null;
   individualWeight: number | null;
-  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string; studentName: string }>;
+  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string | null; studentName: string }>;
   rubricId: string | null;
   rubricName: string;
   rubricContentHash: string | null;
@@ -614,7 +614,7 @@ export interface GroupAssessmentWorkspace {
 export interface CourseDeliveryStudentResultReview {
   enrollmentId: string;
   studentId: string;
-  studentCode: string;
+  studentCode: string | null;
   studentName: string;
   totalCourseGrade: number | null;
   courseGradeComplete: boolean;

@@ -352,7 +352,9 @@ export const groupAssessmentService = {
       for (const [index, group] of input.groups.entries()) {
         const row = await tx.assessmentGroup.create({ data: { id: group.id, offeringId, courseSpecId: context.spec.id, assessmentItemId, name: group.name, sortOrder: index, createdById: authorId } });
         const members = group.enrollmentIds.map((id) => enrollmentById.get(id)!);
-        if (members.length) await tx.assessmentGroupMember.createMany({ data: members.map((enrollment) => ({ groupId: row.id, offeringId, courseSpecId: context.spec.id, assessmentItemId, enrollmentId: enrollment.id, studentIdSnapshot: enrollment.student.id, studentCodeSnapshot: enrollment.student.studentId, studentNameSnapshot: enrollment.student.name })) });
+        const missingOfficialId = members.find((enrollment) => !enrollment.student.studentId);
+        if (missingOfficialId) throw new PortalConflictError(`Official Student ID is required before assessment group membership can be locked for ${missingOfficialId.student.name}`);
+        if (members.length) await tx.assessmentGroupMember.createMany({ data: members.map((enrollment) => ({ groupId: row.id, offeringId, courseSpecId: context.spec.id, assessmentItemId, enrollmentId: enrollment.id, studentIdSnapshot: enrollment.student.id, studentCodeSnapshot: enrollment.student.studentId!, studentNameSnapshot: enrollment.student.name })) });
         created.push({ id: row.id, name: row.name, enrollmentIds: group.enrollmentIds });
       }
       await audit(tx, context, authorId, "GroupsConfigured", { groups: created });

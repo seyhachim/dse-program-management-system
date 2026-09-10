@@ -15,7 +15,7 @@ import type { UserHonorific } from "./lecturers.ts";
 export interface StudentRef {
   id: string;
   name: string;
-  studentId: string;
+  studentId: string | null;
   email: string | null;
   status: StudentStatus;
 }

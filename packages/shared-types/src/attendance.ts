@@ -61,7 +61,7 @@ export type SaveAttendanceInput = z.input<typeof SaveAttendanceInput>;
 
 export interface AttendanceRecordView {
   studentId: string;
-  studentNumber: string;
+  studentNumber: string | null;
   studentName: string;
   status: AttendanceStatus | null;
   permissionPending: boolean;

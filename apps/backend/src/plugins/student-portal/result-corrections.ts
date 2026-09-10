@@ -26,6 +26,11 @@ function assertResultManager(input: {
   }
 }
 
+function requireOfficialStudentCode(studentId: string | null): string {
+  if (!studentId) throw new PortalConflictError("Official Student ID is required for finalized-result correction records");
+  return studentId;
+}
+
 export const resultCorrectionsService = {
   async workspace(
     authorId: string,
@@ -101,7 +106,7 @@ export const resultCorrectionsService = {
             assessmentName: assessment.name,
             enrollmentId: enrollment.id,
             studentId: enrollment.student.id,
-            studentCode: enrollment.student.studentId,
+            studentCode: requireOfficialStudentCode(enrollment.student.studentId),
             studentName: enrollment.student.name,
             score: result.score,
             maxScore: result.maxScore,
@@ -207,7 +212,7 @@ export const resultCorrectionsService = {
       assessmentName: assessment.name,
       enrollmentId: result.enrollment.id,
       studentId: result.enrollment.student.id,
-      studentCode: result.enrollment.student.studentId,
+      studentCode: requireOfficialStudentCode(result.enrollment.student.studentId),
       studentName: result.enrollment.student.name,
       score: result.score,
       maxScore: result.maxScore,

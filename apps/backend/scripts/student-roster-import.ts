@@ -136,7 +136,7 @@ type ProfileData = {
 
 export type ExistingRosterStudent = {
   id: string;
-  studentId: string;
+  studentId: string | null;
   name: string;
   email: string | null;
   status: (typeof STUDENT_STATUSES)[number];

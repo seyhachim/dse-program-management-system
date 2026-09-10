@@ -183,8 +183,8 @@ async function historyForStudent(
 export const studentAttendanceHistoryService = {
   async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
     const student = await students().getByUserId(userId);
-    if (!student || student.status !== "Active") {
-      throw new ReferenceError("No active student profile is linked to this account");
+    if (!student || student.status !== "Active" || !student.studentId) {
+      throw new ReferenceError("No active student profile with an official Student ID is linked to this account");
     }
 
     const enrollment = await prisma.enrollment.findUnique({
@@ -200,7 +200,7 @@ export const studentAttendanceHistoryService = {
       where: { id: studentId },
       select: { id: true, studentId: true },
     });
-    if (!student) return null;
+    if (!student?.studentId) return null;
     const history = await historyForStudent(student, offeringId);
     const finalized = history.history
       .filter((row): row is typeof row & { status: AttendanceStatus } => row.status !== null)
