@@ -31,29 +31,18 @@ jobs:
                   raise SystemExit(f"marker missing in {path}: {old!r}")
               p.write_text(text.replace(old, new, 1))
 
-          one(
-              "packages/shared-types/src/offerings.ts",
+          one("packages/shared-types/src/offerings.ts",
               "  students: { id: string; name: string; studentId: string }[];",
-              "  students: { id: string; name: string; studentId: string | null }[];",
-          )
-
-          one(
-              "apps/backend/src/plugins/offerings/student-attendance-history-service.ts",
+              "  students: { id: string; name: string; studentId: string | null }[];")
+          one("apps/backend/src/plugins/offerings/student-attendance-history-service.ts",
               "    if (!student?.studentId) return null;\n    const history = await historyForStudent(student, offeringId);",
-              "    if (!student?.studentId) return null;\n    const history = await historyForStudent({ id: student.id, studentId: student.studentId }, offeringId);",
-          )
-
-          one(
-              "apps/backend/src/plugins/student-portal/portfolio-profile.ts",
-              "function toProfile(row: PortfolioStudentRow & { email: string }): StudentPortfolioProfileView {",
-              "function toProfile(row: PortfolioStudentRow & { email: string; studentId: string }): StudentPortfolioProfileView {",
-          )
-
-          one(
-              "apps/backend/src/plugins/student-portal/service.ts",
+              "    if (!student?.studentId) return null;\n    const history = await historyForStudent({ id: student.id, studentId: student.studentId }, offeringId);")
+          one("apps/backend/src/plugins/student-portal/portfolio-profile.ts",
+              "function toProfile(row: PortfolioStudentRow & { email: string }): StudentPortfolioProfile {",
+              "function toProfile(row: PortfolioStudentRow & { email: string; studentId: string }): StudentPortfolioProfile {")
+          one("apps/backend/src/plugins/student-portal/service.ts",
               "        studentId: rows.student.studentId,",
-              "        studentId: student.studentId,",
-          )
+              "        studentId: student.studentId,")
           PY
           git diff --check
       - name: Commit patch
