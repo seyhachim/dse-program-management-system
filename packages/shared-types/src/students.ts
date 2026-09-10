@@ -24,11 +24,7 @@ const nullableText = z.preprocess(
   z.string().min(1).nullable(),
 );
 
-/**
- * Official institutional IDs can be unavailable when the initial roster is
- * received. Blank values normalize to null and can be filled later on the
- * same internal PMS student record.
- */
+/** Official institutional identifier. Email is never substituted for this value. */
 export const StudentIdSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null) return null;
@@ -39,10 +35,7 @@ export const StudentIdSchema = z.preprocess(
   z.string().min(1).nullable(),
 );
 
-/**
- * Roster records may exist before a portal/login email is known. Blank form
- * values normalize to null; any supplied value must still be a valid email.
- */
+/** Institutional/login email; blank values normalize to null. */
 export const StudentEmailSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null) return null;
@@ -81,8 +74,6 @@ export const StudentSchema = z.object({
   category: StudentCategorySchema,
   status: StudentStatusSchema,
   createdAt: z.string().datetime(),
-  // Optional for compatibility with consumers that only need the core roster
-  // fields; the Students management API includes this relation when available.
   profile: StudentProfileSchema.nullable().optional(),
 });
 export type Student = z.infer<typeof StudentSchema>;
@@ -95,13 +86,34 @@ const StudentCoreWriteInput = z.object({
   status: StudentStatusSchema.default("Active"),
 });
 
-/** Body for POST /api/students. */
+function enforceCreateIdentity(
+  value: { studentId: string | null; email: string | null; status: StudentStatus },
+  ctx: z.RefinementCtx,
+) {
+  if (value.studentId !== null) return;
+  if (value.status !== "Pending") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Students without an official Student ID must remain Pending",
+      path: ["status"],
+    });
+  }
+  if (value.email === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Institutional email is required while Student ID is pending",
+      path: ["email"],
+    });
+  }
+}
+
+/** Body for POST /api/students. Provisional rows are Pending + email-keyed. */
 export const CreateStudentInput = StudentCoreWriteInput.extend({
   profile: StudentProfileInputSchema.optional(),
-});
+}).superRefine(enforceCreateIdentity);
 export type CreateStudentInput = z.infer<typeof CreateStudentInput>;
 
-/** Body for PATCH /api/students/:id — all core/profile fields optional. */
+/** Body for PATCH /api/students/:id — merged-state identity rules are enforced by the service. */
 export const UpdateStudentInput = StudentCoreWriteInput.partial().extend({
   profile: StudentProfileInputSchema.partial().optional(),
 });
@@ -123,13 +135,6 @@ export const ListStudentsQuery = z.object({
 });
 export type ListStudentsQuery = z.infer<typeof ListStudentsQuery>;
 
-/**
- * Query params for the bounded interactive roster read.
- *
- * The cursor is intentionally opaque to clients. The backend encodes the
- * stable `(createdAt, id)` sort position so equal timestamps and concurrent
- * inserts cannot make interactive page navigation skip or duplicate rows.
- */
 export const ListStudentsPageQuery = ListStudentsQuery.extend({
   cursor: z.string().trim().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
