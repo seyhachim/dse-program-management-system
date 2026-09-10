@@ -208,6 +208,12 @@ jobs:
           OFFERING_COURSE_SPEC_DB_TESTS: "1"
           JWT_SECRET: issue-211-course-spec-binding-ci-secret-at-least-32-characters
 
+      - name: Verify Offering activation exception governance
+        run: bun test apps/backend/src/plugins/offerings/activation-exception-db.test.ts
+        env:
+          OFFERING_ACTIVATION_EXCEPTION_DB_TESTS: "1"
+          JWT_SECRET: issue-963-activation-exception-ci-secret-at-least-32-characters
+
       - name: Verify Academic Calendar revision and Offering history integrity
         run: bun test apps/backend/src/plugins/programme/academic-calendar-integrity-db.test.ts
         env:
