@@ -18,6 +18,12 @@ import {
   groupOfferings,
   type OfferingGroup,
 } from "@/lib/offering-groups";
+import {
+  filterOfferingGroups,
+  offeringScheduleEntries,
+  OFFERING_YEAR_FILTER_OPTIONS,
+  type OfferingYearFilter,
+} from "@/lib/offering-list-view";
 import { studentsApi } from "@/lib/students";
 import { useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
@@ -65,6 +71,7 @@ export function OfferingsClient() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [yearFilter, setYearFilter] = useState<OfferingYearFilter>("all");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -142,23 +149,10 @@ export function OfferingsClient() {
   };
 
   const groups = useMemo(() => groupOfferings(rows), [rows]);
-  const visibleGroups = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    if (!query) return groups;
-
-    return groups.filter((group) =>
-      [
-        group.course?.code,
-        group.course?.title,
-        group.term,
-        ...group.offerings.flatMap((offering) => [
-          offering.sectionCode,
-          offering.lecturer?.name,
-          ...offering.coLecturers.map((lecturer) => lecturer.name),
-        ]),
-      ].some((value) => value?.toLocaleLowerCase().includes(query)),
-    );
-  }, [groups, search]);
+  const visibleGroups = useMemo(
+    () => filterOfferingGroups(groups, search, yearFilter),
+    [groups, search, yearFilter],
+  );
 
   const toggleGroup = (group: OfferingGroup) => {
     setExpandedGroups((current) => {
@@ -198,31 +192,32 @@ export function OfferingsClient() {
       key: "schedule",
       header: "Room & Time",
       render: (group) => {
-        const scheduled = group.offerings.filter(
-          (offering) => offering.meetings.length > 0,
-        ).length;
-        if (group.offerings.length === 1) {
-          const offering = group.offerings[0];
-          return offering && offering.meetings.length ? (
-            <div className="space-y-0.5 text-xs">
-              {offering.meetings.map((meeting) => (
-                <div key={meeting.id}>
-                  <span className="font-medium text-foreground">
-                    {meeting.dayOfWeek.slice(0, 3)}
-                  </span>{" "}
-                  {meeting.startTime}–{meeting.endTime}
-                  {meeting.room ? ` · ${meeting.room}` : ""}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <span className="text-muted-foreground">Not scheduled</span>
-          );
+        const scheduleEntries = offeringScheduleEntries(group);
+        if (scheduleEntries.length === 0) {
+          return <span className="text-muted-foreground">Not scheduled</span>;
         }
+
+        const showClass = group.offerings.length > 1;
         return (
-          <span className="text-muted-foreground">
-            {scheduled}/{group.offerings.length} classes scheduled
-          </span>
+          <div className="space-y-0.5 text-xs">
+            {scheduleEntries.map((entry) => (
+              <div key={entry.key} className="whitespace-nowrap">
+                {showClass ? (
+                  <>
+                    <span className="font-semibold text-foreground">
+                      {entry.sectionCode}
+                    </span>{" "}
+                    ·{" "}
+                  </>
+                ) : null}
+                <span className="font-medium text-foreground">
+                  {entry.dayOfWeek.slice(0, 3)}
+                </span>{" "}
+                {entry.startTime}–{entry.endTime}
+                {entry.room ? ` · Room ${entry.room}` : ""}
+              </div>
+            ))}
+          </div>
         );
       },
     },
@@ -370,7 +365,7 @@ export function OfferingsClient() {
                           {meeting.dayOfWeek.slice(0, 3)}
                         </span>{" "}
                         {meeting.startTime}–{meeting.endTime}
-                        {meeting.room ? ` · ${meeting.room}` : ""}
+                        {meeting.room ? ` · Room ${meeting.room}` : ""}
                       </div>
                     ))}
                   </div>
@@ -442,6 +437,25 @@ export function OfferingsClient() {
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Offerings"
+        filters={
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="sr-only">Study year</span>
+            <select
+              aria-label="Filter offerings by study year"
+              value={yearFilter}
+              onChange={(event) =>
+                setYearFilter(event.target.value as OfferingYearFilter)
+              }
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+            >
+              {OFFERING_YEAR_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
         addLabel={canManage ? "Add Offering" : undefined}
         onAdd={canManage ? () => router.push("/offerings/new") : undefined}
       />
@@ -494,8 +508,8 @@ export function OfferingsClient() {
           ]}
           loading={!hasData && offeringsQuery.isPending}
           emptyMessage={
-            search
-              ? "No course offerings match your search."
+            search || yearFilter !== "all"
+              ? "No course offerings match your filters."
               : "No offerings yet. Add one to link a course, lecturer and students for a term."
           }
         />
