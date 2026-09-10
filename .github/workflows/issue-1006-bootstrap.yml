@@ -1,0 +1,31 @@
+name: Issue 1006 implementation composer
+
+on:
+  push:
+    branches:
+      - feature/1006-final-project-supervisor-discovery
+
+permissions:
+  contents: write
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply implementation
+        run: |
+          python3 scripts/issue-1006-implement.py
+          python3 scripts/issue-1006-postfix.py
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(final-project): add supervisor discovery MVP"
+          git push origin HEAD:feature/1006-final-project-supervisor-discovery
