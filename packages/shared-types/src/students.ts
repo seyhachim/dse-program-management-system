@@ -10,6 +10,15 @@ export const STUDENT_STATUSES = ["Active", "Inactive", "Pending"] as const;
 export const StudentStatusSchema = z.enum(STUDENT_STATUSES);
 export type StudentStatus = z.infer<typeof StudentStatusSchema>;
 
+/**
+ * University Year-1 funding classification used only when an academic policy
+ * explicitly depends on it (currently FDY 2025 attendance thresholds).
+ * Existing/unknown classifications remain null; PMS must never infer one.
+ */
+export const STUDENT_FUNDING_CATEGORIES = ["SCHOLARSHIP", "FEE_PAYING"] as const;
+export const StudentFundingCategorySchema = z.enum(STUDENT_FUNDING_CATEGORIES);
+export type StudentFundingCategory = z.infer<typeof StudentFundingCategorySchema>;
+
 const nullableText = z.preprocess(
   (value) => {
     if (value === undefined || value === null) return null;
@@ -60,6 +69,7 @@ export const StudentSchema = z.object({
   email: StudentEmailSchema,
   studentId: z.string().min(1),
   status: StudentStatusSchema,
+  fundingCategory: StudentFundingCategorySchema.nullable(),
   createdAt: z.string().datetime(),
   // Optional for compatibility with consumers that only need the core roster
   // fields; the Students management API includes this relation when available.
@@ -72,6 +82,9 @@ const StudentCoreWriteInput = z.object({
   email: StudentEmailSchema,
   studentId: z.string().trim().min(1, "Student ID is required"),
   status: StudentStatusSchema.default("Active"),
+  // Optional on writes so existing callers remain compatible. When omitted or
+  // explicitly null the database stores no classification; there is no default.
+  fundingCategory: StudentFundingCategorySchema.nullable().optional(),
 });
 
 /** Body for POST /api/students. */
