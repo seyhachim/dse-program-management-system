@@ -1,6 +1,6 @@
 I am starting a new feature/bug fix in:
 
-**Repository:** `thymadona/dse-program-management-system`
+**Repository:** `seyhachim/dse-program-management-system`
 
 **GitHub issue:** `#ISSUE_NUMBER`
 
