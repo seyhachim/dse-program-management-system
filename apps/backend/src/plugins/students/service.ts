@@ -161,11 +161,20 @@ export const studentService = {
   },
 
   async update(id: string, input: UpdateStudentInput) {
+    const { profile, ...student } = input;
+    const hasProfilePatch = profile !== undefined && Object.keys(profile).length > 0;
+    const data = {
+      ...student,
+      ...(hasProfilePatch ? { profile: { upsert: { create: profile, update: profile } } } : {}),
+    };
+
     const existing = await prisma.student.findUnique({
       where: { id },
       select: { studentId: true, email: true, status: true },
     });
-    if (!existing) return prisma.student.update({ where: { id }, data: input });
+    if (!existing) {
+      return prisma.student.update({ where: { id }, data, include: withProfile });
+    }
 
     assertValidIdentity({
       studentId: input.studentId === undefined ? existing.studentId : input.studentId,
@@ -173,14 +182,9 @@ export const studentService = {
       status: input.status === undefined ? existing.status : input.status,
     });
 
-    const { profile, ...student } = input;
-    const hasProfilePatch = profile !== undefined && Object.keys(profile).length > 0;
     return prisma.student.update({
       where: { id },
-      data: {
-        ...student,
-        ...(hasProfilePatch ? { profile: { upsert: { create: profile, update: profile } } } : {}),
-      },
+      data,
       include: withProfile,
     });
   },
