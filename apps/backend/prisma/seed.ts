@@ -401,6 +401,9 @@ const permissionTitles: Record<string, string> = {
   "qa:read": "View programme quality-assurance evidence and reviews",
   "qa:write":
     "Manage programme quality-assurance evidence and self-assessments",
+  "final-project:read": "View final-project supervisor discovery",
+  "final-project:write": "Maintain own final-project supervisor profile",
+  "final-project:manage": "View programme final-project supervisor capacity",
 };
 
 const permissionSlugs = [
@@ -446,6 +449,9 @@ const roleDefs: {
 
       "qa:read",
       "qa:write",
+      "final-project:read",
+      "final-project:write",
+      "final-project:manage",
     ],
   },
 
@@ -484,6 +490,8 @@ const roleDefs: {
 
       "qa:read",
       "qa:write",
+      "final-project:read",
+      "final-project:manage",
     ],
   },
 
@@ -545,6 +553,8 @@ const roleDefs: {
       "rubrics:write",
 
       "programme:read",
+      "final-project:read",
+      "final-project:write",
     ],
   },
 
@@ -576,7 +586,11 @@ const roleDefs: {
     slug: "student",
     title: "Student",
     description: "Enrollment-scoped access to the student learning portal.",
-    permissions: ["student-portal:read", "student-portal:feedback"],
+    permissions: [
+      "student-portal:read",
+      "student-portal:feedback",
+      "final-project:read",
+    ],
   },
 ];
 

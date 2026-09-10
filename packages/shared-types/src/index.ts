@@ -20,6 +20,7 @@ export * from "./programme-outcome-indicators.ts";
 export * from "./lecturers.ts";
 export * from "./lecturer-portfolio.ts";
 export * from "./lecturer-portfolio-plugin.ts";
+export * from "./final-project.ts";
 export * from "./courses.ts";
 export * from "./offerings.ts";
 export * from "./offering-curriculum.ts";

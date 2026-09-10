@@ -382,6 +382,8 @@ model User {
   gradingScaleAuditActions           ProgrammeGradingScaleAuditAction[]        @relation("ProgrammeGradingScaleAuditActor")
   studentProfile                     Student?
   lecturerProfile                    LecturerProfile?
+  finalProjectSupervisorProfiles      FinalProjectSupervisorProfile[]     @relation("FinalProjectSupervisorUser")
+  finalProjectSupervisorAuditEvents   FinalProjectSupervisorProfileAudit[] @relation("FinalProjectSupervisorAuditActor")
   portfolioVerificationEvents        StudentPortfolioVerificationEvent[]       @relation("StudentPortfolioVerifier")
   portfolioSupervisorAssignments     StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorUser")
   portfolioSupervisorApprovals       StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorApprovedBy")
@@ -488,6 +490,7 @@ model Programme {
   publicImportantDates     ProgrammeImportantDate[]
   publicProfile            ProgrammePublicProfile?
   academicYears            AcademicYear[]
+  finalProjectSupervisorProfiles FinalProjectSupervisorProfile[]
 }
 
 /// Programme-scoped identity for an official academic year. Publication belongs
@@ -3110,6 +3113,80 @@ model ProgrammePublicProfile {
   applicationUrl  String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+
+/// Programme-scoped Year 4 supervisor discovery profile. User remains the identity
+/// source of truth; this table owns only final-project supervision availability.
+model FinalProjectSupervisorProfile {
+  id                String    @id @default(uuid()) @db.Uuid
+  programmeId       String
+  programme         Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  lecturerUserId    String
+  lecturer          User      @relation("FinalProjectSupervisorUser", fields: [lecturerUserId], references: [id], onDelete: Restrict)
+  statement         String    @default("")
+  capacity          Int       @default(0)
+  acceptingStudents Boolean   @default(false)
+  isPublished       Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tracks      FinalProjectResearchTrack[]
+  auditEvents FinalProjectSupervisorProfileAudit[]
+
+  @@unique([programmeId, lecturerUserId])
+  @@index([programmeId, isPublished, acceptingStudents])
+  @@index([lecturerUserId])
+}
+
+/// Lecturer-authored research area used by students to understand supervision fit.
+model FinalProjectResearchTrack {
+  id                  String                         @id @default(uuid()) @db.Uuid
+  supervisorProfileId String                         @db.Uuid
+  supervisorProfile   FinalProjectSupervisorProfile @relation(fields: [supervisorProfileId], references: [id], onDelete: Cascade)
+  title               String
+  description         String                         @default("")
+  sortOrder           Int                            @default(0)
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+
+  ideas FinalProjectProjectIdea[]
+
+  @@unique([supervisorProfileId, title])
+  @@index([supervisorProfileId, sortOrder])
+}
+
+/// Example project direction inside one research track. It is guidance for discovery,
+/// not a student application, assignment, proposal approval, or official project record.
+model FinalProjectProjectIdea {
+  id              String                    @id @default(uuid()) @db.Uuid
+  researchTrackId String                    @db.Uuid
+  researchTrack   FinalProjectResearchTrack @relation(fields: [researchTrackId], references: [id], onDelete: Cascade)
+  title           String
+  summary         String                    @default("")
+  skills          String[]                  @default([])
+  sortOrder       Int                       @default(0)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@unique([researchTrackId, title])
+  @@index([researchTrackId, sortOrder])
+}
+
+/// Append-only snapshot of every supervisor-profile create/update action. This is
+/// discovery governance evidence only; later official assignment history is separate.
+model FinalProjectSupervisorProfileAudit {
+  id                  String                         @id @default(uuid()) @db.Uuid
+  supervisorProfileId String                         @db.Uuid
+  supervisorProfile   FinalProjectSupervisorProfile @relation(fields: [supervisorProfileId], references: [id], onDelete: Restrict)
+  actorId             String
+  actor               User                           @relation("FinalProjectSupervisorAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action              String
+  snapshot            Json
+  createdAt           DateTime                       @default(now())
+
+  @@index([supervisorProfileId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 /// Security-only account recovery audit. Password values are never stored.

@@ -359,6 +359,29 @@ export const qaManifest: PluginManifest = {
  * provided separately by `studentPortalManifest`; these placeholders remain
  * restricted to the programme roles listed below.
  */
+
+export const finalProjectManifest: PluginManifest = {
+  id: "final-project",
+  name: "Final Project",
+  version: "0.1.0",
+  description:
+    "Year 4 supervisor discovery, lecturer supervision profiles, and programme capacity overview.",
+  routes: [
+    {
+      label: "Final Project",
+      path: "/final-project",
+      icon: "graduation-cap",
+      roles: ["admin", "program_coordinator", "lecturer", "student"],
+      group: "Final Project",
+    },
+  ],
+  permissions: [
+    "final-project:read",
+    "final-project:write",
+    "final-project:manage",
+  ],
+};
+
 export const placeholdersManifest: PluginManifest = {
   id: "placeholders",
   name: "Placeholders",
@@ -480,6 +503,7 @@ export const pluginManifests: PluginManifest[] = [
   offeringsManifest,
   lecturersManifest,
   programmeManifest,
+  finalProjectManifest,
   qaManifest,
   placeholdersManifest,
   methodsManifest,
