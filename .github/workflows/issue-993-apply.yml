@@ -22,6 +22,8 @@ jobs:
       - name: Apply scoped patch
         run: python .github/issue-993-patch.py
       - name: Verify focused tests and Prisma schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: |
           bun install --frozen-lockfile
           bunx prisma validate --schema apps/backend/prisma/schema.prisma
