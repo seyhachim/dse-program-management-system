@@ -14,6 +14,7 @@ const summary: LecturerWorkloadSummary = {
       dayOfWeek: "Monday",
       startTime: "08:00",
       endTime: "10:00",
+      building: "STEM Building",
       room: "A203",
       activityType: "Lecture",
       durationHours: 2,
