@@ -5,6 +5,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CreateStudentInput,
+  STUDENT_FUNDING_CATEGORIES,
   STUDENT_STATUSES,
   type Student,
 } from "@dse-pms/shared-types";
@@ -44,6 +45,9 @@ const emptyProfile = {
   gender: "",
 };
 
+const fundingCategoryLabel = (value: (typeof STUDENT_FUNDING_CATEGORIES)[number]) =>
+  value === "SCHOLARSHIP" ? "Scholarship" : "Fee-paying";
+
 /** Add/Edit dialog backed by react-hook-form + the shared Zod schema. */
 export function StudentForm({
   open,
@@ -65,6 +69,7 @@ export function StudentForm({
       email: "",
       studentId: "",
       status: "Active",
+      fundingCategory: null,
       profile: emptyProfile,
     },
   });
@@ -78,6 +83,7 @@ export function StudentForm({
             email: editing.email ?? "",
             studentId: editing.studentId,
             status: editing.status,
+            fundingCategory: editing.fundingCategory ?? null,
             profile: {
               khmerFamilyName: editing.profile?.khmerFamilyName ?? "",
               khmerGivenName: editing.profile?.khmerGivenName ?? "",
@@ -91,6 +97,7 @@ export function StudentForm({
             email: "",
             studentId: "",
             status: "Active",
+            fundingCategory: null,
             profile: emptyProfile,
           },
     );
@@ -143,6 +150,33 @@ export function StudentForm({
                   </Select>
                 )}
               />
+            </Field>
+            <Field label="Funding category" error={errors.fundingCategory?.message}>
+              <Controller
+                control={control}
+                name="fundingCategory"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? "UNSET"}
+                    onValueChange={(value) => field.onChange(value === "UNSET" ? null : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UNSET">Not set — review required</SelectItem>
+                      {STUDENT_FUNDING_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {fundingCategoryLabel(category)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <span className="block text-xs text-muted-foreground">
+                Used only when an applicable university policy needs funding status, such as Year 1 FDY attendance checks. Leave unset if unknown.
+              </span>
             </Field>
           </div>
 
