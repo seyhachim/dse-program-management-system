@@ -12,13 +12,12 @@ export const LECTURER_OVERVIEW_LAYOUT = {
   periodField: "flex w-full flex-col gap-2 text-sm sm:w-60",
   periodSelect:
     "h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring sm:h-9",
-  summaryGrid: "grid grid-cols-2 gap-3 xl:grid-cols-5",
+  summaryGrid: "hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-5",
   summaryCard:
-    "min-h-24 rounded-[1.5rem] border border-border/70 bg-card p-4 shadow-sm sm:min-h-0 md:rounded-xl md:border-border",
-  summaryFinalCard: "col-span-2 xl:col-span-1",
+    "min-h-24 rounded-xl border border-border bg-card p-4 shadow-sm md:min-h-0",
+  summaryFinalCard: "md:col-span-2 xl:col-span-1",
   assignmentSurface:
     "overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-sm md:rounded-xl md:border-border",
-  assignmentHeader: "border-b border-border px-4 py-4 sm:px-5",
-  mobileAssignments: "divide-y divide-border md:hidden",
+  assignmentHeader: "hidden border-b border-border px-4 py-4 sm:px-5 md:block",
   desktopAssignments: "hidden overflow-x-auto md:block",
 } as const;
