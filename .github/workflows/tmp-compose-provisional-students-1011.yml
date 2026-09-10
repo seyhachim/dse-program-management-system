@@ -1,4 +1,4 @@
-name: TEMP Compose Provisional Students #1011
+name: TEMP Patch Provisional Students #1011
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  compose:
-    if: ${{ !contains(github.event.head_commit.message, '[skip compose-1011]') }}
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[skip patch-1011]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -18,25 +18,194 @@ jobs:
         with:
           ref: feat/issue-1011-provisional-email-students
           fetch-depth: 0
-      - name: Configure git
+      - name: Patch nullable official-ID boundaries
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              found = text.count(old)
+              if found < count:
+                  raise SystemExit(f"{path}: expected at least {count} occurrence(s), found {found}: {old[:100]!r}")
+              text = text.replace(old, new, count)
+              p.write_text(text)
+
+          # Cross-plugin student references must acknowledge provisional rows.
+          replace(
+              "packages/shared-types/src/contracts.ts",
+              "  studentId: string;\n  email: string | null;\n  status: StudentStatus;",
+              "  studentId: string | null;\n  email: string | null;\n  status: StudentStatus;",
+          )
+
+          # Attendance roster reads may show an unmarked provisional student, but saved
+          # attendance snapshots still require an official ID and are guarded below.
+          replace(
+              "packages/shared-types/src/attendance.ts",
+              "  studentNumber: string;\n  studentName: string;\n  status: AttendanceStatus | null;",
+              "  studentNumber: string | null;\n  studentName: string;\n  status: AttendanceStatus | null;",
+          )
+
+          # Lecturer-facing draft/read projections can display ID-pending students.
+          portal = Path("packages/shared-types/src/student-portal.ts")
+          text = portal.read_text()
+          text = text.replace("  studentCode: string;\n  studentName: string;\n  score: number | null;", "  studentCode: string | null;\n  studentName: string;\n  score: number | null;", 1)
+          text = text.replace(
+              "  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string; studentName: string }> ;",
+              "  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string | null; studentName: string }> ;",
+          )
+          # Actual source has no space before semicolon; handle it explicitly.
+          text = text.replace(
+              "  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string; studentName: string }>;",
+              "  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string | null; studentName: string }>;",
+              1,
+          )
+          # Keep historical group member snapshots non-null; only current enrollment rows are nullable.
+          marker = "export interface CourseDeliveryStudentResultReview {"
+          i = text.index(marker)
+          j = text.index("}", i)
+          block = text[i:j]
+          if "  studentCode: string;" not in block:
+              raise SystemExit("student-portal.ts: CourseDeliveryStudentResultReview studentCode marker missing")
+          block = block.replace("  studentCode: string;", "  studentCode: string | null;", 1)
+          text = text[:i] + block + text[j:]
+          portal.write_text(text)
+
+          # Prisma now returns nullable official IDs for these importer store projections.
+          replace(
+              "apps/backend/scripts/student-roster-import.ts",
+              "export type ExistingRosterStudent = {\n  id: string;\n  studentId: string;",
+              "export type ExistingRosterStudent = {\n  id: string;\n  studentId: string | null;",
+          )
+          replace(
+              "apps/backend/scripts/student-class-enrollment-import.ts",
+              "export type ExistingClassEnrollmentStudent = {\n  id: string;\n  studentId: string;",
+              "export type ExistingClassEnrollmentStudent = {\n  id: string;\n  studentId: string | null;",
+          )
+
+          # Current roster reads can sort students whose official ID is still pending.
+          replace(
+              "apps/backend/src/plugins/offerings/attendance-service.ts",
+              "  records.sort((a, b) => a.studentNumber.localeCompare(b.studentNumber));",
+              "  records.sort((a, b) => (a.studentNumber ?? \"\").localeCompare(b.studentNumber ?? \"\"));",
+          )
+          # Never write email/null into non-null attendance snapshot columns.
+          replace(
+              "apps/backend/src/plugins/offerings/attendance-service.ts",
+              "        const studentNumber = currentStudent?.studentId ?? historical!.studentNumber;\n        const studentName = currentStudent?.name ?? historical!.studentName;\n        const existingPending = activePendingByStudent.get(requested.studentId);",
+              "        const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;\n        if (!studentNumber) throw new ReferenceError(\"Official Student ID is required before attendance can be recorded\");\n        const studentName = currentStudent?.name ?? historical!.studentName;\n        const existingPending = activePendingByStudent.get(requested.studentId);",
+          )
+          replace(
+              "apps/backend/src/plugins/offerings/attendance-service.ts",
+              "        const studentNumber = currentStudent?.studentId ?? historical!.studentNumber;\n        const studentName = currentStudent?.name ?? historical!.studentName;\n        await tx.$executeRaw`",
+              "        const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;\n        if (!studentNumber) throw new ReferenceError(\"Official Student ID is required before attendance can be recorded\");\n        const studentName = currentStudent?.name ?? historical!.studentName;\n        await tx.$executeRaw`",
+          )
+
+          # Attendance history is an official-ID academic projection; pending students have no history yet.
+          history = Path("apps/backend/src/plugins/offerings/student-attendance-history-service.ts")
+          h = history.read_text()
+          old = "    if (!student) return null;\n    return historyForStudent(student, offeringId);"
+          if old in h:
+              h = h.replace(old, "    if (!student?.studentId) return null;\n    return historyForStudent(student, offeringId);", 1)
+          else:
+              old2 = "    if (!student) return null;\n    return historyForStudent(student);"
+              if old2 not in h:
+                  raise SystemExit("student-attendance-history-service.ts: healthForStudent guard marker missing")
+              h = h.replace(old2, "    if (!student?.studentId) return null;\n    return historyForStudent(student);", 1)
+          history.write_text(h)
+
+          # Group configuration can read provisional enrollments but cannot freeze a null
+          # official student code into immutable assessment provenance.
+          replace(
+              "apps/backend/src/plugins/student-portal/group-assessment-results.ts",
+              "        const members = group.enrollmentIds.map((id) => enrollmentById.get(id)!);\n        if (members.length) await tx.assessmentGroupMember.createMany({ data: members.map((enrollment) => ({ groupId: row.id, offeringId, courseSpecId: context.spec.id, assessmentItemId, enrollmentId: enrollment.id, studentIdSnapshot: enrollment.student.id, studentCodeSnapshot: enrollment.student.studentId, studentNameSnapshot: enrollment.student.name })) });",
+              "        const members = group.enrollmentIds.map((id) => enrollmentById.get(id)!);\n        const missingOfficialId = members.find((enrollment) => !enrollment.student.studentId);\n        if (missingOfficialId) throw new PortalConflictError(`Official Student ID is required before assessment group membership can be locked for ${missingOfficialId.student.name}`);\n        if (members.length) await tx.assessmentGroupMember.createMany({ data: members.map((enrollment) => ({ groupId: row.id, offeringId, courseSpecId: context.spec.id, assessmentItemId, enrollmentId: enrollment.id, studentIdSnapshot: enrollment.student.id, studentCodeSnapshot: enrollment.student.studentId!, studentNameSnapshot: enrollment.student.name })) });",
+          )
+
+          # Student portfolio is an authenticated official student surface, so Pending/no-ID
+          # records are not eligible yet; narrow the type after the runtime guard.
+          replace(
+              "apps/backend/src/plugins/student-portal/portfolio-profile.ts",
+              "  studentId: string;\n  email: string | null;",
+              "  studentId: string | null;\n  email: string | null;",
+          )
+          replace(
+              "apps/backend/src/plugins/student-portal/portfolio-profile.ts",
+              "export function requirePortfolioStudent(row: PortfolioStudentRow | null): asserts row is PortfolioStudentRow & { email: string } {\n  if (!row || row.status !== \"Active\") {",
+              "export function requirePortfolioStudent(row: PortfolioStudentRow | null): asserts row is PortfolioStudentRow & { email: string; studentId: string } {\n  if (!row || row.status !== \"Active\" || !row.studentId) {",
+          )
+          replace(
+              "apps/backend/src/plugins/student-portal/portfolio-profile.ts",
+              "async function studentForPortfolio(userId: string): Promise<PortfolioStudentRow & { email: string }> {",
+              "async function studentForPortfolio(userId: string): Promise<PortfolioStudentRow & { email: string; studentId: string }> {",
+          )
+
+          # Finalized correction output remains non-null by contract; reject corrupted or
+          # impossible finalized records without an official ID rather than fabricating one.
+          corrections = Path("apps/backend/src/plugins/student-portal/result-corrections.ts")
+          c = corrections.read_text()
+          anchor = "export const resultCorrectionsService = {"
+          helper = "function requireOfficialStudentCode(studentId: string | null): string {\n  if (!studentId) throw new PortalConflictError(\"Official Student ID is required for finalized-result correction records\");\n  return studentId;\n}\n\n"
+          if helper not in c:
+              if anchor not in c: raise SystemExit("result-corrections.ts anchor missing")
+              c = c.replace(anchor, helper + anchor, 1)
+          c = c.replace("studentCode: enrollment.student.studentId,", "studentCode: requireOfficialStudentCode(enrollment.student.studentId),", 1)
+          c = c.replace("studentCode: result.enrollment.student.studentId,", "studentCode: requireOfficialStudentCode(result.enrollment.student.studentId),", 1)
+          corrections.write_text(c)
+
+          # Lecturer review is allowed to show ID-pending rows; official snapshot-producing
+          # paths are guarded separately.
+          replace(
+              "apps/backend/src/plugins/student-portal/results-lifecycle.ts",
+              "  student: { id: string; studentId: string; name: string };",
+              "  student: { id: string; studentId: string | null; name: string };",
+          )
+
+          # Student portal login remains limited to Active + official-ID records. Add an
+          # explicit runtime narrowing even though the DB invariant enforces it too.
+          service = Path("apps/backend/src/plugins/student-portal/service.ts")
+          s = service.read_text()
+          patterns = [
+              ('if (!student || student.status !== "Active") {', 'if (!student || student.status !== "Active" || !student.studentId) {'),
+              ('if (!student || student.status !== "Active") throw', 'if (!student || student.status !== "Active" || !student.studentId) throw'),
+          ]
+          changed = False
+          for old, new in patterns:
+              if old in s:
+                  s = s.replace(old, new, 1)
+                  changed = True
+                  break
+          if not changed:
+              raise SystemExit("student-portal/service.ts: active student guard marker missing")
+          service.write_text(s)
+
+          # Promotion previews can represent Pending students. Pending already makes them
+          # ineligible; expose the absent number explicitly instead of inventing one.
+          candidates = []
+          for p in Path("packages/shared-types/src").glob("*.ts"):
+              t = p.read_text()
+              if "StudentPromotionPreviewMember" in t:
+                  candidates.append((p, t))
+          if len(candidates) != 1:
+              raise SystemExit(f"Expected one StudentPromotionPreviewMember file, got {[str(p) for p,_ in candidates]}")
+          p, t = candidates[0]
+          start = t.index("StudentPromotionPreviewMember")
+          end = t.find("}", start)
+          block = t[start:end]
+          if "studentNumber: string;" not in block:
+              raise SystemExit(f"{p}: studentNumber marker missing in StudentPromotionPreviewMember")
+          block = block.replace("studentNumber: string;", "studentNumber: string | null;", 1)
+          p.write_text(t[:start] + block + t[end:])
+          PY
+
+          git diff --check
+          git status --short
+      - name: Commit patch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      - name: Fetch source branches
-        run: |
-          git fetch origin feat/student-nullable-id-category-roster
-          git fetch origin feat/issue-1008-class-enrollment-import
-      - name: Cherry-pick provisional student foundation
-        run: |
-          base=$(git merge-base origin/main origin/feat/student-nullable-id-category-roster)
-          commits=$(git rev-list --reverse "$base"..origin/feat/student-nullable-id-category-roster)
-          if [ -n "$commits" ]; then git cherry-pick $commits; fi
-      - name: Cherry-pick safe class-enrollment importer
-        run: |
-          base=$(git merge-base origin/main origin/feat/issue-1008-class-enrollment-import)
-          commits=$(git rev-list --reverse "$base"..origin/feat/issue-1008-class-enrollment-import)
-          if [ -n "$commits" ]; then git cherry-pick $commits; fi
-      - name: Push composed branch
-        run: |
-          git commit --allow-empty -m "chore: compose #953 and #1009 foundations for #1011 [skip compose-1011]"
+          git add packages/shared-types/src apps/backend/scripts apps/backend/src
+          git commit -m "fix(student): make provisional IDs safe across teaching flows (#1011) [skip patch-1011]"
           git push origin HEAD:feat/issue-1011-provisional-email-students
