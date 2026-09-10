@@ -64,7 +64,7 @@ const DISPLAY_DAY_ORDER = [
 ] as const;
 
 function parseDateOnly(value: string, endOfDay = false): Date {
-  const [year, month, day] = value.split("-").map(Number);
+  const [year = 1970, month = 1, day = 1] = value.split("-").map(Number);
   return new Date(
     year,
     month - 1,
@@ -77,7 +77,7 @@ function parseDateOnly(value: string, endOfDay = false): Date {
 }
 
 function dateAtTime(date: Date, time: string): Date {
-  const [hours, minutes] = time.split(":").map(Number);
+  const [hours = 0, minutes = 0] = time.split(":").map(Number);
   return new Date(
     date.getFullYear(),
     date.getMonth(),
@@ -216,7 +216,8 @@ export function groupOfferingsForMobile<
 
   return [...grouped.entries()]
     .map(([key, groupOfferings]) => {
-      const first = groupOfferings[0];
+      // Every map entry is created from at least one Offering in the loop above.
+      const first = groupOfferings[0]!;
       const sections = groupOfferings
         .map((offering) => ({
           offering,
