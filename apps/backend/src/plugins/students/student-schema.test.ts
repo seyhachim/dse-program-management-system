@@ -5,19 +5,19 @@ describe("student roster schema", () => {
   test("allows a provisional student without an official student ID", () => {
     const parsed = CreateStudentInput.parse({
       name: "Provisional Student",
-      email: "",
+      email: "provisional@rupp.edu.kh",
       studentId: "",
       status: "Pending",
     });
     expect(parsed.studentId).toBeNull();
     expect(parsed.category).toBe("Regular");
-    expect(parsed.email).toBeNull();
+    expect(parsed.email).toBe("provisional@rupp.edu.kh");
   });
 
   test("accepts scholarship category", () => {
     const parsed = CreateStudentInput.parse({
       name: "Scholarship Student",
-      email: null,
+      email: "scholarship@rupp.edu.kh",
       studentId: null,
       category: "Scholarship",
       status: "Pending",
