@@ -10,12 +10,16 @@ const describeDb = process.env.STUDENT_CLASS_ENROLLMENT_DB_TESTS === "1" ? descr
 const prisma = new PrismaClient();
 
 describeDb("student class enrollment import database integrity", () => {
-  test("enrolls a canonical cohort student idempotently and rolls back a capacity-blocked batch", async () => {
+  test("enrolls idempotently and prevents partial writes when any row or capacity is blocked", async () => {
     const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const term = `TEST-1008-${suffix}`;
     const cohortCode = `TEST-1008-COHORT-${suffix}`;
     const courseCodes = [`T1008A-${suffix}`, `T1008B-${suffix}`];
-    const studentIds = [`T1008-STUDENT-${suffix}`, `T1008-BLOCKED-${suffix}`];
+    const studentIds = [
+      `T1008-STUDENT-${suffix}`,
+      `T1008-BLOCKED-${suffix}`,
+      `T1008-ATOMIC-${suffix}`,
+    ];
 
     let cohortId: string | undefined;
     const courseIds: string[] = [];
@@ -116,6 +120,36 @@ describeDb("student class enrollment import database integrity", () => {
         }),
       ).toBe(2);
 
+      const oneBlockedClass = parseStudentClassEnrollmentImportDocument({
+        schemaVersion: 1,
+        source: "issue-1008-atomic-block.json",
+        programmeId: "dse",
+        term,
+        classes: [
+          {
+            cohortCode,
+            programmeYear: 3,
+            classCode: "M1",
+            studentIds: [studentIds[2]],
+          },
+          {
+            cohortCode,
+            programmeYear: 3,
+            classCode: "M2",
+            studentIds: [studentIds[1]],
+          },
+        ],
+      });
+
+      await expect(
+        commitStudentClassEnrollmentImport(prisma, oneBlockedClass),
+      ).rejects.toBeInstanceOf(StudentClassEnrollmentImportBlockedError);
+      expect(
+        await prisma.enrollment.count({
+          where: { studentId: studentRecordIds[2], offeringId: { in: offeringIds } },
+        }),
+      ).toBe(0);
+
       await prisma.offering.update({
         where: { id: offeringIds[1]! },
         data: { capacity: 1 },
@@ -124,7 +158,6 @@ describeDb("student class enrollment import database integrity", () => {
       await expect(
         commitStudentClassEnrollmentImport(prisma, manifestFor(studentIds[1]!)),
       ).rejects.toBeInstanceOf(StudentClassEnrollmentImportBlockedError);
-
       expect(
         await prisma.enrollment.count({
           where: { studentId: studentRecordIds[1], offeringId: { in: offeringIds } },
