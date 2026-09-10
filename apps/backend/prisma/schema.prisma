@@ -16,6 +16,11 @@ enum StudentStatus {
   Pending
 }
 
+enum StudentFundingCategory {
+  SCHOLARSHIP
+  FEE_PAYING
+}
+
 enum StudentCohortStatus {
   Planned
   Active
@@ -1440,6 +1445,7 @@ model Student {
   email                            String?                                  @unique
   studentId                        String                                   @unique
   status                           StudentStatus                            @default(Active)
+  fundingCategory                  StudentFundingCategory?
   createdAt                        DateTime                                 @default(now())
   userId                           String?                                  @unique
   user                             User?                                    @relation(fields: [userId], references: [id], onDelete: SetNull)

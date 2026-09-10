@@ -18,6 +18,7 @@ export const STUDENT_LIST_SELECT = {
   email: true,
   studentId: true,
   status: true,
+  fundingCategory: true,
   createdAt: true,
 } as const;
 

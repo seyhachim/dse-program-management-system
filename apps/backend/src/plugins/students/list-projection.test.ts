@@ -18,6 +18,7 @@ describe("student compact projections", () => {
     expect(selectedKeys(STUDENT_LIST_SELECT)).toEqual([
       "createdAt",
       "email",
+      "fundingCategory",
       "id",
       "name",
       "status",
@@ -49,6 +50,7 @@ describe("student compact projections", () => {
       email: "student@example.edu",
       studentId: "DSE2026001",
       status: "Active",
+      fundingCategory: "SCHOLARSHIP",
       createdAt: "2026-08-30T00:00:00.000Z",
       updatedAt: "2026-08-30T00:00:00.000Z",
       profile: {
@@ -69,14 +71,15 @@ describe("student compact projections", () => {
       email: legacy.email,
       studentId: legacy.studentId,
       status: legacy.status,
+      fundingCategory: legacy.fundingCategory,
       createdAt: legacy.createdAt,
     };
 
     const legacyBytes = Buffer.byteLength(JSON.stringify(legacy));
     const compactBytes = Buffer.byteLength(JSON.stringify(compact));
 
-    expect(legacyBytes).toBe(583);
-    expect(compactBytes).toBe(181);
+    expect(legacyBytes).toBe(615);
+    expect(compactBytes).toBe(213);
     expect(compactBytes).toBeLessThan(legacyBytes * 0.4);
   });
 
