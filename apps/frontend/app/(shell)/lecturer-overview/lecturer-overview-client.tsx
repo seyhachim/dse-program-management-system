@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
@@ -34,6 +34,12 @@ import { LECTURER_OVERVIEW_LAYOUT } from "./mobile-layout";
 
 function formatHours(hours: number): string {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+}
+
+function greetingForHour(hour: number): string {
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 function formatDate(value: string | null): string {
@@ -71,6 +77,7 @@ function roomsLabel(offering: OfferingView): string {
 export function LecturerOverviewClient() {
   const { me, loading: meLoading } = useMe();
   const [term, setTerm] = useState("__all__");
+  const [greeting, setGreeting] = useState("Good morning");
   const queryScope = { userId: me?.id ?? "pending" };
   const offeringsQuery = useQuery({
     queryKey: protectedQueryKey(queryScope, "offerings", "list"),
@@ -103,6 +110,10 @@ export function LecturerOverviewClient() {
     : null;
   const refreshing = offeringsQuery.isFetching || workloadQuery.isFetching;
   const refreshError = offeringsQuery.isError || workloadQuery.isError;
+
+  useEffect(() => {
+    setGreeting(greetingForHour(new Date().getHours()));
+  }, []);
 
   const terms = useMemo(
     () =>
@@ -164,7 +175,7 @@ export function LecturerOverviewClient() {
     <>
       <Topbar
         title="Overview"
-        subtitle="Your teaching assignments, delivery dates, classes, timetable, rooms, students, and current status."
+        subtitle="Your classes, delivery dates, timetable, rooms, students, and current status."
       />
 
       <main className={LECTURER_OVERVIEW_LAYOUT.main}>
@@ -198,14 +209,11 @@ export function LecturerOverviewClient() {
 
               <div className="min-w-0">
                 <p className="text-sm font-medium text-primary-foreground/75">
-                  Welcome back
+                  {greeting}
                 </p>
                 <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight sm:text-3xl">
                   {me?.name || "Lecturer"}
                 </h1>
-                <p className="mt-1 text-xs font-medium text-primary-foreground/70">
-                  Teaching workspace
-                </p>
               </div>
             </div>
           </section>
@@ -342,11 +350,8 @@ export function LecturerOverviewClient() {
               <section className={LECTURER_OVERVIEW_LAYOUT.assignmentSurface}>
                 <div className={LECTURER_OVERVIEW_LAYOUT.assignmentHeader}>
                   <h2 className="font-semibold text-foreground">
-                    Teaching assignments
+                    Your classes
                   </h2>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground md:hidden">
-                    Next class first · classes grouped by course.
-                  </p>
                   <p className="mt-1 hidden text-sm leading-5 text-muted-foreground md:block">
                     Delivery dates, timetable, room, enrolment, and current status
                     for each class.
@@ -355,7 +360,7 @@ export function LecturerOverviewClient() {
 
                 {visibleOfferings.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground sm:p-10">
-                    No teaching assignments are available for this term.
+                    No classes are available for this term.
                   </div>
                 ) : (
                   <>
