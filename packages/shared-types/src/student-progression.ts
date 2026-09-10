@@ -132,7 +132,7 @@ export type ApplyStudentPromotionInput = z.infer<typeof ApplyStudentPromotionInp
 export interface StudentPromotionPreviewMember {
   membershipId: string;
   studentId: string;
-  studentNumber: string;
+  studentNumber: string | null;
   studentName: string;
   currentProgrammeYear: StudentProgrammeYear | null;
   proposedStatus: StudentPromotionDecision | null;

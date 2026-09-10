@@ -16,6 +16,11 @@ enum StudentStatus {
   Pending
 }
 
+enum StudentCategory {
+  Regular
+  Scholarship
+}
+
 enum StudentCohortStatus {
   Planned
   Active
@@ -1438,7 +1443,8 @@ model Student {
   id                               String                                   @id @default(uuid())
   name                             String
   email                            String?                                  @unique
-  studentId                        String                                   @unique
+  studentId                        String?                                   @unique
+  category                         StudentCategory                          @default(Regular)
   status                           StudentStatus                            @default(Active)
   createdAt                        DateTime                                 @default(now())
   userId                           String?                                  @unique

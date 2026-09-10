@@ -31,6 +31,17 @@ import { summarizeLecturerWorkload } from "./workload.ts";
 export class ReferenceError extends Error {}
 export class CapacityError extends Error {}
 
+export function assertOfferingEnrollmentStudentsEligible(
+  found: Array<{ studentId: string | null; status: string }>,
+): void {
+  const ineligible = found.find((student) => student.status !== "Active" || !student.studentId);
+  if (ineligible) {
+    throw new ReferenceError(
+      "Official Student ID and Active status are required before interactive offering enrollment",
+    );
+  }
+}
+
 // Registry accessors — resolved lazily (registration happens at app boot).
 const courses = () => registry.get<CoursesServiceContract>("courses").service;
 const lecturers = () => registry.get<LecturersServiceContract>("lecturers").service;
@@ -549,6 +560,7 @@ export const offeringService = {
     if (found.length !== input.studentIds.length) {
       throw new ReferenceError("One or more students do not exist");
     }
+    assertOfferingEnrollmentStudentsEligible(found);
 
     // Capacity check against not-yet-enrolled students.
     const already = new Set(offering.enrollments.map((e) => e.studentId));

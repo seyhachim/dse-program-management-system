@@ -16,6 +16,7 @@ function selectedKeys(select: Record<string, boolean>): string[] {
 describe("student compact projections", () => {
   test("interactive list selects only fields rendered by the roster contract", () => {
     expect(selectedKeys(STUDENT_LIST_SELECT)).toEqual([
+      "category",
       "createdAt",
       "email",
       "id",
@@ -30,6 +31,7 @@ describe("student compact projections", () => {
 
   test("cross-plugin StudentRef projection excludes profile and account-only fields", () => {
     expect(selectedKeys(STUDENT_REF_SELECT)).toEqual([
+      "category",
       "email",
       "id",
       "name",

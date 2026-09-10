@@ -10,6 +10,10 @@ export const STUDENT_STATUSES = ["Active", "Inactive", "Pending"] as const;
 export const StudentStatusSchema = z.enum(STUDENT_STATUSES);
 export type StudentStatus = z.infer<typeof StudentStatusSchema>;
 
+export const STUDENT_CATEGORIES = ["Regular", "Scholarship"] as const;
+export const StudentCategorySchema = z.enum(STUDENT_CATEGORIES);
+export type StudentCategory = z.infer<typeof StudentCategorySchema>;
+
 const nullableText = z.preprocess(
   (value) => {
     if (value === undefined || value === null) return null;
@@ -20,10 +24,18 @@ const nullableText = z.preprocess(
   z.string().min(1).nullable(),
 );
 
-/**
- * Roster records may exist before a portal/login email is known. Blank form
- * values normalize to null; any supplied value must still be a valid email.
- */
+/** Official institutional identifier. Email is never substituted for this value. */
+export const StudentIdSchema = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== "string") return value;
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  },
+  z.string().min(1).nullable(),
+);
+
+/** Institutional/login email; blank values normalize to null. */
 export const StudentEmailSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null) return null;
@@ -58,11 +70,10 @@ export const StudentSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   email: StudentEmailSchema,
-  studentId: z.string().min(1),
+  studentId: StudentIdSchema,
+  category: StudentCategorySchema,
   status: StudentStatusSchema,
   createdAt: z.string().datetime(),
-  // Optional for compatibility with consumers that only need the core roster
-  // fields; the Students management API includes this relation when available.
   profile: StudentProfileSchema.nullable().optional(),
 });
 export type Student = z.infer<typeof StudentSchema>;
@@ -70,17 +81,39 @@ export type Student = z.infer<typeof StudentSchema>;
 const StudentCoreWriteInput = z.object({
   name: z.string().trim().min(1, "Name is required"),
   email: StudentEmailSchema,
-  studentId: z.string().trim().min(1, "Student ID is required"),
+  studentId: StudentIdSchema,
+  category: StudentCategorySchema.default("Regular"),
   status: StudentStatusSchema.default("Active"),
 });
 
-/** Body for POST /api/students. */
+function enforceCreateIdentity(
+  value: { studentId: string | null; email: string | null; status: StudentStatus },
+  ctx: z.RefinementCtx,
+) {
+  if (value.studentId !== null) return;
+  if (value.status !== "Pending") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Students without an official Student ID must remain Pending",
+      path: ["status"],
+    });
+  }
+  if (value.email === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Institutional email is required while Student ID is pending",
+      path: ["email"],
+    });
+  }
+}
+
+/** Body for POST /api/students. Provisional rows are Pending + email-keyed. */
 export const CreateStudentInput = StudentCoreWriteInput.extend({
   profile: StudentProfileInputSchema.optional(),
-});
+}).superRefine(enforceCreateIdentity);
 export type CreateStudentInput = z.infer<typeof CreateStudentInput>;
 
-/** Body for PATCH /api/students/:id — all core/profile fields optional. */
+/** Body for PATCH /api/students/:id — merged-state identity rules are enforced by the service. */
 export const UpdateStudentInput = StudentCoreWriteInput.partial().extend({
   profile: StudentProfileInputSchema.partial().optional(),
 });
@@ -102,13 +135,6 @@ export const ListStudentsQuery = z.object({
 });
 export type ListStudentsQuery = z.infer<typeof ListStudentsQuery>;
 
-/**
- * Query params for the bounded interactive roster read.
- *
- * The cursor is intentionally opaque to clients. The backend encodes the
- * stable `(createdAt, id)` sort position so equal timestamps and concurrent
- * inserts cannot make interactive page navigation skip or duplicate rows.
- */
 export const ListStudentsPageQuery = ListStudentsQuery.extend({
   cursor: z.string().trim().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),

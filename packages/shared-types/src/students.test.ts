@@ -24,6 +24,7 @@ describe("student roster contracts", () => {
       name: "Seng Kimhour",
       studentId: "RUPP-001",
       email: null,
+      category: "Regular",
       status: "Active",
       profile: {
         khmerFamilyName: "សេង",
@@ -42,6 +43,7 @@ describe("student roster contracts", () => {
       email: "  STUDENT@EXAMPLE.EDU  ",
     });
     expect(parsed.email).toBe("student@example.edu");
+    expect(parsed.category).toBe("Regular");
 
     expect(() =>
       CreateStudentInput.parse({

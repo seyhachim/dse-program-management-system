@@ -171,7 +171,12 @@ export function StudentsClient() {
 
   const columns: DataTableColumn<Student>[] = [
     { key: "name", header: "Name", render: (s) => <span className="font-medium">{s.name}</span> },
-    { key: "studentId", header: "Student ID", render: (s) => s.studentId },
+    {
+    key: "studentId",
+    header: "Student ID",
+    render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
+  },
+  { key: "category", header: "Category", render: (s) => s.category },
     {
       key: "email",
       header: "Email",

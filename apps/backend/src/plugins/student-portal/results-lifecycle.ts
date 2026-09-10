@@ -55,7 +55,7 @@ function achievementStatus(percentage: number | null): PortalCloAchievement["sta
 
 export function buildStudentResultReview(input: {
   enrollmentId: string;
-  student: { id: string; studentId: string; name: string };
+  student: { id: string; studentId: string | null; name: string };
   clos: ReviewClo[];
   assessments: ReviewAssessment[];
   results: ReviewResult[];

@@ -300,7 +300,7 @@ export interface OfferingView {
   } | null;
   // Existing lecturer users assigned alongside the primary lecturer (issue #79).
   coLecturers: LecturerRef[];
-  students: { id: string; name: string; studentId: string }[];
+  students: { id: string; name: string; studentId: string | null }[];
 }
 
 export interface LecturerWorkloadRow {

@@ -15,6 +15,8 @@ describeDb("student roster import database integrity", () => {
     const cohortCode = `TEST-G540-${suffix}`;
     const blockedCohortCode = `TEST-G540-BLOCK-${suffix}`;
     const studentIds = [`TEST-540-A-${suffix}`, `TEST-540-B-${suffix}`, `TEST-540-C-${suffix}`];
+    const provisionalEmail = `pending-${suffix}@rupp.edu.kh`;
+    const provisionalOfficialId = `TEST-1011-PENDING-${suffix}`;
 
     const document = parseStudentRosterImportDocument({
       schemaVersion: 1,
@@ -91,6 +93,69 @@ describeDb("student roster import database integrity", () => {
         }),
       ).toBe(2);
 
+      const provisionalDocument = parseStudentRosterImportDocument({
+        schemaVersion: 1,
+        source: "issue-1011-provisional-db-test.json",
+        programmeId: "dse",
+        importMode: "one-time-upsert",
+        cohorts: [{
+          code: cohortCode,
+          name: "Issue 540 Test Cohort",
+          intakeYear: 2026,
+          expectedGraduationYear: 2030,
+          joinedAt: "2026-11-01",
+          status: "Active",
+        }],
+        students: [{
+          sourceRef: "provisional/row-1",
+          cohortCode,
+          studentId: null,
+          name: "Provisional Student",
+          email: provisionalEmail,
+          status: "Pending",
+        }],
+      });
+
+      const provisionalFirst = await commitStudentRosterImport(prisma, provisionalDocument);
+      expect(provisionalFirst.wouldCreate).toBe(1);
+      const provisionalStudent = await prisma.student.findFirst({ where: { email: provisionalEmail } });
+      expect(provisionalStudent).toMatchObject({ studentId: null, email: provisionalEmail, status: "Pending", userId: null });
+      const provisionalRecordId = provisionalStudent!.id;
+      expect(await prisma.studentCohortMembership.count({ where: { studentId: provisionalRecordId, cohort: { code: cohortCode } } })).toBe(1);
+
+      const provisionalAgain = await commitStudentRosterImport(prisma, provisionalDocument);
+      expect(provisionalAgain.unchanged).toBe(1);
+      expect(await prisma.student.count({ where: { email: provisionalEmail } })).toBe(1);
+
+      const attachIdDocument = parseStudentRosterImportDocument({
+        schemaVersion: 1,
+        source: "issue-1011-attach-id-db-test.json",
+        programmeId: "dse",
+        importMode: "one-time-upsert",
+        cohorts: [{
+          code: cohortCode,
+          name: "Issue 540 Test Cohort",
+          intakeYear: 2026,
+          expectedGraduationYear: 2030,
+          joinedAt: "2026-11-01",
+          status: "Active",
+        }],
+        students: [{
+          sourceRef: "provisional/row-1",
+          cohortCode,
+          studentId: provisionalOfficialId,
+          name: "Provisional Student",
+          email: provisionalEmail,
+          status: "Pending",
+        }],
+      });
+      const attached = await commitStudentRosterImport(prisma, attachIdDocument);
+      expect(attached.wouldUpdate).toBe(1);
+      const afterAttach = await prisma.student.findUnique({ where: { studentId: provisionalOfficialId } });
+      expect(afterAttach?.id).toBe(provisionalRecordId);
+      expect(afterAttach?.email).toBe(provisionalEmail);
+      expect(afterAttach?.status).toBe("Pending");
+
       const blocked = parseStudentRosterImportDocument({
         schemaVersion: 1,
         source: "issue-540-blocked-db-test.json",
@@ -115,8 +180,8 @@ describeDb("student roster import database integrity", () => {
           {
             sourceRef: "blocked/row-2",
             cohortCode: blockedCohortCode,
-            studentId: null,
-            name: "Missing Official ID",
+            studentId: studentIds[0],
+            name: "Conflicting Existing Name",
           },
         ],
       });
@@ -131,10 +196,24 @@ describeDb("student roster import database integrity", () => {
         }),
       ).toBeNull();
     } finally {
-      await prisma.studentCohortMembership.deleteMany({
-        where: { student: { studentId: { in: studentIds } } },
+      const testStudents = await prisma.student.findMany({
+        where: {
+          OR: [
+            { studentId: { in: [...studentIds, provisionalOfficialId] } },
+            { email: provisionalEmail },
+          ],
+        },
+        select: { id: true },
       });
-      await prisma.student.deleteMany({ where: { studentId: { in: studentIds } } });
+      const testStudentRecordIds = testStudents.map((student) => student.id);
+      if (testStudentRecordIds.length > 0) {
+        await prisma.studentCohortMembership.deleteMany({
+          where: { studentId: { in: testStudentRecordIds } },
+        });
+        await prisma.student.deleteMany({
+          where: { id: { in: testStudentRecordIds } },
+        });
+      }
       await prisma.studentCohort.deleteMany({
         where: { programmeId: "dse", code: { in: [cohortCode, blockedCohortCode] } },
       });

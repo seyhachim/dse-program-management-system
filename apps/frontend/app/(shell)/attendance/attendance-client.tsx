@@ -190,7 +190,7 @@ export function AttendanceClient() {
     return records.filter(
       (record) =>
         record.studentName.toLowerCase().includes(query) ||
-        record.studentNumber.toLowerCase().includes(query),
+        (record.studentNumber ?? "").toLowerCase().includes(query),
     );
   }, [records, search]);
 

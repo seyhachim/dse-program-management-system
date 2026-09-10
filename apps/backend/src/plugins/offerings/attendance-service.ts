@@ -140,7 +140,7 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       note: pending.note,
     });
   }
-  records.sort((a, b) => a.studentNumber.localeCompare(b.studentNumber));
+  records.sort((a, b) => (a.studentNumber ?? "").localeCompare(b.studentNumber ?? ""));
   return { sessionId: session?.id ?? null, offeringId, date, records, counts, updatedAt: session?.updatedAt.toISOString() ?? null };
 }
 
@@ -267,7 +267,8 @@ export const attendanceService = {
         if (!requested.permissionPending) continue;
         const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
         const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
-        const studentNumber = currentStudent?.studentId ?? historical!.studentNumber;
+        const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
+        if (!studentNumber) throw new ReferenceError("Official Student ID is required before attendance can be recorded");
         const studentName = currentStudent?.name ?? historical!.studentName;
         const existingPending = activePendingByStudent.get(requested.studentId);
         if (existingPending) {
@@ -288,7 +289,8 @@ export const attendanceService = {
         if (record.status === null) continue;
         const currentStudent = currentStudentIds.has(record.studentId) ? studentById.get(record.studentId) : null;
         const historical = historicalByStudent.get(record.studentId) ?? pendingHistoryByStudent.get(record.studentId);
-        const studentNumber = currentStudent?.studentId ?? historical!.studentNumber;
+        const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
+        if (!studentNumber) throw new ReferenceError("Official Student ID is required before attendance can be recorded");
         const studentName = currentStudent?.name ?? historical!.studentName;
         await tx.$executeRaw`
           INSERT INTO "pms_attendance"."AttendanceRecord"
