@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 import Link from "next/link";
 import {
   BookOpen,
@@ -152,6 +153,69 @@ export function LecturerOverviewClient() {
 
       <main className={LECTURER_OVERVIEW_LAYOUT.main}>
         <div className={LECTURER_OVERVIEW_LAYOUT.content}>
+          <section
+            className={LECTURER_OVERVIEW_LAYOUT.mobileHero}
+            aria-label="Lecturer identity"
+          >
+            <span
+              className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-primary-foreground/10"
+              aria-hidden="true"
+            />
+            <span
+              className="pointer-events-none absolute -bottom-16 right-16 h-28 w-28 rounded-full bg-primary-foreground/5"
+              aria-hidden="true"
+            />
+            <div className="relative z-10 space-y-5">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <Image
+                  src="/dse-logo.svg"
+                  alt="DSE logo"
+                  width={92}
+                  height={30}
+                  priority
+                  className="h-auto w-[5.75rem] shrink-0 sm:w-[6.25rem]"
+                />
+                <span className="shrink-0 rounded-full bg-primary-foreground/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-foreground/80 ring-1 ring-primary-foreground/15">
+                  DSE Lecturer
+                </span>
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-primary-foreground/75">
+                  Welcome back
+                </p>
+                <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {me?.name || "Lecturer"}
+                </h1>
+                <p className="mt-1 text-xs font-medium text-primary-foreground/70">
+                  Teaching workspace
+                </p>
+              </div>
+
+              <label className={LECTURER_OVERVIEW_LAYOUT.mobilePeriodField}>
+                <span className="flex items-center justify-between gap-3 text-xs font-medium text-primary-foreground/75">
+                  <span>Academic period</span>
+                  <span className="tabular-nums">
+                    {visibleOfferings.length} {visibleOfferings.length === 1 ? "section" : "sections"}
+                  </span>
+                </span>
+                <select
+                  value={term}
+                  onChange={(event) => setTerm(event.target.value)}
+                  className={LECTURER_OVERVIEW_LAYOUT.mobilePeriodSelect}
+                  aria-label="Academic period"
+                >
+                  <option value="__all__">All periods</option>
+                  {terms.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
           <section className={LECTURER_OVERVIEW_LAYOUT.intro}>
             <div className="min-w-0">
               <h2 className="font-semibold text-foreground">
@@ -199,6 +263,20 @@ export function LecturerOverviewClient() {
             </div>
           ) : (
             <>
+              <div className="flex items-end justify-between gap-3 px-1 md:hidden">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    At a glance
+                  </p>
+                  <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
+                    Your teaching
+                  </h2>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {uniqueCourses} {uniqueCourses === 1 ? "course" : "courses"}
+                </span>
+              </div>
+
               <section className={LECTURER_OVERVIEW_LAYOUT.summaryGrid}>
                 <SummaryCard
                   icon={<BookOpen className="h-4 w-4" />}
@@ -228,8 +306,8 @@ export function LecturerOverviewClient() {
                 />
               </section>
 
-              <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                <div className="border-b border-border px-4 py-4">
+              <section className={LECTURER_OVERVIEW_LAYOUT.assignmentSurface}>
+                <div className={LECTURER_OVERVIEW_LAYOUT.assignmentHeader}>
                   <h2 className="font-semibold text-foreground">
                     Teaching assignments
                   </h2>
@@ -386,7 +464,9 @@ function SummaryCard({
   return (
     <div className={`${LECTURER_OVERVIEW_LAYOUT.summaryCard} ${className}`}>
       <div className="mb-3 flex items-start gap-2 text-xs leading-4 text-muted-foreground">
-        <span className="mt-px shrink-0">{icon}</span>
+        <span className="mt-px shrink-0 rounded-lg bg-primary/8 p-1.5 text-primary md:bg-transparent md:p-0 md:text-muted-foreground">
+          {icon}
+        </span>
         <span>{label}</span>
       </div>
       <p className="text-2xl font-semibold tracking-tight text-foreground">
@@ -404,7 +484,7 @@ function MobileOfferingCard({
   isPrimary: boolean;
 }) {
   return (
-    <article className="p-4">
+    <article className="p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {offering.course ? (
@@ -488,7 +568,7 @@ function MobileDetail({
         {icon}
         {label}
       </dt>
-      <dd className="mt-1 leading-5 text-foreground">{value}</dd>
+      <dd className="mt-1 break-words leading-5 text-foreground">{value}</dd>
     </div>
   );
 }
