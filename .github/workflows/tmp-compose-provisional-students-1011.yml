@@ -1,4 +1,4 @@
-name: TEMP Apply Provisional Class Enrollment
+name: TEMP Finalize Provisional Students
 
 on:
   push:
@@ -10,22 +10,42 @@ permissions:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, '[skip class-helper-1011]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip finalize-1011]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feat/issue-1011-provisional-email-students
           fetch-depth: 0
-      - name: Apply helper
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Apply final compatibility fixes
+        shell: bash
         run: |
-          python .github/tmp_patch_1011_class.py
+          python .github/tmp_patch_1011_db.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("apps/backend/src/plugins/student-portal/service.ts")
+          text = p.read_text()
+          old = "  return { ...student, email: student.email };"
+          new = "  return { ...student, studentId: student.studentId, email: student.email };"
+          if old not in text:
+              raise SystemExit("student portal narrowing marker missing")
+          p.write_text(text.replace(old, new, 1))
+          PY
           git diff --check
-      - name: Commit patch
+      - name: Verify targeted tests and typecheck
+        run: |
+          bun install --frozen-lockfile
+          bun run db:generate
+          bun test packages/shared-types/src/students.test.ts apps/backend/scripts/student-roster-import.test.ts apps/backend/scripts/student-class-enrollment-import.test.ts
+          bun run typecheck
+      - name: Commit fixes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/backend/scripts/student-class-enrollment-import.ts apps/backend/scripts/student-class-enrollment-import.test.ts apps/backend/scripts/student-class-enrollment-import.README.md
-          git commit -m "feat(student): enroll provisional students by institutional email (#1011) [skip class-helper-1011]"
+          git add apps/backend/scripts/student-roster-import-db.test.ts apps/backend/scripts/student-class-enrollment-import-db.test.ts apps/backend/src/plugins/student-portal/service.ts
+          git commit -m "fix(student): complete provisional student safeguards (#1011) [skip finalize-1011]"
           git push origin HEAD:feat/issue-1011-provisional-email-students
