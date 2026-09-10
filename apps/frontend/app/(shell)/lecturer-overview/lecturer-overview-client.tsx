@@ -24,6 +24,12 @@ import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
+import {
+  compactScheduleLabel,
+  groupOfferingsForMobile,
+  upcomingTeachingLabel,
+  type MobileOfferingGroup,
+} from "./lecturer-overview-ordering";
 import { LECTURER_OVERVIEW_LAYOUT } from "./mobile-layout";
 
 function formatHours(hours: number): string {
@@ -144,6 +150,16 @@ export function LecturerOverviewClient() {
     0,
   );
 
+  // Keep this calculation cheap and render-time based instead of memoizing the
+  // clock. Any normal refresh/re-render then advances the next-class ordering.
+  const mobileNow = new Date();
+  const mobileOfferingGroups = groupOfferingsForMobile(
+    visibleOfferings,
+    mobileNow,
+  );
+  const nextOfferingId =
+    mobileOfferingGroups.find((group) => group.next)?.next?.offering.id ?? null;
+
   return (
     <>
       <Topbar
@@ -196,7 +212,8 @@ export function LecturerOverviewClient() {
                 <span className="flex items-center justify-between gap-3 text-xs font-medium text-primary-foreground/75">
                   <span>Academic period</span>
                   <span className="tabular-nums">
-                    {visibleOfferings.length} {visibleOfferings.length === 1 ? "section" : "sections"}
+                    {visibleOfferings.length}{" "}
+                    {visibleOfferings.length === 1 ? "section" : "sections"}
                   </span>
                 </span>
                 <select
@@ -311,7 +328,10 @@ export function LecturerOverviewClient() {
                   <h2 className="font-semibold text-foreground">
                     Teaching assignments
                   </h2>
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground md:hidden">
+                    Next class first · sections grouped by course.
+                  </p>
+                  <p className="mt-1 hidden text-sm leading-5 text-muted-foreground md:block">
                     Delivery dates, timetable, room, enrolment, and current status
                     for each class section.
                   </p>
@@ -324,11 +344,13 @@ export function LecturerOverviewClient() {
                 ) : (
                   <>
                     <div className={LECTURER_OVERVIEW_LAYOUT.mobileAssignments}>
-                      {visibleOfferings.map((offering) => (
-                        <MobileOfferingCard
-                          key={offering.id}
-                          offering={offering}
-                          isPrimary={offering.lecturer?.id === me?.id}
+                      {mobileOfferingGroups.map((group) => (
+                        <MobileCourseGroupCard
+                          key={group.key}
+                          group={group}
+                          lecturerId={me?.id}
+                          nextOfferingId={nextOfferingId}
+                          now={mobileNow}
                         />
                       ))}
                     </div>
@@ -463,38 +485,57 @@ function SummaryCard({
 }) {
   return (
     <div className={`${LECTURER_OVERVIEW_LAYOUT.summaryCard} ${className}`}>
-      <div className="mb-3 flex items-start gap-2 text-xs leading-4 text-muted-foreground">
+      <div className="mb-2 flex items-start gap-2 text-[11px] leading-4 text-muted-foreground md:mb-3 md:text-xs">
         <span className="mt-px shrink-0 rounded-lg bg-primary/8 p-1.5 text-primary md:bg-transparent md:p-0 md:text-muted-foreground">
           {icon}
         </span>
         <span>{label}</span>
       </div>
-      <p className="text-2xl font-semibold tracking-tight text-foreground">
+      <p className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
         {value}
       </p>
     </div>
   );
 }
 
-function MobileOfferingCard({
-  offering,
-  isPrimary,
+function MobileCourseGroupCard({
+  group,
+  lecturerId,
+  nextOfferingId,
+  now,
 }: {
-  offering: OfferingView;
-  isPrimary: boolean;
+  group: MobileOfferingGroup<OfferingView>;
+  lecturerId: string | undefined;
+  nextOfferingId: string | null;
+  now: Date;
 }) {
+  const firstOffering = group.sections[0]?.offering;
+  if (!firstOffering) return null;
+
+  const statuses = [...new Set(group.sections.map(({ offering }) => offering.status))];
+  const sharedStatus = statuses.length === 1 ? statuses[0] : null;
+  const teachingWindows = new Set(
+    group.sections.map(
+      ({ offering }) => `${offering.startDate ?? ""}:${offering.endDate ?? ""}`,
+    ),
+  );
+  const teachingDates =
+    teachingWindows.size === 1
+      ? teachingPeriodLabel(firstOffering)
+      : "Teaching dates vary by class";
+
   return (
     <article className="p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          {offering.course ? (
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {group.course ? (
             <Link
-              href={`/courses/${offering.course.id}/spec`}
-              className="block min-h-11 py-1 font-semibold text-foreground"
+              href={`/courses/${group.course.id}/spec`}
+              className="block min-h-11 py-0.5 font-semibold text-foreground"
             >
-              <span className="block">{offering.course.code}</span>
-              <span className="mt-0.5 block text-sm font-normal leading-5 text-muted-foreground">
-                {offering.course.title}
+              <span className="block text-lg leading-6">{group.course.code}</span>
+              <span className="mt-0.5 block break-words text-sm font-normal leading-5 text-muted-foreground">
+                {group.course.title}
               </span>
             </Link>
           ) : (
@@ -503,73 +544,84 @@ function MobileOfferingCard({
             </span>
           )}
         </div>
-        <OfferingStatus status={offering.status} />
+        {sharedStatus ? <OfferingStatus status={sharedStatus} /> : null}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground">
-          Class {offering.sectionCode}
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span>{group.term}</span>
+        <span aria-hidden="true">·</span>
+        <span>
+          {group.programmeYear ? `Year ${group.programmeYear}` : "Year not set"}
         </span>
-        <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
-          {isPrimary ? "Primary Lecturer" : "Co-Lecturer"}
-        </span>
+        <span aria-hidden="true">·</span>
+        <span>{semesterLabel(group.semester)}</span>
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>{teachingDates}</span>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
-        <MobileDetail
-          label="Academic period"
-          value={`${offering.term} · ${
-            offering.programmeYear
-              ? `Year ${offering.programmeYear}`
-              : "Year not set"
-          } · ${semesterLabel(offering.semester)}`}
-        />
-        <MobileDetail
-          label="Students"
-          value={`${offering.enrolledCount} / ${offering.capacity}`}
-        />
-        <MobileDetail
-          className="col-span-2"
-          icon={<CalendarDays className="h-4 w-4" />}
-          label="Teaching dates"
-          value={teachingPeriodLabel(offering)}
-        />
-        <MobileDetail
-          className="col-span-2"
-          icon={<Clock3 className="h-4 w-4" />}
-          label="Schedule"
-          value={scheduleLabel(offering)}
-        />
-        <MobileDetail
-          className="col-span-2"
-          icon={<MapPin className="h-4 w-4" />}
-          label="Room"
-          value={roomsLabel(offering)}
-        />
-      </dl>
+      <div className="mt-3 overflow-hidden rounded-2xl border border-border/70 bg-muted/15">
+        {group.sections.map(({ offering, next }, index) => {
+          const isNextClass = nextOfferingId === offering.id && Boolean(next);
+          const isPrimary = offering.lecturer?.id === lecturerId;
+          return (
+            <div
+              key={offering.id}
+              className={`${index > 0 ? "border-t border-border/70" : ""} ${
+                isNextClass ? "bg-primary/5" : ""
+              } p-3`}
+            >
+              <div className="flex min-w-0 items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
+                    Class {offering.sectionCode}
+                  </span>
+                  <span className="rounded-full bg-muted/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+                    {isPrimary ? "Primary" : "Co-Lecturer"}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {isNextClass ? (
+                    <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                      Next class
+                    </span>
+                  ) : null}
+                  {!sharedStatus ? <OfferingStatus status={offering.status} /> : null}
+                </div>
+              </div>
+
+              <div className="mt-2.5 flex items-start gap-2 text-sm">
+                <Clock3
+                  className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                <span className={next ? "font-medium text-foreground" : "text-muted-foreground"}>
+                  {next ? upcomingTeachingLabel(next, now) : "No upcoming class"}
+                </span>
+              </div>
+
+              {offering.meetings.length > 1 || !next ? (
+                <p className="mt-1.5 break-words pl-6 text-xs leading-5 text-muted-foreground">
+                  Weekly · {compactScheduleLabel(offering)}
+                </p>
+              ) : null}
+
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 pl-6 text-xs text-muted-foreground">
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="break-words">{roomsLabel(offering)}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
+                  <UsersRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {offering.enrolledCount} / {offering.capacity}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </article>
-  );
-}
-
-function MobileDetail({
-  label,
-  value,
-  icon,
-  className = "",
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {icon}
-        {label}
-      </dt>
-      <dd className="mt-1 break-words leading-5 text-foreground">{value}</dd>
-    </div>
   );
 }
 
