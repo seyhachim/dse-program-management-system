@@ -22,6 +22,7 @@ export * from "./lecturer-portfolio.ts";
 export * from "./lecturer-portfolio-plugin.ts";
 export * from "./courses.ts";
 export * from "./offerings.ts";
+export * from "./meeting-lecturer-assignments.ts";
 export * from "./offering-curriculum.ts";
 export * from "./dashboard.ts";
 export * from "./attendance.ts";
