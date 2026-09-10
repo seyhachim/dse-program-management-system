@@ -9,6 +9,7 @@ import {
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import {
+  InvalidStudentIdentityError,
   InvalidStudentPageCursorError,
   studentService,
 } from "./service.ts";
@@ -109,8 +110,16 @@ export function createStudentRouter(): Router {
     try {
       const updated = await studentService.setStatus(req.params.id!, parsed.data.status);
       res.json(updated);
-    } catch {
-      res.status(404).json({ error: "Student not found" });
+    } catch (err) {
+      if (err instanceof InvalidStudentIdentityError) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
+      if (notFound(err)) {
+        res.status(404).json({ error: "Student not found" });
+        return;
+      }
+      throw err;
     }
   });
 
