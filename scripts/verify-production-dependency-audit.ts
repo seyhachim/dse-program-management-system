@@ -14,9 +14,15 @@ type AuditReport = Record<string, Advisory[]>;
 const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
   "@hono/node-server": new Set([1139322]),
   "brace-expansion": new Set([1130591, 1130734]),
-  hono: new Set([1130733, 1138771, 1138772, 1138773]),
+  // `bun pm why hono` on the refreshed #1010 lockfile resolves this copy only
+  // through shadcn -> @modelcontextprotocol/sdk / @hono/node-server. shadcn is
+  // explicitly dev-only in both frontend and UI workspaces.
+  hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731]),
   "ip-address": new Set([1130722, 1130723, 1130724]),
-  "js-yaml": new Set([1138115]),
+  // `bun pm why js-yaml` resolves this copy only through ESLint/eslint-config-next
+  // and shadcn/cosmiconfig, all development tooling; it is not in the deployed
+  // Next.js or Bun backend runtime path.
+  "js-yaml": new Set([1138115, 1193727]),
   postcss: new Set([1130709]),
   undici: new Set([1130715, 1130718, 1130726, 1130729, 1130731]),
 };
@@ -70,11 +76,11 @@ if (!ui.devDependencies?.shadcn) {
 if (frontend.devDependencies?.postcss !== "8.5.23") {
   structuralErrors.push("apps/frontend build PostCSS must remain pinned to patched 8.5.23");
 }
-if (frontend.dependencies?.next !== "^16.3.0") {
-  structuralErrors.push("apps/frontend Next.js must remain on the remediated ^16.3.0 line");
+if (frontend.dependencies?.next !== "^16.3.3") {
+  structuralErrors.push("apps/frontend Next.js must remain on the patched ^16.3.3 or newer compatible line");
 }
-if (frontend.devDependencies?.["eslint-config-next"] !== "16.3.0") {
-  structuralErrors.push("eslint-config-next must stay aligned with the remediated Next.js line");
+if (frontend.devDependencies?.["eslint-config-next"] !== "16.3.3") {
+  structuralErrors.push("eslint-config-next must stay aligned with the reviewed 16.3.3 line");
 }
 
 if (structuralErrors.length > 0) {
