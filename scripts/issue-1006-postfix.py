@@ -28,17 +28,17 @@ client_path = ROOT / "apps/frontend/app/(shell)/final-project/final-project-clie
 client = client_path.read_text(encoding="utf-8")
 client = client.replace(
     '  useEffect(() => {\n    if (!me) return;\n    let active = true;',
-    '  useEffect(() => {\n    const currentUser = me;\n    if (!currentUser) return;\n    let active = true;',
+    '  useEffect(() => {\n    if (!me) return;\n    const currentRoles = me.roles;\n    let active = true;',
     1,
 )
 client = client.replace(
     '        if (me.roles.includes("lecturer")) {',
-    '        if (currentUser.roles.includes("lecturer")) {',
+    '        if (currentRoles.includes("lecturer")) {',
     1,
 )
 client = client.replace(
     '        if (me.roles.includes("admin") || me.roles.includes("program_coordinator")) {',
-    '        if (currentUser.roles.includes("admin") || currentUser.roles.includes("program_coordinator")) {',
+    '        if (currentRoles.includes("admin") || currentRoles.includes("program_coordinator")) {',
     1,
 )
 if 'if (me.roles.includes("lecturer"))' in client or 'if (me.roles.includes("admin") || me.roles.includes("program_coordinator"))' in client:
