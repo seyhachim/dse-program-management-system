@@ -1,4 +1,4 @@
-name: TEMP Apply Provisional Roster Helper
+name: TEMP Apply Provisional Class Enrollment
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, '[skip roster-helper-1011]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip class-helper-1011]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -20,12 +20,12 @@ jobs:
           fetch-depth: 0
       - name: Apply helper
         run: |
-          python .github/tmp_patch_1011_roster.py
+          python .github/tmp_patch_1011_class.py
           git diff --check
       - name: Commit patch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/backend/scripts/student-roster-import.ts apps/backend/scripts/student-roster-import.test.ts
-          git commit -m "feat(student): import provisional roster by institutional email (#1011) [skip roster-helper-1011]"
+          git add apps/backend/scripts/student-class-enrollment-import.ts apps/backend/scripts/student-class-enrollment-import.test.ts apps/backend/scripts/student-class-enrollment-import.README.md
+          git commit -m "feat(student): enroll provisional students by institutional email (#1011) [skip class-helper-1011]"
           git push origin HEAD:feat/issue-1011-provisional-email-students
