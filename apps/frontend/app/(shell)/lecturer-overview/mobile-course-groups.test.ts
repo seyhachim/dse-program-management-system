@@ -80,13 +80,14 @@ describe("lecturer mobile course grouping", () => {
     );
 
     expect(groups).toHaveLength(1);
-    expect(groups[0].offerings.map((item) => item.sectionCode)).toEqual([
+    const group = groups[0]!;
+    expect(group.offerings.map((item) => item.sectionCode)).toEqual([
       "M1",
       "M2",
     ]);
-    expect(groups[0].commonRole).toBe("Primary Lecturer");
-    expect(groups[0].commonStatus).toBe("Planned");
-    expect(groups[0].commonTeachingPeriod).toEqual({
+    expect(group.commonRole).toBe("Primary Lecturer");
+    expect(group.commonStatus).toBe("Planned");
+    expect(group.commonTeachingPeriod).toEqual({
       startDate: "2026-09-14",
       endDate: "2027-01-16",
     });
@@ -146,9 +147,10 @@ describe("lecturer mobile course grouping", () => {
     );
 
     expect(groups).toHaveLength(1);
-    expect(groups[0].commonRole).toBeNull();
-    expect(groups[0].commonStatus).toBeNull();
-    expect(groups[0].commonTeachingPeriod).toBeNull();
+    const group = groups[0]!;
+    expect(group.commonRole).toBeNull();
+    expect(group.commonStatus).toBeNull();
+    expect(group.commonTeachingPeriod).toBeNull();
   });
 
   test("uses a compact academic-period label", () => {
