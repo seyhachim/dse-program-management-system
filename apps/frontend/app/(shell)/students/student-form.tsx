@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@dse-pms/ui";
 
-export interface StudentFormValues extends CreateStudentInput {}
+export type StudentFormValues = CreateStudentInput;
 
 interface StudentFormProps {
   open: boolean;
