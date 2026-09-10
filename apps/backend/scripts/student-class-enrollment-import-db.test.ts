@@ -20,6 +20,7 @@ describeDb("student class enrollment import database integrity", () => {
       `T1008-BLOCKED-${suffix}`,
       `T1008-ATOMIC-${suffix}`,
     ];
+    const provisionalEmail = `pending-class-${suffix}@rupp.edu.kh`;
 
     let cohortId: string | undefined;
     const courseIds: string[] = [];
@@ -119,6 +120,44 @@ describeDb("student class enrollment import database integrity", () => {
           where: { studentId: studentRecordIds[0], offeringId: { in: offeringIds } },
         }),
       ).toBe(2);
+
+      const provisionalStudent = await prisma.student.create({
+        data: {
+          studentId: null,
+          email: provisionalEmail,
+          name: "Issue 1011 Provisional Student",
+          status: "Pending",
+        },
+        select: { id: true },
+      });
+      studentRecordIds.push(provisionalStudent.id);
+      await prisma.studentCohortMembership.create({
+        data: {
+          cohortId: cohort.id,
+          studentId: provisionalStudent.id,
+          joinedAt: new Date("2024-11-01T00:00:00.000Z"),
+          note: "Issue #1011 provisional class database test",
+        },
+      });
+      const provisionalManifest = parseStudentClassEnrollmentImportDocument({
+        schemaVersion: 1,
+        source: "issue-1011-provisional-class-db-test.json",
+        programmeId: "dse",
+        term,
+        classes: [{
+          cohortCode,
+          programmeYear: 3,
+          classCode: "M1",
+          studentEmails: [provisionalEmail],
+        }],
+      });
+      const provisionalCommit = await commitStudentClassEnrollmentImport(prisma, provisionalManifest);
+      expect(provisionalCommit.blockedStudents).toBe(0);
+      expect(provisionalCommit.wouldCreateEnrollments).toBe(2);
+      expect(await prisma.enrollment.count({ where: { studentId: provisionalStudent.id, offeringId: { in: offeringIds } } })).toBe(2);
+      const provisionalRerun = await commitStudentClassEnrollmentImport(prisma, provisionalManifest);
+      expect(provisionalRerun.wouldCreateEnrollments).toBe(0);
+      expect(provisionalRerun.unchangedEnrollments).toBe(2);
 
       const oneBlockedClass = parseStudentClassEnrollmentImportDocument({
         schemaVersion: 1,

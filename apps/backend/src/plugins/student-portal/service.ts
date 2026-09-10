@@ -79,7 +79,7 @@ async function studentForUser(userId: string) {
   if (!student.email) {
     throw new PortalAccessError("The linked student portal profile has no official email");
   }
-  return { ...student, email: student.email };
+  return { ...student, studentId: student.studentId, email: student.email };
 }
 
 interface ProgrammeCalendarReadContract {
