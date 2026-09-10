@@ -1,0 +1,46 @@
+name: TEMP Regenerate Bun Lock #1010
+
+on:
+  push:
+    branches:
+      - fix/issue-1010-dependency-audit
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-1010-dependency-audit
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Regenerate lockfile from manifests
+        run: bun install
+      - name: Dependency paths for new advisories
+        run: |
+          for package in next sharp js-yaml hono baseline-browser-mapping; do
+            echo "===== bun pm why $package ====="
+            bun pm why "$package" || true
+          done
+      - name: Capture refreshed production audit
+        run: |
+          set +e
+          bun audit --production --json
+          echo "audit_exit_code=$?"
+          set -e
+      - name: Commit generated lockfile
+        run: |
+          if git diff --quiet -- bun.lock; then
+            echo "bun.lock already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock
+          git commit -m "chore(deps): regenerate bun lock for #1010"
+          git push origin HEAD:fix/issue-1010-dependency-audit
