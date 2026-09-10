@@ -16,8 +16,8 @@ function meeting(
   startTime: string,
   endTime: string,
 ): Meeting {
-  const [startHour, startMinute] = startTime.split(":").map(Number);
-  const [endHour, endMinute] = endTime.split(":").map(Number);
+  const [startHour = 0, startMinute = 0] = startTime.split(":").map(Number);
+  const [endHour = 0, endMinute = 0] = endTime.split(":").map(Number);
   return {
     id,
     dayOfWeek,
@@ -32,12 +32,14 @@ function meeting(
 }
 
 function offering(
-  overrides: Partial<LecturerOverviewOffering> & Pick<LecturerOverviewOffering, "id" | "sectionCode">,
+  overrides: Partial<LecturerOverviewOffering> &
+    Pick<LecturerOverviewOffering, "id" | "sectionCode">,
 ): LecturerOverviewOffering {
+  const { id, sectionCode, ...rest } = overrides;
   return {
-    id: overrides.id,
+    id,
     term: "2026-2027-S1",
-    sectionCode: overrides.sectionCode,
+    sectionCode,
     status: "Planned",
     capacity: 45,
     enrolledCount: 0,
@@ -46,14 +48,14 @@ function offering(
     academicCalendarPeriodId: "period-s1",
     startDate: "2026-09-14",
     endDate: "2027-01-16",
-    meetings: [meeting(`${overrides.id}-meeting`, "Thursday", "07:00", "08:30")],
+    meetings: [meeting(`${id}-meeting`, "Thursday", "07:00", "08:30")],
     course: {
       id: "course-dss301",
       code: "DSS301",
       title: "Data Science for Smart Agriculture",
       programmeId: "programme-dse",
     },
-    ...overrides,
+    ...rest,
   };
 }
 
