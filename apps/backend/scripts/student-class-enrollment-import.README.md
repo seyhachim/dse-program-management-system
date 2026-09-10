@@ -1,6 +1,6 @@
 # Student class enrollment import
 
-Issue: #1008
+Issues: #1008, #1011
 
 This operator-only importer assigns **existing canonical PMS students** to **existing course Offerings** for one declared term/year/class. It is intentionally separate from `student-roster-import.ts`: roster import owns Student/Profile/CohortMembership creation, while this script creates only missing `Enrollment` rows after all safety checks pass.
 
@@ -8,9 +8,9 @@ This operator-only importer assigns **existing canonical PMS students** to **exi
 
 The importer:
 
-- accepts either an official institutional `studentId` or an institutional `studentEmail`; the email path is for canonical provisional/Pending students whose official ID is not yet collected;
+- accepts either an official institutional `studentId` or an institutional `studentEmail`; the email path supports an existing canonical provisional/Pending student whose official ID has not yet been collected;
 - never creates or updates Student identity/profile data;
-- requires an existing active Student and active membership in the declared programme cohort;
+- requires an existing canonical Student and active membership in the declared programme cohort; official-ID identities must be Active, while an email-keyed Student with no official ID must be Pending;
 - resolves only existing Offerings by programme + term + programmeYear + class (`Offering.sectionCode`);
 - never creates, edits, or moves Offerings;
 - blocks a student already enrolled in another parallel class for the same course/term;
