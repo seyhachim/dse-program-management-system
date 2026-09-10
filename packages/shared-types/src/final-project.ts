@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+/** Shared contracts for the Year IV Final Project supervisor-discovery MVP. */
 export const FINAL_PROJECT_MAX_SUPERVISION_CAPACITY = 20;
 
 export const FinalProjectIdeaInput = z.object({
