@@ -38,6 +38,10 @@ const DAY_ORDER = new Map(
  * Keep Course Offerings list filtering entirely presentational. The API remains
  * the source of the caller's authorized rows; this helper only narrows what is
  * shown in the already-authorized result set.
+ *
+ * A grouped course can contain classes with different programme years, so a
+ * specific year filter also narrows the group's Offering records. This avoids
+ * showing another year's class schedule/roster inside an otherwise matching row.
  */
 export function filterOfferingGroups(
   groups: OfferingGroup[],
@@ -47,26 +51,33 @@ export function filterOfferingGroups(
   const query = search.trim().toLocaleLowerCase();
   const selectedYear = yearFilter === "all" ? null : Number(yearFilter);
 
-  return groups.filter((group) => {
-    if (
-      selectedYear !== null &&
-      !group.offerings.some((offering) => offering.programmeYear === selectedYear)
-    ) {
-      return false;
-    }
+  return groups.flatMap((group) => {
+    const offerings =
+      selectedYear === null
+        ? group.offerings
+        : group.offerings.filter(
+            (offering) => offering.programmeYear === selectedYear,
+          );
 
-    if (!query) return true;
+    if (offerings.length === 0) return [];
 
-    return [
-      group.course?.code,
-      group.course?.title,
-      group.term,
-      ...group.offerings.flatMap((offering) => [
+    const filteredGroup =
+      offerings === group.offerings ? group : { ...group, offerings };
+
+    if (!query) return [filteredGroup];
+
+    const matchesSearch = [
+      filteredGroup.course?.code,
+      filteredGroup.course?.title,
+      filteredGroup.term,
+      ...filteredGroup.offerings.flatMap((offering) => [
         offering.sectionCode,
         offering.lecturer?.name,
         ...offering.coLecturers.map((lecturer) => lecturer.name),
       ]),
     ].some((value) => value?.toLocaleLowerCase().includes(query));
+
+    return matchesSearch ? [filteredGroup] : [];
   });
 }
 
