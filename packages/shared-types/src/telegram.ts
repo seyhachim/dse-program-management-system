@@ -3,6 +3,7 @@ import {
   ClassSessionStatusSchema,
   LecturerArrivalStatusSchema,
 } from "./class-delivery.ts";
+import { OpenTeachingSlotStudentAssignmentSchema } from "./open-teaching-slots.ts";
 import { TelegramAttendanceHealthCardSchema } from "./telegram-phase2.ts";
 import type { PluginManifest } from "./plugins.ts";
 
@@ -63,7 +64,10 @@ export const TelegramHomeResponseSchema = z.object({
 });
 export type TelegramHomeResponse = z.infer<typeof TelegramHomeResponseSchema>;
 
-export const TelegramScheduleResponseSchema = z.object({ courses: z.array(TelegramCourseCardSchema) });
+export const TelegramScheduleResponseSchema = z.object({
+  courses: z.array(TelegramCourseCardSchema),
+  additionalClasses: z.array(OpenTeachingSlotStudentAssignmentSchema).default([]),
+});
 export type TelegramScheduleResponse = z.infer<typeof TelegramScheduleResponseSchema>;
 export const TelegramAnnouncementSchema = z.object({ id: z.string(), offeringId: z.string(), courseCode: z.string(), courseTitle: z.string(), title: z.string(), body: z.string(), pinned: z.boolean(), publishedAt: z.string().regex(ISO_DATE_TIME_PATTERN) });
 export type TelegramAnnouncement = z.infer<typeof TelegramAnnouncementSchema>;
