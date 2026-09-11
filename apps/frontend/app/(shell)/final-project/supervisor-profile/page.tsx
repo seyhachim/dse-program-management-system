@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { SupervisorDiscoveryProfileView, UpdateSupervisorProfileInput } from "@dse-pms/shared-types";
 import { api } from "@/lib/api";
 
