@@ -19,6 +19,8 @@ DSE PMS already sends trusted invitation metadata through `inviteUserByEmail`:
 
 The HTML personalizes the greeting with `{{ .Data.name }}` and safely falls back to `DSE colleague`. Because Supabase uses one **Invite user** template for every invited PMS role, lecturer-specific teaching copy is rendered only when `{{ .Data.role }}` equals `lecturer`; other roles receive neutral role-safe onboarding copy.
 
+The header loads the existing PNG PWA icon from `{{ .SiteURL }}/pwa-icon-192.png`. The message remains understandable if an email client blocks remote images.
+
 ## Apply to hosted Supabase
 
 1. Open the production Supabase project.
@@ -27,7 +29,7 @@ The HTML personalizes the greeting with `{{ .Data.name }}` and safely falls back
 4. Set the subject to the exact contents of `docs/auth/supabase-invite-email.subject.txt`.
 5. Copy the full contents of `docs/auth/supabase-invite-email.html` into the template body.
 6. Save the template.
-7. In **Authentication -> URL Configuration**, verify the production DSE PMS site URL and allowed redirect URLs.
+7. In **Authentication -> URL Configuration**, verify the production DSE PMS site URL and allowed redirect URLs. The Site URL must also serve `/pwa-icon-192.png` for the email header icon.
 8. Verify the Render backend environment variable `SUPABASE_INVITE_REDIRECT_URL` points to the intended deployed DSE PMS invitation/login destination. Do not change or expose `SUPABASE_SERVICE_ROLE_KEY`.
 
 Supabase hosted projects store email-template configuration outside this repository; merging this file does not automatically change the hosted Auth template. Applying the hosted template therefore remains an explicit production-configuration step.
@@ -38,6 +40,7 @@ Use a non-privileged test lecturer account/email that is safe to invite. From th
 
 - subject is the DSE PMS subject above;
 - recipient name renders correctly;
+- DSE icon loads when remote images are allowed, while the email still reads correctly when images are blocked;
 - lecturer-specific teaching copy is shown;
 - CTA reads **Activate DSE Account**;
 - CTA URL is a Supabase Auth verification URL and redirects only to the configured DSE PMS destination;
