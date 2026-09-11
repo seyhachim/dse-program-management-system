@@ -63,6 +63,11 @@ const rubricBankManifest: PluginManifest = {
   ],
 };
 
+/**
+ * Frontend information architecture for the existing QA domain. Keeping these
+ * tasks in one section makes the authoring flow obvious without changing any QA
+ * backend route, permission, or source of truth.
+ */
 const qaNavigationManifest: PluginManifest = {
   ...(pluginManifests.find((manifest) => manifest.id === "qa") ?? {
     id: "qa",
@@ -70,13 +75,55 @@ const qaNavigationManifest: PluginManifest = {
     version: "0.2.0",
   }),
   routes: [
-    { label: "AUN-QA Overview", path: "/aun-qa", icon: "shield-check", roles: ["admin", "program_coordinator", "qa_contributor"], group: "Quality Assurance" },
-    { label: "Action Research", path: "/aun-qa/action-research", icon: "refresh-cw", roles: ["admin", "program_coordinator", "lecturer", "qa_reviewer"], group: "Quality Assurance" },
-    { label: "SAR Workspace", path: "/aun-qa/sar", icon: "file-text", roles: ["admin", "program_coordinator", "qa_contributor", "qa_reviewer"], group: "Quality Assurance" },
-    { label: "Evidence Library", path: "/aun-qa/evidence", icon: "library", roles: ["admin", "program_coordinator", "qa_contributor", "qa_reviewer"], group: "Quality Assurance" },
-    { label: "Review & Approval", path: "/aun-qa/review", icon: "clipboard-check", roles: ["admin", "program_coordinator", "qa_reviewer"], group: "Quality Assurance" },
-    { label: "SAR Preview", path: "/aun-qa/sar-preview", icon: "file-text", roles: ["admin", "program_coordinator", "qa_reviewer"], group: "Quality Assurance" },
-    { label: "Evidence Analysis", path: "/qa-dashboard", icon: "file-check", roles: ["admin", "program_coordinator", "qa_reviewer"], group: "Quality Assurance" },
+    {
+      label: "AUN-QA Overview",
+      path: "/aun-qa",
+      icon: "shield-check",
+      roles: ["admin", "program_coordinator", "qa_contributor"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Action Research",
+      path: "/aun-qa/action-research",
+      icon: "refresh-cw",
+      roles: ["admin", "program_coordinator", "lecturer", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "SAR Workspace",
+      path: "/aun-qa/sar",
+      icon: "file-text",
+      roles: ["admin", "program_coordinator", "qa_contributor", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Evidence Library",
+      path: "/aun-qa/evidence",
+      icon: "library",
+      roles: ["admin", "program_coordinator", "qa_contributor", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Review & Approval",
+      path: "/aun-qa/review",
+      icon: "clipboard-check",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "SAR Preview",
+      path: "/aun-qa/sar-preview",
+      icon: "file-text",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
+    {
+      label: "Evidence Analysis",
+      path: "/qa-dashboard",
+      icon: "file-check",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
   ],
 };
 
@@ -84,18 +131,36 @@ const gradingScaleManagementManifest: PluginManifest = {
   id: "programme-grading-scales",
   name: "Programme Rating Scales",
   version: "0.1.0",
-  routes: [{ label: "Rating Scales", path: "/programme-settings/rating-scales", icon: "settings", roles: ["admin", "program_coordinator"], group: "Academic" }],
+  routes: [
+    {
+      label: "Rating Scales",
+      path: "/programme-settings/rating-scales",
+      icon: "settings",
+      roles: ["admin", "program_coordinator"],
+      group: "Academic",
+    },
+  ],
 };
 
 const publicInformationManifest: PluginManifest = {
   id: "public-programme-information",
   name: "Public Programme Information",
   version: "0.1.0",
-  routes: [{ label: "Public Information", path: "/public-information", icon: "megaphone", roles: ["admin", "program_coordinator"], group: "Administration" }],
+  routes: [
+    {
+      label: "Public Information",
+      path: "/public-information",
+      icon: "megaphone",
+      roles: ["admin", "program_coordinator"],
+      group: "Administration",
+    },
+  ],
 };
 
 const frontendManifests = [
-  ...pluginManifests.filter((manifest) => manifest.id !== "rubrics" && manifest.id !== "qa"),
+  ...pluginManifests.filter(
+    (manifest) => manifest.id !== "rubrics" && manifest.id !== "qa",
+  ),
   rubricBankManifest,
   qaNavigationManifest,
   gradingScaleManagementManifest,
@@ -111,7 +176,9 @@ const SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS: Role[] = ["admin", "program_coordinato
 
 function sidebarManifestsForRoles(roles: Role[]): PluginManifest[] {
   const hidePlaceholders = roles.some((role) => SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS.includes(role));
-  return hidePlaceholders ? frontendManifests.filter((manifest) => manifest.id !== "placeholders") : frontendManifests;
+  return hidePlaceholders
+    ? frontendManifests.filter((manifest) => manifest.id !== "placeholders")
+    : frontendManifests;
 }
 
 export const iconMap: Record<string, LucideIcon> = {
@@ -141,10 +208,12 @@ export const iconMap: Record<string, LucideIcon> = {
   megaphone: Megaphone,
 };
 
+/** All nav routes, or — when roles are given — only those the caller's roles may see. */
 export function getNavRoutes(roles?: Role[]): PluginRoute[] {
   return roles ? navForRole(frontendManifests, roles) : navFromManifests(frontendManifests);
 }
 
+/** Nav routes for `roles` (union across all of them), grouped into sidebar sections. */
 export function getNavGroups(roles: Role[]): NavGroup[] {
   return navGroupsForRole(sidebarManifestsForRoles(roles), roles);
 }
