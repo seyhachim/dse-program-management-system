@@ -19,9 +19,13 @@
             </tr>
             <tr>
               <td style="padding:32px;">
-                <p style="margin:0 0 18px;font-size:16px;line-height:1.6;">Dear {{ if .Data.name }}{{ .Data.name }}{{ else }}Lecturer{{ end }},</p>
+                <p style="margin:0 0 18px;font-size:16px;line-height:1.6;">Dear {{ if .Data.name }}{{ .Data.name }}{{ else }}DSE colleague{{ end }},</p>
                 <p style="margin:0 0 18px;font-size:16px;line-height:1.6;">You have been invited to join the <strong>DSE Program Management System (DSE PMS)</strong>.</p>
-                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">After activating your account, you can access your assigned teaching information, course specifications, schedules, assessments, programme resources, and other DSE services available to your role.</p>
+                {{ if eq .Data.role "lecturer" }}
+                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">As a lecturer, after activating your account you can access your assigned teaching information, course specifications, schedules, assessments, programme resources, and other DSE teaching services available to you.</p>
+                {{ else }}
+                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">After activating your account, you can access the DSE PMS services and information available to your assigned role.</p>
+                {{ end }}
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
                   <tr>
                     <td style="border-radius:8px;background:#0f3b66;">
