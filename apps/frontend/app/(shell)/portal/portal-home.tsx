@@ -16,8 +16,10 @@ import {
   ChevronRight,
   ClipboardList,
   Clock3,
+  Crown,
   GraduationCap,
   MapPin,
+  ShieldCheck,
 } from "lucide-react";
 import {
   academicSemesterLabel,
@@ -33,6 +35,7 @@ import {
 } from "@/lib/student-portal";
 import { studentScheduleApi } from "@/lib/student-schedule";
 import { CourseAchievementBadges } from "./course-achievement-badges";
+import { CourseAttendanceProgress } from "./courses/course-attendance-progress";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 import {
   PortalError,
@@ -160,11 +163,6 @@ export function PortalHome() {
         (summary) => summary.offeringId === nextMeeting.course.offeringId,
       ) ?? null
     : null;
-  const nextCourseMonitorRole = nextMeeting
-    ? data.monitorAssignments.find(
-        (assignment) => assignment.offeringId === nextMeeting.course.offeringId,
-      )?.role ?? null
-    : null;
   const calendar = data.academicCalendar;
   const teachingContext = resolveStudentTeachingContext(calendar, now);
   const contextSemester =
@@ -228,27 +226,34 @@ export function PortalHome() {
             <p className="text-sm font-medium text-primary-foreground/75">
               Welcome back
             </p>
-            <h2 className="mt-0.5 truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-              {data.student.name}
-            </h2>
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+              <h2 className="min-w-0 max-w-full break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+                {data.student.name}
+              </h2>
+              {monitorRoleBadges.length > 0 ? (
+                <div
+                  className="flex flex-wrap gap-1.5"
+                  aria-label="Student responsibilities"
+                >
+                  {monitorRoleBadges.map((badge) => {
+                    const RoleIcon =
+                      badge.role === "ClassMonitor" ? Crown : ShieldCheck;
+                    return (
+                      <span
+                        key={badge.role}
+                        className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/15 px-2 py-1 text-[10px] font-semibold text-primary-foreground ring-1 ring-primary-foreground/20 sm:text-[11px]"
+                      >
+                        <RoleIcon className="h-3 w-3" aria-hidden="true" />
+                        {badge.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <p className="mt-1 truncate text-xs font-medium text-primary-foreground/70">
               Student ID · {data.student.studentId}
             </p>
-            {monitorRoleBadges.length > 0 ? (
-              <div
-                className="mt-3 flex flex-wrap gap-2"
-                aria-label="Student responsibilities"
-              >
-                {monitorRoleBadges.map((badge) => (
-                  <span
-                    key={badge.role}
-                    className="inline-flex items-center rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs font-semibold text-primary-foreground ring-1 ring-primary-foreground/20"
-                  >
-                    {badge.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
           </div>
 
           {teachingContext ? (
@@ -329,9 +334,11 @@ export function PortalHome() {
                   {nextMeeting.course.code} · Section {nextMeeting.course.sectionCode}
                 </p>
 
-                <CourseAchievementBadges
+                <CourseAchievementBadges summary={nextCourseAchievement} />
+                <CourseAttendanceProgress
                   summary={nextCourseAchievement}
-                  monitorRole={nextCourseMonitorRole}
+                  calendar={calendar}
+                  term={nextMeeting.course.term}
                 />
 
                 {nextMeeting.impact ? (
