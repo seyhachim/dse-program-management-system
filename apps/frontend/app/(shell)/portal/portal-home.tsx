@@ -1,6 +1,9 @@
 "use client";
 
-import type { PortalScheduleImpact } from "@dse-pms/shared-types";
+import type {
+  MonitorClassResponsibilityView,
+  PortalScheduleImpact,
+} from "@dse-pms/shared-types";
 import { useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -21,6 +24,7 @@ import {
   formatAcademicShortDateRange,
   resolveStudentTeachingContext,
 } from "@/lib/academic-calendar";
+import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import {
   assessmentDeadline,
   meetingLabel,
@@ -41,6 +45,11 @@ const HOME_PREFETCH = [
   { resource: "assessments", loader: studentPortalApi.assessments },
   { resource: "academic-calendar", loader: studentPortalApi.academicCalendar },
 ] as const;
+
+const MONITOR_ROLE_LABELS = {
+  ClassMonitor: "Class Monitor",
+  SubClassMonitor: "Sub-class Monitor",
+} as const;
 
 const WEEKDAY_INDEX = new Map(
   ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
@@ -113,11 +122,14 @@ function relativeMeetingDay(dayOffset: number, dayOfWeek: string): string {
 
 export function PortalHome() {
   const load = useCallback(async () => {
-    const [home, scheduleImpacts] = await Promise.all([
+    const [home, scheduleImpacts, monitorAssignments] = await Promise.all([
       studentPortalApi.home(),
       studentScheduleApi.impacts(),
+      monitorDeliveryApi
+        .assignments()
+        .catch((): MonitorClassResponsibilityView[] => []),
     ]);
-    return { ...home, scheduleImpacts };
+    return { ...home, scheduleImpacts, monitorAssignments };
   }, []);
   const { data, loading, error, refreshError, refreshing } = useCachedPortalData(
     "home",
@@ -135,6 +147,9 @@ export function PortalHome() {
   const nextMeetingHref = nextMeeting?.impact
     ? `/portal/schedule?date=${encodeURIComponent(nextMeeting.impact.sessionDate)}&focus=${encodeURIComponent(nextMeeting.impact.occurrenceId)}`
     : "/portal/schedule";
+  const monitorRoleBadges = [...new Set(data.monitorAssignments.map((item) => item.role))].map(
+    (role) => ({ role, label: MONITOR_ROLE_LABELS[role] }),
+  );
   const calendar = data.academicCalendar;
   const teachingContext = resolveStudentTeachingContext(calendar, now);
   const contextSemester =
@@ -204,6 +219,21 @@ export function PortalHome() {
             <p className="mt-1 truncate text-xs font-medium text-primary-foreground/70">
               Student ID · {data.student.studentId}
             </p>
+            {monitorRoleBadges.length > 0 ? (
+              <div
+                className="mt-3 flex flex-wrap gap-2"
+                aria-label="Student responsibilities"
+              >
+                {monitorRoleBadges.map((badge) => (
+                  <span
+                    key={badge.role}
+                    className="inline-flex items-center rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs font-semibold text-primary-foreground ring-1 ring-primary-foreground/20"
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {teachingContext ? (
