@@ -33,6 +33,7 @@ export function StudentsClient() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -153,6 +154,28 @@ export function StudentsClient() {
     }
   };
 
+  const handleResendInvite = async () => {
+    if (!selectedStudent) return;
+    if (!selectedStudent.email) {
+      setActionError("Add an official email to this student before resending a portal invitation.");
+      return;
+    }
+    if (!confirm(`Resend the pending Student Portal invitation to ${selectedStudent.email}?`)) return;
+    setResending(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.resendStudentInvitation(selectedStudent.id);
+      setNotice(`Fresh portal invitation sent to ${result.email}.`);
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : "Failed to resend the student portal invitation",
+      );
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleNextPage = () => {
     const nextCursor = studentsQuery.data?.nextCursor;
     if (!nextCursor || !canAdvancePage) return;
@@ -172,11 +195,11 @@ export function StudentsClient() {
   const columns: DataTableColumn<Student>[] = [
     { key: "name", header: "Name", render: (s) => <span className="font-medium">{s.name}</span> },
     {
-    key: "studentId",
-    header: "Student ID",
-    render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
-  },
-  { key: "category", header: "Category", render: (s) => s.category },
+      key: "studentId",
+      header: "Student ID",
+      render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
+    },
+    { key: "category", header: "Category", render: (s) => s.category },
     {
       key: "email",
       header: "Email",
@@ -199,6 +222,8 @@ export function StudentsClient() {
       ),
     },
   ];
+
+  const inviteBusy = inviting || resending;
 
   return (
     <div className="space-y-4">
@@ -224,19 +249,30 @@ export function StudentsClient() {
       />
 
       {me?.permissions.includes("accounts:create") ? (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
             {selectedStudent && !selectedStudent.email
               ? "This roster record has no official email yet. Add one before provisioning portal access."
-              : "Select one student with an official email to provision their secure portal login."}
+              : selectedStudent
+                ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
+                : "Select one student with an official email to provision their secure portal login."}
           </p>
-          <Button
-            variant="outline"
-            disabled={!selectedStudent?.email || inviting}
-            onClick={handleInvite}
-          >
-            <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={!selectedStudent?.email || inviteBusy}
+              onClick={handleInvite}
+            >
+              <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!selectedStudent?.email || inviteBusy}
+              onClick={handleResendInvite}
+            >
+              {resending ? "Resending…" : "Resend expired invite"}
+            </Button>
+          </div>
         </div>
       ) : null}
 
