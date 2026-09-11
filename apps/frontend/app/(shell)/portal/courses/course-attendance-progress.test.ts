@@ -95,7 +95,7 @@ describe("course attendance progress", () => {
     expect(progress?.weeks[5]?.state).toBe("future");
   });
 
-  test("uses the term semester when no attendance sessions exist", () => {
+  test("uses the current academic-year term when no attendance sessions exist", () => {
     const progress = buildCourseAttendanceWeeks({
       summary: summary([]),
       calendar,
@@ -107,5 +107,16 @@ describe("course attendance progress", () => {
     expect(progress?.currentWeek).toBe(5);
     expect(progress?.weeks[0]?.state).toBe("not-recorded");
     expect(progress?.weeks[5]?.state).toBe("future");
+  });
+
+  test("does not invent week mapping for a historical academic year absent from the published calendar", () => {
+    const progress = buildCourseAttendanceWeeks({
+      summary: summary([]),
+      calendar,
+      term: "2025-2026-S1",
+      now: new Date(2026, 8, 9, 10, 0, 0),
+    });
+
+    expect(progress).toBeNull();
   });
 });
