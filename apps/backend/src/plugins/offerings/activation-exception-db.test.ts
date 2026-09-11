@@ -117,6 +117,40 @@ dbDescribe("Offering activation exception integrity", () => {
       endYear: 2198,
       isCurrent: false,
     });
+
+    // The exception is for a course that is already placed in a draft curriculum,
+    // but whose curriculum has not yet been formally confirmed. This keeps the
+    // fixture aligned with the real workflow while still exercising CURRICULUM
+    // as a missing readiness item.
+    const curriculum = await prisma.programmeCurriculum.create({
+      data: {
+        programmeId,
+        code: `CUR-${suffix.slice(0, 8)}`,
+        name: "Issue 963 confirmed curriculum",
+      },
+    });
+    const curriculumVersion = await prisma.programmeCurriculumVersion.create({
+      data: {
+        curriculumId: curriculum.id,
+        cohortLabel: "Issue 963 fixture cohort",
+        intakeYear: 2197,
+        academicYear: academicYear.label,
+        createdById: actor.id,
+      },
+    });
+    await prisma.programmeCurriculumCourse.create({
+      data: {
+        curriculumVersionId: curriculumVersion.id,
+        courseId: course.id,
+        courseSpecVersionId: approvedSpec.id,
+        yearLevel: 3,
+        semester: Semester.First,
+        creditsSnapshot: 3,
+        courseTypeSnapshot: CourseType.Core,
+        sortOrder: 0,
+      },
+    });
+
     const draftCalendar = await academicCalendarService.createCalendar(programmeId, actor.id, {
       academicYearId: academicYear.id,
       revisionReason: "Issue 963 exception fixture",
@@ -234,34 +268,6 @@ dbDescribe("Offering activation exception integrity", () => {
       }),
     );
 
-    const curriculum = await prisma.programmeCurriculum.create({
-      data: {
-        programmeId,
-        code: `CUR-${suffix.slice(0, 8)}`,
-        name: "Issue 963 confirmed curriculum",
-      },
-    });
-    const curriculumVersion = await prisma.programmeCurriculumVersion.create({
-      data: {
-        curriculumId: curriculum.id,
-        cohortLabel: "Issue 963 fixture cohort",
-        intakeYear: 2197,
-        academicYear: academicYear.label,
-        createdById: actor.id,
-      },
-    });
-    await prisma.programmeCurriculumCourse.create({
-      data: {
-        curriculumVersionId: curriculumVersion.id,
-        courseId: course.id,
-        courseSpecVersionId: approvedSpec.id,
-        yearLevel: 3,
-        semester: Semester.First,
-        creditsSnapshot: 3,
-        courseTypeSnapshot: CourseType.Core,
-        sortOrder: 0,
-      },
-    });
     await curriculumWorkflowService.submit(
       curriculumVersion.id,
       actor.id,
