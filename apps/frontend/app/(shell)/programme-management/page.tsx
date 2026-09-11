@@ -29,13 +29,13 @@ export default function ProgrammeManagementPage() {
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex h-full flex-col gap-4">
               <div>
-                <h2 className="font-semibold text-foreground">Student Progression</h2>
+                <h2 className="font-semibold text-foreground">Student Cohorts & Sections</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Review a cohort and record auditable Year 1→2→3→4 progression decisions with student-level exceptions.
+                  Maintain cohort membership, canonical sections such as M1/M2/A1/E1, and auditable Year 1→2→3→4 progression.
                 </p>
               </div>
               <Link href="/students/cohorts" className="mt-auto inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
-                Manage Progression
+                Manage Cohorts
               </Link>
             </div>
           </div>

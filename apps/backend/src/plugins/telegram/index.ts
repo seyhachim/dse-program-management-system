@@ -2,6 +2,7 @@ import { Router } from "express";
 import { telegramManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { createTelegramDestinationRouter } from "./destination-router.ts";
+import { createTelegramDestinationSectionRouter } from "./destination-section-router.ts";
 import { telegramDestinationService } from "./destination-service.ts";
 import { telegramNotificationService } from "./notification-service.ts";
 import { createEnhancedPublicTelegramRouter } from "./public-bot/ask-dse-enhanced-router.ts";
@@ -18,6 +19,7 @@ export type TelegramBackendService = typeof telegramBackendService;
 
 const telegramRouter = Router();
 telegramRouter.use("/public", createEnhancedPublicTelegramRouter());
+telegramRouter.use(createTelegramDestinationSectionRouter());
 telegramRouter.use(createTelegramDestinationRouter());
 telegramRouter.use(createTelegramRouter());
 

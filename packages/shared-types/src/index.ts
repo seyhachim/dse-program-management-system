@@ -16,6 +16,7 @@ export * from "./curriculum-course-spec-binding.ts";
 export * from "./curriculum-plugin.ts";
 export * from "./students.ts";
 export * from "./student-progression.ts";
+export * from "./student-cohort-sections.ts";
 export * from "./programme-outcome-indicators.ts";
 export * from "./lecturers.ts";
 export * from "./lecturer-portfolio.ts";
