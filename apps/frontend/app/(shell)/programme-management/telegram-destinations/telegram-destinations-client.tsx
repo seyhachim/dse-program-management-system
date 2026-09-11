@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 
 type Audience = "ALL_LECTURERS" | "ALL_STUDENTS" | "COHORT" | "CLASS_SECTION" | "CUSTOM";
-type CreateAudience = Exclude<Audience, "CLASS_SECTION">;
+type CreateAudience = Audience;
 type ChatType = "GROUP" | "SUPERGROUP" | "CHANNEL";
 type ManagedProgramme = { id: string };
 type Destination = {
@@ -24,6 +24,16 @@ type Destination = {
   updatedAt: string;
 };
 type Cohort = { id: string; code: string; name: string; intakeYear: number; status: string };
+type Section = {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  cohortId: string;
+  cohortCode: string;
+  cohortName: string;
+  intakeYear: number;
+};
 type Registration = {
   id: string;
   observed: boolean;
@@ -47,7 +57,7 @@ const audienceLabels: Record<Audience, string> = {
   CLASS_SECTION: "Class / section",
   CUSTOM: "Custom operational group",
 };
-const createAudiences: CreateAudience[] = ["ALL_LECTURERS", "ALL_STUDENTS", "COHORT", "CUSTOM"];
+const createAudiences: CreateAudience[] = ["ALL_LECTURERS", "ALL_STUDENTS", "COHORT", "CLASS_SECTION", "CUSTOM"];
 const chatTypeLabels: Record<ChatType, string> = {
   GROUP: "Group",
   SUPERGROUP: "Supergroup",
@@ -63,6 +73,7 @@ export function TelegramDestinationsClient() {
   const [selectedProgrammeId, setSelectedProgrammeId] = useState("");
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [name, setName] = useState("");
@@ -94,12 +105,14 @@ export function TelegramDestinationsClient() {
     setLoading(true);
     try {
       const query = `?programmeId=${encodeURIComponent(selectedProgrammeId)}`;
-      const [destinationResult, cohortResult] = await Promise.all([
+      const [destinationResult, cohortResult, sectionResult] = await Promise.all([
         api.get<{ destinations: Destination[] }>(`/api/telegram/destinations${query}`),
         api.get<{ cohorts: Cohort[] }>(`/api/telegram/destinations/scopes/cohorts${query}`),
+        api.get<{ sections: Section[] }>(`/api/telegram/destinations/scopes/sections${query}`),
       ]);
       setDestinations(destinationResult.destinations);
       setCohorts(cohortResult.cohorts);
+      setSections(sectionResult.sections);
       setScopeId("");
       setConnection(undefined);
       setCopiedCommand(false);
@@ -121,16 +134,19 @@ export function TelegramDestinationsClient() {
       setError("Choose a programme before adding a Telegram destination.");
       return;
     }
-    if (audienceType === "COHORT" && !scopeId) {
-      setError("Choose a PMS cohort before adding this destination.");
+    if ((audienceType === "COHORT" || audienceType === "CLASS_SECTION") && !scopeId) {
+      setError(audienceType === "COHORT" ? "Choose a PMS cohort before adding this destination." : "Choose a canonical PMS section before adding this destination.");
       return;
     }
     try {
-      await api.post<Destination>("/api/telegram/destinations", {
+      const endpoint = audienceType === "CLASS_SECTION"
+        ? "/api/telegram/destinations/class-section"
+        : "/api/telegram/destinations";
+      await api.post<Destination>(endpoint, {
         programmeId: selectedProgrammeId,
         name,
         audienceType,
-        ...(audienceType === "COHORT" ? { scopeId } : {}),
+        ...((audienceType === "COHORT" || audienceType === "CLASS_SECTION") ? { scopeId } : {}),
         purpose,
         chatType,
       });
@@ -245,6 +261,12 @@ export function TelegramDestinationsClient() {
     return cohort ? `${cohort.code} · ${cohort.name}` : "PMS cohort";
   };
 
+  const sectionName = (sectionId?: string) => {
+    if (!sectionId) return undefined;
+    const section = sections.find((item) => item.id === sectionId);
+    return section ? `${section.cohortCode} / ${section.code} · ${section.name}` : "PMS section";
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <section className="rounded-xl border border-border bg-card p-5">
@@ -278,6 +300,13 @@ export function TelegramDestinationsClient() {
             </select>
             <span className="text-xs text-muted-foreground">Uses the canonical PMS cohort record. Telegram does not create or own cohort membership.</span>
           </label>}
+          {audienceType === "CLASS_SECTION" && <label className="grid gap-1 text-sm">PMS section
+            <select required value={scopeId} onChange={(e) => setScopeId(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3">
+              <option value="">Choose section…</option>
+              {sections.map((section) => <option key={section.id} value={section.id}>{section.cohortCode} · {section.cohortName} / {section.code} · {section.name}</option>)}
+            </select>
+            <span className="text-xs text-muted-foreground">Uses a canonical active section from Student Cohorts. Telegram membership never defines the section.</span>
+          </label>}
           <label className="grid gap-1 text-sm">Purpose
             <input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3" placeholder="Staff operations and open teaching slots" />
           </label>
@@ -299,11 +328,7 @@ export function TelegramDestinationsClient() {
           </ol>
           <div className="mt-3 flex items-stretch gap-2">
             <code className="min-w-0 flex-1 overflow-x-auto rounded-md border bg-background p-3 text-sm">{connection.command}</code>
-            <button
-              type="button"
-              onClick={() => void copyRegistrationCommand()}
-              className="rounded-md border border-input bg-background px-3 text-sm font-medium"
-            >
+            <button type="button" onClick={() => void copyRegistrationCommand()} className="rounded-md border border-input bg-background px-3 text-sm font-medium">
               {copiedCommand ? "Copied" : "Copy"}
             </button>
           </div>
@@ -322,7 +347,7 @@ export function TelegramDestinationsClient() {
             {destinations.map((destination) => (
               <article key={destination.id} className="rounded-xl border border-border bg-card p-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div><h3 className="font-semibold">{destination.name}</h3><p className="mt-1 text-sm text-muted-foreground">{audienceLabels[destination.audienceType]}{destination.audienceType === "COHORT" ? ` · ${cohortName(destination.scopeId)}` : ""} · {destination.chatTitle ?? chatTypeLabels[destination.chatType]}</p></div>
+                  <div><h3 className="font-semibold">{destination.name}</h3><p className="mt-1 text-sm text-muted-foreground">{audienceLabels[destination.audienceType]}{destination.audienceType === "COHORT" ? ` · ${cohortName(destination.scopeId)}` : destination.audienceType === "CLASS_SECTION" ? ` · ${sectionName(destination.scopeId)}` : ""} · {destination.chatTitle ?? chatTypeLabels[destination.chatType]}</p></div>
                   <span className="rounded-full border px-2.5 py-1 text-xs font-medium">{destination.status}</span>
                 </div>
                 {destination.purpose && <p className="mt-3 text-sm">{destination.purpose}</p>}
@@ -337,13 +362,7 @@ export function TelegramDestinationsClient() {
                   <button disabled={busyId === destination.id} onClick={() => void editDestination(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Edit</button>
                   <button disabled={busyId === destination.id} onClick={() => void toggle(destination)} className="rounded-md border border-input px-3 py-2 text-sm">{destination.enabled ? "Disable" : "Enable"}</button>
                   {destination.status === "PENDING" && !destination.verifiedAt && (
-                    <button
-                      disabled={busyId === destination.id}
-                      onClick={() => void deleteDestination(destination)}
-                      className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
-                    >
-                      Delete
-                    </button>
+                    <button disabled={busyId === destination.id} onClick={() => void deleteDestination(destination)} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">Delete</button>
                   )}
                   <button onClick={() => void showDeliveries(destination)} className="rounded-md border border-input px-3 py-2 text-sm">Deliveries</button>
                 </div>
