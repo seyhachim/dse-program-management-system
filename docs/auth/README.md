@@ -1,6 +1,6 @@
 # DSE PMS authentication email templates
 
-DSE PMS uses Supabase Auth for account invitations. The canonical hosted-project invite template is `supabase-invite-email.html` in this directory.
+DSE PMS uses Supabase Auth for account invitations. The canonical hosted-project invite template is `supabase-invite-email.html` in this directory, with its subject stored in `supabase-invite-email.subject.txt`.
 
 ## Lecturer invitation
 
@@ -17,20 +17,20 @@ DSE PMS already sends trusted invitation metadata through `inviteUserByEmail`:
 - `name` -> available in the template as `{{ .Data.name }}`
 - `role` -> available as `{{ .Data.role }}`
 
-The HTML currently personalizes the greeting with `{{ .Data.name }}` and falls back to `Lecturer` when no name is present.
+The HTML personalizes the greeting with `{{ .Data.name }}` and safely falls back to `DSE colleague`. Because Supabase uses one **Invite user** template for every invited PMS role, lecturer-specific teaching copy is rendered only when `{{ .Data.role }}` equals `lecturer`; other roles receive neutral role-safe onboarding copy.
 
 ## Apply to hosted Supabase
 
 1. Open the production Supabase project.
 2. Go to **Authentication -> Email Templates**.
 3. Select **Invite user**.
-4. Set the subject to `You're invited to DSE Program Management System`.
+4. Set the subject to the exact contents of `docs/auth/supabase-invite-email.subject.txt`.
 5. Copy the full contents of `docs/auth/supabase-invite-email.html` into the template body.
 6. Save the template.
 7. In **Authentication -> URL Configuration**, verify the production DSE PMS site URL and allowed redirect URLs.
 8. Verify the Render backend environment variable `SUPABASE_INVITE_REDIRECT_URL` points to the intended deployed DSE PMS invitation/login destination. Do not change or expose `SUPABASE_SERVICE_ROLE_KEY`.
 
-Supabase hosted projects store email-template configuration outside this repository; merging this file does not automatically change the hosted Auth template.
+Supabase hosted projects store email-template configuration outside this repository; merging this file does not automatically change the hosted Auth template. Applying the hosted template therefore remains an explicit production-configuration step.
 
 ## Production verification
 
@@ -38,6 +38,7 @@ Use a non-privileged test lecturer account/email that is safe to invite. From th
 
 - subject is the DSE PMS subject above;
 - recipient name renders correctly;
+- lecturer-specific teaching copy is shown;
 - CTA reads **Activate DSE Account**;
 - CTA URL is a Supabase Auth verification URL and redirects only to the configured DSE PMS destination;
 - the raw link fallback is present;
@@ -45,7 +46,7 @@ Use a non-privileged test lecturer account/email that is safe to invite. From th
 - accepting the invitation reaches the existing DSE PMS account-setup/sign-in flow;
 - the lecturer receives only the role/access already granted by the existing PMS authorization model.
 
-For a pending invitation, also verify the existing **Resend invitation** flow uses the same branded Supabase template.
+For a pending invitation, also verify the existing **Resend invitation** flow uses the same branded Supabase template. If a safe non-lecturer test invite is available, verify it receives the neutral role-safe copy rather than lecturer teaching copy.
 
 ## Rollback
 
