@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DSE PMS invitation</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f7fb;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+            <tr>
+              <td style="background:#0f3b66;padding:24px 32px;color:#ffffff;">
+                <img src="{{ .SiteURL }}/pwa-icon-192.png" width="56" height="56" alt="DSE" style="display:block;width:56px;height:56px;margin:0 0 14px;border:0;border-radius:12px;" />
+                <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Royal University of Phnom Penh</div>
+                <div style="font-size:24px;font-weight:700;line-height:1.25;margin-top:8px;">Data Science and Engineering Programme</div>
+                <div style="font-size:15px;line-height:1.5;margin-top:6px;opacity:.92;">DSE Program Management System</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0 0 18px;font-size:16px;line-height:1.6;">Dear {{ if .Data.name }}{{ .Data.name }}{{ else }}DSE colleague{{ end }},</p>
+                <p style="margin:0 0 18px;font-size:16px;line-height:1.6;">You have been invited to join the <strong>DSE Program Management System (DSE PMS)</strong>.</p>
+                {{ if eq .Data.role "lecturer" }}
+                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">As a lecturer, after activating your account you can access your assigned teaching information, course specifications, schedules, assessments, programme resources, and other DSE teaching services available to you.</p>
+                {{ else }}
+                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">After activating your account, you can access the DSE PMS services and information available to your assigned role.</p>
+                {{ end }}
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+                  <tr>
+                    <td style="border-radius:8px;background:#0f3b66;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 22px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;">Activate DSE Account</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 10px;font-size:14px;line-height:1.6;color:#4b5563;">This invitation is for <strong>{{ .Email }}</strong>. The activation link is generated securely by Supabase Auth and may expire.</p>
+                <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#4b5563;">If the button does not work, open this secure invitation link:</p>
+                <p style="margin:0 0 24px;font-size:12px;line-height:1.6;word-break:break-all;color:#4b5563;">{{ .ConfirmationURL }}</p>
+                <hr style="border:0;border-top:1px solid #e5e7eb;margin:24px 0;" />
+                <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#4b5563;">If you were not expecting this invitation, you can safely ignore this email.</p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#4b5563;">Regards,<br /><strong>Data Science and Engineering Programme</strong><br />Faculty of Engineering, Royal University of Phnom Penh</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
