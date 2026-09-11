@@ -5,7 +5,11 @@ import {
   UpdateSupervisorProfileInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
-import { hasAnyRoleInProgramme, hasGlobalRole, hasRoleInProgramme } from "../../core/auth/token.ts";
+import {
+  canEditOwnSupervisorProfile,
+  canManageSupervisorOverview,
+  canReadSupervisorDiscovery,
+} from "./authorization.ts";
 import { finalProjectService, FinalProjectNotFoundError } from "./service.ts";
 
 export function createFinalProjectRouter(): Router {
@@ -53,7 +57,7 @@ export function createFinalProjectRouter(): Router {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
       return;
     }
-    if (!hasRoleInProgramme(req.user!, "lecturer", parsed.data.programmeId)) {
+    if (!canEditOwnSupervisorProfile(req.user!, parsed.data.programmeId, req.user!.id)) {
       res.status(403).json({ error: "Supervisor profile updates require the Lecturer role in this programme" });
       return;
     }
@@ -66,7 +70,7 @@ export function createFinalProjectRouter(): Router {
       res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
       return;
     }
-    if (!canManageProgramme(req, parsed.data.programmeId)) {
+    if (!canManageSupervisorOverview(req.user!, parsed.data.programmeId)) {
       res.status(403).json({ error: "Supervisor overview requires Admin or Programme Coordinator role in this programme" });
       return;
     }
@@ -87,13 +91,7 @@ function requireDiscoveryReader(req: Request, res: Response, next: NextFunction)
     res.status(400).json({ error: "programmeId is required" });
     return;
   }
-  if (
-    hasAnyRoleInProgramme(
-      req.user!,
-      ["student", "lecturer", "program_coordinator", "program_secretary", "admin"],
-      programmeId,
-    )
-  ) {
+  if (canReadSupervisorDiscovery(req.user!, programmeId)) {
     next();
     return;
   }
@@ -106,15 +104,11 @@ function requireLecturerOwner(req: Request, res: Response, next: NextFunction): 
     res.status(400).json({ error: "programmeId is required" });
     return;
   }
-  if (hasRoleInProgramme(req.user!, "lecturer", programmeId)) {
+  if (canEditOwnSupervisorProfile(req.user!, programmeId, req.user!.id)) {
     next();
     return;
   }
   res.status(403).json({ error: "Supervisor profile access requires the Lecturer role in this programme" });
-}
-
-function canManageProgramme(req: Request, programmeId: string): boolean {
-  return hasGlobalRole(req.user!, "admin") || hasRoleInProgramme(req.user!, "program_coordinator", programmeId);
 }
 
 function requireProgrammeManager(req: Request, res: Response, next: NextFunction): void {
@@ -123,7 +117,7 @@ function requireProgrammeManager(req: Request, res: Response, next: NextFunction
     res.status(400).json({ error: "programmeId is required" });
     return;
   }
-  if (canManageProgramme(req, programmeId)) {
+  if (canManageSupervisorOverview(req.user!, programmeId)) {
     next();
     return;
   }
