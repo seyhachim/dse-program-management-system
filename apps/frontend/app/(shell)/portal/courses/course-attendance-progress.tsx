@@ -118,6 +118,10 @@ function semesterFromTerm(term: string): "First" | "Second" | null {
   return match?.[1] === "1" ? "First" : match?.[1] === "2" ? "Second" : null;
 }
 
+function academicYearFromTerm(term: string): string | null {
+  return term.trim().match(/^(\d{4}-\d{4})(?:[-_]|$)/)?.[1] ?? null;
+}
+
 function periodForCourse(
   calendar: StudentAcademicCalendarView,
   term: string,
@@ -133,12 +137,22 @@ function periodForCourse(
   );
   if (evidencePeriod) return evidencePeriod;
 
+  const termAcademicYear = academicYearFromTerm(term);
+  if (
+    termAcademicYear &&
+    termAcademicYear !== calendar.academicYear.label
+  ) {
+    return null;
+  }
+
   const semester = semesterFromTerm(term);
   if (semester) {
     return calendar.periods.find((period) => period.semester === semester) ?? null;
   }
 
-  return calendar.periods[0] ?? null;
+  return termAcademicYear === calendar.academicYear.label
+    ? calendar.periods[0] ?? null
+    : null;
 }
 
 function finalizedState(
@@ -189,6 +203,9 @@ export function buildCourseAttendanceWeeks(input: {
         : context?.kind === "complete"
           ? totalWeeks
           : null;
+  const courseIsFuture =
+    (context?.kind === "upcoming" && context.semester === period.semester) ||
+    (context?.kind === "between" && context.nextSemester === period.semester);
 
   const sessionsByWeek = new Map<
     number,
@@ -211,7 +228,7 @@ export function buildCourseAttendanceWeeks(input: {
       ? finalized
       : pending
         ? "pending"
-        : currentWeek !== null && week > currentWeek
+        : courseIsFuture || (currentWeek !== null && week > currentWeek)
           ? "future"
           : "not-recorded";
     return { week, state, current: currentWeek === week };
