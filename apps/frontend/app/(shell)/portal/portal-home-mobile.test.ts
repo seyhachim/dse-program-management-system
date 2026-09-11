@@ -5,6 +5,14 @@ const portalHomeSource = readFileSync(
   new URL("./portal-home.tsx", import.meta.url),
   "utf8",
 );
+const courseBadgeSource = readFileSync(
+  new URL("./course-achievement-badges.tsx", import.meta.url),
+  "utf8",
+);
+const mobileLayoutSource = readFileSync(
+  new URL("./mobile-student-portal-layout.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Student Portal mobile home contract", () => {
   test("keeps internal curriculum terminology off the student home", () => {
@@ -28,6 +36,39 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
     expect(portalHomeSource).toContain("new Set(");
     expect(portalHomeSource).toContain("catch((): MonitorClassResponsibilityView[] => [])");
+  });
+
+  test("loads course achievements as optional home metadata and scopes the role to the exact offering", () => {
+    expect(portalHomeSource).toContain(".courseAchievements()");
+    expect(portalHomeSource).toContain("catch((): PortalCourseAchievementSummary[] => [])");
+    expect(portalHomeSource).toContain("summary.offeringId === nextMeeting.course.offeringId");
+    expect(portalHomeSource).toContain("assignment.offeringId === nextMeeting.course.offeringId");
+    expect(portalHomeSource).toContain("<CourseAchievementBadges");
+  });
+
+  test("renders the five v1 achievement milestones with visible locked states", () => {
+    expect(courseBadgeSource).toContain('"Great Start"');
+    expect(courseBadgeSource).toContain('"Reliable Learner"');
+    expect(courseBadgeSource).toContain('"Perfect Attendance"');
+    expect(courseBadgeSource).toContain('"Strong Performance"');
+    expect(courseBadgeSource).toContain('"Course Excellence"');
+    expect(courseBadgeSource).toContain("badge.achieved ? ACHIEVED_STYLES[badge.kind] : LOCKED_STYLE");
+    expect(courseBadgeSource).toContain("<Lock");
+    expect(courseBadgeSource).toContain('aria-label="Course achievement badges"');
+  });
+
+  test("keeps course role chips separate from achievement status", () => {
+    expect(courseBadgeSource).toContain('role === "ClassMonitor"');
+    expect(courseBadgeSource).toContain('"Class Monitor"');
+    expect(courseBadgeSource).toContain('"Sub-class Monitor"');
+    expect(courseBadgeSource).toContain("Course role:");
+  });
+
+  test("keeps the next-class card compact on phones", () => {
+    expect(mobileLayoutSource).toContain("bg-card p-4 shadow-md");
+    expect(mobileLayoutSource).toContain("sm:p-5");
+    expect(portalHomeSource).toContain('className="mt-4 grid gap-2 sm:grid-cols-3"');
+    expect(portalHomeSource).toContain('className="mt-4 flex min-h-11 items-center');
   });
 
   test("shows published-calendar teaching context without a CourseSpec dependency", () => {
