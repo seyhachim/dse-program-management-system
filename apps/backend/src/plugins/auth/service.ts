@@ -46,6 +46,23 @@ export function createTemporaryPassword(): string {
   return `${randomBytes(18).toString("base64url")}!Aa7`;
 }
 
+export function assertStudentPortalInviteEligible(student: {
+  status: "Active" | "Inactive" | "Pending";
+  userId: string | null;
+} | null): asserts student is { status: "Active"; userId: null } {
+  if (!student) {
+    throw new ProvisioningError(
+      "Create the student roster profile with this email before sending a portal invite",
+    );
+  }
+  if (student.status !== "Active") {
+    throw new ProvisioningError("Only Active students can receive Student Portal invitations");
+  }
+  if (student.userId) {
+    throw new ProvisioningError("This student already has a linked portal account");
+  }
+}
+
 async function programmeRoleView(
   userId: string,
   programmeId: string,
@@ -91,15 +108,13 @@ export const authService = {
 
   async createAccount(input: CreateAccountInput) {
     const studentProfile = input.role === "student"
-      ? await prisma.student.findUnique({ where: { email: input.email } })
+      ? await prisma.student.findUnique({
+          where: { email: input.email },
+          select: { id: true, status: true, userId: true },
+        })
       : null;
-    if (input.role === "student" && !studentProfile) {
-      throw new ProvisioningError(
-        "Create the student roster profile with this email before sending a portal invite",
-      );
-    }
-    if (studentProfile?.userId) {
-      throw new ProvisioningError("This student already has a linked portal account");
+    if (input.role === "student") {
+      assertStudentPortalInviteEligible(studentProfile);
     }
 
     const admin = getAdminClient();

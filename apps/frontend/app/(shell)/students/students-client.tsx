@@ -21,6 +21,8 @@ import { authApi, useMe } from "@/lib/auth";
 
 const PAGE_SIZE = 50;
 
+type InviteEligibleStudent = Student & { email: string; status: "Active" };
+
 export function StudentsClient() {
   const { me } = useMe();
   const [search, setSearch] = useState("");
@@ -33,6 +35,7 @@ export function StudentsClient() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -129,12 +132,23 @@ export function StudentsClient() {
     ? rows.find((row) => row.id === selectedIds[0]) ?? null
     : null;
 
-  const handleInvite = async () => {
-    if (!selectedStudent) return;
-    if (!selectedStudent.email) {
-      setActionError("Add an official email to this student before sending a portal invitation.");
-      return;
+  const validateSelectedInviteStudent = (
+    student: Student | null,
+  ): student is InviteEligibleStudent => {
+    if (!student) return false;
+    if (student.status !== "Active") {
+      setActionError("Only Active students can receive Student Portal invitations.");
+      return false;
     }
+    if (!student.email) {
+      setActionError("Add an official email to this student before sending a portal invitation.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleInvite = async () => {
+    if (!validateSelectedInviteStudent(selectedStudent)) return;
     if (!confirm(`Send a student portal invitation to ${selectedStudent.email}?`)) return;
     setInviting(true);
     setActionError(null);
@@ -150,6 +164,24 @@ export function StudentsClient() {
       setActionError(err instanceof ApiError ? err.message : "Failed to send portal invitation");
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleResendInvite = async () => {
+    if (!validateSelectedInviteStudent(selectedStudent)) return;
+    if (!confirm(`Resend the pending Student Portal invitation to ${selectedStudent.email}?`)) return;
+    setResending(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.resendStudentInvitation(selectedStudent.id);
+      setNotice(`Fresh portal invitation sent to ${result.email}.`);
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : "Failed to resend the student portal invitation",
+      );
+    } finally {
+      setResending(false);
     }
   };
 
@@ -172,11 +204,11 @@ export function StudentsClient() {
   const columns: DataTableColumn<Student>[] = [
     { key: "name", header: "Name", render: (s) => <span className="font-medium">{s.name}</span> },
     {
-    key: "studentId",
-    header: "Student ID",
-    render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
-  },
-  { key: "category", header: "Category", render: (s) => s.category },
+      key: "studentId",
+      header: "Student ID",
+      render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
+    },
+    { key: "category", header: "Category", render: (s) => s.category },
     {
       key: "email",
       header: "Email",
@@ -199,6 +231,11 @@ export function StudentsClient() {
       ),
     },
   ];
+
+  const inviteBusy = inviting || resending;
+  const selectedInviteEligible = Boolean(
+    selectedStudent?.email && selectedStudent.status === "Active",
+  );
 
   return (
     <div className="space-y-4">
@@ -224,19 +261,32 @@ export function StudentsClient() {
       />
 
       {me?.permissions.includes("accounts:create") ? (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            {selectedStudent && !selectedStudent.email
-              ? "This roster record has no official email yet. Add one before provisioning portal access."
-              : "Select one student with an official email to provision their secure portal login."}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+            {selectedStudent && selectedStudent.status !== "Active"
+              ? "Portal invitations are available only after the student is Active."
+              : selectedStudent && !selectedStudent.email
+                ? "This roster record has no official email yet. Add one before provisioning portal access."
+                : selectedStudent
+                  ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
+                  : "Select one Active student with an official email to provision their secure portal login."}
           </p>
-          <Button
-            variant="outline"
-            disabled={!selectedStudent?.email || inviting}
-            onClick={handleInvite}
-          >
-            <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={!selectedInviteEligible || inviteBusy}
+              onClick={handleInvite}
+            >
+              <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!selectedInviteEligible || inviteBusy}
+              onClick={handleResendInvite}
+            >
+              {resending ? "Resending…" : "Resend expired invite"}
+            </Button>
+          </div>
         </div>
       ) : null}
 

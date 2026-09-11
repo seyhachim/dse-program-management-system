@@ -24,6 +24,8 @@
                 <p style="margin:0 0 18px;font-size:16px;line-height:1.6;">You have been invited to join the <strong>DSE Program Management System (DSE PMS)</strong>.</p>
                 {{ if eq .Data.role "lecturer" }}
                 <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">As a lecturer, after activating your account you can access your assigned teaching information, course specifications, schedules, assessments, programme resources, and other DSE teaching services available to you.</p>
+                {{ else if eq .Data.role "student" }}
+                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">As a student, after activating your account you can access the Student Portal services available to you, including enrolled courses, schedules, attendance information, published results, announcements, and learning resources.</p>
                 {{ else }}
                 <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">After activating your account, you can access the DSE PMS services and information available to your assigned role.</p>
                 {{ end }}
