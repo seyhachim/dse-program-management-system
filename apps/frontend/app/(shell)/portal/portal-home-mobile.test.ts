@@ -46,12 +46,13 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("<CourseAchievementBadges");
   });
 
-  test("renders the five v1 achievement milestones with visible locked states", () => {
-    expect(courseBadgeSource).toContain('"Great Start"');
-    expect(courseBadgeSource).toContain('"Reliable Learner"');
-    expect(courseBadgeSource).toContain('"Perfect Attendance"');
-    expect(courseBadgeSource).toContain('"Strong Performance"');
-    expect(courseBadgeSource).toContain('"Course Excellence"');
+  test("renders all five v1 achievement kinds with visible locked states", () => {
+    expect(courseBadgeSource).toContain("great_start:");
+    expect(courseBadgeSource).toContain("reliable_learner:");
+    expect(courseBadgeSource).toContain("perfect_attendance:");
+    expect(courseBadgeSource).toContain("strong_performance:");
+    expect(courseBadgeSource).toContain("course_excellence:");
+    expect(courseBadgeSource).toContain("{badge.title}");
     expect(courseBadgeSource).toContain("badge.achieved ? ACHIEVED_STYLES[badge.kind] : LOCKED_STYLE");
     expect(courseBadgeSource).toContain("<Lock");
     expect(courseBadgeSource).toContain('aria-label="Course achievement badges"');
