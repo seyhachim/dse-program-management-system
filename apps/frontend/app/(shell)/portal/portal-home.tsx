@@ -1,9 +1,11 @@
 "use client";
 
+import type { PortalScheduleImpact } from "@dse-pms/shared-types";
 import { useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  AlertTriangle,
   Bell,
   CalendarClock,
   CalendarDays,
@@ -24,6 +26,7 @@ import {
   meetingLabel,
   studentPortalApi,
 } from "@/lib/student-portal";
+import { studentScheduleApi } from "@/lib/student-schedule";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 import {
   PortalError,
@@ -52,8 +55,21 @@ function timeMinutes(value: string): number {
   return Number(hours) * 60 + Number(minutes);
 }
 
-function nextScheduledMeeting<TCourse extends { meetings: HomeMeeting[] }>(
+function localDateKeyAfterDays(now: Date, dayOffset: number): string {
+  const date = new Date(now);
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + dayOffset);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function nextScheduledMeeting<
+  TCourse extends { offeringId: string; meetings: HomeMeeting[] },
+>(
   courses: TCourse[],
+  impacts: PortalScheduleImpact[],
   now: Date,
 ) {
   const nowDay = now.getDay();
@@ -69,10 +85,17 @@ function nextScheduledMeeting<TCourse extends { meetings: HomeMeeting[] }>(
         const start = timeMinutes(meeting.startTime);
         const end = timeMinutes(meeting.endTime);
         if (dayOffset === 0 && nowMinutes >= end) dayOffset = 7;
+        const sessionDate = localDateKeyAfterDays(now, dayOffset);
+        const impact = impacts.find((item) =>
+          item.offeringId === course.offeringId &&
+          item.meetingId === meeting.id &&
+          item.sessionDate === sessionDate,
+        ) ?? null;
 
         return {
           course,
           meeting,
+          impact,
           dayOffset,
           sortMinutes: dayOffset * 24 * 60 + start - nowMinutes,
         };
@@ -89,7 +112,13 @@ function relativeMeetingDay(dayOffset: number, dayOfWeek: string): string {
 }
 
 export function PortalHome() {
-  const load = useCallback(() => studentPortalApi.home(), []);
+  const load = useCallback(async () => {
+    const [home, scheduleImpacts] = await Promise.all([
+      studentPortalApi.home(),
+      studentScheduleApi.impacts(),
+    ]);
+    return { ...home, scheduleImpacts };
+  }, []);
   const { data, loading, error, refreshError, refreshing } = useCachedPortalData(
     "home",
     load,
@@ -102,7 +131,10 @@ export function PortalHome() {
   }
 
   const now = new Date();
-  const nextMeeting = nextScheduledMeeting(data.courses, now);
+  const nextMeeting = nextScheduledMeeting(data.courses, data.scheduleImpacts ?? [], now);
+  const nextMeetingHref = nextMeeting?.impact
+    ? `/portal/schedule?date=${encodeURIComponent(nextMeeting.impact.sessionDate)}&focus=${encodeURIComponent(nextMeeting.impact.occurrenceId)}`
+    : "/portal/schedule";
   const calendar = data.academicCalendar;
   const teachingContext = resolveStudentTeachingContext(calendar, now);
   const contextSemester =
@@ -220,7 +252,7 @@ export function PortalHome() {
       </section>
 
       <Link
-        href="/portal/schedule"
+        href={nextMeetingHref}
         className={MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass}
       >
         <div className="flex items-start justify-between gap-3">
@@ -235,7 +267,11 @@ export function PortalHome() {
                   : "Schedule"}
               </span>
               <span className="text-xs font-medium text-muted-foreground">
-                {nextMeeting ? "Next class" : "Class schedule"}
+                {nextMeeting?.impact
+                  ? "Schedule changed"
+                  : nextMeeting
+                    ? "Next class"
+                    : "Class schedule"}
               </span>
             </div>
 
@@ -248,13 +284,27 @@ export function PortalHome() {
                   {nextMeeting.course.code} · Section {nextMeeting.course.sectionCode}
                 </p>
 
+                {nextMeeting.impact ? (
+                  <div className="mt-4 flex items-start gap-3 rounded-2xl border border-status-upcoming/30 bg-status-upcoming-bg p-3.5 text-status-upcoming">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="font-semibold">Class cancelled for this session</p>
+                      <p className="mt-0.5 text-sm leading-5">
+                        This class will not take place at the scheduled time. Make-up details are not scheduled yet.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
                   <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-3">
                     <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
                       <Clock3 className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Time</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {nextMeeting.impact ? "Original time" : "Time"}
+                      </p>
                       <p className="mt-0.5 break-words text-sm font-medium text-foreground">
                         {meetingLabel(nextMeeting.meeting)}
                       </p>
@@ -265,7 +315,9 @@ export function PortalHome() {
                       <MapPin className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Room</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {nextMeeting.impact ? "Original room" : "Room"}
+                      </p>
                       <p className="mt-0.5 break-words text-sm font-medium text-foreground">
                         {nextMeeting.meeting.room || "Room TBA"}
                       </p>
@@ -298,7 +350,9 @@ export function PortalHome() {
         </div>
 
         <div className="mt-5 flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-4">
-          <span className="text-sm font-semibold text-primary">View schedule</span>
+          <span className="text-sm font-semibold text-primary">
+            {nextMeeting?.impact ? "View schedule update" : "View schedule"}
+          </span>
           <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition group-hover:translate-x-0.5">
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </span>
