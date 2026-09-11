@@ -165,6 +165,9 @@ const EXPECTED_ATTENDANCE_TABLES = [
   "TeachingLeaveRequest",
   "TeachingLeaveRequestOccurrence",
   "TeachingLeaveAuditEvent",
+  "OpenTeachingSlot",
+  "OpenTeachingSlotClaim",
+  "OpenTeachingSlotAuditEvent",
 ] as const;
 
 const EXPECTED_TELEGRAM_SECURITY_TABLES = [
