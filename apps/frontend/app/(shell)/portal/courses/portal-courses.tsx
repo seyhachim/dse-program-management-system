@@ -9,8 +9,15 @@ import {
   MapPin,
   UserRound,
 } from "lucide-react";
-import type { PortalCourseSummary } from "@dse-pms/shared-types";
+import type {
+  ClassResponsibilityRole,
+  MonitorClassResponsibilityView,
+  PortalCourseAchievementSummary,
+  PortalCourseSummary,
+} from "@dse-pms/shared-types";
+import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { meetingLabel, studentPortalApi } from "@/lib/student-portal";
+import { CourseAchievementBadges } from "../course-achievement-badges";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "../mobile-student-portal-layout";
 import {
   EmptyState,
@@ -19,7 +26,15 @@ import {
   useCachedPortalData,
 } from "../portal-state";
 
-function CourseCard({ course }: { course: PortalCourseSummary }) {
+function CourseCard({
+  course,
+  achievement,
+  monitorRole,
+}: {
+  course: PortalCourseSummary;
+  achievement: PortalCourseAchievementSummary | null;
+  monitorRole: ClassResponsibilityRole | null;
+}) {
   const meeting = course.meetings[0];
 
   return (
@@ -35,11 +50,17 @@ function CourseCard({ course }: { course: PortalCourseSummary }) {
           Section {course.sectionCode}
         </span>
       </div>
-      <p className="mt-4 break-words text-xs font-semibold uppercase tracking-wide text-primary md:mt-5">
+      <p className="mt-3 break-words text-xs font-semibold uppercase tracking-wide text-primary md:mt-4">
         {course.code} · {course.term}
       </p>
       <h3 className="mt-1 break-words text-lg font-semibold">{course.title}</h3>
-      <div className="mt-3 space-y-2 text-sm text-muted-foreground md:mt-4">
+
+      <CourseAchievementBadges
+        summary={achievement}
+        monitorRole={monitorRole}
+      />
+
+      <div className="mt-3 space-y-2 text-sm text-muted-foreground">
         <p className="flex min-w-0 items-start gap-2">
           <UserRound className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="break-words">
@@ -81,11 +102,15 @@ function CourseSection({
   title,
   description,
   courses,
+  achievementsByOffering,
+  monitorRolesByOffering,
   emptyMessage,
 }: {
   title: string;
   description: string;
   courses: PortalCourseSummary[];
+  achievementsByOffering: Map<string, PortalCourseAchievementSummary>;
+  monitorRolesByOffering: Map<string, ClassResponsibilityRole>;
   emptyMessage?: string;
 }) {
   return (
@@ -97,7 +122,12 @@ function CourseSection({
       {courses.length ? (
         <div className="grid gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
           {courses.map((course) => (
-            <CourseCard key={course.offeringId} course={course} />
+            <CourseCard
+              key={course.offeringId}
+              course={course}
+              achievement={achievementsByOffering.get(course.offeringId) ?? null}
+              monitorRole={monitorRolesByOffering.get(course.offeringId) ?? null}
+            />
           ))}
         </div>
       ) : emptyMessage ? (
@@ -110,14 +140,28 @@ function CourseSection({
 }
 
 export function PortalCourses() {
-  const load = useCallback(() => studentPortalApi.courses(), []);
-  const { data, loading, error } = useCachedPortalData("courses", load);
+  const load = useCallback(async () => {
+    const [courses, courseAchievements, monitorAssignments] = await Promise.all([
+      studentPortalApi.courses(),
+      studentPortalApi
+        .courseAchievements()
+        .catch((): PortalCourseAchievementSummary[] => []),
+      monitorDeliveryApi
+        .assignments()
+        .catch((): MonitorClassResponsibilityView[] => []),
+    ]);
+    return { courses, courseAchievements, monitorAssignments };
+  }, []);
+  const { data, loading, error } = useCachedPortalData(
+    "courses-with-achievements",
+    load,
+  );
 
   if (loading) return <PortalLoading />;
   if (error || !data) {
     return <PortalError message={error ?? "Could not load courses"} />;
   }
-  if (!data.length) {
+  if (!data.courses.length) {
     return (
       <EmptyState
         title="No enrolled courses"
@@ -126,9 +170,15 @@ export function PortalCourses() {
     );
   }
 
-  const currentCourses = data.filter((course) => course.lifecycle === "current");
-  const plannedCourses = data.filter((course) => course.lifecycle === "planned");
-  const historicalCourses = data.filter(
+  const achievementsByOffering = new Map(
+    data.courseAchievements.map((summary) => [summary.offeringId, summary]),
+  );
+  const monitorRolesByOffering = new Map(
+    data.monitorAssignments.map((assignment) => [assignment.offeringId, assignment.role]),
+  );
+  const currentCourses = data.courses.filter((course) => course.lifecycle === "current");
+  const plannedCourses = data.courses.filter((course) => course.lifecycle === "planned");
+  const historicalCourses = data.courses.filter(
     (course) => course.lifecycle === "historical",
   );
 
@@ -138,6 +188,8 @@ export function PortalCourses() {
         title="Current courses"
         description="Active offerings for your current teaching period."
         courses={currentCourses}
+        achievementsByOffering={achievementsByOffering}
+        monitorRolesByOffering={monitorRolesByOffering}
         emptyMessage="You do not have any active course offerings right now."
       />
       {plannedCourses.length ? (
@@ -145,6 +197,8 @@ export function PortalCourses() {
           title="Upcoming courses"
           description="Planned offerings you are already enrolled in."
           courses={plannedCourses}
+          achievementsByOffering={achievementsByOffering}
+          monitorRolesByOffering={monitorRolesByOffering}
         />
       ) : null}
       {historicalCourses.length ? (
@@ -152,6 +206,8 @@ export function PortalCourses() {
           title="Course archive"
           description="Completed offerings remain available for published learning information and academic records."
           courses={historicalCourses}
+          achievementsByOffering={achievementsByOffering}
+          monitorRolesByOffering={monitorRolesByOffering}
         />
       ) : null}
     </div>
