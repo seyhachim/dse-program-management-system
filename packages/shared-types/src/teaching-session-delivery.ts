@@ -26,13 +26,13 @@ export type TeachingSessionLearningSummary = z.infer<
 
 export const SaveTeachingSessionDeliveryInputSchema = z
   .object({
-    lecturerArrivalStatus: LecturerArrivalStatusSchema.nullable().default(null),
+    lecturerArrivalStatus: LecturerArrivalStatusSchema.nullable().optional(),
     classOccurred: z.boolean(),
     actualLecturerId: z.string().uuid().nullable().default(null),
     actualStartTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualEndTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualTopic: z.string().trim().max(1000).default(""),
-    learningSummary: TeachingSessionLearningSummarySchema.optional().default(""),
+    learningSummary: TeachingSessionLearningSummarySchema.optional(),
     coverage: TeachingSessionCoverageSchema,
     note: ClassDeliveryNoteSchema.optional().default(""),
   })
@@ -59,7 +59,7 @@ export const SaveTeachingSessionDeliveryInputSchema = z
           message: "A class that did not occur must use NOT_COVERED",
         });
       }
-      if (value.learningSummary.length > 0) {
+      if ((value.learningSummary ?? "").length > 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["learningSummary"],
