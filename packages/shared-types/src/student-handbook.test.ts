@@ -26,14 +26,20 @@ describe("student handbook contracts", () => {
       blocks: [
         { type: "NARRATIVE", content: "Welcome to the DSE programme." },
         { type: "SOURCE_DATA", sourceKind: "CURRICULUM_SUMMARY" },
+        { type: "SOURCE_DATA", sourceKind: "ACADEMIC_CALENDAR_LINKS" },
       ],
     });
-    expect(parsed.blocks).toHaveLength(2);
+    expect(parsed.blocks).toHaveLength(3);
     expect(parsed.blocks[0]?.type).toBe("NARRATIVE");
     expect(parsed.blocks[1]?.type).toBe("SOURCE_DATA");
+    expect(parsed.blocks[2]).toMatchObject({
+      type: "SOURCE_DATA",
+      sourceKind: "ACADEMIC_CALENDAR_LINKS",
+    });
   });
 
-  test("rejects unsupported source types", () => {
+  test("supports academic calendar links but rejects unsupported source types", () => {
+    expect(StudentHandbookSourceKindSchema.safeParse("ACADEMIC_CALENDAR_LINKS").success).toBe(true);
     expect(StudentHandbookSourceKindSchema.safeParse("EDIT_CURRICULUM").success).toBe(false);
   });
 

@@ -5,7 +5,7 @@ import type {
   StudentHandbookDocumentTheme,
   StudentHandbookView,
 } from "@dse-pms/shared-types";
-import { Database, Download, FileText, Loader2 } from "lucide-react";
+import { Database, Download, ExternalLink, FileText, Loader2 } from "lucide-react";
 import { DocumentRenderer, type DocumentRendererTheme } from "@/components/document-editor/document-renderer";
 import {
   buildStudentHandbookExportModel,
@@ -58,7 +58,19 @@ function SourceDataPreview({ source }: { source: StudentHandbookExportSource }) 
           {source.rows.map((row) => (
             <div key={row.key} className="grid gap-1 px-3 py-2 sm:grid-cols-[160px_1fr]">
               <dt className="font-medium text-slate-600">{row.key}</dt>
-              <dd className="break-words">{row.value}</dd>
+              <dd className="break-words">
+                {row.href ? (
+                  <a
+                    href={row.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+                  >
+                    <span className="break-all">{row.value}</span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </a>
+                ) : row.value}
+              </dd>
             </div>
           ))}
         </dl>

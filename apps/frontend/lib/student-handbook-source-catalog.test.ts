@@ -22,6 +22,7 @@ describe("Student Handbook source catalogue", () => {
   test("returns section-aware recommendations", () => {
     expect(recommendedStudentHandbookSources("study-plan").map((item) => item.kind)).toEqual([
       "CURRICULUM_SUMMARY",
+      "ACADEMIC_CALENDAR_LINKS",
     ]);
     expect(recommendedStudentHandbookSources("important-contacts").map((item) => item.kind)).toEqual([
       "PROGRAMME_CONTACT",
