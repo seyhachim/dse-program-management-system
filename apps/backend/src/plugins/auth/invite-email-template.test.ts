@@ -20,8 +20,9 @@ describe("DSE Supabase invite email template", () => {
     expect(template).toContain("available to your assigned role");
   });
 
-  test("contains the required DSE onboarding identity and CTA", () => {
+  test("contains the required DSE onboarding identity, icon, and CTA", () => {
     expect(subject).toBe("You're invited to DSE Program Management System");
+    expect(template).toContain('{{ .SiteURL }}/pwa-icon-192.png');
     expect(template).toContain("Data Science and Engineering Programme");
     expect(template).toContain("Royal University of Phnom Penh");
     expect(template).toContain("DSE Program Management System");
