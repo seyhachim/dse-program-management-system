@@ -11,6 +11,7 @@ import { portfolioTeachingEvidenceService } from "./portfolio-evidence-service.t
 import { createOfferingRouter } from "./router.ts";
 import { offeringService } from "./service.ts";
 import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
+import { studentAttendanceProgressService } from "./student-attendance-progress-service.ts";
 import { studentScheduleImpactService } from "./student-schedule-impact-service.ts";
 import { createTeachingLeaveRouter } from "./teaching-leave-router.ts";
 import { teachingLeaveService } from "./teaching-leave-service.ts";
@@ -23,6 +24,7 @@ export const offeringsService = {
   ...portfolioTeachingEvidenceService,
   attendance: attendanceService,
   studentAttendanceHistory: studentAttendanceHistoryService,
+  studentAttendanceProgress: studentAttendanceProgressService,
   studentScheduleImpacts: studentScheduleImpactService,
   classResponsibilities: classResponsibilityService,
   classDelivery: classDeliveryService,
