@@ -46,7 +46,7 @@ async function enrolledRecipients(offeringId: string): Promise<EnrollmentRecipie
   return prisma.$queryRaw<EnrollmentRecipientRow[]>`
     SELECT e."studentId", ti."identityId", ti."telegramUserId"
     FROM "Enrollment" e
-    JOIN "Student" s ON s."id" = e."studentId"
+    JOIN "Student" s ON s."id" = e."studentId" AND s."status" = 'Active'
     LEFT JOIN LATERAL (
       SELECT identity."id" AS "identityId", identity."telegramUserId"
       FROM "telegram_security"."TelegramIdentity" identity
