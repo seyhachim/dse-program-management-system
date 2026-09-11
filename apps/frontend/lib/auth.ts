@@ -23,6 +23,12 @@ export const authApi = {
       {},
     );
   },
+  resendStudentInvitation(studentId: string): Promise<ResendInvitationResponse> {
+    return api.post<ResendInvitationResponse>(
+      `/api/auth/students/${studentId}/resend-invitation`,
+      {},
+    );
+  },
   setTemporaryPassword(userId: string): Promise<TemporaryPasswordResponse> {
     return api.post<TemporaryPasswordResponse>(
       `/api/auth/accounts/${userId}/temporary-password`,
