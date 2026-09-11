@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
-  applyStudentRosterImportPlan,
   dryRunStudentRosterImport,
   parseStudentRosterImportDocument,
   planStudentRosterImport,
-  StudentRosterImportBlockedError,
   type ExistingRosterCohort,
   type ExistingRosterMembership,
   type ExistingRosterStudent,
@@ -55,6 +53,30 @@ class MemoryStore implements StudentRosterImportStore {
   async createMembership() { this.writes += 1; }
 }
 
+function configureExistingCohort(store: MemoryStore) {
+  store.cohort = {
+    id: "cohort-1",
+    programmeId: "dse",
+    code: "DSE-G5",
+    name: "DSE Generation 5",
+    intakeYear: 2025,
+    expectedGraduationYear: 2029,
+    status: "Active",
+  };
+}
+
+function addExactMembership(store: MemoryStore, studentRecordId: string) {
+  store.memberships.set(studentRecordId, [
+    {
+      id: "membership-1",
+      cohortId: "cohort-1",
+      joinedAt: new Date("2025-11-01T00:00:00.000Z"),
+      exitedAt: null,
+      cohort: { id: "cohort-1", code: "DSE-G5", programmeId: "dse" },
+    },
+  ]);
+}
+
 describe("student roster importer", () => {
   test("dry-run plans a new roster without writing", async () => {
     const store = new MemoryStore();
@@ -79,7 +101,16 @@ describe("student roster importer", () => {
 
   test("email-keyed provisional student is accepted as Pending", async () => {
     const store = new MemoryStore();
-    const document = manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: null, name: "Pending Student", email: "pending@rupp.edu.kh", status: "Pending" }]);
+    const document = manifest([
+      {
+        sourceRef: "G5/M1/row-2",
+        cohortCode: "DSE-G5",
+        studentId: null,
+        name: "Pending Student",
+        email: "pending@rupp.edu.kh",
+        status: "Pending",
+      },
+    ]);
     const plan = await planStudentRosterImport(store, document);
     expect(plan.students[0]?.action).toBe("would_create");
     expect(plan.students[0]?.blockers).toEqual([]);
@@ -87,16 +118,58 @@ describe("student roster importer", () => {
   });
 
   test("provisional creation requires institutional email and Pending status", () => {
-    expect(() => manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: null, name: "Missing Email", email: null, status: "Pending" }])).toThrow();
-    expect(() => manifest([{ sourceRef: "G5/M1/row-3", cohortCode: "DSE-G5", studentId: null, name: "Not Pending", email: "active@rupp.edu.kh", status: "Active" }])).toThrow();
+    expect(() =>
+      manifest([
+        {
+          sourceRef: "G5/M1/row-2",
+          cohortCode: "DSE-G5",
+          studentId: null,
+          name: "Missing Email",
+          email: null,
+          status: "Pending",
+        },
+      ]),
+    ).toThrow();
+    expect(() =>
+      manifest([
+        {
+          sourceRef: "G5/M1/row-3",
+          cohortCode: "DSE-G5",
+          studentId: null,
+          name: "Not Pending",
+          email: "active@rupp.edu.kh",
+          status: "Active",
+        },
+      ]),
+    ).toThrow();
   });
 
   test("official ID attaches to the same provisional Student resolved by email", async () => {
     const store = new MemoryStore();
-    store.cohort = { id: "cohort-1", programmeId: "dse", code: "DSE-G5", name: "DSE Generation 5", intakeYear: 2025, expectedGraduationYear: 2029, status: "Active" };
-    store.students.set("provisional", { id: "student-1", studentId: null, name: "Pending Student", email: "pending@rupp.edu.kh", status: "Pending", userId: null, profile: null });
-    store.memberships.set("student-1", [{ id: "membership-1", cohortId: "cohort-1", joinedAt: new Date("2025-11-01T00:00:00.000Z"), exitedAt: null, cohort: { id: "cohort-1", code: "DSE-G5", programmeId: "dse" } }]);
-    const plan = await planStudentRosterImport(store, manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: "RUPP-001", name: "Pending Student", email: "pending@rupp.edu.kh", status: "Pending" }]));
+    configureExistingCohort(store);
+    store.students.set("provisional", {
+      id: "student-1",
+      studentId: null,
+      name: "Pending Student",
+      email: "pending@rupp.edu.kh",
+      status: "Pending",
+      userId: null,
+      profile: null,
+    });
+    addExactMembership(store, "student-1");
+    const plan = await planStudentRosterImport(
+      store,
+      manifest([
+        {
+          sourceRef: "G5/M1/row-2",
+          cohortCode: "DSE-G5",
+          studentId: "RUPP-001",
+          name: "Pending Student",
+          email: "pending@rupp.edu.kh",
+          status: "Pending",
+        },
+      ]),
+    );
     expect(plan.students[0]?.existingStudentRecordId).toBe("student-1");
     expect(plan.students[0]?.studentIdPatch).toBe("RUPP-001");
     expect(plan.students[0]?.action).toBe("would_update");
@@ -104,24 +177,44 @@ describe("student roster importer", () => {
 
   test("email and official ID resolving to different students fails closed", async () => {
     const store = new MemoryStore();
-    store.students.set("RUPP-001", { id: "student-1", studentId: "RUPP-001", name: "One", email: "one@rupp.edu.kh", status: "Active", userId: null, profile: null });
-    store.students.set("RUPP-002", { id: "student-2", studentId: "RUPP-002", name: "Two", email: "two@rupp.edu.kh", status: "Active", userId: null, profile: null });
-    const plan = await planStudentRosterImport(store, manifest([{ sourceRef: "G5/M1/row-2", cohortCode: "DSE-G5", studentId: "RUPP-001", name: "One", email: "two@rupp.edu.kh", status: "Active" }]));
+    store.students.set("RUPP-001", {
+      id: "student-1",
+      studentId: "RUPP-001",
+      name: "One",
+      email: "one@rupp.edu.kh",
+      status: "Active",
+      userId: null,
+      profile: null,
+    });
+    store.students.set("RUPP-002", {
+      id: "student-2",
+      studentId: "RUPP-002",
+      name: "Two",
+      email: "two@rupp.edu.kh",
+      status: "Active",
+      userId: null,
+      profile: null,
+    });
+    const plan = await planStudentRosterImport(
+      store,
+      manifest([
+        {
+          sourceRef: "G5/M1/row-2",
+          cohortCode: "DSE-G5",
+          studentId: "RUPP-001",
+          name: "One",
+          email: "two@rupp.edu.kh",
+          status: "Active",
+        },
+      ]),
+    );
     expect(plan.students[0]?.action).toBe("blocked");
     expect(plan.students[0]?.blockers.join(" ")).toContain("resolve to different Student records");
   });
 
   test("fills only missing email/profile data and blocks an identity conflict", async () => {
     const store = new MemoryStore();
-    store.cohort = {
-      id: "cohort-1",
-      programmeId: "dse",
-      code: "DSE-G5",
-      name: "DSE Generation 5",
-      intakeYear: 2025,
-      expectedGraduationYear: 2029,
-      status: "Active",
-    };
+    configureExistingCohort(store);
     store.students.set("RUPP-001", {
       id: "student-1",
       studentId: "RUPP-001",
@@ -131,15 +224,7 @@ describe("student roster importer", () => {
       userId: null,
       profile: null,
     });
-    store.memberships.set("student-1", [
-      {
-        id: "membership-1",
-        cohortId: "cohort-1",
-        joinedAt: new Date("2025-11-01T00:00:00.000Z"),
-        exitedAt: null,
-        cohort: { id: "cohort-1", code: "DSE-G5", programmeId: "dse" },
-      },
-    ]);
+    addExactMembership(store, "student-1");
 
     const fillPlan = await planStudentRosterImport(
       store,
@@ -184,5 +269,95 @@ describe("student roster importer", () => {
     );
     expect(conflictPlan.students[0]?.action).toBe("blocked");
     expect(conflictPlan.students[0]?.blockers.join(" ")).toContain("already belongs to studentId");
+  });
+
+  test("repairs casing-only student and Latin profile differences", async () => {
+    const store = new MemoryStore();
+    configureExistingCohort(store);
+    store.students.set("RUPP-001", {
+      id: "student-1",
+      studentId: "RUPP-001",
+      name: "CHEAT KIMLY",
+      email: null,
+      status: "Active",
+      userId: null,
+      profile: {
+        id: "profile-1",
+        khmerFamilyName: "ជាតិ",
+        khmerGivenName: "គឹមលី",
+        latinFamilyName: "CHEAT",
+        latinGivenName: "KIMLY",
+        gender: null,
+      },
+    });
+    addExactMembership(store, "student-1");
+
+    const plan = await planStudentRosterImport(
+      store,
+      manifest([
+        {
+          sourceRef: "G5/M1/row-2",
+          cohortCode: "DSE-G5",
+          studentId: "RUPP-001",
+          name: "CHEAT KIMLY",
+          email: null,
+          profile: {
+            khmerFamilyName: "ជាតិ",
+            khmerGivenName: "គឹមលី",
+            latinFamilyName: "CHEAT",
+            latinGivenName: "KIMLY",
+          },
+        },
+      ]),
+    );
+
+    expect(plan.students[0]?.action).toBe("would_update");
+    expect(plan.students[0]?.name).toBe("Cheat Kimly");
+    expect(plan.students[0]?.namePatch).toBe("Cheat Kimly");
+    expect(plan.students[0]?.profilePatch).toEqual({
+      latinFamilyName: "Cheat",
+      latinGivenName: "Kimly",
+    });
+    expect(plan.students[0]?.blockers).toEqual([]);
+  });
+
+  test("true name spelling conflicts still fail closed", async () => {
+    const store = new MemoryStore();
+    configureExistingCohort(store);
+    store.students.set("RUPP-001", {
+      id: "student-1",
+      studentId: "RUPP-001",
+      name: "Cheat Kimly",
+      email: null,
+      status: "Active",
+      userId: null,
+      profile: {
+        id: "profile-1",
+        khmerFamilyName: null,
+        khmerGivenName: null,
+        latinFamilyName: "Cheat",
+        latinGivenName: "Kimly",
+        gender: null,
+      },
+    });
+    addExactMembership(store, "student-1");
+
+    const plan = await planStudentRosterImport(
+      store,
+      manifest([
+        {
+          sourceRef: "G5/M1/row-2",
+          cohortCode: "DSE-G5",
+          studentId: "RUPP-001",
+          name: "Cheat Kimlee",
+          email: null,
+          profile: { latinFamilyName: "Cheat", latinGivenName: "Kimlee" },
+        },
+      ]),
+    );
+
+    expect(plan.students[0]?.action).toBe("blocked");
+    expect(plan.students[0]?.blockers.join(" ")).toContain("Existing name");
+    expect(plan.students[0]?.blockers.join(" ")).toContain("Existing profile latinGivenName");
   });
 });
