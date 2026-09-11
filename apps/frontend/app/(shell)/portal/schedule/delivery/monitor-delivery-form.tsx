@@ -22,21 +22,25 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
   const existing = context.delivery;
   if (existing) {
     return {
+      lecturerArrivalStatus: context.lecturerArrival?.status ?? null,
       classOccurred: existing.classOccurred,
       actualLecturerId: existing.actualLecturer?.id ?? null,
       actualStartTime: existing.actualStartTime,
       actualEndTime: existing.actualEndTime,
       actualTopic: existing.actualTopic,
+      learningSummary: existing.learningSummary,
       coverage: existing.coverage,
       note: existing.note,
     };
   }
   return {
+    lecturerArrivalStatus: context.lecturerArrival?.status ?? null,
     classOccurred: true,
     actualLecturerId: context.eligibleLecturers[0]?.id ?? null,
     actualStartTime: context.occurrence.scheduledStartTime,
     actualEndTime: context.occurrence.scheduledEndTime,
     actualTopic: context.plannedWeek?.topic ?? "",
+    learningSummary: "",
     coverage: "TAUGHT_AS_PLANNED",
     note: "",
   };
@@ -100,6 +104,7 @@ export function MonitorDeliveryForm() {
           actualLecturerId: null,
           actualStartTime: null,
           actualEndTime: null,
+          learningSummary: "",
           coverage: "NOT_COVERED",
         };
       }
@@ -123,11 +128,7 @@ export function MonitorDeliveryForm() {
       const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
       setContext(refreshed);
       setInput(initialInput(refreshed));
-      setNotice(
-        result.changed
-          ? `Class delivery saved as revision ${result.delivery.revision}.`
-          : "No changes to save.",
-      );
+      setNotice(result.changed ? "Class record saved." : "No changes to save.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save class delivery");
     } finally {
@@ -155,10 +156,13 @@ export function MonitorDeliveryForm() {
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">
               {context.responsibility.role === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor"}
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-foreground">Record actual class delivery</h2>
+            <h2 className="mt-1 text-lg font-semibold text-foreground">Record class delivery</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {context.occurrence.date} · {context.occurrence.scheduledStartTime}–{context.occurrence.scheduledEndTime}
               {context.occurrence.scheduledRoom ? ` · ${context.occurrence.scheduledRoom}` : ""}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              Record factual class evidence only. “Not yet confirmed” is not an official lecturer-absence or disciplinary finding.
             </p>
           </div>
         </div>
@@ -182,6 +186,41 @@ export function MonitorDeliveryForm() {
       </section>
 
       <section className="space-y-5 rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Lecturer arrival</p>
+          <p className="mt-1 text-xs text-muted-foreground">Use only the factual state you can observe.</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              aria-pressed={input.lecturerArrivalStatus === "Present"}
+              onClick={() =>
+                setInput((current) => current ? { ...current, lecturerArrivalStatus: "Present" } : current)
+              }
+              className={`min-h-11 rounded-xl border px-3 text-sm font-medium ${
+                input.lecturerArrivalStatus === "Present"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background"
+              }`}
+            >
+              Present
+            </button>
+            <button
+              type="button"
+              aria-pressed={input.lecturerArrivalStatus === "NotYet"}
+              onClick={() =>
+                setInput((current) => current ? { ...current, lecturerArrivalStatus: "NotYet" } : current)
+              }
+              className={`min-h-11 rounded-xl border px-3 text-sm font-medium ${
+                input.lecturerArrivalStatus === "NotYet"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background"
+              }`}
+            >
+              Not yet confirmed
+            </button>
+          </div>
+        </div>
+
         <div>
           <p className="text-sm font-semibold text-foreground">Did the class occur?</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -254,42 +293,62 @@ export function MonitorDeliveryForm() {
         ) : null}
 
         <label className="block text-sm font-medium text-foreground">
-          What was actually taught?
+          Class topic / title actually taught
           <textarea
             value={input.actualTopic}
             maxLength={1000}
-            rows={4}
+            rows={3}
             onChange={(event) => setInput((current) => current ? { ...current, actualTopic: event.target.value } : current)}
-            placeholder={input.classOccurred ? "Record the actual topic/content taught" : "Optional note about the missed class"}
+            placeholder={input.classOccurred ? "Record the actual topic/content taught" : "Optional factual note about the class not being held"}
             className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
           />
         </label>
 
         {input.classOccurred ? (
-          <label className="block text-sm font-medium text-foreground">
-            Planned-topic coverage
-            <select
-              value={input.coverage}
-              onChange={(event) => setInput((current) => current ? { ...current, coverage: event.target.value as TeachingSessionCoverage } : current)}
-              className="mt-2 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-            >
-              {COVERAGE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
+          <>
+            <label className="block text-sm font-medium text-foreground">
+              What we learned
+              <textarea
+                value={input.learningSummary}
+                maxLength={1000}
+                rows={4}
+                onChange={(event) => setInput((current) => current ? { ...current, learningSummary: event.target.value } : current)}
+                placeholder="Short student-safe summary of what the class learned"
+                className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                This summary can later appear in students’ Week 1–16 Weekly Notes.
+              </span>
+            </label>
+
+            <label className="block text-sm font-medium text-foreground">
+              Planned-topic coverage
+              <select
+                value={input.coverage}
+                onChange={(event) => setInput((current) => current ? { ...current, coverage: event.target.value as TeachingSessionCoverage } : current)}
+                className="mt-2 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              >
+                {COVERAGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </>
         ) : null}
 
         <label className="block text-sm font-medium text-foreground">
-          Note
+          Private internal note
           <textarea
             value={input.note}
             maxLength={500}
             rows={3}
             onChange={(event) => setInput((current) => current ? { ...current, note: event.target.value } : current)}
-            placeholder="Optional delivery note"
+            placeholder="Optional note for authorized staff review"
             className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
           />
+          <span className="mt-1 block text-xs text-muted-foreground">
+            This is structurally separate from “What we learned” and must never be student-visible.
+          </span>
         </label>
 
         {error ? <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
@@ -306,7 +365,7 @@ export function MonitorDeliveryForm() {
           onClick={() => void save()}
           className="min-h-12 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Saving…" : context.delivery ? "Save correction" : "Save class delivery"}
+          {saving ? "Saving…" : context.delivery ? "Save correction" : "Save class record"}
         </button>
       </section>
 

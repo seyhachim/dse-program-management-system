@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { ClassDeliveryNoteSchema, TeachingSessionOccurrenceViewSchema } from "./class-delivery.ts";
+import {
+  ClassDeliveryNoteSchema,
+  LecturerArrivalConfirmationViewSchema,
+  LecturerArrivalStatusSchema,
+  TeachingSessionOccurrenceViewSchema,
+} from "./class-delivery.ts";
 import { ClassResponsibilityRoleSchema } from "./class-responsibilities.ts";
 
 export const TeachingSessionCoverageSchema = z.enum([
@@ -14,13 +19,20 @@ export const TeachingSessionActualTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
+export const TeachingSessionLearningSummarySchema = z.string().trim().max(1000);
+export type TeachingSessionLearningSummary = z.infer<
+  typeof TeachingSessionLearningSummarySchema
+>;
+
 export const SaveTeachingSessionDeliveryInputSchema = z
   .object({
+    lecturerArrivalStatus: LecturerArrivalStatusSchema.nullable().optional(),
     classOccurred: z.boolean(),
     actualLecturerId: z.string().uuid().nullable().default(null),
     actualStartTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualEndTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualTopic: z.string().trim().max(1000).default(""),
+    learningSummary: TeachingSessionLearningSummarySchema.optional(),
     coverage: TeachingSessionCoverageSchema,
     note: ClassDeliveryNoteSchema.optional().default(""),
   })
@@ -45,6 +57,13 @@ export const SaveTeachingSessionDeliveryInputSchema = z
           code: z.ZodIssueCode.custom,
           path: ["coverage"],
           message: "A class that did not occur must use NOT_COVERED",
+        });
+      }
+      if ((value.learningSummary ?? "").length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["learningSummary"],
+          message: "Learning summary must be empty when the class did not occur",
         });
       }
       return;
@@ -112,6 +131,7 @@ export const TeachingSessionDeliverySnapshotSchema = z.object({
   actualEndTime: TeachingSessionActualTimeSchema.nullable(),
   deliveredMinutes: z.number().int().min(0),
   actualTopic: z.string(),
+  learningSummary: z.string(),
   coverage: TeachingSessionCoverageSchema,
   note: z.string(),
 });
@@ -130,6 +150,7 @@ export const TeachingSessionDeliveryViewSchema = z.object({
   deliveredMinutes: z.number().int().min(0),
   deliveredContactHours: z.number().min(0),
   actualTopic: z.string(),
+  learningSummary: z.string(),
   coverage: TeachingSessionCoverageSchema,
   note: z.string(),
   plannedWeek: TeachingSessionPlannedWeekViewSchema.nullable(),
@@ -169,6 +190,7 @@ export const TeachingSessionMonitorContextViewSchema = z.object({
   occurrence: TeachingSessionOccurrenceViewSchema,
   plannedWeek: TeachingSessionPlannedWeekViewSchema.nullable(),
   eligibleLecturers: z.array(TeachingSessionDeliveryLecturerViewSchema),
+  lecturerArrival: LecturerArrivalConfirmationViewSchema.nullable(),
   delivery: TeachingSessionDeliveryViewSchema.nullable(),
   history: z.array(TeachingSessionDeliveryAuditEventViewSchema),
 });

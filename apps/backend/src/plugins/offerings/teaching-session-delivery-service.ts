@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type {
   ClassResponsibilityRole,
+  LecturerArrivalStatus,
   MonitorClassResponsibilityView,
   SaveTeachingSessionDeliveryInput,
   SaveTeachingSessionDeliveryResult,
@@ -33,6 +34,7 @@ interface DeliveryRow {
   actualEndTime: string | null;
   deliveredMinutes: number;
   actualTopic: string;
+  learningSummary: string;
   coverage: TeachingSessionDeliverySnapshot["coverage"];
   note: string;
   plannedCourseSpecId: string | null;
@@ -69,6 +71,11 @@ interface MonitorAssignmentRow {
   role: ClassResponsibilityRole;
 }
 
+interface ArrivalIdentityRow {
+  id: string;
+  status: LecturerArrivalStatus;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function dateOnly(value: Date): string {
@@ -96,6 +103,7 @@ function deliverySnapshot(row: Pick<
   | "actualEndTime"
   | "deliveredMinutes"
   | "actualTopic"
+  | "learningSummary"
   | "coverage"
   | "note"
 >): TeachingSessionDeliverySnapshot {
@@ -106,6 +114,7 @@ function deliverySnapshot(row: Pick<
     actualEndTime: row.actualEndTime,
     deliveredMinutes: row.deliveredMinutes,
     actualTopic: row.actualTopic,
+    learningSummary: row.learningSummary,
     coverage: row.coverage,
     note: row.note,
   };
@@ -142,6 +151,7 @@ function deliveryView(row: DeliveryRow): TeachingSessionDeliveryView {
     deliveredMinutes: row.deliveredMinutes,
     deliveredContactHours: Math.round((row.deliveredMinutes / 60) * 100) / 100,
     actualTopic: row.actualTopic,
+    learningSummary: row.learningSummary,
     coverage: row.coverage,
     note: row.note,
     plannedWeek: plannedWeekFromRow(row),
@@ -171,7 +181,7 @@ async function readDelivery(occurrenceId: string): Promise<DeliveryRow | null> {
       d."id", d."occurrenceId", d."offeringId", d."classOccurred",
       d."actualLecturerId", lecturer."name" AS "actualLecturerName",
       d."actualStartTime", d."actualEndTime", d."deliveredMinutes",
-      d."actualTopic", d."coverage", d."note",
+      d."actualTopic", d."learningSummary", d."coverage", d."note",
       d."plannedCourseSpecId", d."plannedWeekId", d."plannedWeekNumber", d."plannedTopic",
       d."recordedById", recorder."name" AS "recordedByName",
       d."recordedAt", d."updatedAt", d."revision"
@@ -308,6 +318,7 @@ function normalizedSnapshot(
       actualEndTime: null,
       deliveredMinutes: 0,
       actualTopic: input.actualTopic,
+      learningSummary: "",
       coverage: "NOT_COVERED",
       note: input.note,
     };
@@ -324,6 +335,7 @@ function normalizedSnapshot(
     actualEndTime: input.actualEndTime,
     deliveredMinutes: teachingSessionDeliveredMinutes(input.actualStartTime, input.actualEndTime),
     actualTopic: input.actualTopic,
+    learningSummary: input.learningSummary ?? "",
     coverage: input.coverage,
     note: input.note,
   };
@@ -380,10 +392,11 @@ export const teachingSessionDeliveryService = {
       meetingId,
       date,
     );
-    const [delivery, currentPlannedWeek, lecturers, history] = await Promise.all([
+    const [delivery, currentPlannedWeek, lecturers, lecturerArrival, history] = await Promise.all([
       this.getDelivery(occurrence.id),
       plannedWeekForOccurrence(occurrence),
       eligibleLecturers(offeringId),
+      classDeliveryService.getLecturerArrivalForOccurrence(occurrence.id),
       this.getHistory(occurrence.id),
     ]);
     return {
@@ -391,6 +404,7 @@ export const teachingSessionDeliveryService = {
       occurrence,
       plannedWeek: delivery?.plannedWeek ?? currentPlannedWeek,
       eligibleLecturers: lecturers,
+      lecturerArrival,
       delivery,
       history,
     };
@@ -403,8 +417,6 @@ export const teachingSessionDeliveryService = {
     input: SaveTeachingSessionDeliveryInput,
     userId: string,
   ): Promise<SaveTeachingSessionDeliveryResult> {
-    // Resolve the exact meeting/date identity only after the canonical responsibility
-    // service has established that the caller is currently a monitor for this offering.
     await classResponsibilityService.assertActiveForUser(userId, offeringId);
     const occurrence = await classDeliveryService.resolveTeachingSessionOccurrence(
       offeringId,
@@ -415,8 +427,6 @@ export const teachingSessionDeliveryService = {
     const plannedWeek = await plannedWeekForOccurrence(occurrence);
 
     const result = await prisma.$transaction(async (tx) => {
-      // Lock and re-check responsibility so a concurrent revocation cannot race a
-      // delivery write. Revocation must wait for this transaction or win before it.
       await assertActiveMonitorInTransaction(tx, userId, offeringId);
 
       const occurrences = await tx.$queryRaw<OccurrenceIdentityRow[]>`
@@ -425,7 +435,8 @@ export const teachingSessionDeliveryService = {
         WHERE "id" = ${occurrence.id} AND "offeringId" = ${offeringId}
         FOR UPDATE
       `;
-      if (!occurrences[0]) {
+      const exactOccurrence = occurrences[0];
+      if (!exactOccurrence) {
         throw new TeachingSessionDeliveryReferenceError(
           "Teaching session occurrence not found for this offering",
         );
@@ -444,7 +455,7 @@ export const teachingSessionDeliveryService = {
           d."id", d."occurrenceId", d."offeringId", d."classOccurred",
           d."actualLecturerId", lecturer."name" AS "actualLecturerName",
           d."actualStartTime", d."actualEndTime", d."deliveredMinutes",
-          d."actualTopic", d."coverage", d."note",
+          d."actualTopic", d."learningSummary", d."coverage", d."note",
           d."plannedCourseSpecId", d."plannedWeekId", d."plannedWeekNumber", d."plannedTopic",
           d."recordedById", recorder."name" AS "recordedByName",
           d."recordedAt", d."updatedAt", d."revision"
@@ -455,11 +466,47 @@ export const teachingSessionDeliveryService = {
         FOR UPDATE OF d
       `;
       const current = existingRows[0];
-      if (current && JSON.stringify(deliverySnapshot(current)) === JSON.stringify(snapshot)) {
-        return { row: current, changed: false };
+      const now = new Date();
+
+      let arrivalChanged = false;
+      if (input.lecturerArrivalStatus) {
+        const arrivalRows = await tx.$queryRaw<ArrivalIdentityRow[]>`
+          SELECT "id", "status"
+          FROM "pms_attendance"."LecturerArrivalConfirmation"
+          WHERE "occurrenceId" = ${occurrence.id}
+          FOR UPDATE
+        `;
+        const currentArrival = arrivalRows[0];
+        if (currentArrival?.status !== input.lecturerArrivalStatus) {
+          if (currentArrival) {
+            await tx.$executeRaw`
+              UPDATE "pms_attendance"."LecturerArrivalConfirmation"
+              SET "status" = ${input.lecturerArrivalStatus},
+                  "note" = '',
+                  "recordedById" = ${userId},
+                  "recordedAt" = ${now},
+                  "updatedAt" = ${now}
+              WHERE "id" = ${currentArrival.id}
+            `;
+          } else {
+            await tx.$executeRaw`
+              INSERT INTO "pms_attendance"."LecturerArrivalConfirmation" (
+                "id", "offeringId", "date", "occurrenceId", "status", "note",
+                "recordedById", "recordedAt", "updatedAt"
+              ) VALUES (
+                ${randomUUID()}, ${offeringId}, ${exactOccurrence.sessionDate}, ${occurrence.id},
+                ${input.lecturerArrivalStatus}, '', ${userId}, ${now}, ${now}
+              )
+            `;
+          }
+          arrivalChanged = true;
+        }
       }
 
-      const now = new Date();
+      if (current && JSON.stringify(deliverySnapshot(current)) === JSON.stringify(snapshot)) {
+        return { row: current, changed: arrivalChanged };
+      }
+
       const revision = (current?.revision ?? 0) + 1;
       const previousSnapshot = current ? deliverySnapshot(current) : null;
       const deliveryId = current?.id ?? randomUUID();
@@ -476,6 +523,7 @@ export const teachingSessionDeliveryService = {
               "actualEndTime" = ${snapshot.actualEndTime},
               "deliveredMinutes" = ${snapshot.deliveredMinutes},
               "actualTopic" = ${snapshot.actualTopic},
+              "learningSummary" = ${snapshot.learningSummary},
               "coverage" = ${snapshot.coverage},
               "note" = ${snapshot.note},
               "recordedById" = ${userId},
@@ -489,7 +537,7 @@ export const teachingSessionDeliveryService = {
             d."id", d."occurrenceId", d."offeringId", d."classOccurred",
             d."actualLecturerId", lecturer."name" AS "actualLecturerName",
             d."actualStartTime", d."actualEndTime", d."deliveredMinutes",
-            d."actualTopic", d."coverage", d."note",
+            d."actualTopic", d."learningSummary", d."coverage", d."note",
             d."plannedCourseSpecId", d."plannedWeekId", d."plannedWeekNumber", d."plannedTopic",
             d."recordedById", recorder."name" AS "recordedByName",
             d."recordedAt", d."updatedAt", d."revision"
@@ -504,13 +552,14 @@ export const teachingSessionDeliveryService = {
             INSERT INTO "pms_attendance"."TeachingSessionDelivery" (
               "id", "occurrenceId", "offeringId", "classOccurred",
               "actualLecturerId", "actualStartTime", "actualEndTime", "deliveredMinutes",
-              "actualTopic", "coverage", "note",
+              "actualTopic", "learningSummary", "coverage", "note",
               "plannedCourseSpecId", "plannedWeekId", "plannedWeekNumber", "plannedTopic",
               "recordedById", "recordedAt", "updatedAt", "revision"
             ) VALUES (
               ${deliveryId}, ${occurrence.id}, ${offeringId}, ${snapshot.classOccurred},
               ${snapshot.actualLecturerId}, ${snapshot.actualStartTime}, ${snapshot.actualEndTime},
-              ${snapshot.deliveredMinutes}, ${snapshot.actualTopic}, ${snapshot.coverage}, ${snapshot.note},
+              ${snapshot.deliveredMinutes}, ${snapshot.actualTopic}, ${snapshot.learningSummary},
+              ${snapshot.coverage}, ${snapshot.note},
               ${plannedWeek?.courseSpecId ?? null}, ${plannedWeek?.id ?? null},
               ${plannedWeek?.week ?? null}, ${plannedWeek?.topic ?? ""},
               ${userId}, ${now}, ${now}, ${revision}
@@ -521,7 +570,7 @@ export const teachingSessionDeliveryService = {
             d."id", d."occurrenceId", d."offeringId", d."classOccurred",
             d."actualLecturerId", lecturer."name" AS "actualLecturerName",
             d."actualStartTime", d."actualEndTime", d."deliveredMinutes",
-            d."actualTopic", d."coverage", d."note",
+            d."actualTopic", d."learningSummary", d."coverage", d."note",
             d."plannedCourseSpecId", d."plannedWeekId", d."plannedWeekNumber", d."plannedTopic",
             d."recordedById", recorder."name" AS "recordedByName",
             d."recordedAt", d."updatedAt", d."revision"
