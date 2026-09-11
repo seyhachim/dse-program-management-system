@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import {
+  canonicalStudentDisplayName,
+  normalizeStudentProfileNameFields,
+} from "../src/plugins/students/name.ts";
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const STUDENT_STATUSES = ["Active", "Inactive", "Pending"] as const;
@@ -122,10 +126,18 @@ export const StudentRosterImportDocumentSchema = z
 
       if (!student.studentId) {
         if (!student.email) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Institutional email is required while official Student ID is pending", path: ["students", index, "email"] });
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Institutional email is required while official Student ID is pending",
+            path: ["students", index, "email"],
+          });
         }
         if (student.status !== "Pending") {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Students without an official Student ID must be Pending", path: ["students", index, "status"] });
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Students without an official Student ID must be Pending",
+            path: ["students", index, "status"],
+          });
         }
       }
     }
@@ -181,7 +193,12 @@ export type StudentRosterImportStore = {
   createStudent(row: StudentRosterImportRow): Promise<{ id: string }>;
   fillStudentMissingFields(
     studentRecordId: string,
-    patch: { studentId?: string; email?: string; profile?: Partial<ProfileData> },
+    patch: {
+      studentId?: string;
+      name?: string;
+      email?: string;
+      profile?: Partial<ProfileData>;
+    },
   ): Promise<void>;
   createMembership(input: {
     cohortId: string;
@@ -209,6 +226,7 @@ export type StudentImportResult = {
   blockers: string[];
   existingStudentRecordId?: string;
   studentIdPatch?: string;
+  namePatch?: string;
   emailPatch?: string;
   profilePatch?: Partial<ProfileData>;
   membershipExists?: boolean;
@@ -232,7 +250,17 @@ export type StudentRosterImportSummary = {
   warnings: number;
   globalErrors: string[];
   cohorts: CohortImportResult[];
-  students: Array<Omit<StudentImportResult, "existingStudentRecordId" | "emailPatch" | "profilePatch" | "membershipExists">>;
+  students: Array<
+    Omit<
+      StudentImportResult,
+      | "existingStudentRecordId"
+      | "studentIdPatch"
+      | "namePatch"
+      | "emailPatch"
+      | "profilePatch"
+      | "membershipExists"
+    >
+  >;
 };
 
 export class StudentRosterImportBlockedError extends Error {
@@ -246,13 +274,18 @@ export function parseStudentRosterImportDocument(input: unknown): StudentRosterI
 }
 
 function normalizedProfile(row: StudentRosterImportRow): ProfileData {
+  const profile = normalizeStudentProfileNameFields(row.profile);
   return {
-    khmerFamilyName: row.profile?.khmerFamilyName ?? null,
-    khmerGivenName: row.profile?.khmerGivenName ?? null,
-    latinFamilyName: row.profile?.latinFamilyName ?? null,
-    latinGivenName: row.profile?.latinGivenName ?? null,
-    gender: row.profile?.gender ?? null,
+    khmerFamilyName: profile?.khmerFamilyName ?? null,
+    khmerGivenName: profile?.khmerGivenName ?? null,
+    latinFamilyName: profile?.latinFamilyName ?? null,
+    latinGivenName: profile?.latinGivenName ?? null,
+    gender: profile?.gender ?? null,
   };
+}
+
+function canonicalName(row: StudentRosterImportRow): string {
+  return canonicalStudentDisplayName(normalizedProfile(row), row.name);
 }
 
 function comparable(value: string | null | undefined): string {
@@ -329,25 +362,45 @@ export async function planStudentRosterImport(
   for (const row of document.students) {
     const warnings: string[] = [];
     const blockers: string[] = [...globalErrors];
-    const cohortSource = document.cohorts.find((cohort) => cohort.code.toLowerCase() === row.cohortCode.toLowerCase())!;
+    const incomingProfile = normalizedProfile(row);
+    const incomingName = canonicalStudentDisplayName(incomingProfile, row.name);
+    const hasFullLatinName = Boolean(incomingProfile.latinFamilyName && incomingProfile.latinGivenName);
+    if (hasFullLatinName && comparable(row.name) !== comparable(incomingName)) {
+      blockers.push(
+        `Source name '${row.name}' conflicts with Latin profile name '${incomingName}'`,
+      );
+    }
+
+    const cohortSource = document.cohorts.find(
+      (cohort) => cohort.code.toLowerCase() === row.cohortCode.toLowerCase(),
+    )!;
     const cohortPlan = cohortByCode.get(row.cohortCode.toLowerCase())!;
     if (cohortPlan.action === "blocked") blockers.push(`Cohort '${row.cohortCode}' is blocked`);
-    if (row.studentId && duplicateStudentIds.has(row.studentId.toLowerCase())) blockers.push(`Duplicate studentId '${row.studentId}' in import source`);
-    if (row.email && duplicateEmails.has(row.email.toLowerCase())) blockers.push(`Duplicate email '${row.email}' in import source`);
+    if (row.studentId && duplicateStudentIds.has(row.studentId.toLowerCase())) {
+      blockers.push(`Duplicate studentId '${row.studentId}' in import source`);
+    }
+    if (row.email && duplicateEmails.has(row.email.toLowerCase())) {
+      blockers.push(`Duplicate email '${row.email}' in import source`);
+    }
 
     let existing: ExistingRosterStudent | null = null;
     let studentIdPatch: string | undefined;
+    let namePatch: string | undefined;
     let emailPatch: string | undefined;
     let profilePatch: Partial<ProfileData> | undefined;
     let membershipExists = false;
 
     const idMatch = row.studentId ? await store.findStudentByStudentId(row.studentId) : null;
     const emailMatches = row.email ? await store.findStudentsByEmail(row.email) : [];
-    if (emailMatches.length > 1) blockers.push(`Database contains multiple case-insensitive matches for email '${row.email}'`);
+    if (emailMatches.length > 1) {
+      blockers.push(`Database contains multiple case-insensitive matches for email '${row.email}'`);
+    }
     const emailMatch = emailMatches.length === 1 ? emailMatches[0]! : null;
 
     if (idMatch && emailMatch && idMatch.id !== emailMatch.id) {
-      blockers.push(`Official studentId '${row.studentId}' and email '${row.email}' resolve to different Student records`);
+      blockers.push(
+        `Official studentId '${row.studentId}' and email '${row.email}' resolve to different Student records`,
+      );
     } else if (idMatch) {
       existing = idMatch;
     } else if (emailMatch) {
@@ -360,34 +413,88 @@ export async function planStudentRosterImport(
     }
 
     if (existing) {
-      if (comparable(existing.name) !== comparable(row.name)) blockers.push(`Existing name '${existing.name}' conflicts with source name '${row.name}'`);
-      if (existing.email && row.email && comparable(existing.email) !== comparable(row.email)) blockers.push(`Existing email '${existing.email}' conflicts with source email '${row.email}'`);
-      else if (!existing.email && row.email) emailPatch = row.email;
-      if (existing.status !== row.status) warnings.push(`Existing student status '${existing.status}' is preserved instead of source status '${row.status}'`);
-      if (!row.studentId && existing.studentId) warnings.push(`Official studentId '${existing.studentId}' is preserved for email '${row.email}'`);
+      if (comparable(existing.name) !== comparable(incomingName)) {
+        blockers.push(
+          `Existing name '${existing.name}' conflicts with source name '${incomingName}'`,
+        );
+      } else if (existing.name !== incomingName) {
+        namePatch = incomingName;
+      }
 
-      const incomingProfile = normalizedProfile(row);
+      if (existing.email && row.email && comparable(existing.email) !== comparable(row.email)) {
+        blockers.push(`Existing email '${existing.email}' conflicts with source email '${row.email}'`);
+      } else if (!existing.email && row.email) {
+        emailPatch = row.email;
+      }
+      if (existing.status !== row.status) {
+        warnings.push(
+          `Existing student status '${existing.status}' is preserved instead of source status '${row.status}'`,
+        );
+      }
+      if (!row.studentId && existing.studentId) {
+        warnings.push(`Official studentId '${existing.studentId}' is preserved for email '${row.email}'`);
+      }
+
       const patch: Partial<ProfileData> = {};
       for (const key of Object.keys(incomingProfile) as Array<keyof ProfileData>) {
         const incoming = incomingProfile[key];
         if (incoming === null) continue;
         const current = existing.profile?.[key] ?? null;
-        if (current === null) patch[key] = incoming;
-        else if (comparable(current) !== comparable(incoming)) blockers.push(`Existing profile ${key} '${current}' conflicts with source value '${incoming}'`);
+        if (current === null) {
+          patch[key] = incoming;
+        } else if (comparable(current) !== comparable(incoming)) {
+          blockers.push(`Existing profile ${key} '${current}' conflicts with source value '${incoming}'`);
+        } else if (
+          (key === "latinFamilyName" || key === "latinGivenName") &&
+          current !== incoming
+        ) {
+          patch[key] = incoming;
+        }
       }
       if (Object.keys(patch).length > 0) profilePatch = patch;
 
       const memberships = await store.findMembershipsForStudent(existing.id);
-      const exact = memberships.find((membership) => membership.cohort.code.toLowerCase() === row.cohortCode.toLowerCase() && sameDate(membership.joinedAt, cohortSource.joinedAt));
+      const exact = memberships.find(
+        (membership) =>
+          membership.cohort.code.toLowerCase() === row.cohortCode.toLowerCase() &&
+          sameDate(membership.joinedAt, cohortSource.joinedAt),
+      );
       membershipExists = Boolean(exact);
       if (!exact) {
-        const overlap = memberships.find((membership) => hasMembershipOverlap(membership, cohortSource.joinedAt));
-        if (overlap) blockers.push(`Target membership from ${cohortSource.joinedAt} overlaps existing cohort '${overlap.cohort.code}' membership`);
+        const overlap = memberships.find((membership) =>
+          hasMembershipOverlap(membership, cohortSource.joinedAt),
+        );
+        if (overlap) {
+          blockers.push(
+            `Target membership from ${cohortSource.joinedAt} overlaps existing cohort '${overlap.cohort.code}' membership`,
+          );
+        }
       }
     }
 
-    const action: StudentImportResult["action"] = blockers.length > 0 ? "blocked" : existing ? (studentIdPatch || emailPatch || profilePatch || !membershipExists ? "would_update" : "unchanged") : "would_create";
-    studentResults.push({ sourceRef: row.sourceRef, cohortCode: row.cohortCode, studentId: row.studentId, name: row.name, action, warnings, blockers, ...(existing ? { existingStudentRecordId: existing.id } : {}), ...(studentIdPatch ? { studentIdPatch } : {}), ...(emailPatch ? { emailPatch } : {}), ...(profilePatch ? { profilePatch } : {}), membershipExists });
+    const action: StudentImportResult["action"] =
+      blockers.length > 0
+        ? "blocked"
+        : existing
+          ? studentIdPatch || namePatch || emailPatch || profilePatch || !membershipExists
+            ? "would_update"
+            : "unchanged"
+          : "would_create";
+    studentResults.push({
+      sourceRef: row.sourceRef,
+      cohortCode: row.cohortCode,
+      studentId: row.studentId,
+      name: incomingName,
+      action,
+      warnings,
+      blockers,
+      ...(existing ? { existingStudentRecordId: existing.id } : {}),
+      ...(studentIdPatch ? { studentIdPatch } : {}),
+      ...(namePatch ? { namePatch } : {}),
+      ...(emailPatch ? { emailPatch } : {}),
+      ...(profilePatch ? { profilePatch } : {}),
+      membershipExists,
+    });
   }
 
   return { document, globalErrors, cohorts: cohortResults, students: studentResults };
@@ -411,8 +518,15 @@ export function summarizeStudentRosterImport(
     globalErrors: plan.globalErrors,
     cohorts: plan.cohorts,
     students: plan.students.map(
-      ({ existingStudentRecordId: _id, studentIdPatch: _sid, emailPatch: _email, profilePatch: _profile, membershipExists: _membership, ...publicResult }) =>
-        publicResult,
+      ({
+        existingStudentRecordId: _id,
+        studentIdPatch: _sid,
+        namePatch: _name,
+        emailPatch: _email,
+        profilePatch: _profile,
+        membershipExists: _membership,
+        ...publicResult
+      }) => publicResult,
     ),
   };
 }
@@ -450,9 +564,13 @@ export async function applyStudentRosterImportPlan(
       ? result.existingStudentRecordId
       : (await store.createStudent(row)).id;
 
-    if (result.existingStudentRecordId && (result.studentIdPatch || result.emailPatch || result.profilePatch)) {
+    if (
+      result.existingStudentRecordId &&
+      (result.studentIdPatch || result.namePatch || result.emailPatch || result.profilePatch)
+    ) {
       await store.fillStudentMissingFields(studentRecordId, {
         ...(result.studentIdPatch ? { studentId: result.studentIdPatch } : {}),
+        ...(result.namePatch ? { name: result.namePatch } : {}),
         ...(result.emailPatch ? { email: result.emailPatch } : {}),
         ...(result.profilePatch ? { profile: result.profilePatch } : {}),
       });
@@ -490,7 +608,9 @@ export function createPrismaStudentRosterImportStore(
   const includeProfile = { profile: true } as const;
   return {
     async programmeExists(programmeId) {
-      return Boolean(await db.programme.findUnique({ where: { id: programmeId }, select: { id: true } }));
+      return Boolean(
+        await db.programme.findUnique({ where: { id: programmeId }, select: { id: true } }),
+      );
     },
     findCohort(programmeId, code) {
       return db.studentCohort.findUnique({ where: { programmeId_code: { programmeId, code } } });
@@ -531,7 +651,7 @@ export function createPrismaStudentRosterImportStore(
       return db.student.create({
         data: {
           studentId: row.studentId,
-          name: row.name,
+          name: canonicalStudentDisplayName(profile, row.name),
           email: row.email,
           status: row.status,
           ...(hasProfile ? { profile: { create: profile } } : {}),
@@ -544,6 +664,7 @@ export function createPrismaStudentRosterImportStore(
         where: { id: studentRecordId },
         data: {
           ...(patch.studentId ? { studentId: patch.studentId } : {}),
+          ...(patch.name ? { name: patch.name } : {}),
           ...(patch.email ? { email: patch.email } : {}),
           ...(patch.profile
             ? {
@@ -614,7 +735,9 @@ async function main() {
       ? await commitStudentRosterImport(prisma, document)
       : await dryRunStudentRosterImport(createPrismaStudentRosterImportStore(prisma), document);
     console.log(JSON.stringify(summary, null, 2));
-    if (!commit) console.log("No database changes were made. Review blockers/warnings before --commit.");
+    if (!commit) {
+      console.log("No database changes were made. Review blockers/warnings before --commit.");
+    }
   } catch (error) {
     if (error instanceof StudentRosterImportBlockedError) {
       console.error(JSON.stringify(error.summary, null, 2));

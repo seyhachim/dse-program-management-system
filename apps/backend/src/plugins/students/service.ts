@@ -8,6 +8,10 @@ import type {
   UpdateStudentInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import {
+  canonicalStudentDisplayName,
+  normalizeStudentProfileNameFields,
+} from "./name.ts";
 
 const withProfile = { profile: true } as const;
 
@@ -109,6 +113,18 @@ function hasProfileValues(profile: StudentProfileInput | undefined): boolean {
   return Boolean(profile && Object.values(profile).some((value) => value !== null && value !== undefined));
 }
 
+function mergeLatinProfile(
+  existing: { latinFamilyName: string | null; latinGivenName: string | null } | null,
+  patch: StudentProfileInput | undefined,
+) {
+  return {
+    latinFamilyName:
+      patch?.latinFamilyName === undefined ? existing?.latinFamilyName ?? null : patch.latinFamilyName,
+    latinGivenName:
+      patch?.latinGivenName === undefined ? existing?.latinGivenName ?? null : patch.latinGivenName,
+  };
+}
+
 export const studentService = {
   async list(query: ListStudentsQuery) {
     const { search, activeOnly } = query;
@@ -154,25 +170,49 @@ export const studentService = {
   async create(input: CreateStudentInput) {
     const { profile, ...student } = input;
     assertValidIdentity(student);
+    const normalizedProfile = normalizeStudentProfileNameFields(profile);
+    const name = canonicalStudentDisplayName(normalizedProfile, student.name);
     return prisma.student.create({
-      data: { ...student, ...(hasProfileValues(profile) ? { profile: { create: profile } } : {}) },
+      data: {
+        ...student,
+        name,
+        ...(hasProfileValues(normalizedProfile)
+          ? { profile: { create: normalizedProfile } }
+          : {}),
+      },
       include: withProfile,
     });
   },
 
   async update(id: string, input: UpdateStudentInput) {
     const { profile, ...student } = input;
-    const hasProfilePatch = profile !== undefined && Object.keys(profile).length > 0;
-    const data = {
-      ...student,
-      ...(hasProfilePatch ? { profile: { upsert: { create: profile, update: profile } } } : {}),
-    };
+    const normalizedProfile = normalizeStudentProfileNameFields(profile);
+    const hasProfilePatch =
+      normalizedProfile !== undefined && Object.keys(normalizedProfile).length > 0;
 
     const existing = await prisma.student.findUnique({
       where: { id },
-      select: { studentId: true, email: true, status: true },
+      select: {
+        studentId: true,
+        email: true,
+        status: true,
+        name: true,
+        profile: { select: { latinFamilyName: true, latinGivenName: true } },
+      },
     });
+
     if (!existing) {
+      const fallbackName =
+        input.name === undefined
+          ? undefined
+          : canonicalStudentDisplayName(normalizedProfile, input.name);
+      const data = {
+        ...student,
+        ...(fallbackName !== undefined ? { name: fallbackName } : {}),
+        ...(hasProfilePatch
+          ? { profile: { upsert: { create: normalizedProfile, update: normalizedProfile } } }
+          : {}),
+      };
       return prisma.student.update({ where: { id }, data, include: withProfile });
     }
 
@@ -181,6 +221,22 @@ export const studentService = {
       email: input.email === undefined ? existing.email : input.email,
       status: input.status === undefined ? existing.status : input.status,
     });
+
+    const mergedLatinProfile = mergeLatinProfile(existing.profile, normalizedProfile);
+    const namePatch =
+      input.name !== undefined || hasProfilePatch
+        ? canonicalStudentDisplayName(
+            mergedLatinProfile,
+            input.name === undefined ? existing.name : input.name,
+          )
+        : undefined;
+    const data = {
+      ...student,
+      ...(namePatch !== undefined ? { name: namePatch } : {}),
+      ...(hasProfilePatch
+        ? { profile: { upsert: { create: normalizedProfile, update: normalizedProfile } } }
+        : {}),
+    };
 
     return prisma.student.update({
       where: { id },
