@@ -21,6 +21,8 @@ import { authApi, useMe } from "@/lib/auth";
 
 const PAGE_SIZE = 50;
 
+type InviteEligibleStudent = Student & { email: string; status: "Active" };
+
 export function StudentsClient() {
   const { me } = useMe();
   const [search, setSearch] = useState("");
@@ -130,13 +132,15 @@ export function StudentsClient() {
     ? rows.find((row) => row.id === selectedIds[0]) ?? null
     : null;
 
-  const validateSelectedInviteStudent = (): selectedStudent is Student => {
-    if (!selectedStudent) return false;
-    if (selectedStudent.status !== "Active") {
+  const validateSelectedInviteStudent = (
+    student: Student | null,
+  ): student is InviteEligibleStudent => {
+    if (!student) return false;
+    if (student.status !== "Active") {
       setActionError("Only Active students can receive Student Portal invitations.");
       return false;
     }
-    if (!selectedStudent.email) {
+    if (!student.email) {
       setActionError("Add an official email to this student before sending a portal invitation.");
       return false;
     }
@@ -144,7 +148,7 @@ export function StudentsClient() {
   };
 
   const handleInvite = async () => {
-    if (!validateSelectedInviteStudent()) return;
+    if (!validateSelectedInviteStudent(selectedStudent)) return;
     if (!confirm(`Send a student portal invitation to ${selectedStudent.email}?`)) return;
     setInviting(true);
     setActionError(null);
@@ -152,7 +156,7 @@ export function StudentsClient() {
     try {
       await authApi.createAccount({
         name: selectedStudent.name,
-        email: selectedStudent.email!,
+        email: selectedStudent.email,
         role: "student",
       });
       setNotice(`Portal invitation sent to ${selectedStudent.email}.`);
@@ -164,7 +168,7 @@ export function StudentsClient() {
   };
 
   const handleResendInvite = async () => {
-    if (!validateSelectedInviteStudent()) return;
+    if (!validateSelectedInviteStudent(selectedStudent)) return;
     if (!confirm(`Resend the pending Student Portal invitation to ${selectedStudent.email}?`)) return;
     setResending(true);
     setActionError(null);
