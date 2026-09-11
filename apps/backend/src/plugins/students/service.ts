@@ -10,7 +10,6 @@ import type {
 import { prisma } from "../../core/db/prisma.ts";
 import {
   canonicalStudentDisplayName,
-  normalizeNameWhitespace,
   normalizeStudentProfileNameFields,
 } from "./name.ts";
 
