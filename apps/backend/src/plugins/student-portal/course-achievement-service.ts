@@ -14,21 +14,23 @@ type AttendanceCounts = Record<AttendanceStatus, number> & {
   PermissionPending: number;
 };
 
-type AttendanceProgress = {
+type AttendanceHealthSummary = {
   offeringId: string;
-  totalSessions: number;
-  markedSessions: number;
-  attendanceRate: number | null;
-  counts: AttendanceCounts;
+  history: {
+    totalSessions: number;
+    markedSessions: number;
+    attendanceRate: number | null;
+    counts: AttendanceCounts;
+  };
   sessions: PortalCourseAttendanceSummary["sessions"];
 };
 
 interface OfferingsAchievementReadContract {
-  studentAttendanceProgress: {
-    forStudentOfferings(
+  studentAttendanceHistory: {
+    healthForStudentOfferings(
       studentId: string,
       offeringIds: string[],
-    ): Promise<AttendanceProgress[]>;
+    ): Promise<AttendanceHealthSummary[]>;
   };
 }
 
@@ -226,10 +228,11 @@ export const courseAchievementService = {
 
     const offeringIds = enrollments.map((enrollment) => enrollment.offeringId);
     const offerings = registry.get<OfferingsAchievementReadContract>("offerings").service;
-    const attendance = await offerings.studentAttendanceProgress.forStudentOfferings(
-      student.id,
-      offeringIds,
-    );
+    const attendance =
+      await offerings.studentAttendanceHistory.healthForStudentOfferings(
+        student.id,
+        offeringIds,
+      );
     const attendanceByOffering = new Map(
       attendance.map((summary) => [summary.offeringId, summary]),
     );
@@ -254,16 +257,16 @@ export const courseAchievementService = {
         );
       }
 
-      const progress = attendanceByOffering.get(enrollment.offeringId);
+      const attendanceSummary = attendanceByOffering.get(enrollment.offeringId);
       return deriveCourseAchievementSummary({
         offeringId: enrollment.offeringId,
-        counts: progress?.counts,
-        attendance: progress
+        counts: attendanceSummary?.history.counts,
+        attendance: attendanceSummary
           ? {
-              totalSessions: progress.totalSessions,
-              markedSessions: progress.markedSessions,
-              attendanceRate: progress.attendanceRate,
-              sessions: progress.sessions,
+              totalSessions: attendanceSummary.history.totalSessions,
+              markedSessions: attendanceSummary.history.markedSessions,
+              attendanceRate: attendanceSummary.history.attendanceRate,
+              sessions: attendanceSummary.sessions,
             }
           : undefined,
         finalizedGrade,
