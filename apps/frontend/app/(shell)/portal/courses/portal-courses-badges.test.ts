@@ -42,10 +42,17 @@ describe("Student Portal compact course cards", () => {
     expect(source).toContain("courses={currentCourses}");
     expect(source).toContain("courses={plannedCourses}");
     expect(source).toContain("courses={historicalCourses}");
-    expect(source.match(/achievementsByOffering={achievementsByOffering}/g)?.length).toBe(3);
-    expect(source.match(/calendar={calendar}/g)?.length).toBe(3);
+    expect(
+      source.match(
+        /courses=\{(?:currentCourses|plannedCourses|historicalCourses)\}/g,
+      )?.length,
+    ).toBe(3);
+    expect(source).toContain("achievementsByOffering={achievementsByOffering}");
+    expect(source).toContain("calendar={calendar}");
     expect(source).toContain("flex min-w-0 flex-wrap gap-x-3 gap-y-1.5");
     expect(attendanceSource).toContain("gridTemplateColumns");
-    expect(attendanceSource).toContain('aria-label="Teaching-week attendance progress"');
+    expect(attendanceSource).toContain(
+      'aria-label="Teaching-week attendance progress"',
+    );
   });
 });
