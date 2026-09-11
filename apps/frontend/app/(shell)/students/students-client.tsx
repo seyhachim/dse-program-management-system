@@ -18,6 +18,10 @@ import { ApiError } from "@/lib/api";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { StudentForm, type StudentFormValues } from "./student-form";
 import { authApi, useMe } from "@/lib/auth";
+import {
+  canToggleStudentActive,
+  studentPortalProvisioningBlocker,
+} from "./student-portal-eligibility";
 
 const PAGE_SIZE = 50;
 
@@ -128,11 +132,13 @@ export function StudentsClient() {
   const selectedStudent = selectedIds.length === 1
     ? rows.find((row) => row.id === selectedIds[0]) ?? null
     : null;
+  const portalProvisioningBlocker = studentPortalProvisioningBlocker(selectedStudent);
 
   const handleInvite = async () => {
     if (!selectedStudent) return;
-    if (!selectedStudent.email) {
-      setActionError("Add an official email to this student before sending a portal invitation.");
+    const blocker = studentPortalProvisioningBlocker(selectedStudent);
+    if (blocker || !selectedStudent.email) {
+      setActionError(blocker ?? "Add an institutional email before provisioning portal access.");
       return;
     }
     if (!confirm(`Send a student portal invitation to ${selectedStudent.email}?`)) return;
@@ -172,11 +178,11 @@ export function StudentsClient() {
   const columns: DataTableColumn<Student>[] = [
     { key: "name", header: "Name", render: (s) => <span className="font-medium">{s.name}</span> },
     {
-    key: "studentId",
-    header: "Student ID",
-    render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
-  },
-  { key: "category", header: "Category", render: (s) => s.category },
+      key: "studentId",
+      header: "Student ID",
+      render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
+    },
+    { key: "category", header: "Category", render: (s) => s.category },
     {
       key: "email",
       header: "Email",
@@ -190,13 +196,18 @@ export function StudentsClient() {
     {
       key: "active",
       header: "Active",
-      render: (s) => (
-        <Switch
-          checked={s.status === "Active"}
-          onCheckedChange={(checked) => handleToggleStatus(s, checked)}
-          aria-label={`Toggle ${s.name} active`}
-        />
-      ),
+      render: (s) => {
+        const canToggleActive = canToggleStudentActive(s);
+        return (
+          <Switch
+            checked={s.status === "Active"}
+            disabled={!canToggleActive}
+            title={canToggleActive ? undefined : "Add official Student ID first"}
+            onCheckedChange={(checked) => handleToggleStatus(s, checked)}
+            aria-label={`Toggle ${s.name} active`}
+          />
+        );
+      },
     },
   ];
 
@@ -226,13 +237,11 @@ export function StudentsClient() {
       {me?.permissions.includes("accounts:create") ? (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
           <p className="text-sm text-muted-foreground">
-            {selectedStudent && !selectedStudent.email
-              ? "This roster record has no official email yet. Add one before provisioning portal access."
-              : "Select one student with an official email to provision their secure portal login."}
+            {portalProvisioningBlocker ?? "This student is ready for a secure portal invitation."}
           </p>
           <Button
             variant="outline"
-            disabled={!selectedStudent?.email || inviting}
+            disabled={Boolean(portalProvisioningBlocker) || inviting}
             onClick={handleInvite}
           >
             <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
