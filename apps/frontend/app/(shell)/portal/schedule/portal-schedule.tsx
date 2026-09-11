@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ClipboardCheck, Clock3, MapPin } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronDown,
+  ClipboardCheck,
+  Clock3,
+  MapPin,
+} from "lucide-react";
 import {
   academicSemesterLabel,
   formatAcademicDate,
@@ -11,6 +19,7 @@ import {
 } from "@/lib/academic-calendar";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { studentPortalApi } from "@/lib/student-portal";
+import { studentScheduleApi } from "@/lib/student-schedule";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "../mobile-student-portal-layout";
 import {
   EmptyState,
@@ -37,28 +46,50 @@ function lecturerInitials(name: string): string {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "L";
 }
 
+function impactKey(offeringId: string, meetingId: string, sessionDate: string): string {
+  return `${offeringId}:${meetingId}:${sessionDate}`;
+}
+
 export function PortalSchedule() {
+  const searchParams = useSearchParams();
+  const requestedDate = searchParams.get("date")?.trim() ?? "";
+  const requestedFocus = searchParams.get("focus")?.trim() ?? "";
   const load = useCallback(async () => {
-    const [courses, monitorAssignments, academicCalendar] = await Promise.all([
+    const [courses, monitorAssignments, academicCalendar, scheduleImpacts] = await Promise.all([
       studentPortalApi.courses(),
       monitorDeliveryApi.assignments(),
       studentPortalApi.academicCalendar(),
+      studentScheduleApi.impacts(),
     ]);
-    return { courses, monitorAssignments, academicCalendar };
+    return { courses, monitorAssignments, academicCalendar, scheduleImpacts };
   }, []);
   const { data, loading, error } = usePortalData(load);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [view, setView] = useState<"day" | "week">("day");
   const [now, setNow] = useState<Date | null>(null);
+  const [expandedImpactId, setExpandedImpactId] = useState<string | null>(null);
 
   useEffect(() => {
     const current = new Date();
-    setSelectedDate(normalizeTeachingDate(current));
+    const linkedDate = requestedDate ? parseLocalDateKey(requestedDate) : null;
+    setSelectedDate(normalizeTeachingDate(linkedDate ?? current));
+    setExpandedImpactId(requestedFocus || null);
+    if (linkedDate || requestedFocus) setView("day");
     setNow(current);
 
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [requestedDate, requestedFocus]);
+
+  useEffect(() => {
+    if (!requestedFocus || loading || !selectedDate) return;
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`schedule-impact-${requestedFocus}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loading, requestedFocus, selectedDate]);
 
   const dateOptions = useMemo(
     () => (selectedDate ? buildTeachingWeekDateOptions(selectedDate) : []),
@@ -72,6 +103,12 @@ export function PortalSchedule() {
 
   const monitorOfferingIds = new Set(
     data.monitorAssignments.map((assignment) => assignment.offeringId),
+  );
+  const impactsByKey = new Map(
+    data.scheduleImpacts.map((impact) => [
+      impactKey(impact.offeringId, impact.meetingId, impact.sessionDate),
+      impact,
+    ]),
   );
   const entries = data.courses.flatMap((course) =>
     course.meetings.map((meeting) => ({ course, meeting })),
@@ -131,29 +168,53 @@ export function PortalSchedule() {
     occurrenceDate: Date,
   ) => {
     const occurrenceDateKey = toLocalDateKey(occurrenceDate);
-    const current = now
+    const impact = impactsByKey.get(
+      impactKey(course.offeringId, meeting.id, occurrenceDateKey),
+    ) ?? null;
+    const displayStartTime = impact?.originalStartTime ?? meeting.startTime;
+    const displayEndTime = impact?.originalEndTime ?? meeting.endTime;
+    const current = !impact && now
       ? isMeetingInProgress(
           occurrenceDate,
           now,
-          meeting.startTime,
-          meeting.endTime,
+          displayStartTime,
+          displayEndTime,
         )
       : false;
     const lecturerName = course.lecturer?.name ?? "Lecturer TBA";
-    const canRecordDelivery = monitorOfferingIds.has(course.offeringId);
+    const canRecordDelivery = monitorOfferingIds.has(course.offeringId) && !impact;
+    const isImpactExpanded = impact?.occurrenceId === expandedImpactId;
     const courseLabel = `${course.code} ${course.title}, ${formatMeetingTime(
-      meeting.startTime,
-    )} to ${formatMeetingTime(meeting.endTime)}${
-      current ? ", happening now" : ""
+      displayStartTime,
+    )} to ${formatMeetingTime(displayEndTime)}${
+      impact ? ", schedule changed" : current ? ", happening now" : ""
     }`;
+    const originalDateLabel = occurrenceDate.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
 
     return (
       <article
+        id={impact ? `schedule-impact-${impact.occurrenceId}` : undefined}
         key={`${meeting.id}-${occurrenceDateKey}`}
         className={`${MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeeting} ${
           current ? MOBILE_STUDENT_PORTAL_LAYOUT.scheduleMeetingCurrent : ""
         }`}
       >
+        {impact ? (
+          <div className="mb-4 flex items-start gap-3 rounded-2xl border border-status-upcoming/30 bg-status-upcoming-bg p-3.5 text-status-upcoming">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Schedule changed</p>
+              <p className="mt-0.5 text-xs leading-5">
+                This class will not take place at the scheduled time.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         <Link
           href={`/portal/courses/${course.offeringId}`}
           aria-label={courseLabel}
@@ -170,11 +231,11 @@ export function PortalSchedule() {
             <div className="relative min-w-0 border-r border-border/80 pr-3 sm:pr-4">
               <Clock3 className="mb-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm font-semibold tabular-nums text-foreground">
-                {formatMeetingTime(meeting.startTime)}
+                {formatMeetingTime(displayStartTime)}
               </p>
               <div className="my-2 h-5 border-l border-dashed border-border" />
               <p className="text-xs font-medium tabular-nums text-muted-foreground">
-                {formatMeetingTime(meeting.endTime)}
+                {formatMeetingTime(displayEndTime)}
               </p>
             </div>
 
@@ -188,7 +249,14 @@ export function PortalSchedule() {
 
               <div className="mt-4 flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="break-words">{[meeting.building, meeting.room ? `Room ${meeting.room}` : null].filter(Boolean).join(" · ") || "Location TBA"}</span>
+                <span className="break-words">
+                  {[
+                    meeting.building,
+                    (impact?.originalRoom ?? meeting.room)
+                      ? `Room ${impact?.originalRoom ?? meeting.room}`
+                      : null,
+                  ].filter(Boolean).join(" · ") || "Location TBA"}
+                </span>
               </div>
 
               <div className="mt-3 flex min-w-0 items-center gap-2.5">
@@ -206,7 +274,64 @@ export function PortalSchedule() {
           </div>
         </Link>
 
-        {canRecordDelivery ? (
+        {impact ? (
+          <div className="mt-4 border-t border-border/80 pt-3">
+            <button
+              type="button"
+              aria-expanded={isImpactExpanded}
+              aria-controls={`schedule-impact-details-${impact.occurrenceId}`}
+              onClick={() =>
+                setExpandedImpactId(isImpactExpanded ? null : impact.occurrenceId)
+              }
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span>{isImpactExpanded ? "Hide schedule update" : "View schedule update"}</span>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform ${isImpactExpanded ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+
+            {isImpactExpanded ? (
+              <div
+                id={`schedule-impact-details-${impact.occurrenceId}`}
+                className="mt-3 space-y-4 rounded-2xl border border-border bg-muted/35 p-4"
+              >
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-status-upcoming">
+                    Class cancelled for this session
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-foreground">
+                    This class will not take place at the scheduled time.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-background p-3 ring-1 ring-border/70">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Original class
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {originalDateLabel} · {formatMeetingTime(impact.originalStartTime)}–{formatMeetingTime(impact.originalEndTime)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {impact.originalRoom ? `Room ${impact.originalRoom}` : "Room not set"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-background p-3 ring-1 ring-border/70">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Make-up or replacement class
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">Not scheduled yet</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      We’ll update this schedule when a new session is confirmed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : canRecordDelivery ? (
           <div className="mt-4 border-t border-border/80 pt-3">
             <Link
               href={`/portal/schedule/delivery?offeringId=${encodeURIComponent(

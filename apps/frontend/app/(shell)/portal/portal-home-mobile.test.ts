@@ -39,7 +39,7 @@ describe("Student Portal mobile home contract", () => {
   test("keeps schedule context as the primary home action", () => {
     const returnIndex = portalHomeSource.indexOf("return (");
     const nextClassLinkIndex = portalHomeSource.indexOf(
-      'href="/portal/schedule"',
+      "href={nextMeetingHref}",
       returnIndex,
     );
     const assessmentsIndex = portalHomeSource.indexOf("Upcoming work", returnIndex);
@@ -47,12 +47,25 @@ describe("Student Portal mobile home contract", () => {
     expect(nextClassLinkIndex).toBeGreaterThan(-1);
     expect(assessmentsIndex).toBeGreaterThan(-1);
     expect(nextClassLinkIndex).toBeLessThan(assessmentsIndex);
-    expect(portalHomeSource).toContain("nextScheduledMeeting(data.courses, now)");
+    expect(portalHomeSource).toContain("nextScheduledMeeting(data.courses, data.scheduleImpacts ?? [], now)");
     expect(portalHomeSource).toContain("nextMeeting.course.lecturer?.name");
     expect(portalHomeSource).toContain("View schedule");
     expect(portalHomeSource).toContain("Time");
     expect(portalHomeSource).toContain("Room");
     expect(portalHomeSource).toContain("Lecturer");
+  });
+
+  test("makes approved leave unmistakable and deep-links to the exact occurrence", () => {
+    expect(portalHomeSource).toContain("studentScheduleApi.impacts()");
+    expect(portalHomeSource).toContain('"Schedule changed"');
+    expect(portalHomeSource).toContain("Class cancelled for this session");
+    expect(portalHomeSource).toContain("This class will not take place at the scheduled time.");
+    expect(portalHomeSource).toContain("View schedule update");
+    expect(portalHomeSource).toContain("date=${encodeURIComponent(nextMeeting.impact.sessionDate)}");
+    expect(portalHomeSource).toContain("focus=${encodeURIComponent(nextMeeting.impact.occurrenceId)}");
+    expect(portalHomeSource).not.toContain("confidentialReason");
+    expect(portalHomeSource).not.toContain("reviewComment");
+    expect(portalHomeSource).not.toContain("attachmentRef");
   });
 
   test("omits lecturer-created sections when there is no data", () => {
