@@ -1,13 +1,19 @@
+import type { OpenTeachingSlotStudentAssignment } from "@dse-pms/shared-types";
 import { Router } from "express";
 import { registry } from "../../core/plugins/registry.ts";
-import type { OfferingsService } from "../offerings/index.ts";
 import { requireTelegramSession } from "./session.ts";
+
+type OpenTeachingSlotReadContract = {
+  openTeachingSlots: {
+    studentAssignments(userId: string): Promise<OpenTeachingSlotStudentAssignment[]>;
+  };
+};
 
 export function createTelegramOpenTeachingSlotRouter(): Router {
   const router = Router();
   router.get("/mini/open-slot-assignments", requireTelegramSession, async (req, res) => {
     try {
-      const offerings = registry.get<OfferingsService>("offerings").service;
+      const offerings = registry.get<OpenTeachingSlotReadContract>("offerings").service;
       res.json(await offerings.openTeachingSlots.studentAssignments(req.telegramUser!.id));
     } catch (error) {
       const name = error instanceof Error ? error.constructor.name : "";
