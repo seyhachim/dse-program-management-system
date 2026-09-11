@@ -1,11 +1,19 @@
 import { Router } from "express";
-import { CreateTelegramDestinationInput } from "@dse-pms/shared-types";
+import { TelegramDestinationChatTypeSchema } from "@dse-pms/shared-types";
 import { z } from "zod";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { telegramDestinationErrorStatus } from "./destination-service.ts";
 import { telegramDestinationSectionService } from "./destination-section-service.ts";
 
 const ProgrammeQuery = z.object({ programmeId: z.string().trim().min(1).optional() });
+const ClassSectionDestinationCreateRequestSchema = z.object({
+  programmeId: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).max(120),
+  audienceType: z.literal("CLASS_SECTION"),
+  scopeId: z.string().trim().min(1),
+  purpose: z.string().trim().max(500).optional(),
+  chatType: TelegramDestinationChatTypeSchema.default("SUPERGROUP"),
+}).strict();
 
 export function createTelegramDestinationSectionRouter(): Router {
   const router = Router();
@@ -24,11 +32,8 @@ export function createTelegramDestinationSectionRouter(): Router {
   });
 
   router.post("/destinations/class-section", async (req, res) => {
-    const parsed = CreateTelegramDestinationInput.safeParse(req.body);
+    const parsed = ClassSectionDestinationCreateRequestSchema.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
-    if (parsed.data.audienceType !== "CLASS_SECTION") {
-      return void res.status(400).json({ error: "This endpoint only creates CLASS_SECTION destinations" });
-    }
     try {
       res.status(201).json(await telegramDestinationSectionService.create(req.user!, parsed.data));
     } catch (error) {
