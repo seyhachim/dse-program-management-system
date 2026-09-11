@@ -4,15 +4,10 @@ import { useCallback, useState } from "react";
 import {
   BookOpen,
   CalendarDays,
-  ExternalLink,
-  FileCheck2,
   MessageSquareText,
   UserRound,
 } from "lucide-react";
-import type {
-  CourseFeedbackInput,
-  PortalCourseDetail,
-} from "@dse-pms/shared-types";
+import type { CourseFeedbackInput } from "@dse-pms/shared-types";
 import {
   Button,
   Dialog,
@@ -25,12 +20,9 @@ import {
   TabsList,
   TabsTrigger,
 } from "@dse-pms/ui";
-import {
-  assessmentDeadline,
-  meetingLabel,
-  studentPortalApi,
-} from "@/lib/student-portal";
+import { meetingLabel, studentPortalApi } from "@/lib/student-portal";
 import { PortalError, PortalLoading, usePortalData } from "../../portal-state";
+import { PortalCourseAttendance } from "./portal-course-attendance";
 
 export function PortalCourse({ offeringId }: { offeringId: string }) {
   const load = useCallback(
@@ -46,10 +38,10 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5">
       <section className="rounded-2xl border border-border bg-card p-5 md:p-6">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 {data.code}
@@ -61,10 +53,12 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
                 {data.term}
               </span>
             </div>
-            <h2 className="mt-3 text-2xl font-bold">{data.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              {data.description || "No course description has been published."}
-            </p>
+            <h2 className="mt-3 break-words text-2xl font-bold">{data.title}</h2>
+            {data.description ? (
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                {data.description}
+              </p>
+            ) : null}
           </div>
           <Button
             variant="outline"
@@ -77,11 +71,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
         </div>
 
         <div className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Info
-            icon={UserRound}
-            label="Lecturer"
-            value={data.lecturer?.name ?? "TBA"}
-          />
+          <Info icon={UserRound} label="Lecturer" value={data.lecturer?.name ?? "TBA"} />
           <Info
             icon={CalendarDays}
             label="Schedule"
@@ -95,210 +85,81 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
         </div>
       </section>
 
-      {!data.specAvailable ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          Course learning details are not available yet. Please check again after
-          they are published.
-        </div>
-      ) : (
-        <Tabs defaultValue="overview">
-          <TabsList className="max-w-full overflow-x-auto">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="learning">Learning</TabsTrigger>
-            <TabsTrigger value="assessments">Assessments</TabsTrigger>
-            <TabsTrigger value="results">Results</TabsTrigger>
-            <TabsTrigger value="resources">Resources</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="overview">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="weekly-notes">Weekly Notes</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="overview" className="mt-4 space-y-4">
-            <Card title="Class schedule">
-              {data.meetings.length ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {data.meetings.map((meeting) => (
-                    <div
-                      key={meeting.id}
-                      className="rounded-xl bg-muted/50 p-4"
-                    >
-                      <p className="font-medium">{meeting.activityType}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {meetingLabel(meeting)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {meeting.room || "Room TBA"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Muted>No schedule has been published.</Muted>
-              )}
-            </Card>
-            <Card title="Teaching team">
-              <p className="font-medium">
-                {data.lecturer?.name ?? "Primary lecturer TBA"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {data.lecturer?.email}
-              </p>
-              {data.coLecturers.length ? (
-                <p className="mt-3 text-sm">
-                  Co-lecturers: {data.coLecturers.map((item) => item.name).join(", ")}
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <Card title="Class schedule">
+            {data.meetings.length ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {data.meetings.map((meeting) => (
+                  <div key={meeting.id} className="rounded-xl bg-muted/50 p-4">
+                    <p className="font-medium">{meeting.activityType}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {meetingLabel(meeting)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {meeting.room || "Room TBA"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Muted>No schedule has been published.</Muted>
+            )}
+          </Card>
+
+          <Card title="Teaching team">
+            <div className="space-y-3">
+              <div>
+                <p className="font-medium">
+                  {data.lecturer?.name ?? "Primary lecturer TBA"}
                 </p>
-              ) : null}
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="learning" className="mt-4 space-y-4">
-            <Card title="Weekly topics">
-              <div className="space-y-3">
-                {data.weeks.map((week) => (
-                  <div
-                    key={week.id}
-                    className="flex gap-4 rounded-xl bg-muted/40 p-4"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                      {week.week}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="break-words font-medium">
-                        {week.topic || "Topic to be announced"}
-                      </p>
-                      {week.learningOutcomes.length ? (
-                        <p className="mt-1 break-words text-sm text-muted-foreground">
-                          {week.learningOutcomes.join(" · ")}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="assessments" className="mt-4">
-            <Card title="Assessment plan">
-              <div className="space-y-3">
-                {data.assessments.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-border p-4"
-                  >
-                    <div className="flex flex-col justify-between gap-2 sm:flex-row">
-                      <div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs font-semibold uppercase text-primary">
-                            {item.type}
-                          </span>
-                          <span className="text-xs capitalize text-muted-foreground">
-                            {item.mode}
-                          </span>
-                        </div>
-                        <h4 className="mt-1 font-semibold">{item.name}</h4>
-                      </div>
-                      <div className="text-sm sm:text-right">
-                        <p className="font-semibold">
-                          {item.weight === null ? "Weight TBA" : `${item.weight}%`}
-                        </p>
-                        <p className="text-muted-foreground">
-                          {assessmentDeadline(item.dueAt, item.dueWeek)}
-                        </p>
-                      </div>
-                    </div>
-                    {item.description ? (
-                      <p className="mt-3 text-sm text-muted-foreground">
-                        {item.description}
-                      </p>
-                    ) : null}
-                    {item.instructions ? (
-                      <div className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">
-                        <span className="font-medium">Instructions:</span>{" "}
-                        {item.instructions}
-                      </div>
-                    ) : null}
-                    <AssessmentRubric assessment={item} />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="results" className="mt-4 space-y-4">
-            <Card title="Published results">
-              <div className="space-y-2">
-                {data.assessments
-                  .filter((item) => item.result)
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-col justify-between gap-3 rounded-xl bg-muted/40 p-4 sm:flex-row sm:items-center"
-                    >
-                      <div>
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.result?.feedback || "No written feedback"}
-                        </p>
-                        {item.result?.weightedCourseContribution !== null &&
-                        item.result?.weightedCourseContribution !== undefined ? (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Weighted course contribution:{" "}
-                            <span className="font-semibold text-foreground">
-                              {item.result.weightedCourseContribution.toFixed(2)} points
-                            </span>{" "}
-                            of {item.courseGradeWeight ?? 0}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="sm:text-right">
-                        <p className="text-lg font-bold">
-                          {item.result?.score}/{item.result?.maxScore}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Raw score · {item.result?.percentage}%
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                {!data.assessments.some((item) => item.result) ? (
-                  <Muted>No results have been published.</Muted>
+                {data.lecturer?.email ? (
+                  <p className="text-sm text-muted-foreground">{data.lecturer.email}</p>
                 ) : null}
               </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="resources" className="mt-4">
-            <Card title="Learning resources">
-              <div className="grid gap-3 md:grid-cols-2">
-                {data.resources.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.url || undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-xl border border-border p-4 transition hover:border-primary/40"
-                  >
-                    <div className="flex items-start justify-between">
-                      <FileCheck2 className="h-5 w-5 text-primary" />
-                      {item.url ? (
-                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                      ) : null}
-                    </div>
-                    <p className="mt-3 font-medium">
-                      {item.title || item.resourceType}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {item.resourceType}
-                      {item.notes ? ` · ${item.notes}` : ""}
-                    </p>
-                  </a>
-                ))}
-              </div>
-              {!data.resources.length ? (
-                <Muted>No learning resources have been published.</Muted>
+              {data.coLecturers.length ? (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Co-lecturers
+                  </p>
+                  <div className="mt-1 space-y-1">
+                    {data.coLecturers.map((lecturer) => (
+                      <p key={lecturer.id} className="text-sm">
+                        {lecturer.name}
+                      </p>
+                    ))}
+                  </div>
+                </div>
               ) : null}
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
+            </div>
+          </Card>
+
+          {!data.specAvailable ? (
+            <p className="rounded-xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+              More course details will be available when they are published.
+            </p>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="attendance" className="mt-4">
+          <PortalCourseAttendance offeringId={offeringId} />
+        </TabsContent>
+
+        <TabsContent value="weekly-notes" className="mt-4">
+          <Card title="Weekly Notes">
+            <Muted>
+              Weekly learning history will appear here when class delivery records are
+              available.
+            </Muted>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <FeedbackDialog
         open={feedbackOpen}
@@ -320,27 +181,21 @@ function Info({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="rounded-lg bg-primary/10 p-2 text-primary">
+    <div className="flex min-w-0 items-center gap-3">
+      <span className="shrink-0 rounded-lg bg-primary/10 p-2 text-primary">
         <Icon className="h-4 w-4" />
       </span>
-      <div>
+      <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium">{value}</p>
+        <p className="break-words text-sm font-medium">{value}</p>
       </div>
     </div>
   );
 }
 
-function Card({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <h3 className="mb-4 text-base font-semibold">{title}</h3>
       {children}
     </section>
@@ -349,46 +204,6 @@ function Card({
 
 function Muted({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-muted-foreground">{children}</p>;
-}
-
-function AssessmentRubric({
-  assessment,
-}: {
-  assessment: PortalCourseDetail["assessments"][number];
-}) {
-  if (!assessment.rubricName) return null;
-  const criteria = assessment.rubricCriteria ?? [];
-
-  return (
-    <details className="mt-3 rounded-lg border border-border p-3">
-      <summary className="cursor-pointer text-sm font-medium">
-        Rubric: {assessment.rubricName}
-      </summary>
-      <div className="mt-3 space-y-2">
-        {criteria.length ? (
-          criteria.map((criterion) => (
-            <div key={criterion.id} className="rounded bg-muted/40 p-3">
-              <p className="text-sm font-medium">{criterion.name}</p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {criterion.levels.map((level) => (
-                  <span
-                    key={level.id}
-                    className="rounded bg-background px-2 py-1 text-xs"
-                  >
-                    {level.label} · {level.points} pts
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Rubric criteria are not available yet.
-          </p>
-        )}
-      </div>
-    </details>
-  );
 }
 
 function FeedbackDialog({
@@ -422,9 +237,7 @@ function FeedbackDialog({
       onSubmitted();
       onOpenChange(false);
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Could not submit feedback",
-      );
+      setError(reason instanceof Error ? reason.message : "Could not submit feedback");
     } finally {
       setSaving(false);
     }
@@ -436,8 +249,8 @@ function FeedbackDialog({
         <DialogHeader>
           <DialogTitle>Anonymous course feedback</DialogTitle>
           <DialogDescription>
-            Your identity is not stored with this response. One response is
-            allowed per course section.
+            Your identity is not stored with this response. One response is allowed per
+            course section.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
@@ -449,16 +262,12 @@ function FeedbackDialog({
           <Rating
             label="Teaching clarity"
             value={values.teachingClarityRating}
-            onChange={(value) =>
-              setValues({ ...values, teachingClarityRating: value })
-            }
+            onChange={(value) => setValues({ ...values, teachingClarityRating: value })}
           />
           <Rating
             label="Assessment clarity"
             value={values.assessmentClarityRating}
-            onChange={(value) =>
-              setValues({ ...values, assessmentClarityRating: value })
-            }
+            onChange={(value) => setValues({ ...values, assessmentClarityRating: value })}
           />
           <label className="block text-sm font-medium">
             Workload
@@ -497,7 +306,7 @@ function FeedbackDialog({
               }
             />
           </label>
-          {error ? <p className="text-sm text-status-live">{error}</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button className="w-full" disabled={saving}>
             {saving ? "Submitting…" : "Submit anonymous feedback"}
           </Button>
