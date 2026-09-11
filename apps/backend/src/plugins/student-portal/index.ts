@@ -10,15 +10,15 @@ import { createStudentPortalRouter } from "./router.ts";
 import { createStudentScheduleImpactRouter } from "./schedule-impact-router.ts";
 import { studentScheduleImpactProjectionService } from "./schedule-impact-service.ts";
 import { studentPortalService } from "./service.ts";
+import { createStudentAttendanceRouter } from "./student-attendance-router.ts";
+import { studentPortalAttendanceService } from "./student-attendance-service.ts";
 
 const router = Router();
-// Public portfolio is intentionally mounted outside the authenticated Student Portal
-// subrouter. It has its own privacy-filtered DTO and never reuses authenticated payloads.
 router.use("/portfolio/public", createStudentPortfolioPublicRouter());
 
-// Existing Student Portal keeps its global requireAuth boundary inside this child router.
 router.use(createStudentScheduleImpactRouter());
 router.use(createStudentPortalRouter());
+router.use(createStudentAttendanceRouter());
 router.use("/portfolio", createStudentPortfolioRouter());
 router.use("/portfolio/evidence", createStudentPortfolioEvidenceRouter());
 router.use("/portfolio", createStudentPortfolioCompleteRouter());
@@ -26,6 +26,7 @@ router.use("/portfolio", createStudentPortfolioCompleteRouter());
 export const studentPortalPluginService = {
   ...studentPortalService,
   scheduleImpacts: studentScheduleImpactProjectionService,
+  attendance: studentPortalAttendanceService,
   parentProjection: parentAcademicProjectionService,
 };
 
