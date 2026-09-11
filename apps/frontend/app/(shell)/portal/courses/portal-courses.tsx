@@ -140,28 +140,36 @@ function CourseSection({
 }
 
 export function PortalCourses() {
-  const load = useCallback(async () => {
-    const [courses, courseAchievements, monitorAssignments] = await Promise.all([
-      studentPortalApi.courses(),
+  const load = useCallback(() => studentPortalApi.courses(), []);
+  const loadCourseAchievements = useCallback(
+    () =>
       studentPortalApi
         .courseAchievements()
         .catch((): PortalCourseAchievementSummary[] => []),
+    [],
+  );
+  const loadMonitorAssignments = useCallback(
+    () =>
       monitorDeliveryApi
         .assignments()
         .catch((): MonitorClassResponsibilityView[] => []),
-    ]);
-    return { courses, courseAchievements, monitorAssignments };
-  }, []);
-  const { data, loading, error } = useCachedPortalData(
-    "courses-with-achievements",
-    load,
+    [],
+  );
+  const { data, loading, error } = useCachedPortalData("courses", load);
+  const { data: courseAchievements } = useCachedPortalData(
+    "course-achievements",
+    loadCourseAchievements,
+  );
+  const { data: monitorAssignments } = useCachedPortalData(
+    "monitor-assignments",
+    loadMonitorAssignments,
   );
 
   if (loading) return <PortalLoading />;
   if (error || !data) {
     return <PortalError message={error ?? "Could not load courses"} />;
   }
-  if (!data.courses.length) {
+  if (!data.length) {
     return (
       <EmptyState
         title="No enrolled courses"
@@ -171,14 +179,17 @@ export function PortalCourses() {
   }
 
   const achievementsByOffering = new Map(
-    data.courseAchievements.map((summary) => [summary.offeringId, summary]),
+    (courseAchievements ?? []).map((summary) => [summary.offeringId, summary]),
   );
   const monitorRolesByOffering = new Map(
-    data.monitorAssignments.map((assignment) => [assignment.offeringId, assignment.role]),
+    (monitorAssignments ?? []).map((assignment) => [
+      assignment.offeringId,
+      assignment.role,
+    ]),
   );
-  const currentCourses = data.courses.filter((course) => course.lifecycle === "current");
-  const plannedCourses = data.courses.filter((course) => course.lifecycle === "planned");
-  const historicalCourses = data.courses.filter(
+  const currentCourses = data.filter((course) => course.lifecycle === "current");
+  const plannedCourses = data.filter((course) => course.lifecycle === "planned");
+  const historicalCourses = data.filter(
     (course) => course.lifecycle === "historical",
   );
 
