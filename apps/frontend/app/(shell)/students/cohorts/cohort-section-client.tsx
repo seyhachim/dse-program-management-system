@@ -56,7 +56,7 @@ export function CohortSectionClient() {
     setSections(sectionRows);
     setMembers(memberRows);
     setHistory(historyRows);
-    setSectionId((current) => activeSections.some((item) => item.id === current) ? current : sectionRows.find((item) => item.active)?.id ?? "");
+    setSectionId((current) => sectionRows.some((item) => item.id === current && item.active) ? current : sectionRows.find((item) => item.active)?.id ?? "");
     setStudentId((current) => memberRows.some((item) => item.studentId === current && !item.currentSectionMembership) ? current : memberRows.find((item) => !item.currentSectionMembership)?.studentId ?? "");
   }
 
