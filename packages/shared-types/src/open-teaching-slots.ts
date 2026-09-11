@@ -98,14 +98,5 @@ export type OpenTeachingSlotStudentAssignment = z.infer<typeof OpenTeachingSlotS
 export const OpenTeachingSlotClaimReviewResultSchema = z.object({
   claim: OpenTeachingSlotClaimViewSchema,
   changed: z.boolean(),
-  notifications: z.object({
-    claimant: z.enum(["sent", "missing", "failed", "duplicate"]),
-    students: z.object({
-      sent: z.number().int().nonnegative(),
-      failed: z.number().int().nonnegative(),
-      duplicate: z.number().int().nonnegative(),
-      missing: z.number().int().nonnegative(),
-    }).strict(),
-  }).strict(),
 }).strict();
 export type OpenTeachingSlotClaimReviewResult = z.infer<typeof OpenTeachingSlotClaimReviewResultSchema>;
