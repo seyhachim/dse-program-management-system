@@ -23,6 +23,18 @@ function achieved(
 }
 
 describe("Student Portal course achievement badges", () => {
+  test("publishes the stable five v1 badge labels in milestone order", () => {
+    const result = deriveCourseAchievementSummary({ offeringId: "offering-1" });
+
+    expect(result.badges.map(({ kind, title }) => ({ kind, title }))).toEqual([
+      { kind: "great_start", title: "Great Start" },
+      { kind: "reliable_learner", title: "Reliable Learner" },
+      { kind: "perfect_attendance", title: "Perfect Attendance" },
+      { kind: "strong_performance", title: "Strong Performance" },
+      { kind: "course_excellence", title: "Course Excellence" },
+    ]);
+  });
+
   test("Late counts as attendance while Excused is excluded from the motivational denominator", () => {
     const result = deriveCourseAchievementSummary({
       offeringId: "offering-1",
