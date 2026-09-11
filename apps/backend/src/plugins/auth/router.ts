@@ -13,7 +13,10 @@ import {
   ProgrammeRoleAssignmentError,
   ProvisioningError,
 } from "./service.ts";
-import { resendLecturerInvitation } from "./resend-invitation.ts";
+import {
+  resendLecturerInvitation,
+  resendStudentInvitation,
+} from "./resend-invitation.ts";
 
 const ProgrammeRoleListQuery = z.object({
   programmeId: z.string().trim().min(1),
@@ -27,6 +30,10 @@ const ProgrammeRoleDeleteRequest = z.object({
 
 const AccountUserIdParam = z.object({
   userId: z.string().uuid(),
+});
+
+const StudentIdParam = z.object({
+  studentId: z.string().uuid(),
 });
 
 function canManageProgrammeRoles(user: AuthUser, programmeId: string): boolean {
@@ -80,6 +87,27 @@ export function createAuthRouter(): Router {
           return;
         }
         res.status(500).json({ error: "Could not resend invitation" });
+      }
+    },
+  );
+
+  router.post(
+    "/students/:studentId/resend-invitation",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = StudentIdParam.safeParse(req.params);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid student id" });
+        return;
+      }
+      try {
+        res.json(await resendStudentInvitation(parsed.data.studentId));
+      } catch (err) {
+        if (err instanceof ProvisioningError) {
+          res.status(409).json({ error: err.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not resend student portal invitation" });
       }
     },
   );
