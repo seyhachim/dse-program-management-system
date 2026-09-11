@@ -60,6 +60,34 @@ ALTER TABLE "StudentCohortSectionMembership"
   FOREIGN KEY ("studentId") REFERENCES "Student"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
+-- Prevent an authoritative cohort membership from being closed while the student
+-- still has an active section membership in that cohort. Staff must close the
+-- section membership explicitly first so section history never silently outlives
+-- its parent cohort membership.
+CREATE FUNCTION "prevent_cohort_exit_with_active_section"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD."exitedAt" IS NULL AND NEW."exitedAt" IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM "StudentCohortSectionMembership" section_membership
+    WHERE section_membership."cohortId" = OLD."cohortId"
+      AND section_membership."studentId" = OLD."studentId"
+      AND section_membership."exitedAt" IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Close the active cohort section membership before closing cohort membership'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "StudentCohortMembership_section_exit_guard"
+BEFORE UPDATE OF "exitedAt" ON "StudentCohortMembership"
+FOR EACH ROW
+EXECUTE FUNCTION "prevent_cohort_exit_with_active_section"();
+
 ALTER TABLE "StudentCohortSection" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "StudentCohortSectionMembership" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL PRIVILEGES ON TABLE "StudentCohortSection" FROM PUBLIC;
