@@ -9,8 +9,8 @@ import {
   OpenTeachingSlotConflictError,
   OpenTeachingSlotNotFoundError,
   OpenTeachingSlotValidationError,
-  openTeachingSlotService,
 } from "./open-teaching-slot-service.ts";
+import { openTeachingSlotWorkflowService } from "./open-teaching-slot-workflow-service.ts";
 
 export function createOpenTeachingSlotRouter(): Router {
   const router = Router();
@@ -18,7 +18,7 @@ export function createOpenTeachingSlotRouter(): Router {
 
   router.get("/open-teaching-slots", async (req, res) => {
     try {
-      res.json(await openTeachingSlotService.board(req.user!));
+      res.json(await openTeachingSlotWorkflowService.board(req.user!));
     } catch (error) {
       handleOpenSlotError(error, res);
     }
@@ -26,7 +26,7 @@ export function createOpenTeachingSlotRouter(): Router {
 
   router.get("/open-teaching-slots/claims/mine", async (req, res) => {
     try {
-      res.json(await openTeachingSlotService.mine(req.user!));
+      res.json(await openTeachingSlotWorkflowService.mine(req.user!));
     } catch (error) {
       handleOpenSlotError(error, res);
     }
@@ -34,7 +34,7 @@ export function createOpenTeachingSlotRouter(): Router {
 
   router.get("/open-teaching-slots/review-queue", async (req, res) => {
     try {
-      res.json(await openTeachingSlotService.reviewQueue(req.user!));
+      res.json(await openTeachingSlotWorkflowService.reviewQueue(req.user!));
     } catch (error) {
       handleOpenSlotError(error, res);
     }
@@ -47,7 +47,7 @@ export function createOpenTeachingSlotRouter(): Router {
       return;
     }
     try {
-      res.status(201).json(await openTeachingSlotService.claim(req.user!, req.params.slotId!, parsed.data));
+      res.status(201).json(await openTeachingSlotWorkflowService.claim(req.user!, req.params.slotId!, parsed.data));
     } catch (error) {
       handleOpenSlotError(error, res);
     }
@@ -55,7 +55,7 @@ export function createOpenTeachingSlotRouter(): Router {
 
   router.post("/open-teaching-slots/claims/:claimId/withdraw", async (req, res) => {
     try {
-      res.json(await openTeachingSlotService.withdraw(req.user!, req.params.claimId!));
+      res.json(await openTeachingSlotWorkflowService.withdraw(req.user!, req.params.claimId!));
     } catch (error) {
       handleOpenSlotError(error, res);
     }
@@ -68,7 +68,7 @@ export function createOpenTeachingSlotRouter(): Router {
       return;
     }
     try {
-      res.json(await openTeachingSlotService.review(req.user!, req.params.claimId!, parsed.data));
+      res.json(await openTeachingSlotWorkflowService.review(req.user!, req.params.claimId!, parsed.data));
     } catch (error) {
       handleOpenSlotError(error, res);
     }
