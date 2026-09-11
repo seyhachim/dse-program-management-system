@@ -20,6 +20,15 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
   });
 
+  test("shows active monitor responsibilities as non-blocking identity badges", () => {
+    expect(portalHomeSource).toContain("monitorDeliveryApi.assignments()");
+    expect(portalHomeSource).toContain("Class Monitor");
+    expect(portalHomeSource).toContain("Sub-class Monitor");
+    expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
+    expect(portalHomeSource).toContain("new Set(");
+    expect(portalHomeSource).toContain("catch((): MonitorClassResponsibilityView[] => [])");
+  });
+
   test("shows published-calendar teaching context without a CourseSpec dependency", () => {
     expect(portalHomeSource).toContain("resolveStudentTeachingContext(calendar, now)");
     expect(portalHomeSource).toContain('aria-label="Current teaching week"');
