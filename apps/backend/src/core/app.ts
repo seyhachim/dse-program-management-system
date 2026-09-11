@@ -18,6 +18,7 @@ import { guardianRelationshipsPlugin } from "../plugins/guardian-relationships/i
 import { qaPlugin } from "../plugins/qa/index.ts";
 import { telegramPlugin } from "../plugins/telegram/index.ts";
 import { communityPlugin } from "../plugins/community/index.ts";
+import { finalProjectPlugin } from "../plugins/final-project/index.ts";
 import { studentHandbookPlugin } from "../plugins/student-handbook/index.ts";
 
 /**
@@ -45,6 +46,7 @@ export function createApp(): Express {
   registry.register(qaPlugin);
   registry.register(telegramPlugin);
   registry.register(communityPlugin);
+  registry.register(finalProjectPlugin);
   registry.register(studentHandbookPlugin);
 
   const app = express();

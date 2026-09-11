@@ -5,6 +5,10 @@ const prisma = new PrismaClient();
 const EXPECTED_PUBLIC_TABLES = [
   "User",
   "UserSecurityAuditEvent",
+  "FinalProjectSupervisorProfile",
+  "FinalProjectResearchTrack",
+  "FinalProjectProjectIdea",
+  "FinalProjectSupervisorProfileAudit",
   "LecturerProfile",
   "Role",
   "Programme",
