@@ -12,11 +12,15 @@ describe("DSE Supabase invite email template", () => {
     expect(template).toContain('href="{{ .ConfirmationURL }}"');
   });
 
-  test("uses trusted invitation metadata for personalization and role-safe copy", () => {
+  test("uses trusted invitation metadata for personalized role-safe copy", () => {
     expect(template).toContain("{{ .Data.name }}");
     expect(template).toContain("{{ .Email }}");
     expect(template).toContain('{{ if eq .Data.role "lecturer" }}');
     expect(template).toContain("As a lecturer");
+    expect(template).toContain('{{ else if eq .Data.role "student" }}');
+    expect(template).toContain("As a student");
+    expect(template).toContain("Student Portal");
+    expect(template).toContain("published results");
     expect(template).toContain("available to your assigned role");
   });
 
