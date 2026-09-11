@@ -2,6 +2,7 @@ import type {
   AttendanceStatus,
   PortalCourseAchievementBadge,
   PortalCourseAchievementSummary,
+  PortalCourseAttendanceSummary,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
@@ -13,19 +14,21 @@ type AttendanceCounts = Record<AttendanceStatus, number> & {
   PermissionPending: number;
 };
 
-type AttendanceSummary = {
+type AttendanceProgress = {
   offeringId: string;
-  history: {
-    counts: AttendanceCounts;
-  };
+  totalSessions: number;
+  markedSessions: number;
+  attendanceRate: number | null;
+  counts: AttendanceCounts;
+  sessions: PortalCourseAttendanceSummary["sessions"];
 };
 
 interface OfferingsAchievementReadContract {
-  studentAttendanceHistory: {
-    healthForStudentOfferings(
+  studentAttendanceProgress: {
+    forStudentOfferings(
       studentId: string,
       offeringIds: string[],
-    ): Promise<AttendanceSummary[]>;
+    ): Promise<AttendanceProgress[]>;
   };
 }
 
@@ -35,6 +38,13 @@ const EMPTY_COUNTS: AttendanceCounts = {
   Late: 0,
   Excused: 0,
   PermissionPending: 0,
+};
+
+const EMPTY_ATTENDANCE: PortalCourseAttendanceSummary = {
+  totalSessions: 0,
+  markedSessions: 0,
+  attendanceRate: null,
+  sessions: [],
 };
 
 function roundedRate(value: number): number {
@@ -65,6 +75,7 @@ function badge(
 export function deriveCourseAchievementSummary(input: {
   offeringId: string;
   counts?: AttendanceCounts;
+  attendance?: PortalCourseAttendanceSummary;
   finalizedGrade?: Pick<CourseGradeSummary, "complete" | "totalGrade">;
 }): PortalCourseAchievementSummary {
   const counts = input.counts ?? EMPTY_COUNTS;
@@ -115,6 +126,7 @@ export function deriveCourseAchievementSummary(input: {
     eligibleAttendanceSessions,
     achievementAttendanceRate,
     finalizedCourseGrade,
+    attendance: input.attendance ?? EMPTY_ATTENDANCE,
     badges: [
       badge(
         "great_start",
@@ -214,7 +226,7 @@ export const courseAchievementService = {
 
     const offeringIds = enrollments.map((enrollment) => enrollment.offeringId);
     const offerings = registry.get<OfferingsAchievementReadContract>("offerings").service;
-    const attendance = await offerings.studentAttendanceHistory.healthForStudentOfferings(
+    const attendance = await offerings.studentAttendanceProgress.forStudentOfferings(
       student.id,
       offeringIds,
     );
@@ -242,9 +254,18 @@ export const courseAchievementService = {
         );
       }
 
+      const progress = attendanceByOffering.get(enrollment.offeringId);
       return deriveCourseAchievementSummary({
         offeringId: enrollment.offeringId,
-        counts: attendanceByOffering.get(enrollment.offeringId)?.history.counts,
+        counts: progress?.counts,
+        attendance: progress
+          ? {
+              totalSessions: progress.totalSessions,
+              markedSessions: progress.markedSessions,
+              attendanceRate: progress.attendanceRate,
+              sessions: progress.sessions,
+            }
+          : undefined,
         finalizedGrade,
       });
     });
