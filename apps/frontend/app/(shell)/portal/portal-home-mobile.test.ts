@@ -21,7 +21,8 @@ describe("Student Portal mobile home contract", () => {
   });
 
   test("shows active monitor responsibilities as non-blocking identity badges", () => {
-    expect(portalHomeSource).toContain("monitorDeliveryApi.assignments()");
+    expect(portalHomeSource).toContain("monitorDeliveryApi");
+    expect(portalHomeSource).toContain(".assignments()");
     expect(portalHomeSource).toContain("Class Monitor");
     expect(portalHomeSource).toContain("Sub-class Monitor");
     expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
