@@ -1,5 +1,6 @@
 import { Topbar } from "../../topbar";
 import { CohortMembershipClient } from "./cohort-membership-client";
+import { CohortSectionClient } from "./cohort-section-client";
 import { CohortPromotionClient } from "./cohort-promotion-client";
 
 export default function StudentCohortsPage() {
@@ -7,10 +8,11 @@ export default function StudentCohortsPage() {
     <>
       <Topbar
         title="Student Cohorts"
-        subtitle="Assign verified cohort membership and record programme-year progression without rewriting academic history"
+        subtitle="Manage verified cohort/section membership and programme-year progression without rewriting academic history"
       />
       <main className="flex-1 space-y-6 overflow-y-auto p-6">
         <CohortMembershipClient />
+        <CohortSectionClient />
         <CohortPromotionClient />
       </main>
     </>
