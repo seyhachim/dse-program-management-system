@@ -7,6 +7,8 @@ import { classResponsibilityService } from "./class-responsibility-service.ts";
 import { courseSectionPresenceService } from "./course-section-presence-service.ts";
 import { curriculumBoundOfferingService } from "./curriculum-bound-service.ts";
 import { createCurriculumBoundOfferingRouter } from "./curriculum-bound-router.ts";
+import { createOpenTeachingSlotRouter } from "./open-teaching-slot-router.ts";
+import { openTeachingSlotService } from "./open-teaching-slot-service.ts";
 import { portfolioTeachingEvidenceService } from "./portfolio-evidence-service.ts";
 import { createOfferingRouter } from "./router.ts";
 import { offeringService } from "./service.ts";
@@ -24,6 +26,7 @@ export const offeringsService = {
   attendance: attendanceService,
   studentAttendanceHistory: studentAttendanceHistoryService,
   studentScheduleImpacts: studentScheduleImpactService,
+  openTeachingSlots: openTeachingSlotService,
   classResponsibilities: classResponsibilityService,
   classDelivery: classDeliveryService,
   teachingSessionDelivery: teachingSessionDeliveryService,
@@ -37,6 +40,7 @@ const router = Router();
 // Static class-delivery and curriculum-bound workflow routes must be mounted
 // before the legacy /:id offering router so they are not treated as offering ids.
 router.use(createTeachingLeaveRouter());
+router.use(createOpenTeachingSlotRouter());
 router.use(createTeachingSessionDeliveryRouter());
 router.use(createCurriculumBoundOfferingRouter());
 router.use(createOfferingRouter());
