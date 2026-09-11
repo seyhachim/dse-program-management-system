@@ -24,11 +24,20 @@ export const UpdateSupervisorProfileInput = z.object({
 });
 export type UpdateSupervisorProfileInput = z.infer<typeof UpdateSupervisorProfileInput>;
 
+const OptionalBooleanQuery = z.preprocess(
+  (value) => {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return value;
+  },
+  z.boolean().optional(),
+);
+
 export const ListSupervisorDiscoveryQuery = z.object({
   programmeId: z.string().trim().min(1),
   q: z.string().trim().max(100).optional(),
   track: z.string().trim().max(100).optional(),
-  accepting: z.coerce.boolean().optional(),
+  accepting: OptionalBooleanQuery,
 });
 export type ListSupervisorDiscoveryQuery = z.infer<typeof ListSupervisorDiscoveryQuery>;
 
