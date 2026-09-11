@@ -5,6 +5,7 @@ import type {
   CreateAccountInput,
   ManageProgrammeRoleInput,
   ProgrammeRoleAssignmentView,
+  StudentStatus,
   TemporaryPasswordResponse,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
@@ -24,6 +25,36 @@ const accountSelect = {
 
 export class ProvisioningError extends Error {}
 export class ProgrammeRoleAssignmentError extends Error {}
+
+type StudentAccountProvisioningCandidate = {
+  studentId: string | null;
+  status: StudentStatus;
+  userId: string | null;
+};
+
+/**
+ * Student portal accounts are provisioned only after the canonical roster record
+ * has its official institutional ID and is explicitly Active. Keep this guard
+ * before any remote Supabase invite or local account write.
+ */
+export function assertStudentAccountProvisionable(
+  studentProfile: StudentAccountProvisioningCandidate | null,
+): void {
+  if (!studentProfile) {
+    throw new ProvisioningError(
+      "Create the student roster profile with this email before sending a portal invite",
+    );
+  }
+  if (!studentProfile.studentId) {
+    throw new ProvisioningError("Add the official Student ID before sending a portal invite");
+  }
+  if (studentProfile.status !== "Active") {
+    throw new ProvisioningError("Activate the student before sending a portal invite");
+  }
+  if (studentProfile.userId) {
+    throw new ProvisioningError("This student already has a linked portal account");
+  }
+}
 
 let adminClient: SupabaseClient | undefined;
 
@@ -91,15 +122,13 @@ export const authService = {
 
   async createAccount(input: CreateAccountInput) {
     const studentProfile = input.role === "student"
-      ? await prisma.student.findUnique({ where: { email: input.email } })
+      ? await prisma.student.findUnique({
+          where: { email: input.email },
+          select: { id: true, studentId: true, status: true, userId: true },
+        })
       : null;
-    if (input.role === "student" && !studentProfile) {
-      throw new ProvisioningError(
-        "Create the student roster profile with this email before sending a portal invite",
-      );
-    }
-    if (studentProfile?.userId) {
-      throw new ProvisioningError("This student already has a linked portal account");
+    if (input.role === "student") {
+      assertStudentAccountProvisionable(studentProfile);
     }
 
     const admin = getAdminClient();
