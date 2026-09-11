@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ClassDeliveryNoteSchema,
   LecturerArrivalConfirmationViewSchema,
+  LecturerArrivalStatusSchema,
   TeachingSessionOccurrenceViewSchema,
 } from "./class-delivery.ts";
 import { ClassResponsibilityRoleSchema } from "./class-responsibilities.ts";
@@ -25,6 +26,7 @@ export type TeachingSessionLearningSummary = z.infer<
 
 export const SaveTeachingSessionDeliveryInputSchema = z
   .object({
+    lecturerArrivalStatus: LecturerArrivalStatusSchema.nullable().default(null),
     classOccurred: z.boolean(),
     actualLecturerId: z.string().uuid().nullable().default(null),
     actualStartTime: TeachingSessionActualTimeSchema.nullable().default(null),
@@ -55,6 +57,13 @@ export const SaveTeachingSessionDeliveryInputSchema = z
           code: z.ZodIssueCode.custom,
           path: ["coverage"],
           message: "A class that did not occur must use NOT_COVERED",
+        });
+      }
+      if (value.learningSummary.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["learningSummary"],
+          message: "Learning summary must be empty when the class did not occur",
         });
       }
       return;
