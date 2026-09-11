@@ -130,12 +130,21 @@ export function StudentsClient() {
     ? rows.find((row) => row.id === selectedIds[0]) ?? null
     : null;
 
-  const handleInvite = async () => {
-    if (!selectedStudent) return;
+  const validateSelectedInviteStudent = (): selectedStudent is Student => {
+    if (!selectedStudent) return false;
+    if (selectedStudent.status !== "Active") {
+      setActionError("Only Active students can receive Student Portal invitations.");
+      return false;
+    }
     if (!selectedStudent.email) {
       setActionError("Add an official email to this student before sending a portal invitation.");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleInvite = async () => {
+    if (!validateSelectedInviteStudent()) return;
     if (!confirm(`Send a student portal invitation to ${selectedStudent.email}?`)) return;
     setInviting(true);
     setActionError(null);
@@ -143,7 +152,7 @@ export function StudentsClient() {
     try {
       await authApi.createAccount({
         name: selectedStudent.name,
-        email: selectedStudent.email,
+        email: selectedStudent.email!,
         role: "student",
       });
       setNotice(`Portal invitation sent to ${selectedStudent.email}.`);
@@ -155,11 +164,7 @@ export function StudentsClient() {
   };
 
   const handleResendInvite = async () => {
-    if (!selectedStudent) return;
-    if (!selectedStudent.email) {
-      setActionError("Add an official email to this student before resending a portal invitation.");
-      return;
-    }
+    if (!validateSelectedInviteStudent()) return;
     if (!confirm(`Resend the pending Student Portal invitation to ${selectedStudent.email}?`)) return;
     setResending(true);
     setActionError(null);
@@ -224,6 +229,9 @@ export function StudentsClient() {
   ];
 
   const inviteBusy = inviting || resending;
+  const selectedInviteEligible = Boolean(
+    selectedStudent?.email && selectedStudent.status === "Active",
+  );
 
   return (
     <div className="space-y-4">
@@ -251,23 +259,25 @@ export function StudentsClient() {
       {me?.permissions.includes("accounts:create") ? (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            {selectedStudent && !selectedStudent.email
-              ? "This roster record has no official email yet. Add one before provisioning portal access."
-              : selectedStudent
-                ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
-                : "Select one student with an official email to provision their secure portal login."}
+            {selectedStudent && selectedStudent.status !== "Active"
+              ? "Portal invitations are available only after the student is Active."
+              : selectedStudent && !selectedStudent.email
+                ? "This roster record has no official email yet. Add one before provisioning portal access."
+                : selectedStudent
+                  ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
+                  : "Select one Active student with an official email to provision their secure portal login."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
-              disabled={!selectedStudent?.email || inviteBusy}
+              disabled={!selectedInviteEligible || inviteBusy}
               onClick={handleInvite}
             >
               <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
             </Button>
             <Button
               variant="outline"
-              disabled={!selectedStudent?.email || inviteBusy}
+              disabled={!selectedInviteEligible || inviteBusy}
               onClick={handleResendInvite}
             >
               {resending ? "Resending…" : "Resend expired invite"}
