@@ -66,7 +66,7 @@ jobs:
         run: bun run seed
 
       - name: Verify monitor and sub-class-monitor delivery database integrity
-        run: bun test apps/backend/src/plugins/offerings/teaching-session-delivery-db.test.ts apps/backend/src/plugins/offerings/teaching-session-delivery-submonitor-db.test.ts
+        run: bun test apps/backend/src/plugins/offerings/teaching-session-delivery-db.test.ts apps/backend/src/plugins/offerings/teaching-session-delivery-submonitor-db.test.ts apps/backend/src/plugins/offerings/monitor-session-record-db.test.ts
 
       - name: Verify database security inventory and grants
         run: bun run --cwd apps/backend db:security:verify
