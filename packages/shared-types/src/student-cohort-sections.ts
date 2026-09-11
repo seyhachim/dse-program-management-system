@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const DateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const QueryBooleanSchema = z.preprocess(
+  (value) => value === "true" ? true : value === "false" ? false : value,
+  z.boolean(),
+);
 
 export const CreateStudentCohortSectionInput = z.object({
   cohortId: z.string().uuid(),
@@ -17,7 +21,7 @@ export type UpdateStudentCohortSectionInput = z.infer<typeof UpdateStudentCohort
 
 export const ListStudentCohortSectionsQuery = z.object({
   cohortId: z.string().uuid(),
-  activeOnly: z.coerce.boolean().optional().default(false),
+  activeOnly: QueryBooleanSchema.optional().default(false),
 });
 export type ListStudentCohortSectionsQuery = z.infer<typeof ListStudentCohortSectionsQuery>;
 
