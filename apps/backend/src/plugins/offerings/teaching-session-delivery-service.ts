@@ -335,7 +335,7 @@ function normalizedSnapshot(
     actualEndTime: input.actualEndTime,
     deliveredMinutes: teachingSessionDeliveredMinutes(input.actualStartTime, input.actualEndTime),
     actualTopic: input.actualTopic,
-    learningSummary: input.learningSummary,
+    learningSummary: input.learningSummary ?? "",
     coverage: input.coverage,
     note: input.note,
   };
