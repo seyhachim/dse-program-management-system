@@ -313,17 +313,17 @@ export function RollCallDialog({
               {current ? (
                 <>
                   <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <div className="mb-3 flex h-24 w-24 items-center justify-center rounded-full border border-border bg-muted text-3xl font-semibold text-foreground sm:h-28 sm:w-28 sm:text-4xl">
-                      {initials(current.studentName) || <UserRound className="h-10 w-10" />}
+                    <div className="mb-3 flex h-20 w-20 items-center justify-center rounded-full border border-border bg-muted text-2xl font-semibold text-foreground sm:h-24 sm:w-24 sm:text-3xl">
+                      {initials(current.studentName) || <UserRound className="h-9 w-9" />}
                     </div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Student {sequence.length === 0 ? 0 : index + 1} of {sequence.length}</p>
 
                     {current.studentKhmerName ? (
-                      <h3 lang="km" className="mt-3 max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-[3.5rem]">
+                      <h3 lang="km" className="mt-3 max-w-[min(1100px,94vw)] break-words text-6xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-7xl xl:text-8xl 2xl:text-9xl">
                         {current.studentKhmerName}
                       </h3>
                     ) : null}
-                    <h3 className={`${current.studentKhmerName ? "mt-1" : "mt-3"} max-w-4xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.5rem]`}>
+                    <h3 className={`${current.studentKhmerName ? "mt-1 text-5xl md:text-6xl xl:text-7xl 2xl:text-8xl" : "mt-3 text-6xl md:text-7xl xl:text-8xl 2xl:text-9xl"} max-w-[min(1100px,94vw)] break-words font-semibold leading-[1.05] tracking-tight text-foreground`}>
                       {current.studentName}
                     </h3>
 
