@@ -179,7 +179,7 @@ export interface PortalAnnouncement {
 }
 
 export interface StudentPortalHome {
-  student: { id: string; name: string; studentId: string; email: string };
+  student: { id: string; name: string; studentId: string | null; email: string };
   courses: PortalCourseSummary[];
   upcomingAssessments: Array<{
     offeringId: string;
