@@ -247,15 +247,37 @@ export function CourseAttendanceProgress({
   summary,
   calendar,
   term,
+  compact = false,
 }: {
   summary: PortalCourseAchievementSummary | null;
   calendar: StudentAcademicCalendarView;
   term: string;
+  compact?: boolean;
 }) {
   if (!summary) return null;
 
   const progress = buildCourseAttendanceWeeks({ summary, calendar, term });
   const rate = summary.attendance.attendanceRate;
+
+  if (compact) {
+    return (
+      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+        <span className="font-medium">
+          Attendance{" "}
+          <span className="font-semibold text-foreground">
+            {rate === null ? "Not recorded" : `${Math.round(rate)}%`}
+          </span>
+        </span>
+        {progress ? (
+          <span className="font-medium">
+            · {progress.currentWeek
+              ? `Week ${progress.currentWeek}/${progress.totalWeeks}`
+              : `${progress.totalWeeks} weeks`}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 rounded-2xl bg-muted/35 px-3 py-2.5 ring-1 ring-border/50">
