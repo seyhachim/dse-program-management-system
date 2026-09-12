@@ -1,6 +1,10 @@
 import { PrismaClient } from "@prisma/client";
 import { defaultProgrammeIdForRole, signToken } from "../src/core/auth/token.ts";
-import { assertDevAuthMode, parseStudentPersonaArgs } from "./dev-auth-cli.ts";
+import {
+  assertDevAuthMode,
+  assertDevTokenSigningConfigured,
+  parseStudentPersonaArgs,
+} from "./dev-auth-cli.ts";
 
 /**
  * Re-links an existing seeded Student fixture to a chosen local-dev User and
@@ -15,6 +19,7 @@ import { assertDevAuthMode, parseStudentPersonaArgs } from "./dev-auth-cli.ts";
  */
 async function main() {
   assertDevAuthMode(process.env.AUTH_MODE);
+  assertDevTokenSigningConfigured(process.env.JWT_SECRET);
   const { email, studentEmail } = parseStudentPersonaArgs(process.argv.slice(2));
   const prisma = new PrismaClient();
 
