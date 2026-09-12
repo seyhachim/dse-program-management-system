@@ -33,6 +33,12 @@ describe("Student Portal course achievement badges", () => {
       { kind: "strong_performance", title: "Strong Performance" },
       { kind: "course_excellence", title: "Course Excellence" },
     ]);
+    expect(result.attendance).toEqual({
+      totalSessions: 0,
+      markedSessions: 0,
+      attendanceRate: null,
+      sessions: [],
+    });
   });
 
   test("Late counts as attendance while Excused is excluded from the motivational denominator", () => {
@@ -45,6 +51,27 @@ describe("Student Portal course achievement badges", () => {
     expect(result.achievementAttendanceRate).toBe(100);
     expect(achieved(result, "great_start")).toBe(true);
     expect(achieved(result, "reliable_learner")).toBe(true);
+  });
+
+  test("keeps canonical attendance rate separate from motivational badge rate", () => {
+    const result = deriveCourseAchievementSummary({
+      offeringId: "offering-1",
+      counts: counts({ Present: 3, Late: 1, Excused: 1 }),
+      attendance: {
+        totalSessions: 5,
+        markedSessions: 5,
+        attendanceRate: 80,
+        sessions: [
+          { date: "2026-08-10", status: "Present", permissionPending: false },
+          { date: "2026-08-17", status: "Late", permissionPending: false },
+          { date: "2026-08-24", status: "Excused", permissionPending: false },
+        ],
+      },
+    });
+
+    expect(result.achievementAttendanceRate).toBe(100);
+    expect(result.attendance.attendanceRate).toBe(80);
+    expect(result.attendance.sessions[1]?.status).toBe("Late");
   });
 
   test("Absent counts against the badge rate and keeps Reliable Learner locked below 90 percent", () => {

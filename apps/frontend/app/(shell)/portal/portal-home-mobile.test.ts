@@ -28,22 +28,26 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
   });
 
-  test("shows active monitor responsibilities as non-blocking identity badges", () => {
+  test("shows active monitor responsibilities compactly beside the student name", () => {
     expect(portalHomeSource).toContain("monitorDeliveryApi");
     expect(portalHomeSource).toContain(".assignments()");
     expect(portalHomeSource).toContain("Class Monitor");
     expect(portalHomeSource).toContain("Sub-class Monitor");
     expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
+    expect(portalHomeSource).toContain("Crown");
+    expect(portalHomeSource).toContain("ShieldCheck");
+    expect(portalHomeSource).toContain("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5");
     expect(portalHomeSource).toContain("new Set(");
     expect(portalHomeSource).toContain("catch((): MonitorClassResponsibilityView[] => [])");
   });
 
-  test("loads course achievements as optional home metadata and scopes the role to the exact offering", () => {
+  test("loads course achievements as optional home metadata without repeating course role chips", () => {
     expect(portalHomeSource).toContain(".courseAchievements()");
     expect(portalHomeSource).toContain("catch((): PortalCourseAchievementSummary[] => [])");
     expect(portalHomeSource).toContain("summary.offeringId === nextMeeting.course.offeringId");
-    expect(portalHomeSource).toContain("assignment.offeringId === nextMeeting.course.offeringId");
-    expect(portalHomeSource).toContain("<CourseAchievementBadges");
+    expect(portalHomeSource).toContain("<CourseAchievementBadges summary={nextCourseAchievement} />");
+    expect(portalHomeSource).toContain("<CourseAttendanceProgress");
+    expect(portalHomeSource).not.toContain("nextCourseMonitorRole");
   });
 
   test("renders all five v1 achievement kinds with visible locked states", () => {
@@ -56,13 +60,7 @@ describe("Student Portal mobile home contract", () => {
     expect(courseBadgeSource).toContain("badge.achieved ? ACHIEVED_STYLES[badge.kind] : LOCKED_STYLE");
     expect(courseBadgeSource).toContain("<Lock");
     expect(courseBadgeSource).toContain('aria-label="Course achievement badges"');
-  });
-
-  test("keeps course role chips separate from achievement status", () => {
-    expect(courseBadgeSource).toContain('role === "ClassMonitor"');
-    expect(courseBadgeSource).toContain('"Class Monitor"');
-    expect(courseBadgeSource).toContain('"Sub-class Monitor"');
-    expect(courseBadgeSource).toContain("Course role:");
+    expect(courseBadgeSource).not.toContain("Course role:");
   });
 
   test("keeps the next-class card compact on phones", () => {

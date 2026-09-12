@@ -13,7 +13,7 @@ export const MOBILE_STUDENT_PORTAL_LAYOUT = {
     "group block min-h-11 rounded-[1.75rem] bg-muted/40 p-4 ring-1 ring-border/50 transition duration-200 hover:bg-muted/60 hover:ring-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5",
   compactCard: "rounded-2xl border border-border bg-card p-4 md:p-5",
   courseCard:
-    "group flex min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md md:min-h-64 md:p-5 md:hover:-translate-y-0.5",
+    "group flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.75rem] bg-card p-3.5 shadow-sm ring-1 ring-border/70 transition duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4",
   scheduleSurface: "mx-auto w-full max-w-3xl space-y-4 md:space-y-5",
   scheduleToolbar:
     "rounded-[1.75rem] border border-border/70 bg-muted/30 p-3 shadow-sm sm:p-4",

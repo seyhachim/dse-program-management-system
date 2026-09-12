@@ -2,6 +2,7 @@ import type {
   AttendanceStatus,
   PortalCourseAchievementBadge,
   PortalCourseAchievementSummary,
+  PortalCourseAttendanceSummary,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
@@ -13,11 +14,15 @@ type AttendanceCounts = Record<AttendanceStatus, number> & {
   PermissionPending: number;
 };
 
-type AttendanceSummary = {
+type AttendanceHealthSummary = {
   offeringId: string;
   history: {
+    totalSessions: number;
+    markedSessions: number;
+    attendanceRate: number | null;
     counts: AttendanceCounts;
   };
+  sessions: PortalCourseAttendanceSummary["sessions"];
 };
 
 interface OfferingsAchievementReadContract {
@@ -25,7 +30,7 @@ interface OfferingsAchievementReadContract {
     healthForStudentOfferings(
       studentId: string,
       offeringIds: string[],
-    ): Promise<AttendanceSummary[]>;
+    ): Promise<AttendanceHealthSummary[]>;
   };
 }
 
@@ -35,6 +40,13 @@ const EMPTY_COUNTS: AttendanceCounts = {
   Late: 0,
   Excused: 0,
   PermissionPending: 0,
+};
+
+const EMPTY_ATTENDANCE: PortalCourseAttendanceSummary = {
+  totalSessions: 0,
+  markedSessions: 0,
+  attendanceRate: null,
+  sessions: [],
 };
 
 function roundedRate(value: number): number {
@@ -65,6 +77,7 @@ function badge(
 export function deriveCourseAchievementSummary(input: {
   offeringId: string;
   counts?: AttendanceCounts;
+  attendance?: PortalCourseAttendanceSummary;
   finalizedGrade?: Pick<CourseGradeSummary, "complete" | "totalGrade">;
 }): PortalCourseAchievementSummary {
   const counts = input.counts ?? EMPTY_COUNTS;
@@ -115,6 +128,7 @@ export function deriveCourseAchievementSummary(input: {
     eligibleAttendanceSessions,
     achievementAttendanceRate,
     finalizedCourseGrade,
+    attendance: input.attendance ?? EMPTY_ATTENDANCE,
     badges: [
       badge(
         "great_start",
@@ -214,10 +228,11 @@ export const courseAchievementService = {
 
     const offeringIds = enrollments.map((enrollment) => enrollment.offeringId);
     const offerings = registry.get<OfferingsAchievementReadContract>("offerings").service;
-    const attendance = await offerings.studentAttendanceHistory.healthForStudentOfferings(
-      student.id,
-      offeringIds,
-    );
+    const attendance =
+      await offerings.studentAttendanceHistory.healthForStudentOfferings(
+        student.id,
+        offeringIds,
+      );
     const attendanceByOffering = new Map(
       attendance.map((summary) => [summary.offeringId, summary]),
     );
@@ -242,9 +257,18 @@ export const courseAchievementService = {
         );
       }
 
+      const attendanceSummary = attendanceByOffering.get(enrollment.offeringId);
       return deriveCourseAchievementSummary({
         offeringId: enrollment.offeringId,
-        counts: attendanceByOffering.get(enrollment.offeringId)?.history.counts,
+        counts: attendanceSummary?.history.counts,
+        attendance: attendanceSummary
+          ? {
+              totalSessions: attendanceSummary.history.totalSessions,
+              markedSessions: attendanceSummary.history.markedSessions,
+              attendanceRate: attendanceSummary.history.attendanceRate,
+              sessions: attendanceSummary.sessions,
+            }
+          : undefined,
         finalizedGrade,
       });
     });

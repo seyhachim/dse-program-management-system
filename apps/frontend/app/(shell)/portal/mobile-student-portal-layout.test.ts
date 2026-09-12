@@ -26,11 +26,14 @@ describe("mobile Student Portal layout", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeCalendar).toContain("min-h-11");
   });
 
-  test("course cards are compact on phones and restore desktop card height at md", () => {
+  test("course cards stay compact, modern, and viewport-safe", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("min-h-0");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("md:min-h-64");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("p-4");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("md:p-5");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("min-w-0");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("rounded-[1.75rem]");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("p-3.5");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("sm:p-4");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).toContain("shadow-sm");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.courseCard).not.toContain("md:min-h-64");
   });
 
   test("schedule fits a six-day touch strip and viewport-safe meeting cards", () => {

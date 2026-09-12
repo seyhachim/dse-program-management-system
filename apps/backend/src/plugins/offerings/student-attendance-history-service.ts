@@ -45,6 +45,11 @@ export type StudentAttendanceHealthSummary = {
     attendanceRate: number | null;
     counts: Record<AttendanceStatus, number> & { PermissionPending: number };
   };
+  sessions: Array<{
+    date: string;
+    status: AttendanceStatus | null;
+    permissionPending: boolean;
+  }>;
   health: ReturnType<typeof evaluateAttendanceHealth>["health"];
 };
 
@@ -83,16 +88,23 @@ export function summarizeStudentAttendanceHealthByOffering(
     const offeringSessions = sessionsByOffering.get(offeringId) ?? [];
     const counts = emptyCounts();
     const healthRecords: AttendanceHealthRecord[] = [];
+    const safeSessions: StudentAttendanceHealthSummary["sessions"] = [];
 
     for (const session of offeringSessions) {
       const record = recordBySession.get(session.id);
       const date = session.sessionDate.toISOString().slice(0, 10);
+      const permissionPending = !record && pendingSessionIds.has(session.id);
       if (record) {
         counts[record.status] += 1;
         healthRecords.push({ sessionId: session.id, date, status: record.status });
-      } else if (pendingSessionIds.has(session.id)) {
+      } else if (permissionPending) {
         counts.PermissionPending += 1;
       }
+      safeSessions.push({
+        date,
+        status: record?.status ?? null,
+        permissionPending,
+      });
     }
 
     const markedSessions = counts.Present + counts.Absent + counts.Late + counts.Excused;
@@ -108,6 +120,7 @@ export function summarizeStudentAttendanceHealthByOffering(
           : Math.round((attended / markedSessions) * 10_000) / 100,
         counts,
       },
+      sessions: safeSessions,
       health,
     };
   });
