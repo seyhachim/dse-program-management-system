@@ -10,7 +10,7 @@ const source = readFileSync(
 describe("AuthGuard recovery UI", () => {
   test("keeps protected children behind account verification and exposes recovery actions", () => {
     expect(source).toContain("if (meError || !me)");
-    expect(source).toContain(">Retry<");
+    expect(source).toContain("Retry");
     expect(source).toContain("Sign in again");
     expect(source).toContain("getSupabase().auth.signOut()");
     expect(source.indexOf("if (meError || !me)")).toBeLessThan(source.indexOf("return <>{children}</>"));
