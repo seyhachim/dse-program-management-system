@@ -345,7 +345,16 @@ async function assertNoScheduleConflict(
         { lecturerId: claimantId },
         { coLecturers: { some: { lecturerId: claimantId } } },
         { enrollments: { some: { studentId: { in: studentIds } } } },
-        ...(slot.scheduledRoom ? [{ meetings: { some: { room: slot.scheduledRoom } } }] : []),
+        ...(slot.scheduledRoom ? [{
+          meetings: {
+            some: {
+              dayOfWeek: slot.scheduledDayOfWeek as never,
+              startTime: { lt: slot.scheduledEndTime },
+              endTime: { gt: slot.scheduledStartTime },
+              room: slot.scheduledRoom,
+            },
+          },
+        }] : []),
       ],
     },
     include: { meetings: true },
@@ -354,12 +363,7 @@ async function assertNoScheduleConflict(
     meeting.id !== slot.sourceMeetingId &&
     meeting.dayOfWeek === slot.scheduledDayOfWeek &&
     meeting.startTime < slot.scheduledEndTime &&
-    meeting.endTime > slot.scheduledStartTime &&
-    (
-      offering.lecturerId === claimantId ||
-      Boolean(slot.scheduledRoom && meeting.room === slot.scheduledRoom) ||
-      offering.id !== slot.sourceOfferingId
-    )
+    meeting.endTime > slot.scheduledStartTime
   ));
   if (recurringConflict) {
     throw new OpenTeachingSlotConflictError("This slot conflicts with an existing lecturer, class, or room schedule");
