@@ -1,9 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-import { signToken, type Role } from "../src/core/auth/token.ts";
+import { signToken } from "../src/core/auth/token.ts";
+import { parseGenTokenArgs } from "./dev-auth-cli.ts";
 
 /**
  * Mints a dev JWT for a seeded user of the given role. Usage:
  *   bun run gen-token --role admin
+ *   bun run gen-token --role student --email developer@example.com
  *   bun run gen-token             # defaults to admin
  *
  * Paste the printed token into apps/frontend/.env.local as NEXT_PUBLIC_DEV_TOKEN.
@@ -11,31 +13,36 @@ import { signToken, type Role } from "../src/core/auth/token.ts";
  */
 const prisma = new PrismaClient();
 
-const ROLES: Role[] = ["admin", "program_coordinator", "program_secretary", "lecturer", "qa_reviewer", "student"];
-
-function parseRole(): Role {
-  const idx = process.argv.indexOf("--role");
-  const value = idx >= 0 ? process.argv[idx + 1] : "admin";
-  if (!ROLES.includes(value as Role)) {
-    console.error(`Invalid role "${value}". Use one of: ${ROLES.join(", ")}`);
-    process.exit(1);
-  }
-  return value as Role;
-}
-
 async function main() {
-  const role = parseRole();
+  const { role, email } = parseGenTokenArgs(process.argv.slice(2));
+  const include = {
+    roleAssignments: {
+      where: { role: { slug: role } },
+      select: { programmeId: true },
+    },
+  } as const;
+
   // Query through the join table (issue #77 phase B is the enforcement source
-  // of truth now), not the legacy `role` enum column. programmeId comes along
-  // on the same row (issue #147) so the minted token carries real scope.
-  const user = await prisma.user.findFirst({
-    where: { roleAssignments: { some: { role: { slug: role } } } },
-    include: { roleAssignments: { where: { role: { slug: role } }, select: { programmeId: true } } },
-  });
+  // of truth now), not a token-only role override. When --email is supplied the
+  // requested user must already hold the requested DB role assignment.
+  const user = email
+    ? await prisma.user.findUnique({ where: { email }, include })
+    : await prisma.user.findFirst({
+        where: { roleAssignments: { some: { role: { slug: role } } } },
+        include,
+      });
+
   if (!user) {
-    console.error(`No seeded user with role "${role}". Run \`bun run seed\` first.`);
-    process.exit(1);
+    throw new Error(
+      email
+        ? `No user exists with email "${email}". Create/provision the dev persona first.`
+        : `No seeded user with role "${role}". Run \`bun run seed\` first.`,
+    );
   }
+  if (user.roleAssignments.length === 0) {
+    throw new Error(`User "${user.email}" does not hold the "${role}" role.`);
+  }
+
   const programmeId = user.roleAssignments[0]?.programmeId ?? null;
   const token = signToken({
     id: user.id,
@@ -51,7 +58,7 @@ async function main() {
 main()
   .then(() => prisma.$disconnect())
   .catch(async (err) => {
-    console.error(err);
+    console.error(err instanceof Error ? err.message : err);
     await prisma.$disconnect();
     process.exit(1);
   });
