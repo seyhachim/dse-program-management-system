@@ -327,10 +327,7 @@ export function PortalHome() {
                   {nextMeeting.course.code} · Class {nextMeeting.course.sectionCode}
                 </p>
 
-                <CourseAchievementBadges
-                  summary={nextCourseAchievement}
-                  showLocked={false}
-                />
+                <CourseAchievementBadges summary={nextCourseAchievement} />
                 <CourseAttendanceProgress
                   summary={nextCourseAchievement}
                   calendar={calendar}
@@ -350,43 +347,43 @@ export function PortalHome() {
 
                 <dl
                   aria-label="Class details"
-                  className="mt-3 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70 bg-muted/30 shadow-sm"
+                  className="mt-3 grid grid-cols-2 overflow-hidden rounded-2xl border border-border/70 bg-muted/30 shadow-sm"
                 >
-                  <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div className="col-span-2 flex min-w-0 items-center gap-2.5 border-b border-border/60 px-3 py-2.5">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <Clock3 className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
                       <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         {nextMeeting.impact ? "Original time" : "Time"}
                       </dt>
-                      <dd className="mt-0.5 break-words text-sm font-semibold text-foreground">
+                      <dd className="mt-0.5 break-words text-sm font-semibold leading-5 text-foreground">
                         {meetingLabel(nextMeeting.meeting)}
                       </dd>
                     </div>
                   </div>
-                  <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div className="flex min-w-0 items-start gap-2.5 border-r border-border/60 px-3 py-2.5">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <MapPin className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
                       <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         {nextMeeting.impact ? "Original room" : "Room"}
                       </dt>
-                      <dd className="mt-0.5 break-words text-sm font-semibold text-foreground">
+                      <dd className="mt-0.5 break-words text-[13px] font-semibold leading-5 text-foreground">
                         {nextMeeting.meeting.room || "Room TBA"}
                       </dd>
                     </div>
                   </div>
-                  <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div className="flex min-w-0 items-start gap-2.5 px-3 py-2.5">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <GraduationCap className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
                       <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         Lecturer
                       </dt>
-                      <dd className="mt-0.5 break-words text-sm font-semibold text-foreground">
+                      <dd className="mt-0.5 break-words text-[13px] font-semibold leading-5 text-foreground">
                         {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
                       </dd>
                     </div>
