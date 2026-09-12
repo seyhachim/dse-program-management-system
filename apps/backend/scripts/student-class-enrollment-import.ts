@@ -417,16 +417,8 @@ export async function planStudentClassEnrollmentImport(
           resolvedStudentIds.add(student.id);
         }
 
-        if (identity.studentId && student.status !== "Active") {
+        if (student.status !== "Active") {
           blockers.push(`${identityLabel} is '${student.status}', not Active`);
-        } else if (identity.studentEmail && student.status === "Inactive") {
-          blockers.push(`${identityLabel} is Inactive`);
-        } else if (identity.studentEmail && student.status === "Pending" && student.studentId !== null) {
-          warnings.push(`${identityLabel} is Pending even though an official Student ID already exists`);
-        }
-
-        if (identity.studentEmail && student.studentId === null && student.status !== "Pending") {
-          blockers.push(`${identityLabel} has no official Student ID but is not Pending`);
         }
 
         if (context.result.cohortId) {
