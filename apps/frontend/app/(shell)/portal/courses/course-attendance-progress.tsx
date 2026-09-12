@@ -58,6 +58,13 @@ function calendarDate(value: string): Date {
   return new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
 }
 
+function localDateKey(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function inclusiveDays(start: string, end: string): number {
   return Math.floor(
     (calendarDate(end).getTime() - calendarDate(start).getTime()) / DAY_MS,
@@ -193,8 +200,9 @@ export function buildCourseAttendanceWeeks(input: {
   const period = periodForCourse(calendar, term, summary.attendance.sessions);
   if (!period) return null;
 
+  const now = input.now ?? new Date();
   const totalWeeks = teachingWeekCountForAttendance(period);
-  const context = resolveStudentTeachingContext(calendar, input.now ?? new Date());
+  const context = resolveStudentTeachingContext(calendar, now);
   const currentWeek =
     context?.kind === "teaching" && context.semester === period.semester
       ? context.week
@@ -203,9 +211,7 @@ export function buildCourseAttendanceWeeks(input: {
         : context?.kind === "complete"
           ? totalWeeks
           : null;
-  const courseIsFuture =
-    (context?.kind === "upcoming" && context.semester === period.semester) ||
-    (context?.kind === "between" && context.nextSemester === period.semester);
+  const courseIsFuture = localDateKey(now) < period.teachingStart;
 
   const sessionsByWeek = new Map<
     number,
