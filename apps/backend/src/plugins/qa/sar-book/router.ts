@@ -1,6 +1,9 @@
 import { Router, type Response } from "express";
 import {
+  FinalizeQaSarBookReleaseSchema,
+  QaSarBookDocumentQuerySchema,
   QaSarBookQuerySchema,
+  QaSarBookReleaseQuerySchema,
   SaveQaSarBookSectionSchema,
   UpsertQaSarBookSectionAssignmentSchema,
 } from "@dse-pms/shared-types";
@@ -19,6 +22,13 @@ import {
   saveQaSarBookNarrativeSection,
   upsertQaSarBookSectionAssignment,
 } from "./narrative-service.ts";
+import {
+  QaSarBookReleaseNotReadyError,
+  buildQaSarBookDocument,
+  finalizeQaSarBookRelease,
+  getQaSarBookRelease,
+  listQaSarBookReleases,
+} from "./release-service.ts";
 import { getQaSarBook } from "./service.ts";
 
 export function canReadSarBook(
@@ -59,7 +69,8 @@ function sendError(res: Response, error: unknown): void {
   if (
     error instanceof QaSarScopeMismatchError ||
     error instanceof QaSarBookRevisionConflictError ||
-    error instanceof QaSarBookSectionAssigneeError
+    error instanceof QaSarBookSectionAssigneeError ||
+    error instanceof QaSarBookReleaseNotReadyError
   ) {
     res.status(409).json({ error: error.message });
     return;
@@ -91,6 +102,108 @@ export function createQaSarBookRouter(): Router {
 
       try {
         res.json(await getQaSarBook(parsed.data.programmeId, cycleId));
+      } catch (error) {
+        sendError(res, error);
+      }
+    },
+  );
+
+  router.get(
+    "/cycles/:cycleId/sar-book/document",
+    requirePermission("qa:read"),
+    async (req, res) => {
+      const cycleId = req.params.cycleId;
+      const parsed = QaSarBookDocumentQuerySchema.safeParse(req.query);
+      if (!cycleId || !parsed.success) {
+        res.status(400).json({
+          error: "Invalid SAR book document query",
+          details: parsed.success ? undefined : parsed.error.flatten(),
+        });
+        return;
+      }
+      if (!canReadSarBook(req.user!, parsed.data.programmeId)) {
+        res.status(403).json({ error: "You do not have access to this programme SAR book" });
+        return;
+      }
+      try {
+        res.json(await buildQaSarBookDocument(parsed.data.programmeId, cycleId, parsed.data.mode));
+      } catch (error) {
+        sendError(res, error);
+      }
+    },
+  );
+
+  router.get(
+    "/cycles/:cycleId/sar-book/releases",
+    requirePermission("qa:read"),
+    async (req, res) => {
+      const cycleId = req.params.cycleId;
+      const parsed = QaSarBookReleaseQuerySchema.safeParse(req.query);
+      if (!cycleId || !parsed.success) {
+        res.status(400).json({ error: "Invalid SAR book release query" });
+        return;
+      }
+      if (!canReadSarBook(req.user!, parsed.data.programmeId)) {
+        res.status(403).json({ error: "You do not have access to this programme SAR book" });
+        return;
+      }
+      try {
+        res.json(await listQaSarBookReleases(parsed.data.programmeId, cycleId));
+      } catch (error) {
+        sendError(res, error);
+      }
+    },
+  );
+
+  router.get(
+    "/cycles/:cycleId/sar-book/releases/:releaseId",
+    requirePermission("qa:read"),
+    async (req, res) => {
+      const cycleId = req.params.cycleId;
+      const releaseId = req.params.releaseId;
+      const parsed = QaSarBookReleaseQuerySchema.safeParse(req.query);
+      if (!cycleId || !releaseId || !parsed.success) {
+        res.status(400).json({ error: "Invalid SAR book release query" });
+        return;
+      }
+      if (!canReadSarBook(req.user!, parsed.data.programmeId)) {
+        res.status(403).json({ error: "You do not have access to this programme SAR book" });
+        return;
+      }
+      try {
+        res.json(await getQaSarBookRelease(parsed.data.programmeId, cycleId, releaseId));
+      } catch (error) {
+        sendError(res, error);
+      }
+    },
+  );
+
+  router.post(
+    "/cycles/:cycleId/sar-book/releases",
+    requirePermission("qa:manage"),
+    async (req, res) => {
+      const cycleId = req.params.cycleId;
+      const parsed = FinalizeQaSarBookReleaseSchema.safeParse(req.body);
+      if (!cycleId || !parsed.success) {
+        res.status(400).json({
+          error: "Invalid SAR book release request",
+          details: parsed.success ? undefined : parsed.error.flatten(),
+        });
+        return;
+      }
+      if (!canManageSarBook(req.user!, parsed.data.programmeId)) {
+        res.status(403).json({ error: "You cannot finalize SAR book releases for this programme" });
+        return;
+      }
+      try {
+        res.status(201).json(
+          await finalizeQaSarBookRelease(
+            parsed.data.programmeId,
+            cycleId,
+            req.user!.id,
+            parsed.data.title,
+          ),
+        );
       } catch (error) {
         sendError(res, error);
       }
