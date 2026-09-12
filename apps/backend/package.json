@@ -20,6 +20,7 @@
     "performance:http": "bun scripts/performance-benchmark.ts",
     "performance:db": "bun scripts/performance-db-latency.ts",
     "gen-token": "bun scripts/gen-token.ts",
+    "dev:student-persona": "bun scripts/dev-student-persona.ts",
     "test": "bun test"
   },
   "dependencies": {
