@@ -83,3 +83,4 @@ export * from "./action-research-pagination.ts";
 export * from "./community.ts";
 export * from "./community-plugin.ts";
 export * from "./student-handbook.ts";
+export * from "./resources.ts";
