@@ -20,7 +20,7 @@ describeDb("student class enrollment import database integrity", () => {
       `T1008-BLOCKED-${suffix}`,
       `T1008-ATOMIC-${suffix}`,
     ];
-    const provisionalEmail = `pending-class-${suffix}@rupp.edu.kh`;
+    const provisionalEmail = `active-provisional-${suffix}@rupp.edu.kh`;
 
     let cohortId: string | undefined;
     const courseIds: string[] = [];
@@ -125,8 +125,8 @@ describeDb("student class enrollment import database integrity", () => {
         data: {
           studentId: null,
           email: provisionalEmail,
-          name: "Issue 1011 Provisional Student",
-          status: "Pending",
+          name: "Issue 1032 Active Provisional Student",
+          status: "Active",
         },
         select: { id: true },
       });
@@ -136,12 +136,12 @@ describeDb("student class enrollment import database integrity", () => {
           cohortId: cohort.id,
           studentId: provisionalStudent.id,
           joinedAt: new Date("2024-11-01T00:00:00.000Z"),
-          note: "Issue #1011 provisional class database test",
+          note: "Issue #1032 active provisional class database test",
         },
       });
       const provisionalManifest = parseStudentClassEnrollmentImportDocument({
         schemaVersion: 1,
-        source: "issue-1011-provisional-class-db-test.json",
+        source: "issue-1032-active-provisional-class-db-test.json",
         programmeId: "dse",
         term,
         classes: [{
