@@ -53,3 +53,11 @@ export function assertDevAuthMode(authMode: string | undefined) {
     );
   }
 }
+
+export function assertDevTokenSigningConfigured(jwtSecret: string | undefined) {
+  if (!jwtSecret) {
+    throw new Error(
+      "JWT_SECRET must be configured before creating a dev student persona. No database changes were made.",
+    );
+  }
+}
