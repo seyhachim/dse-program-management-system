@@ -117,7 +117,7 @@ export function PortalSchedule() {
     return (
       <EmptyState
         title="No schedule available"
-        description="Class meetings will appear after your section timetable is published."
+        description="Class meetings will appear after your class timetable is published."
       />
     );
   }
@@ -244,7 +244,7 @@ export function PortalSchedule() {
                 {course.title}
               </p>
               <p className="mt-1 break-words text-xs font-medium text-muted-foreground">
-                {course.code} · Section {course.sectionCode} · {meeting.activityType}
+                {course.code} · Class {course.sectionCode} · {meeting.activityType}
               </p>
 
               <div className="mt-4 flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
