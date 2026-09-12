@@ -1,11 +1,13 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import {
+  FinalProjectEligibilityQuery,
   ListSupervisorDiscoveryQuery,
   ProgrammeSupervisorOverviewQuery,
   UpdateSupervisorProfileInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import {
+  canCheckStudentFinalProjectEligibility,
   canEditOwnSupervisorProfile,
   canManageSupervisorOverview,
   canReadSupervisorDiscovery,
@@ -15,6 +17,19 @@ import { finalProjectService, FinalProjectNotFoundError } from "./service.ts";
 export function createFinalProjectRouter(): Router {
   const router = Router();
   router.use(requireAuth);
+
+  router.get("/eligibility", async (req, res) => {
+    const parsed = FinalProjectEligibilityQuery.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+      return;
+    }
+    if (!canCheckStudentFinalProjectEligibility(req.user!, parsed.data.programmeId)) {
+      res.status(403).json({ error: "Final Project eligibility is available only to students in this programme" });
+      return;
+    }
+    res.json(await finalProjectService.studentEligibility(req.user!.id, parsed.data.programmeId));
+  });
 
   router.get("/supervisors", requireDiscoveryReader, async (req, res) => {
     const parsed = ListSupervisorDiscoveryQuery.safeParse(req.query);
@@ -85,17 +100,31 @@ function readProgrammeId(req: Request): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
-function requireDiscoveryReader(req: Request, res: Response, next: NextFunction): void {
+async function requireDiscoveryReader(req: Request, res: Response, next: NextFunction): Promise<void> {
   const programmeId = readProgrammeId(req);
   if (!programmeId) {
     res.status(400).json({ error: "programmeId is required" });
     return;
   }
-  if (canReadSupervisorDiscovery(req.user!, programmeId)) {
-    next();
-    return;
+
+  try {
+    if (canReadSupervisorDiscovery(req.user!, programmeId)) {
+      next();
+      return;
+    }
+
+    if (canCheckStudentFinalProjectEligibility(req.user!, programmeId)) {
+      const eligibility = await finalProjectService.studentEligibility(req.user!.id, programmeId);
+      if (canReadSupervisorDiscovery(req.user!, programmeId, eligibility.eligible)) {
+        next();
+        return;
+      }
+    }
+
+    res.status(403).json({ error: "Final Project discovery is not available for this student" });
+  } catch (error) {
+    next(error);
   }
-  res.status(403).json({ error: "Final Project discovery is not available for this programme" });
 }
 
 function requireLecturerOwner(req: Request, res: Response, next: NextFunction): void {
