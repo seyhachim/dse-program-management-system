@@ -51,7 +51,7 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
         userId: studentUser.id,
         name: "Portal MVP Student",
         email: studentUser.email,
-        studentId: `MVP-S-${suffix}`,
+        studentId: null,
         status: "Active",
       },
     });
@@ -80,6 +80,11 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
     });
 
     try {
+      const home = await studentPortalService.home(studentUser.id);
+      expect(home.student.id).toBe(student.id);
+      expect(home.student.studentId).toBeNull();
+      expect(home.student.email).toBe(studentUser.email);
+
       const courses = await studentPortalService.courses(studentUser.id);
       expect(courses.find((course) => course.offeringId === offering.id)?.lifecycle).toBe("current");
       expect(courses.find((course) => course.offeringId === historicalOffering.id)?.lifecycle).toBe("historical");
