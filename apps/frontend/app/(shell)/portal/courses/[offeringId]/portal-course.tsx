@@ -55,7 +55,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
                 {data.code}
               </span>
               <span className="rounded-lg bg-muted px-3 py-1 text-xs">
-                Section {data.sectionCode}
+                Class {data.sectionCode}
               </span>
               <span className="rounded-lg bg-muted px-3 py-1 text-xs">
                 {data.term}
@@ -437,7 +437,7 @@ function FeedbackDialog({
           <DialogTitle>Anonymous course feedback</DialogTitle>
           <DialogDescription>
             Your identity is not stored with this response. One response is
-            allowed per course section.
+            allowed per class.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
