@@ -68,7 +68,7 @@ type FixtureOptions = {
 
 async function createFixture(label: string, options: FixtureOptions = {}) {
   const date = options.date ?? "2099-09-14";
-  const room = options.room === undefined ? "306" : options.room;
+  const room = options.room === undefined ? `OS-${label}` : options.room;
   const sectionCode = options.sectionCode ?? "M1";
   const term = options.term ?? `2099-${label}`;
 
