@@ -252,7 +252,9 @@ export function PortalHome() {
               ) : null}
             </div>
             <p className="mt-1 truncate text-xs font-medium text-primary-foreground/70">
-              Student ID · {data.student.studentId}
+              {data.student.studentId
+                ? `Student ID · ${data.student.studentId}`
+                : "Pending ID"}
             </p>
           </div>
 
