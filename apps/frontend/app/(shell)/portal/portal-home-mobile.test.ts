@@ -32,7 +32,7 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
   });
 
-  test("shows active monitor responsibilities compactly beside the student name", () => {
+  test("right-aligns active monitor responsibilities beside the student name", () => {
     expect(portalHomeSource).toContain("monitorDeliveryApi");
     expect(portalHomeSource).toContain(".assignments()");
     expect(portalHomeSource).toContain("Class Monitor");
@@ -40,7 +40,15 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
     expect(portalHomeSource).toContain("Crown");
     expect(portalHomeSource).toContain("ShieldCheck");
-    expect(portalHomeSource).toContain("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5");
+    expect(portalHomeSource).toContain(
+      "mt-0.5 flex min-w-0 items-start justify-between gap-3",
+    );
+    expect(portalHomeSource).toContain(
+      "ml-auto flex max-w-[52%] shrink-0 flex-wrap justify-end gap-1.5",
+    );
+    expect(portalHomeSource).toContain(
+      "min-w-0 flex-1 break-words text-2xl font-semibold tracking-tight sm:text-3xl",
+    );
     expect(portalHomeSource).toContain("new Set(");
     expect(portalHomeSource).toContain("catch((): MonitorClassResponsibilityView[] => [])");
   });
@@ -117,12 +125,18 @@ describe("Student Portal mobile home contract", () => {
     expect(detailsSource).toContain('nextMeeting.course.lecturer?.name ?? "Lecturer TBA"');
   });
 
-  test("shows published-calendar teaching context without a CourseSpec dependency", () => {
+  test("shows active teaching context but hides the pre-semester starts-soon box", () => {
     expect(portalHomeSource).toContain("resolveStudentTeachingContext(calendar, now)");
     expect(portalHomeSource).toContain('aria-label="Current teaching week"');
+    expect(portalHomeSource).toContain(
+      'teachingContext && teachingContext.kind !== "upcoming"',
+    );
     expect(portalHomeSource).toContain("Week {teachingContext.week} of {teachingContext.totalWeeks}");
     expect(portalHomeSource).toContain("Semester break");
+    expect(portalHomeSource).toContain("Between semesters");
+    expect(portalHomeSource).toContain("Teaching period complete");
     expect(portalHomeSource).toContain("resumes");
+    expect(portalHomeSource).not.toContain("Teaching starts soon");
     expect(portalHomeSource).not.toContain("CourseSpec");
   });
 
