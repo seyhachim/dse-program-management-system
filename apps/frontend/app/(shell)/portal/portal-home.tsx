@@ -355,33 +355,50 @@ export function PortalHome() {
                   </div>
                 ) : null}
 
-                <div className="mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                  <span className="inline-flex min-w-0 items-center gap-1.5">
-                    <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="break-words">
-                      <span className="font-semibold text-foreground">
-                        {nextMeeting.impact ? "Original time" : "Time"}:
-                      </span>{" "}
-                      {meetingLabel(nextMeeting.meeting)}
+                <dl
+                  aria-label="Class details"
+                  className="mt-3 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70 bg-muted/30 shadow-sm"
+                >
+                  <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Clock3 className="h-4 w-4" aria-hidden="true" />
                     </span>
-                  </span>
-                  <span className="inline-flex min-w-0 items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="break-words">
-                      <span className="font-semibold text-foreground">
-                        {nextMeeting.impact ? "Original room" : "Room"}:
-                      </span>{" "}
-                      {nextMeeting.meeting.room || "Room TBA"}
+                    <div className="min-w-0">
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        {nextMeeting.impact ? "Original time" : "Time"}
+                      </dt>
+                      <dd className="mt-0.5 break-words text-sm font-semibold text-foreground">
+                        {meetingLabel(nextMeeting.meeting)}
+                      </dd>
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <MapPin className="h-4 w-4" aria-hidden="true" />
                     </span>
-                  </span>
-                  <span className="inline-flex min-w-0 basis-full items-center gap-1.5">
-                    <GraduationCap className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="min-w-0 break-words">
-                      <span className="font-semibold text-foreground">Lecturer:</span>{" "}
-                      {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
+                    <div className="min-w-0">
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        {nextMeeting.impact ? "Original room" : "Room"}
+                      </dt>
+                      <dd className="mt-0.5 break-words text-sm font-semibold text-foreground">
+                        {nextMeeting.meeting.room || "Room TBA"}
+                      </dd>
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <GraduationCap className="h-4 w-4" aria-hidden="true" />
                     </span>
-                  </span>
-                </div>
+                    <div className="min-w-0">
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        Lecturer
+                      </dt>
+                      <dd className="mt-0.5 break-words text-sm font-semibold text-foreground">
+                        {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
+                      </dd>
+                    </div>
+                  </div>
+                </dl>
               </>
             ) : (
               <>
