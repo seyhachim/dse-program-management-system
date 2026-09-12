@@ -90,9 +90,31 @@ describe("Student Portal mobile home contract", () => {
     expect(mobileLayoutSource).toContain("rounded-[1.75rem] bg-card p-3.5 shadow-md");
     expect(mobileLayoutSource).toContain("sm:p-4");
     expect(portalHomeSource).toContain("break-words text-xl font-semibold");
-    expect(portalHomeSource).toContain("mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1.5");
+    expect(portalHomeSource).toContain('aria-label="Class details"');
+    expect(portalHomeSource).toContain(
+      "mt-3 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70 bg-muted/30 shadow-sm",
+    );
+    expect(portalHomeSource).toContain(
+      "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary",
+    );
+    expect(portalHomeSource).not.toContain("mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1.5");
     expect(portalHomeSource).toContain("mt-3 flex min-h-10 items-center");
-    expect(portalHomeSource).not.toContain('className="mt-4 grid gap-2 sm:grid-cols-3"');
+  });
+
+  test("groups time, room, and lecturer into one semantic details panel", () => {
+    const detailsStart = portalHomeSource.indexOf('aria-label="Class details"');
+    const detailsEnd = portalHomeSource.indexOf("</dl>", detailsStart);
+    const detailsSource = portalHomeSource.slice(detailsStart, detailsEnd);
+
+    expect(detailsStart).toBeGreaterThan(-1);
+    expect(detailsEnd).toBeGreaterThan(detailsStart);
+    expect(detailsSource).toContain("<Clock3");
+    expect(detailsSource).toContain("<MapPin");
+    expect(detailsSource).toContain("<GraduationCap");
+    expect(detailsSource).toContain('nextMeeting.impact ? "Original time" : "Time"');
+    expect(detailsSource).toContain('nextMeeting.impact ? "Original room" : "Room"');
+    expect(detailsSource).toContain('nextMeeting.meeting.room || "Room TBA"');
+    expect(detailsSource).toContain('nextMeeting.course.lecturer?.name ?? "Lecturer TBA"');
   });
 
   test("shows published-calendar teaching context without a CourseSpec dependency", () => {
