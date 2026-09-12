@@ -109,6 +109,37 @@ describe("course attendance progress", () => {
     expect(progress?.weeks[5]?.state).toBe("future");
   });
 
+  test("marks a later semester as future even while the current semester is teaching", () => {
+    if (calendar.status !== "available") throw new Error("calendar fixture unavailable");
+    const fullYearCalendar: StudentAcademicCalendarView = {
+      ...calendar,
+      periods: [
+        ...calendar.periods,
+        {
+          id: "period-2",
+          calendarId: "calendar-1",
+          semester: "Second",
+          teachingStart: "2027-01-18",
+          teachingEnd: "2027-05-09",
+          examStart: "2027-05-10",
+          examEnd: "2027-05-16",
+          breakStart: null,
+          breakEnd: null,
+        },
+      ],
+    };
+
+    const progress = buildCourseAttendanceWeeks({
+      summary: summary([]),
+      calendar: fullYearCalendar,
+      term: "2026-2027-S2",
+      now: new Date(2026, 8, 9, 10, 0, 0),
+    });
+
+    expect(progress?.currentWeek).toBeNull();
+    expect(progress?.weeks.every((week) => week.state === "future")).toBe(true);
+  });
+
   test("does not invent week mapping for a historical academic year absent from the published calendar", () => {
     const progress = buildCourseAttendanceWeeks({
       summary: summary([]),
