@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { classifyLecturerEvidencePeriod } from "@dse-pms/shared-types";
 import type {
   CreateLecturerPortfolioItemInput,
   LecturerAunQaEvidenceExport,
@@ -332,6 +333,7 @@ export const lecturerPortfolioService = {
         employmentType: profile.professionalProfile?.employmentType ?? null,
         fieldOfSpecialization: profile.professionalProfile?.fieldOfSpecialization ?? null,
         yearsOfExperience: profile.professionalProfile?.yearsOfExperience ?? null,
+        programmeStartDate: profile.professionalProfile?.programmeStartDate ?? null,
       },
       evidence: [
         ...teaching.map((row) => ({
@@ -342,6 +344,7 @@ export const lecturerPortfolioService = {
           source: "PMS Offering",
           sourceEntityId: row.offeringId,
           verification: "authoritative_pms" as const,
+          periodContext: "during_dse" as const,
         })),
         ...items
           .filter((item) => item.verificationStatus !== "rejected")
@@ -355,9 +358,13 @@ export const lecturerPortfolioService = {
             verification: item.verificationStatus === "verified"
               ? "verified_professional" as const
               : "self_declared" as const,
+            periodContext: classifyLecturerEvidencePeriod(
+              item.startDate,
+              profile.professionalProfile?.programmeStartDate,
+            ),
           })),
       ],
-      note: "Read-only evidence projection. It does not create QA evidence, ratings, approvals, or alter academic records. Self-declared records remain clearly distinct from PMS-authoritative and verified professional evidence.",
+      note: "Read-only evidence projection. It does not create QA evidence, ratings, approvals, or alter academic records. Self-declared records remain clearly distinct from PMS-authoritative and verified professional evidence. DSE service-period context is derived from evidence dates and the lecturer programme start date; missing dates remain unclassified.",
     };
   },
 };

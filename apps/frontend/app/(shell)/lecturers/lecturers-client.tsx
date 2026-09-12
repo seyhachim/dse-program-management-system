@@ -7,6 +7,7 @@ import { Button, DataTable, StatusBadge, TableToolbar, type DataTableColumn } fr
 import { lecturersApi } from "@/lib/lecturers";
 import { authApi, useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { LecturerAvatar } from "@/components/lecturer-avatar";
 import { LecturerForm, type LecturerFormValues } from "./lecturer-form";
 
 interface TemporaryCredential {
@@ -149,15 +150,18 @@ export function LecturersClient() {
       key: "name",
       header: "Name",
       render: (l) => (
-        <div>
-          <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
-          {canWrite ? (
-            <div>
-              <Link href={`/lecturers/${l.id}/portfolio`} className="text-xs font-medium text-primary hover:underline">
-                Review portfolio evidence
-              </Link>
-            </div>
-          ) : null}
+        <div className="flex items-center gap-3">
+          <LecturerAvatar name={l.name} imageUrl={l.profileImageUrl} size="sm" />
+          <div>
+            <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
+            {canWrite ? (
+              <div>
+                <Link href={`/lecturers/${l.id}/portfolio`} className="text-xs font-medium text-primary hover:underline">
+                  Review portfolio evidence
+                </Link>
+              </div>
+            ) : null}
+          </div>
         </div>
       ),
     },

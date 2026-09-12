@@ -27,6 +27,7 @@ const lecturerSelect = {
   title: true,
   qualification: true,
   phone: true,
+  profileImageUrl: true,
 } as const;
 
 /** Richer self-profile select; professional metadata is not added to broad lecturer lists. */
@@ -38,6 +39,8 @@ const ownLecturerSelect = {
       employmentType: true,
       fieldOfSpecialization: true,
       yearsOfExperience: true,
+      shortBio: true,
+      programmeStartDate: true,
       legacyCoursesTaught: true,
     },
   },
@@ -66,7 +69,12 @@ function presentOwnLecturer(row: NonNullable<OwnLecturerRow>) {
   const { authId, lecturerProfile, ...lecturer } = row;
   return {
     ...lecturer,
-    professionalProfile: lecturerProfile,
+    professionalProfile: lecturerProfile
+      ? {
+          ...lecturerProfile,
+          programmeStartDate: lecturerProfile.programmeStartDate?.toISOString().slice(0, 10) ?? null,
+        }
+      : null,
     accountAccess: authId ? ("has_access" as const) : ("no_access" as const),
   };
 }
@@ -123,12 +131,21 @@ export const lecturerService = {
       employmentType,
       fieldOfSpecialization,
       yearsOfExperience,
+      shortBio,
+      programmeStartDate,
       ...userProfile
     } = input;
     const hasProfessionalUpdate =
       employmentType !== undefined ||
       fieldOfSpecialization !== undefined ||
-      yearsOfExperience !== undefined;
+      yearsOfExperience !== undefined ||
+      shortBio !== undefined ||
+      programmeStartDate !== undefined;
+    const programmeStartDateValue = programmeStartDate === undefined
+      ? undefined
+      : programmeStartDate
+        ? new Date(`${programmeStartDate}T00:00:00.000Z`)
+        : null;
 
     const row = await prisma.user.update({
       where: { id: userId },
@@ -142,11 +159,15 @@ export const lecturerService = {
                     employmentType,
                     fieldOfSpecialization,
                     yearsOfExperience,
+                    shortBio,
+                    programmeStartDate: programmeStartDateValue,
                   },
                   update: {
                     employmentType,
                     fieldOfSpecialization,
                     yearsOfExperience,
+                    shortBio,
+                    programmeStartDate: programmeStartDateValue,
                   },
                 },
               },
