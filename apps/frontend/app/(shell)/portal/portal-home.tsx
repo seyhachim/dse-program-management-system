@@ -327,70 +327,60 @@ export function PortalHome() {
 
             {nextMeeting ? (
               <>
-                <p className="mt-2.5 break-words text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
+                <p className="mt-2 break-words text-xl font-semibold leading-tight tracking-tight text-foreground sm:text-2xl">
                   {nextMeeting.course.title}
                 </p>
                 <p className="mt-1 break-words text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {nextMeeting.course.code} · Section {nextMeeting.course.sectionCode}
                 </p>
 
-                <CourseAchievementBadges summary={nextCourseAchievement} />
+                <CourseAchievementBadges
+                  summary={nextCourseAchievement}
+                  showLocked={false}
+                />
                 <CourseAttendanceProgress
                   summary={nextCourseAchievement}
                   calendar={calendar}
                   term={nextMeeting.course.term}
+                  compact
                 />
 
                 {nextMeeting.impact ? (
-                  <div className="mt-3 flex items-start gap-3 rounded-2xl border border-status-upcoming/30 bg-status-upcoming-bg p-3 text-status-upcoming">
-                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-                    <div className="min-w-0">
-                      <p className="font-semibold">Class cancelled for this session</p>
-                      <p className="mt-0.5 text-sm leading-5">
-                        This class will not take place at the scheduled time. Make-up details are not scheduled yet.
-                      </p>
-                    </div>
+                  <div className="mt-2.5 flex min-w-0 items-center gap-2 rounded-xl border border-status-upcoming/30 bg-status-upcoming-bg px-3 py-2 text-sm text-status-upcoming">
+                    <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <p className="min-w-0 break-words leading-5">
+                      <span className="font-semibold">Class cancelled for this session</span>
+                      <span className="text-status-upcoming/80"> · Make-up not scheduled yet.</span>
+                    </p>
                   </div>
                 ) : null}
 
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-2.5">
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
-                      <Clock3 className="h-4 w-4" aria-hidden="true" />
+                <div className="mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="break-words">
+                      <span className="font-semibold text-foreground">
+                        {nextMeeting.impact ? "Original time" : "Time"}:
+                      </span>{" "}
+                      {meetingLabel(nextMeeting.meeting)}
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {nextMeeting.impact ? "Original time" : "Time"}
-                      </p>
-                      <p className="mt-0.5 break-words text-sm font-medium text-foreground">
-                        {meetingLabel(nextMeeting.meeting)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-2.5">
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
-                      <MapPin className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="break-words">
+                      <span className="font-semibold text-foreground">
+                        {nextMeeting.impact ? "Original room" : "Room"}:
+                      </span>{" "}
+                      {nextMeeting.meeting.room || "Room TBA"}
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {nextMeeting.impact ? "Original room" : "Room"}
-                      </p>
-                      <p className="mt-0.5 break-words text-sm font-medium text-foreground">
-                        {nextMeeting.meeting.room || "Room TBA"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-2.5">
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
-                      <GraduationCap className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="inline-flex min-w-0 basis-full items-center gap-1.5">
+                    <GraduationCap className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="min-w-0 break-words">
+                      <span className="font-semibold text-foreground">Lecturer:</span>{" "}
+                      {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Lecturer</p>
-                      <p className="mt-0.5 break-words text-sm font-medium text-foreground">
-                        {nextMeeting.course.lecturer?.name ?? "Lecturer TBA"}
-                      </p>
-                    </div>
-                  </div>
+                  </span>
                 </div>
               </>
             ) : (
@@ -406,11 +396,11 @@ export function PortalHome() {
           </div>
         </div>
 
-        <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-3">
+        <div className="mt-3 flex min-h-10 items-center justify-between gap-3 border-t border-border/60 pt-2.5">
           <span className="text-sm font-semibold text-primary">
             {nextMeeting?.impact ? "View schedule update" : "View schedule"}
           </span>
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition group-hover:translate-x-0.5">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition group-hover:translate-x-0.5">
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </span>
         </div>

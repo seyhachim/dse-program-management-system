@@ -5,6 +5,8 @@ import type {
 } from "@dse-pms/shared-types";
 import {
   buildCourseAttendanceWeeks,
+  COURSE_ATTENDANCE_WEEK_COUNT,
+  teachingWeekCountForAttendance,
   teachingWeekForAttendanceDate,
 } from "./course-attendance-progress";
 
@@ -63,6 +65,40 @@ describe("course attendance progress", () => {
     expect(teachingWeekForAttendanceDate(period!, "2026-09-07")).toBe(5);
     expect(teachingWeekForAttendanceDate(period!, "2026-10-07")).toBeNull();
     expect(teachingWeekForAttendanceDate(period!, "2026-10-12")).toBe(9);
+  });
+
+  test("keeps the presentation at exactly 16 weeks when the published period spans extra buffer dates", () => {
+    if (calendar.status !== "available") throw new Error("calendar fixture unavailable");
+    const period = {
+      ...calendar.periods[0]!,
+      teachingStart: "2026-09-14",
+      teachingEnd: "2027-01-16",
+      examStart: "2027-01-18",
+      examEnd: "2027-01-30",
+      breakStart: null,
+      breakEnd: null,
+    };
+    const extendedCalendar: StudentAcademicCalendarView = {
+      ...calendar,
+      periods: [period],
+    };
+
+    expect(teachingWeekForAttendanceDate(period, "2027-01-16")).toBe(18);
+    expect(teachingWeekCountForAttendance(period)).toBe(
+      COURSE_ATTENDANCE_WEEK_COUNT,
+    );
+
+    const progress = buildCourseAttendanceWeeks({
+      summary: summary([]),
+      calendar: extendedCalendar,
+      term: "2026-2027-S1",
+      now: new Date(2026, 8, 12, 10, 0, 0),
+    });
+
+    expect(progress?.totalWeeks).toBe(16);
+    expect(progress?.weeks).toHaveLength(16);
+    expect(progress?.currentWeek).toBeNull();
+    expect(progress?.weeks.every((week) => week.state === "future")).toBe(true);
   });
 
   test("aggregates multiple sessions conservatively and keeps pending below finalized evidence", () => {

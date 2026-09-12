@@ -20,6 +20,8 @@ export interface CourseAttendanceWeek {
   current: boolean;
 }
 
+export const COURSE_ATTENDANCE_WEEK_COUNT = 16;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const STATE_PRIORITY: Record<
@@ -66,9 +68,11 @@ function localDateKey(value: Date): string {
 }
 
 function inclusiveDays(start: string, end: string): number {
-  return Math.floor(
-    (calendarDate(end).getTime() - calendarDate(start).getTime()) / DAY_MS,
-  ) + 1;
+  return (
+    Math.floor(
+      (calendarDate(end).getTime() - calendarDate(start).getTime()) / DAY_MS,
+    ) + 1
+  );
 }
 
 function overlapDays(
@@ -108,16 +112,16 @@ export function teachingWeekForAttendanceDate(
 }
 
 export function teachingWeekCountForAttendance(
-  period: AcademicCalendarPeriodView,
+  _period: AcademicCalendarPeriodView,
 ): number {
-  const totalDays = inclusiveDays(period.teachingStart, period.teachingEnd);
-  const breakDays = overlapDays(
-    period.teachingStart,
-    period.teachingEnd,
-    period.breakStart,
-    period.breakEnd,
-  );
-  return Math.max(1, Math.ceil((totalDays - breakDays) / 7));
+  // DSE course attendance is presented as the agreed 16 teaching weeks.
+  // The published calendar can span extra buffer dates without creating
+  // additional course-attendance milestones.
+  return COURSE_ATTENDANCE_WEEK_COUNT;
+}
+
+function clampAttendanceWeek(week: number): number {
+  return Math.min(COURSE_ATTENDANCE_WEEK_COUNT, Math.max(1, week));
 }
 
 function semesterFromTerm(term: string): "First" | "Second" | null {
@@ -205,9 +209,9 @@ export function buildCourseAttendanceWeeks(input: {
   const context = resolveStudentTeachingContext(calendar, now);
   const currentWeek =
     context?.kind === "teaching" && context.semester === period.semester
-      ? context.week
+      ? clampAttendanceWeek(context.week)
       : context?.kind === "break" && context.semester === period.semester
-        ? Math.max(1, context.nextWeek - 1)
+        ? clampAttendanceWeek(context.nextWeek - 1)
         : context?.kind === "complete"
           ? totalWeeks
           : null;
@@ -243,19 +247,79 @@ export function buildCourseAttendanceWeeks(input: {
   return { weeks, currentWeek, totalWeeks };
 }
 
+function AttendanceWeekStrip({
+  progress,
+  compact,
+}: {
+  progress: NonNullable<ReturnType<typeof buildCourseAttendanceWeeks>>;
+  compact: boolean;
+}) {
+  return (
+    <div
+      className={compact ? "mt-1.5 grid gap-0.5" : "mt-2 grid gap-1"}
+      style={{
+        gridTemplateColumns: `repeat(${progress.totalWeeks}, minmax(0, 1fr))`,
+      }}
+      aria-label="Teaching-week attendance progress"
+    >
+      {progress.weeks.map((item) => (
+        <span
+          key={item.week}
+          className={`${compact ? "h-1.5" : "h-2.5"} min-w-0 rounded-full ${STATE_STYLE[item.state]} ${
+            item.current
+              ? compact
+                ? "ring-1 ring-primary ring-offset-1 ring-offset-card"
+                : "ring-2 ring-primary ring-offset-1 ring-offset-card"
+              : ""
+          }`}
+          title={`Week ${item.week}: ${STATE_LABEL[item.state]}`}
+          aria-label={`Week ${item.week}: ${STATE_LABEL[item.state]}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function CourseAttendanceProgress({
   summary,
   calendar,
   term,
+  compact = false,
 }: {
   summary: PortalCourseAchievementSummary | null;
   calendar: StudentAcademicCalendarView;
   term: string;
+  compact?: boolean;
 }) {
   if (!summary) return null;
 
   const progress = buildCourseAttendanceWeeks({ summary, calendar, term });
   const rate = summary.attendance.attendanceRate;
+
+  if (compact) {
+    return (
+      <div className="mt-2 min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="font-medium">
+            Attendance{" "}
+            <span className="font-semibold text-foreground">
+              {rate === null ? "Not recorded" : `${Math.round(rate)}%`}
+            </span>
+          </span>
+          {progress ? (
+            <span className="shrink-0 font-medium">
+              {progress.currentWeek
+                ? `Week ${progress.currentWeek}/${progress.totalWeeks}`
+                : `${progress.totalWeeks} weeks`}
+            </span>
+          ) : (
+            <span className="font-medium">Weekly progress unavailable</span>
+          )}
+        </div>
+        {progress ? <AttendanceWeekStrip progress={progress} compact /> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 rounded-2xl bg-muted/35 px-3 py-2.5 ring-1 ring-border/50">
@@ -276,26 +340,7 @@ export function CourseAttendanceProgress({
       </div>
 
       {progress ? (
-        <div
-          className="mt-2 grid gap-1"
-          style={{
-            gridTemplateColumns: `repeat(${progress.totalWeeks}, minmax(0, 1fr))`,
-          }}
-          aria-label="Teaching-week attendance progress"
-        >
-          {progress.weeks.map((item) => (
-            <span
-              key={item.week}
-              className={`h-2.5 min-w-0 rounded-full ${STATE_STYLE[item.state]} ${
-                item.current
-                  ? "ring-2 ring-primary ring-offset-1 ring-offset-card"
-                  : ""
-              }`}
-              title={`Week ${item.week}: ${STATE_LABEL[item.state]}`}
-              aria-label={`Week ${item.week}: ${STATE_LABEL[item.state]}`}
-            />
-          ))}
-        </div>
+        <AttendanceWeekStrip progress={progress} compact={false} />
       ) : (
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           Weekly progress appears when the published teaching calendar is available.

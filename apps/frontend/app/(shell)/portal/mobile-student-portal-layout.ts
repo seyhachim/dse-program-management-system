@@ -3,7 +3,7 @@ export const MOBILE_STUDENT_PORTAL_LAYOUT = {
   hero:
     "relative overflow-hidden rounded-[2rem] bg-primary px-5 py-5 text-primary-foreground shadow-md sm:px-6 sm:py-6",
   homeNextClass:
-    "group block min-h-11 min-w-0 rounded-[2rem] bg-card p-4 shadow-md ring-1 ring-primary/15 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5",
+    "group block min-h-11 min-w-0 rounded-[1.75rem] bg-card p-3.5 shadow-md ring-1 ring-primary/15 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4",
   homeSectionCard:
     "rounded-[1.75rem] bg-card p-2 shadow-sm ring-1 ring-border/60",
   homeAnnouncementList: "space-y-2",
