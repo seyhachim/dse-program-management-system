@@ -4,6 +4,8 @@ import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { createOpenSlotAssignmentRouter } from "./open-slot-assignment-router.ts";
 import { openSlotAssignmentProjectionService } from "./open-slot-assignment-service.ts";
 import { parentAcademicProjectionService } from "./parent-projection.ts";
+import { createCourseAchievementRouter } from "./course-achievement-router.ts";
+import { courseAchievementService } from "./course-achievement-service.ts";
 import { createStudentPortfolioCompleteRouter } from "./portfolio-complete-router.ts";
 import { createStudentPortfolioEvidenceRouter } from "./portfolio-evidence-router.ts";
 import { createStudentPortfolioPublicRouter } from "./portfolio-public-router.ts";
@@ -21,6 +23,7 @@ router.use("/portfolio/public", createStudentPortfolioPublicRouter());
 // Existing Student Portal keeps its global requireAuth boundary inside this child router.
 router.use(createOpenSlotAssignmentRouter());
 router.use(createStudentScheduleImpactRouter());
+router.use(createCourseAchievementRouter());
 router.use(createStudentPortalRouter());
 router.use("/portfolio", createStudentPortfolioRouter());
 router.use("/portfolio/evidence", createStudentPortfolioEvidenceRouter());
@@ -29,6 +32,7 @@ router.use("/portfolio", createStudentPortfolioCompleteRouter());
 export const studentPortalPluginService = {
   ...studentPortalService,
   openSlotAssignments: openSlotAssignmentProjectionService,
+  courseAchievements: courseAchievementService,
   scheduleImpacts: studentScheduleImpactProjectionService,
   parentProjection: parentAcademicProjectionService,
 };

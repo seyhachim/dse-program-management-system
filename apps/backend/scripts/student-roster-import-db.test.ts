@@ -38,7 +38,7 @@ describeDb("student roster import database integrity", () => {
           sourceRef: "test/row-1",
           cohortCode,
           studentId: studentIds[0],
-          name: "Roster Student One",
+          name: "Roster One",
           email: null,
           profile: {
             khmerFamilyName: "សាកល្បង",

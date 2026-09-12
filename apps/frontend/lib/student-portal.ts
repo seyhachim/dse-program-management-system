@@ -3,6 +3,7 @@ import type {
   CourseFeedbackInput,
   PortalAnnouncement,
   PortalAssessmentOverview,
+  PortalCourseAchievementSummary,
   PortalCourseDetail,
   PortalCourseDocumentDownload,
   PortalCourseSummary,
@@ -16,6 +17,8 @@ export const studentPortalApi = {
   academicCalendar: () =>
     api.get<StudentAcademicCalendarView>("/api/student-portal/academic-calendar"),
   courses: () => api.get<PortalCourseSummary[]>("/api/student-portal/courses"),
+  courseAchievements: () =>
+    api.get<PortalCourseAchievementSummary[]>("/api/student-portal/course-achievements"),
   course: (offeringId: string) =>
     api.get<PortalCourseDetail>(`/api/student-portal/courses/${offeringId}`),
   assessments: () =>
