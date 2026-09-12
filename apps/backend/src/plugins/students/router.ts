@@ -14,6 +14,7 @@ import {
   studentService,
 } from "./service.ts";
 import { createStudentCohortRouter } from "./cohort-router.ts";
+import { createStudentCohortSectionRouter } from "./cohort-section-router.ts";
 
 /**
  * Students REST router. Every route requires authentication; writes require the
@@ -26,6 +27,7 @@ export function createStudentRouter(): Router {
   router.use(requireAuth);
 
   router.use("/cohorts", createStudentCohortRouter());
+  router.use("/cohort-sections", createStudentCohortSectionRouter());
 
   // GET /api/students?search=&activeOnly=
   // Kept for compatibility with existing non-interactive/cross-plugin callers.

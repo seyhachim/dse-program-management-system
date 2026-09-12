@@ -5,6 +5,14 @@ const portalHomeSource = readFileSync(
   new URL("./portal-home.tsx", import.meta.url),
   "utf8",
 );
+const courseBadgeSource = readFileSync(
+  new URL("./course-achievement-badges.tsx", import.meta.url),
+  "utf8",
+);
+const mobileLayoutSource = readFileSync(
+  new URL("./mobile-student-portal-layout.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Student Portal mobile home contract", () => {
   test("keeps internal curriculum terminology off the student home", () => {
@@ -18,6 +26,48 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("DSE Student Portal");
     expect(portalHomeSource).toContain('aria-label="Student identity"');
     expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
+  });
+
+  test("shows active monitor responsibilities compactly beside the student name", () => {
+    expect(portalHomeSource).toContain("monitorDeliveryApi");
+    expect(portalHomeSource).toContain(".assignments()");
+    expect(portalHomeSource).toContain("Class Monitor");
+    expect(portalHomeSource).toContain("Sub-class Monitor");
+    expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
+    expect(portalHomeSource).toContain("Crown");
+    expect(portalHomeSource).toContain("ShieldCheck");
+    expect(portalHomeSource).toContain("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5");
+    expect(portalHomeSource).toContain("new Set(");
+    expect(portalHomeSource).toContain("catch((): MonitorClassResponsibilityView[] => [])");
+  });
+
+  test("loads course achievements as optional home metadata without repeating course role chips", () => {
+    expect(portalHomeSource).toContain(".courseAchievements()");
+    expect(portalHomeSource).toContain("catch((): PortalCourseAchievementSummary[] => [])");
+    expect(portalHomeSource).toContain("summary.offeringId === nextMeeting.course.offeringId");
+    expect(portalHomeSource).toContain("<CourseAchievementBadges summary={nextCourseAchievement} />");
+    expect(portalHomeSource).toContain("<CourseAttendanceProgress");
+    expect(portalHomeSource).not.toContain("nextCourseMonitorRole");
+  });
+
+  test("renders all five v1 achievement kinds with visible locked states", () => {
+    expect(courseBadgeSource).toContain("great_start:");
+    expect(courseBadgeSource).toContain("reliable_learner:");
+    expect(courseBadgeSource).toContain("perfect_attendance:");
+    expect(courseBadgeSource).toContain("strong_performance:");
+    expect(courseBadgeSource).toContain("course_excellence:");
+    expect(courseBadgeSource).toContain("{badge.title}");
+    expect(courseBadgeSource).toContain("badge.achieved ? ACHIEVED_STYLES[badge.kind] : LOCKED_STYLE");
+    expect(courseBadgeSource).toContain("<Lock");
+    expect(courseBadgeSource).toContain('aria-label="Course achievement badges"');
+    expect(courseBadgeSource).not.toContain("Course role:");
+  });
+
+  test("keeps the next-class card compact on phones", () => {
+    expect(mobileLayoutSource).toContain("bg-card p-4 shadow-md");
+    expect(mobileLayoutSource).toContain("sm:p-5");
+    expect(portalHomeSource).toContain('className="mt-4 grid gap-2 sm:grid-cols-3"');
+    expect(portalHomeSource).toContain('className="mt-4 flex min-h-11 items-center');
   });
 
   test("shows published-calendar teaching context without a CourseSpec dependency", () => {

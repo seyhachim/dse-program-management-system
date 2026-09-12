@@ -28,6 +28,7 @@ import {
 import {
   communityManifest,
   curriculumWorkspaceManifest,
+  finalProjectManifest,
   lecturerPortfolioManifest,
   navForRole,
   navFromManifests,
@@ -42,8 +43,8 @@ import {
 
 /**
  * Sidebar nav is generated from shared feature manifests. Community of Practice,
- * Programme Curriculum, Student Handbook, and Lecturer Portfolio are additive
- * manifests while the legacy registry is gradually split into feature-owned manifests.
+ * Programme Curriculum, Student Handbook, Lecturer Portfolio, and Final Project
+ * are additive manifests while the legacy registry is gradually split into feature-owned manifests.
  */
 const rubricBankManifest: PluginManifest = {
   ...(pluginManifests.find((manifest) => manifest.id === "rubrics") ?? {
@@ -167,6 +168,7 @@ const frontendManifests = [
   studentHandbookManifest,
   communityManifest,
   lecturerPortfolioManifest,
+  finalProjectManifest,
   publicInformationManifest,
 ];
 

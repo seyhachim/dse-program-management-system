@@ -31,6 +31,8 @@ const EXPECTED_PUBLIC_TABLES = [
   "StudentPortfolioEvidenceSoftSkill",
   "StudentCohort",
   "StudentCohortMembership",
+  "StudentCohortSection",
+  "StudentCohortSectionMembership",
   "StudentProgressionRecord",
   "QaCloAttainmentSnapshot",
   "StudentCompletionOutcome",

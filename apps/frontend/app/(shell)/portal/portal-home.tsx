@@ -1,6 +1,10 @@
 "use client";
 
-import type { PortalScheduleImpact } from "@dse-pms/shared-types";
+import type {
+  MonitorClassResponsibilityView,
+  PortalCourseAchievementSummary,
+  PortalScheduleImpact,
+} from "@dse-pms/shared-types";
 import { useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,8 +16,10 @@ import {
   ChevronRight,
   ClipboardList,
   Clock3,
+  Crown,
   GraduationCap,
   MapPin,
+  ShieldCheck,
 } from "lucide-react";
 import {
   academicSemesterLabel,
@@ -21,12 +27,15 @@ import {
   formatAcademicShortDateRange,
   resolveStudentTeachingContext,
 } from "@/lib/academic-calendar";
+import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import {
   assessmentDeadline,
   meetingLabel,
   studentPortalApi,
 } from "@/lib/student-portal";
 import { studentScheduleApi } from "@/lib/student-schedule";
+import { CourseAchievementBadges } from "./course-achievement-badges";
+import { CourseAttendanceProgress } from "./courses/course-attendance-progress";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "./mobile-student-portal-layout";
 import {
   PortalError,
@@ -41,6 +50,11 @@ const HOME_PREFETCH = [
   { resource: "assessments", loader: studentPortalApi.assessments },
   { resource: "academic-calendar", loader: studentPortalApi.academicCalendar },
 ] as const;
+
+const MONITOR_ROLE_LABELS = {
+  ClassMonitor: "Class Monitor",
+  SubClassMonitor: "Sub-class Monitor",
+} as const;
 
 const WEEKDAY_INDEX = new Map(
   ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
@@ -113,11 +127,17 @@ function relativeMeetingDay(dayOffset: number, dayOfWeek: string): string {
 
 export function PortalHome() {
   const load = useCallback(async () => {
-    const [home, scheduleImpacts] = await Promise.all([
+    const [home, scheduleImpacts, monitorAssignments, courseAchievements] = await Promise.all([
       studentPortalApi.home(),
       studentScheduleApi.impacts(),
+      monitorDeliveryApi
+        .assignments()
+        .catch((): MonitorClassResponsibilityView[] => []),
+      studentPortalApi
+        .courseAchievements()
+        .catch((): PortalCourseAchievementSummary[] => []),
     ]);
-    return { ...home, scheduleImpacts };
+    return { ...home, scheduleImpacts, monitorAssignments, courseAchievements };
   }, []);
   const { data, loading, error, refreshError, refreshing } = useCachedPortalData(
     "home",
@@ -135,6 +155,14 @@ export function PortalHome() {
   const nextMeetingHref = nextMeeting?.impact
     ? `/portal/schedule?date=${encodeURIComponent(nextMeeting.impact.sessionDate)}&focus=${encodeURIComponent(nextMeeting.impact.occurrenceId)}`
     : "/portal/schedule";
+  const monitorRoleBadges = [...new Set(data.monitorAssignments.map((item) => item.role))].map(
+    (role) => ({ role, label: MONITOR_ROLE_LABELS[role] }),
+  );
+  const nextCourseAchievement = nextMeeting
+    ? data.courseAchievements.find(
+        (summary) => summary.offeringId === nextMeeting.course.offeringId,
+      ) ?? null
+    : null;
   const calendar = data.academicCalendar;
   const teachingContext = resolveStudentTeachingContext(calendar, now);
   const contextSemester =
@@ -198,9 +226,31 @@ export function PortalHome() {
             <p className="text-sm font-medium text-primary-foreground/75">
               Welcome back
             </p>
-            <h2 className="mt-0.5 truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-              {data.student.name}
-            </h2>
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+              <h2 className="min-w-0 max-w-full break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+                {data.student.name}
+              </h2>
+              {monitorRoleBadges.length > 0 ? (
+                <div
+                  className="flex flex-wrap gap-1.5"
+                  aria-label="Student responsibilities"
+                >
+                  {monitorRoleBadges.map((badge) => {
+                    const RoleIcon =
+                      badge.role === "ClassMonitor" ? Crown : ShieldCheck;
+                    return (
+                      <span
+                        key={badge.role}
+                        className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/15 px-2 py-1 text-[10px] font-semibold text-primary-foreground ring-1 ring-primary-foreground/20 sm:text-[11px]"
+                      >
+                        <RoleIcon className="h-3 w-3" aria-hidden="true" />
+                        {badge.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <p className="mt-1 truncate text-xs font-medium text-primary-foreground/70">
               Student ID · {data.student.studentId}
             </p>
@@ -277,15 +327,22 @@ export function PortalHome() {
 
             {nextMeeting ? (
               <>
-                <p className="mt-3 break-words text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
+                <p className="mt-2.5 break-words text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
                   {nextMeeting.course.title}
                 </p>
-                <p className="mt-1.5 break-words text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="mt-1 break-words text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {nextMeeting.course.code} · Section {nextMeeting.course.sectionCode}
                 </p>
 
+                <CourseAchievementBadges summary={nextCourseAchievement} />
+                <CourseAttendanceProgress
+                  summary={nextCourseAchievement}
+                  calendar={calendar}
+                  term={nextMeeting.course.term}
+                />
+
                 {nextMeeting.impact ? (
-                  <div className="mt-4 flex items-start gap-3 rounded-2xl border border-status-upcoming/30 bg-status-upcoming-bg p-3.5 text-status-upcoming">
+                  <div className="mt-3 flex items-start gap-3 rounded-2xl border border-status-upcoming/30 bg-status-upcoming-bg p-3 text-status-upcoming">
                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
                     <div className="min-w-0">
                       <p className="font-semibold">Class cancelled for this session</p>
@@ -296,8 +353,8 @@ export function PortalHome() {
                   </div>
                 ) : null}
 
-                <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
-                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-3">
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-2.5">
                     <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
                       <Clock3 className="h-4 w-4" aria-hidden="true" />
                     </span>
@@ -310,7 +367,7 @@ export function PortalHome() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-3">
+                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-2.5">
                     <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
                       <MapPin className="h-4 w-4" aria-hidden="true" />
                     </span>
@@ -323,7 +380,7 @@ export function PortalHome() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-3">
+                  <div className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-muted/50 p-2.5">
                     <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-primary shadow-sm ring-1 ring-border/60">
                       <GraduationCap className="h-4 w-4" aria-hidden="true" />
                     </span>
@@ -349,7 +406,7 @@ export function PortalHome() {
           </div>
         </div>
 
-        <div className="mt-5 flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-4">
+        <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-3">
           <span className="text-sm font-semibold text-primary">
             {nextMeeting?.impact ? "View schedule update" : "View schedule"}
           </span>
