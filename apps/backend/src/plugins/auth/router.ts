@@ -45,7 +45,7 @@ export function createAuthRouter(): Router {
   router.use(requireAuth);
 
   router.get("/me", async (req, res) => {
-    res.json(await authService.me(req.user!.id));
+    res.json(await authService.me(req.user!.id, req.user!.roles));
   });
 
   router.post("/accounts", requirePermission("accounts:create"), async (req, res) => {
@@ -153,27 +153,35 @@ export function createAuthRouter(): Router {
     }
   });
 
-  router.get("/programme-roles", requirePermission("qa:manage"), async (req, res) => {
+  router.get("/programme-roles", requirePermission("qa:read"), async (req, res) => {
     const parsed = ProgrammeRoleListQuery.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid programme role query", details: parsed.error.flatten() });
       return;
     }
     if (!canManageProgrammeRoles(req.user!, parsed.data.programmeId)) {
-      res.status(403).json({ error: "You cannot manage roles for this programme" });
+      res.status(403).json({ error: "Not allowed to manage programme QA roles" });
       return;
     }
-    res.json(await authService.listProgrammeRoleAssignments(parsed.data.programmeId));
+    try {
+      res.json(await authService.listProgrammeRoleAssignments(parsed.data.programmeId));
+    } catch (err) {
+      if (err instanceof ProgrammeRoleAssignmentError) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
+      res.status(500).json({ error: "Could not load programme role assignments" });
+    }
   });
 
-  router.post("/programme-roles", requirePermission("qa:manage"), async (req, res) => {
+  router.post("/programme-roles", requirePermission("qa:write"), async (req, res) => {
     const parsed = ManageProgrammeRoleInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid programme role assignment", details: parsed.error.flatten() });
       return;
     }
     if (!canManageProgrammeRoles(req.user!, parsed.data.programmeId)) {
-      res.status(403).json({ error: "You cannot manage roles for this programme" });
+      res.status(403).json({ error: "Not allowed to manage programme QA roles" });
       return;
     }
     try {
@@ -187,18 +195,14 @@ export function createAuthRouter(): Router {
     }
   });
 
-  router.delete("/programme-roles/:userId", requirePermission("qa:manage"), async (req, res) => {
-    const parsed = ProgrammeRoleDeleteRequest.safeParse({
-      userId: req.params.userId,
-      programmeId: req.query.programmeId,
-      role: req.query.role,
-    });
+  router.delete("/programme-roles", requirePermission("qa:write"), async (req, res) => {
+    const parsed = ProgrammeRoleDeleteRequest.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid programme role removal", details: parsed.error.flatten() });
       return;
     }
     if (!canManageProgrammeRoles(req.user!, parsed.data.programmeId)) {
-      res.status(403).json({ error: "You cannot manage roles for this programme" });
+      res.status(403).json({ error: "Not allowed to manage programme QA roles" });
       return;
     }
     try {
