@@ -25,7 +25,9 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain('alt="DSE logo"');
     expect(portalHomeSource).toContain("DSE Student Portal");
     expect(portalHomeSource).toContain('aria-label="Student identity"');
-    expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
+    expect(portalHomeSource).toContain("data.student.studentId");
+    expect(portalHomeSource).toContain("Student ID · ${data.student.studentId}");
+    expect(portalHomeSource).toContain('"Pending ID"');
   });
 
   test("shows active monitor responsibilities compactly beside the student name", () => {
