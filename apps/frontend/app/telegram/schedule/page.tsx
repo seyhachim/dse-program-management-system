@@ -1,6 +1,10 @@
 "use client";
 
-import type { TelegramCourseCard, TelegramScheduleResponse } from "@dse-pms/shared-types";
+import type {
+  OpenTeachingSlotStudentAssignment,
+  TelegramCourseCard,
+  TelegramScheduleResponse,
+} from "@dse-pms/shared-types";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { telegramApi } from "../telegram-client";
@@ -18,8 +22,11 @@ export default function TelegramSchedulePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void telegramApi<TelegramScheduleResponse>("/api/telegram/mini/schedule")
-      .then(setData)
+    void Promise.all([
+      telegramApi<{ courses: TelegramCourseCard[] }>("/api/telegram/mini/schedule"),
+      telegramApi<OpenTeachingSlotStudentAssignment[]>("/api/telegram/mini/open-slot-assignments"),
+    ])
+      .then(([schedule, additionalClasses]) => setData({ ...schedule, additionalClasses }))
       .catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load schedule"));
   }, []);
 
@@ -43,13 +50,40 @@ export default function TelegramSchedulePage() {
       <header>
         <p className="text-sm font-medium text-blue-600">DSE PMS</p>
         <h1 className="text-2xl font-semibold tracking-tight">Weekly schedule</h1>
-        <p className="mt-1 text-sm text-slate-500">Your current PMS class timetable.</p>
+        <p className="mt-1 text-sm text-slate-500">Your current PMS class timetable and confirmed schedule updates.</p>
       </header>
 
       {error ? <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
       {!data && !error ? <p className="text-sm text-slate-500">Loading schedule…</p> : null}
 
-      {data && data.courses.length === 0 ? (
+      {data?.additionalClasses.length ? (
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
+            Confirmed additional classes
+          </h2>
+          {data.additionalClasses.map((assignment) => (
+            <article
+              key={assignment.occurrenceId}
+              className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Confirmed · {assignment.courseCode} · {assignment.sectionCode}
+              </p>
+              <p className="mt-1 font-semibold text-slate-950">{assignment.courseTitle}</p>
+              <p className="mt-2 text-sm text-slate-700">
+                {assignment.sessionDate} · {assignment.startTime}–{assignment.endTime}
+                {assignment.room ? ` · ${assignment.room}` : ""}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">Lecturer: {assignment.lecturerName}</p>
+              <p className="mt-2 text-xs text-slate-500">
+                This class belongs to {assignment.courseCode}; it is not a make-up for the original leave-affected course.
+              </p>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {data && data.courses.length === 0 && data.additionalClasses.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
           <p className="font-semibold">No classes available</p>
           <p className="mt-1 text-sm text-slate-500">No class timetable is currently assigned to this account.</p>

@@ -32,6 +32,7 @@ export * from "./class-responsibilities.ts";
 export * from "./class-delivery.ts";
 export * from "./teaching-session-delivery.ts";
 export * from "./teaching-leave.ts";
+export * from "./open-teaching-slots.ts";
 export * from "./document-theme.ts";
 export * from "./course-spec-document-theme.ts";
 export * from "./course-spec.ts";

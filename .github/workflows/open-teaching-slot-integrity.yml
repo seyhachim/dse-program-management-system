@@ -1,0 +1,77 @@
+name: Open Teaching Slot Integrity
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/offerings/open-teaching-slot-*.ts"
+      - "apps/backend/src/plugins/student-portal/open-slot-*.ts"
+      - "apps/backend/src/plugins/telegram/open-teaching-slot-*.ts"
+      - "packages/shared-types/src/open-teaching-slots*.ts"
+      - ".github/workflows/open-teaching-slot-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/backend/prisma/migrations/**"
+      - "apps/backend/src/plugins/offerings/open-teaching-slot-*.ts"
+      - "apps/backend/src/plugins/student-portal/open-slot-*.ts"
+      - "apps/backend/src/plugins/telegram/open-teaching-slot-*.ts"
+      - "packages/shared-types/src/open-teaching-slots*.ts"
+      - ".github/workflows/open-teaching-slot-integrity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: open-teaching-slot-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrity:
+    name: Open slot DB integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_open_slot_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_open_slot_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/dse_open_slot_ci?schema=public
+      OPEN_TEACHING_SLOT_DB_TESTS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: bun run db:generate
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+      - name: Seed clean database
+        run: bun run seed
+
+      - name: Verify open teaching slot integrity and concurrency
+        run: bun test apps/backend/src/plugins/offerings/open-teaching-slot-db.test.ts
