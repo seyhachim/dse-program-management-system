@@ -55,6 +55,16 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).not.toContain("nextCourseMonitorRole");
   });
 
+  test("keeps a compact 16-week attendance strip visible on Home", () => {
+    expect(attendanceProgressSource).toContain("COURSE_ATTENDANCE_WEEK_COUNT = 16");
+    expect(attendanceProgressSource).toContain("if (compact)");
+    expect(attendanceProgressSource).toContain(
+      "progress ? <AttendanceWeekStrip progress={progress} compact /> : null",
+    );
+    expect(attendanceProgressSource).toContain('compact ? "h-1.5" : "h-2.5"');
+    expect(attendanceProgressSource).toContain('aria-label="Teaching-week attendance progress"');
+  });
+
   test("preserves the full achievement and attendance treatments outside the home override", () => {
     expect(courseBadgeSource).toContain("showLocked = true");
     expect(courseBadgeSource).toContain("summary.badges.filter((badge) => badge.achieved)");
@@ -62,8 +72,7 @@ describe("Student Portal mobile home contract", () => {
     expect(courseBadgeSource).toContain("<Lock");
     expect(courseBadgeSource).toContain('aria-label="Course achievement badges"');
     expect(attendanceProgressSource).toContain("compact = false");
-    expect(attendanceProgressSource).toContain("if (compact)");
-    expect(attendanceProgressSource).toContain('aria-label="Teaching-week attendance progress"');
+    expect(attendanceProgressSource).toContain("<AttendanceWeekStrip progress={progress} compact={false} />");
   });
 
   test("renders all five v1 achievement kinds", () => {
