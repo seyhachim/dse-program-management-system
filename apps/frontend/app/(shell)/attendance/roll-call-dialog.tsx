@@ -2,14 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  Award,
   Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
   FileCheck2,
+  HelpCircle,
+  LogOut,
   Save,
   SkipForward,
+  Star,
+  Trophy,
   UserRound,
   XCircle,
 } from "lucide-react";
@@ -50,28 +55,28 @@ const STATUS_ACTIONS: Array<{
     label: "Present",
     shortcut: "P",
     icon: CheckCircle2,
-    className: "border-status-live/40 bg-status-live-bg text-status-live hover:bg-status-live-bg/70",
+    className: "border-status-live/35 bg-status-live-bg text-status-live hover:bg-status-live-bg/70",
   },
   {
     status: "Late",
     label: "Late",
     shortcut: "L",
     icon: Clock3,
-    className: "border-status-upcoming/40 bg-status-upcoming-bg text-status-upcoming hover:bg-status-upcoming-bg/70",
+    className: "border-status-upcoming/35 bg-status-upcoming-bg text-status-upcoming hover:bg-status-upcoming-bg/70",
   },
   {
     status: "Absent",
     label: "Absent",
     shortcut: "A",
     icon: XCircle,
-    className: "border-destructive/40 bg-destructive/5 text-destructive hover:bg-destructive/10",
+    className: "border-destructive/35 bg-destructive/5 text-destructive hover:bg-destructive/10",
   },
   {
     status: "Excused",
-    label: "Permission / Excused",
+    label: "Excused",
     shortcut: "E",
     icon: FileCheck2,
-    className: "border-border bg-muted/50 text-foreground hover:bg-muted",
+    className: "border-border bg-muted/45 text-foreground hover:bg-muted",
   },
 ];
 
@@ -105,6 +110,12 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
+function BadgeIcon({ title }: { title: string }) {
+  if (title === "Perfect Attendance") return <Trophy className="h-3.5 w-3.5" />;
+  if (title === "Reliable Learner") return <Star className="h-3.5 w-3.5" />;
+  return <Award className="h-3.5 w-3.5" />;
+}
+
 export function RollCallDialog({
   open,
   offering,
@@ -119,12 +130,14 @@ export function RollCallDialog({
   const [index, setIndex] = useState(0);
   const [reviewStudentIds, setReviewStudentIds] = useState<string[] | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setIndex(0);
     setReviewStudentIds(null);
     setFeedback(null);
+    setShortcutsOpen(false);
   }, [open, offering?.id, date]);
 
   const counts = useMemo(() => getAttendanceCounts(records), [records]);
@@ -138,6 +151,8 @@ export function RollCallDialog({
     : null;
   const courseTitle = offering?.course?.title ?? offering?.course?.code ?? "Course";
   const weekLabel = week ? `Week ${week}` : "Week not scheduled";
+  const markedCount = counts.Total - counts.Unmarked;
+  const rollCallProgress = counts.Total === 0 ? 0 : Math.round((markedCount / counts.Total) * 100);
 
   function previous() {
     setFeedback(null);
@@ -167,7 +182,7 @@ export function RollCallDialog({
       status: null,
       permissionPending: true,
     });
-    setFeedback(`${current.studentName} marked Permission Pending. Paper letter still needs confirmation.`);
+    setFeedback(`${current.studentName} marked Permission Pending.`);
     setIndex((currentIndex) => getNextIndex(currentIndex, sequence.length));
   }
 
@@ -226,6 +241,9 @@ export function RollCallDialog({
     : current?.status === "Excused"
       ? "Permission / Excused"
       : current?.status ?? "Unmarked";
+  const history = current?.attendanceSummary ?? null;
+  const historyRate = history?.attendanceRate ?? null;
+  const historyProgress = Math.max(0, Math.min(100, historyRate ?? 0));
 
   return (
     <Dialog
@@ -236,70 +254,136 @@ export function RollCallDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className="h-[min(92vh,860px)] max-h-[92vh] w-[min(1120px,94vw)] max-w-none sm:max-w-none gap-0 overflow-hidden p-0 text-sm shadow-2xl"
+        className="h-[100dvh] max-h-[100dvh] w-screen max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 text-sm shadow-none sm:max-w-none"
       >
         <DialogTitle className="sr-only">Roll Call Mode</DialogTitle>
         <DialogDescription className="sr-only">
           Mark attendance one student at a time. Keyboard shortcuts are P for Present, L for Late, A for Absent,
-          E for Permission or Excused, R for Permission Pending, S to Skip, and the left and right arrows to navigate students.
+          E for Excused, R for Permission Pending, S to Skip, and the left and right arrows to navigate students.
         </DialogDescription>
 
-        <div className="flex h-full min-h-0 flex-col">
-          <header className="flex flex-col gap-3 border-b border-border bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-            <div>
+        <div className="flex h-full min-h-0 flex-col bg-background">
+          <header className="flex min-h-20 items-center justify-between gap-4 border-b border-border bg-card px-6 py-3 lg:px-9">
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">Roll Call Mode</h2>
+                <h2 className="text-xl font-semibold text-foreground">Roll Call Mode</h2>
                 <span className="rounded-full border border-status-live/30 bg-status-live-bg px-2 py-0.5 text-xs font-medium text-status-live">Live</span>
                 {reviewStudentIds ? <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Unmarked review</span> : null}
               </div>
-              <p className="mt-1 font-medium text-foreground">{courseTitle} · Class {offering?.sectionCode ?? "—"}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">{weekLabel} · {formatAttendanceDate(date)} · {sequence.length === 0 ? 0 : index + 1} / {sequence.length}</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{courseTitle}</span> · Class {offering?.sectionCode ?? "—"}
+              </p>
             </div>
-            <button type="button" onClick={onRequestClose} className="h-10 rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Close</button>
+            <div className="flex shrink-0 items-center gap-3">
+              <div className="hidden text-right text-xs text-muted-foreground sm:block">
+                <p className="font-medium text-foreground">{weekLabel}</p>
+                <p>{formatAttendanceDate(date)}</p>
+              </div>
+              <div className="relative">
+                <button type="button" onClick={() => setShortcutsOpen((value) => !value)} className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                  <HelpCircle className="h-4 w-4" /> <span className="hidden sm:inline">Shortcuts</span>
+                </button>
+                {shortcutsOpen ? (
+                  <div className="absolute right-0 top-12 z-20 w-64 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg">
+                    <p className="font-semibold text-foreground">Keyboard shortcuts</p>
+                    <p className="mt-2 leading-5">P Present · L Late · A Absent · E Excused</p>
+                    <p className="leading-5">R Permission Pending · S Skip</p>
+                    <p className="leading-5">← Previous · → Next</p>
+                  </div>
+                ) : null}
+              </div>
+              <button type="button" onClick={onRequestClose} className="inline-flex h-10 items-center gap-2 rounded-md border border-destructive/25 bg-destructive/5 px-3 font-medium text-destructive outline-none hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring">
+                <LogOut className="h-4 w-4" /> Exit
+              </button>
+            </div>
           </header>
 
-          <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <section className="flex min-h-0 flex-col overflow-y-auto px-5 py-6 sm:px-8 lg:px-10">
-              {feedback ? <div aria-live="polite" className="mb-5 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">{feedback}</div> : <div aria-live="polite" className="sr-only" />}
+          <div className="flex items-center gap-4 border-b border-border bg-card px-6 py-2.5 lg:px-9">
+            <p className="shrink-0 text-xs font-medium text-muted-foreground">Marked: <span className="text-foreground">{markedCount} of {counts.Total}</span></p>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${rollCallProgress}%` }} />
+            </div>
+            <span className="w-10 text-right text-xs font-semibold tabular-nums text-foreground">{rollCallProgress}%</span>
+          </div>
+
+          <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <section className="flex min-h-0 flex-col overflow-y-auto px-5 py-5 sm:px-8 lg:px-10">
+              {feedback ? <div aria-live="polite" className="mx-auto mb-2 max-w-2xl rounded-full bg-muted/60 px-4 py-1.5 text-center text-xs text-muted-foreground">{feedback}</div> : <div aria-live="polite" className="sr-only" />}
 
               {current ? (
                 <>
                   <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <div className="mb-5 flex h-28 w-28 items-center justify-center rounded-full border border-border bg-muted text-3xl font-semibold text-foreground sm:h-32 sm:w-32 sm:text-4xl">{initials(current.studentName) || <UserRound className="h-12 w-12" />}</div>
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Student {sequence.length === 0 ? 0 : index + 1} of {sequence.length}</p>
-                    <h3 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">{current.studentName}</h3>
-                    <p className="mt-4 font-mono text-base text-muted-foreground">{current.studentNumber}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">Current status: <span className="font-medium text-foreground">{currentLabel}</span></p>
+                    <div className="mb-3 flex h-24 w-24 items-center justify-center rounded-full border border-border bg-muted text-3xl font-semibold text-foreground sm:h-28 sm:w-28 sm:text-4xl">
+                      {initials(current.studentName) || <UserRound className="h-10 w-10" />}
+                    </div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Student {sequence.length === 0 ? 0 : index + 1} of {sequence.length}</p>
+
+                    {current.studentKhmerName ? (
+                      <h3 lang="km" className="mt-3 max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-[3.5rem]">
+                        {current.studentKhmerName}
+                      </h3>
+                    ) : null}
+                    <h3 className={`${current.studentKhmerName ? "mt-1" : "mt-3"} max-w-4xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.5rem]`}>
+                      {current.studentName}
+                    </h3>
+
+                    <div className="mt-5 w-full max-w-2xl rounded-xl border border-border bg-muted/25 px-5 py-3 text-left">
+                      {history && historyRate !== null ? (
+                        <div className="grid items-center gap-3 sm:grid-cols-[auto_1fr_auto]">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Attendance this course</p>
+                            <p className="text-2xl font-semibold tabular-nums text-foreground">{historyRate}%</p>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                            <div className="h-full rounded-full bg-status-live transition-[width]" style={{ width: `${historyProgress}%` }} />
+                          </div>
+                          <p className="text-right text-sm font-semibold tabular-nums text-foreground">{history.attendedSessions} / {history.markedSessions}<span className="block text-[11px] font-normal text-muted-foreground">sessions attended</span></p>
+                        </div>
+                      ) : (
+                        <p className="text-center text-sm text-muted-foreground">No finalized attendance history yet</p>
+                      )}
+                    </div>
+
+                    {history?.badges.length ? (
+                      <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+                        {history.badges.map((badge) => (
+                          <span key={badge} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground">
+                            <BadgeIcon title={badge} /> {badge}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <p className="mt-3 text-sm text-muted-foreground">Current status: <span className="font-semibold text-foreground">{currentLabel}</span></p>
                   </div>
 
-                  <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                  <div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                     {STATUS_ACTIONS.map((action) => {
                       const Icon = action.icon;
                       const selected = current.status === action.status && !current.permissionPending;
                       return (
-                        <button key={action.status} type="button" onClick={() => mark(action.status)} aria-pressed={selected} className={`relative min-h-24 rounded-xl border px-4 py-4 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${action.className} ${selected ? "ring-2 ring-ring" : ""}`}>
-                          <div className="flex items-start justify-between gap-2"><Icon className="h-6 w-6" /><kbd className="rounded border border-current/20 px-1.5 py-0.5 text-[11px] font-semibold opacity-80">{action.shortcut}</kbd></div>
-                          <div className="mt-3 font-semibold">{action.label}</div>
-                          {selected ? <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium"><Check className="h-3.5 w-3.5" /> Selected</span> : null}
+                        <button key={action.status} type="button" onClick={() => mark(action.status)} aria-pressed={selected} className={`relative min-h-20 rounded-lg border px-3 py-2.5 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${action.className} ${selected ? "ring-2 ring-ring" : ""}`}>
+                          <div className="flex items-center justify-center gap-2"><Icon className="h-5 w-5" /><span className="font-semibold">{action.label}</span></div>
+                          <kbd className="mt-2 inline-block rounded border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold opacity-75">{action.shortcut}</kbd>
+                          {selected ? <span className="sr-only">Selected</span> : null}
                         </button>
                       );
                     })}
-                    <button type="button" onClick={markPermissionPending} aria-pressed={current.permissionPending} className={`relative min-h-24 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-left text-amber-900 outline-none transition hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-ring ${current.permissionPending ? "ring-2 ring-ring" : ""}`}>
-                      <div className="flex items-start justify-between gap-2"><Clock3 className="h-6 w-6" /><kbd className="rounded border border-amber-500/30 px-1.5 py-0.5 text-[11px] font-semibold">R</kbd></div>
-                      <div className="mt-3 font-semibold">Permission Pending</div>
-                      <div className="mt-1 text-xs">Paper letter not confirmed yet</div>
+                    <button type="button" onClick={markPermissionPending} aria-pressed={current.permissionPending} className={`min-h-20 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-center text-amber-900 outline-none transition hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-ring ${current.permissionPending ? "ring-2 ring-ring" : ""}`}>
+                      <div className="flex items-center justify-center gap-2"><Clock3 className="h-5 w-5" /><span className="font-semibold leading-tight">Permission Pending</span></div>
+                      <kbd className="mt-2 inline-block rounded border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold">R</kbd>
                     </button>
-                    <button type="button" onClick={skip} className="min-h-24 rounded-xl border border-border bg-background px-4 py-4 text-left text-foreground outline-none transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-                      <div className="flex items-start justify-between gap-2"><SkipForward className="h-6 w-6" /><kbd className="rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">S</kbd></div>
-                      <div className="mt-3 font-semibold">Skip</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{current.status === null && !current.permissionPending ? "Leave Unmarked" : "Keep existing status"}</div>
+                    <button type="button" onClick={skip} className="min-h-20 rounded-lg border border-border bg-background px-3 py-2.5 text-center text-foreground outline-none transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                      <div className="flex items-center justify-center gap-2"><SkipForward className="h-5 w-5" /><span className="font-semibold">Skip</span></div>
+                      <kbd className="mt-2 inline-block rounded border border-border px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">S</kbd>
                     </button>
                   </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-                    <label className="space-y-1.5"><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance note</span><input value={current.note} maxLength={300} placeholder={current.permissionPending ? "Optional note about pending permission" : "Optional note or approved absence reason"} onChange={(event) => onUpdateRecord(current.studentId, { note: event.target.value })} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" /></label>
+                  <div className="mx-auto mt-3 grid w-full max-w-5xl gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                    <label className="sr-only" htmlFor="roll-call-note">Attendance note</label>
+                    <input id="roll-call-note" value={current.note} maxLength={300} placeholder={current.permissionPending ? "Add a note about pending permission…" : "Add a note (optional)…"} onChange={(event) => onUpdateRecord(current.studentId, { note: event.target.value })} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
                     <button type="button" onClick={previous} disabled={index === 0} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"><ChevronLeft className="h-4 w-4" /> Previous</button>
-                    <button type="button" onClick={next} disabled={index >= sequence.length - 1} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">Next <ChevronRight className="h-4 w-4" /></button>
+                    <button type="button" onClick={next} disabled={index >= sequence.length - 1} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">Next <ChevronRight className="h-4 w-4" /></button>
                   </div>
                 </>
               ) : (
@@ -307,26 +391,29 @@ export function RollCallDialog({
               )}
             </section>
 
-            <aside className="min-h-0 overflow-y-auto border-t border-border bg-muted/20 p-5 lg:border-l lg:border-t-0 lg:p-6">
-              <h3 className="font-semibold text-foreground">Attendance summary</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Updates immediately as you mark students.</p>
-              <div className="mt-5 space-y-2">
-                <SummaryRow label="Present" value={counts.Present} />
-                <SummaryRow label="Late" value={counts.Late} />
-                <SummaryRow label="Absent" value={counts.Absent} />
-                <SummaryRow label="Permission / Excused" value={counts.Excused} />
-                <SummaryRow label="Permission Pending" value={counts.PermissionPending} emphasized={counts.PermissionPending > 0} />
-                <SummaryRow label="Unmarked" value={counts.Unmarked} emphasized={counts.Unmarked > 0} />
-                <div className="my-3 border-t border-border" />
-                <SummaryRow label="Total" value={counts.Total} />
+            <aside className="min-h-0 overflow-y-auto border-t border-border bg-muted/15 p-4 lg:border-l lg:border-t-0">
+              <h3 className="font-semibold text-foreground">Class Summary</h3>
+              <div className="mt-3 space-y-1">
+                <SummaryRow label="Present" value={counts.Present} dotClass="bg-status-live" />
+                <SummaryRow label="Late" value={counts.Late} dotClass="bg-status-upcoming" />
+                <SummaryRow label="Absent" value={counts.Absent} dotClass="bg-destructive" />
+                <SummaryRow label="Excused" value={counts.Excused} dotClass="bg-muted-foreground" />
+                <SummaryRow label="Permission" value={counts.PermissionPending} dotClass="bg-primary" />
+                <SummaryRow label="Unmarked" value={counts.Unmarked} dotClass="bg-border" />
               </div>
+              <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span>Total Students</span><span className="font-semibold tabular-nums text-foreground">{counts.Total}</span></div>
 
-              {counts.Unmarked > 0 ? <button type="button" onClick={reviewUnmarked} className="mt-5 w-full rounded-md border border-border bg-background px-4 py-3 text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Review Unmarked Students ({counts.Unmarked})</button> : <div className="mt-5 rounded-lg border border-status-live/30 bg-status-live-bg px-3 py-3 text-sm font-medium text-status-live">Everyone has a status or pending permission.</div>}
+              {counts.Unmarked > 0 ? <button type="button" onClick={reviewUnmarked} className="mt-4 w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Review Unmarked ({counts.Unmarked})</button> : <div className="mt-4 rounded-md border border-status-live/25 bg-status-live-bg px-3 py-2 text-xs font-medium text-status-live">Everyone has a status.</div>}
 
-              <div className="mt-6 rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground"><p className="font-medium text-foreground">Keyboard shortcuts</p><p className="mt-2 leading-5">P Present · L Late · A Absent · E Permission · R Permission Pending · S Skip</p><p className="leading-5">← Previous · → Next</p></div>
+              {current ? (
+                <div className="mt-4 rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs font-semibold text-foreground">Student Info</p>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">ID</span><span className="truncate font-medium text-foreground">{current.studentNumber ?? "—"}</span></div>
+                </div>
+              ) : null}
 
-              <button type="button" onClick={() => void onSaveAndClose()} disabled={saving || records.length === 0} className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save Attendance"}</button>
-              <p className="mt-2 text-center text-xs text-muted-foreground">Permission Pending stays unresolved until an authorized lecturer changes it. It never becomes Absent automatically.</p>
+              <button type="button" onClick={() => void onSaveAndClose()} disabled={saving || records.length === 0} className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save Attendance"}</button>
+              <p className="mt-2 text-center text-[10px] leading-4 text-muted-foreground">Permission Pending remains unresolved until an authorized lecturer changes it.</p>
             </aside>
           </div>
         </div>
@@ -335,10 +422,10 @@ export function RollCallDialog({
   );
 }
 
-function SummaryRow({ label, value, emphasized = false }: { label: string; value: number; emphasized?: boolean }) {
+function SummaryRow({ label, value, dotClass }: { label: string; value: number; dotClass: string }) {
   return (
-    <div className={`flex items-center justify-between rounded-md px-3 py-2 ${emphasized ? "bg-status-upcoming-bg" : "bg-background"}`}>
-      <span className={emphasized ? "font-medium text-foreground" : "text-muted-foreground"}>{label}</span>
+    <div className="flex items-center justify-between rounded-md bg-background px-2.5 py-2 text-xs">
+      <span className="inline-flex items-center gap-2 text-muted-foreground"><span className={`h-2 w-2 rounded-full ${dotClass}`} />{label}</span>
       <span className="font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   );
