@@ -45,7 +45,7 @@ export function createAuthRouter(): Router {
   router.use(requireAuth);
 
   router.get("/me", async (req, res) => {
-    res.json(await authService.me(req.user!.id));
+    res.json(await authService.me(req.user!.id, req.user!.roles));
   });
 
   router.post("/accounts", requirePermission("accounts:create"), async (req, res) => {

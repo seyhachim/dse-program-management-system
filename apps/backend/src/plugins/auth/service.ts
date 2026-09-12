@@ -25,6 +25,18 @@ const accountSelect = {
 export class ProvisioningError extends Error {}
 export class ProgrammeRoleAssignmentError extends Error {}
 
+/**
+ * `/me` must describe the current authenticated session, not every role that the
+ * underlying User may hold. Supabase sessions already resolve all DB roles in
+ * middleware; dev tokens may intentionally carry a narrower persona role.
+ */
+export function rolesForAuthenticatedSession(
+  databaseRoles: Role[],
+  authenticatedRoles?: Role[],
+): Role[] {
+  return [...new Set(authenticatedRoles ?? databaseRoles)];
+}
+
 let adminClient: SupabaseClient | undefined;
 
 function getAdminClient(): SupabaseClient {
@@ -83,7 +95,7 @@ async function programmeRoleView(
 }
 
 export const authService = {
-  async me(userId: string) {
+  async me(userId: string, authenticatedRoles?: Role[]) {
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
@@ -94,7 +106,8 @@ export const authService = {
         roleAssignments: { select: { role: { select: { slug: true } } } },
       },
     });
-    const roles = user.roleAssignments.map((a) => a.role.slug) as Role[];
+    const databaseRoles = user.roleAssignments.map((a) => a.role.slug) as Role[];
+    const roles = rolesForAuthenticatedSession(databaseRoles, authenticatedRoles);
     return {
       id: user.id,
       email: user.email,
