@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  FinalProjectEligibilityQuery,
   ListSupervisorDiscoveryQuery,
   UpdateSupervisorProfileInput,
 } from "./final-project.ts";
@@ -10,6 +11,11 @@ describe("Final Project discovery contracts", () => {
     expect(ListSupervisorDiscoveryQuery.parse({ programmeId: "dse", accepting: "false" }).accepting).toBe(false);
     expect(ListSupervisorDiscoveryQuery.parse({ programmeId: "dse" }).accepting).toBeUndefined();
     expect(ListSupervisorDiscoveryQuery.safeParse({ programmeId: "dse", accepting: "yes" }).success).toBe(false);
+  });
+
+  test("requires a programme for student Final Project eligibility", () => {
+    expect(FinalProjectEligibilityQuery.parse({ programmeId: "dse" }).programmeId).toBe("dse");
+    expect(FinalProjectEligibilityQuery.safeParse({ programmeId: "   " }).success).toBe(false);
   });
 
   test("accepts valid supervisor discovery profile input", () => {

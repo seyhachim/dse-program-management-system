@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AuthUser } from "../../core/auth/token.ts";
 import {
+  canCheckStudentFinalProjectEligibility,
   canEditOwnSupervisorProfile,
   canManageSupervisorOverview,
   canReadSupervisorDiscovery,
@@ -20,10 +21,23 @@ function user(
 }
 
 describe("Final Project programme authorization", () => {
-  test("student discovery is confined to the student's programme", () => {
+  test("student discovery fails closed until eligibility is established", () => {
     const student = user("student-1", "student", "dse");
-    expect(canReadSupervisorDiscovery(student, "dse")).toBe(true);
-    expect(canReadSupervisorDiscovery(student, "bioeng")).toBe(false);
+    expect(canCheckStudentFinalProjectEligibility(student, "dse")).toBe(true);
+    expect(canReadSupervisorDiscovery(student, "dse")).toBe(false);
+    expect(canReadSupervisorDiscovery(student, "dse", true)).toBe(true);
+  });
+
+  test("student discovery remains confined to the student's programme", () => {
+    const student = user("student-1", "student", "dse");
+    expect(canCheckStudentFinalProjectEligibility(student, "bioeng")).toBe(false);
+    expect(canReadSupervisorDiscovery(student, "bioeng", true)).toBe(false);
+  });
+
+  test("staff discovery does not depend on student eligibility", () => {
+    const lecturer = user("lecturer-1", "lecturer", "dse");
+    expect(canReadSupervisorDiscovery(lecturer, "dse")).toBe(true);
+    expect(canReadSupervisorDiscovery(lecturer, "bioeng")).toBe(false);
   });
 
   test("lecturer can edit only their own profile and only in their programme", () => {
@@ -43,5 +57,6 @@ describe("Final Project programme authorization", () => {
     const admin = user("admin-1", "admin", null);
     expect(canManageSupervisorOverview(admin, "dse")).toBe(true);
     expect(canManageSupervisorOverview(admin, "bioeng")).toBe(true);
+    expect(canReadSupervisorDiscovery(admin, "dse")).toBe(true);
   });
 });

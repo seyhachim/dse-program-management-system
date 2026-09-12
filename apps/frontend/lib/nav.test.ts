@@ -13,8 +13,11 @@ const placeholderPaths = [
   "/help",
 ];
 
-function sidebarPaths(roles: Parameters<typeof getNavGroups>[0]) {
-  return getNavGroups(roles).flatMap((group) => group.routes.map((route) => route.path));
+function sidebarPaths(
+  roles: Parameters<typeof getNavGroups>[0],
+  access?: Parameters<typeof getNavGroups>[1],
+) {
+  return getNavGroups(roles, access).flatMap((group) => group.routes.map((route) => route.path));
 }
 
 test("Rubric Bank is visible only to programme leadership", () => {
@@ -36,6 +39,23 @@ test("Rating Scales management is visible only to Admin and Programme Coordinato
   expect(getNavRoutes(["lecturer"]).find((route) => route.path === path)).toBeUndefined();
   expect(getNavRoutes(["program_secretary"]).find((route) => route.path === path)).toBeUndefined();
   expect(getNavRoutes(["qa_reviewer"]).find((route) => route.path === path)).toBeUndefined();
+});
+
+test("Final Project student navigation follows Year IV eligibility", () => {
+  const path = "/final-project/supervisors";
+
+  expect(sidebarPaths(["student"], { finalProjectStudentEligible: true })).toContain(path);
+  expect(sidebarPaths(["student"], { finalProjectStudentEligible: false })).not.toContain(path);
+
+  // Generic manifest inspection remains unchanged when no runtime access context is supplied.
+  expect(getNavRoutes(["student"]).some((route) => route.path === path)).toBe(true);
+  expect(getNavRoutes(["student"], { finalProjectStudentEligible: false }).some((route) => route.path === path)).toBe(false);
+});
+
+test("Final Project eligibility filtering does not alter staff navigation", () => {
+  expect(sidebarPaths(["lecturer"], { finalProjectStudentEligible: false })).toContain("/final-project/supervisor-profile");
+  expect(sidebarPaths(["program_coordinator"], { finalProjectStudentEligible: false })).toContain("/final-project/supervisors/manage");
+  expect(sidebarPaths(["admin"], { finalProjectStudentEligible: false })).toContain("/final-project/supervisors/manage");
 });
 
 test("Admin and Programme Coordinator sidebars omit placeholder-only routes", () => {

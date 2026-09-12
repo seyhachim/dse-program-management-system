@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const FINAL_PROJECT_PATHWAY_COURSE_CODES = ["FPR401", "FPR402", "THE402", "INT402"] as const;
+
 export const FinalProjectResearchTrackInput = z.object({
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().max(500).default(""),
@@ -41,10 +43,21 @@ export const ListSupervisorDiscoveryQuery = z.object({
 });
 export type ListSupervisorDiscoveryQuery = z.infer<typeof ListSupervisorDiscoveryQuery>;
 
+export const FinalProjectEligibilityQuery = z.object({
+  programmeId: z.string().trim().min(1),
+});
+export type FinalProjectEligibilityQuery = z.infer<typeof FinalProjectEligibilityQuery>;
+
 export const ProgrammeSupervisorOverviewQuery = z.object({
   programmeId: z.string().trim().min(1),
 });
 export type ProgrammeSupervisorOverviewQuery = z.infer<typeof ProgrammeSupervisorOverviewQuery>;
+
+export interface FinalProjectEligibilityView {
+  programmeId: string;
+  eligible: boolean;
+  courseCode: (typeof FINAL_PROJECT_PATHWAY_COURSE_CODES)[number] | null;
+}
 
 export interface FinalProjectResearchTrackView {
   id: string;
