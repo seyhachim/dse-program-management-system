@@ -331,7 +331,7 @@ export function PortalHome() {
                   {nextMeeting.course.title}
                 </p>
                 <p className="mt-1 break-words text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {nextMeeting.course.code} · Section {nextMeeting.course.sectionCode}
+                  {nextMeeting.course.code} · Class {nextMeeting.course.sectionCode}
                 </p>
 
                 <CourseAchievementBadges

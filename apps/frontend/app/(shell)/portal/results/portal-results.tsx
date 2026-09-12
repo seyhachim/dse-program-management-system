@@ -52,7 +52,7 @@ export function PortalResults() {
             <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
               <div className="min-w-0">
                 <p className="break-words text-xs font-semibold uppercase tracking-wide text-primary">
-                  {course.code} · Section {course.sectionCode}
+                  {course.code} · Class {course.sectionCode}
                 </p>
                 <h2 className="mt-1 break-words text-lg font-semibold">
                   {course.title}

@@ -135,7 +135,7 @@ function AssessmentCard({
               {item.courseCode}
             </span>
             <span className="rounded bg-muted px-2 py-1">
-              Section {item.sectionCode}
+              Class {item.sectionCode}
             </span>
             <span className="rounded bg-muted px-2 py-1">{item.type}</span>
           </div>

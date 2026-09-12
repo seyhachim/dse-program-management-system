@@ -50,7 +50,7 @@ export function PortalAnnouncements() {
                   href={`/portal/courses/${item.offeringId}`}
                   className="inline-flex min-h-11 max-w-full items-center break-words text-xs font-semibold uppercase tracking-wide text-primary"
                 >
-                  {item.courseCode} · Section {item.sectionCode}
+                  {item.courseCode} · Class {item.sectionCode}
                 </Link>
                 {item.pinned ? (
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
