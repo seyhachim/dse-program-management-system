@@ -71,7 +71,8 @@ describe("Student Portal mobile home contract", () => {
     expect(courseBadgeSource).toContain("reliable_learner:");
     expect(courseBadgeSource).toContain("perfect_attendance:");
     expect(courseBadgeSource).toContain("strong_performance:");
-    expect(courseBadgeSource).toContain("course_excellence:");
+    const hasCourseExcellence = courseBadgeSource.includes("course_excellence:");
+    expect(hasCourseExcellence).toBe(true);
     expect(courseBadgeSource).toContain("{badge.title}");
     expect(courseBadgeSource).not.toContain("Course role:");
   });
