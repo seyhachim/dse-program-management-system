@@ -179,7 +179,7 @@ export interface PortalAnnouncement {
 }
 
 export interface StudentPortalHome {
-  student: { id: string; name: string; studentId: string | null; email: string };
+  student: { id: string; name: string; studentId: string; email: string };
   courses: PortalCourseSummary[];
   upcomingAssessments: Array<{
     offeringId: string;
@@ -278,18 +278,357 @@ export const PublishAnnouncementInput = z.object({
 });
 export type PublishAnnouncementInput = z.infer<typeof PublishAnnouncementInput>;
 
-export const PublishAssessmentResultInput = z.object({
-  enrollmentId: z.string().uuid(),
-  assessmentItemId: z.string().uuid(),
-  score: z.number().min(0),
-  maxScore: z.number().positive(),
-  feedback: z.string().trim().max(5000).default(""),
+export const SetOfferingResultAccessPolicyInput = z.object({
+  requireSurveyBeforeResults: z.boolean(),
 });
-export type PublishAssessmentResultInput = z.infer<typeof PublishAssessmentResultInput>;
+export type SetOfferingResultAccessPolicyInput = z.infer<typeof SetOfferingResultAccessPolicyInput>;
+
+/** Save one lecturer-entered assessment result without making it student-visible. */
+export const SaveAssessmentResultInput = z.object({
+  enrollmentId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+}).refine((value) => value.score <= value.maxScore, {
+  message: "Score cannot exceed maximum score",
+  path: ["score"],
+});
+export type SaveAssessmentResultInput = z.infer<typeof SaveAssessmentResultInput>;
+
+/** Replace the private criterion-score set for one draft whole-assessment result. */
+export const SaveAssessmentCriterionScoresInput = z.object({
+  enrollmentId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+  scores: z.array(z.object({
+    criterionId: z.string().min(1),
+    score: z.coerce.number().min(0),
+    rubricLevelId: z.string().nullable().optional(),
+  })),
+});
+export type SaveAssessmentCriterionScoresInput = z.infer<typeof SaveAssessmentCriterionScoresInput>;
+
+/** Explicitly publish every complete draft row for one assessment in one offering. */
+export const PublishAssessmentResultsInput = z.object({
+  offeringId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+});
+export type PublishAssessmentResultsInput = z.infer<typeof PublishAssessmentResultsInput>;
+
+/** Finalize one fully-published assessment result set as the official locked state. */
+export const FinalizeAssessmentResultsInput = z.object({
+  offeringId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
+});
+export type FinalizeAssessmentResultsInput = z.infer<typeof FinalizeAssessmentResultsInput>;
+
+/** Apply one controlled correction to an already-finalized result. */
+export const CorrectFinalizedAssessmentResultInput = z.object({
+  assessmentResultId: z.string().uuid(),
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+  reason: z.string().trim().min(1, "A correction reason is required").max(2000),
+  expectedUpdatedAt: z.string().datetime(),
+}).refine((value) => value.score <= value.maxScore, {
+  message: "Score cannot exceed maximum score",
+  path: ["score"],
+});
+export type CorrectFinalizedAssessmentResultInput = z.infer<typeof CorrectFinalizedAssessmentResultInput>;
+
+export interface PublishAssessmentResultsResponse {
+  offeringId: string;
+  assessmentItemId: string;
+  publishedCount: number;
+  previouslyPublishedCount: number;
+  publishedAt: string;
+  publishedById: string;
+}
+
+export interface FinalizeAssessmentResultsResponse {
+  offeringId: string;
+  assessmentItemId: string;
+  finalizedCount: number;
+  finalizedAt: string;
+  finalizedById: string;
+}
+
+export interface CorrectFinalizedAssessmentResultResponse {
+  assessmentResultId: string;
+  correctionId: string;
+  score: number;
+  maxScore: number;
+  feedback: string;
+  correctedAt: string;
+  correctedById: string;
+  updatedAt: string;
+}
+
+/** @deprecated Use SaveAssessmentResultInput. Kept temporarily for source compatibility. */
+export const PublishAssessmentResultInput = SaveAssessmentResultInput;
+export type PublishAssessmentResultInput = SaveAssessmentResultInput;
 
 export const SetAssessmentDeadlineInput = z.object({
   offeringId: z.string().uuid(),
-  assessmentItemId: z.string().uuid(),
+  assessmentItemId: z.string().min(1),
   dueAt: z.string().datetime(),
 });
 export type SetAssessmentDeadlineInput = z.infer<typeof SetAssessmentDeadlineInput>;
+
+export interface CourseDeliveryRubricCriterion {
+  id: string;
+  name: string;
+  cloCodes: string[];
+  scoringScope: "group" | "individual";
+  levels: Array<{ id: string; label: string; points: number }>;
+}
+
+export interface CourseDeliveryCriterionScore {
+  criterionId: string;
+  score: number;
+  maxScore: number;
+  rubricLevelId: string | null;
+  rubricLevelLabel: string | null;
+}
+
+export interface CourseDeliveryResultRow {
+  enrollmentId: string;
+  studentId: string;
+  studentCode: string | null;
+  studentName: string;
+  score: number | null;
+  maxScore: number | null;
+  feedback: string;
+  publishedAt: string | null;
+  finalizedAt: string | null;
+  criterionScores: CourseDeliveryCriterionScore[];
+}
+
+export interface CourseDeliveryAssessment {
+  id: string;
+  name: string;
+  type: string;
+  mode: "individual" | "group" | "group_individual";
+  groupWeight: number | null;
+  individualWeight: number | null;
+  weight: number | null;
+  countsTowardGrade: boolean;
+  courseGradeWeight: number | null;
+  cloCodes: string[];
+  dueWeek: number | null;
+  dueAt: string | null;
+  rubricId: string | null;
+  rubricName: string;
+  rubricContentHash: string | null;
+  rubricCriteria: CourseDeliveryRubricCriterion[];
+  results: CourseDeliveryResultRow[];
+}
+
+export interface CourseDeliveryAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  pinned: boolean;
+  authorName: string;
+  publishedAt: string | null;
+}
+
+export interface CourseFeedbackSummary {
+  responseCount: number;
+  minimumResponses: number;
+  available: boolean;
+  averages: {
+    overall: number;
+    teachingClarity: number;
+    assessmentClarity: number;
+  } | null;
+  workload: {
+    light: number;
+    appropriate: number;
+    heavy: number;
+  };
+  positiveComments: string[];
+  improvementComments: string[];
+}
+
+export interface CourseDeliveryOffering {
+  offeringId: string;
+  courseId: string;
+  code: string;
+  title: string;
+  term: string;
+  sectionCode: string;
+  status: string;
+  specificationStatus: string | null;
+  studentCount: number;
+  assessments: CourseDeliveryAssessment[];
+  announcements: CourseDeliveryAnnouncement[];
+  feedback: CourseFeedbackSummary;
+}
+
+
+export const SaveAssessmentGroupsInput = z.object({
+  groups: z.array(z.object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(1).max(120),
+    enrollmentIds: z.array(z.string().uuid()),
+  })).min(1),
+}).superRefine((value, ctx) => {
+  const names = new Set<string>();
+  const members = new Set<string>();
+  value.groups.forEach((group, groupIndex) => {
+    const name = group.name.toLocaleLowerCase();
+    if (names.has(name)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["groups", groupIndex, "name"], message: "Group names must be unique" });
+    names.add(name);
+    group.enrollmentIds.forEach((id, memberIndex) => {
+      if (members.has(id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["groups", groupIndex, "enrollmentIds", memberIndex], message: "A student can belong to only one group" });
+      members.add(id);
+    });
+  });
+});
+export type SaveAssessmentGroupsInput = z.infer<typeof SaveAssessmentGroupsInput>;
+
+export const SaveAssessmentGroupScoreInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+}).refine((value) => value.score <= value.maxScore, { message: "Score cannot exceed maximum score", path: ["score"] });
+export type SaveAssessmentGroupScoreInput = z.infer<typeof SaveAssessmentGroupScoreInput>;
+
+export const SaveAssessmentSourceCriterionScoresInput = z.object({
+  scores: z.array(z.object({
+    criterionId: z.string().min(1),
+    score: z.coerce.number().min(0),
+    rubricLevelId: z.string().nullable().optional(),
+  })),
+});
+export type SaveAssessmentSourceCriterionScoresInput = z.infer<typeof SaveAssessmentSourceCriterionScoresInput>;
+
+export const SaveAssessmentIndividualComponentInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+  adjustmentPoints: z.coerce.number().default(0),
+  adjustmentReason: z.string().trim().max(2000).default(""),
+}).superRefine((value, ctx) => {
+  const adjusted = value.score + value.adjustmentPoints;
+  if (adjusted < 0 || adjusted > value.maxScore) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["adjustmentPoints"], message: "Adjusted score must remain between 0 and the maximum score" });
+  if (value.adjustmentPoints !== 0 && !value.adjustmentReason) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["adjustmentReason"], message: "An adjustment reason is required" });
+});
+export type SaveAssessmentIndividualComponentInput = z.infer<typeof SaveAssessmentIndividualComponentInput>;
+
+export const CorrectAssessmentGroupScoreInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+  reason: z.string().trim().min(1).max(2000),
+  expectedUpdatedAt: z.string().datetime(),
+}).refine((value) => value.score <= value.maxScore, {
+  message: "Score cannot exceed maximum score",
+  path: ["score"],
+});
+export type CorrectAssessmentGroupScoreInput = z.infer<typeof CorrectAssessmentGroupScoreInput>;
+
+export const CorrectAssessmentIndividualComponentInput = z.object({
+  score: z.coerce.number().min(0),
+  maxScore: z.coerce.number().positive(),
+  feedback: z.string().trim().max(5000).default(""),
+  adjustmentPoints: z.coerce.number().default(0),
+  adjustmentReason: z.string().trim().max(2000).default(""),
+  reason: z.string().trim().min(1).max(2000),
+  expectedUpdatedAt: z.string().datetime(),
+}).superRefine((value, ctx) => {
+  const adjusted = value.score + value.adjustmentPoints;
+  if (adjusted < 0 || adjusted > value.maxScore) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["adjustmentPoints"],
+      message: "Adjusted score must remain between 0 and the maximum score",
+    });
+  }
+  if (value.adjustmentPoints !== 0 && !value.adjustmentReason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["adjustmentReason"],
+      message: "An adjustment reason is required",
+    });
+  }
+});
+export type CorrectAssessmentIndividualComponentInput = z.infer<typeof CorrectAssessmentIndividualComponentInput>;
+
+export interface GroupAssessmentWorkspace {
+  offeringId: string;
+  courseSpecId: string;
+  assessmentItemId: string;
+  assessmentName: string;
+  mode: "group" | "group_individual";
+  groupWeight: number | null;
+  individualWeight: number | null;
+  enrollments: Array<{ enrollmentId: string; studentId: string; studentCode: string | null; studentName: string }>;
+  rubricId: string | null;
+  rubricName: string;
+  rubricContentHash: string | null;
+  rubricCriteria: CourseDeliveryRubricCriterion[];
+  groups: Array<{
+    id: string;
+    name: string;
+    sortOrder: number;
+    membershipLockedAt: string | null;
+    publishedAt: string | null;
+    finalizedAt: string | null;
+    members: Array<{ enrollmentId: string; studentId: string; studentCode: string; studentName: string }>;
+    score: null | {
+      id: string;
+      score: number;
+      maxScore: number;
+      feedback: string;
+      updatedAt: string;
+      criterionScores: CourseDeliveryCriterionScore[];
+    };
+    individualComponents: Array<{
+      id: string;
+      enrollmentId: string;
+      score: number;
+      maxScore: number;
+      feedback: string;
+      adjustmentPoints: number;
+      adjustmentReason: string;
+      updatedAt: string;
+      criterionScores: CourseDeliveryCriterionScore[];
+    }>;
+  }>;
+  readiness: {
+    readyToPublish: boolean;
+    unassignedEnrollmentIds: string[];
+    emptyGroupIds: string[];
+    missingGroupScoreIds: string[];
+    missingGroupCriterionGroupIds: string[];
+    missingIndividualEnrollmentIds: string[];
+    missingIndividualCriterionEnrollmentIds: string[];
+    invalidWeightConfiguration: boolean;
+  };
+  audit: Array<{ id: string; action: string; groupId: string | null; enrollmentId: string | null; actorName: string; reason: string; createdAt: string }>;
+}
+
+/** Lecturer-only calculation preview. Draft marks are included and must never be sent to student endpoints. */
+export interface CourseDeliveryStudentResultReview {
+  enrollmentId: string;
+  studentId: string;
+  studentCode: string | null;
+  studentName: string;
+  totalCourseGrade: number | null;
+  courseGradeComplete: boolean;
+  completedGradeWeight: number;
+  configuredGradeWeight: number;
+  achievements: PortalCloAchievement[];
+  overallAchievement: number | null;
+}
+
+export interface CourseDeliveryResultReview {
+  offeringId: string;
+  courseSpecId: string;
+  courseCode: string;
+  courseTitle: string;
+  sectionCode: string;
+  rows: CourseDeliveryStudentResultReview[];
+}
