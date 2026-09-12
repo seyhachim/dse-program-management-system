@@ -7,6 +7,7 @@ import type {
   TemporaryPasswordResponse,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
+import { createAuthMeCache } from "./auth-me-cache";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
 /** Auth plugin calls. Privileged recovery still goes through the backend. */
@@ -41,21 +42,20 @@ export const authApi = {
 };
 
 /**
- * Cached in-flight `/me` request, shared across all `useMe()` callers so the
- * sidebar, the page guard and the topbar don't each fire their own request.
+ * Successful `/me` results are shared across mounted callers until the auth
+ * identity changes. Failed lookups are deliberately evicted so retry is real.
  */
-let mePromise: Promise<MeResponse> | null = null;
+const meCache = createAuthMeCache(() => authApi.me());
 const meListeners = new Set<() => void>();
 const authIdentityListeners = new Set<(userId: string | undefined) => void>();
 
 function fetchMe(): Promise<MeResponse> {
-  if (!mePromise) mePromise = authApi.me();
-  return mePromise;
+  return meCache.get();
 }
 
 /** Drop the cached `/me` result and tell every mounted `useMe()` to refetch. */
 export function invalidateMe() {
-  mePromise = null;
+  meCache.clear();
   meListeners.forEach((listener) => listener());
 }
 
@@ -81,18 +81,35 @@ if (AUTH_MODE === "supabase" && typeof window !== "undefined") {
   });
 }
 
-/** Resolved current caller, or `null` while loading / on error. */
-export function useMe(): { me: MeResponse | null; loading: boolean } {
+export type UseMeResult = {
+  me: MeResponse | null;
+  loading: boolean;
+  error: Error | null;
+  retry: () => void;
+};
+
+/** Resolved current caller, with an explicit recoverable load-error state. */
+export function useMe(): UseMeResult {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = () => {
       setLoading(true);
+      setError(null);
       fetchMe()
-        .then((res) => active && setMe(res))
-        .catch(() => active && setMe(null))
+        .then((res) => {
+          if (!active) return;
+          setMe(res);
+          setError(null);
+        })
+        .catch((cause: unknown) => {
+          if (!active) return;
+          setMe(null);
+          setError(cause instanceof Error ? cause : new Error("Account verification failed"));
+        })
         .finally(() => active && setLoading(false));
     };
     load();
@@ -103,5 +120,5 @@ export function useMe(): { me: MeResponse | null; loading: boolean } {
     };
   }, []);
 
-  return { me, loading };
+  return { me, loading, error, retry: invalidateMe };
 }
