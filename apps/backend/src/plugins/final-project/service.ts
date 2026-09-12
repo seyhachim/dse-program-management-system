@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import type {
-  ListSupervisorDiscoveryQuery,
-  ProgrammeSupervisorOverviewView,
-  SupervisorDiscoveryProfileView,
-  UpdateSupervisorProfileInput,
+import {
+  FINAL_PROJECT_PATHWAY_COURSE_CODES,
+  type FinalProjectEligibilityView,
+  type ListSupervisorDiscoveryQuery,
+  type ProgrammeSupervisorOverviewView,
+  type SupervisorDiscoveryProfileView,
+  type UpdateSupervisorProfileInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 
@@ -27,10 +29,64 @@ type ProfileRow = {
 type TrackRow = { id: string; name: string; description: string };
 type IdeaRow = { id: string; title: string; summary: string; trackName: string };
 
+export type FinalProjectEnrollmentCandidate = {
+  programmeId: string;
+  courseCode: string;
+  programmeYear: number;
+  offeringStatus: string;
+  studentStatus: string;
+};
+
+const finalProjectCourseCodes = new Set<string>(FINAL_PROJECT_PATHWAY_COURSE_CODES);
+const eligibleOfferingStatuses = new Set(["Planned", "Active"]);
+
+/**
+ * Final Project access follows authoritative academic enrolment, not a manually
+ * maintained UI flag. Keeping the decision pure makes the security rule easy to
+ * exercise without mutating academic records in tests.
+ */
+export function resolveFinalProjectEligibility(
+  candidates: FinalProjectEnrollmentCandidate[],
+  programmeId: string,
+): FinalProjectEligibilityView {
+  const match = candidates.find((candidate) =>
+    candidate.programmeId === programmeId
+    && candidate.studentStatus === "Active"
+    && candidate.programmeYear === 4
+    && eligibleOfferingStatuses.has(candidate.offeringStatus)
+    && finalProjectCourseCodes.has(candidate.courseCode),
+  );
+
+  return {
+    programmeId,
+    eligible: Boolean(match),
+    courseCode: match
+      ? match.courseCode as FinalProjectEligibilityView["courseCode"]
+      : null,
+  };
+}
+
 export class FinalProjectNotFoundError extends Error {}
 
 export class FinalProjectService {
   constructor(private readonly db: DbClient = prisma) {}
+
+  async studentEligibility(userId: string, programmeId: string): Promise<FinalProjectEligibilityView> {
+    const candidates = await this.db.$queryRaw<FinalProjectEnrollmentCandidate[]>(Prisma.sql`
+      SELECT c."programmeId",
+             c."code" AS "courseCode",
+             o."programmeYear",
+             o."status"::text AS "offeringStatus",
+             s."status"::text AS "studentStatus"
+      FROM public."Student" s
+      JOIN public."Enrollment" e ON e."studentId" = s."id"
+      JOIN public."Offering" o ON o."id" = e."offeringId"
+      JOIN public."Course" c ON c."id" = o."courseId"
+      WHERE s."userId" = ${userId}
+      ORDER BY o."createdAt" DESC
+    `);
+    return resolveFinalProjectEligibility(candidates, programmeId);
+  }
 
   async listPublished(query: ListSupervisorDiscoveryQuery): Promise<SupervisorDiscoveryProfileView[]> {
     const q = query.q?.trim() ?? "";
