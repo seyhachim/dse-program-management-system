@@ -18,10 +18,11 @@ describe("Roll Call dialog layout", () => {
     expect(latinName).toBeGreaterThan(khmerName);
   });
 
-  test("shows course attendance context and the three attendance motivation badges", () => {
+  test("shows course attendance context and renders earned attendance badges", () => {
     expect(rollCallDialogSource).toContain("Attendance this course");
+    expect(rollCallDialogSource).toContain("history.badges.map");
+    expect(rollCallDialogSource).toContain("<BadgeIcon title={badge} /> {badge}");
     expect(rollCallDialogSource).toContain("Perfect Attendance");
     expect(rollCallDialogSource).toContain("Reliable Learner");
-    expect(rollCallDialogSource).toContain("Great Start");
   });
 });
