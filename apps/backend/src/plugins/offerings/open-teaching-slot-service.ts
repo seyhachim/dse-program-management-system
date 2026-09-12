@@ -334,6 +334,16 @@ async function assertNoScheduleConflict(
   const recurring = await tx.offering.findMany({
     where: {
       status: "Active",
+      AND: [
+        slot.sourceAcademicCalendarPeriodId
+          ? {
+              OR: [
+                { academicCalendarPeriodId: slot.sourceAcademicCalendarPeriodId },
+                { academicCalendarPeriodId: null, term: slot.sourceTerm },
+              ],
+            }
+          : { term: slot.sourceTerm },
+      ],
       meetings: {
         some: {
           dayOfWeek: slot.scheduledDayOfWeek as never,
