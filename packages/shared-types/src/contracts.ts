@@ -1,4 +1,4 @@
-import type { StudentStatus } from "./students.ts";
+import type { StudentProfile, StudentStatus } from "./students.ts";
 import type { UserHonorific } from "./lecturers.ts";
 
 /**
@@ -18,6 +18,8 @@ export interface StudentRef {
   studentId: string | null;
   email: string | null;
   status: StudentStatus;
+  /** Optional official-name profile for cross-plugin read projections such as Roll Call. */
+  profile?: StudentProfile | null;
 }
 
 export interface CourseRef {

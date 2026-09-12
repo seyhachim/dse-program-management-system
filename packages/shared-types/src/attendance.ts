@@ -59,10 +59,27 @@ export const SaveAttendanceInput = z.object({
 // status=null, permissionPending=false, note="" before reaching the service.
 export type SaveAttendanceInput = z.input<typeof SaveAttendanceInput>;
 
+export type AttendanceMotivationBadge =
+  | "Great Start"
+  | "Reliable Learner"
+  | "Perfect Attendance";
+
+export interface AttendanceStudentSummary {
+  attendanceRate: number | null;
+  attendedSessions: number;
+  markedSessions: number;
+  counts: Record<AttendanceStatus, number>;
+  badges: AttendanceMotivationBadge[];
+}
+
 export interface AttendanceRecordView {
   studentId: string;
   studentNumber: string | null;
   studentName: string;
+  /** Official Khmer full name when available. Kept optional for historical snapshots. */
+  studentKhmerName?: string | null;
+  /** Course-to-date attendance context used by focused Roll Call UI. */
+  attendanceSummary?: AttendanceStudentSummary | null;
   status: AttendanceStatus | null;
   permissionPending: boolean;
   permissionPendingSince: string | null;
