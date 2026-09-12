@@ -97,6 +97,52 @@ integrationDescribe("backend integration authorization boundaries", () => {
     await prisma.$disconnect();
   });
 
+  test("curriculum competency framework routes enforce programme authorization", async () => {
+    const lecturerToken = signToken(context.users.lecturer);
+    const coordinatorToken = signToken(context.users.coordinator);
+
+    const deniedRead = await request("/api/programme/competency-frameworks/programmes/dse", {
+      token: lecturerToken,
+    });
+    expect(deniedRead.status).toBe(403);
+
+    const allowedRead = await request("/api/programme/competency-frameworks/programmes/dse", {
+      token: coordinatorToken,
+    });
+    expect(allowedRead.status).toBe(200);
+
+    const deniedCreate = await request("/api/programme/competency-frameworks/programmes/dse", {
+      method: "POST",
+      token: lecturerToken,
+      body: { code: "integration-framework", name: "Integration Framework", changeNote: "" },
+    });
+    expect(deniedCreate.status).toBe(403);
+
+    const created = await request("/api/programme/competency-frameworks/programmes/dse", {
+      method: "POST",
+      token: coordinatorToken,
+      body: { code: `integration-framework-${crypto.randomUUID().slice(0, 8)}`, name: "Integration Framework", changeNote: "Authorization smoke" },
+    });
+    expect(created.status).toBe(201);
+    const frameworkVersionId = (created.body as { frameworkVersionId?: string }).frameworkVersionId;
+    expect(frameworkVersionId).toBeTruthy();
+
+    const deniedBind = await request(
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/competency-framework`,
+      { method: "PUT", token: lecturerToken, body: { frameworkVersionId } },
+    );
+    expect(deniedBind.status).toBe(403);
+
+    const allowedBind = await request(
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/competency-framework`,
+      { method: "PUT", token: coordinatorToken, body: { frameworkVersionId } },
+    );
+    expect(allowedBind.status).toBe(200);
+    expect(
+      (allowedBind.body as { competencyFramework?: { frameworkVersionId?: string } }).competencyFramework?.frameworkVersionId,
+    ).toBe(frameworkVersionId);
+  });
+
   test("missing, invalid, and expired bearer tokens return 401", async () => {
     const missing = await request("/api/courses");
     expect(missing.status).toBe(401);

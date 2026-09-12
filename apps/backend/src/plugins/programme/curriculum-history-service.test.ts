@@ -36,6 +36,7 @@ function read(versionId: string, courses: CurriculumCourse[], id = curriculumId)
       updatedAt: new Date().toISOString(),
     },
     versions: [],
+    competencyFramework: null,
     years,
     pathways: [],
     totals: { programmeCredits: 0, basicCredits: 0, coreCredits: 0, electiveCredits: 0, specializationCredits: 0, moeysHeipCredits: 0 },
