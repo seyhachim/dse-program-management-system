@@ -1,3 +1,4 @@
+import { OfferingActivationExceptionPanel } from "../../activation-exception-panel";
 import { CurriculumBoundOfferingFormPage } from "../../curriculum-bound-offering-form-page";
 
 export default async function EditOfferingPage({
@@ -6,5 +7,10 @@ export default async function EditOfferingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <CurriculumBoundOfferingFormPage offeringId={id} />;
+  return (
+    <>
+      <CurriculumBoundOfferingFormPage offeringId={id} />
+      <OfferingActivationExceptionPanel offeringId={id} />
+    </>
+  );
 }
