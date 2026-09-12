@@ -10,9 +10,11 @@ describe("mobile Student Portal layout", () => {
     expect("homeQuickAction" in MOBILE_STUDENT_PORTAL_LAYOUT).toBe(false);
   });
 
-  test("next class remains the strongest content card without a hard border", () => {
+  test("next class remains the strongest compact content card without a hard border", () => {
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("min-h-11");
-    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("rounded-[2rem]");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("rounded-[1.75rem]");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("p-3.5");
+    expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("sm:p-4");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("shadow-md");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).toContain("ring-primary/15");
     expect(MOBILE_STUDENT_PORTAL_LAYOUT.homeNextClass).not.toContain("border border");
