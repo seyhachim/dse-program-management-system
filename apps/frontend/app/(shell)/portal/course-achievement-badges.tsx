@@ -46,17 +46,24 @@ function AchievementIcon({ badge }: { badge: PortalCourseAchievementBadge }) {
 
 export function CourseAchievementBadges({
   summary,
+  showLocked = true,
 }: {
   summary: PortalCourseAchievementSummary | null;
+  showLocked?: boolean;
 }) {
   if (!summary) return null;
+
+  const badges = showLocked
+    ? summary.badges
+    : summary.badges.filter((badge) => badge.achieved);
+  if (badges.length === 0) return null;
 
   return (
     <div
       className="mt-2.5 flex flex-wrap gap-1.5"
       aria-label="Course achievement badges"
     >
-      {summary.badges.map((badge) => (
+      {badges.map((badge) => (
         <span
           key={badge.kind}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold leading-none ring-1 sm:text-[11px] ${
