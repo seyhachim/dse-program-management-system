@@ -45,11 +45,6 @@ function assertValidIdentity(value: {
   status: StudentStatus;
 }) {
   if (value.studentId !== null) return;
-  if (value.status !== "Pending") {
-    throw new InvalidStudentIdentityError(
-      "Students without an official Student ID must remain Pending",
-    );
-  }
   if (value.email === null) {
     throw new InvalidStudentIdentityError(
       "Institutional email is required while Student ID is pending",
