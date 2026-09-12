@@ -174,11 +174,33 @@ const frontendManifests = [
 
 const SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS: Role[] = ["admin", "program_coordinator"];
 
+export interface NavigationAccessContext {
+  /** Undefined preserves the manifest-only behavior used by generic route metadata. */
+  finalProjectStudentEligible?: boolean;
+}
+
 function sidebarManifestsForRoles(roles: Role[]): PluginManifest[] {
   const hidePlaceholders = roles.some((role) => SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS.includes(role));
   return hidePlaceholders
     ? frontendManifests.filter((manifest) => manifest.id !== "placeholders")
     : frontendManifests;
+}
+
+function manifestsForAccess(
+  manifests: PluginManifest[],
+  roles: Role[],
+  access?: NavigationAccessContext,
+): PluginManifest[] {
+  if (!roles.includes("student") || access?.finalProjectStudentEligible !== false) {
+    return manifests;
+  }
+
+  return manifests.map((manifest) => manifest.id === finalProjectManifest.id
+    ? {
+        ...manifest,
+        routes: (manifest.routes ?? []).filter((route) => route.path !== "/final-project/supervisors"),
+      }
+    : manifest);
 }
 
 export const iconMap: Record<string, LucideIcon> = {
@@ -209,11 +231,15 @@ export const iconMap: Record<string, LucideIcon> = {
 };
 
 /** All nav routes, or — when roles are given — only those the caller's roles may see. */
-export function getNavRoutes(roles?: Role[]): PluginRoute[] {
-  return roles ? navForRole(frontendManifests, roles) : navFromManifests(frontendManifests);
+export function getNavRoutes(roles?: Role[], access?: NavigationAccessContext): PluginRoute[] {
+  if (!roles) return navFromManifests(frontendManifests);
+  return navForRole(manifestsForAccess(frontendManifests, roles, access), roles);
 }
 
 /** Nav routes for `roles` (union across all of them), grouped into sidebar sections. */
-export function getNavGroups(roles: Role[]): NavGroup[] {
-  return navGroupsForRole(sidebarManifestsForRoles(roles), roles);
+export function getNavGroups(roles: Role[], access?: NavigationAccessContext): NavGroup[] {
+  return navGroupsForRole(
+    manifestsForAccess(sidebarManifestsForRoles(roles), roles, access),
+    roles,
+  );
 }
