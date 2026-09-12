@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   assertDevAuthMode,
+  assertDevTokenSigningConfigured,
   parseGenTokenArgs,
   parseStudentPersonaArgs,
 } from "./dev-auth-cli.ts";
@@ -54,7 +55,7 @@ describe("parseStudentPersonaArgs", () => {
   });
 });
 
-describe("assertDevAuthMode", () => {
+describe("dev persona safety guards", () => {
   test("allows explicit dev auth only", () => {
     expect(() => assertDevAuthMode("dev")).not.toThrow();
   });
@@ -62,5 +63,11 @@ describe("assertDevAuthMode", () => {
   test("fails closed for Supabase or an unset auth mode", () => {
     expect(() => assertDevAuthMode("supabase")).toThrow("AUTH_MODE=dev");
     expect(() => assertDevAuthMode(undefined)).toThrow("AUTH_MODE=dev");
+  });
+
+  test("requires token signing configuration before any persona write", () => {
+    expect(() => assertDevTokenSigningConfigured("local-secret")).not.toThrow();
+    expect(() => assertDevTokenSigningConfigured(undefined)).toThrow("No database changes were made");
+    expect(() => assertDevTokenSigningConfigured("")).toThrow("No database changes were made");
   });
 });
