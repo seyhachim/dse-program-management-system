@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { getNavGroups, iconMap } from "@/lib/nav";
 import { useMe } from "@/lib/auth";
+import { useFinalProjectStudentEligibility } from "@/lib/final-project-access";
 import {
   prefetchRouteData,
   protectedRoutePrefetchPlan,
@@ -40,9 +41,14 @@ export function AppSidebar() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { me, loading } = useMe();
+  const finalProjectAccess = useFinalProjectStudentEligibility(me?.id, me?.roles ?? []);
   // Only show nav the caller's roles are allowed to see. While `me` loads we show
   // skeletons rather than the full list, so restricted items never flash in.
-  const groups = me ? getNavGroups(me.roles) : [];
+  // Student Final Project discovery additionally fails closed until the backend
+  // confirms an eligible Year IV project-course enrolment.
+  const groups = me
+    ? getNavGroups(me.roles, { finalProjectStudentEligible: finalProjectAccess.eligible })
+    : [];
   const guardianPortalVisible = Boolean(me?.roles.includes("guardian"));
   // "footer" is a special group label rendered in the sidebar footer (e.g. Help
   // & Support) instead of the main scrollable nav list.
