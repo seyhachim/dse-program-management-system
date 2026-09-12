@@ -16,77 +16,128 @@ export default function SupervisorDirectoryPage() {
 
   useEffect(() => {
     setLoading(true);
+    setError("");
     const params = new URLSearchParams({ programmeId: PROGRAMME_ID });
-    if (acceptingOnly) params.set("accepting", "true");
     api.get<SupervisorDiscoveryProfileView[]>(`/api/final-project/supervisors?${params}`)
       .then(setItems)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [acceptingOnly]);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) =>
-      item.lecturerName.toLowerCase().includes(q)
-      || item.supervisionStatement.toLowerCase().includes(q)
-      || item.tracks.some((track) => track.name.toLowerCase().includes(q)),
-    );
-  }, [items, search]);
+    return items.filter((item) => {
+      if (acceptingOnly && !item.acceptingStudents) return false;
+      if (!q) return true;
+      return item.lecturerName.toLowerCase().includes(q)
+        || item.supervisionStatement.toLowerCase().includes(q)
+        || item.tracks.some((track) => track.name.toLowerCase().includes(q));
+    });
+  }, [acceptingOnly, items, search]);
+
+  function resetFilters() {
+    setSearch("");
+    setAcceptingOnly(false);
+  }
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6">
       <header className="space-y-2">
-        <p className="text-sm font-medium text-slate-500">Year 4 Final Project</p>
-        <h1 className="text-2xl font-semibold text-slate-950">Find a Supervisor</h1>
-        <p className="max-w-2xl text-sm text-slate-600">Explore published supervision areas and example project ideas before discussing your Final Project direction.</p>
+        <p className="text-sm font-medium text-muted-foreground">Year 4 Final Project</p>
+        <h1 className="text-2xl font-semibold text-foreground">Find a Supervisor</h1>
+        <p className="max-w-2xl text-sm text-foreground-secondary">
+          Explore published supervision areas and example project ideas before discussing your Final Project direction.
+        </p>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-2xl border bg-white p-4 sm:flex-row sm:items-center">
+      <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center">
         <input
-          className="min-h-11 flex-1 rounded-xl border px-3 text-sm"
+          type="search"
+          aria-label="Search supervisors"
+          className="min-h-11 flex-1 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
           placeholder="Search lecturer, research area, or keyword"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <label className="flex min-h-11 items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" checked={acceptingOnly} onChange={(event) => setAcceptingOnly(event.target.checked)} />
+        <label className="flex min-h-11 items-center gap-2 text-sm text-foreground-secondary">
+          <input
+            className="size-4 accent-primary"
+            type="checkbox"
+            checked={acceptingOnly}
+            onChange={(event) => setAcceptingOnly(event.target.checked)}
+          />
           Accepting students only
         </label>
       </section>
 
-      {error ? <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-500">Loading supervisors…</p> : null}
-
-      {!loading && filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-slate-500">No published supervisors match these filters yet.</div>
+      {error ? (
+        <p role="alert" className="rounded-xl border border-error/30 bg-error-bg p-4 text-sm text-error">
+          {error}
+        </p>
+      ) : null}
+      {loading ? (
+        <p role="status" className="text-sm text-muted-foreground">Loading supervisors…</p>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {!loading && !error && items.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <h2 className="font-semibold text-foreground">Supervisor profiles are not published yet</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+            Published supervision areas and project ideas will appear here when lecturers make their profiles available.
+          </p>
+        </div>
+      ) : null}
+
+      {!loading && !error && items.length > 0 && filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <h2 className="font-semibold text-foreground">No supervisors match these filters</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+            Try a different keyword or show all published supervisors, including those who are not currently accepting students.
+          </p>
+          <button
+            type="button"
+            className="mt-4 inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            onClick={resetFilters}
+          >
+            Show all supervisors
+          </button>
+        </div>
+      ) : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Published supervisors">
         {filtered.map((supervisor) => (
-          <article key={supervisor.id} className="flex flex-col gap-4 rounded-2xl border bg-white p-5 shadow-sm">
+          <article key={supervisor.id} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
             <div>
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold text-slate-950">{supervisor.lecturerName}</h2>
-                  <p className="text-sm text-slate-500">{supervisor.lecturerTitle ?? supervisor.qualification ?? "Lecturer"}</p>
+                <div className="min-w-0">
+                  <h2 className="break-words font-semibold text-foreground">{supervisor.lecturerName}</h2>
+                  <p className="break-words text-sm text-muted-foreground">
+                    {supervisor.lecturerTitle ?? supervisor.qualification ?? "Lecturer"}
+                  </p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${supervisor.acceptingStudents ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${supervisor.acceptingStudents ? "bg-success-bg text-success" : "bg-inactive-bg text-inactive"}`}>
                   {supervisor.acceptingStudents ? "Accepting" : "Not accepting"}
                 </span>
               </div>
-              <p className="mt-3 line-clamp-3 text-sm text-slate-600">{supervisor.supervisionStatement || "Supervisor statement coming soon."}</p>
+              <p className="mt-3 line-clamp-3 text-sm text-foreground-secondary">
+                {supervisor.supervisionStatement || "Supervisor statement coming soon."}
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
               {supervisor.tracks.slice(0, 5).map((track) => (
-                <span key={track.id} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{track.name}</span>
+                <span key={track.id} className="max-w-full break-words rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-secondary">
+                  {track.name}
+                </span>
               ))}
             </div>
 
-            <div className="mt-auto flex items-center justify-between border-t pt-4 text-sm">
-              <span className="text-slate-500">Capacity: {supervisor.capacity}</span>
-              <Link className="font-medium text-blue-700 hover:underline" href={`/final-project/supervisors/${supervisor.lecturerId}?programmeId=${PROGRAMME_ID}`}>
+            <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4 text-sm">
+              <span className="text-muted-foreground">Capacity: {supervisor.capacity}</span>
+              <Link
+                className="shrink-0 font-medium text-primary hover:text-primary-hover hover:underline"
+                href={`/final-project/supervisors/${supervisor.lecturerId}?programmeId=${PROGRAMME_ID}`}
+              >
                 View profile →
               </Link>
             </div>
