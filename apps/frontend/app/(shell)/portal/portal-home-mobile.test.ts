@@ -53,11 +53,15 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("catch((): MonitorClassResponsibilityView[] => [])");
   });
 
-  test("loads course achievements as optional metadata but uses compact home variants", () => {
+  test("restores all course achievement badges on Home while keeping compact attendance", () => {
     expect(portalHomeSource).toContain(".courseAchievements()");
     expect(portalHomeSource).toContain("catch((): PortalCourseAchievementSummary[] => [])");
     expect(portalHomeSource).toContain("summary.offeringId === nextMeeting.course.offeringId");
-    expect(portalHomeSource).toContain("showLocked={false}");
+    expect(portalHomeSource).toContain(
+      "<CourseAchievementBadges summary={nextCourseAchievement} />",
+    );
+    expect(portalHomeSource).not.toContain("showLocked={false}");
+    expect(courseBadgeSource).toContain("showLocked = true");
     expect(portalHomeSource).toContain("<CourseAttendanceProgress");
     expect(portalHomeSource).toContain("compact\n");
     expect(portalHomeSource).not.toContain("nextCourseMonitorRole");
@@ -100,22 +104,25 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain("break-words text-xl font-semibold");
     expect(portalHomeSource).toContain('aria-label="Class details"');
     expect(portalHomeSource).toContain(
-      "mt-3 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70 bg-muted/30 shadow-sm",
+      "mt-3 grid grid-cols-2 overflow-hidden rounded-2xl border border-border/70 bg-muted/30 shadow-sm",
     );
     expect(portalHomeSource).toContain(
-      "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary",
+      "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary",
     );
-    expect(portalHomeSource).not.toContain("mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1.5");
+    expect(portalHomeSource).not.toContain("divide-y divide-border/60");
     expect(portalHomeSource).toContain("mt-3 flex min-h-10 items-center");
   });
 
-  test("groups time, room, and lecturer into one semantic details panel", () => {
+  test("groups time, room, and lecturer into one compact semantic details panel", () => {
     const detailsStart = portalHomeSource.indexOf('aria-label="Class details"');
     const detailsEnd = portalHomeSource.indexOf("</dl>", detailsStart);
     const detailsSource = portalHomeSource.slice(detailsStart, detailsEnd);
 
     expect(detailsStart).toBeGreaterThan(-1);
     expect(detailsEnd).toBeGreaterThan(detailsStart);
+    expect(detailsSource).toContain("grid grid-cols-2");
+    expect(detailsSource).toContain("col-span-2");
+    expect(detailsSource).toContain("border-r border-border/60");
     expect(detailsSource).toContain("<Clock3");
     expect(detailsSource).toContain("<MapPin");
     expect(detailsSource).toContain("<GraduationCap");
@@ -123,6 +130,7 @@ describe("Student Portal mobile home contract", () => {
     expect(detailsSource).toContain('nextMeeting.impact ? "Original room" : "Room"');
     expect(detailsSource).toContain('nextMeeting.meeting.room || "Room TBA"');
     expect(detailsSource).toContain('nextMeeting.course.lecturer?.name ?? "Lecturer TBA"');
+    expect(detailsSource).toContain("break-words");
   });
 
   test("shows active teaching context but hides the pre-semester starts-soon box", () => {
