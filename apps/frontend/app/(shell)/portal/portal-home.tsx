@@ -226,13 +226,13 @@ export function PortalHome() {
             <p className="text-sm font-medium text-primary-foreground/75">
               Welcome back
             </p>
-            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-              <h2 className="min-w-0 max-w-full break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+            <div className="mt-0.5 flex min-w-0 items-start justify-between gap-3">
+              <h2 className="min-w-0 flex-1 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
                 {data.student.name}
               </h2>
               {monitorRoleBadges.length > 0 ? (
                 <div
-                  className="flex flex-wrap gap-1.5"
+                  className="ml-auto flex max-w-[52%] shrink-0 flex-wrap justify-end gap-1.5"
                   aria-label="Student responsibilities"
                 >
                   {monitorRoleBadges.map((badge) => {
@@ -256,7 +256,7 @@ export function PortalHome() {
             </p>
           </div>
 
-          {teachingContext ? (
+          {teachingContext && teachingContext.kind !== "upcoming" ? (
             <div
               aria-label="Current teaching week"
               className="inline-flex max-w-full flex-col rounded-2xl bg-primary-foreground/10 px-3.5 py-2.5 ring-1 ring-primary-foreground/15"
@@ -277,13 +277,6 @@ export function PortalHome() {
                     {teachingContext.resumeDate
                       ? `Week ${teachingContext.nextWeek} resumes ${formatAcademicDate(teachingContext.resumeDate)}`
                       : `${academicSemesterLabel(teachingContext.semester)} teaching is complete`}
-                  </span>
-                </>
-              ) : teachingContext.kind === "upcoming" ? (
-                <>
-                  <span className="text-sm font-semibold">Teaching starts soon</span>
-                  <span className="mt-0.5 text-xs text-primary-foreground/75">
-                    {academicSemesterLabel(teachingContext.semester)} · {formatAcademicDate(teachingContext.startDate)}
                   </span>
                 </>
               ) : teachingContext.kind === "between" ? (
