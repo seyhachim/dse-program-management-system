@@ -1,7 +1,9 @@
 import type {
+  AttendanceMotivationBadge,
   AttendanceSessionSummary,
   AttendanceSessionView,
   AttendanceStatus,
+  AttendanceStudentSummary,
   SaveAttendanceInput,
   StudentsServiceContract,
 } from "@dse-pms/shared-types";
@@ -51,11 +53,65 @@ interface PendingRow {
   createdAt: Date;
   resolvedAt: Date | null;
 }
+interface CourseAttendanceRow {
+  studentId: string;
+  status: AttendanceStatus;
+}
 
 function dateOnly(value: Date): string { return value.toISOString().slice(0, 10); }
 function dateValue(value: string): Date { return new Date(`${value}T00:00:00.000Z`); }
 function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: number } {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 };
+}
+
+function emptyStudentCounts(): Record<AttendanceStatus, number> {
+  return { Present: 0, Absent: 0, Late: 0, Excused: 0 };
+}
+
+function buildStudentAttendanceSummary(counts: Record<AttendanceStatus, number>): AttendanceStudentSummary {
+  const markedSessions = counts.Present + counts.Late + counts.Absent + counts.Excused;
+  const attendedSessions = counts.Present + counts.Late;
+  const attendanceRate = markedSessions === 0
+    ? null
+    : Math.round((attendedSessions / markedSessions) * 10_000) / 100;
+
+  // Keep the same motivational attendance semantics used by Student Portal badges:
+  // approved Excused absences remain academic records but are excluded from the badge denominator.
+  const eligibleSessions = counts.Present + counts.Late + counts.Absent;
+  const achievementRate = eligibleSessions === 0
+    ? null
+    : Math.round((attendedSessions / eligibleSessions) * 10_000) / 100;
+  const badges: AttendanceMotivationBadge[] = [];
+  if (eligibleSessions >= 3 && (achievementRate ?? 0) >= 90) badges.push("Great Start");
+  if (eligibleSessions >= 5 && (achievementRate ?? 0) >= 90) badges.push("Reliable Learner");
+  if (eligibleSessions >= 10 && achievementRate === 100) badges.push("Perfect Attendance");
+
+  return { attendanceRate, attendedSessions, markedSessions, counts, badges };
+}
+
+async function courseAttendanceSummaries(offeringId: string): Promise<Map<string, AttendanceStudentSummary>> {
+  const rows = await prisma.$queryRaw<CourseAttendanceRow[]>`
+    SELECT record."studentId", record."status"
+    FROM "pms_attendance"."AttendanceRecord" record
+    INNER JOIN "pms_attendance"."AttendanceSession" session ON session."id" = record."sessionId"
+    WHERE session."offeringId" = ${offeringId}
+  `;
+  const countsByStudent = new Map<string, Record<AttendanceStatus, number>>();
+  for (const row of rows) {
+    const counts = countsByStudent.get(row.studentId) ?? emptyStudentCounts();
+    counts[row.status] += 1;
+    countsByStudent.set(row.studentId, counts);
+  }
+  return new Map(
+    [...countsByStudent.entries()].map(([studentId, counts]) => [studentId, buildStudentAttendanceSummary(counts)]),
+  );
+}
+
+function studentKhmerName(student: Awaited<ReturnType<StudentsServiceContract["findByIds"]>>[number]): string | null {
+  const parts = [student.profile?.khmerFamilyName, student.profile?.khmerGivenName].filter(
+    (part): part is string => Boolean(part?.trim()),
+  );
+  return parts.length > 0 ? parts.join(" ") : null;
 }
 
 async function roster(offeringId: string): Promise<EnrollmentRow[]> {
@@ -80,7 +136,11 @@ async function activePending(sessionId: string): Promise<PendingRow[]> {
 }
 
 async function getAttendance(offeringId: string, date: string): Promise<AttendanceSessionView> {
-  const [enrollments, session] = await Promise.all([roster(offeringId), sessionByDate(offeringId, date)]);
+  const [enrollments, session, summaryByStudent] = await Promise.all([
+    roster(offeringId),
+    sessionByDate(offeringId, date),
+    courseAttendanceSummaries(offeringId),
+  ]);
   const currentStudentIds = enrollments.map((row) => row.studentId);
   const studentRows = await students().findByIds(currentStudentIds);
   const studentById = new Map(studentRows.map((student) => [student.id, student]));
@@ -104,6 +164,8 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentId,
       studentNumber: attendance?.studentNumber ?? pending?.studentNumber ?? student.studentId,
       studentName: attendance?.studentName ?? pending?.studentName ?? student.name,
+      studentKhmerName: studentKhmerName(student),
+      attendanceSummary: summaryByStudent.get(studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
       status: attendance?.status ?? null,
       permissionPending: !attendance && Boolean(pending),
       permissionPendingSince: !attendance && pending ? pending.createdAt.toISOString() : null,
@@ -120,6 +182,8 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentId: historical.studentId,
       studentNumber: historical.studentNumber,
       studentName: historical.studentName,
+      studentKhmerName: null,
+      attendanceSummary: summaryByStudent.get(historical.studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
       status: historical.status,
       permissionPending: false,
       permissionPendingSince: null,
@@ -134,6 +198,8 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentId: pending.studentId,
       studentNumber: pending.studentNumber,
       studentName: pending.studentName,
+      studentKhmerName: null,
+      attendanceSummary: summaryByStudent.get(pending.studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
       status: null,
       permissionPending: true,
       permissionPendingSince: pending.createdAt.toISOString(),
