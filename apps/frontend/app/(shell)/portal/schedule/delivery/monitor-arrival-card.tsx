@@ -52,6 +52,24 @@ export function MonitorArrivalCard({
       now,
     ],
   );
+  const recordedWindow = useMemo(
+    () =>
+      arrival
+        ? lecturerArrivalRecordingWindow(
+            context.occurrence.date,
+            context.occurrence.scheduledStartTime,
+            context.occurrence.scheduledEndTime,
+            new Date(arrival.recordedAt),
+          )
+        : null,
+    [
+      arrival,
+      context.occurrence.date,
+      context.occurrence.scheduledEndTime,
+      context.occurrence.scheduledStartTime,
+    ],
+  );
+  const recordedOutsideWindow = recordedWindow !== null && recordedWindow.status !== "open";
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -88,16 +106,29 @@ export function MonitorArrivalCard({
       </div>
 
       {arrival && punctuality ? (
-        <div className="mt-3 flex items-center gap-3 rounded-xl bg-primary/10 px-3 py-3">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-foreground">Arrived {punctuality.time}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{punctuality.label}</p>
+        <>
+          <div className={`mt-3 flex items-center gap-3 rounded-xl px-3 py-3 ${recordedOutsideWindow ? "bg-muted/45" : "bg-primary/10"}`}>
+            {recordedOutsideWindow ? (
+              <Clock3 className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            ) : (
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">Arrived {punctuality.time}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {recordedOutsideWindow ? "Recorded outside the current arrival window" : punctuality.label}
+              </p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${recordedOutsideWindow ? "bg-background text-muted-foreground" : "bg-background/70 text-primary"}`}>
+              {recordedOutsideWindow ? "Review" : "Recorded"}
+            </span>
           </div>
-          <span className="shrink-0 rounded-full bg-background/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-            Recorded
-          </span>
-        </div>
+          {recordedOutsideWindow ? (
+            <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+              Historical evidence is preserved. Ask authorized staff to review it if the recorded time is incorrect.
+            </p>
+          ) : null}
+        </>
       ) : recordingWindow.status === "too-early" ? (
         <div className="mt-3">
           <div className="rounded-xl bg-muted/45 px-3 py-3 text-sm text-muted-foreground">
