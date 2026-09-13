@@ -4,6 +4,10 @@ import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { studentsManifest, type StudentsServiceContract } from "@dse-pms/shared-types";
 import { registry } from "../../core/plugins/registry.ts";
+import {
+  AttendanceRecheckConflictError,
+  attendanceRecheckService,
+} from "./attendance-recheck-service.ts";
 import { attendanceService } from "./attendance-service.ts";
 import { ReferenceError as OfferingReferenceError } from "./service.ts";
 
@@ -15,6 +19,7 @@ const token = crypto.randomUUID().slice(0, 8);
 const studentIds = new Set<string>();
 const offeringIds = new Set<string>();
 const courseIds = new Set<string>();
+const userIds = new Set<string>();
 
 if (!registry.has("students")) {
   const service: StudentsServiceContract = {
@@ -52,6 +57,17 @@ async function createStudent(label: string) {
   });
   studentIds.add(student.id);
   return student;
+}
+
+async function createActor(label: string) {
+  const user = await prisma.user.create({
+    data: {
+      email: `attendance-actor-${label}-${crypto.randomUUID()}@example.test`,
+      name: `Attendance Actor ${label}`,
+    },
+  });
+  userIds.add(user.id);
+  return user;
 }
 
 async function createOffering(label: string) {
@@ -110,6 +126,7 @@ afterAll(async () => {
   }
   if (courseIds.size > 0) await prisma.course.deleteMany({ where: { id: { in: [...courseIds] } } });
   if (studentIds.size > 0) await prisma.student.deleteMany({ where: { id: { in: [...studentIds] } } });
+  if (userIds.size > 0) await prisma.user.deleteMany({ where: { id: { in: [...userIds] } } });
   await prisma.$disconnect();
 });
 
@@ -134,6 +151,159 @@ describeDb("attendance roster identity", () => {
     expect(record?.studentGender).toBe("Male");
     expect(record?.studentName).toBe(student.name);
     expect(record?.studentNumber).toBe(student.studentId);
+    expect(record?.checkpoints).toEqual([]);
+  });
+});
+
+describeDb("two-pass attendance recheck", () => {
+  test("captures Check 1 once, records immutable Check 2, and keeps final status explicit", async () => {
+    const offering = await createOffering("two-pass");
+    const student = await createStudent("two-pass");
+    const actor = await createActor("two-pass");
+    await enroll(offering.id, student.id);
+
+    const first = await attendanceService.save(
+      offering.id,
+      "2026-09-13",
+      { records: [{ studentId: student.id, status: "Absent", note: "First roll" }] },
+      actor.id,
+    );
+    const firstView = first.records.find((record) => record.studentId === student.id)!;
+    expect(firstView.checkpoints).toHaveLength(1);
+    expect(firstView.checkpoints?.[0]?.checkNumber).toBe(1);
+    expect(firstView.checkpoints?.[0]?.status).toBe("Absent");
+    expect(firstView.checkpoints?.[0]?.checkedById).toBe(actor.id);
+
+    const correctedBeforeRecheck = await attendanceService.save(
+      offering.id,
+      "2026-09-13",
+      { records: [{ studentId: student.id, status: "Excused", note: "Final edited before Check 2" }] },
+      actor.id,
+    );
+    const correctedView = correctedBeforeRecheck.records.find((record) => record.studentId === student.id)!;
+    expect(correctedView.status).toBe("Excused");
+    expect(correctedView.checkpoints).toHaveLength(1);
+    expect(correctedView.checkpoints?.[0]?.status).toBe("Absent");
+    expect(correctedView.checkpoints?.[0]?.note).toBe("First roll");
+
+    await attendanceRecheckService.recheck(
+      offering.id,
+      "2026-09-13",
+      {
+        studentId: student.id,
+        observation: { status: "Present", permissionPending: false, note: "Seen in second roll" },
+        final: { status: "Late", permissionPending: false, note: "Arrived after first roll" },
+      },
+      actor.id,
+    );
+
+    const rechecked = await attendanceService.get(offering.id, "2026-09-13");
+    const recheckedView = rechecked.records.find((record) => record.studentId === student.id)!;
+    expect(recheckedView.status).toBe("Late");
+    expect(recheckedView.note).toBe("Arrived after first roll");
+    expect(recheckedView.checkpoints).toHaveLength(2);
+    expect(recheckedView.checkpoints?.map((checkpoint) => checkpoint.status)).toEqual([
+      "Absent",
+      "Present",
+    ]);
+    expect(recheckedView.checkpoints?.[1]?.note).toBe("Seen in second roll");
+
+    await expect(
+      attendanceRecheckService.recheck(
+        offering.id,
+        "2026-09-13",
+        {
+          studentId: student.id,
+          observation: { status: "Present", permissionPending: false, note: "Duplicate" },
+          final: { status: "Present", permissionPending: false, note: "Duplicate" },
+        },
+        actor.id,
+      ),
+    ).rejects.toBeInstanceOf(AttendanceRecheckConflictError);
+  });
+
+  test("supports Permission Pending as an auditable Check 1/final state", async () => {
+    const offering = await createOffering("pending-recheck");
+    const student = await createStudent("pending-recheck");
+    const actor = await createActor("pending-recheck");
+    await enroll(offering.id, student.id);
+
+    await attendanceService.save(
+      offering.id,
+      "2026-09-14",
+      {
+        records: [
+          {
+            studentId: student.id,
+            status: null,
+            permissionPending: true,
+            note: "Letter to follow",
+          },
+        ],
+      },
+      actor.id,
+    );
+
+    await attendanceRecheckService.recheck(
+      offering.id,
+      "2026-09-14",
+      {
+        studentId: student.id,
+        observation: { status: "Present", permissionPending: false, note: "Student is here" },
+        final: { status: null, permissionPending: true, note: "Permission still awaiting paper" },
+      },
+      actor.id,
+    );
+
+    const view = await attendanceService.get(offering.id, "2026-09-14");
+    const record = view.records.find((row) => row.studentId === student.id)!;
+    expect(record.status).toBeNull();
+    expect(record.permissionPending).toBe(true);
+    expect(record.note).toBe("Permission still awaiting paper");
+    expect(record.checkpoints?.[0]?.permissionPending).toBe(true);
+    expect(record.checkpoints?.[1]?.status).toBe("Present");
+  });
+
+  test("does not manufacture Check 1 for pre-feature attendance sessions", async () => {
+    const offering = await createOffering("legacy-session");
+    const student = await createStudent("legacy-session");
+    const actor = await createActor("legacy-session");
+    await enroll(offering.id, student.id);
+
+    const sessionId = crypto.randomUUID();
+    await prisma.$executeRaw`
+      INSERT INTO "pms_attendance"."AttendanceSession"
+        ("id", "offeringId", "sessionDate", "checkpointTrackingStartedAt")
+      VALUES (${sessionId}, ${offering.id}, ${new Date("2026-08-01T00:00:00.000Z")}, NULL)
+    `;
+    await prisma.$executeRaw`
+      INSERT INTO "pms_attendance"."AttendanceRecord"
+        ("sessionId", "studentId", "studentNumber", "studentName", "status", "note")
+      VALUES (${sessionId}, ${student.id}, ${student.studentId!}, ${student.name}, 'Present', 'Legacy record')
+    `;
+
+    const corrected = await attendanceService.save(
+      offering.id,
+      "2026-08-01",
+      { records: [{ studentId: student.id, status: "Late", note: "Historical correction" }] },
+      actor.id,
+    );
+    const record = corrected.records.find((row) => row.studentId === student.id)!;
+    expect(record.status).toBe("Late");
+    expect(record.checkpoints).toEqual([]);
+
+    await expect(
+      attendanceRecheckService.recheck(
+        offering.id,
+        "2026-08-01",
+        {
+          studentId: student.id,
+          observation: { status: "Present", permissionPending: false, note: "Should fail" },
+          final: { status: "Present", permissionPending: false, note: "Should fail" },
+        },
+        actor.id,
+      ),
+    ).rejects.toBeInstanceOf(AttendanceRecheckConflictError);
   });
 });
 
@@ -182,12 +352,13 @@ describeDb("historical attendance correction", () => {
     const originalFormerNumber = former.studentId;
     const originalFormerName = former.name;
 
-    await attendanceService.save(offering.id, "2026-08-18", {
+    const original = await attendanceService.save(offering.id, "2026-08-18", {
       records: [
         { studentId: current.id, status: "Present", note: "original current" },
         { studentId: former.id, status: "Absent", note: "original former" },
       ],
     });
+    expect(original.records.find((record) => record.studentId === former.id)?.checkpoints?.[0]?.status).toBe("Absent");
 
     const currentAfterEdit = await prisma.student.update({
       where: { id: current.id },
@@ -224,6 +395,8 @@ describeDb("historical attendance correction", () => {
     expect(formerView.studentKhmerName).toBeNull();
     expect(formerView.studentGender).toBeNull();
     expect(formerView.status).toBe("Excused");
+    expect(formerView.checkpoints?.[0]?.status).toBe("Absent");
+    expect(formerView.checkpoints?.[0]?.studentName).toBeUndefined();
 
     await expect(
       attendanceService.save(offering.id, "2026-08-19", {
