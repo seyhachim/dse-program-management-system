@@ -4,6 +4,9 @@ import { MeetingActivityTypeSchema, MeetingDaySchema } from "./offerings.ts";
 export const LecturerArrivalStatusSchema = z.enum(["Present", "NotYet"]);
 export type LecturerArrivalStatus = z.infer<typeof LecturerArrivalStatusSchema>;
 
+/** Earliest the factual lecturer-arrival punch may be recorded before class starts. */
+export const LECTURER_ARRIVAL_EARLY_WINDOW_MINUTES = 60;
+
 export const ClassSessionStatusSchema = z.enum([
   "Scheduled",
   "Holiday",
