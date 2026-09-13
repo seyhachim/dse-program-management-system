@@ -185,8 +185,18 @@ export type MonitorClassResponsibilityView = z.infer<
   typeof MonitorClassResponsibilityViewSchema
 >;
 
+export const TeachingSessionMonitorCourseViewSchema = z.object({
+  code: z.string(),
+  title: z.string(),
+  sectionCode: z.string(),
+});
+export type TeachingSessionMonitorCourseView = z.infer<
+  typeof TeachingSessionMonitorCourseViewSchema
+>;
+
 export const TeachingSessionMonitorContextViewSchema = z.object({
   responsibility: MonitorClassResponsibilityViewSchema,
+  course: TeachingSessionMonitorCourseViewSchema,
   occurrence: TeachingSessionOccurrenceViewSchema,
   plannedWeek: TeachingSessionPlannedWeekViewSchema.nullable(),
   eligibleLecturers: z.array(TeachingSessionDeliveryLecturerViewSchema),
