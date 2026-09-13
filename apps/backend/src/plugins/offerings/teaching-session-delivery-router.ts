@@ -12,6 +12,7 @@ import {
   TeachingSessionOccurrenceReferenceError,
   TeachingSessionOccurrenceValidationError,
 } from "./class-delivery-service.ts";
+import { monitorLecturerArrivalService } from "./monitor-lecturer-arrival-service.ts";
 import {
   TeachingSessionDeliveryReferenceError,
   TeachingSessionDeliveryValidationError,
@@ -65,6 +66,35 @@ export function createTeachingSessionDeliveryRouter(): Router {
   );
 
   router.put(
+    "/:id/meetings/:meetingId/occurrences/:date/monitor-arrival",
+    async (req, res) => {
+      const occurrence = ResolveTeachingSessionOccurrenceInputSchema.safeParse({
+        offeringMeetingId: req.params.meetingId,
+        date: req.params.date,
+      });
+      if (!occurrence.success) {
+        res.status(400).json({
+          error: "Invalid teaching session occurrence",
+          details: occurrence.error.flatten(),
+        });
+        return;
+      }
+      try {
+        res.json(
+          await monitorLecturerArrivalService.markArrived(
+            req.params.id!,
+            occurrence.data.offeringMeetingId,
+            occurrence.data.date,
+            req.user!.id,
+          ),
+        );
+      } catch (err) {
+        handleMonitorDeliveryError(err, res);
+      }
+    },
+  );
+
+  router.put(
     "/:id/meetings/:meetingId/occurrences/:date/monitor-delivery",
     async (req, res) => {
       const occurrence = ResolveTeachingSessionOccurrenceInputSchema.safeParse({
@@ -88,7 +118,9 @@ export function createTeachingSessionDeliveryRouter(): Router {
             req.params.id!,
             occurrence.data.offeringMeetingId,
             occurrence.data.date,
-            body.data,
+            // Arrival is a separate factual punch. Class-learning corrections must
+            // never rewrite the recorded arrival timestamp as a side effect.
+            { ...body.data, lecturerArrivalStatus: null },
             req.user!.id,
           ),
         );
