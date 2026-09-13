@@ -83,6 +83,7 @@ export const RecheckAttendanceInput = z.object({
   final: RecheckAttendanceMarkInput,
 });
 export type RecheckAttendanceInput = z.input<typeof RecheckAttendanceInput>;
+export type RecheckAttendanceData = z.infer<typeof RecheckAttendanceInput>;
 
 export type AttendanceMotivationBadge =
   | "Great Start"
