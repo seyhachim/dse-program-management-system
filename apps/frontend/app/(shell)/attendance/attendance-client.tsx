@@ -26,6 +26,11 @@ import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
+import {
+  attendanceRecheckState,
+  recheckStateLabel,
+  type AttendanceRecheckState,
+} from "./attendance-recheck-state";
 import { MOBILE_ATTENDANCE_LAYOUT } from "./mobile-attendance-layout";
 import { RollCallDialog } from "./roll-call-dialog";
 import {
@@ -36,6 +41,7 @@ import {
   toSaveAttendanceRecords,
   updateAttendanceRecord,
 } from "./roll-call-state";
+import { StudentRecheckDialog } from "./student-recheck-dialog";
 
 const PENDING_VALUE = "__permission_pending__";
 
@@ -100,6 +106,7 @@ export function AttendanceClient() {
   const [rollCallSnapshot, setRollCallSnapshot] = useState<
     AttendanceRecordView[] | null
   >(null);
+  const [recheckStudentId, setRecheckStudentId] = useState<string | null>(null);
   const hydratedContextRef = useRef("");
   const baselineRecordsRef = useRef<AttendanceRecordView[]>([]);
 
@@ -161,6 +168,7 @@ export function AttendanceClient() {
     setMutationError(null);
     setRollCallOpen(false);
     setRollCallSnapshot(null);
+    setRecheckStudentId(null);
   }, [attendanceContext]);
 
   useEffect(() => {
@@ -194,6 +202,14 @@ export function AttendanceClient() {
         (record.studentNumber ?? "").toLowerCase().includes(query),
     );
   }, [records, search]);
+  const hasUnsavedChanges = !attendanceRecordsEqual(
+    records,
+    baselineRecordsRef.current,
+  );
+  const recheckIndex = recheckStudentId
+    ? records.findIndex((record) => record.studentId === recheckStudentId)
+    : -1;
+  const recheckRecord = recheckIndex >= 0 ? records[recheckIndex] ?? null : null;
 
   const hasOfferings = offeringsQuery.data !== undefined;
   const hasSession = !offeringId || sessionQuery.data !== undefined;
@@ -281,6 +297,41 @@ export function AttendanceClient() {
       return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openRecheck(studentId: string) {
+    if (hasUnsavedChanges) {
+      setMutationError(
+        "Save attendance changes before opening an individual recheck so no unsaved marks are lost.",
+      );
+      return;
+    }
+    setMutationError(null);
+    setRecheckStudentId(studentId);
+  }
+
+  function moveRecheck(offset: -1 | 1) {
+    if (recheckIndex < 0) return;
+    const next = records[recheckIndex + offset];
+    if (next) setRecheckStudentId(next.studentId);
+  }
+
+  function handleRecheckSaved(saved: AttendanceSessionView) {
+    queryClient.setQueryData(sessionKey, saved);
+    baselineRecordsRef.current = cloneAttendanceRecords(saved.records);
+    setRecords(cloneAttendanceRecords(saved.records));
+    setSavedMessage(`Check 2 saved for ${formatSessionDate(date)}.`);
+    void queryClient.invalidateQueries({ queryKey: historyKey, exact: true });
+    if (recheckStudentId) {
+      const studentHistoryKey = protectedQueryKey(
+        queryScope,
+        "attendance",
+        "student-history",
+        offeringId,
+        recheckStudentId,
+      );
+      void queryClient.invalidateQueries({ queryKey: studentHistoryKey, exact: true });
     }
   }
 
@@ -553,6 +604,11 @@ export function AttendanceClient() {
                           <span>Sex: {record.studentGender ?? "—"}</span>
                         </div>
                       </div>
+                      <RecheckAction
+                        record={record}
+                        disabled={saving || hasUnsavedChanges}
+                        onOpen={() => openRecheck(record.studentId)}
+                      />
                       <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         Status
                         <select
@@ -598,7 +654,7 @@ export function AttendanceClient() {
                 </div>
 
                 <div className={MOBILE_ATTENDANCE_LAYOUT.desktopRegister}>
-                  <table className="w-full min-w-[1220px] text-sm">
+                  <table className="w-full min-w-[1460px] text-sm">
                     <thead className="bg-muted/30 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       <tr>
                         <th className="px-4 py-3">#</th>
@@ -608,6 +664,7 @@ export function AttendanceClient() {
                         <th className="px-4 py-3">Sex</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Note</th>
+                        <th className="px-4 py-3">Recheck</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -673,6 +730,13 @@ export function AttendanceClient() {
                                 })
                               }
                               className="h-9 w-full min-w-[240px] rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <RecheckAction
+                              record={record}
+                              disabled={saving || hasUnsavedChanges}
+                              onOpen={() => openRecheck(record.studentId)}
                             />
                           </td>
                         </tr>
@@ -804,8 +868,63 @@ export function AttendanceClient() {
         onRequestClose={requestRollCallClose}
         onSaveAndClose={saveRollCallAndClose}
       />
+      <StudentRecheckDialog
+        open={Boolean(recheckRecord)}
+        offeringId={offeringId}
+        date={date}
+        record={recheckRecord}
+        hasPrevious={recheckIndex > 0}
+        hasNext={recheckIndex >= 0 && recheckIndex < records.length - 1}
+        onPrevious={() => moveRecheck(-1)}
+        onNext={() => moveRecheck(1)}
+        onClose={() => setRecheckStudentId(null)}
+        onSaved={handleRecheckSaved}
+      />
     </>
   );
+}
+
+function RecheckAction({
+  record,
+  disabled,
+  onOpen,
+}: {
+  record: AttendanceRecordView;
+  disabled: boolean;
+  onOpen: () => void;
+}) {
+  const state = attendanceRecheckState(record);
+  const tone = recheckTone(state);
+  const buttonLabel = state === "needs-recheck" ? "View / Recheck" : "View";
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${tone}`}>
+        {recheckStateLabel(state)}
+      </span>
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={disabled}
+        title={disabled ? "Save attendance changes before opening recheck" : undefined}
+        className="min-h-9 rounded-md border border-primary/30 px-2.5 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
+function recheckTone(state: AttendanceRecheckState): string {
+  if (state === "needs-recheck") {
+    return "border-status-upcoming/30 bg-status-upcoming-bg text-status-upcoming";
+  }
+  if (state === "checked-twice") {
+    return "border-status-live/30 bg-status-live-bg text-status-live";
+  }
+  if (state === "changed") {
+    return "border-amber-300/60 bg-amber-50/50 text-amber-800";
+  }
+  return "border-border bg-muted/30 text-muted-foreground";
 }
 
 function SummaryCard({
