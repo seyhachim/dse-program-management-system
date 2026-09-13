@@ -266,7 +266,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
                 </Card>
               )}
 
-              <Card title="Published grades" compact>
+              <Card title="Published results" compact>
                 <div className="space-y-2">
                   {publishedResults.map((item) => (
                     <div
