@@ -171,24 +171,27 @@ export function MonitorDeliveryForm() {
       </button>
 
       <section className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                {context.responsibility.role === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor"}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+              {context.responsibility.role === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor"}
+            </span>
+            <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+              Section {context.course.sectionCode}
+            </span>
+            {context.plannedWeek ? (
+              <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                Week {context.plannedWeek.week}
               </span>
-              {context.plannedWeek ? (
-                <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
-                  Week {context.plannedWeek.week}
-                </span>
-              ) : null}
-            </div>
-            <h2 className="mt-2 text-lg font-semibold text-foreground">Class delivery</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {formatSessionDate(context.occurrence.date)} · {context.occurrence.scheduledStartTime}–{context.occurrence.scheduledEndTime}
-              {context.occurrence.scheduledRoom ? ` · Room ${context.occurrence.scheduledRoom}` : ""}
-            </p>
+            ) : null}
           </div>
+          <h2 className="mt-2 text-lg font-semibold leading-snug text-foreground">
+            {context.course.code} · {context.course.title}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatSessionDate(context.occurrence.date)} · {context.occurrence.scheduledStartTime}–{context.occurrence.scheduledEndTime}
+            {context.occurrence.scheduledRoom ? ` · Room ${context.occurrence.scheduledRoom}` : ""}
+          </p>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
