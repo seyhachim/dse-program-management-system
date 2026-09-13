@@ -186,7 +186,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
           ) : (
             <AvailabilityCard
               title="Learning content"
-              message="Learning details will appear here when the approved course specification is published."
+              message="Learning details will appear here when published course information is available."
             />
           )}
         </TabsContent>
