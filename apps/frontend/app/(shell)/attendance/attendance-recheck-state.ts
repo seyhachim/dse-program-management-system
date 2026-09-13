@@ -13,8 +13,9 @@ export function checkpointLabel(checkpoint: AttendanceCheckpointView | undefined
 }
 
 export function attendanceRecheckState(record: AttendanceRecordView): AttendanceRecheckState {
-  const check1 = record.checkpoints.find((checkpoint) => checkpoint.checkNumber === 1);
-  const check2 = record.checkpoints.find((checkpoint) => checkpoint.checkNumber === 2);
+  const checkpoints = record.checkpoints ?? [];
+  const check1 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 1);
+  const check2 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 2);
   if (!check1) return "not-started";
   if (!check2) return "needs-recheck";
   const changed =
