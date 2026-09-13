@@ -1,7 +1,8 @@
-import type {
-  AcademicCalendarPeriodView,
-  PortalWeeklyNotesView,
-  StudentAcademicCalendarView,
+import {
+  STUDENT_PORTAL_TIME_ZONE,
+  type AcademicCalendarPeriodView,
+  type PortalWeeklyNotesView,
+  type StudentAcademicCalendarView,
 } from "@dse-pms/shared-types";
 import { registry } from "../../core/plugins/registry.ts";
 import { studentPortalService } from "./service.ts";
@@ -70,11 +71,16 @@ export function teachingWeekForDate(
   return Math.max(1, Math.ceil((elapsed - elapsedBreak) / 7));
 }
 
-function localDateKey(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function studentPortalDateKey(value: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: STUDENT_PORTAL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 export function toPortalWeeklyNotes(
@@ -86,7 +92,7 @@ export function toPortalWeeklyNotes(
   const periods = calendar.status === "available" ? calendar.periods : [];
   return {
     offeringId,
-    currentWeek: teachingWeekForDate(periods, localDateKey(now)),
+    currentWeek: teachingWeekForDate(periods, studentPortalDateKey(now)),
     entries: sources.map((source) => ({
       week: teachingWeekForDate(periods, source.date),
       date: source.date,
