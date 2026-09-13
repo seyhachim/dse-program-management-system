@@ -39,7 +39,8 @@ describe("Student Course Detail tabs", () => {
   });
 
   test("uses neutral in-tab states instead of hiding optional tabs", () => {
-    expect(courseSource).toContain("Learning details will appear here when the approved course specification is published.");
+    expect(courseSource).toContain("Learning details will appear here when published course information is available.");
+    expect(courseSource).not.toContain("course specification");
     expect(courseSource).toContain("Assessment details are not available yet. They will appear here when they are published.");
     expect(courseSource).toContain("Grades are not available yet. Published results will appear here when they are released.");
     expect(courseSource).toContain("Learning resources are not available yet. They will appear here when they are published.");
