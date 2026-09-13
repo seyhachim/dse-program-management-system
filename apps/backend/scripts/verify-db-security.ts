@@ -157,6 +157,7 @@ const EXPECTED_ATTENDANCE_TABLES = [
   "AttendanceSession",
   "AttendanceRecord",
   "AttendancePermissionPending",
+  "AttendanceCheckpoint",
   "LecturerArrivalConfirmation",
   "ClassSessionStatus",
   "TeachingSessionOccurrence",

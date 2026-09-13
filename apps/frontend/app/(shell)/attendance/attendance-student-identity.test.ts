@@ -7,11 +7,12 @@ const attendanceSource = readFileSync(
 );
 
 describe("Attendance register student identity", () => {
-  test("desktop register shows bilingual identity, sex, and row number", () => {
+  test("desktop register shows bilingual identity, sex, row number, and recheck action", () => {
     expect(attendanceSource).toContain(">#</th>");
     expect(attendanceSource).toContain(">English Name</th>");
     expect(attendanceSource).toContain(">Khmer Name</th>");
     expect(attendanceSource).toContain(">Sex</th>");
+    expect(attendanceSource).toContain(">Recheck</th>");
     expect(attendanceSource).toContain("record.studentKhmerName");
     expect(attendanceSource).toContain("record.studentGender");
     expect(attendanceSource).toContain("{index + 1}");
@@ -30,6 +31,6 @@ describe("Attendance register student identity", () => {
     expect(attendanceSource).toContain(
       'placeholder="English / Khmer name or student ID"',
     );
-    expect(attendanceSource).toContain('min-w-[1220px]');
+    expect(attendanceSource).toContain('min-w-[1460px]');
   });
 });
