@@ -9,6 +9,11 @@ import type {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
+import {
+  captureAttendanceCheck1,
+  loadAttendanceCheckpoints,
+  toCheckpointView,
+} from "./attendance-recheck-service.ts";
 import { ReferenceError } from "./service.ts";
 import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
 
@@ -35,7 +40,13 @@ type TelegramNotificationContract = {
 };
 
 interface EnrollmentRow { studentId: string; }
-interface SessionRow { id: string; offeringId: string; sessionDate: Date; updatedAt: Date; }
+interface SessionRow {
+  id: string;
+  offeringId: string;
+  sessionDate: Date;
+  updatedAt: Date;
+  checkpointTrackingStartedAt: Date | null;
+}
 interface RecordRow {
   studentId: string;
   studentNumber: string;
@@ -124,7 +135,7 @@ async function roster(offeringId: string): Promise<EnrollmentRow[]> {
 
 async function sessionByDate(offeringId: string, date: string): Promise<SessionRow | null> {
   const rows = await prisma.$queryRaw<SessionRow[]>`
-    SELECT "id", "offeringId", "sessionDate", "updatedAt"
+    SELECT "id", "offeringId", "sessionDate", "updatedAt", "checkpointTrackingStartedAt"
     FROM "pms_attendance"."AttendanceSession"
     WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${dateValue(date)} LIMIT 1
   `;
@@ -153,6 +164,9 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
     FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${session.id}
   ` : [];
   const pendingRows = session ? await activePending(session.id) : [];
+  const checkpointByStudent = session
+    ? await loadAttendanceCheckpoints(session.id)
+    : new Map();
   const recordByStudent = new Map(recordRows.map((record) => [record.studentId, record]));
   const pendingByStudent = new Map(pendingRows.map((pending) => [pending.studentId, pending]));
   const counts = { ...emptyCounts(), Unmarked: 0 };
@@ -171,6 +185,7 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentKhmerName: studentKhmerName(student),
       studentGender: studentGender(student),
       attendanceSummary: summaryByStudent.get(studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
+      checkpoints: (checkpointByStudent.get(studentId) ?? []).map(toCheckpointView),
       status: attendance?.status ?? null,
       permissionPending: !attendance && Boolean(pending),
       permissionPendingSince: !attendance && pending ? pending.createdAt.toISOString() : null,
@@ -190,6 +205,7 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentKhmerName: null,
       studentGender: null,
       attendanceSummary: summaryByStudent.get(historical.studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
+      checkpoints: (checkpointByStudent.get(historical.studentId) ?? []).map(toCheckpointView),
       status: historical.status,
       permissionPending: false,
       permissionPendingSince: null,
@@ -207,10 +223,29 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentKhmerName: null,
       studentGender: null,
       attendanceSummary: summaryByStudent.get(pending.studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
+      checkpoints: (checkpointByStudent.get(pending.studentId) ?? []).map(toCheckpointView),
       status: null,
       permissionPending: true,
       permissionPendingSince: pending.createdAt.toISOString(),
       note: pending.note,
+    });
+  }
+  for (const [studentId, checkpoints] of checkpointByStudent.entries()) {
+    if (historicalIds.has(studentId) || checkpoints.length === 0) continue;
+    historicalIds.add(studentId);
+    const identity = checkpoints[checkpoints.length - 1]!;
+    records.push({
+      studentId,
+      studentNumber: identity.studentNumber,
+      studentName: identity.studentName,
+      studentKhmerName: null,
+      studentGender: null,
+      attendanceSummary: summaryByStudent.get(studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
+      checkpoints: checkpoints.map(toCheckpointView),
+      status: null,
+      permissionPending: false,
+      permissionPendingSince: null,
+      note: "",
     });
   }
   records.sort((a, b) => (a.studentNumber ?? "").localeCompare(b.studentNumber ?? ""));
@@ -249,7 +284,7 @@ async function deliverPostSaveNotifications(
 export const attendanceService = {
   async list(offeringId: string): Promise<AttendanceSessionSummary[]> {
     const sessions = await prisma.$queryRaw<SessionRow[]>`
-      SELECT "id", "offeringId", "sessionDate", "updatedAt"
+      SELECT "id", "offeringId", "sessionDate", "updatedAt", "checkpointTrackingStartedAt"
       FROM "pms_attendance"."AttendanceSession" WHERE "offeringId" = ${offeringId}
       ORDER BY "sessionDate" DESC
     `;
@@ -292,7 +327,7 @@ export const attendanceService = {
       `;
       const currentStudentIds = new Set(enrollments.map((row) => row.studentId));
       const existing = await tx.$queryRaw<SessionRow[]>`
-        SELECT "id", "offeringId", "sessionDate", "updatedAt"
+        SELECT "id", "offeringId", "sessionDate", "updatedAt", "checkpointTrackingStartedAt"
         FROM "pms_attendance"."AttendanceSession"
         WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${dateValue(date)} LIMIT 1 FOR UPDATE
       `;
@@ -318,9 +353,37 @@ export const attendanceService = {
 
       const sessionId = existingSession?.id ?? crypto.randomUUID();
       if (!existingSession) {
-        await tx.$executeRaw`INSERT INTO "pms_attendance"."AttendanceSession" ("id", "offeringId", "sessionDate") VALUES (${sessionId}, ${offeringId}, ${dateValue(date)})`;
+        await tx.$executeRaw`
+          INSERT INTO "pms_attendance"."AttendanceSession"
+            ("id", "offeringId", "sessionDate", "checkpointTrackingStartedAt")
+          VALUES (${sessionId}, ${offeringId}, ${dateValue(date)}, CURRENT_TIMESTAMP)
+        `;
       } else {
         await tx.$executeRaw`UPDATE "pms_attendance"."AttendanceSession" SET "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${sessionId}`;
+      }
+
+      // Only sessions explicitly created in the checkpoint era receive Check 1.
+      // Pre-existing sessions keep checkpointTrackingStartedAt = NULL so later
+      // corrections never manufacture observations that did not happen.
+      const checkpointTracking = !existingSession || existingSession.checkpointTrackingStartedAt !== null;
+      if (checkpointTracking) {
+        for (const requested of input.records) {
+          const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
+          const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
+          const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
+          if (!studentNumber) throw new ReferenceError("Official Student ID is required before attendance can be recorded");
+          const studentName = currentStudent?.name ?? historical!.studentName;
+          await captureAttendanceCheck1(tx, {
+            sessionId,
+            studentId: requested.studentId,
+            studentNumber,
+            studentName,
+            status: requested.status ?? null,
+            permissionPending: requested.permissionPending ?? false,
+            note: requested.note ?? "",
+            actorUserId,
+          });
+        }
       }
 
       const requestedByStudent = new Map(input.records.map((record) => [record.studentId, record]));
