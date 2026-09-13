@@ -19,7 +19,20 @@ if (!registry.has("students")) {
       return prisma.student.findUnique({ where: { id } });
     },
     async findByIds(ids) {
-      return prisma.student.findMany({ where: { id: { in: ids } } });
+      const rows = await prisma.student.findMany({
+        where: { id: { in: ids } },
+        include: { profile: true },
+      });
+      return rows.map((row) => ({
+        ...row,
+        profile: row.profile
+          ? {
+              ...row.profile,
+              createdAt: row.profile.createdAt.toISOString(),
+              updatedAt: row.profile.updatedAt.toISOString(),
+            }
+          : null,
+      }));
     },
   };
   registry.register({ manifest: studentsManifest, router: Router(), service });

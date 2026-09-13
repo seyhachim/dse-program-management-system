@@ -22,7 +22,20 @@ if (!registry.has("students")) {
       return prisma.student.findUnique({ where: { id } });
     },
     async findByIds(ids) {
-      return prisma.student.findMany({ where: { id: { in: ids } } });
+      const rows = await prisma.student.findMany({
+        where: { id: { in: ids } },
+        include: { profile: true },
+      });
+      return rows.map((row) => ({
+        ...row,
+        profile: row.profile
+          ? {
+              ...row.profile,
+              createdAt: row.profile.createdAt.toISOString(),
+              updatedAt: row.profile.updatedAt.toISOString(),
+            }
+          : null,
+      }));
     },
   };
   registry.register({ manifest: studentsManifest, router: Router(), service });
@@ -98,6 +111,30 @@ afterAll(async () => {
   if (courseIds.size > 0) await prisma.course.deleteMany({ where: { id: { in: [...courseIds] } } });
   if (studentIds.size > 0) await prisma.student.deleteMany({ where: { id: { in: [...studentIds] } } });
   await prisma.$disconnect();
+});
+
+describeDb("attendance roster identity", () => {
+  test("enriches current roster rows with canonical Khmer name and sex", async () => {
+    const offering = await createOffering("identity");
+    const student = await createStudent("identity");
+    await prisma.studentProfile.create({
+      data: {
+        studentRecordId: student.id,
+        khmerFamilyName: "តាំង",
+        khmerGivenName: "កេរីទ្ធ",
+        gender: "Male",
+      },
+    });
+    await enroll(offering.id, student.id);
+
+    const attendance = await attendanceService.get(offering.id, "2026-09-13");
+    const record = attendance.records.find((item) => item.studentId === student.id);
+
+    expect(record?.studentKhmerName).toBe("តាំង កេរីទ្ធ");
+    expect(record?.studentGender).toBe("Male");
+    expect(record?.studentName).toBe(student.name);
+    expect(record?.studentNumber).toBe(student.studentId);
+  });
 });
 
 describeDb("historical attendance correction", () => {
@@ -184,6 +221,8 @@ describeDb("historical attendance correction", () => {
     expect(currentView.studentNumber).not.toBe(originalCurrentNumber);
     expect(formerView.studentNumber).toBe(originalFormerNumber);
     expect(formerView.studentName).toBe(originalFormerName);
+    expect(formerView.studentKhmerName).toBeNull();
+    expect(formerView.studentGender).toBeNull();
     expect(formerView.status).toBe("Excused");
 
     await expect(

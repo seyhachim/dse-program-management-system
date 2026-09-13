@@ -190,6 +190,7 @@ export function AttendanceClient() {
     return records.filter(
       (record) =>
         record.studentName.toLowerCase().includes(query) ||
+        (record.studentKhmerName ?? "").toLowerCase().includes(query) ||
         (record.studentNumber ?? "").toLowerCase().includes(query),
     );
   }, [records, search]);
@@ -390,7 +391,7 @@ export function AttendanceClient() {
                     id="attendance-search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Name or student ID"
+                    placeholder="English / Khmer name or student ID"
                     className="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring md:h-10"
                   />
                 </div>
@@ -528,12 +529,29 @@ export function AttendanceClient() {
                       className={MOBILE_ATTENDANCE_LAYOUT.mobileStudentCard}
                     >
                       <div className="min-w-0">
-                        <p className="break-words font-semibold text-foreground">
+                        {record.studentKhmerName ? (
+                          <p
+                            lang="km"
+                            className="break-words font-semibold text-foreground"
+                          >
+                            {record.studentKhmerName}
+                          </p>
+                        ) : null}
+                        <p
+                          className={
+                            record.studentKhmerName
+                              ? "mt-0.5 break-words text-sm font-medium text-foreground"
+                              : "break-words font-semibold text-foreground"
+                          }
+                        >
                           {record.studentName}
                         </p>
-                        <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                          {record.studentNumber}
-                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span className="font-mono">
+                            {record.studentNumber ?? "Pending ID"}
+                          </span>
+                          <span>Sex: {record.studentGender ?? "—"}</span>
+                        </div>
                       </div>
                       <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         Status
@@ -580,26 +598,42 @@ export function AttendanceClient() {
                 </div>
 
                 <div className={MOBILE_ATTENDANCE_LAYOUT.desktopRegister}>
-                  <table className="w-full min-w-[900px] text-sm">
+                  <table className="w-full min-w-[1220px] text-sm">
                     <thead className="bg-muted/30 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       <tr>
+                        <th className="px-4 py-3">#</th>
                         <th className="px-4 py-3">Student ID</th>
-                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">English Name</th>
+                        <th className="px-4 py-3">Khmer Name</th>
+                        <th className="px-4 py-3">Sex</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Note</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {filteredRecords.map((record) => (
+                      {filteredRecords.map((record, index) => (
                         <tr
                           key={record.studentId}
                           className="align-middle hover:bg-muted/20"
                         >
+                          <td className="w-12 px-4 py-3 text-xs tabular-nums text-muted-foreground">
+                            {index + 1}
+                          </td>
                           <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                            {record.studentNumber}
+                            {record.studentNumber ?? "Pending ID"}
                           </td>
                           <td className="px-4 py-3 font-medium text-foreground">
                             {record.studentName}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-foreground">
+                            {record.studentKhmerName ? (
+                              <span lang="km">{record.studentKhmerName}</span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-foreground">
+                            {record.studentGender ?? "—"}
                           </td>
                           <td className="px-4 py-3">
                             <select

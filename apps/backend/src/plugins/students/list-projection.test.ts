@@ -6,9 +6,9 @@ import {
   decodeStudentPageCursor,
 } from "./service.ts";
 
-function selectedKeys(select: Record<string, boolean>): string[] {
+function selectedKeys(select: Record<string, unknown>): string[] {
   return Object.entries(select)
-    .filter(([, selected]) => selected)
+    .filter(([, selected]) => Boolean(selected))
     .map(([key]) => key)
     .sort();
 }
@@ -29,16 +29,17 @@ describe("student compact projections", () => {
     expect("updatedAt" in STUDENT_LIST_SELECT).toBe(false);
   });
 
-  test("cross-plugin StudentRef projection excludes profile and account-only fields", () => {
+  test("cross-plugin StudentRef projection includes the official profile but excludes account-only fields", () => {
     expect(selectedKeys(STUDENT_REF_SELECT)).toEqual([
       "category",
       "email",
       "id",
       "name",
+      "profile",
       "status",
       "studentId",
     ]);
-    expect("profile" in STUDENT_REF_SELECT).toBe(false);
+    expect(STUDENT_REF_SELECT.profile).toBe(true);
     expect("userId" in STUDENT_REF_SELECT).toBe(false);
     expect("createdAt" in STUDENT_REF_SELECT).toBe(false);
   });

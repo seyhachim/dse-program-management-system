@@ -114,6 +114,10 @@ function studentKhmerName(student: Awaited<ReturnType<StudentsServiceContract["f
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+function studentGender(student: Awaited<ReturnType<StudentsServiceContract["findByIds"]>>[number]): string | null {
+  return student.profile?.gender?.trim() || null;
+}
+
 async function roster(offeringId: string): Promise<EnrollmentRow[]> {
   return prisma.$queryRaw<EnrollmentRow[]>`SELECT "studentId" FROM "Enrollment" WHERE "offeringId" = ${offeringId}`;
 }
@@ -165,6 +169,7 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentNumber: attendance?.studentNumber ?? pending?.studentNumber ?? student.studentId,
       studentName: attendance?.studentName ?? pending?.studentName ?? student.name,
       studentKhmerName: studentKhmerName(student),
+      studentGender: studentGender(student),
       attendanceSummary: summaryByStudent.get(studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
       status: attendance?.status ?? null,
       permissionPending: !attendance && Boolean(pending),
@@ -183,6 +188,7 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentNumber: historical.studentNumber,
       studentName: historical.studentName,
       studentKhmerName: null,
+      studentGender: null,
       attendanceSummary: summaryByStudent.get(historical.studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
       status: historical.status,
       permissionPending: false,
@@ -199,6 +205,7 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
       studentNumber: pending.studentNumber,
       studentName: pending.studentName,
       studentKhmerName: null,
+      studentGender: null,
       attendanceSummary: summaryByStudent.get(pending.studentId) ?? buildStudentAttendanceSummary(emptyStudentCounts()),
       status: null,
       permissionPending: true,
