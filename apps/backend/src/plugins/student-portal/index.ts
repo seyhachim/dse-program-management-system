@@ -12,6 +12,8 @@ import { createStudentPortalRouter } from "./router.ts";
 import { createStudentScheduleImpactRouter } from "./schedule-impact-router.ts";
 import { studentScheduleImpactProjectionService } from "./schedule-impact-service.ts";
 import { studentPortalService } from "./service.ts";
+import { createStudentWeeklyNotesRouter } from "./weekly-notes-router.ts";
+import { studentPortalWeeklyNotesService } from "./weekly-notes-service.ts";
 
 const router = Router();
 // Public portfolio is intentionally mounted outside the authenticated Student Portal
@@ -21,6 +23,7 @@ router.use("/portfolio/public", createStudentPortfolioPublicRouter());
 // Existing Student Portal keeps its global requireAuth boundary inside this child router.
 router.use(createStudentScheduleImpactRouter());
 router.use(createCourseAchievementRouter());
+router.use(createStudentWeeklyNotesRouter());
 router.use(createStudentPortalRouter());
 router.use("/portfolio", createStudentPortfolioRouter());
 router.use("/portfolio/evidence", createStudentPortfolioEvidenceRouter());
@@ -30,6 +33,7 @@ export const studentPortalPluginService = {
   ...studentPortalService,
   courseAchievements: courseAchievementService,
   scheduleImpacts: studentScheduleImpactProjectionService,
+  weeklyNotes: studentPortalWeeklyNotesService,
   parentProjection: parentAcademicProjectionService,
 };
 
