@@ -1,10 +1,12 @@
 import type {
   AttendanceSessionSummary,
   AttendanceSessionView,
+  AttendanceStudentHistoryView,
   CreateOfferingInput,
   LecturerWorkloadSummary,
   OfferingStatus,
   OfferingView,
+  RecheckAttendanceInput,
   SaveAttendanceInput,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
@@ -44,6 +46,21 @@ export const offeringsApi = {
   },
   saveAttendance(id: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
     return api.put<AttendanceSessionView>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}`, input);
+  },
+  recheckAttendance(
+    id: string,
+    date: string,
+    input: RecheckAttendanceInput,
+  ): Promise<AttendanceSessionView> {
+    return api.post<AttendanceSessionView>(
+      `/api/offerings/${id}/attendance/${encodeURIComponent(date)}/recheck`,
+      input,
+    );
+  },
+  attendanceStudentHistory(id: string, studentId: string): Promise<AttendanceStudentHistoryView> {
+    return api.get<AttendanceStudentHistoryView>(
+      `/api/offerings/${id}/attendance/students/${encodeURIComponent(studentId)}/history`,
+    );
   },
 };
 
