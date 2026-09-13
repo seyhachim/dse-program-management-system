@@ -152,6 +152,7 @@ describeDb("attendance roster identity", () => {
     expect(record?.studentName).toBe(student.name);
     expect(record?.studentNumber).toBe(student.studentId);
     expect(record?.checkpoints).toEqual([]);
+    expect(record?.recheckEligible).toBe(true);
   });
 });
 
@@ -390,12 +391,14 @@ describeDb("historical attendance correction", () => {
     expect(currentView.studentNumber).toBe(currentAfterEdit.studentId);
     expect(currentView.studentName).toBe(currentAfterEdit.name);
     expect(currentView.studentNumber).not.toBe(originalCurrentNumber);
+    expect(currentView.recheckEligible).toBe(true);
     expect(formerView.studentNumber).toBe(originalFormerNumber);
     expect(formerView.studentName).toBe(originalFormerName);
     expect(formerView.studentKhmerName).toBeNull();
     expect(formerView.studentGender).toBeNull();
     expect(formerView.status).toBe("Excused");
     expect(formerView.checkpoints?.[0]?.status).toBe("Absent");
+    expect(formerView.recheckEligible).toBe(false);
 
     await expect(
       attendanceService.save(offering.id, "2026-08-19", {
