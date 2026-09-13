@@ -118,7 +118,7 @@ export interface AttendanceRecordView {
   /** Course-to-date attendance context used by focused Roll Call UI. */
   attendanceSummary?: AttendanceStudentSummary | null;
   /** Immutable first/second roll-call observations for this section/date. */
-  checkpoints: AttendanceCheckpointView[];
+  checkpoints?: AttendanceCheckpointView[];
   status: AttendanceStatus | null;
   permissionPending: boolean;
   permissionPendingSince: string | null;
