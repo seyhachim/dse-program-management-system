@@ -12,6 +12,26 @@ export const AttendanceDateSchema = z
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
   }, "Use a valid calendar date");
 
+function validateAttendanceMark(
+  record: { status: AttendanceStatus | null; permissionPending: boolean },
+  ctx: z.RefinementCtx,
+) {
+  if (record.status !== null && record.permissionPending) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Final attendance status and Permission Pending cannot both be set",
+      path: ["permissionPending"],
+    });
+  }
+  if (record.status === null && !record.permissionPending) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Attendance record must contain a finalized status or Permission Pending",
+      path: ["status"],
+    });
+  }
+}
+
 export const SaveAttendanceRecordInput = z
   .object({
     studentId: z.string().uuid(),
@@ -19,22 +39,7 @@ export const SaveAttendanceRecordInput = z
     permissionPending: z.boolean().default(false),
     note: z.string().trim().max(300).default(""),
   })
-  .superRefine((record, ctx) => {
-    if (record.status !== null && record.permissionPending) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Final attendance status and Permission Pending cannot both be set",
-        path: ["permissionPending"],
-      });
-    }
-    if (record.status === null && !record.permissionPending) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Attendance record must contain a finalized status or Permission Pending",
-        path: ["status"],
-      });
-    }
-  });
+  .superRefine(validateAttendanceMark);
 
 export const SaveAttendanceInput = z.object({
   records: z
@@ -59,6 +64,26 @@ export const SaveAttendanceInput = z.object({
 // status=null, permissionPending=false, note="" before reaching the service.
 export type SaveAttendanceInput = z.input<typeof SaveAttendanceInput>;
 
+const RecheckAttendanceMarkInput = z
+  .object({
+    status: AttendanceStatusSchema.nullable().default(null),
+    permissionPending: z.boolean().default(false),
+    note: z.string().trim().max(300).default(""),
+  })
+  .superRefine(validateAttendanceMark);
+
+/**
+ * Check 2 is an observation, while final is the explicit academic attendance
+ * state the lecturer wants to keep for the section/date. They intentionally may
+ * differ; the PMS does not infer policy such as Absent -> Present meaning Late.
+ */
+export const RecheckAttendanceInput = z.object({
+  studentId: z.string().uuid(),
+  observation: RecheckAttendanceMarkInput,
+  final: RecheckAttendanceMarkInput,
+});
+export type RecheckAttendanceInput = z.input<typeof RecheckAttendanceInput>;
+
 export type AttendanceMotivationBadge =
   | "Great Start"
   | "Reliable Learner"
@@ -72,6 +97,15 @@ export interface AttendanceStudentSummary {
   badges: AttendanceMotivationBadge[];
 }
 
+export interface AttendanceCheckpointView {
+  checkNumber: 1 | 2;
+  status: AttendanceStatus | null;
+  permissionPending: boolean;
+  note: string;
+  checkedAt: string;
+  checkedById: string | null;
+}
+
 export interface AttendanceRecordView {
   studentId: string;
   studentNumber: string | null;
@@ -82,6 +116,8 @@ export interface AttendanceRecordView {
   studentGender?: string | null;
   /** Course-to-date attendance context used by focused Roll Call UI. */
   attendanceSummary?: AttendanceStudentSummary | null;
+  /** Immutable first/second roll-call observations for this section/date. */
+  checkpoints: AttendanceCheckpointView[];
   status: AttendanceStatus | null;
   permissionPending: boolean;
   permissionPendingSince: string | null;
@@ -103,4 +139,19 @@ export interface AttendanceSessionSummary {
   date: string;
   counts: Record<AttendanceStatus, number> & { PermissionPending: number };
   updatedAt: string;
+}
+
+export interface AttendanceStudentHistoryItem {
+  sessionId: string;
+  date: string;
+  status: AttendanceStatus | null;
+  permissionPending: boolean;
+  note: string;
+  updatedAt: string;
+}
+
+export interface AttendanceStudentHistoryView {
+  offeringId: string;
+  studentId: string;
+  history: AttendanceStudentHistoryItem[];
 }
