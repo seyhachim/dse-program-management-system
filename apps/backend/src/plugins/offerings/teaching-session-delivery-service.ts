@@ -9,6 +9,7 @@ import type {
   TeachingSessionDeliverySnapshot,
   TeachingSessionDeliveryView,
   TeachingSessionMonitorContextView,
+  TeachingSessionMonitorCourseView,
   TeachingSessionOccurrenceView,
   TeachingSessionPlannedWeekView,
 } from "@dse-pms/shared-types";
@@ -234,6 +235,22 @@ async function plannedWeekForOccurrence(
   return rows[0] ?? null;
 }
 
+async function monitorCourse(offeringId: string): Promise<TeachingSessionMonitorCourseView> {
+  const offering = await prisma.offering.findUnique({
+    where: { id: offeringId },
+    select: {
+      sectionCode: true,
+      course: { select: { code: true, title: true } },
+    },
+  });
+  if (!offering) throw new TeachingSessionDeliveryReferenceError("Offering not found");
+  return {
+    code: offering.course.code,
+    title: offering.course.title,
+    sectionCode: offering.sectionCode,
+  };
+}
+
 async function eligibleLecturers(offeringId: string) {
   const offering = await prisma.offering.findUnique({
     where: { id: offeringId },
@@ -392,15 +409,18 @@ export const teachingSessionDeliveryService = {
       meetingId,
       date,
     );
-    const [delivery, currentPlannedWeek, lecturers, lecturerArrival, history] = await Promise.all([
-      this.getDelivery(occurrence.id),
-      plannedWeekForOccurrence(occurrence),
-      eligibleLecturers(offeringId),
-      classDeliveryService.getLecturerArrivalForOccurrence(occurrence.id),
-      this.getHistory(occurrence.id),
-    ]);
+    const [delivery, currentPlannedWeek, course, lecturers, lecturerArrival, history] =
+      await Promise.all([
+        this.getDelivery(occurrence.id),
+        plannedWeekForOccurrence(occurrence),
+        monitorCourse(offeringId),
+        eligibleLecturers(offeringId),
+        classDeliveryService.getLecturerArrivalForOccurrence(occurrence.id),
+        this.getHistory(occurrence.id),
+      ]);
     return {
       responsibility: { offeringId, role: responsibility.role },
+      course,
       occurrence,
       plannedWeek: delivery?.plannedWeek ?? currentPlannedWeek,
       eligibleLecturers: lecturers,
