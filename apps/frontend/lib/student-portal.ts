@@ -7,6 +7,7 @@ import type {
   PortalCourseDetail,
   PortalCourseDocumentDownload,
   PortalCourseSummary,
+  PortalStudentAttendanceHistory,
   PortalWeeklyNotesView,
   StudentAcademicCalendarView,
   StudentPortalHome,
@@ -22,6 +23,10 @@ export const studentPortalApi = {
     api.get<PortalCourseAchievementSummary[]>("/api/student-portal/course-achievements"),
   course: (offeringId: string) =>
     api.get<PortalCourseDetail>(`/api/student-portal/courses/${offeringId}`),
+  courseAttendance: (offeringId: string) =>
+    api.get<PortalStudentAttendanceHistory>(
+      `/api/student-portal/courses/${offeringId}/attendance`,
+    ),
   weeklyNotes: (offeringId: string) =>
     api.get<PortalWeeklyNotesView>(
       `/api/student-portal/courses/${offeringId}/weekly-notes`,
