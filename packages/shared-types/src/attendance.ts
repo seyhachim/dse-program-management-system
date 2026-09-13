@@ -119,6 +119,8 @@ export interface AttendanceRecordView {
   attendanceSummary?: AttendanceStudentSummary | null;
   /** Immutable first/second roll-call observations for this section/date. */
   checkpoints?: AttendanceCheckpointView[];
+  /** True only while the student is currently enrolled in this offering. Historical rows remain view-only. */
+  recheckEligible?: boolean;
   status: AttendanceStatus | null;
   permissionPending: boolean;
   permissionPendingSince: string | null;
