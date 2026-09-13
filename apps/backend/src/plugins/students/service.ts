@@ -4,6 +4,7 @@ import type {
   ListStudentsQuery,
   StudentPage,
   StudentProfileInput,
+  StudentRef,
   StudentStatus,
   UpdateStudentInput,
 } from "@dse-pms/shared-types";
@@ -32,6 +33,7 @@ export const STUDENT_REF_SELECT = {
   studentId: true,
   category: true,
   status: true,
+  profile: true,
 } as const;
 
 type StudentPageCursor = { createdAt: Date; id: string };
@@ -163,8 +165,21 @@ export const studentService = {
     return prisma.student.findUnique({ where: { userId }, include: withProfile });
   },
 
-  async findByIds(ids: string[]) {
-    return prisma.student.findMany({ where: { id: { in: ids } }, select: STUDENT_REF_SELECT });
+  async findByIds(ids: string[]): Promise<StudentRef[]> {
+    const rows = await prisma.student.findMany({
+      where: { id: { in: ids } },
+      select: STUDENT_REF_SELECT,
+    });
+    return rows.map((row) => ({
+      ...row,
+      profile: row.profile
+        ? {
+            ...row.profile,
+            createdAt: row.profile.createdAt.toISOString(),
+            updatedAt: row.profile.updatedAt.toISOString(),
+          }
+        : null,
+    }));
   },
 
   async create(input: CreateStudentInput) {
