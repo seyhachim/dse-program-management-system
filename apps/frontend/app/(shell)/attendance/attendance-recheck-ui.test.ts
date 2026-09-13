@@ -37,6 +37,13 @@ describe("Attendance individual recheck UI", () => {
     expect(dialogSource).toContain("Next");
   });
 
+  test("historical students remain viewable but cannot record a new Check 2", () => {
+    expect(dialogSource).toContain("record.recheckEligible === false");
+    expect(dialogSource).toContain("Historical attendance view");
+    expect(dialogSource).toContain("This student is no longer enrolled in this class");
+    expect(dialogSource).toContain("a new Check 2 cannot be recorded");
+  });
+
   test("changed Check 2 requires explicit final attendance instead of policy inference", () => {
     expect(dialogSource).toContain("Observation changed from Check 1");
     expect(dialogSource).toContain("Choose the final academic attendance below");
