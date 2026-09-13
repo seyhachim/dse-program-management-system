@@ -8,25 +8,25 @@ const weeklyNotesSource = readFileSync(
 );
 
 describe("Student Course Weekly Notes", () => {
-  test("keeps Weekly Notes available when CourseSpec is unavailable", () => {
+  test("keeps Weekly Notes available independently of CourseSpec", () => {
     expect(courseSource).toContain('<TabsTrigger value="weekly-notes">Weekly Notes</TabsTrigger>');
-    expect(courseSource).toContain('<TabsContent value="weekly-notes" className="mt-4">');
+    expect(courseSource).toContain('<TabsContent value="weekly-notes" className="mt-3">');
     expect(courseSource).toContain("<PortalCourseWeeklyNotes offeringId={offeringId} />");
-    expect(courseSource.indexOf('<Tabs defaultValue="overview">')).toBeGreaterThan(-1);
-    expect(courseSource.indexOf('<Tabs defaultValue="overview">')).toBeGreaterThan(
-      courseSource.indexOf("!data.specAvailable"),
-    );
+    expect(courseSource).not.toContain("!data.specAvailable ?");
   });
 
-  test("renders exactly the student-safe teaching fields", () => {
+  test("renders only the student-safe teaching fields in compact cards", () => {
     expect(weeklyNotesSource).toContain("Week unavailable");
     expect(weeklyNotesSource).toContain("formatDate(entry.date)");
     expect(weeklyNotesSource).toContain("Topic");
-    expect(weeklyNotesSource).toContain("What we learned");
-    expect(weeklyNotesSource).toContain("Class held");
-    expect(weeklyNotesSource).toContain("Lecturer:");
+    expect(weeklyNotesSource).toContain("Learned");
+    expect(weeklyNotesSource).toContain("Held");
+    expect(weeklyNotesSource).toContain("Lecturer ·");
     expect(weeklyNotesSource).toContain("entry.learningSummary");
     expect(weeklyNotesSource).toContain("entry.lecturerName");
+    expect(weeklyNotesSource).toContain("rounded-xl border px-3 py-3");
+    expect(weeklyNotesSource).toContain('className="space-y-2.5"');
+    expect(weeklyNotesSource).not.toContain("mt-4 grid gap-4");
   });
 
   test("does not render private monitor or leave fields", () => {

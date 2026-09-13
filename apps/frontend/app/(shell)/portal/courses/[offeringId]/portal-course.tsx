@@ -31,6 +31,7 @@ import {
   studentPortalApi,
 } from "@/lib/student-portal";
 import { PortalError, PortalLoading, usePortalData } from "../../portal-state";
+import { PortalCourseAttendance } from "./portal-course-attendance";
 import { PortalCourseWeeklyNotes } from "./portal-course-weekly-notes";
 
 export function PortalCourse({ offeringId }: { offeringId: string }) {
@@ -46,11 +47,13 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
     return <PortalError message={error ?? "Could not load course"} />;
   }
 
+  const publishedResults = data.assessments.filter((item) => item.result);
+
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
-      <section className="rounded-2xl border border-border bg-card p-5 md:p-6">
-        <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
-          <div>
+    <div className="mx-auto max-w-7xl space-y-4">
+      <section className="rounded-2xl border border-border bg-card p-4 md:p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 {data.code}
@@ -62,10 +65,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
                 {data.term}
               </span>
             </div>
-            <h2 className="mt-3 text-2xl font-bold">{data.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              {data.description || "No course description has been published."}
-            </p>
+            <h2 className="mt-3 break-words text-2xl font-bold">{data.title}</h2>
           </div>
           <Button
             variant="outline"
@@ -77,7 +77,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
           </Button>
         </div>
 
-        <div className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
           <Info
             icon={UserRound}
             label="Lecturer"
@@ -96,222 +96,246 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
         </div>
       </section>
 
-      {!data.specAvailable ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          Detailed course learning content is not available yet. Class schedule and
-          Weekly Notes remain available below.
-        </div>
-      ) : null}
-
       <Tabs defaultValue="overview">
-        <TabsList className="max-w-full overflow-x-auto">
+        <TabsList className="max-w-full justify-start overflow-x-auto whitespace-nowrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="weekly-notes">Weekly Notes</TabsTrigger>
-          {data.specAvailable ? (
-            <>
-              <TabsTrigger value="learning">Learning</TabsTrigger>
-              <TabsTrigger value="assessments">Assessments</TabsTrigger>
-              <TabsTrigger value="results">Results</TabsTrigger>
-              <TabsTrigger value="resources">Resources</TabsTrigger>
-            </>
-          ) : null}
+          <TabsTrigger value="learning">Learning</TabsTrigger>
+          <TabsTrigger value="assessments">Assessments</TabsTrigger>
+          <TabsTrigger value="grades">Grades</TabsTrigger>
+          <TabsTrigger value="resources">Resources</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
-          <Card title="Class schedule">
+        <TabsContent value="overview" className="mt-3 space-y-3">
+          <Card title="Course description" compact>
+            <p className="break-words text-sm leading-6 text-muted-foreground">
+              {data.description || "Course description is not available yet."}
+            </p>
+          </Card>
+
+          <Card title="Class schedule" compact>
             {data.meetings.length ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {data.meetings.map((meeting) => (
-                  <div
-                    key={meeting.id}
-                    className="rounded-xl bg-muted/50 p-4"
-                  >
-                    <p className="font-medium">{meeting.activityType}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                  <div key={meeting.id} className="rounded-xl bg-muted/50 p-3">
+                    <p className="text-sm font-medium">{meeting.activityType}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {meetingLabel(meeting)}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {meeting.room || "Room TBA"}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <Muted>No schedule has been published.</Muted>
+              <Muted>No schedule has been published yet.</Muted>
             )}
           </Card>
-          <Card title="Teaching team">
-            <p className="font-medium">
+
+          <Card title="Teaching team" compact>
+            <p className="text-sm font-medium">
               {data.lecturer?.name ?? "Primary lecturer TBA"}
             </p>
-            <p className="text-sm text-muted-foreground">
-              {data.lecturer?.email}
-            </p>
+            {data.lecturer?.email ? (
+              <p className="text-xs text-muted-foreground">{data.lecturer.email}</p>
+            ) : null}
             {data.coLecturers.length ? (
-              <p className="mt-3 text-sm">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Co-lecturers: {data.coLecturers.map((item) => item.name).join(", ")}
               </p>
             ) : null}
           </Card>
         </TabsContent>
 
-        <TabsContent value="weekly-notes" className="mt-4">
+        <TabsContent value="attendance" className="mt-3">
+          <PortalCourseAttendance offeringId={offeringId} />
+        </TabsContent>
+
+        <TabsContent value="weekly-notes" className="mt-3">
           <PortalCourseWeeklyNotes offeringId={offeringId} />
         </TabsContent>
 
-        {data.specAvailable ? (
-          <>
-            <TabsContent value="learning" className="mt-4 space-y-4">
-              <Card title="Weekly topics">
-                <div className="space-y-3">
-                  {data.weeks.map((week) => (
-                    <div
-                      key={week.id}
-                      className="flex gap-4 rounded-xl bg-muted/40 p-4"
-                    >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                        {week.week}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="break-words font-medium">
-                          {week.topic || "Topic to be announced"}
-                        </p>
-                        {week.learningOutcomes.length ? (
-                          <p className="mt-1 break-words text-sm text-muted-foreground">
-                            {week.learningOutcomes.join(" · ")}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="assessments" className="mt-4">
-              <Card title="Assessment plan">
-                <div className="space-y-3">
-                  {data.assessments.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-xl border border-border p-4"
-                    >
-                      <div className="flex flex-col justify-between gap-2 sm:flex-row">
-                        <div>
-                          <div className="flex flex-wrap gap-2">
-                            <span className="text-xs font-semibold uppercase text-primary">
-                              {item.type}
-                            </span>
-                            <span className="text-xs capitalize text-muted-foreground">
-                              {item.mode}
-                            </span>
-                          </div>
-                          <h4 className="mt-1 font-semibold">{item.name}</h4>
-                        </div>
-                        <div className="text-sm sm:text-right">
-                          <p className="font-semibold">
-                            {item.weight === null ? "Weight TBA" : `${item.weight}%`}
-                          </p>
-                          <p className="text-muted-foreground">
-                            {assessmentDeadline(item.dueAt, item.dueWeek)}
-                          </p>
-                        </div>
-                      </div>
-                      {item.description ? (
-                        <p className="mt-3 text-sm text-muted-foreground">
-                          {item.description}
+        <TabsContent value="learning" className="mt-3 space-y-3">
+          {data.specAvailable && data.weeks.length ? (
+            <Card title="Weekly topics" compact>
+              <div className="space-y-2">
+                {data.weeks.map((week) => (
+                  <div
+                    key={week.id}
+                    className="flex gap-3 rounded-xl bg-muted/40 p-3"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                      {week.week}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium">
+                        {week.topic || "Topic to be announced"}
+                      </p>
+                      {week.learningOutcomes.length ? (
+                        <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                          {week.learningOutcomes.join(" · ")}
                         </p>
                       ) : null}
-                      {item.instructions ? (
-                        <div className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">
-                          <span className="font-medium">Instructions:</span>{" "}
-                          {item.instructions}
-                        </div>
-                      ) : null}
-                      <AssessmentRubric assessment={item} />
                     </div>
-                  ))}
-                </div>
-              </Card>
-            </TabsContent>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : (
+            <AvailabilityCard
+              title="Learning content"
+              message="Learning details will appear here when published course information is available."
+            />
+          )}
+        </TabsContent>
 
-            <TabsContent value="results" className="mt-4 space-y-4">
-              <Card title="Published results">
+        <TabsContent value="assessments" className="mt-3">
+          {data.assessments.length ? (
+            <Card title="Assessment plan" compact>
+              <div className="space-y-2.5">
+                {data.assessments.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-border p-3"
+                  >
+                    <div className="flex flex-col justify-between gap-2 sm:flex-row">
+                      <div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-[11px] font-semibold uppercase text-primary">
+                            {item.type}
+                          </span>
+                          <span className="text-[11px] capitalize text-muted-foreground">
+                            {item.mode}
+                          </span>
+                        </div>
+                        <h4 className="mt-1 text-sm font-semibold">{item.name}</h4>
+                      </div>
+                      <div className="text-xs sm:text-right">
+                        <p className="font-semibold">
+                          {item.weight === null ? "Weight TBA" : `${item.weight}%`}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {assessmentDeadline(item.dueAt, item.dueWeek)}
+                        </p>
+                      </div>
+                    </div>
+                    {item.description ? (
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        {item.description}
+                      </p>
+                    ) : null}
+                    {item.instructions ? (
+                      <div className="mt-2 rounded-lg bg-muted/40 p-2.5 text-xs">
+                        <span className="font-medium">Instructions:</span>{" "}
+                        {item.instructions}
+                      </div>
+                    ) : null}
+                    <AssessmentRubric assessment={item} />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : (
+            <AvailabilityCard
+              title="Assessments"
+              message="Assessment details are not available yet. They will appear here when they are published."
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="grades" className="mt-3 space-y-3">
+          {publishedResults.length ? (
+            <>
+              {data.courseGradeComplete && data.totalCourseGrade !== null ? (
+                <Card title="Course grade" compact>
+                  <div className="flex items-end justify-between gap-3">
+                    <p className="text-3xl font-bold">{data.totalCourseGrade.toFixed(2)}</p>
+                    <p className="pb-1 text-xs text-muted-foreground">out of 100</p>
+                  </div>
+                </Card>
+              ) : (
+                <Card title="Published grading progress" compact>
+                  <p className="text-sm font-medium">
+                    {data.completedGradeWeight}% of {data.configuredGradeWeight}% course weighting has published results.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    A final course grade is shown only when the full configured grade is complete.
+                  </p>
+                </Card>
+              )}
+
+              <Card title="Published grades" compact>
                 <div className="space-y-2">
-                  {data.assessments
-                    .filter((item) => item.result)
-                    .map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex flex-col justify-between gap-3 rounded-xl bg-muted/40 p-4 sm:flex-row sm:items-center"
-                      >
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.result?.feedback || "No written feedback"}
-                          </p>
-                          {item.result?.weightedCourseContribution !== null &&
-                          item.result?.weightedCourseContribution !== undefined ? (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Weighted course contribution:{" "}
-                              <span className="font-semibold text-foreground">
-                                {item.result.weightedCourseContribution.toFixed(2)} points
-                              </span>{" "}
-                              of {item.courseGradeWeight ?? 0}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="sm:text-right">
-                          <p className="text-lg font-bold">
-                            {item.result?.score}/{item.result?.maxScore}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Raw score · {item.result?.percentage}%
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  {!data.assessments.some((item) => item.result) ? (
-                    <Muted>No results have been published.</Muted>
-                  ) : null}
-                </div>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="resources" className="mt-4">
-              <Card title="Learning resources">
-                <div className="grid gap-3 md:grid-cols-2">
-                  {data.resources.map((item) => (
-                    <a
+                  {publishedResults.map((item) => (
+                    <div
                       key={item.id}
-                      href={item.url || undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-xl border border-border p-4 transition hover:border-primary/40"
+                      className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 p-3"
                     >
-                      <div className="flex items-start justify-between">
-                        <FileCheck2 className="h-5 w-5 text-primary" />
-                        {item.url ? (
-                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                        ) : null}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.result?.feedback || "No written feedback"}
+                        </p>
                       </div>
-                      <p className="mt-3 font-medium">
-                        {item.title || item.resourceType}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {item.resourceType}
-                        {item.notes ? ` · ${item.notes}` : ""}
-                      </p>
-                    </a>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-bold">
+                          {item.result?.score}/{item.result?.maxScore}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {item.result?.percentage}%
+                        </p>
+                      </div>
+                    </div>
                   ))}
                 </div>
-                {!data.resources.length ? (
-                  <Muted>No learning resources have been published.</Muted>
-                ) : null}
               </Card>
-            </TabsContent>
-          </>
-        ) : null}
+            </>
+          ) : (
+            <AvailabilityCard
+              title="Grades"
+              message="Grades are not available yet. Published results will appear here when they are released."
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="resources" className="mt-3">
+          {data.resources.length ? (
+            <Card title="Learning resources" compact>
+              <div className="grid gap-2 md:grid-cols-2">
+                {data.resources.map((item) => (
+                  <a
+                    key={item.id}
+                    href={item.url || undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-xl border border-border p-3 transition hover:border-primary/40"
+                  >
+                    <div className="flex items-start justify-between">
+                      <FileCheck2 className="h-4 w-4 text-primary" />
+                      {item.url ? (
+                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm font-medium">
+                      {item.title || item.resourceType}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {item.resourceType}
+                      {item.notes ? ` · ${item.notes}` : ""}
+                    </p>
+                  </a>
+                ))}
+              </div>
+            </Card>
+          ) : (
+            <AvailabilityCard
+              title="Resources"
+              message="Learning resources are not available yet. They will appear here when they are published."
+            />
+          )}
+        </TabsContent>
       </Tabs>
 
       <FeedbackDialog
@@ -338,9 +362,9 @@ function Info({
       <span className="rounded-lg bg-primary/10 p-2 text-primary">
         <Icon className="h-4 w-4" />
       </span>
-      <div>
+      <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium">{value}</p>
+        <p className="truncate text-sm font-medium">{value}</p>
       </div>
     </div>
   );
@@ -349,14 +373,29 @@ function Info({
 function Card({
   title,
   children,
+  compact = false,
 }: {
   title: string;
   children: React.ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
-      <h3 className="mb-4 text-base font-semibold">{title}</h3>
+    <section
+      className={`rounded-2xl border border-border bg-card ${compact ? "p-4" : "p-5"}`}
+    >
+      <h3 className={`${compact ? "mb-3 text-sm" : "mb-4 text-base"} font-semibold`}>
+        {title}
+      </h3>
       {children}
+    </section>
+  );
+}
+
+function AvailabilityCard({ title, message }: { title: string; message: string }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">{message}</p>
     </section>
   );
 }
@@ -374,20 +413,20 @@ function AssessmentRubric({
   const criteria = assessment.rubricCriteria ?? [];
 
   return (
-    <details className="mt-3 rounded-lg border border-border p-3">
-      <summary className="cursor-pointer text-sm font-medium">
+    <details className="mt-2 rounded-lg border border-border p-2.5">
+      <summary className="cursor-pointer text-xs font-medium">
         Rubric: {assessment.rubricName}
       </summary>
-      <div className="mt-3 space-y-2">
+      <div className="mt-2 space-y-2">
         {criteria.length ? (
           criteria.map((criterion) => (
-            <div key={criterion.id} className="rounded bg-muted/40 p-3">
-              <p className="text-sm font-medium">{criterion.name}</p>
+            <div key={criterion.id} className="rounded bg-muted/40 p-2.5">
+              <p className="text-xs font-medium">{criterion.name}</p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {criterion.levels.map((level) => (
                   <span
                     key={level.id}
-                    className="rounded bg-background px-2 py-1 text-xs"
+                    className="rounded bg-background px-2 py-1 text-[11px]"
                   >
                     {level.label} · {level.points} pts
                   </span>
@@ -396,7 +435,7 @@ function AssessmentRubric({
             </div>
           ))
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Rubric criteria are not available yet.
           </p>
         )}
