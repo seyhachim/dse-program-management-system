@@ -31,6 +31,7 @@ import {
   studentPortalApi,
 } from "@/lib/student-portal";
 import { PortalError, PortalLoading, usePortalData } from "../../portal-state";
+import { PortalCourseWeeklyNotes } from "./portal-course-weekly-notes";
 
 export function PortalCourse({ offeringId }: { offeringId: string }) {
   const load = useCallback(
@@ -97,208 +98,221 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
 
       {!data.specAvailable ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          Course learning details are not available yet. Please check again after
-          they are published.
+          Detailed course learning content is not available yet. Class schedule and
+          Weekly Notes remain available below.
         </div>
-      ) : (
-        <Tabs defaultValue="overview">
-          <TabsList className="max-w-full overflow-x-auto">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="learning">Learning</TabsTrigger>
-            <TabsTrigger value="assessments">Assessments</TabsTrigger>
-            <TabsTrigger value="results">Results</TabsTrigger>
-            <TabsTrigger value="resources">Resources</TabsTrigger>
-          </TabsList>
+      ) : null}
 
-          <TabsContent value="overview" className="mt-4 space-y-4">
-            <Card title="Class schedule">
-              {data.meetings.length ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {data.meetings.map((meeting) => (
-                    <div
-                      key={meeting.id}
-                      className="rounded-xl bg-muted/50 p-4"
-                    >
-                      <p className="font-medium">{meeting.activityType}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {meetingLabel(meeting)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {meeting.room || "Room TBA"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Muted>No schedule has been published.</Muted>
-              )}
-            </Card>
-            <Card title="Teaching team">
-              <p className="font-medium">
-                {data.lecturer?.name ?? "Primary lecturer TBA"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {data.lecturer?.email}
-              </p>
-              {data.coLecturers.length ? (
-                <p className="mt-3 text-sm">
-                  Co-lecturers: {data.coLecturers.map((item) => item.name).join(", ")}
-                </p>
-              ) : null}
-            </Card>
-          </TabsContent>
+      <Tabs defaultValue="overview">
+        <TabsList className="max-w-full overflow-x-auto">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="weekly-notes">Weekly Notes</TabsTrigger>
+          {data.specAvailable ? (
+            <>
+              <TabsTrigger value="learning">Learning</TabsTrigger>
+              <TabsTrigger value="assessments">Assessments</TabsTrigger>
+              <TabsTrigger value="results">Results</TabsTrigger>
+              <TabsTrigger value="resources">Resources</TabsTrigger>
+            </>
+          ) : null}
+        </TabsList>
 
-          <TabsContent value="learning" className="mt-4 space-y-4">
-            <Card title="Weekly topics">
-              <div className="space-y-3">
-                {data.weeks.map((week) => (
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <Card title="Class schedule">
+            {data.meetings.length ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {data.meetings.map((meeting) => (
                   <div
-                    key={week.id}
-                    className="flex gap-4 rounded-xl bg-muted/40 p-4"
+                    key={meeting.id}
+                    className="rounded-xl bg-muted/50 p-4"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                      {week.week}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="break-words font-medium">
-                        {week.topic || "Topic to be announced"}
-                      </p>
-                      {week.learningOutcomes.length ? (
-                        <p className="mt-1 break-words text-sm text-muted-foreground">
-                          {week.learningOutcomes.join(" · ")}
-                        </p>
-                      ) : null}
-                    </div>
+                    <p className="font-medium">{meeting.activityType}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {meetingLabel(meeting)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {meeting.room || "Room TBA"}
+                    </p>
                   </div>
                 ))}
               </div>
-            </Card>
-          </TabsContent>
+            ) : (
+              <Muted>No schedule has been published.</Muted>
+            )}
+          </Card>
+          <Card title="Teaching team">
+            <p className="font-medium">
+              {data.lecturer?.name ?? "Primary lecturer TBA"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {data.lecturer?.email}
+            </p>
+            {data.coLecturers.length ? (
+              <p className="mt-3 text-sm">
+                Co-lecturers: {data.coLecturers.map((item) => item.name).join(", ")}
+              </p>
+            ) : null}
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="assessments" className="mt-4">
-            <Card title="Assessment plan">
-              <div className="space-y-3">
-                {data.assessments.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-border p-4"
-                  >
-                    <div className="flex flex-col justify-between gap-2 sm:flex-row">
-                      <div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs font-semibold uppercase text-primary">
-                            {item.type}
-                          </span>
-                          <span className="text-xs capitalize text-muted-foreground">
-                            {item.mode}
-                          </span>
-                        </div>
-                        <h4 className="mt-1 font-semibold">{item.name}</h4>
-                      </div>
-                      <div className="text-sm sm:text-right">
-                        <p className="font-semibold">
-                          {item.weight === null ? "Weight TBA" : `${item.weight}%`}
-                        </p>
-                        <p className="text-muted-foreground">
-                          {assessmentDeadline(item.dueAt, item.dueWeek)}
-                        </p>
-                      </div>
-                    </div>
-                    {item.description ? (
-                      <p className="mt-3 text-sm text-muted-foreground">
-                        {item.description}
-                      </p>
-                    ) : null}
-                    {item.instructions ? (
-                      <div className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">
-                        <span className="font-medium">Instructions:</span>{" "}
-                        {item.instructions}
-                      </div>
-                    ) : null}
-                    <AssessmentRubric assessment={item} />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </TabsContent>
+        <TabsContent value="weekly-notes" className="mt-4">
+          <PortalCourseWeeklyNotes offeringId={offeringId} />
+        </TabsContent>
 
-          <TabsContent value="results" className="mt-4 space-y-4">
-            <Card title="Published results">
-              <div className="space-y-2">
-                {data.assessments
-                  .filter((item) => item.result)
-                  .map((item) => (
+        {data.specAvailable ? (
+          <>
+            <TabsContent value="learning" className="mt-4 space-y-4">
+              <Card title="Weekly topics">
+                <div className="space-y-3">
+                  {data.weeks.map((week) => (
                     <div
-                      key={item.id}
-                      className="flex flex-col justify-between gap-3 rounded-xl bg-muted/40 p-4 sm:flex-row sm:items-center"
+                      key={week.id}
+                      className="flex gap-4 rounded-xl bg-muted/40 p-4"
                     >
-                      <div>
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.result?.feedback || "No written feedback"}
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                        {week.week}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="break-words font-medium">
+                          {week.topic || "Topic to be announced"}
                         </p>
-                        {item.result?.weightedCourseContribution !== null &&
-                        item.result?.weightedCourseContribution !== undefined ? (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Weighted course contribution:{" "}
-                            <span className="font-semibold text-foreground">
-                              {item.result.weightedCourseContribution.toFixed(2)} points
-                            </span>{" "}
-                            of {item.courseGradeWeight ?? 0}
+                        {week.learningOutcomes.length ? (
+                          <p className="mt-1 break-words text-sm text-muted-foreground">
+                            {week.learningOutcomes.join(" · ")}
                           </p>
                         ) : null}
                       </div>
-                      <div className="sm:text-right">
-                        <p className="text-lg font-bold">
-                          {item.result?.score}/{item.result?.maxScore}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Raw score · {item.result?.percentage}%
-                        </p>
-                      </div>
                     </div>
                   ))}
-                {!data.assessments.some((item) => item.result) ? (
-                  <Muted>No results have been published.</Muted>
-                ) : null}
-              </div>
-            </Card>
-          </TabsContent>
+                </div>
+              </Card>
+            </TabsContent>
 
-          <TabsContent value="resources" className="mt-4">
-            <Card title="Learning resources">
-              <div className="grid gap-3 md:grid-cols-2">
-                {data.resources.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.url || undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-xl border border-border p-4 transition hover:border-primary/40"
-                  >
-                    <div className="flex items-start justify-between">
-                      <FileCheck2 className="h-5 w-5 text-primary" />
-                      {item.url ? (
-                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            <TabsContent value="assessments" className="mt-4">
+              <Card title="Assessment plan">
+                <div className="space-y-3">
+                  {data.assessments.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-border p-4"
+                    >
+                      <div className="flex flex-col justify-between gap-2 sm:flex-row">
+                        <div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="text-xs font-semibold uppercase text-primary">
+                              {item.type}
+                            </span>
+                            <span className="text-xs capitalize text-muted-foreground">
+                              {item.mode}
+                            </span>
+                          </div>
+                          <h4 className="mt-1 font-semibold">{item.name}</h4>
+                        </div>
+                        <div className="text-sm sm:text-right">
+                          <p className="font-semibold">
+                            {item.weight === null ? "Weight TBA" : `${item.weight}%`}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {assessmentDeadline(item.dueAt, item.dueWeek)}
+                          </p>
+                        </div>
+                      </div>
+                      {item.description ? (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {item.description}
+                        </p>
                       ) : null}
+                      {item.instructions ? (
+                        <div className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">
+                          <span className="font-medium">Instructions:</span>{" "}
+                          {item.instructions}
+                        </div>
+                      ) : null}
+                      <AssessmentRubric assessment={item} />
                     </div>
-                    <p className="mt-3 font-medium">
-                      {item.title || item.resourceType}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {item.resourceType}
-                      {item.notes ? ` · ${item.notes}` : ""}
-                    </p>
-                  </a>
-                ))}
-              </div>
-              {!data.resources.length ? (
-                <Muted>No learning resources have been published.</Muted>
-              ) : null}
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
+                  ))}
+                </div>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="results" className="mt-4 space-y-4">
+              <Card title="Published results">
+                <div className="space-y-2">
+                  {data.assessments
+                    .filter((item) => item.result)
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex flex-col justify-between gap-3 rounded-xl bg-muted/40 p-4 sm:flex-row sm:items-center"
+                      >
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.result?.feedback || "No written feedback"}
+                          </p>
+                          {item.result?.weightedCourseContribution !== null &&
+                          item.result?.weightedCourseContribution !== undefined ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Weighted course contribution:{" "}
+                              <span className="font-semibold text-foreground">
+                                {item.result.weightedCourseContribution.toFixed(2)} points
+                              </span>{" "}
+                              of {item.courseGradeWeight ?? 0}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="sm:text-right">
+                          <p className="text-lg font-bold">
+                            {item.result?.score}/{item.result?.maxScore}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Raw score · {item.result?.percentage}%
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  {!data.assessments.some((item) => item.result) ? (
+                    <Muted>No results have been published.</Muted>
+                  ) : null}
+                </div>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="resources" className="mt-4">
+              <Card title="Learning resources">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {data.resources.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.url || undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl border border-border p-4 transition hover:border-primary/40"
+                    >
+                      <div className="flex items-start justify-between">
+                        <FileCheck2 className="h-5 w-5 text-primary" />
+                        {item.url ? (
+                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                        ) : null}
+                      </div>
+                      <p className="mt-3 font-medium">
+                        {item.title || item.resourceType}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.resourceType}
+                        {item.notes ? ` · ${item.notes}` : ""}
+                      </p>
+                    </a>
+                  ))}
+                </div>
+                {!data.resources.length ? (
+                  <Muted>No learning resources have been published.</Muted>
+                ) : null}
+              </Card>
+            </TabsContent>
+          </>
+        ) : null}
+      </Tabs>
 
       <FeedbackDialog
         open={feedbackOpen}
