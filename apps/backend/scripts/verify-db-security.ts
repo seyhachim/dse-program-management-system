@@ -260,120 +260,234 @@ function compareInventory(
   const actualSet = new Set(actual);
   const errors: string[] = [];
 
-  for (const table of actual) {
-    if (!expectedSet.has(table as never)) {
-      errors.push(`${label}: unclassified table ${table}`);
-    }
+  const missing = [...expectedSet].filter((name) => !actualSet.has(name)).sort();
+  const unexpected = [...actualSet]
+    .filter((name) => !expectedSet.has(name))
+    .sort();
+
+  if (missing.length > 0) {
+    errors.push(`${label}: missing expected tables: ${missing.join(", ")}`);
   }
-  for (const table of expected) {
-    if (!actualSet.has(table)) {
-      errors.push(`${label}: expected table ${table} is missing`);
-    }
+
+  if (unexpected.length > 0) {
+    errors.push(`${label}: unclassified tables: ${unexpected.join(", ")}`);
   }
+
   return errors;
 }
 
-async function main() {
-  const tables = await prisma.$queryRaw<TableRow[]>`
-    SELECT n.nspname AS schema_name,
-           c.relname AS table_name,
-           c.relrowsecurity AS rls_enabled
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE c.relkind = 'r'
-      AND n.nspname = ANY(${ALL_VERIFIED_SCHEMAS}::text[])
-    ORDER BY n.nspname, c.relname
-  `;
+async function tablesForSchema(schemaName: string): Promise<TableRow[]> {
+  return prisma.$queryRawUnsafe<TableRow[]>(
+    `
+      SELECT
+        n.nspname::text AS schema_name,
+        c.relname::text AS table_name,
+        c.relrowsecurity AS rls_enabled
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = $1
+        AND c.relkind IN ('r', 'p')
+        AND c.relname <> '_prisma_migrations'
+      ORDER BY c.relname
+    `,
+    schemaName,
+  );
+}
 
-  const expectedBySchema = new Map<string, readonly string[]>([
-    ["public", EXPECTED_PUBLIC_TABLES],
-    ["pms_attendance", EXPECTED_ATTENDANCE_TABLES],
-    ["telegram_security", EXPECTED_TELEGRAM_SECURITY_TABLES],
-    ["qa_security", EXPECTED_QA_SECURITY_TABLES],
-    ["curriculum_artifact", EXPECTED_CURRICULUM_ARTIFACT_TABLES],
-    ["course_spec_governance", EXPECTED_COURSE_SPEC_GOVERNANCE_TABLES],
-    ["public_analytics", EXPECTED_PUBLIC_ANALYTICS_TABLES],
-    ["student_handbook", EXPECTED_STUDENT_HANDBOOK_TABLES],
-    ["lecturer_portfolio", EXPECTED_LECTURER_PORTFOLIO_TABLES],
+async function main(): Promise<void> {
+  const errors: string[] = [];
+
+  const [
+    publicTables,
+    attendanceTables,
+    telegramSecurityTables,
+    qaSecurityTables,
+    curriculumArtifactTables,
+    courseSpecGovernanceTables,
+    publicAnalyticsTables,
+    studentHandbookTables,
+    lecturerPortfolioTables,
+  ] = await Promise.all([
+    tablesForSchema("public"),
+    tablesForSchema("pms_attendance"),
+    tablesForSchema("telegram_security"),
+    tablesForSchema("qa_security"),
+    tablesForSchema("curriculum_artifact"),
+    tablesForSchema("course_spec_governance"),
+    tablesForSchema("public_analytics"),
+    tablesForSchema("student_handbook"),
+    tablesForSchema("lecturer_portfolio"),
   ]);
 
-  const errors: string[] = [];
-  for (const [schema, expected] of expectedBySchema.entries()) {
-    const schemaRows = tables.filter((row) => row.schema_name === schema);
-    errors.push(...compareInventory(schema, expected, schemaRows.map((row) => row.table_name)));
-    if (schema !== "public") {
-      for (const row of schemaRows) {
-        if (!row.rls_enabled) errors.push(`${schema}.${row.table_name}: RLS is not enabled`);
-      }
+  errors.push(
+    ...compareInventory(
+      "public schema",
+      EXPECTED_PUBLIC_TABLES,
+      publicTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "pms_attendance schema",
+      EXPECTED_ATTENDANCE_TABLES,
+      attendanceTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "telegram_security schema",
+      EXPECTED_TELEGRAM_SECURITY_TABLES,
+      telegramSecurityTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "qa_security schema",
+      EXPECTED_QA_SECURITY_TABLES,
+      qaSecurityTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "curriculum_artifact schema",
+      EXPECTED_CURRICULUM_ARTIFACT_TABLES,
+      curriculumArtifactTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "course_spec_governance schema",
+      EXPECTED_COURSE_SPEC_GOVERNANCE_TABLES,
+      courseSpecGovernanceTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "public_analytics schema",
+      EXPECTED_PUBLIC_ANALYTICS_TABLES,
+      publicAnalyticsTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "student_handbook schema",
+      EXPECTED_STUDENT_HANDBOOK_TABLES,
+      studentHandbookTables.map((table) => table.table_name),
+    ),
+    ...compareInventory(
+      "lecturer_portfolio schema",
+      EXPECTED_LECTURER_PORTFOLIO_TABLES,
+      lecturerPortfolioTables.map((table) => table.table_name),
+    ),
+  );
+
+  for (const table of [
+    ...publicTables,
+    ...attendanceTables,
+    ...telegramSecurityTables,
+    ...qaSecurityTables,
+    ...curriculumArtifactTables,
+    ...courseSpecGovernanceTables,
+    ...publicAnalyticsTables,
+    ...studentHandbookTables,
+    ...lecturerPortfolioTables,
+  ]) {
+    if (!table.rls_enabled) {
+      errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
     }
   }
 
-  const grants = await prisma.$queryRaw<GrantRow[]>`
-    SELECT table_schema AS schema_name,
-           table_name AS object_name,
-           grantee,
-           privilege_type
-    FROM information_schema.role_table_grants
-    WHERE table_schema = ANY(${ALL_VERIFIED_SCHEMAS}::text[])
-      AND grantee = ANY(${[...FORBIDDEN_GRANTEES]}::text[])
-    ORDER BY table_schema, table_name, grantee, privilege_type
-  `;
-  for (const grant of grants) {
-    errors.push(
-      `${grant.schema_name}.${grant.object_name}: forbidden ${grant.privilege_type} grant to ${grant.grantee}`,
-    );
+  const schemaSql = ALL_VERIFIED_SCHEMAS.map((schema) => `'${schema}'`).join(", ");
+  const protectedSchemaSql = PROTECTED_SCHEMAS.map((schema) => `'${schema}'`).join(", ");
+
+  const tableGrants = await prisma.$queryRawUnsafe<GrantRow[]>(`
+    SELECT
+      n.nspname::text AS schema_name,
+      c.relname::text AS object_name,
+      CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
+      acl.privilege_type::text AS privilege_type
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(c.relacl, acldefault('r', c.relowner))
+    ) AS acl
+    LEFT JOIN pg_roles r ON r.oid = acl.grantee
+    WHERE n.nspname IN (${schemaSql})
+      AND c.relkind IN ('r', 'p')
+      AND c.relname <> '_prisma_migrations'
+      AND (
+        acl.grantee = 0
+        OR r.rolname IN ('anon', 'authenticated', 'service_role')
+      )
+    ORDER BY n.nspname, c.relname, grantee, acl.privilege_type
+  `);
+
+  for (const grant of tableGrants) {
+    if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
+      errors.push(
+        `Forbidden table grant: ${grant.grantee} has ${grant.privilege_type} on ${grant.schema_name}.${grant.object_name}`,
+      );
+    }
   }
 
-  const defaults = await prisma.$queryRaw<DefaultGrantRow[]>`
-    SELECT n.nspname AS schema_name,
-           CASE d.defaclobjtype
-             WHEN 'r' THEN 'table'
-             WHEN 'S' THEN 'sequence'
-             WHEN 'f' THEN 'function'
-             WHEN 'T' THEN 'type'
-             WHEN 'n' THEN 'schema'
-             ELSE d.defaclobjtype::text
-           END AS object_type,
-           r.rolname AS grantee,
-           privilege_type
+  const schemaGrants = await prisma.$queryRawUnsafe<GrantRow[]>(`
+    SELECT
+      n.nspname::text AS schema_name,
+      n.nspname::text AS object_name,
+      CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
+      acl.privilege_type::text AS privilege_type
+    FROM pg_namespace n
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(n.nspacl, acldefault('n', n.nspowner))
+    ) AS acl
+    LEFT JOIN pg_roles r ON r.oid = acl.grantee
+    WHERE n.nspname IN (${protectedSchemaSql})
+      AND (
+        acl.grantee = 0
+        OR r.rolname IN ('anon', 'authenticated', 'service_role')
+      )
+    ORDER BY n.nspname, grantee, acl.privilege_type
+  `);
+
+  for (const grant of schemaGrants) {
+    if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
+      errors.push(
+        `Forbidden schema grant: ${grant.grantee} has ${grant.privilege_type} on ${grant.schema_name}`,
+      );
+    }
+  }
+
+  const defaultGrants = await prisma.$queryRawUnsafe<DefaultGrantRow[]>(`
+    SELECT
+      n.nspname::text AS schema_name,
+      CASE d.defaclobjtype
+        WHEN 'r' THEN 'table'
+        WHEN 'S' THEN 'sequence'
+        WHEN 'f' THEN 'function'
+        ELSE d.defaclobjtype::text
+      END AS object_type,
+      CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
+      acl.privilege_type::text AS privilege_type
     FROM pg_default_acl d
     JOIN pg_namespace n ON n.oid = d.defaclnamespace
-    CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
-    JOIN pg_roles r ON r.oid = acl.grantee
-    CROSS JOIN LATERAL (
-      SELECT CASE acl.privilege_type
-        WHEN 'r' THEN 'SELECT'
-        WHEN 'a' THEN 'INSERT'
-        WHEN 'w' THEN 'UPDATE'
-        WHEN 'd' THEN 'DELETE'
-        WHEN 'D' THEN 'TRUNCATE'
-        WHEN 'x' THEN 'REFERENCES'
-        WHEN 't' THEN 'TRIGGER'
-        WHEN 'U' THEN 'USAGE'
-        WHEN 'X' THEN 'EXECUTE'
-        WHEN 'C' THEN 'CREATE'
-        WHEN 'c' THEN 'CONNECT'
-        WHEN 'T' THEN 'TEMPORARY'
-        ELSE acl.privilege_type::text
-      END AS privilege_type
-    ) privilege
-    WHERE n.nspname = ANY(${PROTECTED_SCHEMAS}::text[])
-      AND r.rolname = ANY(${[...FORBIDDEN_GRANTEES]}::text[])
-    ORDER BY n.nspname, object_type, grantee, privilege_type
-  `;
-  for (const grant of defaults) {
-    errors.push(
-      `${grant.schema_name}: forbidden default ${grant.privilege_type} grant on ${grant.object_type} to ${grant.grantee}`,
-    );
+    JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
+    LEFT JOIN pg_roles r ON r.oid = acl.grantee
+    WHERE n.nspname IN (${schemaSql})
+      AND owner_role.rolname = current_user
+      AND (
+        acl.grantee = 0
+        OR r.rolname IN ('anon', 'authenticated', 'service_role')
+      )
+    ORDER BY n.nspname, object_type, grantee, acl.privilege_type
+  `);
+
+  for (const grant of defaultGrants) {
+    if (FORBIDDEN_GRANTEES.has(grant.grantee)) {
+      errors.push(
+        `Forbidden default grant: future ${grant.schema_name} ${grant.object_type}s grant ${grant.privilege_type} to ${grant.grantee}`,
+      );
+    }
   }
 
   if (errors.length > 0) {
-    console.error("Database security verification failed:");
-    errors.forEach((error) => console.error(`- ${error}`));
+    console.error("Database security verification failed:\n");
+    for (const error of errors) {
+      console.error(`- ${error}`);
+    }
     process.exitCode = 1;
-  } else {
-    console.log("Database security verification passed.");
+    return;
   }
+
+  console.log(
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, ${publicAnalyticsTables.length} public-analytics tables, ${studentHandbookTables.length} student-handbook tables, and ${lecturerPortfolioTables.length} lecturer-portfolio tables are classified, RLS-protected, and not granted to Data API roles.`,
+  );
 }
 
 try {
