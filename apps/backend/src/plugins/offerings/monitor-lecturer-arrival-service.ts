@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { SaveLecturerArrivalConfirmationResult } from "@dse-pms/shared-types";
+import {
+  LECTURER_ARRIVAL_EARLY_WINDOW_MINUTES,
+  type SaveLecturerArrivalConfirmationResult,
+} from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import {
   TeachingSessionOccurrenceReferenceError,
+  TeachingSessionOccurrenceValidationError,
   classDeliveryService,
 } from "./class-delivery-service.ts";
 import {
@@ -22,6 +26,14 @@ interface ArrivalRow {
   updatedAt: Date;
 }
 
+interface ExactOccurrenceRow {
+  id: string;
+  offeringId: string;
+  sessionDate: Date;
+  scheduledStartTime: string;
+  scheduledEndTime: string;
+}
+
 function arrivalView(row: ArrivalRow): SaveLecturerArrivalConfirmationResult["confirmation"] {
   return {
     id: row.id,
@@ -33,6 +45,30 @@ function arrivalView(row: ArrivalRow): SaveLecturerArrivalConfirmationResult["co
     recordedAt: row.recordedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function occurrenceInstant(date: string, time: string): Date {
+  return new Date(`${date}T${time}:00+07:00`);
+}
+
+function assertArrivalRecordingWindow(occurrence: ExactOccurrenceRow, now: Date): void {
+  const date = occurrence.sessionDate.toISOString().slice(0, 10);
+  const scheduledStart = occurrenceInstant(date, occurrence.scheduledStartTime);
+  const scheduledEnd = occurrenceInstant(date, occurrence.scheduledEndTime);
+  const opensAt = new Date(
+    scheduledStart.getTime() - LECTURER_ARRIVAL_EARLY_WINDOW_MINUTES * 60_000,
+  );
+
+  if (now < opensAt) {
+    throw new TeachingSessionOccurrenceValidationError(
+      `Lecturer arrival can be recorded from ${LECTURER_ARRIVAL_EARLY_WINDOW_MINUTES} minutes before the scheduled start`,
+    );
+  }
+  if (now > scheduledEnd) {
+    throw new TeachingSessionOccurrenceValidationError(
+      "Lecturer arrival can no longer be recorded after the scheduled class end",
+    );
+  }
 }
 
 export const monitorLecturerArrivalService = {
@@ -51,10 +87,8 @@ export const monitorLecturerArrivalService = {
     );
 
     const result = await prisma.$transaction(async (tx) => {
-      const occurrenceRows = await tx.$queryRaw<
-        Array<{ id: string; offeringId: string; sessionDate: Date }>
-      >`
-        SELECT "id", "offeringId", "sessionDate"
+      const occurrenceRows = await tx.$queryRaw<ExactOccurrenceRow[]>`
+        SELECT "id", "offeringId", "sessionDate", "scheduledStartTime", "scheduledEndTime"
         FROM "pms_attendance"."TeachingSessionOccurrence"
         WHERE "id" = ${occurrence.id}
           AND "offeringId" = ${offeringId}
@@ -110,6 +144,10 @@ export const monitorLecturerArrivalService = {
       }
 
       const now = new Date();
+      // The timestamp is only meaningful when observed near the real class occurrence.
+      // Reject night-before / after-class punches even if a client bypasses the UI gate.
+      assertArrivalRecordingWindow(exactOccurrence, now);
+
       const rows = current
         ? await tx.$queryRaw<ArrivalRow[]>`
             UPDATE "pms_attendance"."LecturerArrivalConfirmation" c
