@@ -91,13 +91,6 @@ function enforceCreateIdentity(
   ctx: z.RefinementCtx,
 ) {
   if (value.studentId !== null) return;
-  if (value.status !== "Pending") {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Students without an official Student ID must remain Pending",
-      path: ["status"],
-    });
-  }
   if (value.email === null) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -107,7 +100,10 @@ function enforceCreateIdentity(
   }
 }
 
-/** Body for POST /api/students. Provisional rows are Pending + email-keyed. */
+/**
+ * Body for POST /api/students. A provisional row may be operationally Active
+ * before the official Student ID is issued, but it must remain email-keyed.
+ */
 export const CreateStudentInput = StudentCoreWriteInput.extend({
   profile: StudentProfileInputSchema.optional(),
 }).superRefine(enforceCreateIdentity);

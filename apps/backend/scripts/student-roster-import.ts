@@ -124,21 +124,12 @@ export const StudentRosterImportDocumentSchema = z
         });
       }
 
-      if (!student.studentId) {
-        if (!student.email) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Institutional email is required while official Student ID is pending",
-            path: ["students", index, "email"],
-          });
-        }
-        if (student.status !== "Pending") {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Students without an official Student ID must be Pending",
-            path: ["students", index, "status"],
-          });
-        }
+      if (!student.studentId && !student.email) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Institutional email is required while official Student ID is pending",
+          path: ["students", index, "email"],
+        });
       }
     }
   });

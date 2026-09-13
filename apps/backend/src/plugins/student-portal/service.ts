@@ -71,7 +71,7 @@ type PortalStudent = Awaited<ReturnType<typeof studentForUser>>;
 
 async function studentForUser(userId: string) {
   const student = await prisma.student.findUnique({ where: { userId } });
-  if (!student || student.status !== "Active" || !student.studentId) {
+  if (!student || student.status !== "Active") {
     throw new PortalAccessError("No active student profile is linked to this account");
   }
   // Roster-only Students may legitimately have no email, but a linked Student
@@ -79,7 +79,7 @@ async function studentForUser(userId: string) {
   if (!student.email) {
     throw new PortalAccessError("The linked student portal profile has no official email");
   }
-  return { ...student, studentId: student.studentId, email: student.email };
+  return { ...student, email: student.email };
 }
 
 interface ProgrammeCalendarReadContract {
