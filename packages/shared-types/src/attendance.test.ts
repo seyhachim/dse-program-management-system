@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { AttendanceDateSchema, SaveAttendanceInput } from "./attendance.ts";
+import {
+  AttendanceDateSchema,
+  RecheckAttendanceInput,
+  SaveAttendanceInput,
+} from "./attendance.ts";
 
 const STUDENT = "11111111-1111-1111-1111-111111111111";
 
@@ -44,4 +48,39 @@ test("attendance save rejects duplicate students", () => {
     ],
   });
   expect(result.success).toBe(false);
+});
+
+test("attendance recheck keeps observation separate from explicit final status", () => {
+  const parsed = RecheckAttendanceInput.parse({
+    studentId: STUDENT,
+    observation: { status: "Present", note: "Seen in second roll" },
+    final: { status: "Late", note: "Arrived after first roll" },
+  });
+  expect(parsed.observation.status).toBe("Present");
+  expect(parsed.final.status).toBe("Late");
+  expect(parsed.observation.permissionPending).toBe(false);
+});
+
+test("attendance recheck supports Permission Pending as observation or final state", () => {
+  const parsed = RecheckAttendanceInput.parse({
+    studentId: STUDENT,
+    observation: { permissionPending: true },
+    final: { permissionPending: true, note: "Paper letter to follow" },
+  });
+  expect(parsed.observation.status).toBeNull();
+  expect(parsed.final.permissionPending).toBe(true);
+});
+
+test("attendance recheck rejects ambiguous observation and final marks", () => {
+  expect(RecheckAttendanceInput.safeParse({
+    studentId: STUDENT,
+    observation: { status: "Present", permissionPending: true },
+    final: { status: "Present" },
+  }).success).toBe(false);
+
+  expect(RecheckAttendanceInput.safeParse({
+    studentId: STUDENT,
+    observation: { status: "Present" },
+    final: { status: null, permissionPending: false },
+  }).success).toBe(false);
 });
