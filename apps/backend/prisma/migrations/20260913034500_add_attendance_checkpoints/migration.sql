@@ -2,6 +2,9 @@
 -- AttendanceRecord / AttendancePermissionPending as the final attendance truth.
 -- Existing sessions are intentionally not backfilled; we cannot manufacture
 -- historical Check 1 / Check 2 evidence that was never observed.
+ALTER TABLE "pms_attendance"."AttendanceSession"
+  ADD COLUMN "checkpointTrackingStartedAt" TIMESTAMP(3);
+
 CREATE TABLE "pms_attendance"."AttendanceCheckpoint" (
   "id" TEXT NOT NULL,
   "sessionId" TEXT NOT NULL,
