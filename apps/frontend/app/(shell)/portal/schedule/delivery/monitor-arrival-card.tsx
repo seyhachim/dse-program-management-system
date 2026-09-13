@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TeachingSessionMonitorContextView } from "@dse-pms/shared-types";
 import { CheckCircle2, Clock3 } from "lucide-react";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
-import { lecturerArrivalPunctuality } from "./monitor-arrival-utils";
+import {
+  lecturerArrivalPunctuality,
+  lecturerArrivalRecordingWindow,
+} from "./monitor-arrival-utils";
 
 export function MonitorArrivalCard({
   context,
@@ -21,6 +24,7 @@ export function MonitorArrivalCard({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const arrival = context.lecturerArrival?.status === "Present" ? context.lecturerArrival : null;
   const punctuality = useMemo(
     () =>
@@ -33,8 +37,29 @@ export function MonitorArrivalCard({
         : null,
     [arrival, context.occurrence.date, context.occurrence.scheduledStartTime],
   );
+  const recordingWindow = useMemo(
+    () =>
+      lecturerArrivalRecordingWindow(
+        context.occurrence.date,
+        context.occurrence.scheduledStartTime,
+        context.occurrence.scheduledEndTime,
+        now,
+      ),
+    [
+      context.occurrence.date,
+      context.occurrence.scheduledEndTime,
+      context.occurrence.scheduledStartTime,
+      now,
+    ],
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const markArrived = async () => {
+    if (!recordingWindow.canRecord) return;
     try {
       setSaving(true);
       setError(null);
@@ -48,60 +73,70 @@ export function MonitorArrivalCard({
   };
 
   return (
-    <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <section className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Lecturer punctuality</p>
-          <h3 className="mt-1 text-base font-semibold text-foreground">Lecturer arrival</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Scheduled start · {context.occurrence.scheduledStartTime}
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Step 1 · Arrival</p>
+          <h3 className="mt-0.5 text-base font-semibold text-foreground">Lecturer arrival</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Scheduled {context.occurrence.scheduledStartTime}
           </p>
         </div>
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Clock3 className="h-5 w-5" aria-hidden="true" />
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Clock3 className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
 
       {arrival && punctuality ? (
-        <div className="mt-4 rounded-2xl bg-primary/10 p-4">
-          <div className="flex items-center gap-2 text-primary">
-            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-            <p className="text-sm font-semibold">Arrival recorded</p>
+        <div className="mt-3 flex items-center gap-3 rounded-xl bg-primary/10 px-3 py-3">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">Arrived {punctuality.time}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{punctuality.label}</p>
           </div>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-            {punctuality.time}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">{punctuality.label}</p>
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            PMS uses the server timestamp. This factual arrival evidence is separate from the actual teaching start time below.
+          <span className="shrink-0 rounded-full bg-background/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+            Recorded
+          </span>
+        </div>
+      ) : recordingWindow.status === "too-early" ? (
+        <div className="mt-3">
+          <div className="rounded-xl bg-muted/45 px-3 py-3 text-sm text-muted-foreground">
+            Arrival recording opens at <span className="font-semibold text-foreground">{recordingWindow.opensAtTime}</span>.
+          </div>
+          <button
+            type="button"
+            disabled
+            className="mt-2 min-h-11 w-full rounded-xl bg-muted px-4 text-sm font-semibold text-muted-foreground"
+          >
+            Opens at {recordingWindow.opensAtTime}
+          </button>
+        </div>
+      ) : recordingWindow.status === "closed" ? (
+        <div className="mt-3 rounded-xl bg-muted/45 px-3 py-3">
+          <p className="text-sm font-semibold text-foreground">Arrival window closed</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            The scheduled class ended at {recordingWindow.closesAtTime}. Continue with the class record below.
           </p>
         </div>
       ) : (
-        <div className="mt-4">
-          <div className="rounded-2xl bg-muted/45 px-4 py-3">
-            <p className="text-sm font-semibold text-foreground">Not arrived yet</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Tap only when you can observe that the lecturer has arrived. PMS records the time automatically; you do not decide whether it is late.
-            </p>
-          </div>
+        <div className="mt-3">
           <button
             type="button"
             disabled={saving}
             onClick={() => void markArrived()}
-            className="mt-3 min-h-12 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-12 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Recording arrival…" : "Lecturer arrived now"}
+            {saving ? "Recording…" : "Lecturer arrived now"}
           </button>
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+            Server time is recorded automatically; the monitor does not classify late or absent.
+          </p>
         </div>
       )}
 
       {error ? (
         <p className="mt-3 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
       ) : null}
-
-      <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        No student-authored “Late” or “Absent” finding is created here. Programme policy can interpret the timestamp separately.
-      </p>
     </section>
   );
 }
