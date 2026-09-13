@@ -10,6 +10,7 @@ import type {
 import { ArrowLeft, CheckCircle2, Clock3, History, NotebookPen } from "lucide-react";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { PortalError, PortalLoading } from "../../portal-state";
+import { MonitorArrivalCard } from "./monitor-arrival-card";
 
 const COVERAGE_OPTIONS: Array<{ value: TeachingSessionCoverage; label: string }> = [
   { value: "TAUGHT_AS_PLANNED", label: "Taught as planned" },
@@ -22,7 +23,7 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
   const existing = context.delivery;
   if (existing) {
     return {
-      lecturerArrivalStatus: context.lecturerArrival?.status ?? null,
+      lecturerArrivalStatus: null,
       classOccurred: existing.classOccurred,
       actualLecturerId: existing.actualLecturer?.id ?? null,
       actualStartTime: existing.actualStartTime,
@@ -34,7 +35,7 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
     };
   }
   return {
-    lecturerArrivalStatus: context.lecturerArrival?.status ?? null,
+    lecturerArrivalStatus: null,
     classOccurred: true,
     actualLecturerId: context.eligibleLecturers[0]?.id ?? null,
     actualStartTime: context.occurrence.scheduledStartTime,
@@ -93,6 +94,11 @@ export function MonitorDeliveryForm() {
   if (error && (!context || !input)) return <PortalError message={error} />;
   if (!context || !input) return <PortalError message="Could not load class delivery" />;
 
+  const refreshArrival = async () => {
+    const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
+    setContext(refreshed);
+  };
+
   const setOccurred = (occurred: boolean) => {
     setNotice(null);
     setInput((current) => {
@@ -124,13 +130,16 @@ export function MonitorDeliveryForm() {
       setSaving(true);
       setError(null);
       setNotice(null);
-      const result = await monitorDeliveryApi.save(offeringId, meetingId, date, input);
+      const result = await monitorDeliveryApi.save(offeringId, meetingId, date, {
+        ...input,
+        lecturerArrivalStatus: null,
+      });
       const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
       setContext(refreshed);
       setInput(initialInput(refreshed));
-      setNotice(result.changed ? "Class record saved." : "No changes to save.");
+      setNotice(result.changed ? "Class learning record saved." : "No changes to save.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save class delivery");
+      setError(err instanceof Error ? err.message : "Could not save class learning record");
     } finally {
       setSaving(false);
     }
@@ -162,11 +171,19 @@ export function MonitorDeliveryForm() {
               {context.occurrence.scheduledRoom ? ` · ${context.occurrence.scheduledRoom}` : ""}
             </p>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Record factual class evidence only. “Not yet confirmed” is not an official lecturer-absence or disciplinary finding.
+              Record observable facts only. Lecturer arrival and the class learning record are saved separately.
             </p>
           </div>
         </div>
       </section>
+
+      <MonitorArrivalCard
+        context={context}
+        offeringId={offeringId}
+        meetingId={meetingId}
+        date={date}
+        onRecorded={refreshArrival}
+      />
 
       <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Planned Weekly Plan</p>
@@ -187,38 +204,11 @@ export function MonitorDeliveryForm() {
 
       <section className="space-y-5 rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
         <div>
-          <p className="text-sm font-semibold text-foreground">Lecturer arrival</p>
-          <p className="mt-1 text-xs text-muted-foreground">Use only the factual state you can observe.</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              aria-pressed={input.lecturerArrivalStatus === "Present"}
-              onClick={() =>
-                setInput((current) => current ? { ...current, lecturerArrivalStatus: "Present" } : current)
-              }
-              className={`min-h-11 rounded-xl border px-3 text-sm font-medium ${
-                input.lecturerArrivalStatus === "Present"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background"
-              }`}
-            >
-              Present
-            </button>
-            <button
-              type="button"
-              aria-pressed={input.lecturerArrivalStatus === "NotYet"}
-              onClick={() =>
-                setInput((current) => current ? { ...current, lecturerArrivalStatus: "NotYet" } : current)
-              }
-              className={`min-h-11 rounded-xl border px-3 text-sm font-medium ${
-                input.lecturerArrivalStatus === "NotYet"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background"
-              }`}
-            >
-              Not yet confirmed
-            </button>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Class learning record</p>
+          <h3 className="mt-1 text-base font-semibold text-foreground">What actually happened in class?</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Complete this separately from lecturer arrival. Actual teaching start can differ from arrival time.
+          </p>
         </div>
 
         <div>
@@ -267,7 +257,7 @@ export function MonitorDeliveryForm() {
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium text-foreground">
-                Actual start
+                Actual teaching start
                 <input
                   type="time"
                   value={input.actualStartTime ?? ""}
@@ -276,7 +266,7 @@ export function MonitorDeliveryForm() {
                 />
               </label>
               <label className="block text-sm font-medium text-foreground">
-                Actual end
+                Actual teaching end
                 <input
                   type="time"
                   value={input.actualEndTime ?? ""}
@@ -365,7 +355,7 @@ export function MonitorDeliveryForm() {
           onClick={() => void save()}
           className="min-h-12 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Saving…" : context.delivery ? "Save correction" : "Save class record"}
+          {saving ? "Saving…" : context.delivery ? "Save learning correction" : "Save class learning record"}
         </button>
       </section>
 
