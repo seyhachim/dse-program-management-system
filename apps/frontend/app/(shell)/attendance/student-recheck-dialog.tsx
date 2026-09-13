@@ -161,7 +161,13 @@ export function StudentRecheckDialog({
   }
 
   async function submit() {
-    if (!record || !observedValue || !finalValue || check2) return;
+    if (
+      !record ||
+      record.recheckEligible === false ||
+      !observedValue ||
+      !finalValue ||
+      check2
+    ) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -266,7 +272,14 @@ export function StudentRecheckDialog({
                 </section>
               ) : null}
 
-              {!check1 ? (
+              {record.recheckEligible === false ? (
+                <section className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                  <p className="font-semibold text-foreground">Historical attendance view</p>
+                  <p className="mt-1">
+                    This student is no longer enrolled in this class. Existing attendance and checkpoint evidence remain visible, but a new Check 2 cannot be recorded.
+                  </p>
+                </section>
+              ) : !check1 ? (
                 <section className="rounded-xl border border-amber-300/50 bg-amber-50/40 p-4 text-sm text-amber-900">
                   Save the initial roll call first. Check 1 is created only from the first saved observation and is never manufactured from older attendance history.
                 </section>
