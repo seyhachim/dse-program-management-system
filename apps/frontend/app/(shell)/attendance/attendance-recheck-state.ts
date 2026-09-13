@@ -4,7 +4,8 @@ export type AttendanceRecheckState =
   | "not-started"
   | "needs-recheck"
   | "checked-twice"
-  | "changed";
+  | "changed"
+  | "view-only";
 
 export function checkpointLabel(checkpoint: AttendanceCheckpointView | undefined): string {
   if (!checkpoint) return "Not checked";
@@ -13,6 +14,7 @@ export function checkpointLabel(checkpoint: AttendanceCheckpointView | undefined
 }
 
 export function attendanceRecheckState(record: AttendanceRecordView): AttendanceRecheckState {
+  if (record.recheckEligible === false) return "view-only";
   const checkpoints = record.checkpoints ?? [];
   const check1 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 1);
   const check2 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 2);
@@ -28,5 +30,6 @@ export function recheckStateLabel(state: AttendanceRecheckState): string {
   if (state === "needs-recheck") return "Needs recheck";
   if (state === "checked-twice") return "Checked twice";
   if (state === "changed") return "Changed";
+  if (state === "view-only") return "Historical";
   return "Not checked";
 }
