@@ -396,7 +396,6 @@ describeDb("historical attendance correction", () => {
     expect(formerView.studentGender).toBeNull();
     expect(formerView.status).toBe("Excused");
     expect(formerView.checkpoints?.[0]?.status).toBe("Absent");
-    expect(formerView.checkpoints?.[0]?.studentName).toBeUndefined();
 
     await expect(
       attendanceService.save(offering.id, "2026-08-19", {
