@@ -7,7 +7,7 @@ import type {
   TeachingSessionCoverage,
   TeachingSessionMonitorContextView,
 } from "@dse-pms/shared-types";
-import { ArrowLeft, CheckCircle2, Clock3, History, NotebookPen } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, Circle, Clock3, History } from "lucide-react";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { PortalError, PortalLoading } from "../../portal-state";
 import { MonitorArrivalCard } from "./monitor-arrival-card";
@@ -45,6 +45,17 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
     coverage: "TAUGHT_AS_PLANNED",
     note: "",
   };
+}
+
+function formatSessionDate(date: string): string {
+  const parsed = new Date(`${date}T00:00:00+07:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Phnom_Penh",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(parsed);
 }
 
 export function MonitorDeliveryForm() {
@@ -94,6 +105,9 @@ export function MonitorDeliveryForm() {
   if (error && (!context || !input)) return <PortalError message={error} />;
   if (!context || !input) return <PortalError message="Could not load class delivery" />;
 
+  const arrivalRecorded = context.lecturerArrival?.status === "Present";
+  const deliveryRecorded = Boolean(context.delivery);
+
   const refreshArrival = async () => {
     const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
     setContext(refreshed);
@@ -137,42 +151,66 @@ export function MonitorDeliveryForm() {
       const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
       setContext(refreshed);
       setInput(initialInput(refreshed));
-      setNotice(result.changed ? "Class learning record saved." : "No changes to save.");
+      setNotice(result.changed ? "Class record saved." : "No changes to save.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save class learning record");
+      setError(err instanceof Error ? err.message : "Could not save class record");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4 pb-8">
+    <div className="mx-auto w-full max-w-2xl space-y-3 pb-8">
       <button
         type="button"
         onClick={() => router.back()}
-        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-medium shadow-sm"
+        className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-medium shadow-sm"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Back to schedule
       </button>
 
-      <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <NotebookPen className="h-5 w-5" aria-hidden="true" />
-          </span>
+      <section className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              {context.responsibility.role === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor"}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                {context.responsibility.role === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor"}
+              </span>
+              {context.plannedWeek ? (
+                <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                  Week {context.plannedWeek.week}
+                </span>
+              ) : null}
+            </div>
+            <h2 className="mt-2 text-lg font-semibold text-foreground">Class delivery</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {formatSessionDate(context.occurrence.date)} · {context.occurrence.scheduledStartTime}–{context.occurrence.scheduledEndTime}
+              {context.occurrence.scheduledRoom ? ` · Room ${context.occurrence.scheduledRoom}` : ""}
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-foreground">Record class delivery</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {context.occurrence.date} · {context.occurrence.scheduledStartTime}–{context.occurrence.scheduledEndTime}
-              {context.occurrence.scheduledRoom ? ` · ${context.occurrence.scheduledRoom}` : ""}
-            </p>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Record observable facts only. Lecturer arrival and the class learning record are saved separately.
-            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="flex items-center gap-2 rounded-xl bg-muted/45 px-3 py-2 text-xs">
+            {arrivalRecorded ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            ) : (
+              <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            )}
+            <span className={arrivalRecorded ? "font-medium text-foreground" : "text-muted-foreground"}>
+              Arrival {arrivalRecorded ? "recorded" : "pending"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl bg-muted/45 px-3 py-2 text-xs">
+            {deliveryRecorded ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            ) : (
+              <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            )}
+            <span className={deliveryRecorded ? "font-medium text-foreground" : "text-muted-foreground"}>
+              Class record {deliveryRecorded ? "saved" : "pending"}
+            </span>
           </div>
         </div>
       </section>
@@ -185,30 +223,38 @@ export function MonitorDeliveryForm() {
         onRecorded={refreshArrival}
       />
 
-      <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Planned Weekly Plan</p>
-        {context.plannedWeek ? (
-          <div className="mt-3">
-            <p className="text-sm font-semibold text-foreground">Week {context.plannedWeek.week}</p>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">{context.plannedWeek.topic || "No planned topic entered"}</p>
-            <p className="mt-3 text-xs text-muted-foreground">
-              This is read-only source context from the exact Approved Course Specification. Recording delivery never changes the Weekly Plan.
+      {context.plannedWeek ? (
+        <details className="group rounded-[1.25rem] border border-border bg-card shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Week {context.plannedWeek.week} plan
+              </p>
+              <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+                {context.plannedWeek.topic || "No planned topic entered"}
+              </p>
+            </div>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-border px-4 py-3">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {context.plannedWeek.topic || "No planned topic entered"}
+            </p>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Read-only plan from the approved Course Specification.
             </p>
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted-foreground">
-            No approved Weekly Plan row could be resolved for this teaching week. You can still record what actually happened.
-          </p>
-        )}
-      </section>
+        </details>
+      ) : (
+        <div className="rounded-[1.25rem] border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+          No approved Weekly Plan found. Record what actually happened in class normally.
+        </div>
+      )}
 
-      <section className="space-y-5 rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
+      <section className="space-y-4 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Class learning record</p>
-          <h3 className="mt-1 text-base font-semibold text-foreground">What actually happened in class?</h3>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Complete this separately from lecturer arrival. Actual teaching start can differ from arrival time.
-          </p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Step 2 · Class record</p>
+          <h3 className="mt-0.5 text-base font-semibold text-foreground">What happened in class?</h3>
         </div>
 
         <div>
@@ -257,7 +303,7 @@ export function MonitorDeliveryForm() {
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium text-foreground">
-                Actual teaching start
+                Teaching start
                 <input
                   type="time"
                   value={input.actualStartTime ?? ""}
@@ -266,7 +312,7 @@ export function MonitorDeliveryForm() {
                 />
               </label>
               <label className="block text-sm font-medium text-foreground">
-                Actual teaching end
+                Teaching end
                 <input
                   type="time"
                   value={input.actualEndTime ?? ""}
@@ -277,69 +323,77 @@ export function MonitorDeliveryForm() {
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
               <Clock3 className="h-4 w-4" aria-hidden="true" />
-              {deliveredMinutes > 0 ? `${deliveredMinutes} minutes (${Math.round((deliveredMinutes / 60) * 100) / 100} contact hours)` : "Enter a valid end time after the start time"}
+              {deliveredMinutes > 0 ? `${deliveredMinutes} min · ${Math.round((deliveredMinutes / 60) * 100) / 100} contact hours` : "Enter an end time after the start time"}
             </div>
           </>
         ) : null}
 
         <label className="block text-sm font-medium text-foreground">
-          Class topic / title actually taught
+          Topic actually taught
           <textarea
             value={input.actualTopic}
             maxLength={1000}
-            rows={3}
+            rows={2}
             onChange={(event) => setInput((current) => current ? { ...current, actualTopic: event.target.value } : current)}
-            placeholder={input.classOccurred ? "Record the actual topic/content taught" : "Optional factual note about the class not being held"}
+            placeholder={input.classOccurred ? "Actual topic/content taught" : "Optional factual note about the class not being held"}
             className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
           />
         </label>
 
         {input.classOccurred ? (
-          <>
-            <label className="block text-sm font-medium text-foreground">
-              What we learned
-              <textarea
-                value={input.learningSummary}
-                maxLength={1000}
-                rows={4}
-                onChange={(event) => setInput((current) => current ? { ...current, learningSummary: event.target.value } : current)}
-                placeholder="Short student-safe summary of what the class learned"
-                className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
-              />
-              <span className="mt-1 block text-xs text-muted-foreground">
-                This summary can later appear in students’ Week 1–16 Weekly Notes.
-              </span>
-            </label>
-
-            <label className="block text-sm font-medium text-foreground">
-              Planned-topic coverage
-              <select
-                value={input.coverage}
-                onChange={(event) => setInput((current) => current ? { ...current, coverage: event.target.value as TeachingSessionCoverage } : current)}
-                className="mt-2 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-              >
-                {COVERAGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-          </>
+          <label className="block text-sm font-medium text-foreground">
+            What we learned
+            <textarea
+              value={input.learningSummary}
+              maxLength={1000}
+              rows={3}
+              onChange={(event) => setInput((current) => current ? { ...current, learningSummary: event.target.value } : current)}
+              placeholder="Short student-safe summary of what the class learned"
+              className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
+            />
+          </label>
         ) : null}
 
-        <label className="block text-sm font-medium text-foreground">
-          Private internal note
-          <textarea
-            value={input.note}
-            maxLength={500}
-            rows={3}
-            onChange={(event) => setInput((current) => current ? { ...current, note: event.target.value } : current)}
-            placeholder="Optional note for authorized staff review"
-            className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
-          />
-          <span className="mt-1 block text-xs text-muted-foreground">
-            This is structurally separate from “What we learned” and must never be student-visible.
-          </span>
-        </label>
+        <details className="group rounded-xl border border-border bg-background">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-medium text-foreground">
+            <span>
+              More details
+              <span className="ml-2 text-xs font-normal text-muted-foreground">Coverage & private note</span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="space-y-4 border-t border-border px-3 py-3">
+            {input.classOccurred ? (
+              <label className="block text-sm font-medium text-foreground">
+                Planned-topic coverage
+                <select
+                  value={input.coverage}
+                  onChange={(event) => setInput((current) => current ? { ...current, coverage: event.target.value as TeachingSessionCoverage } : current)}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
+                >
+                  {COVERAGE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            <label className="block text-sm font-medium text-foreground">
+              Private internal note
+              <textarea
+                value={input.note}
+                maxLength={500}
+                rows={2}
+                onChange={(event) => setInput((current) => current ? { ...current, note: event.target.value } : current)}
+                placeholder="Optional note for authorized staff"
+                className="mt-2 w-full rounded-xl border border-border bg-card px-3 py-3 text-sm"
+              />
+              <span className="mt-1 block text-[11px] text-muted-foreground">
+                Authorized staff only. Never shown in student Weekly Notes.
+              </span>
+            </label>
+          </div>
+        </details>
 
         {error ? <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
         {notice ? (
@@ -355,17 +409,21 @@ export function MonitorDeliveryForm() {
           onClick={() => void save()}
           className="min-h-12 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Saving…" : context.delivery ? "Save learning correction" : "Save class learning record"}
+          {saving ? "Saving…" : context.delivery ? "Save correction" : "Save class record"}
         </button>
       </section>
 
       {context.history.length > 0 ? (
-        <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <h3 className="text-sm font-semibold text-foreground">Delivery history</h3>
-          </div>
-          <div className="mt-3 space-y-2">
+        <details className="group rounded-[1.25rem] border border-border bg-card shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <span className="text-sm font-semibold text-foreground">Delivery history</span>
+              <span className="text-xs text-muted-foreground">{context.history.length}</span>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="space-y-2 border-t border-border px-4 py-3">
             {[...context.history].reverse().map((event) => (
               <div key={event.id} className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">Revision {event.revision} · {event.actor.name}</p>
@@ -373,7 +431,7 @@ export function MonitorDeliveryForm() {
               </div>
             ))}
           </div>
-        </section>
+        </details>
       ) : null}
     </div>
   );
