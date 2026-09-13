@@ -16,6 +16,9 @@ describe("Roll Call dialog layout", () => {
     const latinName = rollCallDialogSource.indexOf("{current.studentName}", khmerName);
     expect(khmerName).toBeGreaterThan(-1);
     expect(latinName).toBeGreaterThan(khmerName);
+    expect(rollCallDialogSource).toContain("2xl:text-9xl");
+    expect(rollCallDialogSource).toContain("2xl:text-8xl");
+    expect(rollCallDialogSource).toContain("max-w-[min(1100px,94vw)]");
   });
 
   test("shows course attendance context and renders earned attendance badges", () => {
