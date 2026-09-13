@@ -40,6 +40,17 @@ describe("attendance recheck state", () => {
     expect(recheckStateLabel("not-started")).toBe("Not checked");
   });
 
+  test("historical unenrolled rows are view-only even when Check 1 exists", () => {
+    expect(
+      attendanceRecheckState({
+        ...BASE_RECORD,
+        checkpoints: [CHECK_1],
+        recheckEligible: false,
+      }),
+    ).toBe("view-only");
+    expect(recheckStateLabel("view-only")).toBe("Historical");
+  });
+
   test("Check 1 without Check 2 needs recheck", () => {
     expect(attendanceRecheckState({ ...BASE_RECORD, checkpoints: [CHECK_1] })).toBe(
       "needs-recheck",
