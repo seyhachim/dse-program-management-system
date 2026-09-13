@@ -78,6 +78,8 @@ export interface AttendanceRecordView {
   studentName: string;
   /** Official Khmer full name when available. Kept optional for historical snapshots. */
   studentKhmerName?: string | null;
+  /** Canonical StudentProfile gender/sex value when available. */
+  studentGender?: string | null;
   /** Course-to-date attendance context used by focused Roll Call UI. */
   attendanceSummary?: AttendanceStudentSummary | null;
   status: AttendanceStatus | null;
