@@ -67,15 +67,15 @@ function markInput(value: string, note: string): RecheckAttendanceInput["observa
 }
 
 function formatTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatDate(value: string): string {
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 function checkpointTone(checkpoint: AttendanceCheckpointView | undefined): string {
@@ -107,8 +107,9 @@ export function StudentRecheckDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const check1 = record?.checkpoints.find((checkpoint) => checkpoint.checkNumber === 1);
-  const check2 = record?.checkpoints.find((checkpoint) => checkpoint.checkNumber === 2);
+  const checkpoints = record?.checkpoints ?? [];
+  const check1 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 1);
+  const check2 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 2);
   const currentFinalValue = record ? markValue(record) : "";
 
   useEffect(() => {
