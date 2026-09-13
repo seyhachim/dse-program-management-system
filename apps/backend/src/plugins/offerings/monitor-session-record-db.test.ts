@@ -109,6 +109,7 @@ async function createFixture(label: string) {
     assigningActor,
     monitorUser,
     ordinaryUser,
+    course,
     offering,
     meeting: offering.meetings[0]!,
     assignment,
@@ -156,6 +157,11 @@ describeDb("student monitor session record", () => {
       "2026-09-08",
       fixture.monitorUser.id,
     );
+    expect(context.course).toEqual({
+      code: fixture.course.code,
+      title: fixture.course.title,
+      sectionCode: fixture.offering.sectionCode,
+    });
     expect(context.lecturerArrival?.status).toBe("Present");
     expect(context.delivery?.learningSummary).toBe(saved.delivery.learningSummary);
     expect(context.plannedWeek?.week).toBe(2);
