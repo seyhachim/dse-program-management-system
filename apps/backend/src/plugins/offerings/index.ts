@@ -1,6 +1,8 @@
 import { offeringsManifest } from "@dse-pms/shared-types";
 import { Router } from "express";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
+import { createAttendanceRecheckRouter } from "./attendance-recheck-router.ts";
+import { attendanceRecheckService } from "./attendance-recheck-service.ts";
 import { attendanceService } from "./attendance-service.ts";
 import { classDeliveryService } from "./class-delivery-service.ts";
 import { classResponsibilityService } from "./class-responsibility-service.ts";
@@ -23,6 +25,7 @@ export const offeringsService = {
   ...courseSectionPresenceService,
   ...portfolioTeachingEvidenceService,
   attendance: attendanceService,
+  attendanceRecheck: attendanceRecheckService,
   studentAttendanceHistory: studentAttendanceHistoryService,
   studentScheduleImpacts: studentScheduleImpactService,
   studentWeeklyNotes: studentWeeklyNotesSourceService,
@@ -36,11 +39,13 @@ export const offeringsService = {
 export type OfferingsService = typeof offeringsService;
 
 const router = Router();
-// Static class-delivery and curriculum-bound workflow routes must be mounted
-// before the legacy /:id offering router so they are not treated as offering ids.
+// Static class-delivery, attendance-recheck, and curriculum-bound workflow routes
+// must be mounted before the legacy /:id offering router so their more-specific
+// paths retain their own validation and authorization behavior.
 router.use(createTeachingLeaveRouter());
 router.use(createTeachingSessionDeliveryRouter());
 router.use(createCurriculumBoundOfferingRouter());
+router.use(createAttendanceRecheckRouter());
 router.use(createOfferingRouter());
 
 export const offeringsPlugin: BackendPlugin<OfferingsService> = {
