@@ -204,7 +204,7 @@ export function AttendanceClient() {
   }, [records, search]);
   const hasUnsavedChanges = !attendanceRecordsEqual(
     records,
-    baselineRecordsRef.current,
+    session?.records ?? [],
   );
   const recheckIndex = recheckStudentId
     ? records.findIndex((record) => record.studentId === recheckStudentId)
