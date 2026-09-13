@@ -1,5 +1,6 @@
 import type {
   MonitorClassResponsibilityView,
+  SaveLecturerArrivalConfirmationResult,
   SaveTeachingSessionDeliveryInput,
   SaveTeachingSessionDeliveryResult,
   TeachingSessionMonitorContextView,
@@ -10,7 +11,7 @@ function deliveryPath(
   offeringId: string,
   meetingId: string,
   date: string,
-  suffix: "monitor-context" | "monitor-delivery",
+  suffix: "monitor-context" | "monitor-arrival" | "monitor-delivery",
 ): string {
   return `/api/offerings/${encodeURIComponent(offeringId)}/meetings/${encodeURIComponent(
     meetingId,
@@ -23,6 +24,11 @@ export const monitorDeliveryApi = {
   context: (offeringId: string, meetingId: string, date: string) =>
     api.put<TeachingSessionMonitorContextView>(
       deliveryPath(offeringId, meetingId, date, "monitor-context"),
+      {},
+    ),
+  markArrived: (offeringId: string, meetingId: string, date: string) =>
+    api.put<SaveLecturerArrivalConfirmationResult>(
+      deliveryPath(offeringId, meetingId, date, "monitor-arrival"),
       {},
     ),
   save: (
