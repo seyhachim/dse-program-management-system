@@ -16,10 +16,16 @@ const courseIds = new Set<string>();
 if (!registry.has("students")) {
   const service: StudentsServiceContract = {
     async getById(id) {
-      return prisma.student.findUnique({ where: { id } });
+      return prisma.student.findUnique({
+        where: { id },
+        include: { profile: true },
+      });
     },
     async findByIds(ids) {
-      return prisma.student.findMany({ where: { id: { in: ids } } });
+      return prisma.student.findMany({
+        where: { id: { in: ids } },
+        include: { profile: true },
+      });
     },
   };
   registry.register({ manifest: studentsManifest, router: Router(), service });
