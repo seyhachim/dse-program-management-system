@@ -31,6 +31,7 @@ import {
   recheckStateLabel,
   type AttendanceRecheckState,
 } from "./attendance-recheck-state";
+import { offeringsScheduledOnDate } from "./attendance-schedule";
 import { MOBILE_ATTENDANCE_LAYOUT } from "./mobile-attendance-layout";
 import { RollCallDialog } from "./roll-call-dialog";
 import {
@@ -120,15 +121,17 @@ export function AttendanceClient() {
     staleTime: QUERY_STALE_MS.operational,
   });
   const offerings = offeringsQuery.data ?? [];
+  const scheduledOfferings = useMemo(
+    () => offeringsScheduledOnDate(offerings, date),
+    [date, offerings],
+  );
 
   useEffect(() => {
     setOfferingId((current) => {
-      if (offerings.some((offering) => offering.id === current)) return current;
-      const firstActive =
-        offerings.find((offering) => offering.status === "Active") ?? offerings[0];
-      return firstActive?.id ?? "";
+      if (scheduledOfferings.some((offering) => offering.id === current)) return current;
+      return scheduledOfferings[0]?.id ?? "";
     });
-  }, [offerings]);
+  }, [scheduledOfferings]);
 
   const attendanceContext = offeringId && date ? `${offeringId}:${date}` : "";
   const sessionKey = protectedQueryKey(
@@ -188,7 +191,7 @@ export function AttendanceClient() {
   }, [attendanceContext, date, offeringId, session]);
 
   const selectedOffering =
-    offerings.find((offering) => offering.id === offeringId) ?? null;
+    scheduledOfferings.find((offering) => offering.id === offeringId) ?? null;
   const teachingWeek = getTeachingWeek(
     selectedOffering?.startDate,
     selectedOffering?.endDate,
@@ -377,7 +380,7 @@ export function AttendanceClient() {
 
   const sessionContext = selectedOffering
     ? `${selectedOffering.course?.title ?? selectedOffering.course?.code ?? "Course"} · Class ${selectedOffering.sectionCode} · ${teachingWeek ? `Week ${teachingWeek}` : "Week not scheduled"} · ${formatSessionDate(date)}`
-    : "Select a class section to load attendance.";
+    : `No classes scheduled for ${formatSessionDate(date)}. Choose another attendance date.`;
 
   return (
     <>
@@ -394,17 +397,18 @@ export function AttendanceClient() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_160px_210px_minmax(0,1fr)] lg:gap-4">
               <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Class section
+                  Class scheduled on date
                 </label>
                 <select
                   value={offeringId}
                   onChange={(event) => setOfferingId(event.target.value)}
+                  disabled={scheduledOfferings.length === 0}
                   className={MOBILE_ATTENDANCE_LAYOUT.control}
                 >
-                  {offerings.length === 0 ? (
-                    <option value="">No assigned classes</option>
+                  {scheduledOfferings.length === 0 ? (
+                    <option value="">No classes scheduled for this date</option>
                   ) : null}
-                  {offerings.map((offering) => (
+                  {scheduledOfferings.map((offering) => (
                     <option key={offering.id} value={offering.id}>
                       {offeringLabel(offering)}
                     </option>
@@ -415,7 +419,11 @@ export function AttendanceClient() {
                     {selectedOffering.course.title} · {selectedOffering.enrolledCount}{" "}
                     enrolled
                   </p>
-                ) : null}
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Choose another attendance date to see classes from the teaching timetable.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -585,6 +593,10 @@ export function AttendanceClient() {
             {loading ? (
               <div className="p-10 text-center text-sm text-muted-foreground">
                 Loading attendance…
+              </div>
+            ) : !offeringId ? (
+              <div className="p-10 text-center text-sm text-muted-foreground">
+                No classes scheduled for this date. Choose another attendance date.
               </div>
             ) : records.length === 0 ? (
               <div className="p-10 text-center text-sm text-muted-foreground">
