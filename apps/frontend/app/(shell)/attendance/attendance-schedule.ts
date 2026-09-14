@@ -10,6 +10,8 @@ const WEEKDAYS: readonly MeetingDay[] = [
   "Saturday",
 ];
 
+const PLANNED_ATTENDANCE_NOTICE = "Offering activation pending";
+
 /**
  * Resolve a YYYY-MM-DD value to its timetable weekday without depending on the
  * browser's local timezone. Invalid/incomplete date inputs return null.
@@ -56,9 +58,22 @@ export function isOfferingScheduledOnDate(
   return offering.meetings.some((meeting) => meeting.dayOfWeek === dayOfWeek);
 }
 
+function withAttendanceGovernanceNotice(offering: OfferingView): OfferingView {
+  if (offering.status !== "Planned" || !offering.course) return offering;
+  return {
+    ...offering,
+    course: {
+      ...offering.course,
+      title: `${offering.course.title} · ${PLANNED_ATTENDANCE_NOTICE}`,
+    },
+  };
+}
+
 export function offeringsScheduledOnDate(
   offerings: readonly OfferingView[],
   date: string,
 ): OfferingView[] {
-  return offerings.filter((offering) => isOfferingScheduledOnDate(offering, date));
+  return offerings
+    .filter((offering) => isOfferingScheduledOnDate(offering, date))
+    .map(withAttendanceGovernanceNotice);
 }
