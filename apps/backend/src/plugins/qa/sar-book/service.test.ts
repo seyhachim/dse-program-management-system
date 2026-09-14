@@ -82,6 +82,22 @@ describe("QA SAR book foundation", () => {
     ]);
   });
 
+  test("extracts pins from the immutable full-book release source index", () => {
+    const pins = extractQaSarBookRequirementPins({
+      sourceIndex: {
+        requirementPins: [
+          { requirementCode: "2.2", submissionId: "submission-22", submissionVersion: 5 },
+          { requirementCode: "1.1", submissionId: "submission-11", submissionVersion: 4 },
+        ],
+      },
+    });
+
+    expect(pins).toEqual([
+      { requirementCode: "1.1", submissionId: "submission-11", submissionVersion: 4 },
+      { requirementCode: "2.2", submissionId: "submission-22", submissionVersion: 5 },
+    ]);
+  });
+
   test("does not invent pins for malformed historical snapshots", () => {
     expect(extractQaSarBookRequirementPins({ criteria: [{ sections: [{ requirementCode: "1.1" }] }] })).toEqual([]);
   });
