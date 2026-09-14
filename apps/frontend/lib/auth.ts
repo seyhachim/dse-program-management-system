@@ -5,6 +5,7 @@ import type {
   CreateAccountInput,
   MeResponse,
   ResendInvitationResponse,
+  StudentPortalAccessStatusResponse,
   TemporaryPasswordResponse,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
@@ -18,6 +19,12 @@ export const authApi = {
   },
   createAccount(input: CreateAccountInput): Promise<MeResponse> {
     return api.post<MeResponse>("/api/auth/accounts", input);
+  },
+  studentPortalAccessStatuses(studentIds: string[]): Promise<StudentPortalAccessStatusResponse> {
+    return api.post<StudentPortalAccessStatusResponse>(
+      "/api/auth/students/portal-access-status",
+      { studentIds },
+    );
   },
   sendStudentPortalAccessToAll(): Promise<BulkStudentPortalAccessResponse> {
     return api.post<BulkStudentPortalAccessResponse>("/api/auth/students/invitations/bulk", {});
