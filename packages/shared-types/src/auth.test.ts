@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  BulkStudentInvitationResponse,
   CreateAccountInput,
   ManageProgrammeRoleInput,
   ResendInvitationResponse,
@@ -90,4 +91,17 @@ test("CreateAccountInput accepts the programme/QA account roles", () => {
 test("ResendInvitationResponse accepts the invited email and rejects invalid email", () => {
   expect(ResendInvitationResponse.safeParse({ email: "ada@dse.dev" }).success).toBe(true);
   expect(ResendInvitationResponse.safeParse({ email: "not-an-email" }).success).toBe(false);
+});
+
+test("BulkStudentInvitationResponse requires internally consistent aggregate counts", () => {
+  const valid = {
+    totalStudents: 10,
+    eligible: 4,
+    invited: 3,
+    failed: 1,
+    skipped: 6,
+  };
+  expect(BulkStudentInvitationResponse.safeParse(valid).success).toBe(true);
+  expect(BulkStudentInvitationResponse.safeParse({ ...valid, eligible: 5 }).success).toBe(false);
+  expect(BulkStudentInvitationResponse.safeParse({ ...valid, totalStudents: 11 }).success).toBe(false);
 });

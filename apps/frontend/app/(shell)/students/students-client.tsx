@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { UserPlus } from "lucide-react";
+import { MailPlus, UserPlus } from "lucide-react";
 import type { Student } from "@dse-pms/shared-types";
 import {
   DataTable,
@@ -35,6 +35,7 @@ export function StudentsClient() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [bulkInviting, setBulkInviting] = useState(false);
   const [resending, setResending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -167,6 +168,35 @@ export function StudentsClient() {
     }
   };
 
+  const handleInviteAll = async () => {
+    const confirmed = confirm(
+      "Send first-time Student Portal invitations to every eligible student in PMS?\n\n" +
+      "This checks the full Student database, not only this page. Only Active students with an official email and no linked portal account will be invited. Existing accounts and pending invitations will not be changed.",
+    );
+    if (!confirmed) return;
+
+    setBulkInviting(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.inviteAllEligibleStudents();
+      setNotice(
+        `Bulk invite complete. Checked ${result.totalStudents} students: ${result.invited} sent, ${result.skipped} skipped.`,
+      );
+      if (result.failed > 0) {
+        setActionError(
+          `${result.failed} invitation${result.failed === 1 ? "" : "s"} failed safely. Run “Invite all eligible” again later to retry only students who are still eligible.`,
+        );
+      }
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : "Failed to send bulk student portal invitations",
+      );
+    } finally {
+      setBulkInviting(false);
+    }
+  };
+
   const handleResendInvite = async () => {
     if (!validateSelectedInviteStudent(selectedStudent)) return;
     if (!confirm(`Resend the pending Student Portal invitation to ${selectedStudent.email}?`)) return;
@@ -232,7 +262,7 @@ export function StudentsClient() {
     },
   ];
 
-  const inviteBusy = inviting || resending;
+  const inviteBusy = inviting || bulkInviting || resending;
   const selectedInviteEligible = Boolean(
     selectedStudent?.email && selectedStudent.status === "Active",
   );
@@ -269,9 +299,16 @@ export function StudentsClient() {
                 ? "This roster record has no official email yet. Add one before provisioning portal access."
                 : selectedStudent
                   ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
-                  : "Select one Active student with an official email to provision their secure portal login."}
+                  : "Select one Active student with an official email, or invite all eligible students across the full PMS roster."}
           </p>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={inviteBusy}
+              onClick={handleInviteAll}
+            >
+              <MailPlus />{bulkInviting ? "Inviting all…" : "Invite all eligible"}
+            </Button>
             <Button
               variant="outline"
               disabled={!selectedInviteEligible || inviteBusy}

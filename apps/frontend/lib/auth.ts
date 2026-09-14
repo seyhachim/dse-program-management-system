@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type {
+  BulkStudentInvitationResponse,
   ChangePasswordInput,
   CreateAccountInput,
   MeResponse,
@@ -17,6 +18,9 @@ export const authApi = {
   },
   createAccount(input: CreateAccountInput): Promise<MeResponse> {
     return api.post<MeResponse>("/api/auth/accounts", input);
+  },
+  inviteAllEligibleStudents(): Promise<BulkStudentInvitationResponse> {
+    return api.post<BulkStudentInvitationResponse>("/api/auth/students/invitations/bulk", {});
   },
   resendInvitation(userId: string): Promise<ResendInvitationResponse> {
     return api.post<ResendInvitationResponse>(
