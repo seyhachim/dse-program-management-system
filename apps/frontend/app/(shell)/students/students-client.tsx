@@ -18,6 +18,7 @@ import { ApiError } from "@/lib/api";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { StudentForm, type StudentFormValues } from "./student-form";
 import { authApi, useMe } from "@/lib/auth";
+import { portalAccessPresentation } from "./student-portal-access-status";
 
 const PAGE_SIZE = 50;
 
@@ -80,6 +81,22 @@ export function StudentsClient() {
     !studentsQuery.isPlaceholderData &&
     !studentsQuery.isError &&
     Boolean(studentsQuery.data?.nextCursor);
+  const canManagePortalAccess = Boolean(me?.permissions.includes("accounts:create"));
+  const portalStudentIds = rows.map((student) => student.id);
+  const portalAccessQuery = useQuery({
+    queryKey: protectedQueryKey(
+      queryScope,
+      "students",
+      "portal-access-status",
+      portalStudentIds.join(","),
+    ),
+    queryFn: () => authApi.studentPortalAccessStatuses(portalStudentIds),
+    enabled: Boolean(me?.id && canManagePortalAccess && portalStudentIds.length > 0),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const portalAccessByStudentId = new Map(
+    (portalAccessQuery.data?.items ?? []).map((item) => [item.studentId, item.status]),
+  );
 
   const handleSubmit = async (values: StudentFormValues) => {
     setSubmitting(true);
@@ -114,6 +131,7 @@ export function StudentsClient() {
     setActionError(null);
     try {
       await studentsApi.setStatus(student.id, active ? "Active" : "Inactive");
+      if (canManagePortalAccess) await portalAccessQuery.refetch();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to update student status");
     }
@@ -160,6 +178,7 @@ export function StudentsClient() {
         email: selectedStudent.email,
         role: "student",
       });
+      await portalAccessQuery.refetch();
       setNotice(`Portal invitation sent to ${selectedStudent.email}.`);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to send portal invitation");
@@ -184,6 +203,7 @@ export function StudentsClient() {
     setNotice(null);
     try {
       const result = await authApi.sendStudentPortalAccessToAll();
+      await portalAccessQuery.refetch();
       // #1103 keeps the old #1101 aggregate fields during rolling deploys. These
       // fallbacks also keep a newly deployed frontend useful against an older
       // backend for the short Vercel/Render deploy-skew window.
@@ -218,6 +238,7 @@ export function StudentsClient() {
     setNotice(null);
     try {
       const result = await authApi.resendStudentInvitation(selectedStudent.id);
+      await portalAccessQuery.refetch();
       setNotice(`Fresh portal invitation sent to ${result.email}.`);
     } catch (err) {
       setActionError(
@@ -257,6 +278,29 @@ export function StudentsClient() {
       header: "Email",
       render: (s) => s.email ?? <span className="text-muted-foreground">—</span>,
     },
+    ...(canManagePortalAccess
+      ? [{
+          key: "portalAccess",
+          header: "Portal Access",
+          render: (student: Student) => {
+            const status = portalAccessByStudentId.get(student.id);
+            if (!status) {
+              return (
+                <StatusBadge
+                  tone={portalAccessQuery.isError ? "danger" : "neutral"}
+                  label={portalAccessQuery.isError ? "Status unavailable" : "Checking…"}
+                />
+              );
+            }
+            const presentation = portalAccessPresentation(status);
+            return (
+              <span title={presentation.description}>
+                <StatusBadge tone={presentation.tone} label={presentation.label} />
+              </span>
+            );
+          },
+        } satisfies DataTableColumn<Student>]
+      : []),
     {
       key: "status",
       header: "Status",
@@ -303,7 +347,7 @@ export function StudentsClient() {
         }}
       />
 
-      {me?.permissions.includes("accounts:create") ? (
+      {canManagePortalAccess ? (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">
             {selectedStudent && selectedStudent.status !== "Active"
@@ -312,7 +356,7 @@ export function StudentsClient() {
                 ? "This roster record has no official email yet. Add one before provisioning portal access."
                 : selectedStudent
                   ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
-                  : "Select one Active student with an official email, or send portal access across the full PMS roster. Pending invitations receive a fresh link; existing accounts stay unchanged."}
+                  : "Select one Active student with an official email, or send portal access across the full PMS roster. The Portal Access column shows who is pending, active, not invited, or needs attention."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
