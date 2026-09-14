@@ -5,6 +5,9 @@ import {
   ManageProgrammeRoleInput,
   ResendInvitationResponse,
   Role,
+  StudentPortalAccessState,
+  StudentPortalAccessStatusRequest,
+  StudentPortalAccessStatusResponse,
 } from "./auth.ts";
 
 test("Role supports additive QA contributor and guardian roles", () => {
@@ -111,4 +114,42 @@ test("BulkStudentPortalAccessResponse requires every student to have exactly one
   expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, skipped: 3 }).success).toBe(false);
   expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, eligible: 7 }).success).toBe(false);
   expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, totalStudents: 11 }).success).toBe(false);
+});
+
+test("StudentPortalAccessState exposes the roster-safe portal states", () => {
+  expect(StudentPortalAccessState.options).toEqual([
+    "not-invited",
+    "invitation-pending",
+    "active-account",
+    "no-email",
+    "inactive-student",
+    "needs-attention",
+    "status-unavailable",
+  ]);
+});
+
+test("StudentPortalAccessStatusRequest accepts bounded student UUID batches", () => {
+  const studentId = "11111111-1111-4111-8111-111111111111";
+  expect(StudentPortalAccessStatusRequest.safeParse({ studentIds: [studentId] }).success).toBe(true);
+  expect(StudentPortalAccessStatusRequest.safeParse({ studentIds: [] }).success).toBe(false);
+  expect(
+    StudentPortalAccessStatusRequest.safeParse({ studentIds: Array.from({ length: 101 }, () => studentId) }).success,
+  ).toBe(false);
+});
+
+test("StudentPortalAccessStatusResponse strips unexpected auth fields", () => {
+  const studentId = "11111111-1111-4111-8111-111111111111";
+  const parsed = StudentPortalAccessStatusResponse.parse({
+    items: [
+      {
+        studentId,
+        status: "invitation-pending",
+        authId: "secret-auth-id",
+      },
+    ],
+  });
+
+  expect(parsed).toEqual({
+    items: [{ studentId, status: "invitation-pending" }],
+  });
 });

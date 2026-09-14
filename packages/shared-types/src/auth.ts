@@ -68,6 +68,39 @@ export const BulkStudentPortalAccessResponse = z.object({
 export type BulkStudentPortalAccessResponse = z.infer<typeof BulkStudentPortalAccessResponse>;
 
 /**
+ * Read-only Student Portal access state shown to account managers on the roster.
+ * `needs-attention` means local/auth linkage is inconsistent or the linked
+ * Supabase identity is missing. `status-unavailable` is reserved for a provider
+ * lookup failure so the UI never guesses an invitation/account state.
+ */
+export const StudentPortalAccessState = z.enum([
+  "not-invited",
+  "invitation-pending",
+  "active-account",
+  "no-email",
+  "inactive-student",
+  "needs-attention",
+  "status-unavailable",
+]);
+export type StudentPortalAccessState = z.infer<typeof StudentPortalAccessState>;
+
+export const StudentPortalAccessStatusRequest = z.object({
+  studentIds: z.array(z.string().uuid()).min(1).max(100),
+}).strict();
+export type StudentPortalAccessStatusRequest = z.infer<typeof StudentPortalAccessStatusRequest>;
+
+export const StudentPortalAccessStatusItem = z.object({
+  studentId: z.string().uuid(),
+  status: StudentPortalAccessState,
+});
+export type StudentPortalAccessStatusItem = z.infer<typeof StudentPortalAccessStatusItem>;
+
+export const StudentPortalAccessStatusResponse = z.object({
+  items: z.array(StudentPortalAccessStatusItem).max(100),
+});
+export type StudentPortalAccessStatusResponse = z.infer<typeof StudentPortalAccessStatusResponse>;
+
+/**
  * New passwords are deliberately validated in the shared API contract rather
  * than only in the UI. Supabase may accept weaker values, but DSE PMS recovery
  * should not create them. We require 12+ characters plus upper/lower/digit and
