@@ -44,6 +44,7 @@ export const SaveAttendanceRecordInput = z
 export const SaveAttendanceInput = z.object({
   records: z
     .array(SaveAttendanceRecordInput)
+    .min(1, "Mark at least one student before saving attendance")
     .max(1000)
     .superRefine((records, ctx) => {
       const ids = new Set<string>();
