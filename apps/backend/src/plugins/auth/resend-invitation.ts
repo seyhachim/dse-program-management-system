@@ -156,7 +156,9 @@ export async function resendLecturerInvitation(userId: string): Promise<{ email:
   return { email: result.email };
 }
 
-async function requireStudentInvitationContext(studentId: string) {
+async function requireStudentInvitationContext(
+  studentId: string,
+): Promise<{ email: string; userId: string }> {
   const student = await prisma.student.findUnique({
     where: { id: studentId },
     select: { email: true, userId: true, status: true },
@@ -171,7 +173,7 @@ async function requireStudentInvitationContext(studentId: string) {
   if (!student.userId) {
     throw new ProvisioningError("This student has no pending portal invitation. Use Send portal invite first.");
   }
-  return student;
+  return { email: student.email, userId: student.userId };
 }
 
 /**
