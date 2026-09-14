@@ -49,7 +49,7 @@ interface SessionRow {
 }
 interface RecordRow {
   studentId: string;
-  studentNumber: string;
+  studentNumber: string | null;
   studentName: string;
   status: AttendanceStatus;
   note: string;
@@ -58,7 +58,7 @@ interface PendingRow {
   id: string;
   sessionId: string;
   studentId: string;
-  studentNumber: string;
+  studentNumber: string | null;
   studentName: string;
   note: string;
   createdAt: Date;
@@ -375,7 +375,6 @@ export const attendanceService = {
           const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
           const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
           const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
-          if (!studentNumber) throw new ReferenceError("Official Student ID is required before attendance can be recorded");
           const studentName = currentStudent?.name ?? historical!.studentName;
           await captureAttendanceCheck1(tx, {
             sessionId,
@@ -408,7 +407,6 @@ export const attendanceService = {
         const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
         const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
         const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
-        if (!studentNumber) throw new ReferenceError("Official Student ID is required before attendance can be recorded");
         const studentName = currentStudent?.name ?? historical!.studentName;
         const existingPending = activePendingByStudent.get(requested.studentId);
         if (existingPending) {
@@ -430,7 +428,6 @@ export const attendanceService = {
         const currentStudent = currentStudentIds.has(record.studentId) ? studentById.get(record.studentId) : null;
         const historical = historicalByStudent.get(record.studentId) ?? pendingHistoryByStudent.get(record.studentId);
         const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
-        if (!studentNumber) throw new ReferenceError("Official Student ID is required before attendance can be recorded");
         const studentName = currentStudent?.name ?? historical!.studentName;
         await tx.$executeRaw`
           INSERT INTO "pms_attendance"."AttendanceRecord"
