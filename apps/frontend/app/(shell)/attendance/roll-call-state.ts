@@ -37,6 +37,12 @@ export function getAttendanceCounts(records: AttendanceRecordView[]): Attendance
   return counts;
 }
 
+export function hasAttendanceObservation(records: AttendanceRecordView[]): boolean {
+  return records.some(
+    (record) => record.status !== null || record.permissionPending,
+  );
+}
+
 export function getTeachingWeek(
   startDate: string | null | undefined,
   endDate: string | null | undefined,
