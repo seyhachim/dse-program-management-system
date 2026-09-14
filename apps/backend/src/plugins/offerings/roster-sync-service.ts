@@ -104,7 +104,7 @@ export function buildRosterSyncPreview(
     term: input.term,
     programmeYear: input.programmeYear,
     offerings,
-    canApply: roster.active && mutable.length > 0,
+    canApply: roster.active && mutable.some((item) => item.state !== "blocked"),
     missingEnrollmentCount: mutable.reduce((sum, item) => sum + item.missingStudents.length, 0),
     blockedOfferingCount: mutable.filter((item) => item.state === "blocked").length,
     historicalOfferingCount: offerings.filter((item) => item.state === "historical").length,
