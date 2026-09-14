@@ -7,18 +7,26 @@ export type StudentPortalInvitationRefreshResult =
   | { status: "resent"; email: string }
   | { status: "existing-account"; email: string };
 
-export function invitationIsPending(user: {
+type InvitationState = {
   invited_at?: string | null;
   email_confirmed_at?: string | null;
   confirmed_at?: string | null;
   last_sign_in_at?: string | null;
-}): boolean {
+};
+
+export function invitationIsPending(user: InvitationState): boolean {
   return Boolean(
     user.invited_at &&
       !user.email_confirmed_at &&
       !user.confirmed_at &&
       !user.last_sign_in_at,
   );
+}
+
+export function invitationRefreshAction(
+  user: InvitationState,
+): "resend" | "existing-account" {
+  return invitationIsPending(user) ? "resend" : "existing-account";
 }
 
 export function invitationEmailsMatch(
@@ -100,7 +108,7 @@ async function resendRoleInvitation(
       );
     }
 
-    if (!invitationIsPending(existingAuth.user)) {
+    if (invitationRefreshAction(existingAuth.user) === "existing-account") {
       if (options.skipNonPending) {
         return { status: "existing-account", email: user.email };
       }
