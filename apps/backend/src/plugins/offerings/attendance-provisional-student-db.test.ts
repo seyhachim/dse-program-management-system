@@ -53,7 +53,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describeDb("attendance for active provisional students", () => {
+describeDb("attendance for students with pending official IDs", () => {
   test("saves roll call, permission pending, and Check 2 without inventing an official ID", async () => {
     const course = await prisma.course.create({
       data: {
@@ -74,12 +74,15 @@ describeDb("attendance for active provisional students", () => {
     });
     offeringId = offering.id;
 
+    // Current main still carries the pre-#1032 Student constraint, while production
+    // already permits Active + null official ID. Attendance itself is status-agnostic;
+    // this fixture isolates the contract under test: canonical UUID + nullable ID snapshot.
     const student = await prisma.student.create({
       data: {
-        name: "Active Provisional Attendance Student",
+        name: "Provisional Attendance Student",
         email: `attendance-provisional-${token}@rupp.edu.kh`,
         studentId: null,
-        status: "Active",
+        status: "Pending",
       },
     });
     studentId = student.id;
