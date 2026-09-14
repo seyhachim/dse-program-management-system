@@ -38,6 +38,7 @@ import {
   cloneAttendanceRecords,
   getAttendanceCounts,
   getTeachingWeek,
+  hasAttendanceObservation,
   toSaveAttendanceRecords,
   updateAttendanceRecord,
 } from "./roll-call-state";
@@ -192,6 +193,7 @@ export function AttendanceClient() {
     date,
   );
   const counts = useMemo(() => getAttendanceCounts(records), [records]);
+  const canSaveAttendance = hasAttendanceObservation(records);
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return records;
@@ -277,6 +279,11 @@ export function AttendanceClient() {
 
   async function save(): Promise<boolean> {
     if (!offeringId) return false;
+    if (!canSaveAttendance) {
+      setSavedMessage(null);
+      setMutationError("Mark at least one student before saving attendance.");
+      return false;
+    }
     setSaving(true);
     setMutationError(null);
     setSavedMessage(null);
@@ -288,7 +295,11 @@ export function AttendanceClient() {
       baselineRecordsRef.current = cloneAttendanceRecords(saved.records);
       setRecords(cloneAttendanceRecords(saved.records));
       await queryClient.invalidateQueries({ queryKey: historyKey, exact: true });
-      setSavedMessage(`Attendance saved for ${formatSessionDate(date)}.`);
+      const savedCounts = getAttendanceCounts(saved.records);
+      const markedCount = savedCounts.Total - savedCounts.Unmarked;
+      setSavedMessage(
+        `Attendance saved for ${formatSessionDate(date)} · ${markedCount} marked, ${savedCounts.Unmarked} unmarked.`,
+      );
       return true;
     } catch (err) {
       setMutationError(
@@ -549,7 +560,18 @@ export function AttendanceClient() {
                 <button
                   type="button"
                   onClick={() => void save()}
-                  disabled={!offeringId || loading || saving || records.length === 0}
+                  disabled={
+                    !offeringId ||
+                    loading ||
+                    saving ||
+                    records.length === 0 ||
+                    !canSaveAttendance
+                  }
+                  title={
+                    records.length > 0 && !canSaveAttendance
+                      ? "Mark at least one student before saving attendance"
+                      : undefined
+                  }
                   className={`${MOBILE_ATTENDANCE_LAYOUT.secondaryAction} gap-2 border-primary text-primary`}
                 >
                   <Save className="h-4 w-4" />
