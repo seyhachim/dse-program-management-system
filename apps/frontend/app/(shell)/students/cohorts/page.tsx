@@ -1,7 +1,8 @@
 import { Topbar } from "../../topbar";
 import { CohortMembershipClient } from "./cohort-membership-client";
-import { CohortSectionClient } from "./cohort-section-client";
 import { CohortPromotionClient } from "./cohort-promotion-client";
+import { CohortRosterSyncClient } from "./cohort-roster-sync-client";
+import { CohortSectionClient } from "./cohort-section-client";
 
 export default function StudentCohortsPage() {
   return (
@@ -13,6 +14,7 @@ export default function StudentCohortsPage() {
       <main className="flex-1 space-y-6 overflow-y-auto p-6">
         <CohortMembershipClient />
         <CohortSectionClient />
+        <CohortRosterSyncClient />
         <CohortPromotionClient />
       </main>
     </>
