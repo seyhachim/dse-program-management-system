@@ -61,9 +61,10 @@ async function deliverStudentPortalAccess(
     return result.status === "resent" ? "resent" : "existing-account";
   }
 
+  if (!student.email) return "ineligible";
   await authService.createAccount({
     name: student.name,
-    email: student.email!,
+    email: student.email,
     role: "student",
   } satisfies CreateAccountInput);
   return "invited";
@@ -155,9 +156,21 @@ export async function sendStudentPortalAccessToAll(): Promise<BulkStudentPortalA
     students.map((student) => student.id),
     deliverStudentPortalAccess,
   );
+  const invited = counts.newlyInvited + counts.resent;
+  const skipped = counts.existingAccountSkipped + counts.ineligibleSkipped;
 
   return {
     totalStudents: students.length,
     ...counts,
+    eligible: invited + counts.failed,
+    invited,
+    skipped,
   };
 }
+
+/**
+ * Compatibility export for the #1101 router while frontend/backend deployments
+ * may temporarily run different revisions. The endpoint semantics are now the
+ * safer #1103 send-or-refresh behavior above.
+ */
+export const inviteAllEligibleStudents = sendStudentPortalAccessToAll;
