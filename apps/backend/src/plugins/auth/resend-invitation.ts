@@ -3,6 +3,9 @@ import { prisma } from "../../core/db/prisma.ts";
 import { ProvisioningError } from "./service.ts";
 
 export type ResendableInvitationRole = "lecturer" | "student";
+export type StudentPortalInvitationRefreshResult =
+  | { status: "resent"; email: string }
+  | { status: "existing-account"; email: string };
 
 export function invitationIsPending(user: {
   invited_at?: string | null;
@@ -33,16 +36,23 @@ function accountLabel(role: ResendableInvitationRole): string {
   return role === "lecturer" ? "Lecturer" : "Student portal";
 }
 
+type ResendRoleInvitationOptions = {
+  skipNonPending?: boolean;
+};
+
 /**
  * Rotate only a still-pending Supabase invitation for the requested PMS role.
  * Confirmed, signed-in, non-invite, wrong-role, or email-mismatched identities
- * fail closed and are never deleted.
+ * fail closed and are never deleted. Bulk Student Portal delivery may opt to
+ * classify a safe non-pending identity as an existing account instead of an
+ * error so the caller can skip it without mutating authentication state.
  */
 async function resendRoleInvitation(
   userId: string,
   role: ResendableInvitationRole,
   expectedEmail?: string,
-): Promise<{ email: string }> {
+  options: ResendRoleInvitationOptions = {},
+): Promise<StudentPortalInvitationRefreshResult> {
   const label = accountLabel(role);
   const user = await prisma.user.findFirst({
     where: {
@@ -91,6 +101,9 @@ async function resendRoleInvitation(
     }
 
     if (!invitationIsPending(existingAuth.user)) {
+      if (options.skipNonPending) {
+        return { status: "existing-account", email: user.email };
+      }
       throw new ProvisioningError(
         role === "lecturer"
           ? "This lecturer account is not a pending invitation. Use password recovery for an active account."
@@ -126,20 +139,16 @@ async function resendRoleInvitation(
     throw error;
   }
 
-  return { email: user.email };
+  return { status: "resent", email: user.email };
 }
 
 /** Preserve the existing lecturer API contract and behavior. */
 export async function resendLecturerInvitation(userId: string): Promise<{ email: string }> {
-  return resendRoleInvitation(userId, "lecturer");
+  const result = await resendRoleInvitation(userId, "lecturer");
+  return { email: result.email };
 }
 
-/**
- * Re-send a Student Portal invitation by canonical Student UUID. The official
- * Student ID is intentionally not required: current provisional students are
- * email-identified until the institutional identifier is issued (#1032).
- */
-export async function resendStudentInvitation(studentId: string): Promise<{ email: string }> {
+async function requireStudentInvitationContext(studentId: string) {
   const student = await prisma.student.findUnique({
     where: { id: studentId },
     select: { email: true, userId: true, status: true },
@@ -154,6 +163,33 @@ export async function resendStudentInvitation(studentId: string): Promise<{ emai
   if (!student.userId) {
     throw new ProvisioningError("This student has no pending portal invitation. Use Send portal invite first.");
   }
+  return student;
+}
 
-  return resendRoleInvitation(student.userId, "student", student.email);
+/**
+ * Re-send a Student Portal invitation by canonical Student UUID. The official
+ * Student ID is intentionally not required: current provisional students are
+ * email-identified until the institutional identifier is issued (#1032).
+ */
+export async function resendStudentInvitation(studentId: string): Promise<{ email: string }> {
+  const student = await requireStudentInvitationContext(studentId);
+  const result = await resendRoleInvitation(student.userId, "student", student.email);
+  return { email: result.email };
+}
+
+/**
+ * Bulk-safe Student Portal refresh. Pending invitations are rotated and sent
+ * again; linked identities that are no longer pending are reported as existing
+ * accounts and are never deleted or modified.
+ */
+export async function refreshStudentPortalInvitation(
+  studentId: string,
+): Promise<StudentPortalInvitationRefreshResult> {
+  const student = await requireStudentInvitationContext(studentId);
+  return resendRoleInvitation(
+    student.userId,
+    "student",
+    student.email,
+    { skipNonPending: true },
+  );
 }
