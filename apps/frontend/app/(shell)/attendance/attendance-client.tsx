@@ -177,13 +177,15 @@ export function AttendanceClient() {
     if (session.offeringId !== offeringId || session.date !== date) return;
     if (hydratedContextRef.current !== attendanceContext) return;
 
-    const dirty = !attendanceRecordsEqual(records, baselineRecordsRef.current);
-    if (dirty) return;
+    setRecords((current) => {
+      const dirty = !attendanceRecordsEqual(current, baselineRecordsRef.current);
+      if (dirty) return current;
 
-    const nextRecords = cloneAttendanceRecords(session.records);
-    baselineRecordsRef.current = cloneAttendanceRecords(session.records);
-    setRecords(nextRecords);
-  }, [attendanceContext, date, offeringId, records, session]);
+      const nextRecords = cloneAttendanceRecords(session.records);
+      baselineRecordsRef.current = cloneAttendanceRecords(session.records);
+      return nextRecords;
+    });
+  }, [attendanceContext, date, offeringId, session]);
 
   const selectedOffering =
     offerings.find((offering) => offering.id === offeringId) ?? null;
