@@ -101,8 +101,14 @@ test("BulkStudentPortalAccessResponse requires every student to have exactly one
     existingAccountSkipped: 2,
     ineligibleSkipped: 2,
     failed: 1,
+    eligible: 6,
+    invited: 5,
+    skipped: 4,
   };
   expect(BulkStudentPortalAccessResponse.safeParse(valid).success).toBe(true);
   expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, resent: 3 }).success).toBe(false);
+  expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, invited: 4 }).success).toBe(false);
+  expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, skipped: 3 }).success).toBe(false);
+  expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, eligible: 7 }).success).toBe(false);
   expect(BulkStudentPortalAccessResponse.safeParse({ ...valid, totalStudents: 11 }).success).toBe(false);
 });
