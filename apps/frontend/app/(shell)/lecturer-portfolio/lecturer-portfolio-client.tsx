@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   BookOpen,
@@ -26,6 +27,7 @@ import {
   currentLecturerTeachingRows,
   uniqueTeachingCourseCount,
 } from "./lecturer-portfolio-model";
+import { lecturerProfileImage } from "./lecturer-profile-image";
 
 export function LecturerPortfolioClient() {
   const [lecturer, setLecturer] = useState<Lecturer | null>(null);
@@ -209,6 +211,8 @@ function PortfolioHero({ lecturer }: { lecturer: Lecturer }) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+  const displayName = formatLecturerDisplayName(lecturer.name, lecturer.honorific);
+  const profileImage = lecturerProfileImage(lecturer.email);
   const profile = lecturer.professionalProfile;
   const tags = [
     profile?.employmentType,
@@ -219,13 +223,24 @@ function PortfolioHero({ lecturer }: { lecturer: Lecturer }) {
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/10 text-xl font-semibold text-primary">
-            {initials || "L"}
-          </div>
-          <div className="min-w-0">
+        <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start">
+          {profileImage ? (
+            <Image
+              src={profileImage}
+              alt={`Profile photo of ${displayName}`}
+              width={112}
+              height={112}
+              priority
+              className="h-28 w-28 shrink-0 rounded-2xl border border-border object-cover shadow-sm"
+            />
+          ) : (
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-2xl font-semibold text-primary">
+              {initials || "L"}
+            </div>
+          )}
+          <div className="min-w-0 pt-1">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {formatLecturerDisplayName(lecturer.name, lecturer.honorific)}
+              {displayName}
             </h1>
             <p className="mt-1 font-medium text-primary">{lecturer.title || "Lecturer"}</p>
             {lecturer.qualification ? <p className="mt-1 text-sm text-muted-foreground">{lecturer.qualification}</p> : null}
