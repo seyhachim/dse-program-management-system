@@ -32,6 +32,10 @@ export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
  * Aggregate result for the admin-only Student Portal bulk access action.
  * The response never contains recipient identity, invitation URLs, tokens, or
  * other sensitive values. Every Student is accounted for exactly once.
+ *
+ * `eligible`/`invited`/`skipped` remain in the response during the frontend /
+ * backend rolling-deploy window so the #1101 UI can still render meaningful
+ * counts while #1103 is being deployed.
  */
 export const BulkStudentPortalAccessResponse = z.object({
   totalStudents: z.number().int().nonnegative(),
@@ -40,6 +44,9 @@ export const BulkStudentPortalAccessResponse = z.object({
   existingAccountSkipped: z.number().int().nonnegative(),
   ineligibleSkipped: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
+  eligible: z.number().int().nonnegative(),
+  invited: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
 }).refine(
   (value) => value.totalStudents ===
     value.newlyInvited +
@@ -48,6 +55,15 @@ export const BulkStudentPortalAccessResponse = z.object({
       value.ineligibleSkipped +
       value.failed,
   { message: "Total students must equal all bulk portal-access outcomes" },
+).refine(
+  (value) => value.invited === value.newlyInvited + value.resent,
+  { message: "Legacy invited count must equal newly invited plus resent" },
+).refine(
+  (value) => value.skipped === value.existingAccountSkipped + value.ineligibleSkipped,
+  { message: "Legacy skipped count must equal both safe skip outcomes" },
+).refine(
+  (value) => value.eligible === value.invited + value.failed,
+  { message: "Legacy eligible count must equal sent plus failed" },
 );
 export type BulkStudentPortalAccessResponse = z.infer<typeof BulkStudentPortalAccessResponse>;
 
