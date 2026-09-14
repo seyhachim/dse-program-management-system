@@ -1,4 +1,5 @@
 import type {
+  CanonicalRosterSyncApplyInput,
   CanonicalRosterSyncApplyResult,
   CanonicalRosterSyncInput,
   CanonicalRosterSyncPreview,
@@ -103,7 +104,7 @@ export function buildRosterSyncPreview(
     term: input.term,
     programmeYear: input.programmeYear,
     offerings,
-    canApply: roster.active && mutable.length > 0 && mutable.every((item) => item.state !== "blocked"),
+    canApply: roster.active && mutable.length > 0,
     missingEnrollmentCount: mutable.reduce((sum, item) => sum + item.missingStudents.length, 0),
     blockedOfferingCount: mutable.filter((item) => item.state === "blocked").length,
     historicalOfferingCount: offerings.filter((item) => item.state === "historical").length,
@@ -148,8 +149,9 @@ export const rosterSyncService = {
     return buildRosterSyncPreview(roster, input, rows);
   },
 
-  async apply(input: CanonicalRosterSyncInput): Promise<CanonicalRosterSyncApplyResult> {
+  async apply(input: CanonicalRosterSyncApplyInput): Promise<CanonicalRosterSyncApplyResult> {
     const roster = await resolveRoster(input);
+    const selected = new Set(input.offeringIds);
     let createdEnrollmentCount = 0;
 
     await prisma.$transaction(async (tx) => {
@@ -159,10 +161,19 @@ export const rosterSyncService = {
         orderBy: { course: { code: "asc" } },
       });
       const preview = buildRosterSyncPreview(roster, input, rows);
-      if (!preview.canApply) throw new RosterSyncBlockedError(preview);
+      const selectedItems = preview.offerings.filter((item) => selected.has(item.offeringId));
+      if (selectedItems.length !== selected.size) {
+        throw new RosterSyncReferenceError("One or more selected offerings do not match this canonical class context");
+      }
+      if (selectedItems.some((item) => item.status === "Completed")) {
+        throw new RosterSyncBlockedError(preview);
+      }
+      if (selectedItems.some((item) => item.state === "blocked")) {
+        throw new RosterSyncBlockedError(preview);
+      }
 
-      for (const item of preview.offerings) {
-        if (item.status === "Completed" || item.missingStudents.length === 0) continue;
+      for (const item of selectedItems) {
+        if (item.missingStudents.length === 0) continue;
         const result = await tx.enrollment.createMany({
           data: item.missingStudents.map((student) => ({
             offeringId: item.offeringId,
@@ -175,6 +186,6 @@ export const rosterSyncService = {
     });
 
     const refreshed = await this.preview(input);
-    return { ...refreshed, createdEnrollmentCount };
+    return { ...refreshed, selectedOfferingIds: [...selected], createdEnrollmentCount };
   },
 };
