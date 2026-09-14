@@ -74,6 +74,23 @@ describe("canonical roster sync planner", () => {
     expect(preview.offerings[0]!.blockedReason).toContain("capacity");
   });
 
+  test("still allows explicitly selecting a safe standard course when another row is blocked", () => {
+    const preview = buildRosterSyncPreview(roster, input, [
+      row(),
+      row({
+        id: "55555555-5555-4555-8555-555555555555",
+        course: { id: "66666666-6666-4666-8666-666666666666", code: "EL301", title: "Elective" },
+        enrollments: [
+          ...roster.students.map((student) => ({ studentId: student.id })),
+          { studentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+        ],
+      }),
+    ]);
+    expect(preview.canApply).toBe(true);
+    expect(preview.blockedOfferingCount).toBe(1);
+    expect(preview.offerings.map((item) => item.state)).toEqual(["needs_sync", "blocked"]);
+  });
+
   test("never makes a completed offering mutable", () => {
     const preview = buildRosterSyncPreview(roster, input, [row({ status: "Completed" as const })]);
     expect(preview.canApply).toBe(false);
