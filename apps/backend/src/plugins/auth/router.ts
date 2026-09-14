@@ -13,6 +13,7 @@ import {
   ProgrammeRoleAssignmentError,
   ProvisioningError,
 } from "./service.ts";
+import { inviteAllEligibleStudents } from "./bulk-student-invitations.ts";
 import {
   resendLecturerInvitation,
   resendStudentInvitation,
@@ -69,6 +70,22 @@ export function createAuthRouter(): Router {
       res.status(500).json({ error: "Could not create account" });
     }
   });
+
+  router.post(
+    "/students/invitations/bulk",
+    requirePermission("accounts:create"),
+    async (_req, res) => {
+      try {
+        res.json(await inviteAllEligibleStudents());
+      } catch (err) {
+        if (err instanceof ProvisioningError) {
+          res.status(502).json({ error: err.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not send bulk student portal invitations" });
+      }
+    },
+  );
 
   router.post(
     "/accounts/:userId/resend-invitation",
