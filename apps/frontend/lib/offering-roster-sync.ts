@@ -1,4 +1,5 @@
 import type {
+  CanonicalRosterSyncApplyInput,
   CanonicalRosterSyncApplyResult,
   CanonicalRosterSyncInput,
   CanonicalRosterSyncPreview,
@@ -11,7 +12,7 @@ export const offeringRosterSyncApi = {
   preview(input: CanonicalRosterSyncInput): Promise<CanonicalRosterSyncPreview> {
     return api.post<CanonicalRosterSyncPreview>(`${BASE}/preview`, input);
   },
-  apply(input: CanonicalRosterSyncInput): Promise<CanonicalRosterSyncApplyResult> {
+  apply(input: CanonicalRosterSyncApplyInput): Promise<CanonicalRosterSyncApplyResult> {
     return api.post<CanonicalRosterSyncApplyResult>(`${BASE}/apply`, input);
   },
 };
