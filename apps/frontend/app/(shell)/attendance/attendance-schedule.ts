@@ -24,6 +24,20 @@ export function meetingDayForDate(date: string): MeetingDay | null {
 }
 
 /**
+ * Planned offerings normally mean academic delivery activation is still pending.
+ * At semester start, however, DSE can have a published Academic Calendar and an
+ * assigned recurring timetable before the Approved CourseSpec is available. In
+ * that case Attendance must still be able to record the class that actually ran,
+ * without falsely changing the Offering to Active.
+ *
+ * Keep this exception narrow: legacy/unlinked Planned offerings remain hidden.
+ */
+export function isAttendanceEligibleOffering(offering: OfferingView): boolean {
+  if (offering.status !== "Planned") return true;
+  return Boolean(offering.academicCalendarPeriodId);
+}
+
+/**
  * Attendance may be opened only for a real recurring class on the selected
  * date. Effective start/end dates come from the canonical Academic Calendar
  * for current Offerings (with legacy snapshots retained only for history).
@@ -32,7 +46,7 @@ export function isOfferingScheduledOnDate(
   offering: OfferingView,
   date: string,
 ): boolean {
-  if (offering.status === "Planned") return false;
+  if (!isAttendanceEligibleOffering(offering)) return false;
   if (!offering.startDate || !offering.endDate) return false;
   if (date < offering.startDate || date > offering.endDate) return false;
 
