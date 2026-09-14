@@ -11,10 +11,59 @@ export interface AttendanceCounts {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const KHMER_NAME_COLLATOR = new Intl.Collator("km-KH", {
+  usage: "sort",
+  sensitivity: "base",
+  numeric: true,
+});
+const ENGLISH_NAME_COLLATOR = new Intl.Collator("en", {
+  usage: "sort",
+  sensitivity: "base",
+  numeric: true,
+});
 
 function dateValue(value: string): number | null {
   const parsed = new Date(`${value}T00:00:00.000Z`).getTime();
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function normalizedName(value: string | null | undefined): string {
+  return value?.trim().normalize("NFC") ?? "";
+}
+
+/**
+ * DSE class registers follow Khmer-name order. Students without a Khmer name
+ * remain visible after the Khmer roster and use deterministic English/ID
+ * fallbacks. This is display ordering only; it never rewrites student records.
+ */
+export function compareAttendanceStudentsByKhmerName(
+  a: AttendanceRecordView,
+  b: AttendanceRecordView,
+): number {
+  const aKhmer = normalizedName(a.studentKhmerName);
+  const bKhmer = normalizedName(b.studentKhmerName);
+
+  if (aKhmer && !bKhmer) return -1;
+  if (!aKhmer && bKhmer) return 1;
+
+  if (aKhmer && bKhmer) {
+    const khmerCompare = KHMER_NAME_COLLATOR.compare(aKhmer, bKhmer);
+    if (khmerCompare !== 0) return khmerCompare;
+  }
+
+  const englishCompare = ENGLISH_NAME_COLLATOR.compare(
+    normalizedName(a.studentName),
+    normalizedName(b.studentName),
+  );
+  if (englishCompare !== 0) return englishCompare;
+
+  const numberCompare = ENGLISH_NAME_COLLATOR.compare(
+    normalizedName(a.studentNumber),
+    normalizedName(b.studentNumber),
+  );
+  if (numberCompare !== 0) return numberCompare;
+
+  return a.studentId.localeCompare(b.studentId);
 }
 
 export function getAttendanceCounts(records: AttendanceRecordView[]): AttendanceCounts {
@@ -130,5 +179,7 @@ export function attendanceRecordsEqual(a: AttendanceRecordView[], b: AttendanceR
 }
 
 export function cloneAttendanceRecords(records: AttendanceRecordView[]): AttendanceRecordView[] {
-  return records.map((record) => ({ ...record }));
+  return records
+    .map((record) => ({ ...record }))
+    .sort(compareAttendanceStudentsByKhmerName);
 }

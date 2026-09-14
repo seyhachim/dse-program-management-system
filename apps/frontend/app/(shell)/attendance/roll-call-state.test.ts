@@ -20,6 +20,7 @@ const records: AttendanceRecordView[] = [
     studentId: "11111111-1111-1111-1111-111111111111",
     studentNumber: "DSE001",
     studentName: "Student One",
+    studentKhmerName: "កែវ សីលា",
     status: "Present",
     permissionPending: false,
     permissionPendingSince: null,
@@ -29,6 +30,7 @@ const records: AttendanceRecordView[] = [
     studentId: "22222222-2222-2222-2222-222222222222",
     studentNumber: "DSE002",
     studentName: "Student Two",
+    studentKhmerName: "ខន សុធារ៉ា",
     status: null,
     permissionPending: false,
     permissionPendingSince: null,
@@ -38,6 +40,7 @@ const records: AttendanceRecordView[] = [
     studentId: "33333333-3333-3333-3333-333333333333",
     studentNumber: "DSE003",
     studentName: "Student Three",
+    studentKhmerName: "គង់ តាណា",
     status: "Late",
     permissionPending: false,
     permissionPendingSince: null,
@@ -79,6 +82,57 @@ describe("roll call counts and status", () => {
     const pending = updateAttendanceRecord(records, records[1]!.studentId, { permissionPending: true });
     expect(getUnmarkedStudentIds(pending)).toEqual([]);
     expect(getSkipFeedback(pending[1]!)).toBe("Student Two skipped; existing Permission Pending kept.");
+  });
+});
+
+describe("Khmer roster ordering", () => {
+  test("sorts students by Khmer alphabetical order regardless of enrollment order", () => {
+    const shuffled = [records[2]!, records[0]!, records[1]!];
+    expect(cloneAttendanceRecords(shuffled).map((record) => record.studentKhmerName)).toEqual([
+      "កែវ សីលា",
+      "ខន សុធារ៉ា",
+      "គង់ តាណា",
+    ]);
+  });
+
+  test("places missing Khmer names after Khmer names with deterministic English fallback", () => {
+    const withoutKhmerA: AttendanceRecordView = {
+      ...records[0]!,
+      studentId: "44444444-4444-4444-4444-444444444444",
+      studentNumber: "DSE010",
+      studentName: "Alpha Student",
+      studentKhmerName: null,
+    };
+    const withoutKhmerB: AttendanceRecordView = {
+      ...records[0]!,
+      studentId: "55555555-5555-5555-5555-555555555555",
+      studentNumber: "DSE011",
+      studentName: "Beta Student",
+      studentKhmerName: null,
+    };
+
+    const ordered = cloneAttendanceRecords([
+      withoutKhmerB,
+      records[1]!,
+      withoutKhmerA,
+      records[0]!,
+    ]);
+
+    expect(ordered.map((record) => record.studentName)).toEqual([
+      "Student One",
+      "Student Two",
+      "Alpha Student",
+      "Beta Student",
+    ]);
+  });
+
+  test("does not mutate the source roster while sorting a cloned register", () => {
+    const shuffled = [records[2]!, records[0]!, records[1]!];
+    const sourceIds = shuffled.map((record) => record.studentId);
+    const ordered = cloneAttendanceRecords(shuffled);
+
+    expect(shuffled.map((record) => record.studentId)).toEqual(sourceIds);
+    expect(ordered).not.toBe(shuffled);
   });
 });
 
