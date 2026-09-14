@@ -26,6 +26,7 @@ import {
   getPreviousIndex,
   getSkipFeedback,
   getUnmarkedStudentIds,
+  hasAttendanceObservation,
 } from "./roll-call-state";
 
 interface RollCallDialogProps {
@@ -141,6 +142,7 @@ export function RollCallDialog({
   }, [open, offering?.id, date]);
 
   const counts = useMemo(() => getAttendanceCounts(records), [records]);
+  const canSaveAttendance = hasAttendanceObservation(records);
   const sequence = useMemo(
     () => reviewStudentIds ?? records.map((record) => record.studentId),
     [records, reviewStudentIds],
@@ -412,8 +414,12 @@ export function RollCallDialog({
                 </div>
               ) : null}
 
-              <button type="button" onClick={() => void onSaveAndClose()} disabled={saving || records.length === 0} className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save Attendance"}</button>
-              <p className="mt-2 text-center text-[10px] leading-4 text-muted-foreground">Permission Pending remains unresolved until an authorized lecturer changes it.</p>
+              <button type="button" onClick={() => void onSaveAndClose()} disabled={saving || records.length === 0 || !canSaveAttendance} className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save Attendance"}</button>
+              <p className="mt-2 text-center text-[10px] leading-4 text-muted-foreground">
+                {canSaveAttendance
+                  ? "Permission Pending remains unresolved until an authorized lecturer changes it."
+                  : "Mark at least one student before saving. Unmarked is not a saved attendance status."}
+              </p>
             </aside>
           </div>
         </div>
