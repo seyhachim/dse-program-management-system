@@ -1,6 +1,10 @@
-import type { SaveAttendanceInput } from "@dse-pms/shared-types";
+import type { AttendanceStatus, SaveAttendanceInput } from "@dse-pms/shared-types";
 
-const WARNING_RELEVANT_STATUSES = new Set(["Absent", "Late", "Excused"] as const);
+const WARNING_RELEVANT_STATUSES: ReadonlySet<AttendanceStatus> = new Set([
+  "Absent",
+  "Late",
+  "Excused",
+]);
 
 /**
  * Post-save warning evaluation only needs students whose newly saved status can
@@ -13,7 +17,7 @@ export function attendanceWarningStudentIds(
 ): string[] {
   const studentIds = new Set<string>();
   for (const record of records) {
-    if (record.status && WARNING_RELEVANT_STATUSES.has(record.status as "Absent" | "Late" | "Excused")) {
+    if (record.status && WARNING_RELEVANT_STATUSES.has(record.status)) {
       studentIds.add(record.studentId);
     }
   }
