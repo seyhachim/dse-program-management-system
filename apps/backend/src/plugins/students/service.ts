@@ -13,6 +13,11 @@ import {
   canonicalStudentDisplayName,
   normalizeStudentProfileNameFields,
 } from "./name.ts";
+import {
+  StudentRosterCursorNotFoundError,
+  pageStudentRosterRows,
+  sortStudentRosterRows,
+} from "./roster-order.ts";
 
 const withProfile = { profile: true } as const;
 
@@ -26,6 +31,18 @@ export const STUDENT_LIST_SELECT = {
   createdAt: true,
 } as const;
 
+export const STUDENT_LIST_ORDER_SELECT = {
+  ...STUDENT_LIST_SELECT,
+  profile: {
+    select: {
+      khmerFamilyName: true,
+      khmerGivenName: true,
+      latinFamilyName: true,
+      latinGivenName: true,
+    },
+  },
+} as const;
+
 export const STUDENT_REF_SELECT = {
   id: true,
   name: true,
@@ -36,7 +53,7 @@ export const STUDENT_REF_SELECT = {
   profile: true,
 } as const;
 
-type StudentPageCursor = { createdAt: Date; id: string };
+type StudentPageCursor = { id: string };
 
 export class InvalidStudentPageCursorError extends Error {}
 export class InvalidStudentIdentityError extends Error {}
@@ -59,11 +76,8 @@ function assertValidIdentity(value: {
   }
 }
 
-function encodeStudentPageCursor(row: { createdAt: Date; id: string }): string {
-  return Buffer.from(
-    JSON.stringify({ createdAt: row.createdAt.toISOString(), id: row.id }),
-    "utf8",
-  ).toString("base64url");
+function encodeStudentPageCursor(row: { id: string }): string {
+  return Buffer.from(JSON.stringify({ id: row.id }), "utf8").toString("base64url");
 }
 
 export function decodeStudentPageCursor(cursor: string): StudentPageCursor {
@@ -72,42 +86,60 @@ export function decodeStudentPageCursor(cursor: string): StudentPageCursor {
       createdAt?: unknown;
       id?: unknown;
     };
-    if (typeof parsed.createdAt !== "string" || typeof parsed.id !== "string" || !parsed.id) {
+    if (typeof parsed.id !== "string" || !parsed.id) {
       throw new Error("invalid shape");
     }
-    const createdAt = new Date(parsed.createdAt);
-    if (Number.isNaN(createdAt.getTime())) throw new Error("invalid date");
-    return { createdAt, id: parsed.id };
+    if (parsed.createdAt !== undefined) {
+      if (typeof parsed.createdAt !== "string") throw new Error("invalid legacy date");
+      const createdAt = new Date(parsed.createdAt);
+      if (Number.isNaN(createdAt.getTime())) throw new Error("invalid legacy date");
+    }
+    return { id: parsed.id };
   } catch {
     throw new InvalidStudentPageCursorError("Invalid student page cursor");
   }
 }
 
-export function buildStudentPageFindManyArgs(query: ListStudentsPageQuery) {
-  const { search, activeOnly, limit, cursor: encodedCursor } = query;
-  const cursor = encodedCursor ? decodeStudentPageCursor(encodedCursor) : null;
+function buildStudentListWhere(query: ListStudentsQuery) {
+  const { search, activeOnly } = query;
   return {
-    where: {
-      ...(activeOnly ? { status: "Active" as const } : {}),
-      AND: [
-        ...(search
-          ? [{ OR: [
-              { name: { contains: search, mode: "insensitive" as const } },
-              { email: { contains: search, mode: "insensitive" as const } },
-              { studentId: { contains: search, mode: "insensitive" as const } },
-            ] }]
-          : []),
-        ...(cursor
-          ? [{ OR: [
-              { createdAt: { lt: cursor.createdAt } },
-              { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-            ] }]
-          : []),
-      ],
-    },
-    select: STUDENT_LIST_SELECT,
-    orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
-    take: limit + 1,
+    ...(activeOnly ? { status: "Active" as const } : {}),
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" as const } },
+            { email: { contains: search, mode: "insensitive" as const } },
+            { studentId: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+}
+
+export function buildStudentPageFindManyArgs(query: ListStudentsPageQuery) {
+  return {
+    where: buildStudentListWhere(query),
+    select: STUDENT_LIST_ORDER_SELECT,
+  };
+}
+
+function compactStudentListRow(row: {
+  id: string;
+  name: string;
+  email: string | null;
+  studentId: string | null;
+  category: "Regular" | "Scholarship";
+  status: StudentStatus;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    studentId: row.studentId,
+    category: row.category,
+    status: row.status,
+    createdAt: row.createdAt,
   };
 }
 
@@ -129,30 +161,33 @@ function mergeLatinProfile(
 
 export const studentService = {
   async list(query: ListStudentsQuery) {
-    const { search, activeOnly } = query;
-    return prisma.student.findMany({
-      where: {
-        ...(activeOnly ? { status: "Active" } : {}),
-        ...(search ? { OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
-          { studentId: { contains: search, mode: "insensitive" } },
-        ] } : {}),
-      },
-      select: STUDENT_LIST_SELECT,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    const rows = await prisma.student.findMany({
+      where: buildStudentListWhere(query),
+      select: STUDENT_LIST_ORDER_SELECT,
     });
+    return sortStudentRosterRows(rows).map(compactStudentListRow);
   },
 
   async listPage(query: ListStudentsPageQuery): Promise<StudentPage> {
+    const cursor = query.cursor ? decodeStudentPageCursor(query.cursor) : null;
     const rows = await prisma.student.findMany(buildStudentPageFindManyArgs(query));
-    const hasNextPage = rows.length > query.limit;
-    const pageRows = hasNextPage ? rows.slice(0, query.limit) : rows;
+
+    let page;
+    try {
+      page = pageStudentRosterRows(rows, query.limit, cursor?.id ?? null);
+    } catch (error) {
+      if (error instanceof StudentRosterCursorNotFoundError) {
+        throw new InvalidStudentPageCursorError("Invalid student page cursor");
+      }
+      throw error;
+    }
+
+    const pageRows = page.items.map(compactStudentListRow);
     return {
       items: pageRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
       nextCursor:
-        hasNextPage && pageRows.length > 0
-          ? encodeStudentPageCursor(pageRows[pageRows.length - 1]!)
+        page.hasNextPage && page.items.length > 0
+          ? encodeStudentPageCursor(page.items[page.items.length - 1]!)
           : null,
     };
   },
