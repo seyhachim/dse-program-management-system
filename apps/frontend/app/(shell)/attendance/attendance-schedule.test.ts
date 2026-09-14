@@ -84,6 +84,13 @@ describe("attendance date schedule", () => {
     expect(isOfferingScheduledOnDate(legacyPlanned, "2026-09-14")).toBe(false);
   });
 
+  test("marks Planned attendance choices as activation pending without mutating the source offering", () => {
+    const planned = offering({ status: "Planned" });
+    const [visible] = offeringsScheduledOnDate([planned], "2026-09-14");
+    expect(visible?.course?.title).toBe("Time Series Analysis · Offering activation pending");
+    expect(planned.course?.title).toBe("Time Series Analysis");
+  });
+
   test("requires effective teaching dates and a matching timetable meeting", () => {
     expect(isOfferingScheduledOnDate(offering({ startDate: null }), "2026-09-14")).toBe(false);
     expect(isOfferingScheduledOnDate(offering({ endDate: null }), "2026-09-14")).toBe(false);
