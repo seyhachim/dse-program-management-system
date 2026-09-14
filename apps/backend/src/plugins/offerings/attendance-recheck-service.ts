@@ -19,7 +19,7 @@ export interface AttendanceCheckpointRow {
   id: string;
   sessionId: string;
   studentId: string;
-  studentNumber: string;
+  studentNumber: string | null;
   studentName: string;
   checkNumber: number;
   status: AttendanceStatus | null;
@@ -108,7 +108,7 @@ export async function captureAttendanceCheck1(
   input: {
     sessionId: string;
     studentId: string;
-    studentNumber: string;
+    studentNumber: string | null;
     studentName: string;
     status: AttendanceStatus | null;
     permissionPending: boolean;
@@ -177,9 +177,6 @@ export const attendanceRecheckService = {
     const studentRows = await students().findByIds([input.studentId]);
     const student = studentRows[0] ?? null;
     if (!student) throw new ReferenceError("Student no longer exists");
-    if (!student.studentId) {
-      throw new ReferenceError("Official Student ID is required before attendance can be rechecked");
-    }
 
     let newlyPendingId: string | null = null;
     await prisma.$transaction(async (tx) => {
