@@ -7,6 +7,11 @@ export const CanonicalRosterSyncInput = z.object({
 }).strict();
 export type CanonicalRosterSyncInput = z.infer<typeof CanonicalRosterSyncInput>;
 
+export const CanonicalRosterSyncApplyInput = CanonicalRosterSyncInput.extend({
+  offeringIds: z.array(z.string().uuid()).min(1, "Select at least one course offering to synchronize"),
+}).strict();
+export type CanonicalRosterSyncApplyInput = z.infer<typeof CanonicalRosterSyncApplyInput>;
+
 export interface CanonicalSectionRosterStudentRef {
   id: string;
   name: string;
@@ -66,5 +71,6 @@ export interface CanonicalRosterSyncPreview {
 }
 
 export interface CanonicalRosterSyncApplyResult extends CanonicalRosterSyncPreview {
+  selectedOfferingIds: string[];
   createdEnrollmentCount: number;
 }
