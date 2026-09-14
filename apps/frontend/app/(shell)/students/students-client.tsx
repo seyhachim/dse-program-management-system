@@ -168,10 +168,14 @@ export function StudentsClient() {
     }
   };
 
-  const handleInviteAll = async () => {
+  const handleSendPortalAccessToAll = async () => {
     const confirmed = confirm(
-      "Send first-time Student Portal invitations to every eligible student in PMS?\n\n" +
-      "This checks the full Student database, not only this page. Only Active students with an official email and no linked portal account will be invited. Existing accounts and pending invitations will not be changed.",
+      "Send Student Portal access to all students who still need an invitation?\n\n" +
+      "This checks the full Student database, not only this page or filter.\n\n" +
+      "• Active students with an email and no portal account receive their first invitation.\n" +
+      "• Pending invitations are replaced with a fresh email; the old pending link becomes invalid.\n" +
+      "• Existing/activated accounts are not changed.\n" +
+      "• Inactive students or students without email are skipped.",
     );
     if (!confirmed) return;
 
@@ -179,18 +183,27 @@ export function StudentsClient() {
     setActionError(null);
     setNotice(null);
     try {
-      const result = await authApi.inviteAllEligibleStudents();
+      const result = await authApi.sendStudentPortalAccessToAll();
+      // #1103 keeps the old #1101 aggregate fields during rolling deploys. These
+      // fallbacks also keep a newly deployed frontend useful against an older
+      // backend for the short Vercel/Render deploy-skew window.
+      const compatible = result as Partial<typeof result>;
+      const newlyInvited = compatible.newlyInvited ?? compatible.invited ?? 0;
+      const resent = compatible.resent ?? 0;
+      const existingAccountSkipped = compatible.existingAccountSkipped ?? 0;
+      const ineligibleSkipped = compatible.ineligibleSkipped ?? compatible.skipped ?? 0;
+
       setNotice(
-        `Bulk invite complete. Checked ${result.totalStudents} students: ${result.invited} sent, ${result.skipped} skipped.`,
+        `Portal access delivery complete. Checked ${result.totalStudents} students: ${newlyInvited} new invitation${newlyInvited === 1 ? "" : "s"}, ${resent} refreshed pending invitation${resent === 1 ? "" : "s"}, ${existingAccountSkipped} existing account${existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${ineligibleSkipped} inactive/no-email record${ineligibleSkipped === 1 ? "" : "s"} skipped.`,
       );
       if (result.failed > 0) {
         setActionError(
-          `${result.failed} invitation${result.failed === 1 ? "" : "s"} failed safely. Run “Invite all eligible” again later to retry only students who are still eligible.`,
+          `${result.failed} student${result.failed === 1 ? "" : "s"} failed safely. Run “Send portal access to all” again after resolving provider or student-account data errors; successful and activated accounts will not be reprovisioned.`,
         );
       }
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : "Failed to send bulk student portal invitations",
+        err instanceof ApiError ? err.message : "Failed to send Student Portal access emails",
       );
     } finally {
       setBulkInviting(false);
@@ -299,15 +312,15 @@ export function StudentsClient() {
                 ? "This roster record has no official email yet. Add one before provisioning portal access."
                 : selectedStudent
                   ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
-                  : "Select one Active student with an official email, or invite all eligible students across the full PMS roster."}
+                  : "Select one Active student with an official email, or send portal access across the full PMS roster. Pending invitations receive a fresh link; existing accounts stay unchanged."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               disabled={inviteBusy}
-              onClick={handleInviteAll}
+              onClick={handleSendPortalAccessToAll}
             >
-              <MailPlus />{bulkInviting ? "Inviting all…" : "Invite all eligible"}
+              <MailPlus />{bulkInviting ? "Sending to all…" : "Send portal access to all"}
             </Button>
             <Button
               variant="outline"
