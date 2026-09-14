@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { OfferingView } from "@dse-pms/shared-types";
 import {
+  isAttendanceEligibleOffering,
   isOfferingScheduledOnDate,
   meetingDayForDate,
   offeringsScheduledOnDate,
@@ -64,13 +65,30 @@ describe("attendance date schedule", () => {
     expect(isOfferingScheduledOnDate(tsa, "2027-01-04")).toBe(false);
   });
 
-  test("keeps completed classes available on matching historical dates but excludes planned delivery", () => {
+  test("keeps completed classes available on matching historical dates", () => {
     expect(
       isOfferingScheduledOnDate(offering({ status: "Completed" }), "2026-09-14"),
     ).toBe(true);
-    expect(
-      isOfferingScheduledOnDate(offering({ status: "Planned" }), "2026-09-14"),
-    ).toBe(false);
+  });
+
+  test("allows calendar-linked Planned offerings without treating legacy Planned rows as attendance-ready", () => {
+    const planned = offering({ status: "Planned" });
+    expect(isAttendanceEligibleOffering(planned)).toBe(true);
+    expect(isOfferingScheduledOnDate(planned, "2026-09-14")).toBe(true);
+
+    const legacyPlanned = offering({
+      status: "Planned",
+      academicCalendarPeriodId: null,
+    });
+    expect(isAttendanceEligibleOffering(legacyPlanned)).toBe(false);
+    expect(isOfferingScheduledOnDate(legacyPlanned, "2026-09-14")).toBe(false);
+  });
+
+  test("marks Planned attendance choices as activation pending without mutating the source offering", () => {
+    const planned = offering({ status: "Planned" });
+    const [visible] = offeringsScheduledOnDate([planned], "2026-09-14");
+    expect(visible?.course?.title).toBe("Time Series Analysis · Offering activation pending");
+    expect(planned.course?.title).toBe("Time Series Analysis");
   });
 
   test("requires effective teaching dates and a matching timetable meeting", () => {
