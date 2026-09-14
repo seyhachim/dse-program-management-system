@@ -1,3 +1,4 @@
+import "./attendance-provisional-student-db.test.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
