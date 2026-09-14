@@ -1,4 +1,4 @@
-import { CanonicalRosterSyncInput } from "@dse-pms/shared-types";
+import { CanonicalRosterSyncApplyInput, CanonicalRosterSyncInput } from "@dse-pms/shared-types";
 import { Router } from "express";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type Role } from "../../core/auth/token.ts";
@@ -34,7 +34,7 @@ export function createRosterSyncRouter(): Router {
   });
 
   router.post("/roster-sync/apply", requirePermission("offerings:manage"), async (req, res) => {
-    const parsed = CanonicalRosterSyncInput.safeParse(req.body);
+    const parsed = CanonicalRosterSyncApplyInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid roster synchronization request", details: parsed.error.flatten() });
       return;
