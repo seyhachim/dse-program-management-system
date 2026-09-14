@@ -1,32 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import {
-  STUDENT_LIST_SELECT,
+  STUDENT_LIST_ORDER_SELECT,
   buildStudentPageFindManyArgs,
 } from "./service.ts";
 
 describe("student cursor pagination", () => {
-  test("requests one look-ahead row with the stable composite ordering", () => {
+  test("loads the filtered roster with only the fields needed for Khmer ordering", () => {
     const args = buildStudentPageFindManyArgs({
       activeOnly: false,
       limit: 2,
     });
 
     expect(args).toEqual({
-      where: { AND: [] },
-      select: STUDENT_LIST_SELECT,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 3,
+      where: {},
+      select: STUDENT_LIST_ORDER_SELECT,
     });
   });
 
-  test("applies filters before the composite cursor boundary", () => {
-    const createdAt = new Date("2026-08-30T12:00:00.000Z");
-    const cursorId = "20000000-0000-4000-8000-000000000002";
+  test("applies search and active filters before application-level ordering and paging", () => {
     const cursor = Buffer.from(
-      JSON.stringify({
-        createdAt: createdAt.toISOString(),
-        id: cursorId,
-      }),
+      JSON.stringify({ id: "20000000-0000-4000-8000-000000000002" }),
       "utf8",
     ).toString("base64url");
 
@@ -40,25 +33,13 @@ describe("student cursor pagination", () => {
     expect(args).toEqual({
       where: {
         status: "Active",
-        AND: [
-          {
-            OR: [
-              { name: { contains: "DSE", mode: "insensitive" } },
-              { email: { contains: "DSE", mode: "insensitive" } },
-              { studentId: { contains: "DSE", mode: "insensitive" } },
-            ],
-          },
-          {
-            OR: [
-              { createdAt: { lt: createdAt } },
-              { createdAt, id: { lt: cursorId } },
-            ],
-          },
+        OR: [
+          { name: { contains: "DSE", mode: "insensitive" } },
+          { email: { contains: "DSE", mode: "insensitive" } },
+          { studentId: { contains: "DSE", mode: "insensitive" } },
         ],
       },
-      select: STUDENT_LIST_SELECT,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 11,
+      select: STUDENT_LIST_ORDER_SELECT,
     });
   });
 });
