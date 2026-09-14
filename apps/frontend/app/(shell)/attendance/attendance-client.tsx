@@ -296,7 +296,7 @@ export function AttendanceClient() {
       queryClient.setQueryData(sessionKey, saved);
       baselineRecordsRef.current = cloneAttendanceRecords(saved.records);
       setRecords(cloneAttendanceRecords(saved.records));
-      await queryClient.invalidateQueries({ queryKey: historyKey, exact: true });
+      void queryClient.invalidateQueries({ queryKey: historyKey, exact: true });
       const savedCounts = getAttendanceCounts(saved.records);
       const markedCount = savedCounts.Total - savedCounts.Unmarked;
       setSavedMessage(
