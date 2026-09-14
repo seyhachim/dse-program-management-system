@@ -4,6 +4,7 @@ import {
   ChangePasswordInput,
   CreateAccountInput,
   ManageProgrammeRoleInput,
+  StudentPortalAccessStatusRequest,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, type AuthUser } from "../../core/auth/token.ts";
@@ -18,6 +19,7 @@ import {
   resendLecturerInvitation,
   resendStudentInvitation,
 } from "./resend-invitation.ts";
+import { getStudentPortalAccessStatuses } from "./student-portal-access-status.ts";
 
 const ProgrammeRoleListQuery = z.object({
   programmeId: z.string().trim().min(1),
@@ -70,6 +72,24 @@ export function createAuthRouter(): Router {
       res.status(500).json({ error: "Could not create account" });
     }
   });
+
+  router.post(
+    "/students/portal-access-status",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = StudentPortalAccessStatusRequest.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.set("Cache-Control", "no-store");
+        res.json(await getStudentPortalAccessStatuses(parsed.data.studentIds));
+      } catch {
+        res.status(500).json({ error: "Could not load Student Portal access status" });
+      }
+    },
+  );
 
   router.post(
     "/students/invitations/bulk",
