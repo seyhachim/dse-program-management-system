@@ -28,4 +28,14 @@ describe("Roll Call dialog layout", () => {
     expect(rollCallDialogSource).toContain("Perfect Attendance");
     expect(rollCallDialogSource).toContain("Reliable Learner");
   });
+
+  test("does not allow a zero-mark roll call to save", () => {
+    expect(rollCallDialogSource).toContain("hasAttendanceObservation(records)");
+    expect(rollCallDialogSource).toContain(
+      "disabled={saving || records.length === 0 || !canSaveAttendance}",
+    );
+    expect(rollCallDialogSource).toContain(
+      "Mark at least one student before saving. Unmarked is not a saved attendance status.",
+    );
+  });
 });

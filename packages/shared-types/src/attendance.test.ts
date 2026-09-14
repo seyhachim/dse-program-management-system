@@ -12,6 +12,16 @@ test("attendance date accepts real ISO calendar dates", () => {
   expect(AttendanceDateSchema.safeParse("2026-02-30").success).toBe(false);
 });
 
+test("attendance save rejects an empty all-Unmarked register payload", () => {
+  const result = SaveAttendanceInput.safeParse({ records: [] });
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0]?.message).toBe(
+      "Mark at least one student before saving attendance",
+    );
+  }
+});
+
 test("attendance save accepts finalized status and note", () => {
   const parsed = SaveAttendanceInput.parse({
     records: [{ studentId: STUDENT, status: "Late", note: "Arrived 10 minutes late" }],
