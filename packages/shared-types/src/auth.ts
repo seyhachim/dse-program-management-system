@@ -29,6 +29,26 @@ export const ResendInvitationResponse = z.object({
 export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
 
 /**
+ * Aggregate result for the admin-only first-time Student Portal bulk invite.
+ * No recipient identity, invitation URL, token, or other sensitive value is
+ * returned. The count invariants make partial-provider failures explicit.
+ */
+export const BulkStudentInvitationResponse = z.object({
+  totalStudents: z.number().int().nonnegative(),
+  eligible: z.number().int().nonnegative(),
+  invited: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+}).refine(
+  (value) => value.eligible === value.invited + value.failed,
+  { message: "Eligible count must equal invited plus failed" },
+).refine(
+  (value) => value.totalStudents === value.eligible + value.skipped,
+  { message: "Total students must equal eligible plus skipped" },
+);
+export type BulkStudentInvitationResponse = z.infer<typeof BulkStudentInvitationResponse>;
+
+/**
  * New passwords are deliberately validated in the shared API contract rather
  * than only in the UI. Supabase may accept weaker values, but DSE PMS recovery
  * should not create them. We require 12+ characters plus upper/lower/digit and
