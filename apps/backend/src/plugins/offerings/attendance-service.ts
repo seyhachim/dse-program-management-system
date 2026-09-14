@@ -14,6 +14,7 @@ import {
   loadAttendanceCheckpoints,
   toCheckpointView,
 } from "./attendance-recheck-service.ts";
+import { attendanceWarningStudentIds } from "./attendance-warning-students.ts";
 import { ReferenceError } from "./service.ts";
 import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
 
@@ -437,7 +438,12 @@ export const attendanceService = {
       }
     });
 
-    await deliverPostSaveNotifications(offeringId, date, requestedStudentIds, newlyPending);
+    await deliverPostSaveNotifications(
+      offeringId,
+      date,
+      attendanceWarningStudentIds(input.records),
+      newlyPending,
+    );
     return getAttendance(offeringId, date);
   },
 };
