@@ -9,6 +9,7 @@ import {
   getSkipFeedback,
   getTeachingWeek,
   getUnmarkedStudentIds,
+  hasAttendanceObservation,
   markAttendanceStatus,
   toSaveAttendanceRecords,
   updateAttendanceRecord,
@@ -104,6 +105,26 @@ describe("session context", () => {
 });
 
 describe("save flow", () => {
+  test("does not treat an all-Unmarked register as a recorded attendance observation", () => {
+    const allUnmarked = records.map((record) => ({
+      ...record,
+      status: null,
+      permissionPending: false,
+    }));
+    expect(hasAttendanceObservation(allUnmarked)).toBe(false);
+    expect(toSaveAttendanceRecords(allUnmarked)).toEqual([]);
+  });
+
+  test("treats finalized or Permission Pending marks as saveable observations", () => {
+    expect(hasAttendanceObservation(records)).toBe(true);
+    const pendingOnly = records.map((record, index) => ({
+      ...record,
+      status: null,
+      permissionPending: index === 1,
+    }));
+    expect(hasAttendanceObservation(pendingOnly)).toBe(true);
+  });
+
   test("preserves finalized marks and omits unmarked students from the PUT payload", () => {
     expect(toSaveAttendanceRecords(records)).toEqual([
       {
