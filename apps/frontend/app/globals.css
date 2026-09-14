@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@100..700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -98,6 +99,7 @@
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-heading: var(--font-sans);
+  --font-khmer: "Kantumruy Pro", var(--font-sans);
 
   /* shadcn/ui CLI tokens — aliased onto the Noviq tokens above where an
      equivalent exists; `destructive` has no Noviq equivalent so is a plain
@@ -186,6 +188,10 @@ body {
   background-color: var(--canvas);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+:lang(km) {
+  font-family: var(--font-khmer);
 }
 
 html {
