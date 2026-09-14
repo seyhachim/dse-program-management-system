@@ -137,19 +137,19 @@ test("StudentPortalAccessStatusRequest accepts bounded student UUID batches", ()
   ).toBe(false);
 });
 
-test("StudentPortalAccessStatusResponse contains only student id and safe status", () => {
-  const valid = {
+test("StudentPortalAccessStatusResponse strips unexpected auth fields", () => {
+  const studentId = "11111111-1111-4111-8111-111111111111";
+  const parsed = StudentPortalAccessStatusResponse.parse({
     items: [
       {
-        studentId: "11111111-1111-4111-8111-111111111111",
+        studentId,
         status: "invitation-pending",
+        authId: "secret-auth-id",
       },
     ],
-  };
-  expect(StudentPortalAccessStatusResponse.safeParse(valid).success).toBe(true);
-  expect(
-    StudentPortalAccessStatusResponse.safeParse({
-      items: [{ ...valid.items[0], authId: "secret-auth-id" }],
-    }).success,
-  ).toBe(true);
+  });
+
+  expect(parsed).toEqual({
+    items: [{ studentId, status: "invitation-pending" }],
+  });
 });
