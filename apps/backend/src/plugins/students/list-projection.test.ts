@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   InvalidStudentPageCursorError,
+  STUDENT_LIST_ORDER_SELECT,
   STUDENT_LIST_SELECT,
   STUDENT_REF_SELECT,
   decodeStudentPageCursor,
@@ -27,6 +28,25 @@ describe("student compact projections", () => {
     expect("profile" in STUDENT_LIST_SELECT).toBe(false);
     expect("userId" in STUDENT_LIST_SELECT).toBe(false);
     expect("updatedAt" in STUDENT_LIST_SELECT).toBe(false);
+  });
+
+  test("ordering projection loads only name fields needed for sorting", () => {
+    expect(selectedKeys(STUDENT_LIST_ORDER_SELECT)).toEqual([
+      "category",
+      "createdAt",
+      "email",
+      "id",
+      "name",
+      "profile",
+      "status",
+      "studentId",
+    ]);
+    expect(selectedKeys(STUDENT_LIST_ORDER_SELECT.profile.select)).toEqual([
+      "khmerFamilyName",
+      "khmerGivenName",
+      "latinFamilyName",
+      "latinGivenName",
+    ]);
   });
 
   test("cross-plugin StudentRef projection includes the official profile but excludes account-only fields", () => {
@@ -83,7 +103,18 @@ describe("student compact projections", () => {
     expect(compactBytes).toBeLessThan(legacyBytes * 0.4);
   });
 
-  test("cursor decoding preserves the composite createdAt/id position", () => {
+  test("cursor decoding accepts the new roster cursor", () => {
+    const cursor = Buffer.from(
+      JSON.stringify({ id: "11111111-1111-4111-8111-111111111111" }),
+      "utf8",
+    ).toString("base64url");
+
+    expect(decodeStudentPageCursor(cursor)).toEqual({
+      id: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
+  test("cursor decoding keeps legacy createdAt/id cursors readable during rollout", () => {
     const cursor = Buffer.from(
       JSON.stringify({
         createdAt: "2026-08-30T12:34:56.000Z",
@@ -93,7 +124,6 @@ describe("student compact projections", () => {
     ).toString("base64url");
 
     expect(decodeStudentPageCursor(cursor)).toEqual({
-      createdAt: new Date("2026-08-30T12:34:56.000Z"),
       id: "11111111-1111-4111-8111-111111111111",
     });
   });
@@ -101,8 +131,12 @@ describe("student compact projections", () => {
   test("malformed or incomplete cursors fail closed", () => {
     for (const cursor of [
       "not-base64-json",
-      Buffer.from(JSON.stringify({ id: "student-1" }), "utf8").toString("base64url"),
-      Buffer.from(JSON.stringify({ createdAt: "not-a-date", id: "student-1" }), "utf8").toString("base64url"),
+      Buffer.from(JSON.stringify({ createdAt: "2026-08-30T12:34:56.000Z" }), "utf8").toString(
+        "base64url",
+      ),
+      Buffer.from(JSON.stringify({ createdAt: "not-a-date", id: "student-1" }), "utf8").toString(
+        "base64url",
+      ),
     ]) {
       expect(() => decodeStudentPageCursor(cursor)).toThrow(InvalidStudentPageCursorError);
     }
