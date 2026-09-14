@@ -3,6 +3,7 @@ import {
   invitationEmailsMatch,
   invitationIsPending,
   invitationMetadata,
+  invitationRefreshAction,
 } from "./resend-invitation.ts";
 
 describe("invitationIsPending", () => {
@@ -59,6 +60,38 @@ describe("invitationIsPending", () => {
         last_sign_in_at: "2026-08-25T03:01:00.000Z",
       }),
     ).toBe(false);
+  });
+});
+
+describe("invitationRefreshAction", () => {
+  it("resends only a still-pending invitation", () => {
+    expect(invitationRefreshAction({
+      invited_at: "2026-08-25T02:00:00.000Z",
+      email_confirmed_at: null,
+      confirmed_at: null,
+      last_sign_in_at: null,
+    })).toBe("resend");
+  });
+
+  it("classifies confirmed, signed-in, or non-invite identities as existing accounts", () => {
+    expect(invitationRefreshAction({
+      invited_at: "2026-08-25T02:00:00.000Z",
+      email_confirmed_at: "2026-08-25T03:00:00.000Z",
+      confirmed_at: null,
+      last_sign_in_at: null,
+    })).toBe("existing-account");
+    expect(invitationRefreshAction({
+      invited_at: "2026-08-25T02:00:00.000Z",
+      email_confirmed_at: null,
+      confirmed_at: null,
+      last_sign_in_at: "2026-08-25T03:01:00.000Z",
+    })).toBe("existing-account");
+    expect(invitationRefreshAction({
+      invited_at: null,
+      email_confirmed_at: null,
+      confirmed_at: null,
+      last_sign_in_at: null,
+    })).toBe("existing-account");
   });
 });
 

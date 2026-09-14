@@ -1,89 +1,101 @@
 import { describe, expect, test } from "bun:test";
 import {
-  bulkStudentInviteCandidate,
-  runBulkStudentInvitationBatch,
-  type BulkStudentInviteCandidate,
+  runBulkStudentPortalAccessBatch,
+  studentPortalAccessPlan,
+  type BulkStudentPortalAccessOutcome,
 } from "./bulk-student-invitations.ts";
 import { ProvisioningError } from "./service.ts";
 
-const candidates: BulkStudentInviteCandidate[] = [
-  { id: "student-a", name: "Student A", email: "a@example.edu" },
-  { id: "student-b", name: "Student B", email: "b@example.edu" },
-  { id: "student-c", name: "Student C", email: "c@example.edu" },
-  { id: "student-d", name: "Student D", email: "d@example.edu" },
-];
+const studentIds = ["student-a", "student-b", "student-c", "student-d", "student-e"];
 
-describe("bulk Student Portal invitations", () => {
-  test("pre-filters to Active students with email and no linked portal User", () => {
-    expect(bulkStudentInviteCandidate({
-      id: "eligible",
-      name: "Eligible Student",
-      email: "eligible@example.edu",
+describe("bulk Student Portal access", () => {
+  test("plans first invite, linked refresh, and ineligible skips safely", () => {
+    expect(studentPortalAccessPlan({
+      id: "new",
+      name: "New Student",
+      email: "new@example.edu",
       status: "Active",
       userId: null,
-    })).toEqual({
-      id: "eligible",
-      name: "Eligible Student",
-      email: "eligible@example.edu",
-    });
+    })).toBe("invite");
 
-    expect(bulkStudentInviteCandidate({
-      id: "inactive",
-      name: "Inactive Student",
-      email: "inactive@example.edu",
-      status: "Inactive",
-      userId: null,
-    })).toBeNull();
-    expect(bulkStudentInviteCandidate({
-      id: "missing-email",
-      name: "Missing Email",
-      email: null,
-      status: "Active",
-      userId: null,
-    })).toBeNull();
-    expect(bulkStudentInviteCandidate({
+    expect(studentPortalAccessPlan({
       id: "linked",
       name: "Linked Student",
       email: "linked@example.edu",
       status: "Active",
       userId: "11111111-1111-4111-8111-111111111111",
-    })).toBeNull();
+    })).toBe("refresh");
+
+    expect(studentPortalAccessPlan({
+      id: "inactive",
+      name: "Inactive Student",
+      email: "inactive@example.edu",
+      status: "Inactive",
+      userId: null,
+    })).toBe("ineligible");
+
+    expect(studentPortalAccessPlan({
+      id: "missing-email",
+      name: "Missing Email",
+      email: null,
+      status: "Active",
+      userId: null,
+    })).toBe("ineligible");
   });
 
-  test("counts expected per-student provisioning failures and continues safely", async () => {
-    const attempted: string[] = [];
-    const result = await runBulkStudentInvitationBatch(candidates, async (candidate) => {
-      attempted.push(candidate.id);
-      if (candidate.id === "student-b") {
+  test("counts new invites, pending resends, existing accounts, skips, and failures", async () => {
+    const outcomes = new Map<string, BulkStudentPortalAccessOutcome>([
+      ["student-a", "invited"],
+      ["student-b", "resent"],
+      ["student-c", "existing-account"],
+      ["student-d", "ineligible"],
+    ]);
+
+    const result = await runBulkStudentPortalAccessBatch(studentIds, async (studentId) => {
+      if (studentId === "student-e") {
         throw new ProvisioningError("Provider rejected this invitation");
       }
+      return outcomes.get(studentId)!;
     }, 2);
 
-    expect(new Set(attempted)).toEqual(new Set(candidates.map((candidate) => candidate.id)));
-    expect(result).toEqual({ invited: 3, failed: 1 });
+    expect(result).toEqual({
+      newlyInvited: 1,
+      resent: 1,
+      existingAccountSkipped: 1,
+      ineligibleSkipped: 1,
+      failed: 1,
+    });
   });
 
-  test("never exceeds the configured invitation concurrency", async () => {
+  test("never exceeds the configured portal-delivery concurrency", async () => {
     let active = 0;
     let maxActive = 0;
 
-    const result = await runBulkStudentInvitationBatch(candidates, async () => {
+    const result = await runBulkStudentPortalAccessBatch(studentIds, async () => {
       active += 1;
       maxActive = Math.max(maxActive, active);
       await new Promise((resolve) => setTimeout(resolve, 5));
       active -= 1;
+      return "invited";
     }, 2);
 
-    expect(result).toEqual({ invited: 4, failed: 0 });
+    expect(result).toEqual({
+      newlyInvited: studentIds.length,
+      resent: 0,
+      existingAccountSkipped: 0,
+      ineligibleSkipped: 0,
+      failed: 0,
+    });
     expect(maxActive).toBeLessThanOrEqual(2);
   });
 
-  test("stops scheduling new invitations after an unexpected local failure", async () => {
+  test("stops scheduling new students after an unexpected local failure", async () => {
     const attempted: string[] = [];
 
-    await expect(runBulkStudentInvitationBatch(candidates, async (candidate) => {
-      attempted.push(candidate.id);
-      if (candidate.id === "student-b") throw new Error("database unavailable");
+    await expect(runBulkStudentPortalAccessBatch(studentIds, async (studentId) => {
+      attempted.push(studentId);
+      if (studentId === "student-b") throw new Error("database unavailable");
+      return "invited";
     }, 1)).rejects.toThrow("database unavailable");
 
     expect(attempted).toEqual(["student-a", "student-b"]);

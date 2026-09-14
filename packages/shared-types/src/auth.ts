@@ -29,24 +29,43 @@ export const ResendInvitationResponse = z.object({
 export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
 
 /**
- * Aggregate result for the admin-only first-time Student Portal bulk invite.
- * No recipient identity, invitation URL, token, or other sensitive value is
- * returned. The count invariants make partial-provider failures explicit.
+ * Aggregate result for the admin-only Student Portal bulk access action.
+ * The response never contains recipient identity, invitation URLs, tokens, or
+ * other sensitive values. Every Student is accounted for exactly once.
+ *
+ * `eligible`/`invited`/`skipped` remain in the response during the frontend /
+ * backend rolling-deploy window so the #1101 UI can still render meaningful
+ * counts while #1103 is being deployed.
  */
-export const BulkStudentInvitationResponse = z.object({
+export const BulkStudentPortalAccessResponse = z.object({
   totalStudents: z.number().int().nonnegative(),
+  newlyInvited: z.number().int().nonnegative(),
+  resent: z.number().int().nonnegative(),
+  existingAccountSkipped: z.number().int().nonnegative(),
+  ineligibleSkipped: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
   eligible: z.number().int().nonnegative(),
   invited: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
 }).refine(
-  (value) => value.eligible === value.invited + value.failed,
-  { message: "Eligible count must equal invited plus failed" },
+  (value) => value.totalStudents ===
+    value.newlyInvited +
+      value.resent +
+      value.existingAccountSkipped +
+      value.ineligibleSkipped +
+      value.failed,
+  { message: "Total students must equal all bulk portal-access outcomes" },
 ).refine(
-  (value) => value.totalStudents === value.eligible + value.skipped,
-  { message: "Total students must equal eligible plus skipped" },
+  (value) => value.invited === value.newlyInvited + value.resent,
+  { message: "Legacy invited count must equal newly invited plus resent" },
+).refine(
+  (value) => value.skipped === value.existingAccountSkipped + value.ineligibleSkipped,
+  { message: "Legacy skipped count must equal both safe skip outcomes" },
+).refine(
+  (value) => value.eligible === value.invited + value.failed,
+  { message: "Legacy eligible count must equal sent plus failed" },
 );
-export type BulkStudentInvitationResponse = z.infer<typeof BulkStudentInvitationResponse>;
+export type BulkStudentPortalAccessResponse = z.infer<typeof BulkStudentPortalAccessResponse>;
 
 /**
  * New passwords are deliberately validated in the shared API contract rather

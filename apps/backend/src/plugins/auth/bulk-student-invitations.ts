@@ -1,13 +1,16 @@
 import type {
-  BulkStudentInvitationResponse,
+  BulkStudentPortalAccessResponse,
   CreateAccountInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import {
+  refreshStudentPortalInvitation,
+} from "./resend-invitation.ts";
 import { authService, ProvisioningError } from "./service.ts";
 
-const DEFAULT_BULK_STUDENT_INVITE_CONCURRENCY = 3;
+const DEFAULT_BULK_STUDENT_PORTAL_CONCURRENCY = 3;
 
-type StudentInviteSource = {
+type StudentPortalAccessSource = {
   id: string;
   name: string;
   email: string | null;
@@ -15,43 +18,90 @@ type StudentInviteSource = {
   userId: string | null;
 };
 
-export type BulkStudentInviteCandidate = {
-  id: string;
-  name: string;
-  email: string;
-};
+export type StudentPortalAccessPlan = "invite" | "refresh" | "ineligible";
+export type BulkStudentPortalAccessOutcome =
+  | "invited"
+  | "resent"
+  | "existing-account"
+  | "ineligible";
 
-/**
- * Pre-filter for the bulk action. `authService.createAccount()` rechecks the
- * current Student row before every remote invite, so this list can never widen
- * the authoritative first-invite gate if a Student changes concurrently.
- */
-export function bulkStudentInviteCandidate(
-  student: StudentInviteSource,
-): BulkStudentInviteCandidate | null {
-  if (student.status !== "Active" || !student.email || student.userId) return null;
-  return { id: student.id, name: student.name, email: student.email };
+export function studentPortalAccessPlan(
+  student: StudentPortalAccessSource,
+): StudentPortalAccessPlan {
+  if (student.status !== "Active" || !student.email) return "ineligible";
+  return student.userId ? "refresh" : "invite";
 }
 
 /**
- * Run a bounded worker pool. Provider/eligibility failures are safe per-recipient
- * failures and are counted. Any unexpected local/database error stops scheduling
- * more work so the bulk action fails closed rather than amplifying a bad state.
+ * Re-read one Student at execution time before deciding what to do. The existing
+ * first-invite and resend services then perform their own authoritative checks
+ * again immediately before touching Supabase, so concurrent roster/account
+ * changes fail closed instead of widening the operation.
  */
-export async function runBulkStudentInvitationBatch(
-  candidates: BulkStudentInviteCandidate[],
-  invite: (candidate: BulkStudentInviteCandidate) => Promise<unknown>,
-  concurrency = DEFAULT_BULK_STUDENT_INVITE_CONCURRENCY,
-): Promise<{ invited: number; failed: number }> {
-  if (candidates.length === 0) return { invited: 0, failed: 0 };
+async function deliverStudentPortalAccess(
+  studentId: string,
+): Promise<BulkStudentPortalAccessOutcome> {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      status: true,
+      userId: true,
+    },
+  });
+  if (!student) return "ineligible";
+
+  const plan = studentPortalAccessPlan(student);
+  if (plan === "ineligible") return "ineligible";
+
+  if (plan === "refresh") {
+    const result = await refreshStudentPortalInvitation(student.id);
+    return result.status === "resent" ? "resent" : "existing-account";
+  }
+
+  if (!student.email) return "ineligible";
+  await authService.createAccount({
+    name: student.name,
+    email: student.email,
+    role: "student",
+  } satisfies CreateAccountInput);
+  return "invited";
+}
+
+export type BulkStudentPortalAccessBatchResult = {
+  newlyInvited: number;
+  resent: number;
+  existingAccountSkipped: number;
+  ineligibleSkipped: number;
+  failed: number;
+};
+
+/**
+ * Run a bounded worker pool. Expected provider/eligibility failures are counted
+ * per student and the batch continues. Any unexpected local/database error stops
+ * scheduling additional students so the action fails closed.
+ */
+export async function runBulkStudentPortalAccessBatch(
+  studentIds: string[],
+  deliver: (studentId: string) => Promise<BulkStudentPortalAccessOutcome>,
+  concurrency = DEFAULT_BULK_STUDENT_PORTAL_CONCURRENCY,
+): Promise<BulkStudentPortalAccessBatchResult> {
+  const counts: BulkStudentPortalAccessBatchResult = {
+    newlyInvited: 0,
+    resent: 0,
+    existingAccountSkipped: 0,
+    ineligibleSkipped: 0,
+    failed: 0,
+  };
+  if (studentIds.length === 0) return counts;
 
   const workerCount = Math.min(
-    candidates.length,
+    studentIds.length,
     Math.max(1, Math.floor(concurrency)),
   );
   let nextIndex = 0;
-  let invited = 0;
-  let failed = 0;
   let abort = false;
   let fatalError: unknown;
 
@@ -59,15 +109,18 @@ export async function runBulkStudentInvitationBatch(
     while (!abort) {
       const index = nextIndex;
       nextIndex += 1;
-      const candidate = candidates[index];
-      if (!candidate) return;
+      const studentId = studentIds[index];
+      if (!studentId) return;
 
       try {
-        await invite(candidate);
-        invited += 1;
+        const outcome = await deliver(studentId);
+        if (outcome === "invited") counts.newlyInvited += 1;
+        else if (outcome === "resent") counts.resent += 1;
+        else if (outcome === "existing-account") counts.existingAccountSkipped += 1;
+        else counts.ineligibleSkipped += 1;
       } catch (error) {
         if (error instanceof ProvisioningError) {
-          failed += 1;
+          counts.failed += 1;
           continue;
         }
         fatalError = error;
@@ -78,15 +131,16 @@ export async function runBulkStudentInvitationBatch(
 
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
   if (abort) throw fatalError;
-  return { invited, failed };
+  return counts;
 }
 
 /**
- * Send first-time invitations across the complete PMS Student dataset. This is
- * intentionally not a bulk-resend path: any Student with a linked portal User is
- * skipped, including accounts whose invitation is still pending.
+ * Send/refresh Student Portal access across the complete PMS Student dataset.
+ * New students receive a first invitation, still-pending linked invitations are
+ * rotated to a fresh email, and existing/non-pending portal accounts are left
+ * unchanged. Inactive students and students without email are skipped.
  */
-export async function inviteAllEligibleStudents(): Promise<BulkStudentInvitationResponse> {
+export async function sendStudentPortalAccessToAll(): Promise<BulkStudentPortalAccessResponse> {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new ProvisioningError(
       "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for account administration",
@@ -95,33 +149,28 @@ export async function inviteAllEligibleStudents(): Promise<BulkStudentInvitation
 
   const students = await prisma.student.findMany({
     orderBy: { id: "asc" },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      status: true,
-      userId: true,
-    },
-  });
-  const candidates = students.flatMap((student) => {
-    const candidate = bulkStudentInviteCandidate(student);
-    return candidate ? [candidate] : [];
+    select: { id: true },
   });
 
-  const { invited, failed } = await runBulkStudentInvitationBatch(
-    candidates,
-    (student) => authService.createAccount({
-      name: student.name,
-      email: student.email,
-      role: "student",
-    } satisfies CreateAccountInput),
+  const counts = await runBulkStudentPortalAccessBatch(
+    students.map((student) => student.id),
+    deliverStudentPortalAccess,
   );
+  const invited = counts.newlyInvited + counts.resent;
+  const skipped = counts.existingAccountSkipped + counts.ineligibleSkipped;
 
   return {
     totalStudents: students.length,
-    eligible: candidates.length,
+    ...counts,
+    eligible: invited + counts.failed,
     invited,
-    failed,
-    skipped: students.length - candidates.length,
+    skipped,
   };
 }
+
+/**
+ * Compatibility export for the #1101 router while frontend/backend deployments
+ * may temporarily run different revisions. The endpoint semantics are now the
+ * safer #1103 send-or-refresh behavior above.
+ */
+export const inviteAllEligibleStudents = sendStudentPortalAccessToAll;
