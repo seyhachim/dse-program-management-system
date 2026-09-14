@@ -25,6 +25,7 @@ export * from "./final-project.ts";
 export * from "./final-project-plugin.ts";
 export * from "./courses.ts";
 export * from "./offerings.ts";
+export * from "./offering-roster-sync.ts";
 export * from "./offering-curriculum.ts";
 export * from "./dashboard.ts";
 export * from "./attendance.ts";
