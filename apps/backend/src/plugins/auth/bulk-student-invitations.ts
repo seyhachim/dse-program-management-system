@@ -52,10 +52,11 @@ export async function runBulkStudentInvitationBatch(
   let nextIndex = 0;
   let invited = 0;
   let failed = 0;
+  let abort = false;
   let fatalError: unknown;
 
   const worker = async () => {
-    while (fatalError === undefined) {
+    while (!abort) {
       const index = nextIndex;
       nextIndex += 1;
       const candidate = candidates[index];
@@ -70,12 +71,13 @@ export async function runBulkStudentInvitationBatch(
           continue;
         }
         fatalError = error;
+        abort = true;
       }
     }
   };
 
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  if (fatalError !== undefined) throw fatalError;
+  if (abort) throw fatalError;
   return { invited, failed };
 }
 
