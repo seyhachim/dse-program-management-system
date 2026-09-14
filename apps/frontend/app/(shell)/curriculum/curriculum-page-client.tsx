@@ -13,6 +13,7 @@ import {
   curriculumVersionLabel,
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
+import { CurriculumCreditChart } from "./curriculum-credit-chart";
 import { CurriculumPathwayView } from "./curriculum-pathway-view";
 import {
   normalizeStudyYear,
@@ -589,6 +590,8 @@ export function CurriculumPageClient() {
         <Stat label="Elective" value={data.totals.electiveCredits} />
         <Stat label="Specialization" value={data.totals.specializationCredits} />
       </section>
+
+      <CurriculumCreditChart totals={data.totals} />
 
       <section className="rounded-xl border bg-card p-4">
         <div className="hidden gap-2 sm:flex" role="tablist" aria-label="Study year">
