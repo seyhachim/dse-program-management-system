@@ -176,6 +176,21 @@ integrationDescribe("Google approval requires independently audited exact identi
     expect((await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { authId: true } })).authId).toBe(uid);
   });
 
+  test("a later staff role immediately disables previously approved Google and password sessions", async () => {
+    const admin = await prisma.role.findUniqueOrThrow({ where: { slug: "admin" }, select: { id: true } });
+    await prisma.userRoleAssignment.create({ data: { userId, roleId: admin.id, programmeId: null } });
+    try {
+      expect((await callMe(await tokenFor(uid, "google", ["email", "google"]))).status).toBe(403);
+      // Supabase's provider list can be stale after promotion; both sessions
+      // must be denied while the unapproved Google identity remains attached.
+      expect((await callMe(await tokenFor(uid, "email", ["email"]))).status).toBe(403);
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { authId: true } })).authId).toBe(uid);
+    } finally {
+      await prisma.userRoleAssignment.delete({ where: { userId_roleId: { userId, roleId: admin.id } } });
+    }
+    expect((await callMe(await tokenFor(uid, "email", ["email"]))).status).toBe(200);
+  });
+
   test("append-only revocation blocks previously signed token; password resumes only after Google identity removal", async () => {
     const signed = await tokenFor(uid, "google", ["email", "google"]);
     await appendDecision("revoked", googleIdentityId);
