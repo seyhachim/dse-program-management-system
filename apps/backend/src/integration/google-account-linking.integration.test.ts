@@ -184,7 +184,12 @@ integrationDescribe("Google approval requires independently audited exact identi
     googleId = null;
     expect((await callMe(await tokenFor(uid))).status).toBe(200);
     googleId = googleIdentityId;
-    await expect(prisma.$executeRaw`DELETE FROM pms_auth_security.google_identity_approval_event WHERE auth_uid = ${uid}`)
-      .rejects.toThrow();
+    let mutationBlocked = false;
+    try {
+      await prisma.$executeRaw`DELETE FROM pms_auth_security.google_identity_approval_event WHERE auth_uid = ${uid}`;
+    } catch {
+      mutationBlocked = true;
+    }
+    expect(mutationBlocked).toBe(true);
   });
 });
