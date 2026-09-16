@@ -99,6 +99,22 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   const metadata = decodeJwt(token).app_metadata;
   const provider = metadata && typeof metadata === "object" && "provider" in metadata
     && typeof metadata.provider === "string" ? metadata.provider : null;
+  const googleIdentityInJwt = tokenHasGoogleIdentity(metadata);
+
+  // Supabase can automatically attach a matching-email Google identity to an
+  // existing UID. Enforce the independently approved exact provider identity
+  // BEFORE any legacy email-based PMS account claim or other database write.
+  if (googleIdentityInJwt) {
+    const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
+    if (error || data.user?.id !== authId) {
+      throw new AccountLinkingError("Unable to verify Google identity");
+    }
+    assertApprovedGoogleIdentity(
+      authId,
+      data.user.identities,
+      process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES,
+    );
+  }
 
   const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
 
@@ -128,24 +144,8 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   if (!user) {
     throw new UnprovisionedAccountError("No account provisioned for this login");
   }
-
-  // Supabase can automatically attach a matching-email Google identity to an
-  // existing auth UID. A valid UID and frontend /me check cannot detect that.
-  // Require independent, exact provider-identity approval on the backend even
-  // when Google has already been attached upstream. No email matching here.
-  if (tokenHasGoogleIdentity(metadata)) {
-    const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
-    if (error || data.user?.id !== authId) {
-      throw new AccountLinkingError("Unable to verify Google identity");
-    }
-    if (!user.roleAssignments.some((assignment) => assignment.role.slug === "student")) {
-      throw new AccountLinkingError("Google pilot is restricted to students");
-    }
-    assertApprovedGoogleIdentity(
-      authId,
-      data.user.identities,
-      process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES,
-    );
+  if (googleIdentityInJwt && !user.roleAssignments.some((assignment) => assignment.role.slug === "student")) {
+    throw new AccountLinkingError("Google pilot is restricted to students");
   }
 
   const roles = user.roleAssignments.map((a) => a.role.slug as Role);
