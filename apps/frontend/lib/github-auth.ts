@@ -4,6 +4,9 @@
  */
 export const GITHUB_PILOT_ENABLED = process.env.NEXT_PUBLIC_GITHUB_PILOT_ENABLED === "true";
 
+/** The return path is kept only in same-tab session storage, never in OAuth URLs. */
+export const GITHUB_OAUTH_RETURN_KEY = "dse-pms:github-oauth-return";
+
 export function safeGithubReturnPath(next: string | null): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return "/";
   try {
@@ -15,9 +18,9 @@ export function safeGithubReturnPath(next: string | null): string {
   }
 }
 
-export function githubLoginRedirect(origin: string, next: string | null): string {
+export function githubLoginRedirect(origin: string): string {
   const redirect = new URL("/github-sign-in", origin);
-  redirect.searchParams.set("next", safeGithubReturnPath(next));
+  redirect.searchParams.set("callback", "1");
   return redirect.toString();
 }
 
