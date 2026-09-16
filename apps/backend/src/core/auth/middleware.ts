@@ -93,10 +93,18 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   const provider = metadata && typeof metadata === "object" && "provider" in metadata
     && typeof metadata.provider === "string" ? metadata.provider : null;
 
-  // A stale or incomplete JWT can omit a Google identity that Supabase has
-  // already auto-linked by email. Always consult the authoritative Auth user
-  // BEFORE any PMS lookup/legacy email claim, not just on Google-tagged JWTs.
-  // An Auth outage fails closed; never grant access using a stale identity list.
+  const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
+  // Read-only PMS candidate lookups may precede the Admin call. An entirely
+  // unknown UID/email retains the existing 403 unprovisioned API contract.
+  // Never grant access, modify User.authId, or use an email candidate until
+  // the current authoritative Supabase identities have been verified.
+  let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
+  const byEmail = user ? null : await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
+  if (!user && !byEmail) throw new UnprovisionedAccountError("No account provisioned for this login");
+
+  // A stale/incomplete JWT can omit Google after an automatic verified-email
+  // link. Check Supabase Admin identities on EVERY potentially authorized
+  // request. An outage fails closed rather than trusting stale JWT metadata.
   const { data: verified, error: verificationError } = await getVerificationClient().auth.admin.getUserById(authId);
   if (verificationError || verified.user?.id !== authId) {
     throw new AccountLinkingError("Unable to verify current sign-in identities");
@@ -107,24 +115,18 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
     assertApprovedGoogleIdentity(authId, verified.user.identities, process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES);
   }
 
-  const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
-  let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
-  if (!user) {
-    const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
-    if (byEmail) {
-      // Google-linked identities must never claim an unbound legacy account by
-      // email, even if app_metadata.provider still says "email".
-      if (hasGoogleIdentity) throw new AccountLinkingError("Google identity cannot claim a PMS account by email");
-      assertLegacyEmailClaim({ authId, email, provider }, byEmail.authId, verified.user);
-
-      const claimed = await prisma.user.updateMany({
-        where: { id: byEmail.id, authId: null },
-        data: { authId },
-      });
-      if (claimed.count !== 1) throw new AccountLinkingError("Account linking conflict");
-      user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
-      if (!user || user.id !== byEmail.id) throw new AccountLinkingError("Account linking conflict");
-    }
+  if (!user && byEmail) {
+    // Email can never claim a legacy account once a Google identity is linked,
+    // even when app_metadata.provider still advertises the email provider.
+    if (hasGoogleIdentity) throw new AccountLinkingError("Google identity cannot claim a PMS account by email");
+    assertLegacyEmailClaim({ authId, email, provider }, byEmail.authId, verified.user);
+    const claimed = await prisma.user.updateMany({
+      where: { id: byEmail.id, authId: null },
+      data: { authId },
+    });
+    if (claimed.count !== 1) throw new AccountLinkingError("Account linking conflict");
+    user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
+    if (!user || user.id !== byEmail.id) throw new AccountLinkingError("Account linking conflict");
   }
 
   if (!user) throw new UnprovisionedAccountError("No account provisioned for this login");
