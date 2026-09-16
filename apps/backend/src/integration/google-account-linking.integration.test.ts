@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -6,15 +7,16 @@ import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { createApp } from "../core/app.ts";
 import { prisma } from "../core/db/prisma.ts";
 
-/** Disposable CI PostgreSQL and local Auth/JWKS only; never connect to production. */
+/** Disposable CI PostgreSQL and local mock Auth/JWKS only; NEVER production. */
 const integrationDescribe = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 
-integrationDescribe("Google verified-email auto-link cannot authorize a PMS student", () => {
+integrationDescribe("Google approval requires independently audited exact identity", () => {
   const uid = "00000000-0000-4000-8000-000000000201";
   const otherUid = "00000000-0000-4000-8000-000000000202";
   const googleIdentityId = "ci-google-provider-identity";
   const otherIdentityId = "ci-wrong-google-provider-identity";
   let userId: string;
+  let operatorId: string;
   let originalAuthId: string | null;
   let privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
   let baseUrl: string;
@@ -27,6 +29,7 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     SUPABASE_JWKS_URL: process.env.SUPABASE_JWKS_URL,
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    GOOGLE_OAUTH_APPROVAL_ENABLED: process.env.GOOGLE_OAUTH_APPROVAL_ENABLED,
     GOOGLE_OAUTH_APPROVED_IDENTITIES: process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES,
   };
 
@@ -45,21 +48,38 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     return { status: response.status, body: await response.json() as { id?: string; roles?: string[] } };
   };
 
-  const callHome = async (token: string, studentId?: string) => {
-    const query = studentId ? `?studentId=${encodeURIComponent(studentId)}` : "";
-    const response = await fetch(`${baseUrl}/api/student-portal/home${query}`, {
+  const callHome = async (token: string, claimedStudentId: string) => {
+    const response = await fetch(`${baseUrl}/api/student-portal/home?studentId=${claimedStudentId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return { status: response.status, body: await response.json() as { student?: { id?: string } } };
+    return { status: response.status, body: await response.json() as { student?: { id: string } } };
   };
+
+  async function appendDecision(action: "approved" | "revoked", googleIdentity: string): Promise<void> {
+    const intentId = action === "approved" ? randomUUID() : null;
+    if (intentId) {
+      await prisma.$executeRaw`
+        INSERT INTO pms_auth_security.google_link_intent (id, user_id, auth_uid, expires_at, consumed_at)
+        VALUES (${intentId}, ${userId}, ${uid}, clock_timestamp() + interval '15 minutes', clock_timestamp())`;
+    }
+    await prisma.$executeRaw`
+      INSERT INTO pms_auth_security.google_identity_approval_event
+        (user_id, auth_uid, google_identity_id, action, actor_user_id, evidence_reference, reason, link_intent_id)
+      VALUES (${userId}, ${uid}, ${googleIdentity}, ${action}, ${operatorId},
+        'CI-TEST-TICKET', 'Independent synthetic test verification', ${intentId})`;
+  }
 
   beforeAll(async () => {
     const student = await prisma.user.findUniqueOrThrow({
       where: { email: "student@dse.dev" }, select: { id: true, authId: true },
     });
+    const operator = await prisma.user.findUniqueOrThrow({
+      where: { email: "admin@dse.dev" }, select: { id: true },
+    });
     userId = student.id;
+    operatorId = operator.id;
     originalAuthId = student.authId;
-    // Mutate only the isolated CI seed user; restored in afterAll.
+    // Only the isolated CI seed User is changed and is restored in afterAll.
     await prisma.user.update({ where: { id: userId }, data: { authId: uid } });
 
     const keys = await generateKeyPair("RS256");
@@ -93,6 +113,7 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     process.env.SUPABASE_URL = `http://127.0.0.1:${(adminServer.address() as AddressInfo).port}`;
     process.env.SUPABASE_SERVICE_ROLE_KEY = "ci-only-fake-service-role-key";
     process.env.AUTH_MODE = "supabase";
+    process.env.GOOGLE_OAUTH_APPROVAL_ENABLED = "true";
     delete process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES;
     appServer = createApp().listen(0, "127.0.0.1");
     await once(appServer, "listening");
@@ -112,33 +133,31 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     await prisma.$disconnect();
   });
 
-  test("denies an auto-linked verified Gmail despite stale email-only JWT and leaves PMS UID unchanged", async () => {
+  test("unapproved auto-linked verified Google with stale email-only JWT returns 403 and does not rewrite canonical IDs", async () => {
     const response = await callMe(await tokenFor(uid));
     expect(response.status).toBe(403);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { authId: true } }))
       .toEqual({ authId: uid });
   });
 
-  test("denies a wrong, missing or stale operator-approved provider identity", async () => {
-    process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES = JSON.stringify({ [uid]: otherIdentityId });
-    expect((await callMe(await tokenFor(uid, "google", ["email", "google"]))).status).toBe(403);
-    googleId = otherIdentityId;
+  test("wrong audited identity and even legacy environment allowlist never authorize", async () => {
     process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES = JSON.stringify({ [uid]: googleIdentityId });
-    expect((await callMe(await tokenFor(uid))).status).toBe(403);
-    googleId = googleIdentityId;
+    await appendDecision("approved", otherIdentityId);
+    expect((await callMe(await tokenFor(uid, "google", ["email", "google"]))).status).toBe(403);
+    await appendDecision("revoked", otherIdentityId);
+    delete process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES;
   });
 
-  test("correct approved identity accesses only the original PMS user with no Student rewrite", async () => {
-    process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES = JSON.stringify({ [uid]: googleIdentityId });
+  test("exact audited identity authorizes existing student without changing PMS User or Student IDs", async () => {
+    await appendDecision("approved", googleIdentityId);
     const response = await callMe(await tokenFor(uid, "google", ["email", "google"]));
     expect(response.status).toBe(200);
     expect(response.body.id).toBe(userId);
     expect(response.body.roles).toContain("student");
-    expect((await callMe(await tokenFor(otherUid, "google", ["google"]))).status).not.toBe(200);
+    expect((await callMe(await tokenFor(otherUid, "google", ["google"]))).status).toBe(403);
   });
 
-  test("approved student portal ignores a claimed student ID and denies a different auth UID", async () => {
-    process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES = JSON.stringify({ [uid]: googleIdentityId });
+  test("approved student portal ignores a claimed second Student ID; different UID receives 403", async () => {
     const ownStudent = await prisma.student.findUniqueOrThrow({ where: { userId }, select: { id: true } });
     const otherStudent = await prisma.student.findFirst({ where: { id: { not: ownStudent.id } }, select: { id: true } });
     const targetId = otherStudent?.id ?? "00000000-0000-4000-8000-000000000299";
@@ -146,13 +165,10 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     expect(ownHome.status).toBe(200);
     expect(ownHome.body.student?.id).toBe(ownStudent.id);
     expect(ownHome.body.student?.id).not.toBe(targetId);
-    const otherHome = await callHome(await tokenFor(otherUid, "google", ["google"]), ownStudent.id);
-    expect(otherHome.status).toBe(403);
-    expect(otherHome.body.student).toBeUndefined();
+    expect((await callHome(await tokenFor(otherUid, "google", ["google"]), ownStudent.id)).status).toBe(403);
   });
 
-  test("approved linked identity preserves existing password-token access to the same PMS user", async () => {
-    process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES = JSON.stringify({ [uid]: googleIdentityId });
+  test("approved linked identity preserves existing email/password token access to the same PMS user", async () => {
     const passwordResponse = await callMe(await tokenFor(uid, "email", ["email"]));
     expect(passwordResponse.status).toBe(200);
     expect(passwordResponse.body.id).toBe(userId);
@@ -160,12 +176,15 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     expect((await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { authId: true } })).authId).toBe(uid);
   });
 
-  test("revoked approval blocks even a previously signed token; password works after Google identity removal", async () => {
+  test("append-only revocation blocks previously signed token; password resumes only after Google identity removal", async () => {
     const signed = await tokenFor(uid, "google", ["email", "google"]);
-    delete process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES;
+    await appendDecision("revoked", googleIdentityId);
     expect((await callMe(signed)).status).toBe(403);
+    expect((await callMe(await tokenFor(uid, "email", ["email"]))).status).toBe(403);
     googleId = null;
     expect((await callMe(await tokenFor(uid))).status).toBe(200);
     googleId = googleIdentityId;
+    await expect(prisma.$executeRaw`DELETE FROM pms_auth_security.google_identity_approval_event WHERE auth_uid = ${uid}`)
+      .rejects.toThrow();
   });
 });
