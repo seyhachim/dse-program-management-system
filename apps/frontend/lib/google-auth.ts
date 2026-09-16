@@ -17,6 +17,13 @@ export function safeGoogleReturnPath(next: string | null): string {
   }
 }
 
+/** Fresh password sign-in must not silently switch the PMS account to another UID. */
+export function assertSameGoogleLinkUid(originalUid: string, freshUid: string | undefined): void {
+  if (!originalUid || !freshUid || originalUid !== freshUid) {
+    throw new Error("The authenticated account changed during Google linking");
+  }
+}
+
 export function googleLoginRedirect(origin: string): string {
   const callback = new URL("/google-sign-in", origin);
   callback.searchParams.set("callback", "1");
