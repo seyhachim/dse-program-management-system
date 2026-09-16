@@ -10,7 +10,8 @@ import { prisma } from "../core/db/prisma.ts";
 const integrationDescribe = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 
 integrationDescribe("Google verified-email auto-link cannot authorize a PMS student", () => {
-  const uid = "ci-existing-supabase-student";
+  const uid = "00000000-0000-4000-8000-000000000201";
+  const otherUid = "00000000-0000-4000-8000-000000000202";
   const googleIdentityId = "ci-google-provider-identity";
   const otherIdentityId = "ci-wrong-google-provider-identity";
   let userId: string;
@@ -125,7 +126,7 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     expect(response.status).toBe(200);
     expect(response.body.id).toBe(userId);
     expect(response.body.roles).toContain("student");
-    expect((await callMe(await tokenFor("other-uid", "google", ["google"]))).status).not.toBe(200);
+    expect((await callMe(await tokenFor(otherUid, "google", ["google"]))).status).not.toBe(200);
   });
 
   test("revoked approval blocks even a previously signed token; password works after Google identity removal", async () => {
