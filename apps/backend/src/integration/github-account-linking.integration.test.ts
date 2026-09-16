@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { createApp } from "../core/app.ts";
 import { prisma } from "../core/db/prisma.ts";
 
@@ -15,7 +15,7 @@ const integrationDescribe = process.env.BACKEND_INTEGRATION_TESTS === "1" ? desc
 integrationDescribe("one student's GitHub account-matching security", () => {
   let appServer: Server | undefined;
   let jwksServer: Server | undefined;
-  let privateKey: KeyLike;
+  let privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
   let keyId: string;
   let baseUrl: string;
   let studentId: string;
