@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@dse-pms/ui";
 import { authApi, useMe } from "@/lib/auth";
-import { GOOGLE_LINK_UID_KEY, GOOGLE_PILOT_ENABLED, googleLinkRedirect } from "@/lib/google-auth";
+import { assertSameGoogleLinkUid, GOOGLE_LINK_UID_KEY, GOOGLE_PILOT_ENABLED, googleLinkRedirect } from "@/lib/google-auth";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
 /**
@@ -68,10 +68,12 @@ export default function ConnectGooglePage() {
         email: data.user.email,
         password: suppliedPassword,
       });
-      if (reauthError || !fresh.user || fresh.user.id !== originalUid) {
-        if (fresh.user && fresh.user.id !== originalUid) await supabase.auth.signOut();
-        throw new Error("Fresh password verification failed");
+      if (reauthError || !fresh.user) throw new Error("Fresh password verification failed");
+      if (fresh.user.id !== originalUid) {
+        await supabase.auth.signOut();
+        throw new Error("Fresh password verification changed the account");
       }
+      assertSameGoogleLinkUid(originalUid, fresh.user.id);
       const current = await authApi.me();
       if (!current.roles.includes("student")) throw new Error("Not authorized");
       window.sessionStorage.setItem(GOOGLE_LINK_UID_KEY, originalUid);
