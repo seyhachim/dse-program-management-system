@@ -30,8 +30,8 @@ export function googleLoginRedirect(origin: string): string {
   return callback.toString();
 }
 
+/** Pending Google links cannot enter the PMS shell until independently approved. */
 export function googleLinkRedirect(origin: string): string {
-  const callback = new URL("/connect-google", origin);
-  callback.searchParams.set("callback", "1");
+  const callback = new URL("/google-link/callback", origin);
   return callback.toString();
 }
