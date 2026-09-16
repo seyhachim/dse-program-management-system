@@ -80,7 +80,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     next();
   } catch (err) {
-    if (err instanceof UnprovisionedAccountError || err instanceof AccountLinkingError) {
+    if (err instanceof UnprovisionedAccountError) {
+      res.status(403).json({ error: err.message });
+      return;
+    }
+    if (err instanceof AccountLinkingError) {
       res.status(403).json({ error: "This sign-in is not linked to an authorized PMS account" });
       return;
     }
