@@ -1,5 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { decodeJwt } from "jose";
 import { prisma } from "../db/prisma.ts";
+import { AccountLinkingError, assertLegacyEmailClaim } from "./account-linking.ts";
 import {
   getAuthMode,
   verifySupabaseToken,
@@ -19,6 +22,21 @@ declare global {
 }
 
 class UnprovisionedAccountError extends Error {}
+
+let verificationClient: SupabaseClient | undefined;
+
+function getVerificationClient(): SupabaseClient {
+  if (verificationClient) return verificationClient;
+  const url = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new Error("Supabase account verification is not configured");
+  }
+  verificationClient = createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return verificationClient;
+}
 
 async function mustChangePassword(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
@@ -62,8 +80,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     next();
   } catch (err) {
-    if (err instanceof UnprovisionedAccountError) {
-      res.status(403).json({ error: err.message });
+    if (err instanceof UnprovisionedAccountError || err instanceof AccountLinkingError) {
+      res.status(403).json({ error: "This sign-in is not linked to an authorized PMS account" });
       return;
     }
     res.status(401).json({ error: "Invalid or expired token" });
@@ -71,23 +89,36 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 async function resolveSupabaseUser(token: string): Promise<AuthUser> {
+  // Verify signature and expiration BEFORE interpreting any provider metadata.
   const { authId, email } = await verifySupabaseToken(token);
+  const metadata = decodeJwt(token).app_metadata;
+  const provider = metadata && typeof metadata === "object" && "provider" in metadata
+    && typeof metadata.provider === "string" ? metadata.provider : null;
 
   const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
 
-  // Prefer the stable auth uid; fall back to email so pre-existing seeded
-  // profiles (created before they ever logged in) link on first login.
+  // The stable Supabase UID is authoritative, including after an explicitly
+  // linked GitHub identity is added to that SAME Supabase account.
   let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
   if (!user) {
     const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
     if (byEmail) {
-      user = byEmail.authId
-        ? byEmail
-        : await prisma.user.update({
-            where: { id: byEmail.id },
-            data: { authId },
-            include: roleAssignmentsInclude,
-          });
+      // Never accept an existing User whose authId points at a different UID.
+      // A GitHub email/username is not sufficient proof of institutional identity.
+      const { data, error } = byEmail.authId === null && provider === "email"
+        ? await getVerificationClient().auth.admin.getUserById(authId)
+        : { data: null, error: null };
+      if (error) throw error;
+      assertLegacyEmailClaim({ authId, email, provider }, byEmail.authId, data?.user ?? null);
+
+      // A conditional claim avoids overwriting an identity linked concurrently.
+      const claimed = await prisma.user.updateMany({
+        where: { id: byEmail.id, authId: null },
+        data: { authId },
+      });
+      if (claimed.count !== 1) throw new AccountLinkingError("Account linking conflict");
+      user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
+      if (!user || user.id !== byEmail.id) throw new AccountLinkingError("Account linking conflict");
     }
   }
 
