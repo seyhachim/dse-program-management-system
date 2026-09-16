@@ -48,17 +48,10 @@ async function mustChangePassword(userId: string): Promise<boolean> {
 }
 
 export function isPasswordRecoveryRoute(req: Pick<Request, "baseUrl" | "path">): boolean {
-  // The caller must still be able to inspect /me so the frontend can route to
-  // the recovery screen, and must be able to submit that one recovery action.
   return req.baseUrl === "/api/auth" && (req.path === "/me" || req.path === "/change-password");
 }
 
-/**
- * Verifies the Bearer token and attaches `req.user`. After authentication it
- * enforces the PMS-owned forced-password-change gate for every protected API.
- * A gated user may call only /api/auth/me and /api/auth/change-password until
- * the credential has been replaced successfully.
- */
+/** Verify the bearer token, resolve a PMS-owned identity, then enforce password recovery. */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization ?? "";
   const [scheme, token] = header.split(" ");
@@ -94,43 +87,36 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 async function resolveSupabaseUser(token: string): Promise<AuthUser> {
-  // Verify signature and expiration BEFORE interpreting any provider metadata.
+  // Verify signature and expiration before interpreting any provider metadata.
   const { authId, email } = await verifySupabaseToken(token);
   const metadata = decodeJwt(token).app_metadata;
   const provider = metadata && typeof metadata === "object" && "provider" in metadata
     && typeof metadata.provider === "string" ? metadata.provider : null;
-  const googleIdentityInJwt = tokenHasGoogleIdentity(metadata);
 
-  // Supabase can automatically attach a matching-email Google identity to an
-  // existing UID. Enforce the independently approved exact provider identity
-  // BEFORE any legacy email-based PMS account claim or other database write.
-  if (googleIdentityInJwt) {
-    const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
-    if (error || data.user?.id !== authId) {
-      throw new AccountLinkingError("Unable to verify Google identity");
-    }
-    assertApprovedGoogleIdentity(
-      authId,
-      data.user.identities,
-      process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES,
-    );
+  // A stale or incomplete JWT can omit a Google identity that Supabase has
+  // already auto-linked by email. Always consult the authoritative Auth user
+  // BEFORE any PMS lookup/legacy email claim, not just on Google-tagged JWTs.
+  // An Auth outage fails closed; never grant access using a stale identity list.
+  const { data: verified, error: verificationError } = await getVerificationClient().auth.admin.getUserById(authId);
+  if (verificationError || verified.user?.id !== authId) {
+    throw new AccountLinkingError("Unable to verify current sign-in identities");
+  }
+  const currentGoogleIdentities = verified.user.identities?.filter((identity) => identity.provider === "google") ?? [];
+  const hasGoogleIdentity = tokenHasGoogleIdentity(metadata) || currentGoogleIdentities.length > 0;
+  if (hasGoogleIdentity) {
+    assertApprovedGoogleIdentity(authId, verified.user.identities, process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES);
   }
 
   const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
-
-  // The stable Supabase UID is authoritative; provider email is never a proof
-  // of identity for a pre-existing account.
   let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
   if (!user) {
     const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
     if (byEmail) {
-      const { data, error } = byEmail.authId === null && provider === "email"
-        ? await getVerificationClient().auth.admin.getUserById(authId)
-        : { data: null, error: null };
-      if (error) throw error;
-      assertLegacyEmailClaim({ authId, email, provider }, byEmail.authId, data?.user ?? null);
+      // Google-linked identities must never claim an unbound legacy account by
+      // email, even if app_metadata.provider still says "email".
+      if (hasGoogleIdentity) throw new AccountLinkingError("Google identity cannot claim a PMS account by email");
+      assertLegacyEmailClaim({ authId, email, provider }, byEmail.authId, verified.user);
 
-      // A conditional claim avoids overwriting an identity linked concurrently.
       const claimed = await prisma.user.updateMany({
         where: { id: byEmail.id, authId: null },
         data: { authId },
@@ -141,10 +127,8 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
     }
   }
 
-  if (!user) {
-    throw new UnprovisionedAccountError("No account provisioned for this login");
-  }
-  if (googleIdentityInJwt && !user.roleAssignments.some((assignment) => assignment.role.slug === "student")) {
+  if (!user) throw new UnprovisionedAccountError("No account provisioned for this login");
+  if (hasGoogleIdentity && !user.roleAssignments.some((assignment) => assignment.role.slug === "student")) {
     throw new AccountLinkingError("Google pilot is restricted to students");
   }
 
