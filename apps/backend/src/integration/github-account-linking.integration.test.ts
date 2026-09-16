@@ -2,8 +2,10 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { createClient } from "@supabase/supabase-js";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { createApp } from "../core/app.ts";
+import { verifySupabaseToken } from "../core/auth/token.ts";
 import { prisma } from "../core/db/prisma.ts";
 
 /** Runs only against a disposable, freshly seeded CI database and local mock Auth. */
@@ -33,6 +35,8 @@ integrationDescribe("one student's GitHub account-matching security", () => {
       .sign(privateKey);
 
   const asMe = async (token: string) => {
+    // Distinguish a malformed mock JWT from a PMS authorization rejection.
+    expect((await verifySupabaseToken(token)).email).toBe("student@dse.dev");
     const response = await fetch(`${baseUrl}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -63,8 +67,6 @@ integrationDescribe("one student's GitHub account-matching security", () => {
     await once(jwksServer, "listening");
     process.env.SUPABASE_JWKS_URL = `http://127.0.0.1:${(jwksServer.address() as AddressInfo).port}/auth/v1/.well-known/jwks.json`;
 
-    // A local, non-production Supabase Admin API mock allows the backend to
-    // recheck actual identity membership even when JWT provider data is stale.
     authServer = createServer((req, res) => {
       const uid = decodeURIComponent((req.url ?? "").split("/auth/v1/admin/users/")[1] ?? "");
       res.setHeader("content-type", "application/json");
@@ -79,6 +81,10 @@ integrationDescribe("one student's GitHub account-matching security", () => {
     await once(authServer, "listening");
     process.env.SUPABASE_URL = `http://127.0.0.1:${(authServer.address() as AddressInfo).port}`;
     process.env.SUPABASE_SERVICE_ROLE_KEY = "ci-only-fake-service-role-key";
+    const mockClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data: mockUser, error: mockError } = await mockClient.auth.admin.getUserById(claimedUid);
+    expect(mockError).toBeNull();
+    expect(mockUser.user?.id).toBe(claimedUid);
     process.env.AUTH_MODE = "supabase";
 
     appServer = createApp().listen(0, "127.0.0.1");
