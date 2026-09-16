@@ -2,19 +2,19 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { createClient } from "@supabase/supabase-js";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { createApp } from "../core/app.ts";
+import { verifySupabaseToken } from "../core/auth/token.ts";
 import { prisma } from "../core/db/prisma.ts";
 
-/**
- * Runs against CI's isolated, freshly seeded PostgreSQL, never production.
- * Simulates one Student's Supabase/GitHub identities using locally signed JWTs.
- */
+/** Runs only against a disposable, freshly seeded CI database and local mock Auth. */
 const integrationDescribe = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 
 integrationDescribe("one student's GitHub account-matching security", () => {
   let appServer: Server | undefined;
   let jwksServer: Server | undefined;
+  let authServer: Server | undefined;
   let privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
   let keyId: string;
   let baseUrl: string;
@@ -22,7 +22,11 @@ integrationDescribe("one student's GitHub account-matching security", () => {
   let originalAuthId: string | null;
   const originalMode = process.env.AUTH_MODE;
   const originalJwksUrl = process.env.SUPABASE_JWKS_URL;
-  const claimedUid = "synthetic-supabase-student-uid";
+  const originalSupabaseUrl = process.env.SUPABASE_URL;
+  const originalServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const claimedUid = "00000000-0000-4000-8000-000000000101";
+  const unlinkedUid = "00000000-0000-4000-8000-000000000102";
+  const otherUid = "00000000-0000-4000-8000-000000000103";
 
   const tokenFor = (sub: string, email: string, provider: string) =>
     new SignJWT({ email, app_metadata: { provider } })
@@ -33,6 +37,7 @@ integrationDescribe("one student's GitHub account-matching security", () => {
       .sign(privateKey);
 
   const asMe = async (token: string) => {
+    expect((await verifySupabaseToken(token)).email).toBe("student@dse.dev");
     const response = await fetch(`${baseUrl}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -46,8 +51,6 @@ integrationDescribe("one student's GitHub account-matching security", () => {
     });
     studentId = student.id;
     originalAuthId = student.authId;
-    // Only a disposable CI seed User.authId is changed for this test; no
-    // Student, enrollment, result or other academic record is modified.
     await prisma.user.update({ where: { id: studentId }, data: { authId: null } });
 
     const keys = await generateKeyPair("RS256");
@@ -63,8 +66,26 @@ integrationDescribe("one student's GitHub account-matching security", () => {
     });
     jwksServer.listen(0, "127.0.0.1");
     await once(jwksServer, "listening");
-    const jwksAddress = jwksServer.address() as AddressInfo;
-    process.env.SUPABASE_JWKS_URL = `http://127.0.0.1:${jwksAddress.port}/auth/v1/.well-known/jwks.json`;
+    process.env.SUPABASE_JWKS_URL = `http://127.0.0.1:${(jwksServer.address() as AddressInfo).port}/auth/v1/.well-known/jwks.json`;
+
+    authServer = createServer((req, res) => {
+      const uid = decodeURIComponent((req.url ?? "").split("/auth/v1/admin/users/")[1] ?? "");
+      res.setHeader("content-type", "application/json");
+      if (!uid || uid.includes("/")) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ message: "Not found" }));
+        return;
+      }
+      res.end(JSON.stringify({ id: uid, email: "student@dse.dev", email_confirmed_at: "2026-09-16T00:00:00Z", identities: [{ id: `email-${uid}`, provider: "email" }] }));
+    });
+    authServer.listen(0, "127.0.0.1");
+    await once(authServer, "listening");
+    process.env.SUPABASE_URL = `http://127.0.0.1:${(authServer.address() as AddressInfo).port}`;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "ci-only-fake-service-role-key";
+    const mockClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data: mockUser, error: mockError } = await mockClient.auth.admin.getUserById(claimedUid);
+    expect(mockError).toBeNull();
+    expect(mockUser.user?.id).toBe(claimedUid);
     process.env.AUTH_MODE = "supabase";
 
     appServer = createApp().listen(0, "127.0.0.1");
@@ -73,12 +94,12 @@ integrationDescribe("one student's GitHub account-matching security", () => {
   });
 
   afterAll(async () => {
-    if (studentId) {
-      await prisma.user.update({ where: { id: studentId }, data: { authId: originalAuthId } });
-    }
+    if (studentId) await prisma.user.update({ where: { id: studentId }, data: { authId: originalAuthId } });
     process.env.AUTH_MODE = originalMode;
     process.env.SUPABASE_JWKS_URL = originalJwksUrl;
-    await Promise.all([appServer, jwksServer].map((server) => new Promise<void>((resolve, reject) => {
+    process.env.SUPABASE_URL = originalSupabaseUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRoleKey;
+    await Promise.all([appServer, jwksServer, authServer].map((server) => new Promise<void>((resolve, reject) => {
       if (!server) return resolve();
       server.close((error) => error ? reject(error) : resolve());
     })));
@@ -86,7 +107,7 @@ integrationDescribe("one student's GitHub account-matching security", () => {
   });
 
   test("a GitHub user cannot claim an unbound student profile by matching its email", async () => {
-    const token = await tokenFor("unlinked-github-uid", "student@dse.dev", "github");
+    const token = await tokenFor(unlinkedUid, "student@dse.dev", "github");
     const response = await asMe(token);
     expect(response.status).toBe(403);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: studentId }, select: { authId: true } }))
@@ -95,14 +116,14 @@ integrationDescribe("one student's GitHub account-matching security", () => {
 
   test("a different Supabase UID cannot impersonate a bound student even with matching email", async () => {
     await prisma.user.update({ where: { id: studentId }, data: { authId: claimedUid } });
-    const token = await tokenFor("other-github-uid", "student@dse.dev", "github");
+    const token = await tokenFor(otherUid, "student@dse.dev", "github");
     const response = await asMe(token);
     expect(response.status).toBe(403);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: studentId }, select: { authId: true } }))
       .toEqual({ authId: claimedUid });
   });
 
-  test("a GitHub identity attached to the same verified Supabase UID resolves only the existing student", async () => {
+  test("a GitHub identity with the same Supabase UID resolves only the existing student", async () => {
     const token = await tokenFor(claimedUid, "student@dse.dev", "github");
     const response = await asMe(token);
     expect(response.status).toBe(200);
