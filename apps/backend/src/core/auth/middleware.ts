@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { decodeJwt } from "jose";
 import { prisma } from "../db/prisma.ts";
 import { AccountLinkingError, assertLegacyEmailClaim } from "./account-linking.ts";
+import { assertApprovedGoogleIdentity, tokenHasGoogleIdentity } from "./google-identity-approval.ts";
 import {
   getAuthMode,
   verifySupabaseToken,
@@ -101,14 +102,12 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
 
   const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
 
-  // The stable Supabase UID is authoritative, including after an explicitly
-  // linked GitHub identity is added to that SAME Supabase account.
+  // The stable Supabase UID is authoritative; provider email is never a proof
+  // of identity for a pre-existing account.
   let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
   if (!user) {
     const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
     if (byEmail) {
-      // Never accept an existing User whose authId points at a different UID.
-      // A GitHub email/username is not sufficient proof of institutional identity.
       const { data, error } = byEmail.authId === null && provider === "email"
         ? await getVerificationClient().auth.admin.getUserById(authId)
         : { data: null, error: null };
@@ -128,6 +127,25 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
 
   if (!user) {
     throw new UnprovisionedAccountError("No account provisioned for this login");
+  }
+
+  // Supabase can automatically attach a matching-email Google identity to an
+  // existing auth UID. A valid UID and frontend /me check cannot detect that.
+  // Require independent, exact provider-identity approval on the backend even
+  // when Google has already been attached upstream. No email matching here.
+  if (tokenHasGoogleIdentity(metadata)) {
+    const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
+    if (error || data.user?.id !== authId) {
+      throw new AccountLinkingError("Unable to verify Google identity");
+    }
+    if (!user.roleAssignments.some((assignment) => assignment.role.slug === "student")) {
+      throw new AccountLinkingError("Google pilot is restricted to students");
+    }
+    assertApprovedGoogleIdentity(
+      authId,
+      data.user.identities,
+      process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES,
+    );
   }
 
   const roles = user.roleAssignments.map((a) => a.role.slug as Role);
