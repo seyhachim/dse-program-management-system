@@ -118,6 +118,11 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
     // Never approve by email or token metadata; an unbound historical PMS user
     // cannot be claimed by a Google provider under any circumstances.
     if (!user) throw new AccountLinkingError("Google identity cannot claim a PMS account by email");
+    // Approval is student-only, including after a later role change. A newly
+    // granted staff role must not inherit a previously approved Google login.
+    if (user.roleAssignments.length !== 1 || user.roleAssignments[0]?.role.slug !== "student") {
+      throw new AccountLinkingError("Google pilot is restricted to nonprivileged students");
+    }
     const approvedIdentityId = await getApprovedGoogleIdentity(authId, user.id).catch(() => {
       throw new AccountLinkingError("Google approval lookup unavailable");
     });
@@ -141,9 +146,6 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   }
 
   if (!user) throw new UnprovisionedAccountError("No account provisioned for this login");
-  if (hasGoogleIdentity && !user.roleAssignments.some((assignment) => assignment.role.slug === "student")) {
-    throw new AccountLinkingError("Google pilot is restricted to students");
-  }
 
   const roles = user.roleAssignments.map((a) => a.role.slug as Role);
   const programmeRoles = user.roleAssignments.map((a) => ({
