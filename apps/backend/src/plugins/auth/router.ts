@@ -20,6 +20,7 @@ import {
   resendStudentInvitation,
 } from "./resend-invitation.ts";
 import { getStudentPortalAccessStatuses } from "./student-portal-access-status.ts";
+import { createGoogleApprovalRouter } from "./google-approval-router.ts";
 
 const ProgrammeRoleListQuery = z.object({
   programmeId: z.string().trim().min(1),
@@ -46,6 +47,7 @@ function canManageProgrammeRoles(user: AuthUser, programmeId: string): boolean {
 export function createAuthRouter(): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use("/google", createGoogleApprovalRouter());
 
   router.get("/me", async (req, res) => {
     res.json(await authService.me(req.user!.id, req.user!.roles));
@@ -231,7 +233,7 @@ export function createAuthRouter(): Router {
       role: req.query.role,
     });
     if (!parsed.success) {
-      res.status(400).json({ error: "Invalid programme role removal", details: parsed.error.flatten() });
+      res.status(400).json({ error: "Invalid programme role removal" });
       return;
     }
     if (!canManageProgrammeRoles(req.user!, parsed.data.programmeId)) {
