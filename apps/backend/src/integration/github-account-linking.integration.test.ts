@@ -24,7 +24,9 @@ integrationDescribe("one student's GitHub account-matching security", () => {
   const originalJwksUrl = process.env.SUPABASE_JWKS_URL;
   const originalSupabaseUrl = process.env.SUPABASE_URL;
   const originalServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const claimedUid = "synthetic-supabase-student-uid";
+  const claimedUid = "00000000-0000-4000-8000-000000000101";
+  const unlinkedUid = "00000000-0000-4000-8000-000000000102";
+  const otherUid = "00000000-0000-4000-8000-000000000103";
 
   const tokenFor = (sub: string, email: string, provider: string) =>
     new SignJWT({ email, app_metadata: { provider } })
@@ -35,7 +37,6 @@ integrationDescribe("one student's GitHub account-matching security", () => {
       .sign(privateKey);
 
   const asMe = async (token: string) => {
-    // Distinguish a malformed mock JWT from a PMS authorization rejection.
     expect((await verifySupabaseToken(token)).email).toBe("student@dse.dev");
     const response = await fetch(`${baseUrl}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -106,7 +107,7 @@ integrationDescribe("one student's GitHub account-matching security", () => {
   });
 
   test("a GitHub user cannot claim an unbound student profile by matching its email", async () => {
-    const token = await tokenFor("unlinked-github-uid", "student@dse.dev", "github");
+    const token = await tokenFor(unlinkedUid, "student@dse.dev", "github");
     const response = await asMe(token);
     expect(response.status).toBe(403);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: studentId }, select: { authId: true } }))
@@ -115,7 +116,7 @@ integrationDescribe("one student's GitHub account-matching security", () => {
 
   test("a different Supabase UID cannot impersonate a bound student even with matching email", async () => {
     await prisma.user.update({ where: { id: studentId }, data: { authId: claimedUid } });
-    const token = await tokenFor("other-github-uid", "student@dse.dev", "github");
+    const token = await tokenFor(otherUid, "student@dse.dev", "github");
     const response = await asMe(token);
     expect(response.status).toBe(403);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: studentId }, select: { authId: true } }))
