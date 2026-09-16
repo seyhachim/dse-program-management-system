@@ -45,6 +45,14 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     return { status: response.status, body: await response.json() as { id?: string; roles?: string[] } };
   };
 
+  const callHome = async (token: string, studentId?: string) => {
+    const query = studentId ? `?studentId=${encodeURIComponent(studentId)}` : "";
+    const response = await fetch(`${baseUrl}/api/student-portal/home${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return { status: response.status, body: await response.json() as { student?: { id?: string } } };
+  };
+
   beforeAll(async () => {
     const student = await prisma.user.findUniqueOrThrow({
       where: { email: "student@dse.dev" }, select: { id: true, authId: true },
@@ -127,6 +135,20 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     expect(response.body.id).toBe(userId);
     expect(response.body.roles).toContain("student");
     expect((await callMe(await tokenFor(otherUid, "google", ["google"]))).status).not.toBe(200);
+  });
+
+  test("approved student portal ignores a claimed student ID and denies a different auth UID", async () => {
+    process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES = JSON.stringify({ [uid]: googleIdentityId });
+    const ownStudent = await prisma.student.findUniqueOrThrow({ where: { userId }, select: { id: true } });
+    const otherStudent = await prisma.student.findFirst({ where: { id: { not: ownStudent.id } }, select: { id: true } });
+    const targetId = otherStudent?.id ?? "00000000-0000-4000-8000-000000000299";
+    const ownHome = await callHome(await tokenFor(uid, "google", ["email", "google"]), targetId);
+    expect(ownHome.status).toBe(200);
+    expect(ownHome.body.student?.id).toBe(ownStudent.id);
+    expect(ownHome.body.student?.id).not.toBe(targetId);
+    const otherHome = await callHome(await tokenFor(otherUid, "google", ["google"]), ownStudent.id);
+    expect(otherHome.status).toBe(403);
+    expect(otherHome.body.student).toBeUndefined();
   });
 
   test("approved linked identity preserves existing password-token access to the same PMS user", async () => {
