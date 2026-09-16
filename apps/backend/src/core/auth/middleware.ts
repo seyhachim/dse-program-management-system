@@ -31,7 +31,7 @@ function getVerificationClient(): SupabaseClient {
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
-    throw new Error("Supabase account verification is not configured");
+    throw new AccountLinkingError("Supabase account verification is not configured");
   }
   verificationClient = createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
