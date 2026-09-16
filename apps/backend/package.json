@@ -11,7 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
-    "db:security:verify": "bun scripts/verify-db-security.ts",
+    "db:security:verify": "bun scripts/verify-db-security.ts && bun scripts/verify-google-approval-security.ts",
     "seed": "bun prisma/seed.ts && bun prisma/sync-qa-permissions.ts",
     "course-spec:import": "bun scripts/course-spec-import.ts",
     "lecturer-profile:import": "bun scripts/lecturer-profile-import.ts",
