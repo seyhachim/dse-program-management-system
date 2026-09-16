@@ -99,25 +99,27 @@ describe("student roster importer", () => {
     expect(store.writes).toBe(0);
   });
 
-  test("email-keyed provisional student is accepted as Pending", async () => {
+  test("email-keyed provisional student is accepted as Active", async () => {
     const store = new MemoryStore();
     const document = manifest([
       {
         sourceRef: "G5/M1/row-2",
         cohortCode: "DSE-G5",
         studentId: null,
-        name: "Pending Student",
-        email: "pending@rupp.edu.kh",
-        status: "Pending",
+        name: "Active Student",
+        email: "active@rupp.edu.kh",
+        status: "Active",
       },
     ]);
     const plan = await planStudentRosterImport(store, document);
     expect(plan.students[0]?.action).toBe("would_create");
     expect(plan.students[0]?.blockers).toEqual([]);
+    expect(plan.document.students[0]?.studentId).toBeNull();
+    expect(plan.document.students[0]?.status).toBe("Active");
     expect(store.writes).toBe(0);
   });
 
-  test("provisional creation requires institutional email and Pending status", () => {
+  test("provisional creation requires institutional email but not Pending status", () => {
     expect(() =>
       manifest([
         {
@@ -126,33 +128,34 @@ describe("student roster importer", () => {
           studentId: null,
           name: "Missing Email",
           email: null,
-          status: "Pending",
+          status: "Active",
         },
       ]),
     ).toThrow();
+
     expect(() =>
       manifest([
         {
           sourceRef: "G5/M1/row-3",
           cohortCode: "DSE-G5",
           studentId: null,
-          name: "Not Pending",
+          name: "Active Provisional",
           email: "active@rupp.edu.kh",
           status: "Active",
         },
       ]),
-    ).toThrow();
+    ).not.toThrow();
   });
 
-  test("official ID attaches to the same provisional Student resolved by email", async () => {
+  test("official ID attaches to the same active provisional Student resolved by email", async () => {
     const store = new MemoryStore();
     configureExistingCohort(store);
     store.students.set("provisional", {
       id: "student-1",
       studentId: null,
-      name: "Pending Student",
-      email: "pending@rupp.edu.kh",
-      status: "Pending",
+      name: "Active Student",
+      email: "active@rupp.edu.kh",
+      status: "Active",
       userId: null,
       profile: null,
     });
@@ -164,9 +167,9 @@ describe("student roster importer", () => {
           sourceRef: "G5/M1/row-2",
           cohortCode: "DSE-G5",
           studentId: "RUPP-001",
-          name: "Pending Student",
-          email: "pending@rupp.edu.kh",
-          status: "Pending",
+          name: "Active Student",
+          email: "active@rupp.edu.kh",
+          status: "Active",
         },
       ]),
     );

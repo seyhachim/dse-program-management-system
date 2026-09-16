@@ -182,7 +182,47 @@ describe("student class enrollment importer", () => {
     expect(inactivePlan.students[0]?.blockers.join(" ")).toContain("no active membership");
   });
 
-  test("enrolls a Pending provisional student resolved by institutional email", async () => {
+  test("enrolls an Active provisional student resolved by institutional email", async () => {
+    const store = new MemoryStore();
+    const recordId = "student-active-provisional";
+    store.students.set("active-key", {
+      id: recordId,
+      studentId: null,
+      email: "active@rupp.edu.kh",
+      name: "Active Provisional Student",
+      status: "Active",
+    });
+    store.memberships.set(recordId, [{
+      id: "membership-active-provisional",
+      cohortId: "cohort-2024",
+      joinedAt: new Date("2024-11-01T00:00:00.000Z"),
+      exitedAt: null,
+      cohort: { id: "cohort-2024", code: "DSE-2024", programmeId: "dse" },
+    }]);
+    const parsed = parseStudentClassEnrollmentImportDocument({
+      schemaVersion: 1,
+      source: "active-email.json",
+      programmeId: "dse",
+      term: "2026-2027-S1",
+      classes: [{
+        cohortCode: "DSE-2024",
+        programmeYear: 3,
+        classCode: "M1",
+        studentEmails: [" ACTIVE@RUPP.EDU.KH "],
+      }],
+    });
+    expect(parsed.classes[0]?.studentEmails).toEqual(["active@rupp.edu.kh"]);
+    const plan = await planStudentClassEnrollmentImport(store, parsed);
+    expect(plan.students[0]?.studentId).toBeNull();
+    expect(plan.students[0]?.studentEmail).toBe("active@rupp.edu.kh");
+    expect(plan.students[0]?.studentRecordId).toBe(recordId);
+    expect(plan.students[0]?.action).toBe("would_enroll");
+    await applyStudentClassEnrollmentImportPlan(store, plan);
+    expect(store.writes).toHaveLength(2);
+    expect(store.writes.every((write) => write.studentRecordId === recordId)).toBe(true);
+  });
+
+  test("blocks Pending provisional students until they are operationally Active", async () => {
     const store = new MemoryStore();
     const recordId = "student-pending";
     store.students.set("pending-key", {
@@ -208,17 +248,12 @@ describe("student class enrollment importer", () => {
         cohortCode: "DSE-2024",
         programmeYear: 3,
         classCode: "M1",
-        studentEmails: [" PENDING@RUPP.EDU.KH "],
+        studentEmails: ["pending@rupp.edu.kh"],
       }],
     });
-    expect(parsed.classes[0]?.studentEmails).toEqual(["pending@rupp.edu.kh"]);
     const plan = await planStudentClassEnrollmentImport(store, parsed);
-    expect(plan.students[0]?.studentId).toBeNull();
-    expect(plan.students[0]?.studentEmail).toBe("pending@rupp.edu.kh");
-    expect(plan.students[0]?.action).toBe("would_enroll");
-    await applyStudentClassEnrollmentImportPlan(store, plan);
-    expect(store.writes).toHaveLength(2);
-    expect(store.writes.every((write) => write.studentRecordId === recordId)).toBe(true);
+    expect(plan.students[0]?.action).toBe("blocked");
+    expect(plan.students[0]?.blockers.join(" ")).toContain("not Active");
   });
 
   test("rejects duplicate emails and blocks missing or inactive email identities", async () => {
@@ -253,7 +288,7 @@ describe("student class enrollment importer", () => {
       classes: [{ cohortCode: "DSE-2024", programmeYear: 3, classCode: "M1", studentEmails: ["inactive@rupp.edu.kh"] }],
     });
     const inactivePlan = await planStudentClassEnrollmentImport(inactiveStore, inactive);
-    expect(inactivePlan.students[0]?.blockers.join(" ")).toContain("Inactive");
+    expect(inactivePlan.students[0]?.blockers.join(" ")).toContain("not Active");
   });
 
   test("keeps exact enrollments idempotent and blocks a conflicting parallel class", async () => {
