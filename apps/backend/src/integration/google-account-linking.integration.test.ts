@@ -129,6 +129,15 @@ integrationDescribe("Google verified-email auto-link cannot authorize a PMS stud
     expect((await callMe(await tokenFor(otherUid, "google", ["google"]))).status).not.toBe(200);
   });
 
+  test("approved linked identity preserves existing password-token access to the same PMS user", async () => {
+    process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES = JSON.stringify({ [uid]: googleIdentityId });
+    const passwordResponse = await callMe(await tokenFor(uid, "email", ["email"]));
+    expect(passwordResponse.status).toBe(200);
+    expect(passwordResponse.body.id).toBe(userId);
+    expect(passwordResponse.body.roles).toContain("student");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { authId: true } })).authId).toBe(uid);
+  });
+
   test("revoked approval blocks even a previously signed token; password works after Google identity removal", async () => {
     const signed = await tokenFor(uid, "google", ["email", "google"]);
     delete process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES;
