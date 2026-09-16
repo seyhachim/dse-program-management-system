@@ -1,0 +1,30 @@
+/** Google login is private pilot-only until identity-linking UAT is approved. */
+export const GOOGLE_PILOT_ENABLED = process.env.NEXT_PUBLIC_GOOGLE_PILOT_ENABLED === "true";
+
+/** Keep the return path out of the URL sent to Google and Supabase. */
+export const GOOGLE_OAUTH_RETURN_KEY = "dse-pms:google-oauth-return";
+export const GOOGLE_LINK_UID_KEY = "dse-pms:google-link-uid";
+
+/** Reject external, protocol-relative and backslash-based return paths. */
+export function safeGoogleReturnPath(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return "/";
+  try {
+    const origin = "https://pms.invalid";
+    const target = new URL(next, origin);
+    return target.origin === origin ? `${target.pathname}${target.search}${target.hash}` : "/";
+  } catch {
+    return "/";
+  }
+}
+
+export function googleLoginRedirect(origin: string): string {
+  const callback = new URL("/google-sign-in", origin);
+  callback.searchParams.set("callback", "1");
+  return callback.toString();
+}
+
+export function googleLinkRedirect(origin: string): string {
+  const callback = new URL("/connect-google", origin);
+  callback.searchParams.set("callback", "1");
+  return callback.toString();
+}
