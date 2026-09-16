@@ -4,6 +4,7 @@ import { decodeJwt } from "jose";
 import { prisma } from "../db/prisma.ts";
 import { AccountLinkingError, assertLegacyEmailClaim } from "./account-linking.ts";
 import { assertApprovedGoogleIdentity, tokenHasGoogleIdentity } from "./google-identity-approval.ts";
+import { getApprovedGoogleIdentity } from "./google-approval-store.ts";
 import {
   getAuthMode,
   verifySupabaseToken,
@@ -82,6 +83,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(403).json({ error: "This sign-in is not linked to an authorized PMS account" });
       return;
     }
+    // The audit store and current Supabase identities are required to authorize
+    // Google; outages fail closed instead of trusting JWT/provider/email alone.
     res.status(401).json({ error: "Invalid or expired token" });
   }
 }
@@ -112,12 +115,20 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   const currentGoogleIdentities = verified.user.identities?.filter((identity) => identity.provider === "google") ?? [];
   const hasGoogleIdentity = tokenHasGoogleIdentity(metadata) || currentGoogleIdentities.length > 0;
   if (hasGoogleIdentity) {
-    assertApprovedGoogleIdentity(authId, verified.user.identities, process.env.GOOGLE_OAUTH_APPROVED_IDENTITIES);
+    // Never approve by email or token metadata; an unbound historical PMS user
+    // cannot be claimed by a Google provider under any circumstances.
+    if (!user) throw new AccountLinkingError("Google identity cannot claim a PMS account by email");
+    const approvedIdentityId = await getApprovedGoogleIdentity(authId, user.id).catch(() => {
+      throw new AccountLinkingError("Google approval lookup unavailable");
+    });
+    assertApprovedGoogleIdentity(
+      authId,
+      verified.user.identities,
+      approvedIdentityId ? JSON.stringify({ [authId]: approvedIdentityId }) : undefined,
+    );
   }
 
   if (!user && byEmail) {
-    // Email can never claim a legacy account once a Google identity is linked,
-    // even when app_metadata.provider still advertises the email provider.
     if (hasGoogleIdentity) throw new AccountLinkingError("Google identity cannot claim a PMS account by email");
     assertLegacyEmailClaim({ authId, email, provider }, byEmail.authId, verified.user);
     const claimed = await prisma.user.updateMany({
