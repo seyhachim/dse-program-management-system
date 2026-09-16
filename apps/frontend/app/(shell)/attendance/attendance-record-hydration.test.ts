@@ -14,7 +14,7 @@ describe("Attendance local record hydration", () => {
     );
     expect(attendanceClientSource).toContain("if (dirty) return current;");
     expect(attendanceClientSource).toContain(
-      "}, [attendanceContext, date, offeringId, session]);",
+      "}, [attendanceContext, date, offeringId, session, draftKey]);",
     );
     expect(attendanceClientSource).not.toContain(
       "}, [attendanceContext, date, offeringId, records, session]);",
@@ -27,5 +27,19 @@ describe("Attendance local record hydration", () => {
     );
     expect(attendanceClientSource).toContain("records={records}");
     expect(attendanceClientSource).toContain("onUpdateRecord={updateRecord}");
+  });
+
+  test("uses an authenticated scoped key and restores only against an unchanged server baseline", () => {
+    expect(attendanceClientSource).toContain("attendanceDraftKey(me.id, offeringId, date)");
+    expect(attendanceClientSource).toContain("readAttendanceDraft(window.localStorage, draftKey, session.updatedAt ?? null, serverRecords)");
+    expect(attendanceClientSource).toContain("writeAttendanceDraft(");
+    expect(attendanceClientSource).toContain("baselineVersionRef.current !== (session.updatedAt ?? null)");
+    expect(attendanceClientSource).toContain("clearAttendanceDraft(window.localStorage, draftKey)");
+  });
+
+  test("failed saves remain editable and errors are passed to Roll Call", () => {
+    expect(attendanceClientSource).toContain("saveError={mutationError}");
+    expect(attendanceClientSource).toContain("if (!saved) return;");
+    expect(attendanceClientSource).toContain("setMutationError(null);");
   });
 });
