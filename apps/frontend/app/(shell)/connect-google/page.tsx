@@ -8,10 +8,10 @@ import { assertSameGoogleLinkUid, GOOGLE_LINK_UID_KEY, GOOGLE_PILOT_ENABLED, goo
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
 /**
- * Pilot-only: Google linking starts from the existing authorized student account.
- * A fresh password check reduces unattended-session linking risk. Backend-only
- * independent operator approval remains mandatory: browser checks alone cannot
- * prevent Supabase's upstream email-based automatic linking.
+ * An authorized student explicitly consents and verifies their existing PMS
+ * password with the backend before OAuth starts. An operator must still approve
+ * the exact linked Google identity: a verified provider email alone is never
+ * sufficient to grant PMS access.
  */
 export default function ConnectGooglePage() {
   const { me, loading } = useMe();
@@ -19,6 +19,7 @@ export default function ConnectGooglePage() {
   const [linked, setLinked] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const eligible = GOOGLE_PILOT_ENABLED && AUTH_MODE === "supabase" && me?.roles.includes("student");
 
@@ -30,14 +31,6 @@ export default function ConnectGooglePage() {
       const supabase = getSupabase();
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) throw new Error("Your PMS session could not be verified.");
-      const callback = new URLSearchParams(window.location.search).get("callback") === "1";
-      if (callback) {
-        const initialUid = window.sessionStorage.getItem(GOOGLE_LINK_UID_KEY);
-        window.sessionStorage.removeItem(GOOGLE_LINK_UID_KEY);
-        if (!initialUid || initialUid !== userData.user.id) {
-          throw new Error("Your sign-in account changed while connecting Google. Please sign in again.");
-        }
-      }
       const authorized = await authApi.me();
       if (!authorized.roles.includes("student")) throw new Error("This account is not an authorized student.");
       const { data, error: identitiesError } = await supabase.auth.getUserIdentities();
@@ -51,10 +44,9 @@ export default function ConnectGooglePage() {
   }, [eligible, loading]);
 
   const connect = async () => {
-    if (!eligible || checking || linked || connecting || error || !password) return;
+    if (!eligible || checking || linked || connecting || error || !password || !consent) return;
     setConnecting(true);
     setError(null);
-    // Do not retain a password in component state while navigating to OAuth.
     const suppliedPassword = password;
     setPassword("");
     try {
@@ -62,8 +54,9 @@ export default function ConnectGooglePage() {
       const { data, error: userError } = await supabase.auth.getUser();
       if (userError || !data.user?.email || !data.user.email_confirmed_at) throw new Error("Missing verified PMS session");
       const originalUid = data.user.id;
-      // Supabase verifies the password against the existing, confirmed email;
-      // a different returned UID cannot be allowed to complete the link.
+      // Server independently verifies the existing password and records one
+      // expiring consent intent; the browser cannot mint its own approval.
+      await authApi.startGoogleLink(suppliedPassword);
       const { data: fresh, error: reauthError } = await supabase.auth.signInWithPassword({
         email: data.user.email,
         password: suppliedPassword,
@@ -84,7 +77,7 @@ export default function ConnectGooglePage() {
       if (linkError) throw linkError;
     } catch {
       try { window.sessionStorage.removeItem(GOOGLE_LINK_UID_KEY); } catch { /* unavailable */ }
-      setError("Google could not be connected. Verify your existing PMS password and contact DSE support if this persists.");
+      setError("Google could not be connected. Verify your PMS password and contact DSE support if this persists.");
     } finally {
       setConnecting(false);
     }
@@ -108,8 +101,12 @@ export default function ConnectGooglePage() {
               <input id="google-link-password" type="password" autoComplete="current-password" required value={password}
                 onChange={(event) => setPassword(event.target.value)} disabled={connecting}
                 className="w-full rounded-md border border-border bg-background p-2 text-foreground" />
-              <Button type="submit" disabled={connecting || Boolean(error) || !password}>{connecting ? "Verifying…" : "Verify password and connect Google"}</Button>
-              <p className="text-xs text-muted-foreground">If you do not have a PMS password, contact DSE support for independent account verification. Never enter your Google password here.</p>
+              <label className="flex gap-2 text-sm text-foreground">
+                <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} disabled={connecting} required />
+                I consent to linking this Google identity to my existing PMS account. DSE will independently verify the identity before Google sign-in is permitted.
+              </label>
+              <Button type="submit" disabled={connecting || Boolean(error) || !password || !consent}>{connecting ? "Verifying…" : "Verify password and connect Google"}</Button>
+              <p className="text-xs text-muted-foreground">Google sign-in remains unavailable until DSE independently approves your identity. Never enter your Google password here.</p>
             </form>
           ) : null}
         </div>
