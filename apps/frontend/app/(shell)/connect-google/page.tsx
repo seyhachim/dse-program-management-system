@@ -8,14 +8,17 @@ import { GOOGLE_LINK_UID_KEY, GOOGLE_PILOT_ENABLED, googleLinkRedirect } from "@
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
 /**
- * Pilot-only: an already provisioned student explicitly links Google to their
- * existing Supabase UID. The roster Gmail is never used to grant access.
+ * Pilot-only: Google linking starts from the existing authorized student account.
+ * A fresh password check reduces unattended-session linking risk. Backend-only
+ * independent operator approval remains mandatory: browser checks alone cannot
+ * prevent Supabase's upstream email-based automatic linking.
  */
 export default function ConnectGooglePage() {
   const { me, loading } = useMe();
   const [checking, setChecking] = useState(true);
   const [linked, setLinked] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const eligible = GOOGLE_PILOT_ENABLED && AUTH_MODE === "supabase" && me?.roles.includes("student");
 
@@ -35,7 +38,6 @@ export default function ConnectGooglePage() {
           throw new Error("Your sign-in account changed while connecting Google. Please sign in again.");
         }
       }
-      // The backend remains authoritative for the existing PMS user and role.
       const authorized = await authApi.me();
       if (!authorized.roles.includes("student")) throw new Error("This account is not an authorized student.");
       const { data, error: identitiesError } = await supabase.auth.getUserIdentities();
@@ -49,17 +51,30 @@ export default function ConnectGooglePage() {
   }, [eligible, loading]);
 
   const connect = async () => {
-    if (!eligible || checking || linked || connecting || error) return;
+    if (!eligible || checking || linked || connecting || error || !password) return;
     setConnecting(true);
     setError(null);
+    // Do not retain a password in component state while navigating to OAuth.
+    const suppliedPassword = password;
+    setPassword("");
     try {
       const supabase = getSupabase();
       const { data, error: userError } = await supabase.auth.getUser();
-      if (userError || !data.user) throw new Error("Missing PMS session");
-      // Require a fresh authorization check before starting the external flow.
+      if (userError || !data.user?.email || !data.user.email_confirmed_at) throw new Error("Missing verified PMS session");
+      const originalUid = data.user.id;
+      // Supabase verifies the password against the existing, confirmed email;
+      // a different returned UID cannot be allowed to complete the link.
+      const { data: fresh, error: reauthError } = await supabase.auth.signInWithPassword({
+        email: data.user.email,
+        password: suppliedPassword,
+      });
+      if (reauthError || !fresh.user || fresh.user.id !== originalUid) {
+        if (fresh.user && fresh.user.id !== originalUid) await supabase.auth.signOut();
+        throw new Error("Fresh password verification failed");
+      }
       const current = await authApi.me();
       if (!current.roles.includes("student")) throw new Error("Not authorized");
-      window.sessionStorage.setItem(GOOGLE_LINK_UID_KEY, data.user.id);
+      window.sessionStorage.setItem(GOOGLE_LINK_UID_KEY, originalUid);
       const { error: linkError } = await supabase.auth.linkIdentity({
         provider: "google",
         options: { redirectTo: googleLinkRedirect(window.location.origin) },
@@ -67,7 +82,7 @@ export default function ConnectGooglePage() {
       if (linkError) throw linkError;
     } catch {
       try { window.sessionStorage.removeItem(GOOGLE_LINK_UID_KEY); } catch { /* unavailable */ }
-      setError("Google could not be connected. Sign in with your existing PMS account and try again.");
+      setError("Google could not be connected. Verify your existing PMS password and contact DSE support if this persists.");
     } finally {
       setConnecting(false);
     }
@@ -85,7 +100,16 @@ export default function ConnectGooglePage() {
         <div className="space-y-4 rounded-xl border border-border bg-card p-5">
           <p role="status" className="text-sm text-foreground">{linked ? "Google is connected to your PMS sign-in." : "Google is not connected yet."}</p>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          {!linked ? <Button type="button" disabled={connecting || Boolean(error)} onClick={connect}>{connecting ? "Connecting…" : "Connect Google securely"}</Button> : null}
+          {!linked ? (
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void connect(); }}>
+              <label htmlFor="google-link-password" className="block text-sm text-foreground">Confirm your current PMS password before connecting Google</label>
+              <input id="google-link-password" type="password" autoComplete="current-password" required value={password}
+                onChange={(event) => setPassword(event.target.value)} disabled={connecting}
+                className="w-full rounded-md border border-border bg-background p-2 text-foreground" />
+              <Button type="submit" disabled={connecting || Boolean(error) || !password}>{connecting ? "Verifying…" : "Verify password and connect Google"}</Button>
+              <p className="text-xs text-muted-foreground">If you do not have a PMS password, contact DSE support for independent account verification. Never enter your Google password here.</p>
+            </form>
+          ) : null}
         </div>
       )}
       <Link className="text-sm text-primary underline-offset-4 hover:underline" href="/">Return to PMS</Link>
