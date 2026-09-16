@@ -183,7 +183,8 @@ export function AttendanceClient() {
         (record.studentNumber ?? "").toLowerCase().includes(query),
     );
   }, [records, search]);
-  const hasUnsavedChanges = !attendanceRecordsEqual(records, baselineRecordsRef.current);
+  // Server query data is the render-safe authoritative baseline; refs are only read inside effects and handlers.
+  const hasUnsavedChanges = !attendanceRecordsEqual(records, session?.records ?? []);
   const recheckIndex = recheckStudentId ? records.findIndex((record) => record.studentId === recheckStudentId) : -1;
   const recheckRecord = recheckIndex >= 0 ? records[recheckIndex] ?? null : null;
 
