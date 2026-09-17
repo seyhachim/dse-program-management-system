@@ -511,6 +511,6 @@ describeDb("attendance save optimistic concurrency", () => {
     }
     const stored = await storedRecords(offering.id, date);
     expect(stored).toHaveLength(1);
-    expect(["first", "second"]).toContain(stored[0]?.note);
+    expect(["first", "second"]).toContain(stored[0]?.note ?? "");
   });
 });
