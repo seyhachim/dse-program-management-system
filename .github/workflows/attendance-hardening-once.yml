@@ -1,0 +1,36 @@
+name: One-shot attendance concurrency hardening
+
+on:
+  push:
+    branches:
+      - fix/1121-attendance-draft-recovery
+    paths:
+      - .github/workflows/attendance-hardening-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the isolated draft branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/1121-attendance-draft-recovery
+          persist-credentials: true
+      - name: Apply exact-anchor patch and remove temporary runner
+        run: |
+          set -euo pipefail
+          python3 scripts/attendance-hardening-once.py
+          git diff --check
+          git status --short
+      - name: Commit only the reviewed attendance source and tests
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(attendance): reject stale saves under session lock (#1121)"
+          git push origin HEAD:fix/1121-attendance-draft-recovery
