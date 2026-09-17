@@ -286,6 +286,13 @@ async function deliverPostSaveNotifications(
   await Promise.allSettled(work);
 }
 
+export class AttendanceSaveConflictError extends Error {
+  constructor() {
+    super("Attendance has changed since it was loaded. Reload and review the latest register before saving.");
+    this.name = "AttendanceSaveConflictError";
+  }
+}
+
 export const attendanceService = {
   async list(offeringId: string): Promise<AttendanceSessionSummary[]> {
     const sessions = await prisma.$queryRaw<SessionRow[]>`
@@ -337,6 +344,12 @@ export const attendanceService = {
         WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${dateValue(date)} LIMIT 1 FOR UPDATE
       `;
       const existingSession = existing[0] ?? null;
+      // Compare inside the same transaction, after locking the session row.
+      // A stale request cannot delete records, alter Check 1 or send alerts.
+      if (input.expectedUpdatedAt !== undefined &&
+          (existingSession?.updatedAt.toISOString() ?? null) !== input.expectedUpdatedAt) {
+        throw new AttendanceSaveConflictError();
+      }
       const historicalRows = existingSession ? await tx.$queryRaw<RecordRow[]>`
         SELECT "studentId", "studentNumber", "studentName", "status", "note"
         FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${existingSession.id}
@@ -364,7 +377,9 @@ export const attendanceService = {
           VALUES (${sessionId}, ${offeringId}, ${dateValue(date)}, CURRENT_TIMESTAMP)
         `;
       } else {
-        await tx.$executeRaw`UPDATE "pms_attendance"."AttendanceSession" SET "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${sessionId}`;
+        await tx.$executeRaw`UPDATE "pms_attendance"."AttendanceSession"
+          SET "updatedAt" = GREATEST(CURRENT_TIMESTAMP, "updatedAt" + INTERVAL '1 millisecond')
+          WHERE "id" = ${sessionId}`;
       }
 
       // Only sessions explicitly created in the checkpoint era receive Check 1.

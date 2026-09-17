@@ -239,12 +239,21 @@ export function AttendanceClient() {
       setMutationError("Mark at least one student before saving attendance.");
       return false;
     }
+    // A server refresh may have arrived while local marks remained dirty. Never
+    // submit the old register against a newer authoritative session.
+    const currentSession = queryClient.getQueryData<AttendanceSessionView>(sessionKey);
+    if (restoredContextRef.current !== attendanceContext ||
+        !currentSession || currentSession.updatedAt !== baselineVersionRef.current) {
+      setMutationError("Attendance changed on the server or is still loading. Your unsaved marks remain on this device. Review the latest register before saving.");
+      return false;
+    }
     setSaving(true);
     setMutationError(null);
     setSavedMessage(null);
     try {
       const saved = await offeringsApi.saveAttendance(offeringId, date, {
         records: toSaveAttendanceRecords(records),
+        expectedUpdatedAt: baselineVersionRef.current,
       });
       queryClient.setQueryData(sessionKey, saved);
       baselineRecordsRef.current = cloneAttendanceRecords(saved.records);
@@ -261,7 +270,9 @@ export function AttendanceClient() {
       );
       return true;
     } catch (err) {
-      setMutationError(err instanceof ApiError ? err.message : "Failed to save attendance");
+      setMutationError(err instanceof ApiError && err.status === 409
+        ? "Attendance was saved by someone else while you were editing. Your unsaved marks are preserved. Review the latest register before attempting another save."
+        : err instanceof ApiError ? err.message : "Failed to save attendance");
       return false;
     } finally {
       setSaving(false);

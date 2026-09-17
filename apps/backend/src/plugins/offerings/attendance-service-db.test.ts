@@ -8,7 +8,7 @@ import {
   AttendanceRecheckConflictError,
   attendanceRecheckService,
 } from "./attendance-recheck-service.ts";
-import { attendanceService } from "./attendance-service.ts";
+import { AttendanceSaveConflictError, attendanceService } from "./attendance-service.ts";
 import { ReferenceError as OfferingReferenceError } from "./service.ts";
 
 const dbTestsEnabled = process.env.ATTENDANCE_DB_TESTS === "1";
@@ -450,5 +450,67 @@ describeDb("historical attendance correction", () => {
       }),
     ).rejects.toBeInstanceOf(OfferingReferenceError);
     expect(await storedRecords(offering.id, "2026-08-20")).toEqual(before);
+  });
+});
+
+
+describeDb("attendance save optimistic concurrency", () => {
+  test("stale versions reject without replacing records, then an updated version succeeds", async () => {
+    const offering = await createOffering("save-version");
+    const student = await createStudent("save-version");
+    await enroll(offering.id, student.id);
+    const date = "2026-09-17";
+    const initial = await attendanceService.get(offering.id, date);
+    expect(initial.updatedAt).toBeNull();
+
+    const first = await attendanceService.save(offering.id, date, {
+      expectedUpdatedAt: initial.updatedAt,
+      records: [{ studentId: student.id, status: "Present", note: "first writer" }],
+    });
+    expect(first.updatedAt).not.toBeNull();
+    const before = await storedRecords(offering.id, date);
+
+    await expect(attendanceService.save(offering.id, date, {
+      expectedUpdatedAt: initial.updatedAt,
+      records: [{ studentId: student.id, status: "Absent", note: "stale writer" }],
+    })).rejects.toBeInstanceOf(AttendanceSaveConflictError);
+    expect(await storedRecords(offering.id, date)).toEqual(before);
+
+    const next = await attendanceService.save(offering.id, date, {
+      expectedUpdatedAt: first.updatedAt,
+      records: [{ studentId: student.id, status: "Late", note: "current writer" }],
+    });
+    expect(next.updatedAt).not.toBe(first.updatedAt);
+    expect(next.records.find((item) => item.studentId === student.id)?.status).toBe("Late");
+  });
+
+  test("two concurrent saves of one version permit exactly one writer", async () => {
+    const offering = await createOffering("concurrent-save");
+    const student = await createStudent("concurrent-save");
+    await enroll(offering.id, student.id);
+    const date = "2026-09-18";
+    const baseline = await attendanceService.save(offering.id, date, {
+      expectedUpdatedAt: null,
+      records: [{ studentId: student.id, status: "Present", note: "original" }],
+    });
+    const results = await Promise.allSettled([
+      attendanceService.save(offering.id, date, {
+        expectedUpdatedAt: baseline.updatedAt,
+        records: [{ studentId: student.id, status: "Absent", note: "first" }],
+      }),
+      attendanceService.save(offering.id, date, {
+        expectedUpdatedAt: baseline.updatedAt,
+        records: [{ studentId: student.id, status: "Late", note: "second" }],
+      }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected?.status).toBe("rejected");
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toBeInstanceOf(AttendanceSaveConflictError);
+    }
+    const stored = await storedRecords(offering.id, date);
+    expect(stored).toHaveLength(1);
+    expect(["first", "second"]).toContain(stored[0]?.note);
   });
 });

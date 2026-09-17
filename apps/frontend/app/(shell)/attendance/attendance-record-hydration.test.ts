@@ -43,3 +43,13 @@ describe("Attendance local record hydration", () => {
     expect(attendanceClientSource).toContain("setMutationError(null);");
   });
 });
+
+
+describe("Attendance version-safe save", () => {
+  test("sends the hydrated server version, checks refreshed cache and preserves local marks on conflict", () => {
+    expect(attendanceClientSource).toContain("currentSession.updatedAt !== baselineVersionRef.current");
+    expect(attendanceClientSource).toContain("expectedUpdatedAt: baselineVersionRef.current");
+    expect(attendanceClientSource).toContain("err.status === 409");
+    expect(attendanceClientSource).toContain("if (!saved) return;");
+  });
+});

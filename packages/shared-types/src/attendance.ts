@@ -42,6 +42,8 @@ export const SaveAttendanceRecordInput = z
   .superRefine(validateAttendanceMark);
 
 export const SaveAttendanceInput = z.object({
+  /** Optimistic concurrency precondition; null means no saved session exists yet. */
+  expectedUpdatedAt: z.string().datetime({ offset: true }).nullable().optional(),
   records: z
     .array(SaveAttendanceRecordInput)
     .min(1, "Mark at least one student before saving attendance")
