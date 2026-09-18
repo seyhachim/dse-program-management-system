@@ -14,7 +14,7 @@ import {
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
-import { attendanceService } from "./attendance-service.ts";
+import { AttendanceSaveConflictError, attendanceService } from "./attendance-service.ts";
 import {
   ClassResponsibilityConflictError,
   ClassResponsibilityEligibilityError,
@@ -143,9 +143,19 @@ export function createOfferingRouter(): Router {
       });
       return;
     }
+    // Existing browsers without a server version must fail closed instead of
+    // silently overwriting attendance saved by a different lecturer.
+    if (parsedBody.data.expectedUpdatedAt === undefined) {
+      res.status(428).json({ error: "Reload attendance before saving; the expected server version is missing" });
+      return;
+    }
     try {
       res.json(await attendanceService.save(req.params.id!, parsedDate.data, parsedBody.data, req.user!.id));
     } catch (err) {
+      if (err instanceof AttendanceSaveConflictError) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
       handleError(err, res, "Could not save attendance");
     }
   });
