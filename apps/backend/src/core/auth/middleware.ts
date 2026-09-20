@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { prisma } from "../db/prisma.ts";
-import { AccountLinkingError, assertEmailOnlySupabaseIdentity, assertLegacyEmailClaim } from "./account-linking.ts";
+import { AccountLinkingError, assertEmailOnlySupabaseIdentity, assertLegacyEmailClaim, type ConfirmedAuthUser } from "./account-linking.ts";
 import {
   getAuthMode,
   verifySupabaseToken,
@@ -84,7 +84,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
     if (err instanceof AccountLinkingError) {
-      res.status(403).json({ error: "This sign-in is not linked to an authorized PMS account" });
+      // Deliberately do not reveal whether a PMS user exists or why verification failed.
+      res.status(403).json({ error: "No account provisioned for this sign-in identity" });
       return;
     }
     res.status(401).json({ error: "Invalid or expired token" });
@@ -98,7 +99,7 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   // A currently auto-linked provider can inherit the SAME UID, even when an
   // old JWT still advertises email/password. Never authorize solely on UID or
   // token metadata: read the live Supabase Admin identity set every request.
-  let verifiedAuthUser;
+  let verifiedAuthUser: ConfirmedAuthUser | null = null;
   try {
     const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
     if (error) throw error;
