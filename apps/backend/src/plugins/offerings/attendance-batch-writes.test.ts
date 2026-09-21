@@ -37,12 +37,15 @@ describe("attendance set-based writes", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.sql).toContain("ON CONFLICT (\"sessionId\", \"studentId\", \"checkNumber\") DO NOTHING");
     expect(calls[0]!.sql).not.toContain("DROP TABLE");
-    expect(calls[0]!.values).toHaveLength(43 * 10);
+    // checkNumber is the SQL literal 1; the other nine values are parameterized.
+    expect(calls[0]!.values).toHaveLength(43 * 9);
     expect(calls[0]!.values).toContain("Student's note'); DROP TABLE fake; --");
     expect(calls[0]!.values).toContain(true);
     expect(calls[0]!.values).toContain(null);
     expect(calls[0]!.values).toContain("lecturer-1");
-    expect(new Set(calls[0]!.values.filter((value) => typeof value === "string" && /^[0-9a-f]{8}-/.test(value)))).toHaveProperty("size", 43);
+    expect(calls[0]!.values.filter((_, index) => index % 9 === 2)).toEqual(
+      rows.map((row) => row.studentId),
+    );
   });
 
   test("replacement deletes once and inserts only 38 finalized marks in one statement", async () => {

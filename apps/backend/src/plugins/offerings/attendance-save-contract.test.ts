@@ -16,10 +16,10 @@ describe("attendance optimistic save API contract", () => {
   test("checks the version under the attendance row lock before any replacement", () => {
     const lock = service.indexOf("LIMIT 1 FOR UPDATE");
     const guard = service.indexOf("input.expectedUpdatedAt !== undefined");
-    const deleteRecords = service.indexOf('DELETE FROM "pms_attendance"."AttendanceRecord"');
+    const replaceRecords = service.indexOf("replaceAttendanceRecordsBatch(tx, sessionId, writeRows)");
     expect(lock).toBeGreaterThan(-1);
     expect(guard).toBeGreaterThan(lock);
-    expect(deleteRecords).toBeGreaterThan(guard);
+    expect(replaceRecords).toBeGreaterThan(guard);
   });
 
   test("advances session versions for both saves and Check 2 updates", () => {
