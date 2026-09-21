@@ -95,14 +95,16 @@ export function workloadForTerm(
     ? summary.scheduleRows.filter((row) => row.term === term)
     : summary.scheduleRows;
   const rows = term ? summary.rows.filter((row) => row.term === term) : summary.rows;
-  const weeklyTotals = term ? summary.weeklyTotals.filter((week) => week.term === term) : summary.weeklyTotals;
+  const weeklyTotals = term
+    ? summary.weeklyTotals.filter((week) => week.term === term)
+    : summary.weeklyTotals;
   return {
     scheduleRows,
     scheduledWeeklyHours:
       Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
     rows,
     weeklyTotals,
-    peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours),
+    peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
     totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
     coLecturerAssumption: summary.coLecturerAssumption,
   };
