@@ -1,4 +1,4 @@
-import { Prisma, type AttendanceStatus as UnusedAttendanceStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { AttendanceStatus } from "@dse-pms/shared-types";
 
 /** A validated, roster-authorized mark with its canonical or saved historical identity. */
