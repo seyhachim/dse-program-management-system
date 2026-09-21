@@ -10,7 +10,9 @@ import type {
   SaveAttendanceInput,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
-import { api } from "./api";
+import { ApiError, api } from "./api";
+
+const ATTENDANCE_SAVE_TIMEOUT_MS = 65_000;
 
 export const offeringsApi = {
   list(): Promise<OfferingView[]> {
@@ -44,8 +46,28 @@ export const offeringsApi = {
   attendance(id: string, date: string): Promise<AttendanceSessionView> {
     return api.get<AttendanceSessionView>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}`);
   },
-  saveAttendance(id: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
-    return api.put<AttendanceSessionView>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}`, input);
+  async saveAttendance(id: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ATTENDANCE_SAVE_TIMEOUT_MS);
+    try {
+      return await api.put<AttendanceSessionView>(
+        `/api/offerings/${id}/attendance/${encodeURIComponent(date)}`,
+        input,
+        controller.signal,
+      );
+    } catch (error) {
+      if (controller.signal.aborted) {
+        // A network timeout is not proof of rollback: the server may have committed.
+        // Never retry automatically or clear the local Roll Call marks.
+        throw new ApiError(
+          504,
+          "Attendance save response timed out. Your marks remain on this device, but the server may have saved them. Check this date in another tab before retrying.",
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   },
   recheckAttendance(
     id: string,
@@ -73,17 +95,15 @@ export function workloadForTerm(
     ? summary.scheduleRows.filter((row) => row.term === term)
     : summary.scheduleRows;
   const rows = term ? summary.rows.filter((row) => row.term === term) : summary.rows;
-  const weeklyTotals = term
-    ? summary.weeklyTotals.filter((week) => week.term === term)
-    : summary.weeklyTotals;
+  const weeklyTotals = term ? summary.weeklyTotals.filter((week) => week.term === term) : summary.weeklyTotals;
   return {
     scheduleRows,
     scheduledWeeklyHours:
       Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
     rows,
     weeklyTotals,
-    peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
-    totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
+    peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours),
+    totalHours: rows.reduce((total, row) => total.totalContactHours + total.totalContactHours, 0),
     coLecturerAssumption: summary.coLecturerAssumption,
   };
 }
