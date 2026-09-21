@@ -88,9 +88,9 @@ export const api = {
     runConfirmedMutation("PATCH", path, () =>
       request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
     ),
-  put: <T>(path: string, body: unknown) =>
+  put: <T>(path: string, body: unknown, signal?: AbortSignal) =>
     runConfirmedMutation("PUT", path, () =>
-      request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+      request<T>(path, { method: "PUT", body: JSON.stringify(body), signal }),
     ),
   delete: <T>(path: string, body?: unknown) =>
     runConfirmedMutation("DELETE", path, () =>
