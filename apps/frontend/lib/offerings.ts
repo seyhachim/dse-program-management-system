@@ -103,7 +103,7 @@ export function workloadForTerm(
     rows,
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours),
-    totalHours: rows.reduce((total, row) => total.totalContactHours + total.totalContactHours, 0),
+    totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
     coLecturerAssumption: summary.coLecturerAssumption,
   };
 }
