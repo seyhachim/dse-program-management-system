@@ -10,7 +10,11 @@ import type {
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import {
-  captureAttendanceCheck1,
+  insertAttendanceCheck1Batch,
+  replaceAttendanceRecordsBatch,
+  type AttendanceWriteRow,
+} from "./attendance-batch-writes.ts";
+import {
   loadAttendanceCheckpoints,
   toCheckpointView,
 } from "./attendance-recheck-service.ts";
@@ -369,6 +373,21 @@ export const attendanceService = {
         if (isCurrent && !studentById.has(record.studentId)) throw new ReferenceError("One or more attendance students no longer exist");
       }
 
+      // Resolve identity only after validating the entire replacement. Keep the
+      // historical snapshot for students no longer enrolled in this exact session.
+      const writeRows: AttendanceWriteRow[] = input.records.map((requested) => {
+        const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
+        const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
+        return {
+          studentId: requested.studentId,
+          studentNumber: currentStudent?.studentId ?? historical?.studentNumber ?? null,
+          studentName: currentStudent?.name ?? historical!.studentName,
+          status: requested.status ?? null,
+          permissionPending: requested.permissionPending ?? false,
+          note: requested.note ?? "",
+        };
+      });
+
       const sessionId = existingSession?.id ?? crypto.randomUUID();
       if (!existingSession) {
         await tx.$executeRaw`
@@ -387,22 +406,7 @@ export const attendanceService = {
       // corrections never manufacture observations that did not happen.
       const checkpointTracking = !existingSession || existingSession.checkpointTrackingStartedAt !== null;
       if (checkpointTracking) {
-        for (const requested of input.records) {
-          const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
-          const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
-          const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
-          const studentName = currentStudent?.name ?? historical!.studentName;
-          await captureAttendanceCheck1(tx, {
-            sessionId,
-            studentId: requested.studentId,
-            studentNumber,
-            studentName,
-            status: requested.status ?? null,
-            permissionPending: requested.permissionPending ?? false,
-            note: requested.note ?? "",
-            actorUserId,
-          });
-        }
+        await insertAttendanceCheck1Batch(tx, sessionId, writeRows, actorUserId);
       }
 
       const requestedByStudent = new Map(input.records.map((record) => [record.studentId, record]));
@@ -438,19 +442,7 @@ export const attendanceService = {
         }
       }
 
-      await tx.$executeRaw`DELETE FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${sessionId}`;
-      for (const record of input.records) {
-        if (record.status === null) continue;
-        const currentStudent = currentStudentIds.has(record.studentId) ? studentById.get(record.studentId) : null;
-        const historical = historicalByStudent.get(record.studentId) ?? pendingHistoryByStudent.get(record.studentId);
-        const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
-        const studentName = currentStudent?.name ?? historical!.studentName;
-        await tx.$executeRaw`
-          INSERT INTO "pms_attendance"."AttendanceRecord"
-            ("sessionId", "studentId", "studentNumber", "studentName", "status", "note")
-          VALUES (${sessionId}, ${record.studentId}, ${studentNumber}, ${studentName}, ${record.status}, ${record.note})
-        `;
-      }
+      await replaceAttendanceRecordsBatch(tx, sessionId, writeRows);
     });
 
     await deliverPostSaveNotifications(
