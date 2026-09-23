@@ -49,10 +49,16 @@ jobs:
           for attempt in $(seq 1 50); do
             CODE=$(curl -sS --max-time 30 -o /tmp/me.json -w '%{http_code}'               -H "Authorization: Bearer $TOKEN"               "$NEXT_PUBLIC_API_URL/api/auth/me" || true)
             if [ "$CODE" = "200" ]; then
-              echo "Disposable candidate dev auth ready"
-              exit 0
+              ATT_CODE=$(curl -sS --max-time 90 -o /tmp/attendance-preflight.json -w '%{http_code}' \
+                -H "Authorization: Bearer $TOKEN" \
+                "$NEXT_PUBLIC_API_URL/api/offerings/33333333-3333-4333-8333-333333333333/attendance/2026-09-23" || true)
+              if [ "$ATT_CODE" = "200" ] && [ "$(jq '.records|length' /tmp/attendance-preflight.json)" = "43" ]; then
+                echo "Disposable candidate dev auth and 43-student attendance API ready"
+                exit 0
+              fi
+              echo "Attendance preflight HTTP $ATT_CODE, records=$(jq -r '.records|length // 0' /tmp/attendance-preflight.json 2>/dev/null || echo 0)"
             fi
-            echo "Waiting for candidate dev auth: HTTP $CODE (attempt $attempt)"
+            echo "Waiting for candidate dev auth/data: HTTP $CODE (attempt $attempt)"
             sleep 5
           done
           cat /tmp/me.json || true
@@ -99,6 +105,12 @@ jobs:
             await page.goto(baseURL + "/attendance", { waitUntil: "domcontentloaded", timeout: 120000 });
             await page.getByText("Attendance register", { exact: true }).waitFor({ timeout: 120000 });
             await page.getByText(/Attendance UAT Only.*43 enrolled/).waitFor({ timeout: 120000 });
+            await page.waitForFunction(() => {
+              const button = [...document.querySelectorAll("button")].find(
+                (el) => el.textContent?.trim() === "Mark all present",
+              );
+              return button instanceof HTMLButtonElement && !button.disabled;
+            }, null, { timeout: 120000 });
           }
 
           const desktop = await browser.newContext({
