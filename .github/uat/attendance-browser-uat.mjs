@@ -65,7 +65,7 @@ try {
   await saveAndWait(desktopPage);
 
   await desktopPage.reload({ waitUntil: "domcontentloaded" });
-  await desktopPage.getByText(/Attendance UAT Only · 43 enrolled/).waitFor({ state: "visible", timeout: 45_000 });
+  await openAttendance(desktopPage, "2026-09-30");
   await waitForCount(desktopPage.locator("table tbody select"), 43);
   const desktopAfter = desktopPage.locator("table tbody select");
   for (let i = 0; i < 5; i += 1) {
@@ -105,7 +105,7 @@ try {
   if ((await mobileSelects.nth(0).inputValue()) !== "Present") throw new Error("Mobile local mark failed");
 
   await mobilePage.reload({ waitUntil: "domcontentloaded" });
-  await mobilePage.getByText(/Attendance UAT Only · 43 enrolled/).waitFor({ state: "visible", timeout: 45_000 });
+  await openAttendance(mobilePage, "2026-10-07");
   await mobilePage.getByText("Unsaved attendance draft recovered on this device. Review the marks before saving.", { exact: true })
     .waitFor({ state: "visible", timeout: 30_000 });
   const recovered = mobilePage.locator("article select");
@@ -114,7 +114,7 @@ try {
 
   await saveAndWait(mobilePage);
   await mobilePage.reload({ waitUntil: "domcontentloaded" });
-  await mobilePage.getByText(/Attendance UAT Only · 43 enrolled/).waitFor({ state: "visible", timeout: 45_000 });
+  await openAttendance(mobilePage, "2026-10-07");
   await waitForCount(mobilePage.locator("article select"), 43);
   if ((await mobilePage.locator("article select").nth(0).inputValue()) !== "Present") {
     throw new Error("Mobile saved readback mismatch");
