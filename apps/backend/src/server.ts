@@ -51,10 +51,16 @@ const server = app.listen(port, async () => {
       LIMIT 1
     `;
     const offeringId = offeringRows[0]?.offeringId;
-    const users = await prisma.$queryRaw<Array<{ id: string; email: string }>>`
-      SELECT "id", "email" FROM "User" ORDER BY "id" LIMIT 1
-    `;
-    if (!offeringId || !users[0]) {
+    const lecturers = offeringId
+      ? await prisma.$queryRaw<Array<{ id: string; email: string }>>`
+          SELECT u."id", u."email"
+          FROM "Offering" o
+          JOIN "User" u ON u."id" = o."lecturerId"
+          WHERE o."id" = ${offeringId}
+          LIMIT 1
+        `
+      : [];
+    if (!offeringId || !lecturers[0]) {
       console.log("[perf-uat-1147-http] skipped=missing-fixture");
       return;
     }
@@ -75,12 +81,12 @@ const server = app.listen(port, async () => {
       const status = index < 20 ? "Present" : index < 30 ? "Late" : index < 35 ? "Absent" : "Excused";
       return { studentId: row.studentId, status, permissionPending: false, note: "" };
     });
-    const user = users[0];
+    const user = lecturers[0];
     const token = signToken({
       id: user.id,
       email: user.email,
-      roles: ["admin"],
-      programmeRoles: [{ role: "admin", programmeId: null }],
+      roles: ["lecturer"],
+      programmeRoles: [{ role: "lecturer", programmeId: "dse" }],
     });
 
     for (let index = 0; index < UAT_DATES.length; index += 1) {
