@@ -84,6 +84,13 @@ function emptyStudentCounts(): Record<AttendanceStatus, number> {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0 };
 }
 
+function logAttendanceSaveTiming(phase: string, startedAt: number): void {
+  if (process.env.PERF_ATTENDANCE_SAVE_TIMING !== "true") return;
+  const durationMs = Math.max(0, performance.now() - startedAt);
+  // Performance-only metadata: never log offering/date/student IDs or attendance payloads.
+  console.warn(`[perf] attendance-save phase=${phase} duration=${durationMs.toFixed(1)}ms`);
+}
+
 function buildStudentAttendanceSummary(counts: Record<AttendanceStatus, number>): AttendanceStudentSummary {
   const markedSessions = counts.Present + counts.Late + counts.Absent + counts.Excused;
   const attendedSessions = counts.Present + counts.Late;
@@ -272,8 +279,16 @@ async function deliverPostSaveNotifications(
   const work: Array<Promise<void>> = newlyPending.map((pending) =>
     telegram.notifications.deliverPermissionPending({ ...pending, offeringId, date }),
   );
+
+  // Warning evaluation used to await one full attendance-history read per student.
+  // Fetch all warning-relevant students in one set-based query so save latency is
+  // bounded by a constant number of DB round trips rather than class size/history.
+  const evaluations = await studentAttendanceHistoryService.warningHealthForStudents(
+    requestedStudentIds,
+    offeringId,
+  );
   for (const studentId of requestedStudentIds) {
-    const evaluation = await studentAttendanceHistoryService.healthForStudent(studentId, offeringId);
+    const evaluation = evaluations.get(studentId);
     if (!evaluation) continue;
     for (const candidate of evaluation.warningCandidates) {
       work.push(telegram.notifications.deliverAttendanceWarning({
@@ -282,8 +297,8 @@ async function deliverPostSaveNotifications(
         warningKind: candidate.kind,
         count: candidate.count,
         eventSessionId: candidate.eventSessionId,
-        absentCount: evaluation.history.counts.Absent,
-        excusedCount: evaluation.history.counts.Excused,
+        absentCount: evaluation.counts.Absent,
+        excusedCount: evaluation.counts.Excused,
       }));
     }
   }
@@ -332,11 +347,13 @@ export const attendanceService = {
   get: getAttendance,
 
   async save(offeringId: string, date: string, input: SaveAttendanceInput, actorUserId?: string): Promise<AttendanceSessionView> {
+    const saveStartedAt = performance.now();
     const requestedStudentIds = [...new Set(input.records.map((record) => record.studentId))];
     const studentRows = await students().findByIds(requestedStudentIds);
     const studentById = new Map(studentRows.map((student) => [student.id, student]));
     const newlyPending: Array<{ permissionPendingId: string; studentId: string }> = [];
 
+    const transactionStartedAt = performance.now();
     await prisma.$transaction(async (tx) => {
       const enrollments = await tx.$queryRaw<EnrollmentRow[]>`
         SELECT "studentId" FROM "Enrollment" WHERE "offeringId" = ${offeringId} FOR SHARE
@@ -444,13 +461,21 @@ export const attendanceService = {
 
       await replaceAttendanceRecordsBatch(tx, sessionId, writeRows);
     });
+    logAttendanceSaveTiming("transaction", transactionStartedAt);
 
+    const notificationsStartedAt = performance.now();
     await deliverPostSaveNotifications(
       offeringId,
       date,
       attendanceWarningStudentIds(input.records),
       newlyPending,
     );
-    return getAttendance(offeringId, date);
+    logAttendanceSaveTiming("notifications", notificationsStartedAt);
+
+    const readbackStartedAt = performance.now();
+    const view = await getAttendance(offeringId, date);
+    logAttendanceSaveTiming("readback", readbackStartedAt);
+    logAttendanceSaveTiming("total", saveStartedAt);
+    return view;
   },
 };
