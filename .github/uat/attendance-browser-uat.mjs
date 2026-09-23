@@ -10,7 +10,7 @@ const browser = await chromium.launch({ headless: true });
 async function login(page) {
   await page.goto(`${baseURL}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.locator("#password").fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
 }
