@@ -51,7 +51,7 @@ try {
 
   const desktopSelects = desktopPage.locator("table tbody select");
   await waitForCount(desktopSelects, 43);
-  if (!(await desktopPage.locator("table").isVisible())) throw new Error("Desktop attendance table is not visible");
+  if (!(await desktopPage.locator("table").first().isVisible())) throw new Error("Desktop attendance table is not visible");
 
   await desktopPage.getByRole("button", { name: "Mark all present" }).click();
   for (let i = 0; i < 5; i += 1) {
@@ -95,7 +95,7 @@ try {
 
   const mobileSelects = mobilePage.locator("article select");
   await waitForCount(mobileSelects, 43);
-  if (await mobilePage.locator("table").isVisible()) throw new Error("Desktop table visible in mobile layout");
+  if (await mobilePage.locator("table").first().isVisible()) throw new Error("Desktop table visible in mobile layout");
 
   const widthOk = await mobilePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
   if (!widthOk) throw new Error("Mobile layout has horizontal page overflow");
