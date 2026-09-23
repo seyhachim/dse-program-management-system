@@ -1,0 +1,44 @@
+name: Prepare Attendance Browser UAT User
+
+on:
+  push:
+    branches:
+      - ops/1145-browser-uat-r3
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://dwiqdvxfmzklhrviuzem.supabase.co
+      SUPABASE_KEY: sb_publishable_kGzTbbPovGtW37a9BUeJQA_W_028IFp
+      UAT_EMAIL: seyhachim.pr1145.uat@gmail.com
+      UAT_PASSWORD: ${{ secrets.DSE_PMS_UAT_PASSWORD }}
+    steps:
+      - name: Ensure disposable user exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${UAT_PASSWORD:-}" ]; then
+            echo "Missing DSE_PMS_UAT_PASSWORD"
+            exit 20
+          fi
+
+          LOGIN=$(curl -sS --max-time 30 -o /tmp/login.json -w '%{http_code}'             -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password"             -H "apikey: $SUPABASE_KEY"             -H "Content-Type: application/json"             --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$UAT_PASSWORD" '{email:$email,password:$password}')")
+
+          if [ "$LOGIN" = "200" ]; then
+            echo "UAT_USER_READY existing_login=200"
+            exit 0
+          fi
+
+          SIGNUP=$(curl -sS --max-time 30 -o /tmp/signup.json -w '%{http_code}'             -X POST "$SUPABASE_URL/auth/v1/signup"             -H "apikey: $SUPABASE_KEY"             -H "Content-Type: application/json"             --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$UAT_PASSWORD" '{email:$email,password:$password}')")
+
+          echo "signup_http=$SIGNUP"
+          if [ "$SIGNUP" != "200" ]; then
+            jq '{code,error_code,msg,message}' /tmp/signup.json 2>/dev/null || cat /tmp/signup.json
+            exit 21
+          fi
+
+          jq '{user_id:(.user.id // null), email:(.user.email // null), email_confirmed_at:(.user.email_confirmed_at // null)}' /tmp/signup.json
