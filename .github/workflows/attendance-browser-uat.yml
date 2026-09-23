@@ -92,8 +92,10 @@ jobs:
             await expect(page.getByRole('heading', { name: 'Attendance register' })).toBeVisible({ timeout: 60_000 });
           }
 
-          function register(page) {
-            return page.locator('section').filter({ has: page.getByRole('heading', { name: 'Attendance register' }) }).first();
+          function statusSelects(page) {
+            return page.locator('select:visible').filter({
+              has: page.locator('option[value="__permission_pending__"]'),
+            });
           }
 
           function attendancePut(response) {
@@ -107,9 +109,9 @@ jobs:
             await login(pageA);
             await loadAttendance(pageA);
 
-            const regA = register(pageA);
-            const statusA = regA.locator('select:visible');
-            await expect(statusA).toHaveCount(43);
+            const statusA = statusSelects(pageA);
+            await expect(statusA).toHaveCount(43, { timeout: 30_000 });
+            await expect(pageA.getByRole('columnheader', { name: 'Student ID' })).toBeVisible();
             await pageA.screenshot({ path: '/tmp/browser-uat/desktop-before-save.png', fullPage: true });
 
             await pageA.getByRole('button', { name: 'Mark all present' }).click();
@@ -132,9 +134,8 @@ jobs:
 
             const pageB = await desktop.newPage();
             await loadAttendance(pageB);
-            const regB = register(pageB);
-            const statusB = regB.locator('select:visible');
-            await expect(statusB).toHaveCount(43);
+            const statusB = statusSelects(pageB);
+            await expect(statusB).toHaveCount(43, { timeout: 30_000 });
             for (let i = 0; i < 5; i += 1) await expect(statusB.nth(i)).toHaveValue('__permission_pending__');
 
             await statusA.nth(5).selectOption('Late');
@@ -167,16 +168,16 @@ jobs:
 
             await pageA.reload({ waitUntil: 'domcontentloaded' });
             await expect(pageA.getByText('Unsaved attendance draft recovered on this device.')).toBeVisible({ timeout: 60_000 });
-            const recovered = register(pageA).locator('select:visible');
+            const recovered = statusSelects(pageA);
             await expect(recovered.nth(7)).toHaveValue('Absent');
 
             const storage = await desktop.storageState();
             const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: storage });
             const mobilePage = await mobile.newPage();
             await loadAttendance(mobilePage);
-            const mobileReg = register(mobilePage);
-            await expect(mobileReg.locator('article:visible')).toHaveCount(43);
-            await expect(mobileReg.locator('table')).toBeHidden();
+            const mobileStatus = statusSelects(mobilePage);
+            await expect(mobileStatus).toHaveCount(43, { timeout: 30_000 });
+            await expect(mobilePage.getByRole('columnheader', { name: 'Student ID' })).toBeHidden();
             await expect(mobilePage.getByRole('button', { name: 'Start Roll Call' })).toBeVisible();
             await mobilePage.getByRole('button', { name: 'Start Roll Call' }).click();
             await expect(mobilePage.getByText('Roll Call Mode', { exact: true })).toBeVisible();
