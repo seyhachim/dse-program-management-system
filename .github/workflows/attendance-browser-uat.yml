@@ -1,0 +1,218 @@
+name: Attendance Browser UAT
+
+on:
+  push:
+    branches:
+      - ops/1145-browser-uat
+
+permissions:
+  contents: read
+
+jobs:
+  browser-uat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      UAT_EMAIL: seyhachim.pr1145.uat@gmail.com
+      UAT_PASSWORD: ${{ secrets.DSE_PMS_UAT_PASSWORD }}
+      UAT_DATE: "2026-09-23"
+      UAT_OFFERING_ID: 33333333-3333-4333-8333-333333333333
+      NEXT_PUBLIC_API_URL: https://dse-pms-native-prod-candidate.onrender.com
+      NEXT_PUBLIC_AUTH_MODE: supabase
+      NEXT_PUBLIC_SUPABASE_URL: https://dwiqdvxfmzklhrviuzem.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_kGzTbbPovGtW37a9BUeJQA_W_028IFp
+
+    steps:
+      - name: Checkout exact reviewed main
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install app dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Start local exact-head frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${UAT_PASSWORD:-}" ]; then echo "Missing DSE_PMS_UAT_PASSWORD"; exit 10; fi
+          bun run --cwd apps/frontend dev > /tmp/dse-frontend.log 2>&1 &
+          echo $! > /tmp/dse-frontend.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/login >/dev/null 2>&1; then
+              echo "Frontend ready on attempt $attempt"
+              exit 0
+            fi
+            sleep 2
+          done
+          tail -100 /tmp/dse-frontend.log || true
+          exit 11
+
+      - name: Install Playwright Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/browser-uat
+          cd /tmp/browser-uat
+          npm init -y >/dev/null
+          npm install --no-fund --no-audit @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Write isolated browser UAT
+        shell: bash
+        run: |
+          cat > /tmp/browser-uat/attendance.spec.cjs <<'EOF'
+          const { test, expect } = require('@playwright/test');
+
+          const APP = 'http://127.0.0.1:3000';
+          const EMAIL = process.env.UAT_EMAIL;
+          const PASSWORD = process.env.UAT_PASSWORD;
+          const DATE = process.env.UAT_DATE;
+          const OFFERING_ID = process.env.UAT_OFFERING_ID;
+
+          test.setTimeout(420_000);
+
+          async function login(page) {
+            await page.goto(`${APP}/login`, { waitUntil: 'domcontentloaded' });
+            await page.locator('#email').fill(EMAIL);
+            await page.locator('#password').fill(PASSWORD);
+            await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+            await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30_000 });
+          }
+
+          async function loadAttendance(page) {
+            await page.goto(`${APP}/attendance`, { waitUntil: 'domcontentloaded' });
+            const dateInput = page.locator('input[type="date"]');
+            await expect(dateInput).toBeVisible({ timeout: 30_000 });
+            if ((await dateInput.inputValue()) !== DATE) await dateInput.fill(DATE);
+            await expect(page.getByText('Attendance UAT Only · 43 enrolled')).toBeVisible({ timeout: 60_000 });
+            await expect(page.getByRole('heading', { name: 'Attendance register' })).toBeVisible({ timeout: 60_000 });
+          }
+
+          function register(page) {
+            return page.locator('section').filter({ has: page.getByRole('heading', { name: 'Attendance register' }) }).first();
+          }
+
+          function attendancePut(response) {
+            return response.request().method() === 'PUT' &&
+              response.url().includes(`/api/offerings/${OFFERING_ID}/attendance/${DATE}`);
+          }
+
+          test('desktop save/conflict/timeout-draft and mobile layout', async ({ browser }) => {
+            const desktop = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+            const pageA = await desktop.newPage();
+            await login(pageA);
+            await loadAttendance(pageA);
+
+            const regA = register(pageA);
+            const statusA = regA.locator('select:visible');
+            await expect(statusA).toHaveCount(43);
+            await pageA.screenshot({ path: '/tmp/browser-uat/desktop-before-save.png', fullPage: true });
+
+            await pageA.getByRole('button', { name: 'Mark all present' }).click();
+            for (let i = 0; i < 5; i += 1) {
+              await statusA.nth(i).selectOption('__permission_pending__');
+            }
+            for (let i = 0; i < 5; i += 1) await expect(statusA.nth(i)).toHaveValue('__permission_pending__');
+
+            const saveA = pageA.getByRole('button', { name: 'Save attendance' });
+            const started = Date.now();
+            const firstSave = pageA.waitForResponse(attendancePut, { timeout: 70_000 });
+            await saveA.click();
+            await expect(saveA).toHaveText('Saving…', { timeout: 5_000 });
+            const firstResponse = await firstSave;
+            expect(firstResponse.status()).toBe(200);
+            const firstSeconds = Math.round((Date.now() - started) / 1000);
+            console.log(`BROWSER_FULL_SAVE_SECONDS=${firstSeconds}`);
+            await expect(pageA.getByText(/Attendance saved for/)).toBeVisible({ timeout: 10_000 });
+            await expect(saveA).toHaveText('Save attendance');
+
+            const pageB = await desktop.newPage();
+            await loadAttendance(pageB);
+            const regB = register(pageB);
+            const statusB = regB.locator('select:visible');
+            await expect(statusB).toHaveCount(43);
+            for (let i = 0; i < 5; i += 1) await expect(statusB.nth(i)).toHaveValue('__permission_pending__');
+
+            await statusA.nth(5).selectOption('Late');
+            const aSave2 = pageA.waitForResponse(attendancePut, { timeout: 70_000 });
+            await saveA.click();
+            expect((await aSave2).status()).toBe(200);
+            await expect(saveA).toHaveText('Save attendance', { timeout: 10_000 });
+
+            await statusB.nth(6).selectOption('Absent');
+            const staleResponse = pageB.waitForResponse(attendancePut, { timeout: 30_000 });
+            await pageB.getByRole('button', { name: 'Save attendance' }).click();
+            expect((await staleResponse).status()).toBe(409);
+            await expect(pageB.getByRole('alert')).toContainText('saved by someone else', { timeout: 10_000 });
+            await expect(statusB.nth(6)).toHaveValue('Absent');
+
+            let intercepted = false;
+            await pageA.route(`**/api/offerings/${OFFERING_ID}/attendance/${DATE}`, async (route) => {
+              if (route.request().method() !== 'PUT') return route.continue();
+              intercepted = true;
+              await new Promise((resolve) => setTimeout(resolve, 70_000));
+              try { await route.abort('timedout'); } catch {}
+            });
+            await statusA.nth(7).selectOption('Absent');
+            await saveA.click();
+            await expect(pageA.getByRole('alert')).toContainText('Attendance save response timed out', { timeout: 72_000 });
+            expect(intercepted).toBeTruthy();
+            await expect(statusA.nth(7)).toHaveValue('Absent');
+            await new Promise((resolve) => setTimeout(resolve, 6_000));
+            await pageA.unroute(`**/api/offerings/${OFFERING_ID}/attendance/${DATE}`);
+
+            await pageA.reload({ waitUntil: 'domcontentloaded' });
+            await expect(pageA.getByText('Unsaved attendance draft recovered on this device.')).toBeVisible({ timeout: 60_000 });
+            const recovered = register(pageA).locator('select:visible');
+            await expect(recovered.nth(7)).toHaveValue('Absent');
+
+            const storage = await desktop.storageState();
+            const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: storage });
+            const mobilePage = await mobile.newPage();
+            await loadAttendance(mobilePage);
+            const mobileReg = register(mobilePage);
+            await expect(mobileReg.locator('article:visible')).toHaveCount(43);
+            await expect(mobileReg.locator('table')).toBeHidden();
+            await expect(mobilePage.getByRole('button', { name: 'Start Roll Call' })).toBeVisible();
+            await mobilePage.getByRole('button', { name: 'Start Roll Call' }).click();
+            await expect(mobilePage.getByText('Roll Call Mode', { exact: true })).toBeVisible();
+            await mobilePage.screenshot({ path: '/tmp/browser-uat/mobile-roll-call.png', fullPage: false });
+            await mobilePage.getByRole('button', { name: 'Exit' }).click();
+            await expect(mobilePage.getByText('Roll Call Mode', { exact: true })).toBeHidden();
+
+            console.log('BROWSER_UAT_SUMMARY desktop_login=ok roster=43 full_save=200 pending=5 readback=ok tab_conflict=409 unsaved_preserved=ok timeout_65s=ok draft_recovery=ok mobile_cards=43 roll_call=ok');
+            await mobile.close();
+            await desktop.close();
+          });
+          EOF
+
+      - name: Run browser UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/browser-uat
+          npx playwright test attendance.spec.cjs --reporter=line --workers=1
+
+      - name: Show frontend log on failure
+        if: failure()
+        run: tail -200 /tmp/dse-frontend.log || true
+
+      - name: Upload safe screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-browser-uat-screenshots
+          path: |
+            /tmp/browser-uat/desktop-before-save.png
+            /tmp/browser-uat/mobile-roll-call.png
+          if-no-files-found: ignore
+
+      - name: Stop local frontend
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/dse-frontend.pid ]; then kill "$(cat /tmp/dse-frontend.pid)" 2>/dev/null || true; fi
