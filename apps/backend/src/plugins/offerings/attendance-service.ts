@@ -169,16 +169,21 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
     courseAttendanceSummaries(offeringId),
   ]);
   const currentStudentIds = enrollments.map((row) => row.studentId);
-  const studentRows = await students().findByIds(currentStudentIds);
+  // These reads are independent once the roster/session baseline is known.
+  // Run them together so post-save readback costs one network round-trip window
+  // instead of serially waiting on student identity, records, pending and checkpoints.
+  const [studentRows, recordRows, pendingRows, checkpointByStudent] = await Promise.all([
+    students().findByIds(currentStudentIds),
+    session
+      ? prisma.$queryRaw<RecordRow[]>`
+          SELECT "studentId", "studentNumber", "studentName", "status", "note"
+          FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${session.id}
+        `
+      : Promise.resolve([] as RecordRow[]),
+    session ? activePending(session.id) : Promise.resolve([] as PendingRow[]),
+    session ? loadAttendanceCheckpoints(session.id) : Promise.resolve(new Map()),
+  ]);
   const studentById = new Map(studentRows.map((student) => [student.id, student]));
-  const recordRows = session ? await prisma.$queryRaw<RecordRow[]>`
-    SELECT "studentId", "studentNumber", "studentName", "status", "note"
-    FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${session.id}
-  ` : [];
-  const pendingRows = session ? await activePending(session.id) : [];
-  const checkpointByStudent = session
-    ? await loadAttendanceCheckpoints(session.id)
-    : new Map();
   const recordByStudent = new Map(recordRows.map((record) => [record.studentId, record]));
   const pendingByStudent = new Map(pendingRows.map((pending) => [pending.studentId, pending]));
   const counts = { ...emptyCounts(), Unmarked: 0 };
