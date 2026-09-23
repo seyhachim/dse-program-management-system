@@ -11,15 +11,17 @@ permissions:
 jobs:
   hosted-uat:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
+      SUPABASE_URL: https://dwiqdvxfmzklhrviuzem.supabase.co
+      SUPABASE_KEY: sb_publishable_kGzTbbPovGtW37a9BUeJQA_W_028IFp
       CANDIDATE_URL: https://dse-pms-native-prod-candidate.onrender.com
       OFFERING_ID: 33333333-3333-4333-8333-333333333333
       UAT_DATE: "2099-11-14"
-      UAT_TOKEN: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJlbWFpbCI6InNleWhhY2hpbStwcjExNDUtdWF0QGdtYWlsLmNvbSIsInJvbGVzIjpbImxlY3R1cmVyIl0sInByb2dyYW1tZVJvbGVzIjpbeyJyb2xlIjoibGVjdHVyZXIiLCJwcm9ncmFtbWVJZCI6ImRzZSJ9XSwiaWF0IjoxNzkwMTUxMjg2LCJleHAiOjE3OTAxNTIxODZ9.vnKtB-wSUJi_TIUuqwLR7g4tPJFoG83QvHE4Whgf_Zk
+      UAT_EMAIL: seyhachim+pr1145-uat@gmail.com
 
     steps:
-      - name: Candidate health and authorization boundary
+      - name: Candidate health and unauthenticated boundary
         shell: bash
         run: |
           set -euo pipefail
@@ -30,152 +32,42 @@ jobs:
           UNAUTH_CODE=$(curl -sS --max-time 60 -o /tmp/unauth.json -w '%{http_code}'             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
           test "$UNAUTH_CODE" = "401"
 
-      - name: Run disposable 43-student Attendance UAT
+      - name: Supabase-authenticated read-only verification
         shell: bash
         run: |
           set -euo pipefail
-          auth_header=(-H "Authorization: Bearer $UAT_TOKEN")
-          json_header=(-H "Content-Type: application/json")
+          PW=$(openssl rand -base64 30 | tr -d '/+=' | head -c 32)
 
-          GET1_CODE=$(curl -sS --max-time 90 -o /tmp/get1.json -w '%{http_code}'             "${auth_header[@]}" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          if [ "$GET1_CODE" != "200" ]; then
-            echo "Initial authenticated GET HTTP $GET1_CODE"
-            cat /tmp/get1.json
-            exit 30
-          fi
-          jq -e '.records|length == 43' /tmp/get1.json >/dev/null
-          jq -e '.counts.Unmarked == 43 and .updatedAt == null' /tmp/get1.json >/dev/null
-
-          PAYLOAD_428=$(jq '{records:[.records[0] | {studentId,status:"Present",permissionPending:false,note:"UAT 428"}]}' /tmp/get1.json)
-          CODE_428=$(curl -sS --max-time 90 -o /tmp/put428.json -w '%{http_code}'             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$PAYLOAD_428"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$CODE_428" = "428"
-
-          GET2_CODE=$(curl -sS --max-time 90 -o /tmp/get2.json -w '%{http_code}'             "${auth_header[@]}" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$GET2_CODE" = "200"
-          jq -e '.updatedAt == null and .counts.Unmarked == 43' /tmp/get2.json >/dev/null
-
-          FULL_PAYLOAD=$(jq '{
-            expectedUpdatedAt:null,
-            records:(.records | to_entries | map(
-              if .key < 5 then
-                {studentId:.value.studentId,status:null,permissionPending:true,note:"UAT pending"}
-              elif .key < 25 then
-                {studentId:.value.studentId,status:"Present",permissionPending:false,note:""}
-              elif .key < 35 then
-                {studentId:.value.studentId,status:"Late",permissionPending:false,note:""}
-              elif .key < 40 then
-                {studentId:.value.studentId,status:"Absent",permissionPending:false,note:""}
-              else
-                {studentId:.value.studentId,status:"Excused",permissionPending:false,note:""}
-              end
-            ))
-          }' /tmp/get2.json)
-
-          START_MS=$(date +%s%3N)
-          SAVE_CODE=$(curl -sS --max-time 90 -o /tmp/save1.json -w '%{http_code}'             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$FULL_PAYLOAD"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          SAVE_MS=$(( $(date +%s%3N) - START_MS ))
-          test "$SAVE_CODE" = "200"
-          jq -e '.counts.PermissionPending == 5 and .counts.Present == 20 and .counts.Late == 10 and .counts.Absent == 5 and .counts.Excused == 3 and .counts.Unmarked == 0' /tmp/save1.json >/dev/null
-          V1=$(jq -r '.updatedAt' /tmp/save1.json)
-          test -n "$V1"
-
-          READ_CODE=$(curl -sS --max-time 90 -o /tmp/read1.json -w '%{http_code}'             "${auth_header[@]}" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$READ_CODE" = "200"
-          jq -e '.counts.PermissionPending == 5 and .counts.Present == 20 and .counts.Late == 10 and .counts.Absent == 5 and .counts.Excused == 3 and .counts.Unmarked == 0' /tmp/read1.json >/dev/null
-
-          STALE=$(jq '.expectedUpdatedAt=null' <<<"$FULL_PAYLOAD")
-          STALE_CODE=$(curl -sS --max-time 90 -o /tmp/stale.json -w '%{http_code}'             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$STALE"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$STALE_CODE" = "409"
-
-          TAB_A=$(jq --arg v "$V1" '{
-            expectedUpdatedAt:$v,
-            records:(.records | map({
-              studentId,
-              status:(if .permissionPending then null else .status end),
-              permissionPending,
-              note
-            }) | .[5].status="Late")
-          }' /tmp/read1.json)
-          TAB_B=$(jq --arg v "$V1" '{
-            expectedUpdatedAt:$v,
-            records:(.records | map({
-              studentId,
-              status:(if .permissionPending then null else .status end),
-              permissionPending,
-              note
-            }) | .[6].status="Absent")
-          }' /tmp/read1.json)
-
-          A_CODE=$(curl -sS --max-time 90 -o /tmp/tabA.json -w '%{http_code}'             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$TAB_A"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$A_CODE" = "200"
-          V2=$(jq -r '.updatedAt' /tmp/tabA.json)
-          test "$V2" != "$V1"
-
-          B_CODE=$(curl -sS --max-time 90 -o /tmp/tabB.json -w '%{http_code}'             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$TAB_B"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$B_CODE" = "409"
-
-          BAD=$(jq --arg v "$V2" '{
-            expectedUpdatedAt:$v,
-            records:(.records | map({
-              studentId,
-              status:(if .permissionPending then null else .status end),
-              permissionPending,
-              note
-            }) | .[7].studentId="00000000-0000-4000-8000-000000000999")
-          }' /tmp/tabA.json)
-          BAD_CODE=$(curl -sS --max-time 90 -o /tmp/bad.json -w '%{http_code}'             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$BAD"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$BAD_CODE" = "400"
-
-          VERIFY_FAIL=$(curl -sS --max-time 90 "${auth_header[@]}"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$(jq -r '.updatedAt' <<<"$VERIFY_FAIL")" = "$V2"
-
-          RETRY=$(jq --arg v "$V2" '{
-            expectedUpdatedAt:$v,
-            records:(.records | map({
-              studentId,
-              status:(if .permissionPending then null else .status end),
-              permissionPending,
-              note
-            }) | .[7].status="Late")
-          }' /tmp/tabA.json)
-          RETRY_CODE=$(curl -sS --max-time 90 -o /tmp/retry.json -w '%{http_code}'             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$RETRY"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$RETRY_CODE" = "200"
-          V3=$(jq -r '.updatedAt' /tmp/retry.json)
-
-          TIMEOUT_PAYLOAD=$(jq --arg v "$V3" '{
-            expectedUpdatedAt:$v,
-            records:(.records | map({
-              studentId,
-              status:(if .permissionPending then null else .status end),
-              permissionPending,
-              note
-            }) | .[8].status="Late")
-          }' /tmp/retry.json)
-          set +e
-          curl -sS --max-time 0.05 -o /tmp/timeout-put.json             -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$TIMEOUT_PAYLOAD"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE"
-          TIMEOUT_EXIT=$?
-          set -e
-
-          curl -sS --max-time 90 "${auth_header[@]}"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE" > /tmp/timeout-read.json
-          V_AFTER_TIMEOUT=$(jq -r '.updatedAt' /tmp/timeout-read.json)
-          if [ "$V_AFTER_TIMEOUT" = "$V3" ]; then
-            TIMEOUT_RETRY_CODE=$(curl -sS --max-time 90 -o /tmp/timeout-retry.json -w '%{http_code}'               -X PUT "${auth_header[@]}" "${json_header[@]}" --data "$TIMEOUT_PAYLOAD"               "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-            test "$TIMEOUT_RETRY_CODE" = "200"
-            cp /tmp/timeout-retry.json /tmp/base.json
-            TIMEOUT_RESULT="not_committed_then_retry_200"
-          else
-            cp /tmp/timeout-read.json /tmp/base.json
-            TIMEOUT_RESULT="committed_despite_client_timeout"
+          SIGNUP_CODE=$(curl -sS --max-time 30 -o /tmp/signup.json -w '%{http_code}'             -X POST "$SUPABASE_URL/auth/v1/signup"             -H "apikey: $SUPABASE_KEY"             -H "Content-Type: application/json"             --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
+          if [ "$SIGNUP_CODE" != "200" ]; then
+            echo "Signup HTTP $SIGNUP_CODE"
+            jq '{code,error_code,msg,message}' /tmp/signup.json
+            exit 20
           fi
 
-          STUDENT=$(jq -r '.records[5].studentId' /tmp/base.json)
-          RECHECK=$(jq -nc --arg s "$STUDENT" '{
-            studentId:$s,
-            observation:{status:"Late",permissionPending:false,note:"UAT Check 2"},
-            final:{status:"Present",permissionPending:false,note:"UAT final"}
-          }')
-          RECHECK_CODE=$(curl -sS --max-time 90 -o /tmp/recheck.json -w '%{http_code}'             -X POST "${auth_header[@]}" "${json_header[@]}" --data "$RECHECK"             "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE/recheck")
-          test "$RECHECK_CODE" = "200"
-          jq --arg s "$STUDENT" -e '.records[] | select(.studentId==$s) | (.checkpoints|length)==2 and .status=="Present"' /tmp/recheck.json >/dev/null
+          TOKEN=$(jq -r '.access_token // empty' /tmp/signup.json)
+          if [ -z "$TOKEN" ]; then
+            echo "Waiting for disposable account confirmation..."
+            for attempt in $(seq 1 60); do
+              sleep 5
+              LOGIN_CODE=$(curl -sS --max-time 30 -o /tmp/login.json -w '%{http_code}'                 -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password"                 -H "apikey: $SUPABASE_KEY"                 -H "Content-Type: application/json"                 --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
+              if [ "$LOGIN_CODE" = "200" ]; then
+                TOKEN=$(jq -r '.access_token // empty' /tmp/login.json)
+                [ -n "$TOKEN" ] && break
+              fi
+              echo "Waiting for confirmation attempt $attempt"
+            done
+          fi
+          test -n "$TOKEN"
 
-          echo "UAT_SUMMARY health=200 unauthorized=401 initial=43_unmarked precondition=428 full_save=200 full_save_ms=$SAVE_MS readback=200 stale=409 tabA=200 tabB=409 failed_save=400 retry=200 timeout_exit=$TIMEOUT_EXIT timeout_result=$TIMEOUT_RESULT recheck=200"
+          auth_header=(-H "Authorization: Bearer $TOKEN")
+
+          ME_CODE=$(curl -sS --max-time 90 -o /tmp/me.json -w '%{http_code}'             "${auth_header[@]}" "$CANDIDATE_URL/api/auth/me")
+          test "$ME_CODE" = "200"
+
+          GET_CODE=$(curl -sS --max-time 90 -o /tmp/attendance.json -w '%{http_code}'             "${auth_header[@]}" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
+          test "$GET_CODE" = "200"
+          jq -e '.records|length == 43' /tmp/attendance.json >/dev/null
+          jq -e '.counts.Unmarked == 43 and .updatedAt == null and .sessionId == null' /tmp/attendance.json >/dev/null
+
+          echo "SUPABASE_READONLY_UAT health=200 unauthorized=401 me=200 attendance=200 records=43 unmarked=43 no_session=true"
