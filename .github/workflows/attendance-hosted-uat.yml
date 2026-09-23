@@ -18,7 +18,7 @@ jobs:
       CANDIDATE_URL: https://dse-pms-native-prod-candidate.onrender.com
       OFFERING_ID: 33333333-3333-4333-8333-333333333333
       UAT_DATE: "2099-11-14"
-      UAT_EMAIL: lecturer.pr1144@example.invalid
+      UAT_EMAIL: seyhachim+pr1145-uat@gmail.com
 
     steps:
       - name: Candidate health and auth settings
@@ -49,8 +49,24 @@ jobs:
 
           TOKEN=$(jq -r '.access_token // empty' /tmp/signup.json)
           if [ -z "$TOKEN" ]; then
-            echo "Signup created no session; email confirmation is required."
+            echo "Signup created no session; waiting for disposable email confirmation."
             jq '{user_id:(.user.id // null), email_confirmed_at:(.user.email_confirmed_at // null)}' /tmp/signup.json
+            for attempt in $(seq 1 40); do
+              sleep 10
+              LOGIN_CODE=$(curl -sS --max-time 30 -o /tmp/login.json -w '%{http_code}' \
+                -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" \
+                -H "apikey: $SUPABASE_KEY" \
+                -H "Content-Type: application/json" \
+                --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
+              if [ "$LOGIN_CODE" = "200" ]; then
+                TOKEN=$(jq -r '.access_token // empty' /tmp/login.json)
+                [ -n "$TOKEN" ] && break
+              fi
+              echo "Waiting for confirmation attempt $attempt"
+            done
+          fi
+          if [ -z "$TOKEN" ]; then
+            echo "Disposable lecturer was not confirmed in time."
             exit 21
           fi
 
