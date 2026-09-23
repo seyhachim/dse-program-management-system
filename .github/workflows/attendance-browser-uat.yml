@@ -1,0 +1,196 @@
+name: Attendance Browser UAT
+
+on:
+  push:
+    branches:
+      - ops/1145-attendance-hosted-uat
+
+permissions:
+  contents: read
+
+jobs:
+  browser-uat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_API_URL: https://dse-pms-native-prod-candidate.onrender.com
+      NEXT_PUBLIC_AUTH_MODE: dev
+      UAT_JWT_SECRET: attendance-browser-uat-1145-not-a-secret-ephemeral
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install app dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Mint short-lived disposable lecturer token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(bun -e '
+            import jwt from "jsonwebtoken";
+            const now = Math.floor(Date.now() / 1000);
+            console.log(jwt.sign({
+              sub: "11111111-1111-4111-8111-111111111111",
+              email: "lecturer.pr1144@example.invalid",
+              roles: ["lecturer"],
+              programmeRoles: [{ role: "lecturer", programmeId: "dse" }],
+              iat: now,
+              exp: now + 900,
+            }, process.env.UAT_JWT_SECRET));
+          ')
+          echo "::add-mask::$TOKEN"
+          echo "NEXT_PUBLIC_DEV_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+          for attempt in $(seq 1 50); do
+            CODE=$(curl -sS --max-time 30 -o /tmp/me.json -w '%{http_code}'               -H "Authorization: Bearer $TOKEN"               "$NEXT_PUBLIC_API_URL/api/auth/me" || true)
+            if [ "$CODE" = "200" ]; then
+              echo "Disposable candidate dev auth ready"
+              exit 0
+            fi
+            echo "Waiting for candidate dev auth: HTTP $CODE (attempt $attempt)"
+            sleep 5
+          done
+          cat /tmp/me.json || true
+          exit 1
+
+      - name: Install Playwright Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pw
+          npm install --prefix /tmp/pw --no-audit --no-fund playwright@1.55.0
+          /tmp/pw/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Start reviewed frontend locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup bun run --cwd apps/frontend dev -- --hostname 127.0.0.1 >/tmp/frontend.log 2>&1 &
+          echo $! >/tmp/frontend.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS --max-time 3 http://127.0.0.1:3000/attendance >/dev/null; then
+              echo "Frontend ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/frontend.log
+          exit 1
+
+      - name: Desktop and mobile lecturer Attendance UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >/tmp/pw/uat.mjs <<'NODE'
+          import { chromium } from "playwright";
+
+          const baseURL = "http://127.0.0.1:3000";
+          const browser = await chromium.launch({
+            headless: true,
+            args: ["--disable-web-security", "--disable-features=IsolateOrigins,site-per-process"],
+          });
+
+          async function waitForAttendance(page) {
+            await page.goto(baseURL + "/attendance", { waitUntil: "domcontentloaded", timeout: 120000 });
+            await page.getByText("Attendance register", { exact: true }).waitFor({ timeout: 120000 });
+            await page.getByText(/Attendance UAT Only.*43 enrolled/).waitFor({ timeout: 120000 });
+          }
+
+          const desktop = await browser.newContext({
+            viewport: { width: 1440, height: 1000 },
+          });
+          const desktopPage = await desktop.newPage();
+          await waitForAttendance(desktopPage);
+
+          await desktopPage.getByRole("button", { name: "Mark all present", exact: true }).click();
+          const desktopSelects = desktopPage.locator("table select");
+          if (await desktopSelects.count() !== 43) {
+            throw new Error("Expected 43 desktop status controls");
+          }
+          for (let i = 0; i < 5; i += 1) {
+            await desktopSelects.nth(i).selectOption("__permission_pending__");
+          }
+
+          await desktopPage.getByRole("button", { name: "Save attendance", exact: true }).click();
+          await desktopPage.getByText(/Attendance saved for .*43 marked, 0 unmarked/).waitFor({ timeout: 90000 });
+
+          const desktopValues = await desktopSelects.evaluateAll((els) => els.map((el) => el.value));
+          if (desktopValues.filter((v) => v === "__permission_pending__").length !== 5) {
+            throw new Error("Desktop did not retain 5 Permission Pending marks");
+          }
+          if (desktopValues.filter((v) => v === "Present").length !== 38) {
+            throw new Error("Desktop did not retain 38 Present marks");
+          }
+          await desktopPage.screenshot({ path: "/tmp/pw/desktop-attendance.png", fullPage: true });
+          await desktop.close();
+
+          const mobile = await browser.newContext({
+            viewport: { width: 390, height: 844 },
+            screen: { width: 390, height: 844 },
+            isMobile: true,
+            hasTouch: true,
+          });
+          const mobilePage = await mobile.newPage();
+          await waitForAttendance(mobilePage);
+
+          const mobileSelects = mobilePage.locator("article select:visible");
+          if (await mobileSelects.count() !== 43) {
+            throw new Error("Expected 43 mobile status controls");
+          }
+          const mobileValues = await mobileSelects.evaluateAll((els) => els.map((el) => el.value));
+          if (mobileValues.filter((v) => v === "__permission_pending__").length !== 5) {
+            throw new Error("Mobile readback did not show 5 Permission Pending marks");
+          }
+          if (mobileValues.filter((v) => v === "Present").length !== 38) {
+            throw new Error("Mobile readback did not show 38 Present marks");
+          }
+
+          await mobileSelects.nth(5).selectOption("Late");
+          await mobilePage.getByRole("button", { name: "Save attendance", exact: true }).click();
+          await mobilePage.getByText(/Attendance saved for .*43 marked, 0 unmarked/).waitFor({ timeout: 90000 });
+
+          const afterMobile = await mobileSelects.evaluateAll((els) => els.map((el) => el.value));
+          if (afterMobile.filter((v) => v === "__permission_pending__").length !== 5 ||
+              afterMobile.filter((v) => v === "Present").length !== 37 ||
+              afterMobile.filter((v) => v === "Late").length !== 1) {
+            throw new Error("Mobile save/readback did not match expected 5 pending / 37 present / 1 late");
+          }
+
+          const hasOverflow = await mobilePage.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth + 1,
+          );
+          if (hasOverflow) throw new Error("Mobile Attendance page has horizontal viewport overflow");
+
+          await mobilePage.screenshot({ path: "/tmp/pw/mobile-attendance.png", fullPage: true });
+          await mobilePage.getByRole("button", { name: "Start Roll Call", exact: true }).click();
+          await mobilePage.getByText("Student 1 of 43", { exact: true }).waitFor({ timeout: 30000 });
+          await mobilePage.getByText("Class Summary", { exact: true }).waitFor({ timeout: 30000 });
+          await mobilePage.screenshot({ path: "/tmp/pw/mobile-roll-call.png", fullPage: true });
+
+          await mobile.close();
+          await browser.close();
+          console.log("BROWSER_UAT desktop_load=pass desktop_save=pass desktop_5_pending=pass mobile_readback=pass mobile_save=pass mobile_no_overflow=pass mobile_roll_call=pass");
+          NODE
+
+          node /tmp/pw/uat.mjs
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-browser-uat
+          path: |
+            /tmp/pw/desktop-attendance.png
+            /tmp/pw/mobile-attendance.png
+            /tmp/pw/mobile-roll-call.png
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Show frontend log on failure
+        if: failure()
+        run: cat /tmp/frontend.log || true
