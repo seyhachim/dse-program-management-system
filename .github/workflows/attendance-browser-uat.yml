@@ -42,7 +42,7 @@ jobs:
           bun run --cwd apps/frontend dev > /tmp/dse-frontend.log 2>&1 &
           echo $! > /tmp/dse-frontend.pid
           for attempt in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3000/login >/dev/null 2>&1; then
+            if curl -fsS http://localhost:3000/login >/dev/null 2>&1; then
               echo "Frontend ready on attempt $attempt"
               exit 0
             fi
@@ -67,7 +67,7 @@ jobs:
           cat > /tmp/browser-uat/attendance.spec.cjs <<'EOF'
           const { test, expect } = require('@playwright/test');
 
-          const APP = 'http://127.0.0.1:3000';
+          const APP = 'http://localhost:3000';
           const EMAIL = process.env.UAT_EMAIL;
           const PASSWORD = process.env.UAT_PASSWORD;
           const DATE = process.env.UAT_DATE;
