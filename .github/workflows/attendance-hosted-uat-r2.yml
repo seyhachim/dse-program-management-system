@@ -19,6 +19,7 @@ jobs:
       OFFERING_ID: 33333333-3333-4333-8333-333333333333
       UAT_DATE: "2099-11-15"
       UAT_EMAIL: seyhachim.pr1145.uat@gmail.com
+      UAT_PASSWORD: ${{ secrets.DSE_PMS_UAT_PASSWORD }}
 
     steps:
       - name: Health boundary
@@ -33,23 +34,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PW=$(openssl rand -hex 20)
-          echo "::add-mask::$PW"
-          echo "UAT_PASSWORD=$PW" >> "$GITHUB_ENV"
-          CODE=$(curl -sS --max-time 30 -o /tmp/signup.json -w '%{http_code}' -X POST "$SUPABASE_URL/auth/v1/signup" -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
-          if [ "$CODE" != "200" ]; then jq '{code,error_code,msg,message}' /tmp/signup.json; exit 22; fi
-          TOKEN=$(jq -r '.access_token // empty' /tmp/signup.json)
-          for attempt in $(seq 1 50); do
-            if [ -n "$TOKEN" ]; then break; fi
-            sleep 8
-            LOGIN_CODE=$(curl -sS --max-time 30 -o /tmp/login.json -w '%{http_code}' -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
-            if [ "$LOGIN_CODE" = "200" ]; then TOKEN=$(jq -r '.access_token // empty' /tmp/login.json); fi
-            echo "confirmation wait attempt $attempt"
-          done
+          if [ -z "${UAT_PASSWORD:-}" ]; then echo "Missing DSE_PMS_UAT_PASSWORD repository secret"; exit 23; fi
+          CODE=$(curl -sS --max-time 30 -o /tmp/login.json -w '%{http_code}' -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$UAT_PASSWORD" '{email:$email,password:$password}')")
+          if [ "$CODE" != "200" ]; then jq '{code,error_code,msg,message}' /tmp/login.json; exit 24; fi
+          TOKEN=$(jq -r '.access_token // empty' /tmp/login.json)
           test -n "$TOKEN"
           echo "::add-mask::$TOKEN"
           echo "UAT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-
       - name: Attendance contract
         shell: bash
         run: |
