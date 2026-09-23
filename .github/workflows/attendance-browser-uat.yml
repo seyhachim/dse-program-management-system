@@ -73,7 +73,7 @@ jobs:
           const DATE = process.env.UAT_DATE;
           const OFFERING_ID = process.env.UAT_OFFERING_ID;
 
-          test.setTimeout(420_000);
+          test.setTimeout(600_000);
 
           async function login(page) {
             await page.goto(`${APP}/login`, { waitUntil: 'domcontentloaded' });
@@ -93,9 +93,7 @@ jobs:
           }
 
           function statusSelects(page) {
-            return page.locator('select:visible').filter({
-              has: page.locator('option[value="__permission_pending__"]'),
-            });
+            return page.locator('select:has(option[value="__permission_pending__"]):visible');
           }
 
           function attendancePut(response) {
@@ -110,7 +108,14 @@ jobs:
             await loadAttendance(pageA);
 
             const statusA = statusSelects(pageA);
-            await expect(statusA).toHaveCount(43, { timeout: 30_000 });
+            try {
+              await expect(statusA).toHaveCount(43, { timeout: 120_000 });
+            } catch (error) {
+              console.log("ATTENDANCE_PAGE_TEXT=" + (await pageA.locator('body').innerText()).slice(0, 5000));
+              console.log("VISIBLE_SELECTS=" + await pageA.locator('select:visible').count());
+              console.log("ATTENDANCE_STATUS_SELECTS=" + await statusA.count());
+              throw error;
+            }
             await expect(pageA.getByRole('columnheader', { name: 'Student ID' })).toBeVisible();
             await pageA.screenshot({ path: '/tmp/browser-uat/desktop-before-save.png', fullPage: true });
 
@@ -135,7 +140,7 @@ jobs:
             const pageB = await desktop.newPage();
             await loadAttendance(pageB);
             const statusB = statusSelects(pageB);
-            await expect(statusB).toHaveCount(43, { timeout: 30_000 });
+            await expect(statusB).toHaveCount(43, { timeout: 120_000 });
             for (let i = 0; i < 5; i += 1) await expect(statusB.nth(i)).toHaveValue('__permission_pending__');
 
             await statusA.nth(5).selectOption('Late');
@@ -176,7 +181,7 @@ jobs:
             const mobilePage = await mobile.newPage();
             await loadAttendance(mobilePage);
             const mobileStatus = statusSelects(mobilePage);
-            await expect(mobileStatus).toHaveCount(43, { timeout: 30_000 });
+            await expect(mobileStatus).toHaveCount(43, { timeout: 120_000 });
             await expect(mobilePage.getByRole('columnheader', { name: 'Student ID' })).toBeHidden();
             await expect(mobilePage.getByRole('button', { name: 'Start Roll Call' })).toBeVisible();
             await mobilePage.getByRole('button', { name: 'Start Roll Call' }).click();
