@@ -274,6 +274,32 @@ export const offeringService = {
     return offering ? toView(offering, await lecturerLookup()) : null;
   },
 
+  /**
+   * Minimal authorization projection for offering-scoped routes. Keep access
+   * checks independent from the much heavier full OfferingView/read model.
+   */
+  async accessScope(id: string): Promise<{
+    programmeId: string | null;
+    lecturerId: string | null;
+    coLecturerIds: string[];
+  } | null> {
+    const offering = await prisma.offering.findUnique({
+      where: { id },
+      select: {
+        lecturerId: true,
+        course: { select: { programmeId: true } },
+        coLecturers: { select: { lecturerId: true } },
+      },
+    });
+    return offering
+      ? {
+          programmeId: offering.course?.programmeId ?? null,
+          lecturerId: offering.lecturerId,
+          coLecturerIds: offering.coLecturers.map((item) => item.lecturerId),
+        }
+      : null;
+  },
+
   async programmeIdForCourse(courseId: string): Promise<string | null> {
     return (await courses().getById(courseId))?.programmeId ?? null;
   },
