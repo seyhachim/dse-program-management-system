@@ -18,7 +18,7 @@ jobs:
       CANDIDATE_URL: https://dse-pms-native-prod-candidate.onrender.com
       OFFERING_ID: 33333333-3333-4333-8333-333333333333
       UAT_DATE: "2099-11-15"
-      UAT_EMAIL: seyhachim+pr1145-uat2@gmail.com
+      UAT_EMAIL: seyhachim.pr1145.uat@gmail.com
 
     steps:
       - name: Health boundary
@@ -37,7 +37,7 @@ jobs:
           echo "::add-mask::$PW"
           echo "UAT_PASSWORD=$PW" >> "$GITHUB_ENV"
           CODE=$(curl -sS --max-time 30 -o /tmp/signup.json -w '%{http_code}' -X POST "$SUPABASE_URL/auth/v1/signup" -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
-          test "$CODE" = "200"
+          if [ "$CODE" != "200" ]; then jq '{code,error_code,msg,message}' /tmp/signup.json; exit 22; fi
           TOKEN=$(jq -r '.access_token // empty' /tmp/signup.json)
           for attempt in $(seq 1 50); do
             if [ -n "$TOKEN" ]; then break; fi
