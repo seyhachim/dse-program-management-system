@@ -1,0 +1,93 @@
+name: Attendance Hosted UAT R2
+
+on:
+  push:
+    branches:
+      - ops/1145-attendance-hosted-uat-r2
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-uat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: https://dwiqdvxfmzklhrviuzem.supabase.co
+      SUPABASE_KEY: sb_publishable_kGzTbbPovGtW37a9BUeJQA_W_028IFp
+      CANDIDATE_URL: https://dse-pms-native-prod-candidate.onrender.com
+      OFFERING_ID: 33333333-3333-4333-8333-333333333333
+      UAT_DATE: "2099-11-15"
+      UAT_EMAIL: seyhachim+pr1145-uat2@gmail.com
+
+    steps:
+      - name: Health boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(curl -sS --retry 2 --retry-delay 5 --max-time 90 -o /tmp/health.json -w '%{http_code}' "$CANDIDATE_URL/health")" = "200"
+          jq -e '.ok == true' /tmp/health.json >/dev/null
+          test "$(curl -sS --max-time 60 -o /tmp/unauth.json -w '%{http_code}' "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")" = "401"
+
+      - name: Disposable auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          PW=$(openssl rand -hex 20)
+          echo "::add-mask::$PW"
+          echo "UAT_PASSWORD=$PW" >> "$GITHUB_ENV"
+          CODE=$(curl -sS --max-time 30 -o /tmp/signup.json -w '%{http_code}' -X POST "$SUPABASE_URL/auth/v1/signup" -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
+          test "$CODE" = "200"
+          TOKEN=$(jq -r '.access_token // empty' /tmp/signup.json)
+          for attempt in $(seq 1 50); do
+            if [ -n "$TOKEN" ]; then break; fi
+            sleep 8
+            LOGIN_CODE=$(curl -sS --max-time 30 -o /tmp/login.json -w '%{http_code}' -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" --data "$(jq -nc --arg email "$UAT_EMAIL" --arg password "$PW" '{email:$email,password:$password}')")
+            if [ "$LOGIN_CODE" = "200" ]; then TOKEN=$(jq -r '.access_token // empty' /tmp/login.json); fi
+            echo "confirmation wait attempt $attempt"
+          done
+          test -n "$TOKEN"
+          echo "::add-mask::$TOKEN"
+          echo "UAT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Attendance contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          AUTH="Authorization: Bearer $UAT_TOKEN"
+          GET_CODE=$(curl -sS --max-time 90 -o /tmp/get0.json -w '%{http_code}' -H "$AUTH" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
+          test "$GET_CODE" = "200"
+          jq -e '.records|length == 43' /tmp/get0.json >/dev/null
+          jq -e '.updatedAt == null and .counts.Unmarked == 43' /tmp/get0.json >/dev/null
+          NO_VERSION=$(jq '{records:[.records[0]|{studentId,status:"Present",permissionPending:false,note:""}]}' /tmp/get0.json)
+          CODE_428=$(curl -sS --max-time 90 -o /tmp/428.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$NO_VERSION" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
+          test "$CODE_428" = "428"
+          FULL=$(jq '{expectedUpdatedAt:null,records:(.records|to_entries|map(if .key < 5 then {studentId:.value.studentId,status:null,permissionPending:true,note:"UAT pending"} elif .key < 25 then {studentId:.value.studentId,status:"Present",permissionPending:false,note:""} elif .key < 35 then {studentId:.value.studentId,status:"Late",permissionPending:false,note:""} elif .key < 40 then {studentId:.value.studentId,status:"Absent",permissionPending:false,note:""} else {studentId:.value.studentId,status:"Excused",permissionPending:false,note:""} end))}' /tmp/get0.json)
+          START=$(date +%s)
+          SAVE_CODE=$(curl -sS --max-time 90 -o /tmp/save1.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$FULL" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
+          ELAPSED=$(( $(date +%s)-START ))
+          test "$SAVE_CODE" = "200"
+          jq -e '.counts.PermissionPending==5 and .counts.Present==20 and .counts.Late==10 and .counts.Absent==5 and .counts.Excused==3 and .counts.Unmarked==0' /tmp/save1.json >/dev/null
+          V1=$(jq -r '.updatedAt' /tmp/save1.json)
+          READ_CODE=$(curl -sS --max-time 90 -o /tmp/read1.json -w '%{http_code}' -H "$AUTH" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
+          test "$READ_CODE" = "200"
+          jq -e '.counts.PermissionPending==5 and .counts.Present==20 and .counts.Late==10 and .counts.Absent==5 and .counts.Excused==3 and .counts.Unmarked==0' /tmp/read1.json >/dev/null
+          STALE=$(jq '.expectedUpdatedAt=null' <<<"$FULL")
+          test "$(curl -sS --max-time 90 -o /tmp/stale.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$STALE" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")" = "409"
+          TAB_A=$(jq --arg v "$V1" '{expectedUpdatedAt:$v,records:(.records|map({studentId,status:(if .permissionPending then null else .status end),permissionPending,note})|.[5].status="Late")}' /tmp/read1.json)
+          TAB_B=$(jq --arg v "$V1" '{expectedUpdatedAt:$v,records:(.records|map({studentId,status:(if .permissionPending then null else .status end),permissionPending,note})|.[6].status="Absent")}' /tmp/read1.json)
+          test "$(curl -sS --max-time 90 -o /tmp/tabA.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$TAB_A" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")" = "200"
+          V2=$(jq -r '.updatedAt' /tmp/tabA.json)
+          test "$V2" != "$V1"
+          test "$(curl -sS --max-time 90 -o /tmp/tabB.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$TAB_B" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")" = "409"
+          BAD=$(jq --arg v "$V2" '{expectedUpdatedAt:$v,records:(.records|map({studentId,status:(if .permissionPending then null else .status end),permissionPending,note})|.[7].studentId="00000000-0000-4000-8000-000000000999")}' /tmp/tabA.json)
+          test "$(curl -sS --max-time 90 -o /tmp/bad.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$BAD" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")" = "400"
+          AFTER_BAD=$(curl -sS --max-time 90 -H "$AUTH" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
+          test "$(jq -r '.updatedAt' <<<"$AFTER_BAD")" = "$V2"
+          RETRY=$(jq --arg v "$V2" '{expectedUpdatedAt:$v,records:(.records|map({studentId,status:(if .permissionPending then null else .status end),permissionPending,note})|.[7].status="Late")}' /tmp/tabA.json)
+          test "$(curl -sS --max-time 90 -o /tmp/retry.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$RETRY" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")" = "200"
+          STUDENT=$(jq -r '.records[5].studentId' /tmp/retry.json)
+          RECHECK=$(jq -nc --arg s "$STUDENT" '{studentId:$s,observation:{status:"Late",permissionPending:false,note:"UAT Check 2"},final:{status:"Present",permissionPending:false,note:"UAT final"}}')
+          test "$(curl -sS --max-time 90 -o /tmp/recheck.json -w '%{http_code}' -X POST -H "$AUTH" -H "Content-Type: application/json" --data "$RECHECK" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE/recheck")" = "200"
+          jq --arg s "$STUDENT" -e '.records[]|select(.studentId==$s)|(.checkpoints|length)==2 and .status=="Present"' /tmp/recheck.json >/dev/null
+          echo "UAT_SUMMARY health=200 unauthorized=401 roster=43 precondition=428 full_save=200 full_save_seconds=$ELAPSED readback=200 stale=409 tabA=200 tabB=409 failed_save=400 retry=200 recheck=200"
