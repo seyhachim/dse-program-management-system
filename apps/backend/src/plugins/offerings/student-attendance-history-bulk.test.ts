@@ -90,7 +90,7 @@ describe("batched attendance warning evaluation", () => {
     ];
 
     const evaluations = evaluateAttendanceWarningsByStudent(studentIds, rows);
-    expect(evaluations).toHaveLength(43);
+    expect(evaluations.size).toBe(43);
     expect(evaluations.get("student-3")?.counts.Absent).toBe(2);
     expect(evaluations.get("student-3")?.counts.Excused).toBe(1);
     expect(evaluations.get("student-3")?.warningCandidates).toContainEqual(
