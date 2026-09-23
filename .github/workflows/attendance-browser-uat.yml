@@ -1,0 +1,100 @@
+name: Attendance Browser UAT
+
+on:
+  push:
+    branches:
+      - ops/1145-browser-uat-r3
+
+permissions:
+  contents: read
+
+jobs:
+  browser-uat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_API_URL: https://dse-pms-native-prod-candidate.onrender.com
+      NEXT_PUBLIC_AUTH_MODE: supabase
+      NEXT_PUBLIC_SUPABASE_URL: https://dwiqdvxfmzklhrviuzem.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_kGzTbbPovGtW37a9BUeJQA_W_028IFp
+      UAT_BASE_URL: http://127.0.0.1:3000
+      UAT_EMAIL: seyhachim.pr1145.uat@gmail.com
+      UAT_PASSWORD: ${{ secrets.DSE_PMS_UAT_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Verify candidate is live
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            CODE=$(curl -sS --max-time 30 -o /tmp/health.json -w '%{http_code}' "$NEXT_PUBLIC_API_URL/health" || true)
+            if [ "$CODE" = "200" ] && jq -e '.ok == true' /tmp/health.json >/dev/null 2>&1; then
+              echo "candidate health=200 attempt=$attempt"
+              exit 0
+            fi
+            echo "waiting for candidate attempt=$attempt http=$CODE"
+            sleep 10
+          done
+          exit 20
+
+      - name: Install and build exact frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run --cwd apps/frontend build
+
+      - name: Start disposable frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup bun run --cwd apps/frontend start > /tmp/frontend.log 2>&1 &
+          echo $! > /tmp/frontend.pid
+          for attempt in $(seq 1 30); do
+            if curl -sS --max-time 5 "$UAT_BASE_URL/login" >/dev/null; then
+              echo "frontend ready attempt=$attempt"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/frontend.log
+          exit 21
+
+      - name: Install Chromium browser harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pw
+          cd /tmp/pw
+          npm init -y >/dev/null
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run authenticated desktop and mobile UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/uat/attendance-browser-uat.mjs /tmp/pw/attendance-browser-uat.mjs
+          cd /tmp/pw
+          node attendance-browser-uat.mjs
+
+      - name: Upload UAT screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-browser-uat-screenshots
+          path: |
+            /tmp/attendance-desktop.png
+            /tmp/attendance-mobile.png
+          if-no-files-found: ignore
+
+      - name: Print frontend log on failure
+        if: failure()
+        shell: bash
+        run: cat /tmp/frontend.log || true
