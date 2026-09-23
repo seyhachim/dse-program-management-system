@@ -47,17 +47,21 @@ jobs:
           set -euo pipefail
           AUTH="Authorization: Bearer $UAT_TOKEN"
           GET_CODE=$(curl -sS --max-time 90 -o /tmp/get0.json -w '%{http_code}' -H "$AUTH" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$GET_CODE" = "200"
-          jq -e '.records|length == 43' /tmp/get0.json >/dev/null
-          jq -e '.updatedAt == null and .counts.Unmarked == 43' /tmp/get0.json >/dev/null
+          echo "STAGE initial_get http=$GET_CODE"
+          if [ "$GET_CODE" != "200" ]; then jq '{error,message,code,statusCode}' /tmp/get0.json 2>/dev/null || cat /tmp/get0.json; exit 31; fi
+          echo "STAGE roster count=$(jq '.records|length' /tmp/get0.json) updatedAt=$(jq -r '.updatedAt' /tmp/get0.json) unmarked=$(jq -r '.counts.Unmarked' /tmp/get0.json)"
+          jq -e '.records|length == 43' /tmp/get0.json >/dev/null || { jq '{counts,updatedAt,recordCount:(.records|length)}' /tmp/get0.json; exit 32; }
+          jq -e '.updatedAt == null and .counts.Unmarked == 43' /tmp/get0.json >/dev/null || { jq '{counts,updatedAt}' /tmp/get0.json; exit 33; }
           NO_VERSION=$(jq '{records:[.records[0]|{studentId,status:"Present",permissionPending:false,note:""}]}' /tmp/get0.json)
           CODE_428=$(curl -sS --max-time 90 -o /tmp/428.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$NO_VERSION" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
-          test "$CODE_428" = "428"
+          echo "STAGE precondition_without_version http=$CODE_428"
+          if [ "$CODE_428" != "428" ]; then jq '{error,message,code,statusCode}' /tmp/428.json 2>/dev/null || cat /tmp/428.json; exit 34; fi
           FULL=$(jq '{expectedUpdatedAt:null,records:(.records|to_entries|map(if .key < 5 then {studentId:.value.studentId,status:null,permissionPending:true,note:"UAT pending"} elif .key < 25 then {studentId:.value.studentId,status:"Present",permissionPending:false,note:""} elif .key < 35 then {studentId:.value.studentId,status:"Late",permissionPending:false,note:""} elif .key < 40 then {studentId:.value.studentId,status:"Absent",permissionPending:false,note:""} else {studentId:.value.studentId,status:"Excused",permissionPending:false,note:""} end))}' /tmp/get0.json)
           START=$(date +%s)
           SAVE_CODE=$(curl -sS --max-time 90 -o /tmp/save1.json -w '%{http_code}' -X PUT -H "$AUTH" -H "Content-Type: application/json" --data "$FULL" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
           ELAPSED=$(( $(date +%s)-START ))
-          test "$SAVE_CODE" = "200"
+          echo "STAGE full_save http=$SAVE_CODE seconds=$ELAPSED"
+          if [ "$SAVE_CODE" != "200" ]; then jq '{error,message,code,statusCode}' /tmp/save1.json 2>/dev/null || cat /tmp/save1.json; exit 35; fi
           jq -e '.counts.PermissionPending==5 and .counts.Present==20 and .counts.Late==10 and .counts.Absent==5 and .counts.Excused==3 and .counts.Unmarked==0' /tmp/save1.json >/dev/null
           V1=$(jq -r '.updatedAt' /tmp/save1.json)
           READ_CODE=$(curl -sS --max-time 90 -o /tmp/read1.json -w '%{http_code}' -H "$AUTH" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
