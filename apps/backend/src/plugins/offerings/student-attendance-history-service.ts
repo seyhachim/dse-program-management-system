@@ -37,6 +37,18 @@ export type AttendanceAggregatePendingRow = {
   sessionId: string;
 };
 
+export type AttendanceWarningAggregateRow = {
+  studentId: string;
+  sessionId: string;
+  sessionDate: Date;
+  status: AttendanceStatus;
+};
+
+export type AttendanceWarningEvaluation = {
+  counts: Record<AttendanceStatus, number>;
+  warningCandidates: ReturnType<typeof evaluateAttendanceHealth>["warningCandidates"];
+};
+
 export type StudentAttendanceHealthSummary = {
   offeringId: string;
   history: {
@@ -65,6 +77,43 @@ const students = () => registry.get<StudentLookup>("students").service;
 
 function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: number } {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 };
+}
+
+function emptyFinalCounts(): Record<AttendanceStatus, number> {
+  return { Present: 0, Absent: 0, Late: 0, Excused: 0 };
+}
+
+/**
+ * Evaluate warning candidates for many students from one set-based attendance history read.
+ * This keeps the synchronous save path bounded instead of issuing per-student/per-session queries.
+ */
+export function evaluateAttendanceWarningsByStudent(
+  studentIds: string[],
+  rows: AttendanceWarningAggregateRow[],
+): Map<string, AttendanceWarningEvaluation> {
+  const uniqueStudentIds = [...new Set(studentIds)];
+  const recordsByStudent = new Map<string, AttendanceHealthRecord[]>();
+  const countsByStudent = new Map<string, Record<AttendanceStatus, number>>();
+
+  for (const row of rows) {
+    const records = recordsByStudent.get(row.studentId) ?? [];
+    records.push({
+      sessionId: row.sessionId,
+      date: row.sessionDate.toISOString().slice(0, 10),
+      status: row.status,
+    });
+    recordsByStudent.set(row.studentId, records);
+
+    const counts = countsByStudent.get(row.studentId) ?? emptyFinalCounts();
+    counts[row.status] += 1;
+    countsByStudent.set(row.studentId, counts);
+  }
+
+  return new Map(uniqueStudentIds.map((studentId) => {
+    const counts = countsByStudent.get(studentId) ?? emptyFinalCounts();
+    const evaluation = evaluateAttendanceHealth(recordsByStudent.get(studentId) ?? [], counts);
+    return [studentId, { counts, warningCandidates: evaluation.warningCandidates }];
+  }));
 }
 
 export function summarizeStudentAttendanceHealthByOffering(
@@ -220,6 +269,33 @@ export const studentAttendanceHistoryService = {
       .map((row) => ({ sessionId: row.sessionId, date: row.date, status: row.status }));
     const evaluation = evaluateAttendanceHealth(finalized, history.counts);
     return { history, ...evaluation };
+  },
+
+  async warningHealthForStudents(
+    studentIds: string[],
+    offeringId: string,
+  ): Promise<Map<string, AttendanceWarningEvaluation>> {
+    const uniqueStudentIds = [...new Set(studentIds)];
+    if (uniqueStudentIds.length === 0) return new Map();
+
+    const rows = await prisma.$queryRaw<AttendanceWarningAggregateRow[]>(Prisma.sql`
+      SELECT
+        record."studentId",
+        record."sessionId",
+        session."sessionDate",
+        record."status"
+      FROM "pms_attendance"."AttendanceRecord" record
+      INNER JOIN "pms_attendance"."AttendanceSession" session
+        ON session."id" = record."sessionId"
+      INNER JOIN "Student" student
+        ON student."id" = record."studentId"
+      WHERE session."offeringId" = ${offeringId}
+        AND record."studentId" IN (${Prisma.join(uniqueStudentIds)})
+        AND student."studentId" IS NOT NULL
+      ORDER BY record."studentId", session."sessionDate" DESC
+    `);
+
+    return evaluateAttendanceWarningsByStudent(uniqueStudentIds, rows);
   },
 
   async healthForStudentOfferings(
