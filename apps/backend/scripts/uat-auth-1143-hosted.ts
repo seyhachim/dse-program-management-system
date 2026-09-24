@@ -126,20 +126,17 @@ export async function runAuth1143HostedUat(): Promise<void> {
     await record("unprovisioned-hosted-user", unknown.token, 403);
 
     // 5) A current Google-linked identity must fail closed even when using an email magic-link session.
-    const users = await admin.auth.admin.listUsers({ page: 1, perPage: 100 });
-    if (users.error) throw users.error;
-    let googleLinked: { email?: string | null } | null = null;
-    for (const candidate of users.data.users) {
-      const detail = await admin.auth.admin.getUserById(candidate.id);
-      if (detail.error || !detail.data.user) continue;
-      const providers = new Set(detail.data.user.identities?.map((identity) => identity.provider) ?? []);
-      if (detail.data.user.email && providers.has("google") && providers.has("email")) {
-        googleLinked = detail.data.user;
-        break;
-      }
-    }
-    if (!googleLinked?.email) throw new Error("No disposable email+Google hosted identity available for social-provider regression");
-    const googleLinkedToken = await sessionForEmail(admin, googleLinked.email);
+    const googleLinkedRows = await prisma.$queryRaw<Array<{ email: string }>>`
+      select u.email
+      from auth.users u
+      join auth.identities e on e.user_id = u.id and e.provider = 'email'
+      join auth.identities g on g.user_id = u.id and g.provider = 'google'
+      where u.email is not null
+      limit 1
+    `;
+    const googleLinkedEmail = googleLinkedRows[0]?.email;
+    if (!googleLinkedEmail) throw new Error("No disposable email+Google hosted identity available for social-provider regression");
+    const googleLinkedToken = await sessionForEmail(admin, googleLinkedEmail);
     await record("same-uid-current-google-identity", googleLinkedToken, 403);
 
     // 6) Per-request Admin verification latency sample on the successful bound account.
