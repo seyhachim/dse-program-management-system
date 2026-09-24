@@ -59,9 +59,20 @@ function fixture(): QaSarBookDocument {
           sourceKind: "approvedSubmission",
           submissionId: "submission-1",
           submissionVersion: 3,
-          content: null,
-          plainText: "Approved requirement narrative",
-          evidenceIds: [],
+          content: {
+            version: 1,
+            blocks: [
+              { id: "p1", type: "paragraph", text: "Approved requirement narrative" },
+              {
+                id: "e1",
+                type: "evidenceReference",
+                evidenceId: "00000000-0000-4000-8000-000000000008",
+                label: "Approved programme evidence",
+              },
+            ],
+          },
+          plainText: "Approved requirement narrative [Evidence: Approved programme evidence]",
+          evidenceIds: ["00000000-0000-4000-8000-000000000008"],
         }],
       }],
     },
@@ -92,7 +103,22 @@ function fixture(): QaSarBookDocument {
         note: "Human self-assessment only — ratings are not external assessor scores or an accreditation verdict.",
         criteria: [],
         associations: [],
-        improvementActions: [],
+        improvementActions: [{
+          id: "00000000-0000-4000-8000-000000000009",
+          requirementCode: "1.1",
+          plannedAction: "Improve curriculum review follow-up",
+          indicator: "Action closed with evidence",
+          ownerId: "00000000-0000-4000-8000-000000000002",
+          ownerName: "Programme Head",
+          dueDate: "2026-12-15T00:00:00.000Z",
+          status: "inProgress",
+          result: "",
+          effectivenessReview: "",
+          overdue: false,
+          followUpEvidenceCount: 0,
+          sourceAnalysisId: "00000000-0000-4000-8000-000000000010",
+          sourceReviewId: "00000000-0000-4000-8000-000000000011",
+        }],
       },
     },
     part4: {
@@ -116,7 +142,27 @@ function fixture(): QaSarBookDocument {
           requirementLabel: "Requirement",
           criterionLabel: "Criterion",
         },
-        items: [],
+        items: [{
+          evidenceId: "00000000-0000-4000-8000-000000000008",
+          title: "Approved programme evidence",
+          kind: "document",
+          status: "reviewed",
+          reportingPeriod: "2026",
+          sourceRef: "QA-EV-001",
+          sourceUrl: null,
+          appendixGroup: "programme",
+          number: "1.1-01",
+          citationLabel: "Exhibit 1.1-01",
+          citationText: "Exhibit 1.1-01 — Approved programme evidence",
+          usages: [{
+            part: "part2",
+            sectionKey: "part2.1.1",
+            sectionTitle: "Programme learning outcomes are established",
+            requirementCode: "1.1",
+            submissionId: null,
+            revisionId: null,
+          }],
+        }],
         issues: [],
         generatedAt: "2026-08-29T00:00:00.000Z",
       },
@@ -150,6 +196,15 @@ function fixture(): QaSarBookDocument {
 describe("SAR book export", () => {
   test("uses a deterministic official release filename", () => {
     expect(sarBookExportBaseName(fixture())).toBe("DSE-AUN-QA-SAR-2026-2027-release-v2");
+  });
+
+  test("keeps PDF text projection aligned with exhibit numbering and full improvement-plan accountability", () => {
+    const lines = sarBookDocumentLines(fixture());
+    expect(lines).toContain("[1.1-01] Approved programme evidence");
+    expect(lines.some((line) => line.includes("[Evidence: Approved programme evidence]"))).toBe(false);
+    expect(lines).toContain(
+      "1.1 — Action: Improve curriculum review follow-up — Indicator: Action closed with evidence — Owner: Programme Head — Due: 2026-12-15 — Status: inProgress",
+    );
   });
 
   test("projects all four parts in canonical order", () => {
