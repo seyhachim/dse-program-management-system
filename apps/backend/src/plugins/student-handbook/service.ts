@@ -32,6 +32,7 @@ const SOURCE_LABELS: Record<StudentHandbookSourceKind, string> = {
   CURRICULUM_SUMMARY: "From Curriculum",
   PROGRAMME_PROFILE: "From Programme",
   PROGRAMME_CONTACT: "From Programme Contacts",
+  ACADEMIC_CALENDAR_LINKS: "Official Academic Calendar",
 };
 
 type ProgrammeReadContract = {
@@ -41,6 +42,9 @@ type ProgrammeReadContract = {
   publicRead: {
     getProgramme(programmeId: string): Promise<unknown>;
     getContact(programmeId: string): Promise<unknown>;
+  };
+  academicCalendar: {
+    currentAcademicYear(programmeId: string): Promise<{ label: string } | null>;
   };
 };
 
@@ -91,17 +95,39 @@ function programmeService(): ProgrammeReadContract {
   return registry.get<ProgrammeReadContract>("programme").service;
 }
 
+function academicCalendarLinks(programmeId: string, academicYearLabel: string) {
+  const academicYearSegment = academicYearLabel.replace(/–/g, "-");
+  const base = `/calendar/${encodeURIComponent(programmeId)}/${encodeURIComponent(academicYearSegment)}`;
+  return {
+    "Academic Year": academicYearLabel,
+    "Year 1": `${base}/year-1`,
+    "Year 2": `${base}/year-2`,
+    "Year 3": `${base}/year-3`,
+    "Year 4": `${base}/year-4`,
+  };
+}
+
 async function resolveSource(
   programmeId: string,
   kind: StudentHandbookSourceKind,
 ): Promise<StudentHandbookSourcePreview> {
   const service = programmeService();
-  const data =
-    kind === "CURRICULUM_SUMMARY"
-      ? await service.publicCurriculumRead.getTotals(programmeId)
-      : kind === "PROGRAMME_PROFILE"
-        ? await service.publicRead.getProgramme(programmeId)
-        : await service.publicRead.getContact(programmeId);
+  let data: unknown;
+  if (kind === "CURRICULUM_SUMMARY") {
+    data = await service.publicCurriculumRead.getTotals(programmeId);
+  } else if (kind === "PROGRAMME_PROFILE") {
+    data = await service.publicRead.getProgramme(programmeId);
+  } else if (kind === "PROGRAMME_CONTACT") {
+    data = await service.publicRead.getContact(programmeId);
+  } else {
+    const academicYear = await service.academicCalendar.currentAcademicYear(programmeId);
+    if (!academicYear) {
+      throw new StudentHandbookValidationError(
+        "No current Academic Year is configured for this programme",
+      );
+    }
+    data = academicCalendarLinks(programmeId, academicYear.label);
+  }
 
   return {
     kind,

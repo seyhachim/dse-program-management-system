@@ -17,6 +17,7 @@ export const StudentHandbookSourceKindSchema = z.enum([
   "CURRICULUM_SUMMARY",
   "PROGRAMME_PROFILE",
   "PROGRAMME_CONTACT",
+  "ACADEMIC_CALENDAR_LINKS",
 ]);
 export type StudentHandbookSourceKind = z.infer<typeof StudentHandbookSourceKindSchema>;
 
