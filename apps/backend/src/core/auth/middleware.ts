@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { prisma } from "../db/prisma.ts";
 import { AccountLinkingError, assertEmailOnlySupabaseIdentity, assertLegacyEmailClaim, type ConfirmedAuthUser } from "./account-linking.ts";
+import { resolveRequestAuthOnce } from "./request-auth-cache.ts";
 import {
   getAuthMode,
   verifySupabaseToken,
@@ -21,6 +22,7 @@ declare global {
 }
 
 class UnprovisionedAccountError extends Error {}
+class PasswordChangeRequiredError extends Error {}
 
 let verificationClient: SupabaseClient | undefined;
 
@@ -67,18 +69,28 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    req.user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
+    await resolveRequestAuthOnce(req, async () => {
+      const user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
 
-    if (await mustChangePassword(req.user.id) && !isPasswordRecoveryRoute(req)) {
+      // Cache this request only after the complete authentication boundary has
+      // succeeded. A password-gated or failed identity request is never marked
+      // verified and therefore cannot bypass a later middleware invocation.
+      if (await mustChangePassword(user.id) && !isPasswordRecoveryRoute(req)) {
+        throw new PasswordChangeRequiredError();
+      }
+
+      return user;
+    });
+
+    next();
+  } catch (err) {
+    if (err instanceof PasswordChangeRequiredError) {
       res.status(403).json({
         error: "Password change required before using DSE PMS",
         code: "PASSWORD_CHANGE_REQUIRED",
       });
       return;
     }
-
-    next();
-  } catch (err) {
     if (err instanceof UnprovisionedAccountError) {
       res.status(403).json({ error: err.message });
       return;
