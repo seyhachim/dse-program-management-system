@@ -1,0 +1,64 @@
+name: SAR Book Browser UAT
+
+on:
+  push:
+    branches:
+      - fix/1151-sar-release-integrity
+    paths:
+      - "apps/frontend/app/(shell)/aun-qa/sar-preview/**"
+      - "packages/shared-types/src/qa-sar-book-release.ts"
+      - ".github/uat/sar-book-browser.spec.ts"
+      - ".github/workflows/uat-sar-book-browser.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sar-book-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install repository dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install temporary Playwright test runner
+        run: bun add --dev @playwright/test@1.55.0
+
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Start frontend in isolated dev-auth mode
+        env:
+          NEXT_PUBLIC_AUTH_MODE: dev
+          NEXT_PUBLIC_DEV_TOKEN: sar-book-browser-uat
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3000/mock-api
+        run: |
+          bun run --cwd apps/frontend dev --hostname 127.0.0.1 --port 3000 > /tmp/sar-book-next.log 2>&1 &
+          echo $! > /tmp/sar-book-next.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/aun-qa/sar-preview >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sar-book-next.log
+          exit 1
+
+      - name: Run authenticated SAR Book browser smoke
+        run: bunx playwright test .github/uat/sar-book-browser.spec.ts --reporter=line
+
+      - name: Upload SAR Book browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sar-book-browser-uat-evidence
+          path: |
+            artifacts/sar-book-browser
+            /tmp/sar-book-next.log
+          if-no-files-found: warn
