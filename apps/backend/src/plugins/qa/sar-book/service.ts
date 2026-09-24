@@ -105,8 +105,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function extractQaSarBookRequirementPins(snapshot: Prisma.JsonValue): QaSarBookRequirementPin[] {
-  if (!isRecord(snapshot) || !Array.isArray(snapshot.criteria)) return [];
+  if (!isRecord(snapshot)) return [];
 
+  if (isRecord(snapshot.sourceIndex) && Array.isArray(snapshot.sourceIndex.requirementPins)) {
+    return snapshot.sourceIndex.requirementPins
+      .flatMap((pin): QaSarBookRequirementPin[] => {
+        if (!isRecord(pin)) return [];
+        const requirementCode = pin.requirementCode;
+        const submissionId = pin.submissionId;
+        const submissionVersion = pin.submissionVersion;
+        if (
+          typeof requirementCode === "string" && requirementCode.trim() &&
+          typeof submissionId === "string" && submissionId.trim() &&
+          typeof submissionVersion === "number" && Number.isInteger(submissionVersion) && submissionVersion > 0
+        ) {
+          return [{ requirementCode, submissionId, submissionVersion }];
+        }
+        return [];
+      })
+      .sort((a, b) => a.requirementCode.localeCompare(b.requirementCode, undefined, { numeric: true }));
+  }
+
+  if (!Array.isArray(snapshot.criteria)) return [];
   const pins: QaSarBookRequirementPin[] = [];
   for (const criterion of snapshot.criteria) {
     if (!isRecord(criterion) || !Array.isArray(criterion.sections)) continue;
