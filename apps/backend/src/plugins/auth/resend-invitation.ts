@@ -48,6 +48,15 @@ type ResendRoleInvitationOptions = {
   skipNonPending?: boolean;
 };
 
+async function clearStaleInvitationBinding(userId: string, staleAuthId: string): Promise<void> {
+  // The linked Auth identity has already been deleted or is already missing.
+  // Clear only the exact stale binding; never overwrite a concurrent recovery.
+  await prisma.user.updateMany({
+    where: { id: userId, authId: staleAuthId },
+    data: { authId: null },
+  });
+}
+
 /**
  * Rotate only a still-pending Supabase invitation for the requested PMS role.
  * Confirmed, signed-in, non-invite, wrong-role, or email-mismatched identities
@@ -126,11 +135,17 @@ async function resendRoleInvitation(
   }
 
   const redirectTo = process.env.SUPABASE_INVITE_REDIRECT_URL;
+  const staleAuthId = user.authId;
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(user.email, {
     data: invitationMetadata(user.name, role),
     ...(redirectTo ? { redirectTo } : {}),
   });
   if (inviteError || !invited?.user) {
+    // The old pending Auth identity was deleted before the resend attempt.
+    // If Supabase refuses the replacement (for example, email rate limiting),
+    // never leave PMS pointing at a deleted Auth UID. Clearing only this exact
+    // stale binding keeps the account recoverable via the normal first-invite flow.
+    await clearStaleInvitationBinding(user.id, staleAuthId);
     throw new ProvisioningError(inviteError?.message ?? "Supabase could not resend the invitation");
   }
 
@@ -141,9 +156,10 @@ async function resendRoleInvitation(
     });
   } catch (error) {
     // Compensate if linking fails so a newly-created orphan auth identity does
-    // not block a later retry. PMS role, Student linkage, and academic relations
-    // are never rewritten by this flow.
+    // not block a later retry. Also clear the exact stale binding left by the
+    // deleted pending identity; never touch a concurrent replacement binding.
     await admin.auth.admin.deleteUser(invited.user.id).catch(() => undefined);
+    await clearStaleInvitationBinding(user.id, staleAuthId);
     throw error;
   }
 

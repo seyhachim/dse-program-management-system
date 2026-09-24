@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import {
   invitationEmailsMatch,
@@ -119,5 +120,24 @@ describe("invitationMetadata", () => {
       name: "Student One",
       role: "student",
     });
+  });
+});
+
+
+describe("pending invitation resend compensation", () => {
+  it("clears only the exact stale PMS auth binding when replacement invite creation fails", () => {
+    const source = readFileSync(new URL("./resend-invitation.ts", import.meta.url), "utf8");
+    expect(source).toContain("await clearStaleInvitationBinding(user.id, staleAuthId)");
+    expect(source).toContain("where: { id: userId, authId: staleAuthId }");
+    expect(source).toContain("data: { authId: null }");
+    expect(source).toContain("if (inviteError || !invited?.user)");
+  });
+
+  it("also compensates if linking the newly-created replacement identity fails", () => {
+    const source = readFileSync(new URL("./resend-invitation.ts", import.meta.url), "utf8");
+    const deleteReplacementAt = source.indexOf("await admin.auth.admin.deleteUser(invited.user.id)");
+    const clearStaleAt = source.lastIndexOf("await clearStaleInvitationBinding(user.id, staleAuthId)");
+    expect(deleteReplacementAt).toBeGreaterThan(0);
+    expect(clearStaleAt).toBeGreaterThan(deleteReplacementAt);
   });
 });
