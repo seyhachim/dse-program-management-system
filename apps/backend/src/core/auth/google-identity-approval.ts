@@ -11,7 +11,7 @@ export type ProviderIdentity = { id?: string; provider?: string };
 
 export function assertApprovedGoogleIdentity(
   authUid: string,
-  identities: ProviderIdentity[] | null | undefined,
+  identities: readonly ProviderIdentity[] | null | undefined,
   approvalsJson: string | undefined,
 ): void {
   const google = identities?.filter((identity) => identity.provider === "google") ?? [];
