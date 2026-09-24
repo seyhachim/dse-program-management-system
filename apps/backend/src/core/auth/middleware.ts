@@ -67,6 +67,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
+    if (
+      process.env.AUTH_UAT_1143 === "1" &&
+      req.headers["x-uat-admin-outage"] === "1" &&
+      getAuthMode() === "supabase"
+    ) {
+      throw new AccountLinkingError("Simulated Supabase Admin outage");
+    }
     req.user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
 
     if (await mustChangePassword(req.user.id) && !isPasswordRecoveryRoute(req)) {
@@ -106,7 +113,12 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   // token metadata: read the live Supabase Admin identity set every request.
   let verifiedAuthUser: ConfirmedAuthUser | null = null;
   try {
+    const started = performance.now();
     const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
+    if (process.env.AUTH_UAT_1143 === "1") {
+      // eslint-disable-next-line no-console
+      console.log(`[uat-1143] admin-get-user elapsedMs=${(performance.now() - started).toFixed(1)}`);
+    }
     if (error) throw error;
     verifiedAuthUser = data?.user ?? null;
   } catch {
