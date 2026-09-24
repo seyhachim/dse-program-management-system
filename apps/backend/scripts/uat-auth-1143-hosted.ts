@@ -128,12 +128,16 @@ export async function runAuth1143HostedUat(): Promise<void> {
     // 5) A current Google-linked identity must fail closed even when using an email magic-link session.
     const users = await admin.auth.admin.listUsers({ page: 1, perPage: 100 });
     if (users.error) throw users.error;
-    const googleLinked = users.data.users.find(
-      (user) =>
-        !!user.email &&
-        user.identities?.some((identity) => identity.provider === "google") &&
-        user.identities?.some((identity) => identity.provider === "email"),
-    );
+    let googleLinked: { email?: string | null } | null = null;
+    for (const candidate of users.data.users) {
+      const detail = await admin.auth.admin.getUserById(candidate.id);
+      if (detail.error || !detail.data.user) continue;
+      const providers = new Set(detail.data.user.identities?.map((identity) => identity.provider) ?? []);
+      if (detail.data.user.email && providers.has("google") && providers.has("email")) {
+        googleLinked = detail.data.user;
+        break;
+      }
+    }
     if (!googleLinked?.email) throw new Error("No disposable email+Google hosted identity available for social-provider regression");
     const googleLinkedToken = await sessionForEmail(admin, googleLinked.email);
     await record("same-uid-current-google-identity", googleLinkedToken, 403);
