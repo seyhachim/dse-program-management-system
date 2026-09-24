@@ -33,8 +33,10 @@ describe("attendance warning student selection", () => {
     ).toEqual(["late", "absent", "excused"]);
   });
 
-  test("attendance save wires the filtered ids into post-save notification work", () => {
+  test("attendance save wires one batched warning-history read into post-save notification work", () => {
     const source = readFileSync(new URL("./attendance-service.ts", import.meta.url), "utf8");
     expect(source).toContain("attendanceWarningStudentIds(input.records)");
+    expect(source).toContain("warningHealthForStudents(");
+    expect(source).not.toContain("await studentAttendanceHistoryService.healthForStudent(studentId, offeringId)");
   });
 });

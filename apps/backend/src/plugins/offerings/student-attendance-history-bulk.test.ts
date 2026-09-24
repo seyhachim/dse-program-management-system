@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { summarizeStudentAttendanceHealthByOffering } from "./student-attendance-history-service.ts";
+import {
+  evaluateAttendanceWarningsByStudent,
+  summarizeStudentAttendanceHealthByOffering,
+} from "./student-attendance-history-service.ts";
 
 describe("batched student attendance health summary", () => {
   test("preserves canonical counts, pending precedence, rates, and health per offering", () => {
@@ -63,5 +66,40 @@ describe("batched student attendance health summary", () => {
         health: expect.objectContaining({ state: "healthy" }),
       }),
     ]);
+  });
+});
+
+
+describe("batched attendance warning evaluation", () => {
+  test("evaluates a 43-student save in memory after one set-based history read", () => {
+    const studentIds = Array.from({ length: 43 }, (_, index) => `student-${index + 1}`);
+    const rows = [
+      ...studentIds
+        .filter((studentId) => studentId !== "student-1" && studentId !== "student-3")
+        .map((studentId) => ({
+          studentId,
+          sessionId: `latest-${studentId}`,
+          sessionDate: new Date("2026-09-23T00:00:00.000Z"),
+          status: "Present" as const,
+        })),
+      { studentId: "student-1", sessionId: "l1", sessionDate: new Date("2026-09-23T00:00:00.000Z"), status: "Late" as const },
+      { studentId: "student-1", sessionId: "l2", sessionDate: new Date("2026-09-16T00:00:00.000Z"), status: "Late" as const },
+      { studentId: "student-1", sessionId: "l3", sessionDate: new Date("2026-09-09T00:00:00.000Z"), status: "Late" as const },
+      { studentId: "student-3", sessionId: "a1", sessionDate: new Date("2026-09-09T00:00:00.000Z"), status: "Absent" as const },
+      { studentId: "student-3", sessionId: "a2", sessionDate: new Date("2026-09-16T00:00:00.000Z"), status: "Excused" as const },
+      { studentId: "student-3", sessionId: "a3", sessionDate: new Date("2026-09-23T00:00:00.000Z"), status: "Absent" as const },
+    ];
+
+    const evaluations = evaluateAttendanceWarningsByStudent(studentIds, rows);
+    expect(evaluations.size).toBe(43);
+    expect(evaluations.get("student-1")?.warningCandidates).toContainEqual(
+      expect.objectContaining({ kind: "punctuality", count: 3 }),
+    );
+    expect(evaluations.get("student-3")?.counts.Absent).toBe(2);
+    expect(evaluations.get("student-3")?.counts.Excused).toBe(1);
+    expect(evaluations.get("student-3")?.warningCandidates).toContainEqual(
+      expect.objectContaining({ kind: "attendance", count: 3 }),
+    );
+    expect(evaluations.get("student-43")?.warningCandidates).toEqual([]);
   });
 });
