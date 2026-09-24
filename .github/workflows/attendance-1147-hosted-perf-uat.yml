@@ -58,7 +58,7 @@ jobs:
           GET=$(curl -sS --max-time 90 -o /tmp/get0.json -D /tmp/get0.h -w '%{http_code} %{time_total}' -H "$AUTH" "$CANDIDATE_URL/api/offerings/$OFFERING_ID/attendance/$UAT_DATE")
           echo "INITIAL_GET $GET roster=$(jq '.records|length' /tmp/get0.json) unmarked=$(jq -r '.counts.Unmarked' /tmp/get0.json)"
           test "$(cut -d' ' -f1 <<<"$GET")" = "200"
-          jq -e '.records|length == 43 and .updatedAt == null and .counts.Unmarked == 43' /tmp/get0.json >/dev/null
+          jq -e '(.records|length) == 43 and .updatedAt == null and .counts.Unmarked == 43' /tmp/get0.json >/dev/null
 
       - name: Full-class save latency and correctness
         shell: bash
