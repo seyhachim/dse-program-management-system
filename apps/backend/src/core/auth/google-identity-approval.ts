@@ -7,7 +7,7 @@ import { AccountLinkingError } from "./account-linking.ts";
  * Supabase UID + Google identity ID pair. This is an owner-controlled pilot
  * configuration, never a roster-email match or browser-controlled allowlist.
  */
-export type ProviderIdentity = { id?: string; provider?: string };
+export type ProviderIdentity = { id?: string | null; provider?: string | null };
 
 export function assertApprovedGoogleIdentity(
   authUid: string,
