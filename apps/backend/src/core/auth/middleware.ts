@@ -88,6 +88,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(403).json({ error: "No account provisioned for this sign-in identity" });
       return;
     }
+    if (process.env.AUTH_UAT_1143 === "1") {
+      // Disposable hosted-UAT diagnostic only; never logs token, email, uid, or PII.
+      // eslint-disable-next-line no-console
+      console.error("[uat-1143] middleware-generic-error", err instanceof Error ? `${err.name}: ${err.message}` : "unknown");
+    }
     res.status(401).json({ error: "Invalid or expired token" });
   }
 }
