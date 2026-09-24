@@ -4,15 +4,25 @@
 -- Some hosted runtimes use a least-privilege database role that may create
 -- objects inside an existing schema but may not CREATE SCHEMA on the database.
 -- CI/local roles can create it here; hosted Supabase may pre-provision the
--- schema once with a privileged migration channel and make the runtime role its
--- owner. Never fall back to public for these records.
-DO $
+-- schema once with a privileged migration channel, revoke Data API/Public
+-- access there, and grant only USAGE/CREATE to the backend migration role.
+-- Never fall back to public for these records.
+DO $$
+DECLARE schema_owner TEXT;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'pms_auth_security') THEN
     EXECUTE 'CREATE SCHEMA pms_auth_security';
   END IF;
-END $;
-REVOKE ALL ON SCHEMA pms_auth_security FROM PUBLIC;
+
+  SELECT pg_get_userbyid(nspowner)
+    INTO schema_owner
+    FROM pg_namespace
+   WHERE nspname = 'pms_auth_security';
+
+  IF schema_owner = current_user THEN
+    EXECUTE 'REVOKE ALL ON SCHEMA pms_auth_security FROM PUBLIC';
+  END IF;
+END $$;
 
 CREATE TABLE pms_auth_security.google_link_intent (
   id TEXT PRIMARY KEY,
@@ -66,16 +76,33 @@ REVOKE ALL ON ALL SEQUENCES IN SCHEMA pms_auth_security FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA pms_auth_security FROM PUBLIC;
 
 -- Supabase Data API roles (when present) must never query or mutate the store.
+-- A pre-provisioned hosted schema can be owned by the privileged migration
+-- channel; in that case schema-level revocation/commenting is done by that
+-- channel, while this runtime-owned migration still revokes its tables,
+-- sequences and functions.
 DO $$
-DECLARE r TEXT;
+DECLARE
+  r TEXT;
+  schema_owner TEXT;
 BEGIN
+  SELECT pg_get_userbyid(nspowner)
+    INTO schema_owner
+    FROM pg_namespace
+   WHERE nspname = 'pms_auth_security';
+
   FOREACH r IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
-      EXECUTE format('REVOKE ALL ON SCHEMA pms_auth_security FROM %I', r);
+      IF schema_owner = current_user THEN
+        EXECUTE format('REVOKE ALL ON SCHEMA pms_auth_security FROM %I', r);
+      END IF;
       EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA pms_auth_security FROM %I', r);
       EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA pms_auth_security FROM %I', r);
       EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA pms_auth_security FROM %I', r);
     END IF;
   END LOOP;
+
+  IF schema_owner = current_user THEN
+    COMMENT ON SCHEMA pms_auth_security IS
+      'Restricted server-only Google identity approval history; SQL-managed, never exposed to the Data API';
+  END IF;
 END $$;
-COMMENT ON SCHEMA pms_auth_security IS 'Restricted server-only Google identity approval history; SQL-managed, never exposed to the Data API';
