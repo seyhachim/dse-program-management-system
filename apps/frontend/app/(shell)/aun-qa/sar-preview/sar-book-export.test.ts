@@ -111,7 +111,7 @@ function fixture(): QaSarBookDocument {
           ownerId: "00000000-0000-4000-8000-000000000002",
           ownerName: "Programme Head",
           dueDate: "2026-12-15T00:00:00.000Z",
-          status: "InProgress",
+          status: "inProgress",
           result: "",
           effectivenessReview: "",
           overdue: false,
@@ -203,7 +203,7 @@ describe("SAR book export", () => {
     expect(lines).toContain("[1.1-01] Approved programme evidence");
     expect(lines.some((line) => line.includes("[Evidence: Approved programme evidence]"))).toBe(false);
     expect(lines).toContain(
-      "1.1 — Action: Improve curriculum review follow-up — Indicator: Action closed with evidence — Owner: Programme Head — Due: 2026-12-15 — Status: InProgress",
+      "1.1 — Action: Improve curriculum review follow-up — Indicator: Action closed with evidence — Owner: Programme Head — Due: 2026-12-15 — Status: inProgress",
     );
   });
 
