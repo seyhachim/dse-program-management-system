@@ -1,7 +1,17 @@
 -- #1140 (rebased after #1143): SQL-managed security-only schema. Intentionally outside Prisma's public
 -- schema models so these operator identity-proofing records are not surfaced by
 -- generated Data API/Prisma model CRUD. Application access uses bound raw SQL.
-CREATE SCHEMA IF NOT EXISTS pms_auth_security;
+-- Some hosted runtimes use a least-privilege database role that may create
+-- objects inside an existing schema but may not CREATE SCHEMA on the database.
+-- CI/local roles can create it here; hosted Supabase may pre-provision the
+-- schema once with a privileged migration channel and make the runtime role its
+-- owner. Never fall back to public for these records.
+DO $
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'pms_auth_security') THEN
+    EXECUTE 'CREATE SCHEMA pms_auth_security';
+  END IF;
+END $;
 REVOKE ALL ON SCHEMA pms_auth_security FROM PUBLIC;
 
 CREATE TABLE pms_auth_security.google_link_intent (
