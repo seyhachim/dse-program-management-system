@@ -50,6 +50,38 @@ async function callMe(baseUrl: string, accessToken: string): Promise<{ status: n
   return { status: response.status, elapsedMs: performance.now() - started };
 }
 
+async function callJson(
+  baseUrl: string,
+  path: string,
+  accessToken: string,
+  init: RequestInit = {},
+): Promise<{ status: number; body: unknown; elapsedMs: number }> {
+  const started = performance.now();
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  const text = await response.text();
+  let body: unknown = null;
+  try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+  return { status: response.status, body, elapsedMs: performance.now() - started };
+}
+
+async function passwordSession(email: string, password: string): Promise<string> {
+  const client = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_SERVICE_ROLE_KEY"), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const signedIn = await client.auth.signInWithPassword({ email, password });
+  if (signedIn.error) throw signedIn.error;
+  const token = signedIn.data.session?.access_token;
+  if (!token) throw new Error("Password sign-in returned no access token");
+  return token;
+}
+
 export async function runAuth1143HostedUat(): Promise<void> {
   if (process.env.AUTH_UAT_1143 !== "1") return;
 
@@ -75,6 +107,17 @@ export async function runAuth1143HostedUat(): Promise<void> {
     createdEmails.push(email);
     const token = await sessionForEmail(admin, email);
     return { id: created.data.user.id, email, token };
+  }
+
+  async function createPasswordAuthUser(label: string): Promise<{ id: string; email: string; password: string; token: string }> {
+    const email = `${prefix}-${label}@example.invalid`;
+    const password = `Aa7!${crypto.randomUUID()}-Zz9!`;
+    const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+    if (created.error || !created.data.user) throw created.error ?? new Error("Could not create password Auth user");
+    createdAuthIds.push(created.data.user.id);
+    createdEmails.push(email);
+    const token = await passwordSession(email, password);
+    return { id: created.data.user.id, email, password, token };
   }
 
   async function record(name: string, token: string, expected: number): Promise<void> {
@@ -139,7 +182,86 @@ export async function runAuth1143HostedUat(): Promise<void> {
     const googleLinkedToken = await sessionForEmail(admin, googleLinkedEmail);
     await record("same-uid-current-google-identity", googleLinkedToken, 403);
 
-    // 6) Per-request Admin verification latency sample on the successful bound account.
+    // 6) Real hosted email/password sign-in succeeds for an already-bound account.
+    const passwordUser = await createPasswordAuthUser("password");
+    const passwordPms = await prisma.user.create({
+      data: { email: passwordUser.email, name: "UAT 1143 Password", authId: passwordUser.id },
+    });
+    const passwordMe = await callJson(baseUrl, "/api/auth/me", passwordUser.token);
+    if (passwordMe.status !== 200) throw new Error(`password-login: expected HTTP 200, got ${passwordMe.status}`);
+    results.push({ name: "hosted-password-login", expected: 200, status: passwordMe.status, elapsedMs: passwordMe.elapsedMs });
+
+    // 7) Forced-password-change gate permits recovery endpoints only, clears after change, and audits.
+    await prisma.user.update({ where: { id: passwordPms.id }, data: { mustChangePassword: true } });
+    const gated = await callJson(baseUrl, "/api/auth/programme-roles?programmeId=dse", passwordUser.token);
+    const gatedCode =
+      gated.body && typeof gated.body === "object" && "code" in gated.body
+        ? (gated.body as { code?: unknown }).code
+        : undefined;
+    if (gated.status !== 403 || gatedCode !== "PASSWORD_CHANGE_REQUIRED") {
+      throw new Error(`forced-password-gate: expected 403 PASSWORD_CHANGE_REQUIRED, got ${gated.status}`);
+    }
+    results.push({ name: "forced-password-gate", expected: 403, status: gated.status, elapsedMs: gated.elapsedMs });
+
+    const newPassword = `Bb8!${crypto.randomUUID()}-Yy6!`;
+    const changed = await callJson(baseUrl, "/api/auth/change-password", passwordUser.token, {
+      method: "POST",
+      body: JSON.stringify({ password: newPassword }),
+    });
+    if (changed.status !== 200) throw new Error(`password-change: expected HTTP 200, got ${changed.status}`);
+    const postChange = await prisma.user.findUnique({
+      where: { id: passwordPms.id },
+      select: { mustChangePassword: true },
+    });
+    const auditCount = await prisma.userSecurityAuditEvent.count({
+      where: { action: "PasswordChanged", targetUserId: passwordPms.id },
+    });
+    if (postChange?.mustChangePassword || auditCount < 1) {
+      throw new Error("Password-change recovery did not clear the gate and record an audit event");
+    }
+    const newPasswordToken = await passwordSession(passwordUser.email, newPassword);
+    const postChangeMe = await callMe(baseUrl, newPasswordToken);
+    if (postChangeMe.status !== 200) throw new Error(`password-change-relogin: expected HTTP 200, got ${postChangeMe.status}`);
+    results.push({ name: "password-change-and-relogin", expected: 200, status: postChangeMe.status, elapsedMs: postChangeMe.elapsedMs });
+
+    // 8) Concurrent first-login claims never bind a wrong UID.
+    const concurrent = await createAuthUser("concurrent");
+    const concurrentPms = await prisma.user.create({
+      data: { email: concurrent.email, name: "UAT 1143 Concurrent" },
+    });
+    const concurrentResponses = await Promise.all([
+      callMe(baseUrl, concurrent.token),
+      callMe(baseUrl, concurrent.token),
+    ]);
+    if (concurrentResponses.some((item) => ![200, 403].includes(item.status))) {
+      throw new Error(`concurrent-claim: unexpected statuses ${concurrentResponses.map((x) => x.status).join(",")}`);
+    }
+    const concurrentAfter = await prisma.user.findUnique({
+      where: { id: concurrentPms.id },
+      select: { authId: true },
+    });
+    if (concurrentAfter?.authId !== concurrent.id) throw new Error("Concurrent claim did not preserve the exact hosted Auth UID");
+    console.log(`[uat-1143] case=concurrent-claim statuses=${concurrentResponses.map((x) => x.status).join(",")} boundExactUid=yes`);
+
+    // 9) Two independently bound users resolve only to their own PMS identities.
+    const isoA = await createAuthUser("isolation-a");
+    const isoB = await createAuthUser("isolation-b");
+    const [isoPmsA, isoPmsB] = await Promise.all([
+      prisma.user.create({ data: { email: isoA.email, name: "UAT 1143 Isolation A", authId: isoA.id } }),
+      prisma.user.create({ data: { email: isoB.email, name: "UAT 1143 Isolation B", authId: isoB.id } }),
+    ]);
+    const [isoMeA, isoMeB] = await Promise.all([
+      callJson(baseUrl, "/api/auth/me", isoA.token),
+      callJson(baseUrl, "/api/auth/me", isoB.token),
+    ]);
+    const idA = isoMeA.body && typeof isoMeA.body === "object" && "id" in isoMeA.body ? (isoMeA.body as { id?: unknown }).id : undefined;
+    const idB = isoMeB.body && typeof isoMeB.body === "object" && "id" in isoMeB.body ? (isoMeB.body as { id?: unknown }).id : undefined;
+    if (isoMeA.status !== 200 || isoMeB.status !== 200 || idA !== isoPmsA.id || idB !== isoPmsB.id || idA === idB) {
+      throw new Error("two-user-isolation: hosted sessions did not resolve to their exact independent PMS users");
+    }
+    console.log("[uat-1143] case=two-user-isolation status=pass exact-own-user=yes");
+
+    // 10) Per-request Admin verification latency sample on the successful bound account.
     const samples: number[] = [];
     for (let i = 0; i < 5; i += 1) {
       const sample = await callMe(baseUrl, bound.token);
@@ -162,6 +284,16 @@ export async function runAuth1143HostedUat(): Promise<void> {
   } finally {
     // Cleanup only synthetic rows created by this harness.
     if (createdEmails.length > 0) {
+      const uatUsers = await prisma.user.findMany({
+        where: { email: { in: createdEmails } },
+        select: { id: true },
+      });
+      const userIds = uatUsers.map((user) => user.id);
+      if (userIds.length > 0) {
+        await prisma.userSecurityAuditEvent.deleteMany({
+          where: { OR: [{ actorUserId: { in: userIds } }, { targetUserId: { in: userIds } }] },
+        });
+      }
       await prisma.user.deleteMany({ where: { email: { in: createdEmails } } });
     }
     for (const authId of createdAuthIds) {
