@@ -20,6 +20,43 @@ export function formatLecturerDisplayName(
   return honorific ? `${USER_HONORIFIC_LABELS[honorific]} ${name}` : name;
 }
 
+const DateOnlySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .nullable();
+
+/**
+ * Canonical profile images must be stable HTTPS resources. Supabase signed
+ * object URLs and common cloud-provider signed URLs are deliberately rejected;
+ * expiring credentials must never become a long-lived profile reference.
+ */
+export function isStableHttpsProfileImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return false;
+    if (url.pathname.includes("/storage/v1/object/sign/")) return false;
+    const signedKeys = [
+      "token",
+      "signature",
+      "expires",
+      "x-amz-signature",
+      "x-amz-expires",
+      "x-goog-signature",
+      "x-goog-expires",
+    ];
+    const keys = new Set([...url.searchParams.keys()].map((key) => key.toLowerCase()));
+    return signedKeys.every((key) => !keys.has(key));
+  } catch {
+    return false;
+  }
+}
+
+export const StableProfileImageUrlSchema = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine(isStableHttpsProfileImageUrl, "Use a stable HTTPS image URL, not an expiring signed URL");
+
 /**
  * Existing structured professional metadata stored in LecturerProfile.
  * `legacyCoursesTaught` is migration/history evidence only; current teaching
@@ -30,6 +67,8 @@ export const LecturerProfessionalProfileSchema = z.object({
   employmentType: z.string().nullable(),
   fieldOfSpecialization: z.string().nullable(),
   yearsOfExperience: z.number().int().min(0).nullable(),
+  shortBio: z.string().nullable().optional(),
+  programmeStartDate: DateOnlySchema.optional(),
   legacyCoursesTaught: z.string().nullable(),
 });
 export type LecturerProfessionalProfile = z.infer<typeof LecturerProfessionalProfileSchema>;
@@ -50,6 +89,7 @@ export const LecturerSchema = z.object({
   title: z.string().nullable().optional(),
   qualification: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
+  profileImageUrl: StableProfileImageUrlSchema.nullable().optional(),
   professionalProfile: LecturerProfessionalProfileSchema.nullable().optional(),
   /**
    * Whether this lecturer profile is linked to a provisioned Supabase Auth
@@ -67,6 +107,7 @@ export const CreateLecturerInput = z.object({
   title: z.string().optional(),
   qualification: z.string().optional(),
   phone: z.string().optional(),
+  profileImageUrl: StableProfileImageUrlSchema.nullable().optional(),
 });
 export type CreateLecturerInput = z.infer<typeof CreateLecturerInput>;
 
@@ -81,9 +122,12 @@ export const UpdateMyLecturerProfileInput = z
     title: z.string().trim().max(100).nullable(),
     qualification: z.string().trim().max(500).nullable(),
     phone: z.string().trim().max(50).nullable(),
+    profileImageUrl: StableProfileImageUrlSchema.nullable().optional(),
     employmentType: z.string().trim().max(120).nullable().optional(),
     fieldOfSpecialization: z.string().trim().max(500).nullable().optional(),
     yearsOfExperience: z.number().int().min(0).max(80).nullable().optional(),
+    shortBio: z.string().trim().max(4000).nullable().optional(),
+    programmeStartDate: DateOnlySchema.optional(),
   })
   .strict();
 export type UpdateMyLecturerProfileInput = z.infer<typeof UpdateMyLecturerProfileInput>;
