@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../src/core/db/prisma.ts";
 import { verifySupabaseToken } from "../src/core/auth/token.ts";
 import { decodeProtectedHeader, decodeJwt } from "jose";
+import { refreshStudentPortalInvitation } from "../src/plugins/auth/resend-invitation.ts";
 
 type UatCase = {
   name: string;
@@ -97,6 +98,7 @@ export async function runAuth1143HostedUat(): Promise<void> {
   const prefix = `uat-1143-${runId}`;
   const createdAuthIds: string[] = [];
   const createdEmails: string[] = [];
+  const createdStudentIds: string[] = [];
   const results: UatCase[] = [];
 
   async function createAuthUser(label: string): Promise<{ id: string; email: string; token: string }> {
@@ -266,7 +268,64 @@ export async function runAuth1143HostedUat(): Promise<void> {
     }
     console.log("[uat-1143] case=two-user-isolation status=pass exact-own-user=yes");
 
-    // 10) Per-request Admin verification latency sample on the successful bound account.
+    // 10) Unconfirmed email/password identity is rejected by hosted Supabase before PMS authorization.
+    const unconfirmedEmail = `${prefix}-unconfirmed@example.invalid`;
+    const unconfirmedPassword = `Cc9!${crypto.randomUUID()}-Xx5!`;
+    const unconfirmedCreated = await admin.auth.admin.createUser({
+      email: unconfirmedEmail,
+      password: unconfirmedPassword,
+      email_confirm: false,
+    });
+    if (unconfirmedCreated.error || !unconfirmedCreated.data.user) {
+      throw unconfirmedCreated.error ?? new Error("Could not create unconfirmed hosted Auth user");
+    }
+    createdAuthIds.push(unconfirmedCreated.data.user.id);
+    createdEmails.push(unconfirmedEmail);
+    let unconfirmedRejected = false;
+    try {
+      await passwordSession(unconfirmedEmail, unconfirmedPassword);
+    } catch {
+      unconfirmedRejected = true;
+    }
+    if (!unconfirmedRejected) throw new Error("unconfirmed-identity: hosted Auth unexpectedly issued a session");
+    console.log("[uat-1143] case=unconfirmed-password-identity status=pass noSession=yes");
+
+    // 11) Simulated live Admin verification outage fails closed at the hosted HTTP boundary.
+    const outage = await callJson(baseUrl, "/api/auth/me", bound.token, {
+      headers: { "x-uat-admin-outage": "1" },
+    });
+    if (outage.status !== 403) throw new Error(`admin-outage-fail-closed: expected HTTP 403, got ${outage.status}`);
+    results.push({ name: "admin-outage-fail-closed-simulated", expected: 403, status: outage.status, elapsedMs: outage.elapsedMs });
+
+    // 12) Student invitation recovery must not delete or rotate an already-active hosted account.
+    const studentRole = await prisma.role.findUnique({ where: { slug: "student" }, select: { id: true } });
+    if (!studentRole) throw new Error("student role missing from disposable PMS seed");
+    await prisma.userRoleAssignment.create({
+      data: { userId: passwordPms.id, roleId: studentRole.id, programmeId: "dse" },
+    });
+    const recoveryStudent = await prisma.student.create({
+      data: {
+        name: "UAT 1143 Recovery Student",
+        email: passwordUser.email,
+        userId: passwordPms.id,
+        status: "Active",
+      },
+    });
+    createdStudentIds.push(recoveryStudent.id);
+    const recoveryResult = await refreshStudentPortalInvitation(recoveryStudent.id);
+    if (recoveryResult.status !== "existing-account") {
+      throw new Error(`student-invitation-recovery: expected existing-account, got ${recoveryResult.status}`);
+    }
+    const [authStillExists, pmsStillBound] = await Promise.all([
+      admin.auth.admin.getUserById(passwordUser.id),
+      prisma.user.findUnique({ where: { id: passwordPms.id }, select: { authId: true } }),
+    ]);
+    if (authStillExists.error || authStillExists.data.user?.id !== passwordUser.id || pmsStillBound?.authId !== passwordUser.id) {
+      throw new Error("student-invitation-recovery mutated an active identity");
+    }
+    console.log("[uat-1143] case=student-invitation-recovery-active-account status=pass identityUnchanged=yes");
+
+    // 13) Per-request hosted request latency sample on the successful bound account.
     const samples: number[] = [];
     for (let i = 0; i < 5; i += 1) {
       const sample = await callMe(baseUrl, bound.token);
@@ -284,7 +343,7 @@ export async function runAuth1143HostedUat(): Promise<void> {
       );
     }
     console.log(
-      `[uat-1143] admin-verification-latency samples=5 minMs=${min.toFixed(1)} avgMs=${avg.toFixed(1)} maxMs=${max.toFixed(1)}`,
+      `[uat-1143] hosted-me-total-latency samples=5 minMs=${min.toFixed(1)} avgMs=${avg.toFixed(1)} maxMs=${max.toFixed(1)}`,
     );
   } finally {
     // Cleanup only synthetic rows created by this harness.
@@ -294,7 +353,11 @@ export async function runAuth1143HostedUat(): Promise<void> {
         select: { id: true },
       });
       const userIds = uatUsers.map((user) => user.id);
+      if (createdStudentIds.length > 0) {
+        await prisma.student.deleteMany({ where: { id: { in: createdStudentIds } } });
+      }
       if (userIds.length > 0) {
+        await prisma.userRoleAssignment.deleteMany({ where: { userId: { in: userIds } } });
         await prisma.userSecurityAuditEvent.deleteMany({
           where: { OR: [{ actorUserId: { in: userIds } }, { targetUserId: { in: userIds } }] },
         });
