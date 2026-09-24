@@ -31,3 +31,8 @@ Test first-time automatic verified-email linking and JWT refresh with a **second
 ## Later Microsoft transition
 
 Link university Microsoft Entra to the same existing Supabase/PMS UID after independent verification and an approved recovery procedure. Never replace canonical `User.authId`, `Student.userId`, official IDs, results or QA evidence based on matching email.
+
+
+## Hosted database role preflight
+
+The Google approval store must remain in `pms_auth_security`; do not move it to the Supabase Data API `public` schema to work around permissions. Before the first hosted deployment, check the backend migration role. If it lacks database-level `CREATE`, use the privileged Supabase migration channel once to create `pms_auth_security` with the backend database role as owner, revoke PUBLIC access, then run the normal Prisma migration. The migration itself creates the schema only when it is absent, so a safely pre-provisioned schema is reused. This is an infrastructure preflight only; it must not create or modify PMS User, Student, academic, CourseSpec, QA, or SAR data.
