@@ -325,7 +325,50 @@ export async function runAuth1143HostedUat(): Promise<void> {
     }
     console.log("[uat-1143] case=student-invitation-recovery-active-account status=pass identityUnchanged=yes");
 
-    // 13) Per-request hosted request latency sample on the successful bound account.
+    // 13) Real pending Student Portal invitation recovery rotates only the synthetic pending Auth identity.
+    const pendingEmail = `${prefix}-pending-invite@example.invalid`;
+    const pendingInvite = await admin.auth.admin.inviteUserByEmail(pendingEmail, {
+      data: { name: "UAT 1143 Pending Student", role: "student" },
+    });
+    if (pendingInvite.error || !pendingInvite.data.user) {
+      throw pendingInvite.error ?? new Error("Could not create synthetic pending invitation");
+    }
+    createdAuthIds.push(pendingInvite.data.user.id);
+    createdEmails.push(pendingEmail);
+    const pendingPms = await prisma.user.create({
+      data: { email: pendingEmail, name: "UAT 1143 Pending Student", authId: pendingInvite.data.user.id },
+    });
+    await prisma.userRoleAssignment.create({
+      data: { userId: pendingPms.id, roleId: studentRole.id, programmeId: "dse" },
+    });
+    const pendingStudent = await prisma.student.create({
+      data: {
+        name: "UAT 1143 Pending Student",
+        email: pendingEmail,
+        userId: pendingPms.id,
+        status: "Active",
+      },
+    });
+    createdStudentIds.push(pendingStudent.id);
+    const pendingRecovery = await refreshStudentPortalInvitation(pendingStudent.id);
+    if (pendingRecovery.status !== "resent") {
+      throw new Error(`student-pending-invitation-recovery: expected resent, got ${pendingRecovery.status}`);
+    }
+    const reboundPms = await prisma.user.findUnique({ where: { id: pendingPms.id }, select: { authId: true } });
+    if (!reboundPms?.authId || reboundPms.authId === pendingInvite.data.user.id) {
+      throw new Error("student-pending-invitation-recovery did not rotate to a new hosted Auth identity");
+    }
+    if (!createdAuthIds.includes(reboundPms.authId)) createdAuthIds.push(reboundPms.authId);
+    const [oldAuth, newAuth] = await Promise.all([
+      admin.auth.admin.getUserById(pendingInvite.data.user.id),
+      admin.auth.admin.getUserById(reboundPms.authId),
+    ]);
+    if (oldAuth.data.user || !newAuth.data.user || newAuth.data.user.id !== reboundPms.authId) {
+      throw new Error("student-pending-invitation-recovery left the wrong hosted identity active");
+    }
+    console.log("[uat-1143] case=student-pending-invitation-recovery status=pass rotatedPendingOnly=yes");
+
+    // 14) Per-request hosted request latency sample on the successful bound account.
     const samples: number[] = [];
     for (let i = 0; i < 5; i += 1) {
       const sample = await callMe(baseUrl, bound.token);
