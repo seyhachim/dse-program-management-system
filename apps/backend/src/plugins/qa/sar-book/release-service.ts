@@ -12,6 +12,7 @@ import {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
+import { lockQaSarBookFinalizationSources, lockQaSarReleaseVersion } from "../sar-release-lock.ts";
 import { getQaSarBookEvidenceRegister } from "./evidence-register-service.ts";
 import { getQaSarBookNarrativeSection } from "./narrative-service.ts";
 import { getQaSarBookPart2 } from "./part2-service.ts";
@@ -323,13 +324,18 @@ export async function finalizeQaSarBookRelease(
   userId: string,
   title?: string,
 ): Promise<QaSarBookReleaseView> {
-  const source = await buildQaSarBookDocument(programmeId, cycleId, "official");
-  assertQaSarBookFinalizable(source);
-
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw(
-      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`qa-sar-book-release:${cycleId}`})::bigint)`,
-    );
+    // QaSarRelease version numbers are shared with the legacy SAR finaliser.
+    await lockQaSarReleaseVersion(tx, cycleId);
+
+    // Freeze canonical SAR/evidence/Part-3 source tables against mutation before
+    // assembling the immutable snapshot. Reads remain allowed, so the existing
+    // read services can build one stable committed view while this transaction
+    // holds the SHARE locks.
+    await lockQaSarBookFinalizationSources(tx);
+    const source = await buildQaSarBookDocument(programmeId, cycleId, "official");
+    assertQaSarBookFinalizable(source);
+
     const latest = await tx.qaSarRelease.findFirst({
       where: { cycleId },
       orderBy: { version: "desc" },
@@ -373,7 +379,7 @@ export async function finalizeQaSarBookRelease(
       include: { finalizedBy: { select: { id: true, name: true } } },
     });
     return releaseToView(created);
-  });
+  }, { timeout: 60_000 });
 }
 
 export async function listQaSarBookReleases(
