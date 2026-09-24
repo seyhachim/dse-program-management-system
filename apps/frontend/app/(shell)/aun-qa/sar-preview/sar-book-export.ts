@@ -104,6 +104,44 @@ function narrativeDocx(number: string, title: string, content: string): Paragrap
   return [sectionHeading(number, title), ...richDocxBlocks(parseStoredDocumentContent(content))];
 }
 
+function richDocumentTextLines(document: DseDocumentContent): string[] {
+  const lines: string[] = [];
+  for (const block of document.content) {
+    if (block.type === "heading" || block.type === "paragraph") {
+      lines.push(block.content.map((node) => node.text).join(""));
+      continue;
+    }
+    for (const item of block.items) {
+      const text = item.map((node) => node.text).join("");
+      lines.push(block.type === "bulletList" ? `• ${text}` : text);
+    }
+  }
+  return lines;
+}
+
+function qaDocumentTextLines(
+  content: QaSarBookDocument["part2"]["criteria"][number]["requirements"][number]["content"],
+  evidenceNumbers: Map<string, string>,
+): string[] {
+  if (!content) return ["[No included source content]"];
+  const lines: string[] = [];
+  for (const block of content.blocks) {
+    if (block.type === "richText") {
+      lines.push(...richDocumentTextLines(parseStoredDocumentContent(block.content)));
+    } else if (block.type === "evidenceReference") {
+      const number = evidenceNumbers.get(block.evidenceId) ?? block.evidenceId;
+      lines.push(`[${number}] ${block.label}`);
+    } else if (block.type === "pmsData") {
+      lines.push(`[PMS data] ${block.label}`);
+    } else if (block.type === "bullet") {
+      lines.push(`• ${block.text}`);
+    } else {
+      lines.push(block.text);
+    }
+  }
+  return lines.length > 0 ? lines : ["[No included source content]"];
+}
+
 function qaDocumentDocx(
   content: QaSarBookDocument["part2"]["criteria"][number]["requirements"][number]["content"],
   evidenceNumbers: Map<string, string>,
@@ -171,6 +209,9 @@ function improvementTable(model: QaSarBookDocument): Table {
 }
 
 export function sarBookDocumentLines(model: QaSarBookDocument): string[] {
+  const evidenceNumbers = new Map(
+    model.part4.evidenceRegister.items.map((item) => [item.evidenceId, item.number]),
+  );
   const lines = [
     "SELF-ASSESSMENT REPORT",
     model.programme.name,
@@ -187,7 +228,7 @@ export function sarBookDocumentLines(model: QaSarBookDocument): string[] {
   for (const criterion of model.part2.criteria) {
     lines.push(`${criterion.number} Criterion ${criterion.criterionCode}: ${criterion.criterionTitle}`);
     for (const requirement of criterion.requirements) {
-      lines.push(`${requirement.number} ${requirement.requirementCode} ${requirement.requirementTitle}`, requirement.plainText || "[No included source content]", "");
+      lines.push(`${requirement.number} ${requirement.requirementCode} ${requirement.requirementTitle}`, ...qaDocumentTextLines(requirement.content, evidenceNumbers), "");
     }
   }
   lines.push(model.part3.title, `${model.part3.strengths.number} ${model.part3.strengths.title}`, model.part3.strengths.plainText, "", `${model.part3.weaknesses.number} ${model.part3.weaknesses.title}`, model.part3.weaknesses.plainText, "", "3.3 Self-Ratings", model.part3.snapshot.note);
@@ -198,7 +239,11 @@ export function sarBookDocumentLines(model: QaSarBookDocument): string[] {
     }
   }
   lines.push("", "3.4 Improvement Plan");
-  for (const item of model.part3.snapshot.improvementActions) lines.push(`${item.requirementCode} — ${item.plannedAction} — ${item.status}`);
+  for (const item of model.part3.snapshot.improvementActions) {
+    lines.push(
+      `${item.requirementCode} — Action: ${item.plannedAction} — Indicator: ${item.indicator || "—"} — Owner: ${item.ownerName ?? "—"} — Due: ${item.dueDate ? item.dueDate.slice(0, 10) : "—"} — Status: ${item.status}`,
+    );
+  }
   lines.push("", model.part4.title, `${model.part4.glossary.number} ${model.part4.glossary.title}`, model.part4.glossary.plainText, "", `4.2 ${model.part4.evidenceRegister.terminology.evidenceRegisterTitle}`);
   for (const item of model.part4.evidenceRegister.items) lines.push(`${item.number} — ${item.title} — ${item.reportingPeriod || "—"} — ${item.sourceUrl ?? item.sourceRef ?? "—"}`);
   lines.push("", "4.3 Supporting Documents", ...model.part4.evidenceRegister.items.map((item) => `${item.number} — ${item.title}`));
