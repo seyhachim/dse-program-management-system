@@ -326,7 +326,7 @@ export async function runAuth1143HostedUat(): Promise<void> {
     console.log("[uat-1143] case=student-invitation-recovery-active-account status=pass identityUnchanged=yes");
 
     // 13) Real pending Student Portal invitation recovery rotates only the synthetic pending Auth identity.
-    const pendingEmail = `${prefix}-pending-invite@example.invalid`;
+    const pendingEmail = `${prefix}-pending-invite@example.com`;
     const pendingInvite = await admin.auth.admin.inviteUserByEmail(pendingEmail, {
       data: { name: "UAT 1143 Pending Student", role: "student" },
     });
