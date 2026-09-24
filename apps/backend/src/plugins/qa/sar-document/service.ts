@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   QaSarDocumentCriterionView,
   QaSarDocumentMode,
@@ -11,6 +11,7 @@ import { QaSarDocumentSchema } from "@dse-pms/shared-types";
 import { prisma } from "../../../core/db/prisma.ts";
 import { prepareQaSarExternalEvidence } from "../evidence-sharing/sar-integration.ts";
 import { QaSarResourceNotFoundError, QaSarScopeMismatchError } from "../sar/service.ts";
+import { lockQaSarReleaseVersion } from "../sar-release-lock.ts";
 
 const LEGACY_QA_SAR_TEMPLATE_VERSION = "aun-qa-sar-v1" as const;
 
@@ -345,23 +346,26 @@ export async function finalizeQaSarDocument(
   // route is used as the release-time evidence source of truth.
   model = await prepareQaSarExternalEvidence(model, userId);
 
-  const latest = await prisma.qaSarRelease.findFirst({
-    where: { cycleId },
-    orderBy: { version: "desc" },
-    select: { version: true },
-  });
-  const created = await prisma.qaSarRelease.create({
-    data: {
-      programmeId,
-      cycleId,
-      version: (latest?.version ?? 0) + 1,
-      title: title?.trim() || `${model.programmeName} — ${model.cycleTitle} SAR`,
-      templateVersion: LEGACY_QA_SAR_TEMPLATE_VERSION,
-      snapshot: model as unknown as Prisma.InputJsonValue,
-      submissionIds,
-      finalizedById: userId,
-    },
-    include: { finalizedBy: { select: { id: true, name: true } } },
+  const created = await prisma.$transaction(async (tx) => {
+    await lockQaSarReleaseVersion(tx, cycleId);
+    const latest = await tx.qaSarRelease.findFirst({
+      where: { cycleId },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    });
+    return tx.qaSarRelease.create({
+      data: {
+        programmeId,
+        cycleId,
+        version: (latest?.version ?? 0) + 1,
+        title: title?.trim() || `${model.programmeName} — ${model.cycleTitle} SAR`,
+        templateVersion: LEGACY_QA_SAR_TEMPLATE_VERSION,
+        snapshot: model as unknown as Prisma.InputJsonValue,
+        submissionIds,
+        finalizedById: userId,
+      },
+      include: { finalizedBy: { select: { id: true, name: true } } },
+    });
   });
   return releaseToView(created);
 }
