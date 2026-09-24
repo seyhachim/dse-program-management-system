@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../src/core/db/prisma.ts";
+import { verifySupabaseToken } from "../src/core/auth/token.ts";
+import { decodeProtectedHeader, decodeJwt } from "jose";
 
 type UatCase = {
   name: string;
@@ -86,6 +88,15 @@ export async function runAuth1143HostedUat(): Promise<void> {
   try {
     // 1) Already-bound, email-only hosted identity succeeds.
     const bound = await createAuthUser("bound");
+    try {
+      const header = decodeProtectedHeader(bound.token);
+      const claims = decodeJwt(bound.token);
+      console.log(`[uat-1143] token-preflight alg=${String(header.alg)} kid=${header.kid ? "present" : "absent"} issuerHost=${typeof claims.iss === "string" ? new URL(claims.iss).host : "missing"}`);
+      await verifySupabaseToken(bound.token);
+      console.log("[uat-1143] token-preflight verifySupabaseToken=pass");
+    } catch (error) {
+      console.log("[uat-1143] token-preflight verifySupabaseToken=fail", error instanceof Error ? error.message : "unknown");
+    }
     await prisma.user.create({
       data: { email: bound.email, name: "UAT 1143 Bound", authId: bound.id },
     });
