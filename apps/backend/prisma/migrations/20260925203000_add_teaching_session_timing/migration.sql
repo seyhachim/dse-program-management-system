@@ -30,7 +30,10 @@ CREATE TABLE "pms_attendance"."TeachingSessionTiming" (
   CONSTRAINT "TeachingSessionTiming_order_check"
     CHECK (
       "endedAt" IS NULL
-      OR ("startedAt" IS NOT NULL AND "endedAt" > "startedAt")
+      OR (
+        "startedAt" IS NOT NULL
+        AND "endedAt" >= "startedAt" + INTERVAL '1 minute'
+      )
     )
 );
 
