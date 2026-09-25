@@ -39,14 +39,14 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
   return {
     lecturerArrivalStatus: null,
     classOccurred: true,
-    actualLecturerId: context.eligibleLecturers[0]?.id ?? null,
+    actualLecturerId: null,
     actualStartTime: context.timing?.startedAt
       ? phnomPenhTimeFromIso(context.timing.startedAt)
       : null,
     actualEndTime: context.timing?.endedAt
       ? phnomPenhTimeFromIso(context.timing.endedAt)
       : null,
-    actualTopic: context.plannedWeek?.topic ?? "",
+    actualTopic: "",
     learningSummary: "",
     coverage: "TAUGHT_AS_PLANNED",
     note: "",
@@ -158,7 +158,7 @@ export function MonitorDeliveryForm() {
       return {
         ...current,
         classOccurred: true,
-        actualLecturerId: current.actualLecturerId ?? context.eligibleLecturers[0]?.id ?? null,
+        actualLecturerId: current.actualLecturerId,
         actualStartTime:
           current.actualStartTime ??
           (context.timing?.startedAt ? phnomPenhTimeFromIso(context.timing.startedAt) : null),
