@@ -11,7 +11,7 @@ describe("monitor teaching timing UI contract", () => {
     expect(source).toContain("markTeachingEnded");
     expect(source).toContain("Start teaching now");
     expect(source).toContain("End teaching now");
-    expect(source).toContain("Server timestamps are preserved");
+    expect(source).toContain("Captured timestamps are preserved");
   });
 
   test("does not silently prefill new actual times from the scheduled meeting", async () => {
