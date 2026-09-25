@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { SaveTeachingSessionDeliveryInputSchema } from "./teaching-session-delivery.ts";
+import {
+  SaveTeachingSessionDeliveryInputSchema,
+  TeachingSessionTimingViewSchema,
+} from "./teaching-session-delivery.ts";
 
 describe("teaching session delivery contracts", () => {
   test("accepts an occurred class with neutral arrival, learning summary, lecturer and ordered times", () => {
@@ -96,5 +99,32 @@ describe("teaching session delivery contracts", () => {
       note: "x".repeat(501),
     });
     expect(tooLongPrivate.success).toBe(false);
+  });
+  test("validates partial and completed server timing views", () => {
+    const partial = TeachingSessionTimingViewSchema.parse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: "2026-09-25T00:40:00.000Z",
+      startedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+      endedAt: null,
+      endedBy: null,
+    });
+    expect(partial.startedAt).toContain("2026-09-25");
+
+    const invalidEndOnly = TeachingSessionTimingViewSchema.safeParse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: null,
+      startedBy: null,
+      endedAt: "2026-09-25T04:20:00.000Z",
+      endedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+    });
+    expect(invalidEndOnly.success).toBe(false);
   });
 });
