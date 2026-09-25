@@ -22,6 +22,9 @@ export const TeachingSessionActualTimeSchema = z
 /** Earliest a monitor may punch teaching start before the scheduled class start. */
 export const TEACHING_START_EARLY_WINDOW_MINUTES = 60;
 
+/** Minimum captured teaching duration so minute-precision final times stay ordered. */
+export const TEACHING_TIMING_MIN_DURATION_SECONDS = 60;
+
 export const TeachingSessionLearningSummarySchema = z.string().trim().max(1000);
 export type TeachingSessionLearningSummary = z.infer<
   typeof TeachingSessionLearningSummarySchema
@@ -236,16 +239,16 @@ export const TeachingSessionTimingViewSchema = z
         message: "Teaching cannot end before a teaching start is recorded",
       });
     }
-    if (
-      value.startedAt !== null &&
-      value.endedAt !== null &&
-      new Date(value.endedAt).getTime() <= new Date(value.startedAt).getTime()
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["endedAt"],
-        message: "Teaching end must be after teaching start",
-      });
+    if (value.startedAt !== null && value.endedAt !== null) {
+      const durationMs =
+        new Date(value.endedAt).getTime() - new Date(value.startedAt).getTime();
+      if (durationMs < TEACHING_TIMING_MIN_DURATION_SECONDS * 1000) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["endedAt"],
+          message: "Teaching end must be at least one minute after teaching start",
+        });
+      }
     }
   });
 export type TeachingSessionTimingView = z.infer<typeof TeachingSessionTimingViewSchema>;
