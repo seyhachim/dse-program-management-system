@@ -75,6 +75,7 @@ export async function runGoogle1141HostedUat(): Promise<void> {
   const cleanupStudentIds: string[] = [];
   let createdReadPermissionId: string | undefined;
   let createdStudentPermissionMapping = false;
+  let studentRoleIdForCleanup: string | undefined;
 
   const baseline = await Promise.all([
     prisma.enrollment.count(),
@@ -109,6 +110,7 @@ export async function runGoogle1141HostedUat(): Promise<void> {
       if (!role) throw new Error(`Missing ${slug} role`);
       return role.id;
     };
+    studentRoleIdForCleanup = roleId("student");
 
     const targetAuth = await admin.auth.admin.getUserById(target.authId);
     if (targetAuth.error || !targetAuth.data.user) throw targetAuth.error ?? new Error("Target hosted Auth identity missing");
@@ -270,9 +272,9 @@ export async function runGoogle1141HostedUat(): Promise<void> {
     }
     for (const id of cleanupAuthIds) await admin.auth.admin.deleteUser(id).catch(() => undefined);
 
-    if (createdStudentPermissionMapping && createdReadPermissionId) {
+    if (createdStudentPermissionMapping && createdReadPermissionId && studentRoleIdForCleanup) {
       await prisma.rolePermission.deleteMany({
-        where: { roleId: rolesafe("student"), permissionId: createdReadPermissionId },
+        where: { roleId: studentRoleIdForCleanup, permissionId: createdReadPermissionId },
       }).catch(() => undefined);
     }
     if (createdReadPermissionId) {
@@ -280,11 +282,4 @@ export async function runGoogle1141HostedUat(): Promise<void> {
     }
   }
 
-  function rolesafe(slug: string): string {
-    // Cleanup helper deliberately resolves the seeded role without logging IDs.
-    // It is only reached after the test body initialized roles.
-    return slug === "student"
-      ? (process.env.UAT_STUDENT_ROLE_ID ?? "")
-      : "";
-  }
 }
