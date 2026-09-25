@@ -23,6 +23,8 @@ describe("monitor teaching timing punch contract", () => {
     expect(source).toContain("TEACHING_START_EARLY_WINDOW_MINUTES");
     expect(source).toContain("assertStartWindow(exactOccurrence, now)");
     expect(source).toContain("Record teaching start before teaching end");
+    expect(source).toContain("TEACHING_TIMING_MIN_DURATION_SECONDS");
+    expect(source).toContain("Teaching end can be recorded at least one minute after teaching start");
     expect(source).toContain("Teaching end can only be recorded on the teaching-session date");
   });
 
