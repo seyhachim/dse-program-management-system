@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   phnomPenhTimeFromIso,
+  teachingEndRecordingWindow,
   teachingStartRecordingWindow,
   teachingTimingDurationMinutes,
 } from "./monitor-teaching-time-utils.ts";
@@ -33,6 +34,16 @@ describe("monitor teaching time utilities", () => {
         new Date("2026-09-25T04:30:01.000Z"),
       ).status,
     ).toBe("closed");
+  });
+
+  test("opens teaching end only after one captured minute", () => {
+    const startedAt = "2026-09-25T00:40:30.000Z";
+    expect(
+      teachingEndRecordingWindow(startedAt, new Date("2026-09-25T00:41:29.000Z")),
+    ).toEqual({ canRecord: false, secondsRemaining: 1 });
+    expect(
+      teachingEndRecordingWindow(startedAt, new Date("2026-09-25T00:41:30.000Z")),
+    ).toEqual({ canRecord: true, secondsRemaining: 0 });
   });
 
   test("formats server timestamps in Phnom Penh time and derives delivered minutes", () => {
