@@ -1,4 +1,4 @@
-/** Google login is private pilot-only until identity-linking UAT is approved. */
+/** Google login is private pilot-only; both frontend and backend pilot flags must be explicitly enabled. */
 export const GOOGLE_PILOT_ENABLED = process.env.NEXT_PUBLIC_GOOGLE_PILOT_ENABLED === "true";
 
 /** Keep the return path out of the URL sent to Google and Supabase. */
