@@ -50,7 +50,7 @@ function GooglePilotSignIn() {
     void complete().catch(async () => {
       await getSupabase().auth.signOut().catch(() => undefined);
       if (active) {
-        setError("This Google account is not connected to an authorized PMS student account. Sign in with your existing PMS account first to connect Google.");
+        setError("Google is connected, but DSE approval is still required before Google sign-in can be used. You can continue using your PMS email and password meanwhile.");
         setWorking(false);
       }
     });
