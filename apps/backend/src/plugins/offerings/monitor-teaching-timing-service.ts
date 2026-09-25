@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   TEACHING_START_EARLY_WINDOW_MINUTES,
+  TEACHING_TIMING_MIN_DURATION_SECONDS,
   type SaveTeachingSessionTimingResult,
   type TeachingSessionTimingView,
 } from "@dse-pms/shared-types";
@@ -88,9 +89,12 @@ function assertEndWindow(
   now: Date,
 ): void {
   const date = occurrence.sessionDate.toISOString().slice(0, 10);
-  if (now <= startedAt) {
+  const earliestEnd = new Date(
+    startedAt.getTime() + TEACHING_TIMING_MIN_DURATION_SECONDS * 1000,
+  );
+  if (now < earliestEnd) {
     throw new TeachingSessionTimingValidationError(
-      "Teaching end must be recorded after teaching start",
+      "Teaching end can be recorded at least one minute after teaching start",
     );
   }
   if (now > occurrenceDayEnd(date)) {
