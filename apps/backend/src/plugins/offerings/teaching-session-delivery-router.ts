@@ -14,6 +14,11 @@ import {
 } from "./class-delivery-service.ts";
 import { monitorLecturerArrivalService } from "./monitor-lecturer-arrival-service.ts";
 import {
+  TeachingSessionTimingReferenceError,
+  TeachingSessionTimingValidationError,
+  monitorTeachingTimingService,
+} from "./monitor-teaching-timing-service.ts";
+import {
   TeachingSessionDeliveryReferenceError,
   TeachingSessionDeliveryValidationError,
   teachingSessionDeliveryService,
@@ -95,6 +100,64 @@ export function createTeachingSessionDeliveryRouter(): Router {
   );
 
   router.put(
+    "/:id/meetings/:meetingId/occurrences/:date/monitor-teaching-start",
+    async (req, res) => {
+      const occurrence = ResolveTeachingSessionOccurrenceInputSchema.safeParse({
+        offeringMeetingId: req.params.meetingId,
+        date: req.params.date,
+      });
+      if (!occurrence.success) {
+        res.status(400).json({
+          error: "Invalid teaching session occurrence",
+          details: occurrence.error.flatten(),
+        });
+        return;
+      }
+      try {
+        res.json(
+          await monitorTeachingTimingService.markStarted(
+            req.params.id!,
+            occurrence.data.offeringMeetingId,
+            occurrence.data.date,
+            req.user!.id,
+          ),
+        );
+      } catch (err) {
+        handleMonitorDeliveryError(err, res);
+      }
+    },
+  );
+
+  router.put(
+    "/:id/meetings/:meetingId/occurrences/:date/monitor-teaching-end",
+    async (req, res) => {
+      const occurrence = ResolveTeachingSessionOccurrenceInputSchema.safeParse({
+        offeringMeetingId: req.params.meetingId,
+        date: req.params.date,
+      });
+      if (!occurrence.success) {
+        res.status(400).json({
+          error: "Invalid teaching session occurrence",
+          details: occurrence.error.flatten(),
+        });
+        return;
+      }
+      try {
+        res.json(
+          await monitorTeachingTimingService.markEnded(
+            req.params.id!,
+            occurrence.data.offeringMeetingId,
+            occurrence.data.date,
+            req.user!.id,
+          ),
+        );
+      } catch (err) {
+        handleMonitorDeliveryError(err, res);
+      }
+    },
+  );
+
+  router.put(
     "/:id/meetings/:meetingId/occurrences/:date/monitor-delivery",
     async (req, res) => {
       const occurrence = ResolveTeachingSessionOccurrenceInputSchema.safeParse({
@@ -144,14 +207,16 @@ function handleMonitorDeliveryError(
   if (
     err instanceof ClassResponsibilityNotFoundError ||
     err instanceof TeachingSessionOccurrenceReferenceError ||
-    err instanceof TeachingSessionDeliveryReferenceError
+    err instanceof TeachingSessionDeliveryReferenceError ||
+    err instanceof TeachingSessionTimingReferenceError
   ) {
     res.status(404).json({ error: err.message });
     return;
   }
   if (
     err instanceof TeachingSessionOccurrenceValidationError ||
-    err instanceof TeachingSessionDeliveryValidationError
+    err instanceof TeachingSessionDeliveryValidationError ||
+    err instanceof TeachingSessionTimingValidationError
   ) {
     res.status(400).json({ error: err.message });
     return;
