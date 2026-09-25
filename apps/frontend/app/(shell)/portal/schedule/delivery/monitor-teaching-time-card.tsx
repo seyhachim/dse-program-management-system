@@ -6,6 +6,7 @@ import { CheckCircle2, Clock3, Play, Square } from "lucide-react";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import {
   phnomPenhTimeFromIso,
+  teachingEndRecordingWindow,
   teachingStartRecordingWindow,
   teachingTimingDurationMinutes,
 } from "./monitor-teaching-time-utils";
@@ -44,6 +45,14 @@ export function MonitorTeachingTimeCard({
     ],
   );
 
+  const endWindow = useMemo(
+    () =>
+      timing?.startedAt
+        ? teachingEndRecordingWindow(timing.startedAt, now)
+        : { canRecord: false, secondsRemaining: 0 },
+    [now, timing?.startedAt],
+  );
+
   const duration = useMemo(
     () =>
       teachingTimingDurationMinutes(
@@ -54,9 +63,10 @@ export function MonitorTeachingTimeCard({
   );
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    const intervalMs = timing?.startedAt && !timing.endedAt ? 1_000 : 30_000;
+    const timer = window.setInterval(() => setNow(new Date()), intervalMs);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [timing?.endedAt, timing?.startedAt]);
 
   const markStarted = async () => {
     if (!startWindow.canRecord) return;
@@ -73,6 +83,7 @@ export function MonitorTeachingTimeCard({
   };
 
   const markEnded = async () => {
+    if (!endWindow.canRecord) return;
     try {
       setSaving("end");
       setError(null);
@@ -140,12 +151,16 @@ export function MonitorTeachingTimeCard({
           </div>
           <button
             type="button"
-            disabled={saving !== null}
+            disabled={saving !== null || !endWindow.canRecord}
             onClick={() => void markEnded()}
             className="mt-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-primary bg-background px-4 text-sm font-semibold text-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Square className="h-4 w-4" aria-hidden="true" />
-            {saving === "end" ? "Recording end…" : "End teaching now"}
+            {saving === "end"
+              ? "Recording end…"
+              : endWindow.canRecord
+                ? "End teaching now"
+                : `End available in ${endWindow.secondsRemaining}s`}
           </button>
         </div>
       ) : (
