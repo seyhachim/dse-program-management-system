@@ -1,4 +1,7 @@
-import { TEACHING_START_EARLY_WINDOW_MINUTES } from "@dse-pms/shared-types";
+import {
+  TEACHING_START_EARLY_WINDOW_MINUTES,
+  TEACHING_TIMING_MIN_DURATION_SECONDS,
+} from "@dse-pms/shared-types";
 
 function phnomPenhInstant(date: string, time: string): Date {
   return new Date(`${date}T${time}:00+07:00`);
@@ -47,4 +50,23 @@ export function teachingTimingDurationMinutes(
     (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60_000,
   );
   return minutes > 0 ? minutes : null;
+}
+
+
+export type TeachingEndRecordingWindow = {
+  canRecord: boolean;
+  secondsRemaining: number;
+};
+
+export function teachingEndRecordingWindow(
+  startedAt: string,
+  now = new Date(),
+): TeachingEndRecordingWindow {
+  const earliestEndMs =
+    new Date(startedAt).getTime() + TEACHING_TIMING_MIN_DURATION_SECONDS * 1000;
+  const remainingMs = earliestEndMs - now.getTime();
+  return {
+    canRecord: remainingMs <= 0,
+    secondsRemaining: Math.max(0, Math.ceil(remainingMs / 1000)),
+  };
 }
