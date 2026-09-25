@@ -20,6 +20,7 @@ import {
   ClassResponsibilityEligibilityError,
   classResponsibilityService,
 } from "./class-responsibility-service.ts";
+import { monitorTeachingTimingService } from "./monitor-teaching-timing-service.ts";
 
 export class TeachingSessionDeliveryReferenceError extends Error {}
 export class TeachingSessionDeliveryValidationError extends Error {}
@@ -409,15 +410,23 @@ export const teachingSessionDeliveryService = {
       meetingId,
       date,
     );
-    const [delivery, currentPlannedWeek, course, lecturers, lecturerArrival, history] =
-      await Promise.all([
-        this.getDelivery(occurrence.id),
-        plannedWeekForOccurrence(occurrence),
-        monitorCourse(offeringId),
-        eligibleLecturers(offeringId),
-        classDeliveryService.getLecturerArrivalForOccurrence(occurrence.id),
-        this.getHistory(occurrence.id),
-      ]);
+    const [
+      delivery,
+      currentPlannedWeek,
+      course,
+      lecturers,
+      lecturerArrival,
+      timing,
+      history,
+    ] = await Promise.all([
+      this.getDelivery(occurrence.id),
+      plannedWeekForOccurrence(occurrence),
+      monitorCourse(offeringId),
+      eligibleLecturers(offeringId),
+      classDeliveryService.getLecturerArrivalForOccurrence(occurrence.id),
+      monitorTeachingTimingService.getTiming(occurrence.id),
+      this.getHistory(occurrence.id),
+    ]);
     return {
       responsibility: { offeringId, role: responsibility.role },
       course,
@@ -425,6 +434,7 @@ export const teachingSessionDeliveryService = {
       plannedWeek: delivery?.plannedWeek ?? currentPlannedWeek,
       eligibleLecturers: lecturers,
       lecturerArrival,
+      timing,
       delivery,
       history,
     };

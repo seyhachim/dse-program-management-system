@@ -11,6 +11,8 @@ import { ArrowLeft, CheckCircle2, ChevronDown, Circle, Clock3, History } from "l
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { PortalError, PortalLoading } from "../../portal-state";
 import { MonitorArrivalCard } from "./monitor-arrival-card";
+import { MonitorTeachingTimeCard } from "./monitor-teaching-time-card";
+import { phnomPenhTimeFromIso } from "./monitor-teaching-time-utils";
 
 const COVERAGE_OPTIONS: Array<{ value: TeachingSessionCoverage; label: string }> = [
   { value: "TAUGHT_AS_PLANNED", label: "Taught as planned" },
@@ -37,10 +39,14 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
   return {
     lecturerArrivalStatus: null,
     classOccurred: true,
-    actualLecturerId: context.eligibleLecturers[0]?.id ?? null,
-    actualStartTime: context.occurrence.scheduledStartTime,
-    actualEndTime: context.occurrence.scheduledEndTime,
-    actualTopic: context.plannedWeek?.topic ?? "",
+    actualLecturerId: null,
+    actualStartTime: context.timing?.startedAt
+      ? phnomPenhTimeFromIso(context.timing.startedAt)
+      : null,
+    actualEndTime: context.timing?.endedAt
+      ? phnomPenhTimeFromIso(context.timing.endedAt)
+      : null,
+    actualTopic: "",
     learningSummary: "",
     coverage: "TAUGHT_AS_PLANNED",
     note: "",
@@ -113,6 +119,27 @@ export function MonitorDeliveryForm() {
     setContext(refreshed);
   };
 
+  const refreshTiming = async () => {
+    const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
+    setContext(refreshed);
+    setInput((current) => {
+      if (!current || refreshed.delivery) return current;
+      return {
+        ...current,
+        actualStartTime:
+          current.actualStartTime ??
+          (refreshed.timing?.startedAt
+            ? phnomPenhTimeFromIso(refreshed.timing.startedAt)
+            : null),
+        actualEndTime:
+          current.actualEndTime ??
+          (refreshed.timing?.endedAt
+            ? phnomPenhTimeFromIso(refreshed.timing.endedAt)
+            : null),
+      };
+    });
+  };
+
   const setOccurred = (occurred: boolean) => {
     setNotice(null);
     setInput((current) => {
@@ -131,9 +158,13 @@ export function MonitorDeliveryForm() {
       return {
         ...current,
         classOccurred: true,
-        actualLecturerId: current.actualLecturerId ?? context.eligibleLecturers[0]?.id ?? null,
-        actualStartTime: current.actualStartTime ?? context.occurrence.scheduledStartTime,
-        actualEndTime: current.actualEndTime ?? context.occurrence.scheduledEndTime,
+        actualLecturerId: current.actualLecturerId,
+        actualStartTime:
+          current.actualStartTime ??
+          (context.timing?.startedAt ? phnomPenhTimeFromIso(context.timing.startedAt) : null),
+        actualEndTime:
+          current.actualEndTime ??
+          (context.timing?.endedAt ? phnomPenhTimeFromIso(context.timing.endedAt) : null),
         coverage: current.coverage === "NOT_COVERED" ? "TAUGHT_AS_PLANNED" : current.coverage,
       };
     });
@@ -288,6 +319,14 @@ export function MonitorDeliveryForm() {
 
         {input.classOccurred ? (
           <>
+            <MonitorTeachingTimeCard
+              context={context}
+              offeringId={offeringId}
+              meetingId={meetingId}
+              date={date}
+              onChanged={refreshTiming}
+            />
+
             <label className="block text-sm font-medium text-foreground">
               Actual lecturer
               <select
@@ -306,7 +345,7 @@ export function MonitorDeliveryForm() {
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium text-foreground">
-                Teaching start
+                Final actual start
                 <input
                   type="time"
                   value={input.actualStartTime ?? ""}
@@ -315,7 +354,7 @@ export function MonitorDeliveryForm() {
                 />
               </label>
               <label className="block text-sm font-medium text-foreground">
-                Teaching end
+                Final actual end
                 <input
                   type="time"
                   value={input.actualEndTime ?? ""}
@@ -324,9 +363,17 @@ export function MonitorDeliveryForm() {
                 />
               </label>
             </div>
-            <div className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              <Clock3 className="h-4 w-4" aria-hidden="true" />
-              {deliveredMinutes > 0 ? `${deliveredMinutes} min · ${Math.round((deliveredMinutes / 60) * 100) / 100} contact hours` : "Enter an end time after the start time"}
+            <div className="rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Clock3 className="h-4 w-4" aria-hidden="true" />
+                {deliveredMinutes > 0
+                  ? `${deliveredMinutes} min · ${Math.round((deliveredMinutes / 60) * 100) / 100} contact hours`
+                  : "Capture start/end above or enter a valid correction/fallback time."}
+              </div>
+              <p className="mt-1 pl-6 text-[11px]">
+                Server punches prefill these fields. Manual edits are saved through the existing
+                audited delivery revision history.
+              </p>
             </div>
           </>
         ) : null}
