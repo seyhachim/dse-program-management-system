@@ -45,13 +45,9 @@ export function MonitorTeachingTimeCard({
     ],
   );
 
-  const endWindow = useMemo(
-    () =>
-      timing?.startedAt
-        ? teachingEndRecordingWindow(timing.startedAt, now)
-        : { canRecord: false, secondsRemaining: 0 },
-    [now, timing?.startedAt],
-  );
+  const endWindow = timing?.startedAt
+    ? teachingEndRecordingWindow(timing.startedAt, now)
+    : { canRecord: false, secondsRemaining: 0 };
 
   const duration = useMemo(
     () =>
