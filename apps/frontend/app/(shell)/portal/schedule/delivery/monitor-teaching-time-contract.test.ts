@@ -21,6 +21,8 @@ describe("monitor teaching timing UI contract", () => {
     expect(source).toContain("context.timing?.endedAt");
     expect(source).not.toContain("actualStartTime: context.occurrence.scheduledStartTime");
     expect(source).not.toContain("actualEndTime: context.occurrence.scheduledEndTime");
+    expect(source).not.toContain("actualLecturerId: context.eligibleLecturers[0]");
+    expect(source).not.toContain('actualTopic: context.plannedWeek?.topic ?? ""');
     expect(source).toContain("audited delivery revision history");
   });
 });
