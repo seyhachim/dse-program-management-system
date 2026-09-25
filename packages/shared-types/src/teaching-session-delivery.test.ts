@@ -114,6 +114,38 @@ describe("teaching session delivery contracts", () => {
     });
     expect(partial.startedAt).toContain("2026-09-25");
 
+    const tooShort = TeachingSessionTimingViewSchema.safeParse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: "2026-09-25T00:40:30.000Z",
+      startedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+      endedAt: "2026-09-25T00:41:29.000Z",
+      endedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+    });
+    expect(tooShort.success).toBe(false);
+
+    const validOneMinute = TeachingSessionTimingViewSchema.safeParse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: "2026-09-25T00:40:30.000Z",
+      startedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+      endedAt: "2026-09-25T00:41:30.000Z",
+      endedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+    });
+    expect(validOneMinute.success).toBe(true);
+
     const invalidEndOnly = TeachingSessionTimingViewSchema.safeParse({
       occurrenceId: "11111111-1111-4111-8111-111111111111",
       offeringId: "22222222-2222-4222-8222-222222222222",
