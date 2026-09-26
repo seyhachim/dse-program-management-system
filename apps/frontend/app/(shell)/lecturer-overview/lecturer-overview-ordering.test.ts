@@ -26,6 +26,8 @@ function meeting(
     building: "STEM Building",
     room: "305",
     activityType: "Lecture",
+    lecturerIds: [],
+    lecturers: [],
     durationHours:
       endHour - startHour + (endMinute - startMinute) / 60,
   };
@@ -161,5 +163,13 @@ describe("lecturer mobile overview ordering", () => {
     expect(compactScheduleLabel(course)).toBe(
       "Thu 07:00–08:30, 08:30–10:00",
     );
+  });
+
+  test("unallocated lecturer view has no next class and states that no weekly session is assigned", () => {
+    const now = new Date(2026, 8, 10, 12, 0);
+    const unallocated = offering({ id: "unallocated", sectionCode: "M1", meetings: [] });
+
+    expect(nextTeachingOccurrence(unallocated, now)).toBeNull();
+    expect(compactScheduleLabel(unallocated)).toBe("No weekly session assigned to you");
   });
 });
