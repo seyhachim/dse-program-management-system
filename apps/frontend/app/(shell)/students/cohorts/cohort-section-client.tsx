@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type {
+  ClassResponsibilityRole,
+  OfferingView,
   StudentCohortSectionMemberView,
   StudentCohortSectionView,
   StudentCohortSummaryView,
@@ -10,6 +12,11 @@ import { Button, Input } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { studentCohortsApi } from "@/lib/student-cohorts";
+import { offeringsApi } from "@/lib/offerings";
+import {
+  activeSectionMembers,
+  eligibleOfferingsForSectionResponsibility,
+} from "@/lib/section-class-leadership";
 import {
   studentCohortSectionsApi,
   type StudentCohortSectionHistoryView,
@@ -22,11 +29,16 @@ const messageOf = (error: unknown) => error instanceof ApiError || error instanc
 export function CohortSectionClient() {
   const { me } = useMe();
   const canWrite = me?.permissions.includes("students:write") ?? false;
+  const canManageLeadership = me?.roles.some((role) => role === "admin" || role === "program_coordinator") ?? false;
   const [cohorts, setCohorts] = useState<StudentCohortSummaryView[]>([]);
   const [cohortId, setCohortId] = useState("");
   const [sections, setSections] = useState<StudentCohortSectionView[]>([]);
   const [members, setMembers] = useState<StudentCohortSectionMemberView[]>([]);
   const [history, setHistory] = useState<StudentCohortSectionHistoryView[]>([]);
+  const [offerings, setOfferings] = useState<OfferingView[]>([]);
+  const [leadershipSectionId, setLeadershipSectionId] = useState("");
+  const [leadershipStudentId, setLeadershipStudentId] = useState("");
+  const [leadershipRole, setLeadershipRole] = useState<ClassResponsibilityRole>("ClassMonitor");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [studentId, setStudentId] = useState("");
@@ -42,22 +54,33 @@ export function CohortSectionClient() {
     () => members.filter((member) => !member.currentSectionMembership),
     [members],
   );
+  const leadershipMembers = useMemo(
+    () => activeSectionMembers(members, leadershipSectionId),
+    [members, leadershipSectionId],
+  );
 
   async function load(selectedCohortId: string) {
     if (!selectedCohortId) {
       setSections([]); setMembers([]); setHistory([]);
       return;
     }
-    const [sectionRows, memberRows, historyRows] = await Promise.all([
+    const [sectionRows, memberRows, historyRows, offeringRows] = await Promise.all([
       studentCohortSectionsApi.list(selectedCohortId),
       studentCohortSectionsApi.members(selectedCohortId),
       studentCohortSectionsApi.history(selectedCohortId),
+      canManageLeadership ? offeringsApi.list() : Promise.resolve([]),
     ]);
     setSections(sectionRows);
     setMembers(memberRows);
     setHistory(historyRows);
+    setOfferings(offeringRows);
     setSectionId((current) => sectionRows.some((item) => item.id === current && item.active) ? current : sectionRows.find((item) => item.active)?.id ?? "");
     setStudentId((current) => memberRows.some((item) => item.studentId === current && !item.currentSectionMembership) ? current : memberRows.find((item) => !item.currentSectionMembership)?.studentId ?? "");
+    const firstActiveSection = sectionRows.find((item) => item.active);
+    setLeadershipSectionId((current) => sectionRows.some((item) => item.id === current && item.active) ? current : firstActiveSection?.id ?? "");
+    const firstSectionId = sectionRows.some((item) => item.id === leadershipSectionId && item.active) ? leadershipSectionId : firstActiveSection?.id ?? "";
+    const firstLeadershipMember = activeSectionMembers(memberRows, firstSectionId)[0];
+    setLeadershipStudentId((current) => activeSectionMembers(memberRows, firstSectionId).some((item) => item.studentId === current) ? current : firstLeadershipMember?.studentId ?? "");
   }
 
   useEffect(() => {
@@ -166,6 +189,37 @@ export function CohortSectionClient() {
     finally { setBusy(false); }
   }
 
+  async function assignLeadership() {
+    if (!canManageLeadership || !leadershipSectionId || !leadershipStudentId) return;
+    const section = sections.find((item) => item.id === leadershipSectionId);
+    const member = leadershipMembers.find((item) => item.studentId === leadershipStudentId);
+    if (!section || !member) return;
+
+    const targets = eligibleOfferingsForSectionResponsibility(offerings, section.code, member.studentId);
+    if (targets.length === 0) {
+      setError(`No current ${section.code} offering currently enrolls ${member.studentName}. Nothing was changed.`);
+      return;
+    }
+
+    const label = leadershipRole === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor";
+    if (!window.confirm(
+      `Assign ${member.studentName} as ${label} for ${targets.length} current ${section.code} offering${targets.length === 1 ? "" : "s"}? Existing holders of this role will be replaced with audit history preserved.`,
+    )) return;
+
+    setBusy(true); setError(null); setNotice(null);
+    const results = await Promise.allSettled(
+      targets.map((offering) => offeringsApi.assignResponsibility(offering.id, member.studentId, leadershipRole)),
+    );
+    const succeeded = results.filter((result) => result.status === "fulfilled").length;
+    const failed = results.length - succeeded;
+    if (failed > 0) {
+      setError(`${succeeded} of ${targets.length} offerings updated; ${failed} failed. Review the failed offering(s) before retrying so successful audited assignments are not treated as rolled back.`);
+    } else {
+      setNotice(`${member.studentName} assigned as ${label} across ${succeeded} current ${section.code} offering${succeeded === 1 ? "" : "s"}.`);
+    }
+    setBusy(false);
+  }
+
   return (
     <section className="space-y-5 rounded-xl border border-border bg-card p-5">
       <div>
@@ -229,6 +283,47 @@ export function CohortSectionClient() {
         </div>
         <Button className="mt-3" disabled={!canWrite || busy || !studentId || !sectionId || !effectiveDate} onClick={() => void assignMember()}>Assign section</Button>
       </div>
+
+      {canManageLeadership && activeSections.length ? (
+        <div className="border-t border-border pt-5">
+          <h3 className="font-semibold">Class leadership</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Assign a Class Monitor or Sub-class Monitor using existing audited Offering responsibilities. Only non-completed offerings for this section where the selected student is enrolled are updated.
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={leadershipSectionId}
+              onChange={(event) => {
+                const nextSectionId = event.target.value;
+                setLeadershipSectionId(nextSectionId);
+                setLeadershipStudentId(activeSectionMembers(members, nextSectionId)[0]?.studentId ?? "");
+              }}
+            >
+              {activeSections.map((section) => <option key={section.id} value={section.id}>{section.code} · {section.name}</option>)}
+            </select>
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={leadershipRole}
+              onChange={(event) => setLeadershipRole(event.target.value as ClassResponsibilityRole)}
+            >
+              <option value="ClassMonitor">Class Monitor</option>
+              <option value="SubClassMonitor">Sub-class Monitor</option>
+            </select>
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={leadershipStudentId}
+              onChange={(event) => setLeadershipStudentId(event.target.value)}
+            >
+              <option value="">Choose section member…</option>
+              {leadershipMembers.map((member) => <option key={member.studentId} value={member.studentId}>{member.studentNumber} · {member.studentName}</option>)}
+            </select>
+          </div>
+          <Button className="mt-3" disabled={busy || !leadershipStudentId} onClick={() => void assignLeadership()}>
+            Assign leadership
+          </Button>
+        </div>
+      ) : null}
 
       {members.length ? (
         <div className="overflow-x-auto rounded-lg border border-border">

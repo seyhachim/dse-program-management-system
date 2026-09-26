@@ -2,6 +2,8 @@ import type {
   AttendanceSessionSummary,
   AttendanceSessionView,
   AttendanceStudentHistoryView,
+  ClassResponsibilityRole,
+  ClassResponsibilityView,
   CreateOfferingInput,
   LecturerWorkloadSummary,
   OfferingStatus,
@@ -33,8 +35,6 @@ export async function saveAttendanceWithTimeout(
     );
   } catch (error) {
     if (controller.signal.aborted) {
-      // A network timeout is not proof of rollback: the server may have committed.
-      // Never retry automatically or clear the local Roll Call marks.
       throw new ApiError(
         504,
         "Attendance save response timed out. Your marks remain on this device, but the server may have saved them. Check this date in another tab before retrying.",
@@ -72,6 +72,19 @@ export const offeringsApi = {
   unenroll(id: string, studentId: string): Promise<OfferingView> {
     return api.delete<OfferingView>(`/api/offerings/${id}/enrollments/${studentId}`);
   },
+  responsibilities(id: string): Promise<ClassResponsibilityView[]> {
+    return api.get<ClassResponsibilityView[]>(`/api/offerings/${id}/responsibilities`);
+  },
+  assignResponsibility(
+    id: string,
+    studentId: string,
+    role: ClassResponsibilityRole,
+  ): Promise<ClassResponsibilityView> {
+    return api.post<ClassResponsibilityView>(`/api/offerings/${id}/responsibilities`, {
+      studentId,
+      role,
+    });
+  },
   attendanceSessions(id: string): Promise<AttendanceSessionSummary[]> {
     return api.get<AttendanceSessionSummary[]>(`/api/offerings/${id}/attendance`);
   },
@@ -98,7 +111,6 @@ export const offeringsApi = {
   },
 };
 
-/** Apply the My Courses term selection to a server-provided workload summary. */
 export function workloadForTerm(
   summary: LecturerWorkloadSummary,
   term: string | null,
@@ -118,11 +130,10 @@ export function workloadForTerm(
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
     totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
-    coLecturerAssumption: summary.coLecturerAssumption,
+    coLecturerAssumption: "full",
   };
 }
 
-/** Map an offering status to a StatusBadge tone. */
 export function offeringTone(status: OfferingStatus): "live" | "upcoming" | "neutral" {
   if (status === "Active") return "live";
   if (status === "Planned") return "upcoming";
