@@ -277,14 +277,8 @@ export const studentAttendanceHistoryService = {
 
   async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
     const student = await activeStudentForUser(userId);
-    if (!student.studentId) {
-      throw new ReferenceError(
-        "No active student profile with an official Student ID is linked to this account",
-      );
-    }
     await requireOfferingEnrollment(student.id, offeringId);
-    const history = await historyForStudent(student, offeringId);
-    return { ...history, studentNumber: student.studentId };
+    return historyForStudent(student, offeringId);
   },
 
   async healthForStudent(studentId: string, offeringId: string) {
@@ -292,8 +286,8 @@ export const studentAttendanceHistoryService = {
       where: { id: studentId },
       select: { id: true, studentId: true },
     });
-    if (!student?.studentId) return null;
-    const history = await historyForStudent({ id: student.id, studentId: student.studentId }, offeringId);
+    if (!student) return null;
+    const history = await historyForStudent(student, offeringId);
     const finalized = history.history
       .filter((row): row is typeof row & { status: AttendanceStatus } => row.status !== null)
       .map((row) => ({ sessionId: row.sessionId, date: row.date, status: row.status }));
@@ -317,11 +311,8 @@ export const studentAttendanceHistoryService = {
       FROM "pms_attendance"."AttendanceRecord" record
       INNER JOIN "pms_attendance"."AttendanceSession" session
         ON session."id" = record."sessionId"
-      INNER JOIN "Student" student
-        ON student."id" = record."studentId"
       WHERE session."offeringId" = ${offeringId}
         AND record."studentId" IN (${Prisma.join(uniqueStudentIds)})
-        AND student."studentId" IS NOT NULL
       ORDER BY record."studentId", session."sessionDate" DESC
     `);
 
