@@ -17,6 +17,10 @@ export const authApi = {
   me(): Promise<MeResponse> {
     return api.get<MeResponse>("/api/auth/me");
   },
+  /** Server verifies current PMS password and stores one short-lived consent intent. */
+  startGoogleLink(password: string): Promise<{ expiresAt: string }> {
+    return api.post<{ expiresAt: string }>("/api/auth/google/link-intent", { password, consent: true });
+  },
   createAccount(input: CreateAccountInput): Promise<MeResponse> {
     return api.post<MeResponse>("/api/auth/accounts", input);
   },
