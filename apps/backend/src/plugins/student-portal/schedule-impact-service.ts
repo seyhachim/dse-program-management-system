@@ -7,6 +7,11 @@ import { registry } from "../../core/plugins/registry.ts";
 
 export class StudentScheduleImpactAccessError extends Error {}
 
+interface PortalStudentAccessRecord {
+  status: "Active" | "Inactive" | "Pending";
+  email: string | null;
+}
+
 interface OfferingsScheduleImpactReadContract {
   studentScheduleImpacts: {
     forStudent(userId: string): Promise<Array<{
@@ -21,16 +26,22 @@ interface OfferingsScheduleImpactReadContract {
   };
 }
 
-async function assertActivePortalStudent(userId: string): Promise<void> {
-  const student = await prisma.student.findUnique({
-    where: { userId },
-    select: { status: true, studentId: true, email: true },
-  });
-  if (!student || student.status !== "Active" || !student.studentId || !student.email) {
+export function assertSchedulePortalStudent(
+  student: PortalStudentAccessRecord | null,
+): asserts student is { status: "Active"; email: string } {
+  if (!student || student.status !== "Active" || !student.email) {
     throw new StudentScheduleImpactAccessError(
       "No active student portal profile is linked to this account",
     );
   }
+}
+
+async function assertActivePortalStudent(userId: string): Promise<void> {
+  const student = await prisma.student.findUnique({
+    where: { userId },
+    select: { status: true, email: true },
+  });
+  assertSchedulePortalStudent(student);
 }
 
 export const studentScheduleImpactProjectionService = {
