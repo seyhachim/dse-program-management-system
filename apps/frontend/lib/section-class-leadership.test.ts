@@ -35,14 +35,15 @@ function offering(
   };
 }
 
-test("selects only active matching-section offerings where the student is enrolled", () => {
+test("selects planned/active matching-section offerings where the student is enrolled", () => {
   const rows = [
     offering("a", "M2", "Active", ["student-a"]),
     offering("b", "M2", "Planned", ["student-a"]),
+    offering("e", "M2", "Completed", ["student-a"]),
     offering("c", "M1", "Active", ["student-a"]),
     offering("d", "m2", "Active", ["student-b"]),
   ];
-  expect(eligibleOfferingsForSectionResponsibility(rows, "M2", "student-a").map((row) => row.id)).toEqual(["a"]);
+  expect(eligibleOfferingsForSectionResponsibility(rows, "M2", "student-a").map((row) => row.id)).toEqual(["a", "b"]);
 });
 
 test("fails closed when no matching enrolled offering exists", () => {
