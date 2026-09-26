@@ -127,6 +127,18 @@ function isManager(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, [...REVIEW_ROLES], programmeId);
 }
 
+export function assertTeachingLeaveReviewer(
+  user: AuthUser,
+  request: Pick<TeachingLeaveRequestView, "programmeId" | "requester">,
+): void {
+  if (!isManager(user, request.programmeId)) {
+    throw new TeachingLeaveAuthorizationError("Only a programme administrator or coordinator can review teaching leave");
+  }
+  if (request.requester.id === user.id) {
+    throw new TeachingLeaveAuthorizationError("A lecturer cannot review their own teaching leave request");
+  }
+}
+
 async function requestRowsByIds(ids: string[]): Promise<LeaveRow[]> {
   if (ids.length === 0) return [];
   return prisma.$queryRawUnsafe<LeaveRow[]>(
@@ -618,14 +630,15 @@ export const teachingLeaveService = {
     return request;
   },
 
+  async getForReview(user: AuthUser, id: string): Promise<TeachingLeaveRequestView> {
+    const request = await readRequest(id);
+    assertTeachingLeaveReviewer(user, request);
+    return request;
+  },
+
   async review(user: AuthUser, id: string, input: ReviewTeachingLeaveRequest): Promise<TeachingLeaveReviewResult> {
     const before = await readRequest(id);
-    if (!isManager(user, before.programmeId)) {
-      throw new TeachingLeaveAuthorizationError("Only a programme administrator or coordinator can review teaching leave");
-    }
-    if (before.requester.id === user.id) {
-      throw new TeachingLeaveAuthorizationError("A lecturer cannot review their own teaching leave request");
-    }
+    assertTeachingLeaveReviewer(user, before);
     if (input.decision === "REQUEST_CHANGES" && !input.comment?.trim()) {
       throw new TeachingLeaveValidationError("Reviewer guidance is required when requesting changes");
     }
