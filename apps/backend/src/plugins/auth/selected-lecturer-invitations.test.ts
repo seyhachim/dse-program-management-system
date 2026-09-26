@@ -107,11 +107,18 @@ describe("selected lecturer invitations", () => {
   });
 });
 
-test("selected lecturer route keeps the accounts:create permission boundary", async () => {
+test("lecturer onboarding routes keep the accounts:create permission boundary", async () => {
   const source = await Bun.file(new URL("./router.ts", import.meta.url)).text();
-  const routeStart = source.indexOf('"/lecturers/invitations/selected"');
-  expect(routeStart).toBeGreaterThan(-1);
-  const routeSnippet = source.slice(routeStart, routeStart + 1000);
-  expect(routeSnippet).toContain('requirePermission("accounts:create")');
-  expect(routeSnippet).toContain("SelectedLecturerInvitationRequest.safeParse(req.body)");
+
+  const statusRouteStart = source.indexOf('"/lecturers/access-status"');
+  expect(statusRouteStart).toBeGreaterThan(-1);
+  const statusRouteSnippet = source.slice(statusRouteStart, statusRouteStart + 900);
+  expect(statusRouteSnippet).toContain('requirePermission("accounts:create")');
+  expect(statusRouteSnippet).toContain("LecturerAccessStatusRequest.safeParse(req.body)");
+
+  const selectedRouteStart = source.indexOf('"/lecturers/invitations/selected"');
+  expect(selectedRouteStart).toBeGreaterThan(-1);
+  const selectedRouteSnippet = source.slice(selectedRouteStart, selectedRouteStart + 1000);
+  expect(selectedRouteSnippet).toContain('requirePermission("accounts:create")');
+  expect(selectedRouteSnippet).toContain("SelectedLecturerInvitationRequest.safeParse(req.body)");
 });
