@@ -15,7 +15,7 @@ export function eligibleOfferingsForSectionResponsibility(
   const normalizedCode = sectionCode.trim().toUpperCase();
   return offerings.filter(
     (offering) =>
-      offering.status === "Active" &&
+      offering.status !== "Completed" &&
       offering.sectionCode.toUpperCase() === normalizedCode &&
       offering.students.some((student) => student.id === studentId),
   );
