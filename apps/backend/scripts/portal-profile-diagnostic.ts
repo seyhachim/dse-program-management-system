@@ -1,5 +1,6 @@
 import { prisma } from "../src/core/db/prisma.ts";
 import { studentPortalService } from "../src/plugins/student-portal/service.ts";
+import { studentScheduleImpactProjectionService } from "../src/plugins/student-portal/schedule-impact-service.ts";
 
 export async function runPortalProfileDiagnostic(): Promise<void> {
   const userId = "9331c306-2c02-4ede-8497-c8a98599ea00";
@@ -21,5 +22,12 @@ export async function runPortalProfileDiagnostic(): Promise<void> {
     });
   } catch (error) {
     console.error("[portal-profile-diagnostic] home FAIL", error instanceof Error ? error.message : "unknown");
+  }
+
+  try {
+    const impacts = await studentScheduleImpactProjectionService.list(userId);
+    console.log("[portal-profile-diagnostic] schedule PASS", { impactCount: impacts.length });
+  } catch (error) {
+    console.error("[portal-profile-diagnostic] schedule FAIL", error instanceof Error ? error.message : "unknown");
   }
 }
