@@ -3,6 +3,7 @@ import type {
   SaveLecturerArrivalConfirmationResult,
   SaveTeachingSessionDeliveryInput,
   SaveTeachingSessionDeliveryResult,
+  SaveTeachingSessionTimingResult,
   TeachingSessionMonitorContextView,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
@@ -11,7 +12,12 @@ function deliveryPath(
   offeringId: string,
   meetingId: string,
   date: string,
-  suffix: "monitor-context" | "monitor-arrival" | "monitor-delivery",
+  suffix:
+    | "monitor-context"
+    | "monitor-arrival"
+    | "monitor-teaching-start"
+    | "monitor-teaching-end"
+    | "monitor-delivery",
 ): string {
   return `/api/offerings/${encodeURIComponent(offeringId)}/meetings/${encodeURIComponent(
     meetingId,
@@ -29,6 +35,16 @@ export const monitorDeliveryApi = {
   markArrived: (offeringId: string, meetingId: string, date: string) =>
     api.put<SaveLecturerArrivalConfirmationResult>(
       deliveryPath(offeringId, meetingId, date, "monitor-arrival"),
+      {},
+    ),
+  markTeachingStarted: (offeringId: string, meetingId: string, date: string) =>
+    api.put<SaveTeachingSessionTimingResult>(
+      deliveryPath(offeringId, meetingId, date, "monitor-teaching-start"),
+      {},
+    ),
+  markTeachingEnded: (offeringId: string, meetingId: string, date: string) =>
+    api.put<SaveTeachingSessionTimingResult>(
+      deliveryPath(offeringId, meetingId, date, "monitor-teaching-end"),
       {},
     ),
   save: (

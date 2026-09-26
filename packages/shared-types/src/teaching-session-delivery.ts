@@ -19,6 +19,12 @@ export const TeachingSessionActualTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
+/** Earliest a monitor may punch teaching start before the scheduled class start. */
+export const TEACHING_START_EARLY_WINDOW_MINUTES = 60;
+
+/** Minimum captured teaching duration so minute-precision final times stay ordered. */
+export const TEACHING_TIMING_MIN_DURATION_SECONDS = 60;
+
 export const TeachingSessionLearningSummarySchema = z.string().trim().max(1000);
 export type TeachingSessionLearningSummary = z.infer<
   typeof TeachingSessionLearningSummarySchema
@@ -194,6 +200,67 @@ export type TeachingSessionMonitorCourseView = z.infer<
   typeof TeachingSessionMonitorCourseViewSchema
 >;
 
+export const TeachingSessionTimingActorViewSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+});
+export type TeachingSessionTimingActorView = z.infer<
+  typeof TeachingSessionTimingActorViewSchema
+>;
+
+export const TeachingSessionTimingViewSchema = z
+  .object({
+    occurrenceId: z.string().uuid(),
+    offeringId: z.string().uuid(),
+    startedAt: z.string().datetime().nullable(),
+    startedBy: TeachingSessionTimingActorViewSchema.nullable(),
+    endedAt: z.string().datetime().nullable(),
+    endedBy: TeachingSessionTimingActorViewSchema.nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if ((value.startedAt === null) !== (value.startedBy === null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["startedAt"],
+        message: "Teaching start timestamp and actor must be recorded together",
+      });
+    }
+    if ((value.endedAt === null) !== (value.endedBy === null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endedAt"],
+        message: "Teaching end timestamp and actor must be recorded together",
+      });
+    }
+    if (value.endedAt !== null && value.startedAt === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endedAt"],
+        message: "Teaching cannot end before a teaching start is recorded",
+      });
+    }
+    if (value.startedAt !== null && value.endedAt !== null) {
+      const durationMs =
+        new Date(value.endedAt).getTime() - new Date(value.startedAt).getTime();
+      if (durationMs < TEACHING_TIMING_MIN_DURATION_SECONDS * 1000) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["endedAt"],
+          message: "Teaching end must be at least one minute after teaching start",
+        });
+      }
+    }
+  });
+export type TeachingSessionTimingView = z.infer<typeof TeachingSessionTimingViewSchema>;
+
+export const SaveTeachingSessionTimingResultSchema = z.object({
+  timing: TeachingSessionTimingViewSchema,
+  changed: z.boolean(),
+});
+export type SaveTeachingSessionTimingResult = z.infer<
+  typeof SaveTeachingSessionTimingResultSchema
+>;
+
 export const TeachingSessionMonitorContextViewSchema = z.object({
   responsibility: MonitorClassResponsibilityViewSchema,
   course: TeachingSessionMonitorCourseViewSchema,
@@ -201,6 +268,7 @@ export const TeachingSessionMonitorContextViewSchema = z.object({
   plannedWeek: TeachingSessionPlannedWeekViewSchema.nullable(),
   eligibleLecturers: z.array(TeachingSessionDeliveryLecturerViewSchema),
   lecturerArrival: LecturerArrivalConfirmationViewSchema.nullable(),
+  timing: TeachingSessionTimingViewSchema.nullable(),
   delivery: TeachingSessionDeliveryViewSchema.nullable(),
   history: z.array(TeachingSessionDeliveryAuditEventViewSchema),
 });

@@ -68,7 +68,7 @@ export type StudentAttendanceHealthSummary = {
 type StudentLookup = {
   getByUserId(userId: string): Promise<{
     id: string;
-    studentId: string;
+    studentId: string | null;
     status: string;
   } | null>;
 };
@@ -175,10 +175,17 @@ export function summarizeStudentAttendanceHealthByOffering(
   });
 }
 
+type CanonicalStudentAttendanceHistory = Omit<
+  TelegramStudentAttendanceHistory,
+  "studentNumber"
+> & {
+  studentNumber: string | null;
+};
+
 async function historyForStudent(
-  student: { id: string; studentId: string },
+  student: { id: string; studentId: string | null },
   offeringId: string,
-): Promise<TelegramStudentAttendanceHistory> {
+): Promise<CanonicalStudentAttendanceHistory> {
   const sessions = await prisma.$queryRaw<SessionRow[]>`
     SELECT "id", "sessionDate", "updatedAt"
     FROM "pms_attendance"."AttendanceSession"
@@ -242,18 +249,35 @@ async function historyForStudent(
   };
 }
 
-export const studentAttendanceHistoryService = {
-  async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
-    const student = await students().getByUserId(userId);
-    if (!student || student.status !== "Active" || !student.studentId) {
-      throw new ReferenceError("No active student profile with an official Student ID is linked to this account");
-    }
+async function activeStudentForUser(userId: string) {
+  const student = await students().getByUserId(userId);
+  if (!student || student.status !== "Active") {
+    throw new ReferenceError("No active student profile is linked to this account");
+  }
+  return student;
+}
 
-    const enrollment = await prisma.enrollment.findUnique({
-      where: { offeringId_studentId: { offeringId, studentId: student.id } },
-      select: { id: true },
-    });
-    if (!enrollment) throw new ReferenceError("Student is not enrolled in this offering");
+async function requireOfferingEnrollment(studentId: string, offeringId: string): Promise<void> {
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { offeringId_studentId: { offeringId, studentId } },
+    select: { id: true },
+  });
+  if (!enrollment) throw new ReferenceError("Student is not enrolled in this offering");
+}
+
+export const studentAttendanceHistoryService = {
+  async forPortalUser(
+    userId: string,
+    offeringId: string,
+  ): Promise<CanonicalStudentAttendanceHistory> {
+    const student = await activeStudentForUser(userId);
+    await requireOfferingEnrollment(student.id, offeringId);
+    return historyForStudent(student, offeringId);
+  },
+
+  async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
+    const student = await activeStudentForUser(userId);
+    await requireOfferingEnrollment(student.id, offeringId);
     return historyForStudent(student, offeringId);
   },
 
@@ -262,8 +286,8 @@ export const studentAttendanceHistoryService = {
       where: { id: studentId },
       select: { id: true, studentId: true },
     });
-    if (!student?.studentId) return null;
-    const history = await historyForStudent({ id: student.id, studentId: student.studentId }, offeringId);
+    if (!student) return null;
+    const history = await historyForStudent(student, offeringId);
     const finalized = history.history
       .filter((row): row is typeof row & { status: AttendanceStatus } => row.status !== null)
       .map((row) => ({ sessionId: row.sessionId, date: row.date, status: row.status }));
@@ -287,11 +311,8 @@ export const studentAttendanceHistoryService = {
       FROM "pms_attendance"."AttendanceRecord" record
       INNER JOIN "pms_attendance"."AttendanceSession" session
         ON session."id" = record."sessionId"
-      INNER JOIN "Student" student
-        ON student."id" = record."studentId"
       WHERE session."offeringId" = ${offeringId}
         AND record."studentId" IN (${Prisma.join(uniqueStudentIds)})
-        AND student."studentId" IS NOT NULL
       ORDER BY record."studentId", session."sessionDate" DESC
     `);
 

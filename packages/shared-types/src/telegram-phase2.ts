@@ -68,7 +68,7 @@ export type TelegramAttendanceHealthCard = z.infer<typeof TelegramAttendanceHeal
 export const TelegramStudentAttendanceHistorySchema = z.object({
   offeringId: z.string(),
   studentId: z.string(),
-  studentNumber: z.string(),
+  studentNumber: z.string().nullable(),
   totalSessions: z.number().int().nonnegative(),
   markedSessions: z.number().int().nonnegative(),
   attendanceRate: z.number().min(0).max(100).nullable(),
