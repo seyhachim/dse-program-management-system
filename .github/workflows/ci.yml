@@ -197,6 +197,11 @@ jobs:
         env:
           CLASS_DELIVERY_DB_TESTS: "1"
 
+      - name: Verify unassigned teaching request integrity
+        run: bun test apps/backend/src/plugins/offerings/unassigned-teaching-request-db.test.ts
+        env:
+          UNASSIGNED_TEACHING_DB_TESTS: "1"
+
       - name: Verify historical attendance correction
         run: bun test apps/backend/src/plugins/offerings/attendance-service-db.test.ts
         env:
