@@ -197,13 +197,13 @@ export function CohortSectionClient() {
 
     const targets = eligibleOfferingsForSectionResponsibility(offerings, section.code, member.studentId);
     if (targets.length === 0) {
-      setError(`No active ${section.code} offering currently enrolls ${member.studentName}. Nothing was changed.`);
+      setError(`No current ${section.code} offering currently enrolls ${member.studentName}. Nothing was changed.`);
       return;
     }
 
     const label = leadershipRole === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor";
     if (!window.confirm(
-      `Assign ${member.studentName} as ${label} for ${targets.length} active ${section.code} offering${targets.length === 1 ? "" : "s"}? Existing holders of this role will be replaced with audit history preserved.`,
+      `Assign ${member.studentName} as ${label} for ${targets.length} current ${section.code} offering${targets.length === 1 ? "" : "s"}? Existing holders of this role will be replaced with audit history preserved.`,
     )) return;
 
     setBusy(true); setError(null); setNotice(null);
@@ -215,7 +215,7 @@ export function CohortSectionClient() {
     if (failed > 0) {
       setError(`${succeeded} of ${targets.length} offerings updated; ${failed} failed. Review the failed offering(s) before retrying so successful audited assignments are not treated as rolled back.`);
     } else {
-      setNotice(`${member.studentName} assigned as ${label} across ${succeeded} active ${section.code} offering${succeeded === 1 ? "" : "s"}.`);
+      setNotice(`${member.studentName} assigned as ${label} across ${succeeded} current ${section.code} offering${succeeded === 1 ? "" : "s"}.`);
     }
     setBusy(false);
   }
@@ -288,7 +288,7 @@ export function CohortSectionClient() {
         <div className="border-t border-border pt-5">
           <h3 className="font-semibold">Class leadership</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Assign a Class Monitor or Sub-class Monitor using existing audited Offering responsibilities. Only active offerings for this section where the selected student is enrolled are updated.
+            Assign a Class Monitor or Sub-class Monitor using existing audited Offering responsibilities. Only non-completed offerings for this section where the selected student is enrolled are updated.
           </p>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <select
