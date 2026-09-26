@@ -60,6 +60,30 @@ async function assertLecturersExist(lecturerIds: string[]): Promise<void> {
   if (found.some((l) => l === null)) throw new ReferenceError("One or more co-lecturers do not exist");
 }
 
+export function invalidMeetingLecturerId(
+  meetings: Array<{ lecturerIds: string[] }>,
+  teamIds: string[],
+): string | null {
+  const allowed = new Set(teamIds);
+  for (const meeting of meetings) {
+    for (const lecturerId of meeting.lecturerIds) {
+      if (!allowed.has(lecturerId)) return lecturerId;
+    }
+  }
+  return null;
+}
+
+function assertMeetingLecturersBelongToTeam(
+  meetings: Array<{ lecturerIds: string[] }>,
+  lecturerId: string | null | undefined,
+  coLecturerIds: string[],
+): void {
+  const teamIds = [lecturerId, ...coLecturerIds].filter((id): id is string => Boolean(id));
+  if (invalidMeetingLecturerId(meetings, teamIds)) {
+    throw new ReferenceError("Meeting lecturers must belong to the Offering teaching team");
+  }
+}
+
 async function resolveCoursePlacement(
   programmeId: string,
   academicYearId: string,
@@ -112,7 +136,7 @@ async function lecturerLookup(): Promise<Map<string, LecturerRef>> {
 const withRelations = {
   enrollments: { select: { studentId: true } },
   coLecturers: { select: { lecturerId: true } },
-  meetings: true,
+  meetings: { include: { lecturers: { select: { lecturerId: true } } } },
   academicCalendarPeriod: {
     include: {
       calendar: { include: { academicYear: true, studyYears: true } },
@@ -179,6 +203,7 @@ async function toView(
       building: string | null;
       room: string | null;
       activityType: string;
+      lecturers: { lecturerId: string }[];
     }[];
   },
   lecturerById: Map<string, LecturerRef>,
@@ -218,12 +243,23 @@ async function toView(
     startDate: dateOnly(offering.academicCalendarPeriod?.teachingStart ?? offering.startDate),
     endDate: dateOnly(offering.academicCalendarPeriod?.teachingEnd ?? offering.endDate),
     otherLecturers: offering.otherLecturers,
-    meetings: offering.meetings.map((meeting) => ({
-      ...meeting,
-      dayOfWeek: meeting.dayOfWeek as OfferingView["meetings"][number]["dayOfWeek"],
-      activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
-      durationHours: meetingDurationHours(meeting.startTime, meeting.endTime),
-    })),
+    meetings: offering.meetings.map((meeting) => {
+      const lecturerIds = meeting.lecturers.map((item) => item.lecturerId);
+      return {
+        id: meeting.id,
+        dayOfWeek: meeting.dayOfWeek as OfferingView["meetings"][number]["dayOfWeek"],
+        startTime: meeting.startTime,
+        endTime: meeting.endTime,
+        building: meeting.building,
+        room: meeting.room,
+        activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
+        lecturerIds,
+        lecturers: lecturerIds
+          .map((id) => lecturerById.get(id))
+          .filter((item): item is LecturerRef => item != null),
+        durationHours: meetingDurationHours(meeting.startTime, meeting.endTime),
+      };
+    }),
     enrolledCount: offering.enrollments.length,
     createdAt: offering.createdAt.toISOString(),
     course: course
@@ -315,6 +351,11 @@ export const offeringService = {
       throw new ReferenceError("Assigned lecturer does not exist");
     }
     if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
+    assertMeetingLecturersBelongToTeam(
+      meetings,
+      offeringInput.lecturerId,
+      coLecturerIds ?? [],
+    );
     if (!offeringInput.academicCalendarPeriodId || !offeringInput.programmeYear || !offeringInput.semester) {
       throw new ReferenceError("A published Academic Calendar period, study year, and semester are required");
     }
@@ -354,7 +395,16 @@ export const offeringService = {
           ? { create: coLecturerIds.map((lecturerId) => ({ lecturerId })) }
           : undefined,
         meetings: meetings.length
-          ? { create: meetings.map((meeting) => ({ ...meeting, building: meeting.building || null, room: meeting.room || null })) }
+          ? {
+              create: meetings.map(({ lecturerIds, ...meeting }) => ({
+                ...meeting,
+                building: meeting.building || null,
+                room: meeting.room || null,
+                lecturers: lecturerIds.length
+                  ? { create: lecturerIds.map((lecturerId) => ({ lecturerId })) }
+                  : undefined,
+              })),
+            }
           : undefined,
       },
       include: withRelations,
@@ -370,7 +420,10 @@ export const offeringService = {
 
     const existing = await prisma.offering.findUnique({
       where: { id },
-      include: { coLecturers: { select: { lecturerId: true } } },
+      include: {
+        coLecturers: { select: { lecturerId: true } },
+        meetings: { include: { lecturers: { select: { lecturerId: true } } } },
+      },
     });
     if (!existing) throw new ReferenceError("Offering not found");
     const unboundLegacyOffering = !existing.courseSpecId && !existing.academicCalendarPeriodId;
@@ -403,6 +456,10 @@ export const offeringService = {
       throw new ReferenceError("The primary lecturer cannot also be a co-lecturer");
     }
     if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
+    const nextMeetingAssignments = meetings ?? existing.meetings.map((meeting) => ({
+      lecturerIds: meeting.lecturers.map((item) => item.lecturerId),
+    }));
+    assertMeetingLecturersBelongToTeam(nextMeetingAssignments, nextLecturerId, nextCoLecturerIds);
 
     const calendarContextChanging =
       offeringInput.academicCalendarPeriodId !== undefined ||
@@ -457,7 +514,19 @@ export const offeringService = {
       }
       if (meetings !== undefined) {
         await tx.offeringMeeting.deleteMany({ where: { offeringId: id } });
-        if (meetings.length) await tx.offeringMeeting.createMany({ data: meetings.map((meeting) => ({ offeringId: id, ...meeting, building: meeting.building || null, room: meeting.room || null })) });
+        for (const { lecturerIds, ...meeting } of meetings) {
+          await tx.offeringMeeting.create({
+            data: {
+              offeringId: id,
+              ...meeting,
+              building: meeting.building || null,
+              room: meeting.room || null,
+              lecturers: lecturerIds.length
+                ? { create: lecturerIds.map((lecturerId) => ({ lecturerId })) }
+                : undefined,
+            },
+          });
+        }
       }
       return tx.offering.update({
         where: { id },
@@ -528,6 +597,7 @@ export const offeringService = {
             building: true,
             room: true,
             activityType: true,
+            lecturers: { select: { lecturerId: true } },
           },
         },
       },
@@ -561,8 +631,9 @@ export const offeringService = {
           return course
             ? {
                 ...assignment,
-                meetings: assignment.meetings.map((meeting) => ({
+                meetings: assignment.meetings.map(({ lecturers: meetingLecturers, ...meeting }) => ({
                   ...meeting,
+                  lecturerIds: meetingLecturers.map((item) => item.lecturerId),
                   dayOfWeek: meeting.dayOfWeek as OfferingView["meetings"][number]["dayOfWeek"],
                   activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
                 })),
