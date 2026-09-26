@@ -68,6 +68,15 @@ type TelegramWorkflowService = {
       status: TeachingLeaveStatus;
       firstOccurrence: TeachingLeaveOperationalImpact;
     }): Promise<"sent" | "missing" | "failed" | "duplicate">;
+    deliverTeachingLeaveReviewers(input: {
+      requestId: string;
+      programmeId: string;
+      requesterId: string;
+      requesterName: string;
+      submittedLate: boolean;
+      submissionVersion: string;
+      firstOccurrence: TeachingLeaveOperationalImpact;
+    }): Promise<{ sent: number; failed: number; duplicate: number }>;
     deliverTeachingLeaveStudents(input: TeachingLeaveOperationalImpact): Promise<{
       sent: number;
       failed: number;
@@ -116,6 +125,18 @@ function dateOnly(value: Date): string {
 
 function isManager(user: AuthUser, programmeId: string): boolean {
   return hasAnyRoleInProgramme(user, [...REVIEW_ROLES], programmeId);
+}
+
+export function assertTeachingLeaveReviewer(
+  user: AuthUser,
+  request: Pick<TeachingLeaveRequestView, "programmeId" | "requester">,
+): void {
+  if (!isManager(user, request.programmeId)) {
+    throw new TeachingLeaveAuthorizationError("Only a programme administrator or coordinator can review teaching leave");
+  }
+  if (request.requester.id === user.id) {
+    throw new TeachingLeaveAuthorizationError("A lecturer cannot review their own teaching leave request");
+  }
 }
 
 async function requestRowsByIds(ids: string[]): Promise<LeaveRow[]> {
@@ -222,6 +243,25 @@ async function requesterNotification(request: TeachingLeaveRequestView) {
     });
   } catch {
     return "failed" as const;
+  }
+}
+
+async function reviewerNotification(request: TeachingLeaveRequestView): Promise<void> {
+  const first = request.occurrences[0];
+  if (!first || request.status !== "PENDING") return;
+  try {
+    await telegram().notifications.deliverTeachingLeaveReviewers({
+      requestId: request.id,
+      programmeId: request.programmeId,
+      requesterId: request.requester.id,
+      requesterName: request.requester.name,
+      submittedLate: request.submittedLate,
+      submissionVersion: request.updatedAt,
+      firstOccurrence: impactFor(request, first),
+    });
+  } catch {
+    // Telegram is a notification channel only. A delivery failure must never
+    // roll back or invalidate the authoritative teaching-leave submission.
   }
 }
 
@@ -387,6 +427,7 @@ export const teachingLeaveService = {
 
     const request = await readRequest(requestId);
     void requesterNotification(request);
+    void reviewerNotification(request);
     return request;
   },
 
@@ -475,7 +516,9 @@ export const teachingLeaveService = {
       `;
     });
 
-    return readRequest(id);
+    const request = await readRequest(id);
+    void reviewerNotification(request);
+    return request;
   },
 
   async mine(user: AuthUser): Promise<TeachingLeaveRequestView[]> {
@@ -587,14 +630,15 @@ export const teachingLeaveService = {
     return request;
   },
 
+  async getForReview(user: AuthUser, id: string): Promise<TeachingLeaveRequestView> {
+    const request = await readRequest(id);
+    assertTeachingLeaveReviewer(user, request);
+    return request;
+  },
+
   async review(user: AuthUser, id: string, input: ReviewTeachingLeaveRequest): Promise<TeachingLeaveReviewResult> {
     const before = await readRequest(id);
-    if (!isManager(user, before.programmeId)) {
-      throw new TeachingLeaveAuthorizationError("Only a programme administrator or coordinator can review teaching leave");
-    }
-    if (before.requester.id === user.id) {
-      throw new TeachingLeaveAuthorizationError("A lecturer cannot review their own teaching leave request");
-    }
+    assertTeachingLeaveReviewer(user, before);
     if (input.decision === "REQUEST_CHANGES" && !input.comment?.trim()) {
       throw new TeachingLeaveValidationError("Reviewer guidance is required when requesting changes");
     }

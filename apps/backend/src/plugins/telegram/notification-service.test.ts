@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   attendanceWarningEventKey,
+  sendTelegramPmsActionMessage,
   sendTelegramPmsMessage,
   teachingLeaveRequesterPath,
+  teachingLeaveReviewerPath,
+  teachingLeaveReviewerText,
   teachingLeaveStudentPath,
 } from "./notification-service.ts";
 
@@ -96,6 +99,63 @@ describe("Telegram PMS notifications", () => {
     expect(teachingLeaveRequesterPath("request/with spaces")).toBe(
       "/telegram/teaching-leave?requestId=request%2Fwith%20spaces",
     );
+  });
+
+  test("routes reviewer notifications to the protected Mini App review surface", () => {
+    expect(teachingLeaveReviewerPath("request/with spaces")).toBe(
+      "/telegram/teaching-leave-review?requestId=request%2Fwith%20spaces",
+    );
+  });
+
+  test("uses a review-specific private-chat button without exposing confidential leave text", async () => {
+    configurePmsBot();
+    let body: any;
+    const fakeFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 91 } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const text = teachingLeaveReviewerText({
+      requesterName: "Lecturer Example",
+      submittedLate: true,
+      firstOccurrence: {
+        requestId: "request-1",
+        occurrenceId: "occurrence-1",
+        offeringId: "offering-1",
+        programmeId: "dse",
+        courseCode: "TSA301",
+        courseTitle: "Time Series Analysis",
+        sectionCode: "M1",
+        sessionDate: "2026-09-30",
+        startTime: "07:30",
+        endTime: "11:30",
+        room: "101",
+        releaseForReuse: false,
+        proposedHandling: "MAKE_UP",
+      },
+    });
+
+    await sendTelegramPmsActionMessage(
+      "123",
+      text,
+      "https://example.com/telegram?startapp=review-token",
+      "Review leave request",
+      fakeFetch,
+    );
+
+    expect(text).toContain("Lecturer: Lecturer Example");
+    expect(text).toContain("TSA301 · Class M1");
+    expect(text).toContain("Late/current-session request");
+    expect(text).not.toContain("Reason:");
+    expect(text).not.toContain("attachment");
+    expect(text).not.toContain("reviewer comment");
+    expect(body.reply_markup.inline_keyboard[0][0]).toEqual({
+      text: "Review leave request",
+      web_app: { url: "https://example.com/telegram?startapp=review-token" },
+    });
   });
 
   test("routes student teaching leave updates to an exact occurrence impact surface", () => {

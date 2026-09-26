@@ -75,6 +75,31 @@ async function eligibleUserRecipient(userId: string): Promise<RecipientRow | nul
   return rows[0] ?? null;
 }
 
+async function eligibleTeachingLeaveReviewerRecipients(
+  programmeId: string,
+  requesterId: string,
+): Promise<RecipientRow[]> {
+  return prisma.$queryRaw<RecipientRow[]>`
+    SELECT identity."id" AS "identityId", identity."telegramUserId"
+    FROM (
+      SELECT DISTINCT assignment."userId"
+      FROM "UserRoleAssignment" assignment
+      JOIN "Role" role ON role."id" = assignment."roleId"
+      WHERE role."slug" IN ('admin', 'program_coordinator')
+        AND (assignment."programmeId" IS NULL OR assignment."programmeId" = ${programmeId})
+        AND assignment."userId" <> ${requesterId}
+    ) reviewer
+    JOIN LATERAL (
+      SELECT ti."id", ti."telegramUserId"
+      FROM "telegram_security"."TelegramIdentity" ti
+      WHERE ti."userId" = reviewer."userId" AND ti."revokedAt" IS NULL
+      ORDER BY ti."linkedAt" DESC
+      LIMIT 1
+    ) identity ON TRUE
+    ORDER BY reviewer."userId"
+  `;
+}
+
 async function sendTelegramPmsPayload(
   chatId: string,
   text: string,
@@ -98,16 +123,32 @@ async function sendTelegramPmsPayload(
  * groups/supergroups/channels use negative chat ids and therefore receive an
  * ordinary URL button (Web App buttons are private-chat only).
  */
+export async function sendTelegramPmsActionMessage(
+  chatId: string,
+  text: string,
+  url: string,
+  buttonText: string,
+  fetchImpl: typeof fetch = fetch,
+) {
+  const replyMarkup = chatId.startsWith("-")
+    ? { inline_keyboard: [[{ text: buttonText, url }]] }
+    : { inline_keyboard: [[{ text: buttonText, web_app: { url } }]] };
+  return sendTelegramPmsPayload(chatId, text, replyMarkup, fetchImpl);
+}
+
 export async function sendTelegramPmsMessage(
   chatId: string,
   text: string,
   url: string,
   fetchImpl: typeof fetch = fetch,
 ) {
-  const replyMarkup = chatId.startsWith("-")
-    ? { inline_keyboard: [[{ text: "Open DSE PMS", url }]] }
-    : { inline_keyboard: [[{ text: "Open in DSE PMS", web_app: { url } }]] };
-  return sendTelegramPmsPayload(chatId, text, replyMarkup, fetchImpl);
+  return sendTelegramPmsActionMessage(
+    chatId,
+    text,
+    url,
+    chatId.startsWith("-") ? "Open DSE PMS" : "Open in DSE PMS",
+    fetchImpl,
+  );
 }
 
 /** Explicit group/channel sender for callers that already know the chat kind. */
@@ -172,10 +213,13 @@ async function deliverToRecipient(
   resourceId: string,
   text: string,
   url: string,
+  buttonText?: string,
 ): Promise<DeliveryStatus> {
   const deliveryId = await claimDelivery(recipient.identityId, eventKey, kind, resourceId);
   if (!deliveryId) return "duplicate";
-  return finishDelivery(deliveryId, () => sendTelegramPmsMessage(recipient.telegramUserId, text, url));
+  return finishDelivery(deliveryId, () => buttonText
+    ? sendTelegramPmsActionMessage(recipient.telegramUserId, text, url, buttonText)
+    : sendTelegramPmsMessage(recipient.telegramUserId, text, url));
 }
 
 export function attendanceWarningEventKey(input: {
@@ -191,6 +235,10 @@ export function teachingLeaveRequesterPath(requestId: string): string {
   return `/telegram/teaching-leave?requestId=${encodeURIComponent(requestId)}`;
 }
 
+export function teachingLeaveReviewerPath(requestId: string): string {
+  return `/telegram/teaching-leave-review?requestId=${encodeURIComponent(requestId)}`;
+}
+
 export function teachingLeaveStudentPath(occurrenceId: string): string {
   return `/telegram/schedule-impact?occurrenceId=${encodeURIComponent(occurrenceId)}`;
 }
@@ -203,9 +251,57 @@ function leaveDecisionLabel(status: TeachingLeaveStatus): string {
   return "submitted";
 }
 
+export function teachingLeaveReviewerText(input: {
+  requesterName: string;
+  submittedLate: boolean;
+  firstOccurrence: TeachingLeaveOperationalImpact;
+}): string {
+  const impact = input.firstOccurrence;
+  return [
+    "New teaching leave request",
+    "",
+    `Lecturer: ${input.requesterName}`,
+    `${impact.courseCode} · Class ${impact.sectionCode}`,
+    `${impact.sessionDate} · ${impact.startTime}–${impact.endTime}`,
+    ...(input.submittedLate ? ["Late/current-session request"] : []),
+    "",
+    "Open DSE PMS to review confidential details and record a decision.",
+  ].join("\n");
+}
+
 export const telegramNotificationService = {
   workflowUrl(path: string) {
     return createTelegramDeepLink(path);
+  },
+
+  async deliverTeachingLeaveReviewers(input: {
+    requestId: string;
+    programmeId: string;
+    requesterId: string;
+    requesterName: string;
+    submittedLate: boolean;
+    submissionVersion: string;
+    firstOccurrence: TeachingLeaveOperationalImpact;
+  }): Promise<{ sent: number; failed: number; duplicate: number }> {
+    const recipients = await eligibleTeachingLeaveReviewerRecipients(input.programmeId, input.requesterId);
+    const summary = { sent: 0, failed: 0, duplicate: 0 };
+    if (recipients.length === 0) return summary;
+
+    const eventKey = `teaching-leave:${input.requestId}:reviewer:${input.submissionVersion}`;
+    const link = createTelegramDeepLink(teachingLeaveReviewerPath(input.requestId));
+    const text = teachingLeaveReviewerText(input);
+    const statuses = await Promise.all(recipients.map((recipient) =>
+      deliverToRecipient(
+        recipient,
+        eventKey,
+        "teaching_leave_reviewer",
+        input.requestId,
+        text,
+        link,
+        "Review leave request",
+      )));
+    for (const status of statuses) summary[status] += 1;
+    return summary;
   },
 
   async deliverTeachingLeaveRequester(input: {
