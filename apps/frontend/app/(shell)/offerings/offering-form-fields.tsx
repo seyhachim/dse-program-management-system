@@ -53,6 +53,7 @@ interface OfferingFormFieldsProps {
   status: OfferingFormValues["status"];
   lecturers: Lecturer[];
   lecturerId: string | null;
+  coLecturerIds: string[];
   academicYears: AcademicYearView[];
   selectedAcademicYearId: string;
   onAcademicYearChange: (academicYearId: string) => void;
@@ -76,6 +77,7 @@ export function OfferingFormFields({
   status,
   lecturers,
   lecturerId,
+  coLecturerIds,
   academicYears,
   selectedAcademicYearId,
   onAcademicYearChange,
@@ -93,6 +95,10 @@ export function OfferingFormFields({
     lecturers.map((lecturer) => [lecturer.id, lecturer.name]),
   );
   const coLecturerOptions = lecturers.filter((lecturer) => lecturer.id !== lecturerId);
+  const meetingLecturerIds = new Set(
+    [lecturerId, ...coLecturerIds].filter((id): id is string => Boolean(id)),
+  );
+  const meetingLecturerOptions = lecturers.filter((lecturer) => meetingLecturerIds.has(lecturer.id));
   const { fields: meetingFields, append: appendMeeting, remove: removeMeeting } = useFieldArray({
     control,
     name: "meetings",
@@ -272,7 +278,7 @@ export function OfferingFormFields({
       <fieldset className="space-y-3 rounded-2xl border border-border p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
           <div><legend className="text-sm font-semibold text-foreground"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">3</span>Weekly class schedule <span className="ml-1 text-status-live" aria-label="required">*</span></legend><p className="text-xs text-muted-foreground">Academic Calendar defines the semester boundary; these rows define the recurring class timetable.</p></div>
-          <Button type="button" variant="outline" size="sm" onClick={() => appendMeeting({ dayOfWeek: "Monday", startTime: "08:00", endTime: "09:00", building: DEFAULT_OFFERING_BUILDING, room: "", activityType: "Lecture" })}>Add session</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => appendMeeting({ dayOfWeek: "Monday", startTime: "08:00", endTime: "09:00", building: DEFAULT_OFFERING_BUILDING, room: "", activityType: "Lecture", lecturerIds: [] })}>Add session</Button>
         </div>
         {meetingFields.length === 0 ? <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Add at least one weekly session before saving this offering.</p> : null}
         {meetingsError ? <p className="text-xs text-status-live">{meetingsError}</p> : null}
@@ -286,7 +292,31 @@ export function OfferingFormFields({
               <Field label="Room" error={errors.meetings?.[index]?.room?.message} optional><Input placeholder="A203" maxLength={80} {...register(`meetings.${index}.room`)} /></Field>
               <Field label="Activity" error={errors.meetings?.[index]?.activityType?.message}><Controller control={control} name={`meetings.${index}.activityType`} render={({ field }) => <Select items={activityItems} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{MEETING_ACTIVITY_TYPES.map((activity) => <SelectItem key={activity} value={activity}>{activity}</SelectItem>)}</SelectContent></Select>} /></Field>
             </div>
-            <div className="flex justify-end"><Button type="button" variant="ghost" size="sm" onClick={() => removeMeeting(index)}>Remove session</Button></div>
+            <Controller
+              control={control}
+              name={`meetings.${index}.lecturerIds`}
+              render={({ field }) => (
+                <LecturerChecklist
+                  label="Assigned lecturer(s)"
+                  options={meetingLecturerOptions}
+                  selectedIds={field.value ?? []}
+                  onChange={field.onChange}
+                  description="Choose the teaching-team member(s) responsible for this recurring session. Leave empty only when the session is intentionally unallocated."
+                  emptyMessage="Choose the Offering Primary/Co-Lecturers first; this session will remain unallocated until then."
+                  selectedAriaLabel="Assigned meeting lecturers"
+                  removeTitle="Remove meeting lecturer"
+                />
+              )}
+            />
+            {errors.meetings?.[index]?.lecturerIds?.message ? (
+              <p className="text-xs text-status-live">{errors.meetings[index]?.lecturerIds?.message}</p>
+            ) : null}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                Meeting-level ownership controls lecturer timetable, workload, and teaching-leave access. Empty means unallocated.
+              </p>
+              <Button type="button" variant="ghost" size="sm" onClick={() => removeMeeting(index)}>Remove session</Button>
+            </div>
           </div>
         ))}
       </fieldset>
