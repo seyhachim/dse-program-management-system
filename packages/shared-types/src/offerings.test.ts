@@ -137,8 +137,9 @@ test("meeting validation accepts building/room/time and derives no user-entered 
   expect("duration" in meeting).toBe(false);
 });
 
-test("meeting lecturer assignments default to unallocated and reject duplicates", () => {
-  expect(OfferingMeetingInput.parse(VALID_MEETING).lecturerIds).toEqual([]);
+test("meeting lecturer assignments accept backward-compatible omission and reject duplicates", () => {
+  expect(OfferingMeetingInput.parse(VALID_MEETING).lecturerIds).toBeUndefined();
+  expect(OfferingMeetingInput.parse({ ...VALID_MEETING, lecturerIds: [] }).lecturerIds).toEqual([]);
   expect(OfferingMeetingInput.parse({ ...VALID_MEETING, lecturerIds: [A, B] }).lecturerIds).toEqual([A, B]);
   expect(OfferingMeetingInput.safeParse({ ...VALID_MEETING, lecturerIds: [A, A] }).success).toBe(false);
 });
