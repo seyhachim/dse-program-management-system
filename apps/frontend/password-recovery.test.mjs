@@ -20,10 +20,14 @@ describe("forced password recovery UI wiring", () => {
     expect(changePasswordSource).toContain('router.replace("/dashboard")');
   });
 
-  test("active lecturer rows expose admin recovery rather than resend invitation", () => {
+  test("active lecturer rows expose recovery while pending rows expose resend", () => {
+    expect(lecturersSource).toContain('status === "active-account"');
     expect(lecturersSource).toContain("Set temporary password");
     expect(lecturersSource).toContain("authApi.setTemporaryPassword(lecturer.id)");
     expect(lecturersSource).toContain("This password is shown only in this browser state");
-    expect(lecturersSource).not.toContain("Resend invitation");
+
+    expect(lecturersSource).toContain('status === "invitation-pending"');
+    expect(lecturersSource).toContain("Resend invitation");
+    expect(lecturersSource).toContain("authApi.resendInvitation(lecturer.id)");
   });
 });
