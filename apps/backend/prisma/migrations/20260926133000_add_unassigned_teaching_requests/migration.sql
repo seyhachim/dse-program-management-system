@@ -1,3 +1,9 @@
+-- Existing unallocated rows may predate explicit meeting ownership. Keep them
+-- closed by default so unknown legacy ownership is never advertised as a real
+-- vacancy. Programme staff must explicitly open a meeting for requests.
+ALTER TABLE "OfferingMeeting"
+  ADD COLUMN "openForAssignment" BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE TABLE "pms_attendance"."OfferingMeetingTeachingRequest" (
   "id" TEXT PRIMARY KEY,
   "programmeId" TEXT NOT NULL,
