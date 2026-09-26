@@ -303,6 +303,14 @@ async function notifyRequester(request: UnassignedTeachingRequestView): Promise<
 }
 
 export const unassignedTeachingRequestService = {
+  errorStatus(error: unknown): number | null {
+    if (error instanceof UnassignedTeachingNotFoundError) return 404;
+    if (error instanceof UnassignedTeachingAuthorizationError) return 403;
+    if (error instanceof UnassignedTeachingConflictError) return 409;
+    if (error instanceof UnassignedTeachingValidationError) return 400;
+    return null;
+  },
+
   async available(user: AuthUser): Promise<UnassignedTeachingMeetingView[]> {
     const rows = await prisma.$queryRaw<MeetingRow[]>`
       SELECT meeting."id" AS "meetingId", offering."id" AS "offeringId",
