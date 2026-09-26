@@ -31,7 +31,7 @@ export interface UnassignedTeachingMeetingView {
   };
   term: string;
   sectionCode: string;
-  offeringStatus: "Planned" | "Active";
+  offeringStatus: "Planned" | "Active" | "Completed";
   academicCalendarPeriodId: string | null;
   dayOfWeek: MeetingDay;
   startTime: string;
