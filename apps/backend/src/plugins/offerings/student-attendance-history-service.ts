@@ -68,7 +68,7 @@ export type StudentAttendanceHealthSummary = {
 type StudentLookup = {
   getByUserId(userId: string): Promise<{
     id: string;
-    studentId: string;
+    studentId: string | null;
     status: string;
   } | null>;
 };
@@ -175,10 +175,17 @@ export function summarizeStudentAttendanceHealthByOffering(
   });
 }
 
+type CanonicalStudentAttendanceHistory = Omit<
+  TelegramStudentAttendanceHistory,
+  "studentNumber"
+> & {
+  studentNumber: string | null;
+};
+
 async function historyForStudent(
-  student: { id: string; studentId: string },
+  student: { id: string; studentId: string | null },
   offeringId: string,
-): Promise<TelegramStudentAttendanceHistory> {
+): Promise<CanonicalStudentAttendanceHistory> {
   const sessions = await prisma.$queryRaw<SessionRow[]>`
     SELECT "id", "sessionDate", "updatedAt"
     FROM "pms_attendance"."AttendanceSession"
@@ -242,19 +249,42 @@ async function historyForStudent(
   };
 }
 
-export const studentAttendanceHistoryService = {
-  async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
-    const student = await students().getByUserId(userId);
-    if (!student || student.status !== "Active" || !student.studentId) {
-      throw new ReferenceError("No active student profile with an official Student ID is linked to this account");
-    }
+async function activeStudentForUser(userId: string) {
+  const student = await students().getByUserId(userId);
+  if (!student || student.status !== "Active") {
+    throw new ReferenceError("No active student profile is linked to this account");
+  }
+  return student;
+}
 
-    const enrollment = await prisma.enrollment.findUnique({
-      where: { offeringId_studentId: { offeringId, studentId: student.id } },
-      select: { id: true },
-    });
-    if (!enrollment) throw new ReferenceError("Student is not enrolled in this offering");
+async function requireOfferingEnrollment(studentId: string, offeringId: string): Promise<void> {
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { offeringId_studentId: { offeringId, studentId } },
+    select: { id: true },
+  });
+  if (!enrollment) throw new ReferenceError("Student is not enrolled in this offering");
+}
+
+export const studentAttendanceHistoryService = {
+  async forPortalUser(
+    userId: string,
+    offeringId: string,
+  ): Promise<CanonicalStudentAttendanceHistory> {
+    const student = await activeStudentForUser(userId);
+    await requireOfferingEnrollment(student.id, offeringId);
     return historyForStudent(student, offeringId);
+  },
+
+  async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
+    const student = await activeStudentForUser(userId);
+    if (!student.studentId) {
+      throw new ReferenceError(
+        "No active student profile with an official Student ID is linked to this account",
+      );
+    }
+    await requireOfferingEnrollment(student.id, offeringId);
+    const history = await historyForStudent(student, offeringId);
+    return { ...history, studentNumber: student.studentId };
   },
 
   async healthForStudent(studentId: string, offeringId: string) {
