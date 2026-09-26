@@ -4,6 +4,7 @@ import {
   SaveAttendanceInput,
   SaveClassSessionStatusInputSchema,
   SaveLecturerArrivalConfirmationInputSchema,
+  ReviewTeachingLeaveRequestSchema,
   TelegramInitDataVerifyRequestSchema,
   TelegramLinkRequestSchema,
 } from "@dse-pms/shared-types";
@@ -159,6 +160,16 @@ export function createTelegramRouter(service: TelegramService = telegramService)
     try {
       const offerings = registry.get<OfferingsService>("offerings").service;
       res.json(await offerings.teachingLeave.get(req.telegramUser!, req.params.requestId!));
+    } catch (error) { sendMiniAppError(res, error); }
+  });
+  router.post("/mini/teaching-leave/:requestId/review", async (req, res) => {
+    const parsed = ReviewTeachingLeaveRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return void res.status(400).json({ error: "Invalid teaching leave review", details: parsed.error.flatten() });
+    }
+    try {
+      const offerings = registry.get<OfferingsService>("offerings").service;
+      res.json(await offerings.teachingLeave.review(req.telegramUser!, req.params.requestId!, parsed.data));
     } catch (error) { sendMiniAppError(res, error); }
   });
   router.get("/mini/teaching-leave-impact/:occurrenceId", async (req, res) => {
