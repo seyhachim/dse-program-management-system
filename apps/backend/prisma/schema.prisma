@@ -2485,8 +2485,11 @@ model OfferingMeeting {
   endTime      String
   building     String?
   room         String?
-  activityType String   @default("Lecture")
-  lecturers    OfferingMeetingLecturer[]
+  activityType      String   @default("Lecture")
+  /// Explicit vacancy flag. Existing/legacy unallocated meetings default false
+  /// so missing ownership metadata is never advertised as a real open class.
+  openForAssignment Boolean @default(false)
+  lecturers         OfferingMeetingLecturer[]
 
   @@index([offeringId, dayOfWeek, startTime])
 }

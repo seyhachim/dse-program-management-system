@@ -81,6 +81,8 @@ export const OfferingMeetingInput = z
         }
       })
       .optional(),
+    /** Programme staff explicitly open an unallocated weekly meeting for lecturer requests. */
+    openForAssignment: z.boolean().optional(),
   })
   .superRefine((meeting, ctx) => {
     if (meeting.endTime <= meeting.startTime) {
@@ -101,9 +103,11 @@ export interface OfferingMeetingView {
   building: string | null;
   room: string | null;
   activityType: MeetingActivityType;
-  /** Explicit recurring-meeting ownership. Empty means intentionally unallocated. */
+  /** Explicit recurring-meeting ownership. Empty means currently unallocated. */
   lecturerIds: string[];
   lecturers: LecturerRef[];
+  /** True only after programme staff explicitly expose this unallocated meeting for lecturer requests. */
+  openForAssignment: boolean;
   /** Derived from start/end time; callers never enter duration separately. */
   durationHours: number;
 }

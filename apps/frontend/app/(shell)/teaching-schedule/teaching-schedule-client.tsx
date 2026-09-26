@@ -134,11 +134,14 @@ export function TeachingScheduleClient() {
             <div>
               <p className="text-sm font-medium text-foreground">Weekly timetable</p>
               <p className="text-sm text-muted-foreground">
-                Includes classes where you are the primary lecturer or co-lecturer. Teaching leave is requested for an exact session date, not the recurring timetable itself.
+                Shows only recurring meetings explicitly assigned to you. Teaching leave is requested for an exact session date, not the recurring timetable itself.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <Link href="/teaching-schedule/available-classes" className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent">
+                Available classes
+              </Link>
               <Link href="/teaching-schedule/leave-requests" className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent">
                 My leave requests
               </Link>
