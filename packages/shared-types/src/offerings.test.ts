@@ -137,6 +137,12 @@ test("meeting validation accepts building/room/time and derives no user-entered 
   expect("duration" in meeting).toBe(false);
 });
 
+test("meeting lecturer assignments default to unallocated and reject duplicates", () => {
+  expect(OfferingMeetingInput.parse(VALID_MEETING).lecturerIds).toEqual([]);
+  expect(OfferingMeetingInput.parse({ ...VALID_MEETING, lecturerIds: [A, B] }).lecturerIds).toEqual([A, B]);
+  expect(OfferingMeetingInput.safeParse({ ...VALID_MEETING, lecturerIds: [A, A] }).success).toBe(false);
+});
+
 test("meeting building is optional, trimmed, and length-limited", () => {
   expect(OfferingMeetingInput.parse({ ...VALID_MEETING, building: undefined }).building).toBeUndefined();
   expect(OfferingMeetingInput.parse({ ...VALID_MEETING, building: "  STEM Building  " }).building).toBe("STEM Building");
