@@ -100,7 +100,7 @@ function toMeeting(row: MeetingRow): UnassignedTeachingMeetingView {
     },
     term: row.term,
     sectionCode: row.sectionCode,
-    offeringStatus: row.offeringStatus as "Planned" | "Active",
+    offeringStatus: row.offeringStatus,
     academicCalendarPeriodId: row.academicCalendarPeriodId,
     dayOfWeek: row.dayOfWeek,
     startTime: row.startTime,
