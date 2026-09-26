@@ -282,6 +282,24 @@ async function toView(
   };
 }
 
+/**
+ * Keep Offering-level access for every Primary/Co-Lecturer, but never fabricate
+ * recurring timetable ownership. A lecturer-scoped Offering view includes only
+ * weekly meetings explicitly assigned to that lecturer. An empty meeting list
+ * therefore means "this Offering is visible to you, but no weekly session is
+ * allocated to you yet".
+ */
+export function scopeOfferingMeetingsForLecturer(
+  offering: OfferingView,
+  lecturerId: string | undefined,
+): OfferingView {
+  if (!lecturerId) return offering;
+  return {
+    ...offering,
+    meetings: offering.meetings.filter((meeting) => meeting.lecturerIds.includes(lecturerId)),
+  };
+}
+
 export const offeringService = {
   /**
    * List offerings. When `lecturerScope` is given (the router passes it for
@@ -302,7 +320,8 @@ export const offeringService = {
       orderBy: [{ term: "desc" }, { createdAt: "desc" }],
     });
     const lecturerById = await lecturerLookup();
-    return Promise.all(offerings.map((o) => toView(o, lecturerById)));
+    const views = await Promise.all(offerings.map((o) => toView(o, lecturerById)));
+    return views.map((offering) => scopeOfferingMeetingsForLecturer(offering, lecturerScope));
   },
 
   async getById(id: string): Promise<OfferingView | null> {
