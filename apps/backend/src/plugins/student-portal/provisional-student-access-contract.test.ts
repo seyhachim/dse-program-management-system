@@ -25,4 +25,26 @@ describe("Student Portal provisional identity contract", () => {
 
     expect(violations).toEqual([]);
   });
+
+  test("keeps Student Portal attendance provisional-safe across the Offerings boundary", async () => {
+    const source = await Bun.file(
+      new URL("../offerings/student-attendance-history-service.ts", import.meta.url),
+    ).text();
+
+    const portalMethod = source.match(
+      /async forPortalUser\([\s\S]*?\n  },\n\n  async forUser/,
+    )?.[0];
+    const telegramMethod = source.match(
+      /async forUser\([\s\S]*?\n  },\n\n  async healthForStudent/,
+    )?.[0];
+
+    expect(portalMethod).toBeDefined();
+    expect(portalMethod).toContain("requireOfferingEnrollment");
+    expect(portalMethod).not.toContain("!student.studentId");
+
+    // Telegram's existing DTO still requires an official student number; keep
+    // that contract separate rather than weakening it for the web portal fix.
+    expect(telegramMethod).toBeDefined();
+    expect(telegramMethod).toContain("!student.studentId");
+  });
 });
