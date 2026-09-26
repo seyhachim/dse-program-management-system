@@ -167,6 +167,63 @@ describeDb("unassigned weekly teaching request integrity", () => {
     ).rejects.toThrow("overlaps another weekly class");
   });
 
+  test("fails closed for stale lecturer tokens, wrong-programme reviewers, and self-review", async () => {
+    const fixture = await createUnassignedMeeting("auth-boundaries");
+
+    const nonLecturer = await createUser("stale-token-user", "program_coordinator", "dse");
+    const staleLecturerToken: AuthUser = {
+      id: nonLecturer.user.id,
+      email: nonLecturer.user.email!,
+      roles: ["lecturer"],
+      programmeRoles: [{ role: "lecturer", programmeId: "dse" }],
+    };
+    await expect(
+      unassignedTeachingRequestService.submit(staleLecturerToken, fixture.meeting.id),
+    ).rejects.toBeInstanceOf(UnassignedTeachingAuthorizationError);
+
+    const lecturer = await createUser("auth-requester", "lecturer", "dse");
+    const submitted = await unassignedTeachingRequestService.submit(lecturer.auth, fixture.meeting.id);
+
+    const otherProgrammeId = `uar-review-${crypto.randomUUID()}`;
+    await prisma.programme.create({
+      data: {
+        id: otherProgrammeId,
+        code: `URV-${crypto.randomUUID().slice(0, 8)}`,
+        name: "Other review programme",
+      },
+    });
+    const wrongManager = await createUser("wrong-reviewer", "program_coordinator", otherProgrammeId);
+    await expect(
+      unassignedTeachingRequestService.getForReview(wrongManager.auth, submitted.id),
+    ).rejects.toBeInstanceOf(UnassignedTeachingAuthorizationError);
+    await expect(
+      unassignedTeachingRequestService.review(wrongManager.auth, submitted.id, { decision: "APPROVE" }),
+    ).rejects.toBeInstanceOf(UnassignedTeachingAuthorizationError);
+
+    await prisma.userRoleAssignment.create({
+      data: {
+        userId: lecturer.user.id,
+        roleId: await roleId("admin"),
+        programmeId: null,
+      },
+    });
+    const selfReviewer: AuthUser = {
+      id: lecturer.user.id,
+      email: lecturer.user.email!,
+      roles: ["lecturer", "admin"],
+      programmeRoles: [
+        { role: "lecturer", programmeId: "dse" },
+        { role: "admin", programmeId: null },
+      ],
+    };
+    await expect(
+      unassignedTeachingRequestService.getForReview(selfReviewer, submitted.id),
+    ).rejects.toThrow("cannot review their own");
+    await expect(
+      unassignedTeachingRequestService.review(selfReviewer, submitted.id, { decision: "APPROVE" }),
+    ).rejects.toThrow("cannot review their own");
+  });
+
   test("rejecting a request preserves the unallocated meeting and does not add the lecturer to the Offering team", async () => {
     const lecturer = await createUser("reject-lecturer", "lecturer", "dse");
     const admin = await createUser("reject-admin", "admin", null);
