@@ -22,11 +22,19 @@ export function LecturerChecklist({
   options,
   selectedIds,
   onChange,
+  description = "Search and tick one or more lecturers. The primary lecturer is excluded automatically.",
+  emptyMessage = "No other lecturers available.",
+  selectedAriaLabel = "Selected co-lecturers",
+  removeTitle = "Remove lecturer",
 }: {
   label: string;
   options: Lecturer[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  description?: string;
+  emptyMessage?: string;
+  selectedAriaLabel?: string;
+  removeTitle?: string;
 }) {
   const [query, setQuery] = useState("");
   const selected = new Set(selectedIds);
@@ -47,9 +55,7 @@ export function LecturerChecklist({
           <legend className="text-sm font-semibold text-foreground">
             {label} <span className="font-normal text-muted-foreground">(Optional)</span>
           </legend>
-          <p className="text-xs text-muted-foreground">
-            Search and tick one or more lecturers. The primary lecturer is excluded automatically.
-          </p>
+          <p className="text-xs text-muted-foreground">{description}</p>
         </div>
         <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
           {selectedIds.length} selected
@@ -58,7 +64,7 @@ export function LecturerChecklist({
 
       {options.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-          No other lecturers available.
+          {emptyMessage}
         </p>
       ) : (
         <>
@@ -71,14 +77,14 @@ export function LecturerChecklist({
           />
 
           {selectedLecturers.length > 0 ? (
-            <div className="flex flex-wrap gap-2" aria-label="Selected co-lecturers">
+            <div className="flex flex-wrap gap-2" aria-label={selectedAriaLabel}>
               {selectedLecturers.map((lecturer) => (
                 <button
                   key={lecturer.id}
                   type="button"
                   onClick={() => toggle(lecturer.id)}
                   className="rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-foreground hover:bg-muted/70"
-                  title="Remove co-lecturer"
+                  title={removeTitle}
                 >
                   {formatLecturerDisplayName(lecturer.name, lecturer.honorific)} ×
                 </button>
