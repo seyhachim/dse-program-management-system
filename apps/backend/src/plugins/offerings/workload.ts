@@ -22,6 +22,7 @@ export interface WorkloadAssignment {
     building: string | null;
     room: string | null;
     activityType: MeetingActivityType;
+    lecturerIds: string[];
   }[];
 }
 
@@ -38,20 +39,22 @@ export function summarizeLecturerWorkload(
 ): LecturerWorkloadSummary {
   const scheduleRows = assignments
     .flatMap((assignment) =>
-      assignment.meetings.map((meeting) => ({
-        meetingId: meeting.id,
-        offeringId: assignment.id,
-        course: {
-          id: assignment.course.id,
-          code: assignment.course.code,
-          title: assignment.course.title,
-        },
-        term: assignment.term,
-        sectionCode: assignment.sectionCode,
-        role: assignment.lecturerId === lecturerId ? "Primary" as const : "Co-Lecturer" as const,
-        ...meeting,
-        durationHours: durationHours(meeting.startTime, meeting.endTime),
-      })),
+      assignment.meetings
+        .filter((meeting) => meeting.lecturerIds.includes(lecturerId))
+        .map(({ lecturerIds: _lecturerIds, ...meeting }) => ({
+          meetingId: meeting.id,
+          offeringId: assignment.id,
+          course: {
+            id: assignment.course.id,
+            code: assignment.course.code,
+            title: assignment.course.title,
+          },
+          term: assignment.term,
+          sectionCode: assignment.sectionCode,
+          role: assignment.lecturerId === lecturerId ? "Primary" as const : "Co-Lecturer" as const,
+          ...meeting,
+          durationHours: durationHours(meeting.startTime, meeting.endTime),
+        })),
     )
     .sort(
       (a, b) =>
@@ -106,6 +109,6 @@ export function summarizeLecturerWorkload(
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
     totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
-    coLecturerAssumption: "full",
+    coLecturerAssumption: "meeting-assignment",
   };
 }
