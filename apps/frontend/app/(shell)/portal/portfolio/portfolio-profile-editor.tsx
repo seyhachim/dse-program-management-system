@@ -59,7 +59,9 @@ export function PortfolioProfileEditor() {
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">PMS identity</p>
           <h2 className="mt-1 text-xl font-semibold">{currentProfile.identity.name}</h2>
           <div className="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-            <p>Student ID: {currentProfile.identity.studentId}</p>
+            <p>
+              Student ID: {currentProfile.identity.studentId ?? "Pending ID"}
+            </p>
             <p className="truncate">Email: {currentProfile.identity.email}</p>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">Institutional identity is read-only here. Portfolio edits cannot change your student record or academic results.</p>

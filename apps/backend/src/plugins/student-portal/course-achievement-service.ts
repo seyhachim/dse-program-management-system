@@ -10,6 +10,22 @@ import { calculateCourseGrade, type CourseGradeSummary } from "./assessment-calc
 
 export class CourseAchievementAccessError extends Error {}
 
+type CourseAchievementStudent = {
+  id: string;
+  email: string | null;
+  status: string;
+};
+
+export function requireCourseAchievementStudent(
+  student: CourseAchievementStudent | null,
+): asserts student is CourseAchievementStudent & { email: string } {
+  if (!student || student.status !== "Active" || !student.email) {
+    throw new CourseAchievementAccessError(
+      "No active student portal profile is linked to this account",
+    );
+  }
+}
+
 type AttendanceCounts = Record<AttendanceStatus, number> & {
   PermissionPending: number;
 };
@@ -175,18 +191,9 @@ export const courseAchievementService = {
   async list(userId: string): Promise<PortalCourseAchievementSummary[]> {
     const student = await prisma.student.findUnique({
       where: { userId },
-      select: { id: true, studentId: true, email: true, status: true },
+      select: { id: true, email: true, status: true },
     });
-    if (
-      !student ||
-      student.status !== "Active" ||
-      !student.studentId ||
-      !student.email
-    ) {
-      throw new CourseAchievementAccessError(
-        "No active student portal profile is linked to this account",
-      );
-    }
+    requireCourseAchievementStudent(student);
 
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: student.id },

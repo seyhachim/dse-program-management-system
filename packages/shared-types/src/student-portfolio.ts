@@ -35,7 +35,7 @@ export type StudentPortfolioProfileInput = z.infer<typeof StudentPortfolioProfil
 
 export interface StudentPortfolioIdentity {
   studentRecordId: string;
-  studentId: string;
+  studentId: string | null;
   name: string;
   email: string;
 }
