@@ -8,7 +8,7 @@ import type {
   UnassignedTeachingReviewResult,
 } from "@dse-pms/shared-types";
 import type { AuthUser } from "../../core/auth/token.ts";
-import { hasAnyRoleInProgramme, hasRoleInProgramme } from "../../core/auth/token.ts";
+import { hasAnyRoleInProgramme } from "../../core/auth/token.ts";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 
@@ -384,8 +384,10 @@ export const unassignedTeachingRequestService = {
       if (meeting.offeringStatus === "Completed") {
         throw new UnassignedTeachingConflictError("This class is no longer available for assignment");
       }
-      if (!hasRoleInProgramme(user, "lecturer", meeting.programmeId)) {
-        throw new UnassignedTeachingAuthorizationError("You can request only unassigned classes in your lecturer programme");
+      if (!(await hasPersistedLecturerRole(tx, user.id, meeting.programmeId))) {
+        throw new UnassignedTeachingAuthorizationError(
+          "You can request only unassigned classes in your active lecturer programme",
+        );
       }
       if (await isMeetingAllocated(tx, meetingId)) {
         throw new UnassignedTeachingConflictError("This weekly class already has an assigned lecturer");
@@ -432,7 +434,7 @@ export const unassignedTeachingRequestService = {
     id: string,
     input: ReviewUnassignedTeachingRequest,
   ): Promise<UnassignedTeachingReviewResult> {
-    const changed = await prisma.$transaction(async (tx) => {
+    const outcome = await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<RequestRow[]>`
         SELECT request."id", request."status", request."requesterId",
                requester."name" AS "requesterName", request."requestedAt",
@@ -464,7 +466,7 @@ export const unassignedTeachingRequestService = {
       if (request.requesterId === user.id) {
         throw new UnassignedTeachingAuthorizationError("A lecturer cannot review their own teaching assignment request");
       }
-      if (request.status !== "PENDING") return false;
+      if (request.status !== "PENDING") return { changed: false, supersededIds: [] as string[] };
 
       if (input.decision === "REJECT") {
         await tx.$executeRaw`
@@ -482,7 +484,7 @@ export const unassignedTeachingRequestService = {
           newStatus: "REJECTED",
           details: input.comment ? { comment: input.comment } : undefined,
         });
-        return true;
+        return { changed: true, supersededIds: [] as string[] };
       }
 
       if (request.offeringStatus === "Completed") {
@@ -546,11 +548,19 @@ export const unassignedTeachingRequestService = {
           details: { approvedRequestId: id },
         });
       }
-      return true;
+      return { changed: true, supersededIds: competing.map((item) => item.id) };
     });
 
     const request = await readRequest(id);
-    if (changed) await notifyRequester(request);
-    return { request, changed };
+    if (outcome.changed) {
+      await notifyRequester(request);
+      await Promise.allSettled(
+        outcome.supersededIds.map(async (supersededId) => {
+          const superseded = await readRequest(supersededId);
+          await notifyRequester(superseded);
+        }),
+      );
+    }
+    return { request, changed: outcome.changed };
   },
 };
