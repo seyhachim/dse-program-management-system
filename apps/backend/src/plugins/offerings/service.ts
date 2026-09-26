@@ -84,6 +84,14 @@ function assertMeetingLecturersBelongToTeam(
   }
 }
 
+function assertOpenMeetingsAreUnassigned(
+  meetings: Array<{ lecturerIds?: string[]; openForAssignment?: boolean }>,
+): void {
+  if (meetings.some((meeting) => meeting.openForAssignment && (meeting.lecturerIds?.length ?? 0) > 0)) {
+    throw new ReferenceError("A weekly meeting cannot be open for requests while it already has an assigned lecturer");
+  }
+}
+
 function offeringMeetingSignature(meeting: {
   dayOfWeek: string;
   startTime: string;
@@ -212,6 +220,7 @@ async function toView(
       building: string | null;
       room: string | null;
       activityType: string;
+      openForAssignment: boolean;
       lecturers: { lecturerId: string }[];
     }[];
   },
@@ -263,6 +272,7 @@ async function toView(
         room: meeting.room,
         activityType: meeting.activityType as OfferingView["meetings"][number]["activityType"],
         lecturerIds,
+        openForAssignment: meeting.openForAssignment,
         lecturers: lecturerIds
           .map((id) => lecturerById.get(id))
           .filter((item): item is LecturerRef => item != null),
@@ -384,6 +394,7 @@ export const offeringService = {
       offeringInput.lecturerId,
       coLecturerIds ?? [],
     );
+    assertOpenMeetingsAreUnassigned(meetings);
     if (!offeringInput.academicCalendarPeriodId || !offeringInput.programmeYear || !offeringInput.semester) {
       throw new ReferenceError("A published Academic Calendar period, study year, and semester are required");
     }
@@ -424,10 +435,11 @@ export const offeringService = {
           : undefined,
         meetings: meetings.length
           ? {
-              create: meetings.map(({ lecturerIds, ...meeting }) => ({
+              create: meetings.map(({ lecturerIds, openForAssignment, ...meeting }) => ({
                 ...meeting,
                 building: meeting.building || null,
                 room: meeting.room || null,
+                openForAssignment: Boolean(openForAssignment),
                 lecturers: lecturerIds?.length
                   ? { create: lecturerIds.map((lecturerId) => ({ lecturerId })) }
                   : undefined,
@@ -484,23 +496,30 @@ export const offeringService = {
       throw new ReferenceError("The primary lecturer cannot also be a co-lecturer");
     }
     if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
-    const existingMeetingLecturers = new Map(
+    const existingMeetingState = new Map(
       existing.meetings.map((meeting) => [
         offeringMeetingSignature(meeting),
-        meeting.lecturers.map((item) => item.lecturerId),
+        {
+          lecturerIds: meeting.lecturers.map((item) => item.lecturerId),
+          openForAssignment: meeting.openForAssignment,
+        },
       ] as const),
     );
-    const resolvedMeetings = meetings?.map((meeting) => ({
-      ...meeting,
-      lecturerIds:
-        meeting.lecturerIds ??
-        existingMeetingLecturers.get(offeringMeetingSignature(meeting)) ??
-        [],
-    }));
+    const resolvedMeetings = meetings?.map((meeting) => {
+      const persisted = existingMeetingState.get(offeringMeetingSignature(meeting));
+      const lecturerIds = meeting.lecturerIds ?? persisted?.lecturerIds ?? [];
+      return {
+        ...meeting,
+        lecturerIds,
+        openForAssignment: meeting.openForAssignment ?? persisted?.openForAssignment ?? false,
+      };
+    });
     const nextMeetingAssignments = resolvedMeetings ?? existing.meetings.map((meeting) => ({
       lecturerIds: meeting.lecturers.map((item) => item.lecturerId),
+      openForAssignment: meeting.openForAssignment,
     }));
     assertMeetingLecturersBelongToTeam(nextMeetingAssignments, nextLecturerId, nextCoLecturerIds);
+    assertOpenMeetingsAreUnassigned(nextMeetingAssignments);
 
     const calendarContextChanging =
       offeringInput.academicCalendarPeriodId !== undefined ||
@@ -555,13 +574,14 @@ export const offeringService = {
       }
       if (resolvedMeetings !== undefined) {
         await tx.offeringMeeting.deleteMany({ where: { offeringId: id } });
-        for (const { lecturerIds, ...meeting } of resolvedMeetings) {
+        for (const { lecturerIds, openForAssignment, ...meeting } of resolvedMeetings) {
           await tx.offeringMeeting.create({
             data: {
               offeringId: id,
               ...meeting,
               building: meeting.building || null,
               room: meeting.room || null,
+              openForAssignment: Boolean(openForAssignment),
               lecturers: lecturerIds.length
                 ? { create: lecturerIds.map((lecturerId) => ({ lecturerId })) }
                 : undefined,
@@ -638,6 +658,7 @@ export const offeringService = {
             building: true,
             room: true,
             activityType: true,
+            openForAssignment: true,
             lecturers: { select: { lecturerId: true } },
           },
         },
