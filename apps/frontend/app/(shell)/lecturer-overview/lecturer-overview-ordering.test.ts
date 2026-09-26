@@ -26,6 +26,8 @@ function meeting(
     building: "STEM Building",
     room: "305",
     activityType: "Lecture",
+    lecturerIds: [],
+    lecturers: [],
     durationHours:
       endHour - startHour + (endMinute - startMinute) / 60,
   };
