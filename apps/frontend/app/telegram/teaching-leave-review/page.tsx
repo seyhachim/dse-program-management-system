@@ -37,7 +37,7 @@ export default function TelegramTeachingLeaveReviewPage() {
     }
 
     void telegramApi<TeachingLeaveRequestView>(
-      `/api/telegram/mini/teaching-leave/${encodeURIComponent(requestId)}`,
+      `/api/telegram/mini/teaching-leave/${encodeURIComponent(requestId)}/review`,
     )
       .then(setRequest)
       .catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load teaching leave request"));
