@@ -20,6 +20,42 @@ describe("Telegram phase 2 contracts", () => {
     }] }).success).toBe(true);
   });
 
+  test("accepts attendance history while the official student number is pending", () => {
+    expect(TelegramStudentAttendanceHistorySchema.safeParse({
+      offeringId: "offering-1",
+      studentId: "student-1",
+      studentNumber: null,
+      totalSessions: 1,
+      markedSessions: 1,
+      attendanceRate: 100,
+      counts: {
+        Present: 1,
+        Absent: 0,
+        Late: 0,
+        Excused: 0,
+        PermissionPending: 0,
+      },
+      health: {
+        state: "healthy",
+        attendanceStreak: 1,
+        onTimeStreak: 1,
+        consecutiveLate: 0,
+        absencePermissionCount: 0,
+        signals: [],
+        message: "Keep building a consistent attendance routine.",
+      },
+      history: [{
+        sessionId: "session-1",
+        date: "2026-08-17",
+        status: "Present",
+        permissionPending: false,
+        permissionPendingSince: null,
+        note: "",
+        updatedAt: "2026-08-17T10:00:00.000Z",
+      }],
+    }).success).toBe(true);
+  });
+
   test("rejects invalid attendance percentages and statuses", () => {
     expect(TelegramStudentAttendanceHistorySchema.safeParse({
       offeringId: "offering-1",
