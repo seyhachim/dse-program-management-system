@@ -36,6 +36,7 @@ export function LecturersClient() {
   const [accountStatuses, setAccountStatuses] = useState<Map<string, LecturerAccessState>>(
     new Map(),
   );
+  const [accountStatusLoading, setAccountStatusLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -57,9 +58,12 @@ export function LecturersClient() {
     async (lecturers: Lecturer[]) => {
       if (!canCreateAccount || lecturers.length === 0) {
         setAccountStatuses(new Map());
+        setAccountStatusLoading(false);
         return;
       }
 
+      setAccountStatusLoading(true);
+      setAccountStatuses(new Map());
       try {
         const result = await authApi.lecturerAccessStatuses(lecturers.map((lecturer) => lecturer.id));
         setAccountStatuses(
@@ -69,6 +73,8 @@ export function LecturersClient() {
         setAccountStatuses(
           new Map(lecturers.map((lecturer) => [lecturer.id, "status-unavailable" as const])),
         );
+      } finally {
+        setAccountStatusLoading(false);
       }
     },
     [canCreateAccount],
@@ -80,6 +86,7 @@ export function LecturersClient() {
     try {
       const lecturers = await lecturersApi.list(search);
       setRows(lecturers);
+      setLoading(false);
       await loadAccountStatuses(lecturers);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load lecturers");
@@ -181,7 +188,7 @@ export function LecturersClient() {
           `${result.failed} selected lecturer${result.failed === 1 ? "" : "s"} failed safely. Retry after resolving the provider or account-data error; successful and active accounts will not be reprovisioned.`,
         );
       }
-      setSelectedIds([]);
+      if (result.failed === 0) setSelectedIds([]);
       await load();
     } catch (err) {
       setError(
@@ -239,6 +246,10 @@ export function LecturersClient() {
     }
   };
 
+  const accountMutationBusy = Boolean(
+    invitingId || resendingId || resettingId || selectedInviting || submitting,
+  );
+
   const accountCell = (lecturer: Lecturer) => {
     if (!canCreateAccount) {
       return lecturer.accountAccess === "has_access" ? (
@@ -250,7 +261,12 @@ export function LecturersClient() {
 
     const status = accountStatuses.get(lecturer.id);
     if (!status) {
-      return <StatusBadge tone="neutral" label={loading ? "Checking…" : "Status unavailable"} />;
+      return (
+        <StatusBadge
+          tone={accountStatusLoading ? "neutral" : "danger"}
+          label={accountStatusLoading ? "Checking…" : "Status unavailable"}
+        />
+      );
     }
 
     const presentation = lecturerAccessPresentation(status);
@@ -264,7 +280,7 @@ export function LecturersClient() {
             type="button"
             variant="outline"
             size="sm"
-            disabled={invitingId === lecturer.id || selectedInviting}
+            disabled={accountMutationBusy}
             onClick={() => handleInvite(lecturer)}
           >
             {invitingId === lecturer.id ? "Inviting…" : "Invite to DSE"}
@@ -275,7 +291,7 @@ export function LecturersClient() {
             type="button"
             variant="outline"
             size="sm"
-            disabled={resendingId === lecturer.id || selectedInviting}
+            disabled={accountMutationBusy}
             onClick={() => handleResendInvite(lecturer)}
           >
             {resendingId === lecturer.id ? "Resending…" : "Resend invitation"}
@@ -286,7 +302,7 @@ export function LecturersClient() {
             type="button"
             variant="outline"
             size="sm"
-            disabled={resettingId === lecturer.id || selectedInviting}
+            disabled={accountMutationBusy}
             onClick={() => handleSetTemporaryPassword(lecturer)}
           >
             {resettingId === lecturer.id ? "Setting…" : "Set temporary password"}
@@ -346,8 +362,6 @@ export function LecturersClient() {
     },
   ];
 
-  const invitationBusy = Boolean(invitingId || resendingId || selectedInviting);
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
@@ -389,7 +403,7 @@ export function LecturersClient() {
             disabled={
               selectedIds.length === 0 ||
               selectedIds.length > 20 ||
-              invitationBusy
+              accountMutationBusy
             }
             onClick={handleSendSelected}
           >
