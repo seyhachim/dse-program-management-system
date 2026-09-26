@@ -5,6 +5,7 @@ import {
   ManageProgrammeRoleInput,
   ResendInvitationResponse,
   Role,
+  SelectedStudentPortalAccessRequest,
   StudentPortalAccessState,
   StudentPortalAccessStatusRequest,
   StudentPortalAccessStatusResponse,
@@ -94,6 +95,17 @@ test("CreateAccountInput accepts the programme/QA account roles", () => {
 test("ResendInvitationResponse accepts the invited email and rejects invalid email", () => {
   expect(ResendInvitationResponse.safeParse({ email: "ada@dse.dev" }).success).toBe(true);
   expect(ResendInvitationResponse.safeParse({ email: "not-an-email" }).success).toBe(false);
+});
+
+test("SelectedStudentPortalAccessRequest accepts unique batches of up to 20 students", () => {
+  const ids = Array.from({ length: 20 }, (_, index) =>
+    `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`,
+  );
+  expect(SelectedStudentPortalAccessRequest.safeParse({ studentIds: ids.slice(0, 5) }).success).toBe(true);
+  expect(SelectedStudentPortalAccessRequest.safeParse({ studentIds: [] }).success).toBe(false);
+  expect(SelectedStudentPortalAccessRequest.safeParse({ studentIds: [...ids, "22222222-2222-4222-8222-222222222222"] }).success).toBe(false);
+  expect(SelectedStudentPortalAccessRequest.safeParse({ studentIds: [ids[0], ids[0]] }).success).toBe(false);
+  expect(SelectedStudentPortalAccessRequest.safeParse({ studentIds: ["not-a-uuid"] }).success).toBe(false);
 });
 
 test("BulkStudentPortalAccessResponse requires every student to have exactly one outcome", () => {

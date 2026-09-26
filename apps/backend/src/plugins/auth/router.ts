@@ -4,6 +4,7 @@ import {
   ChangePasswordInput,
   CreateAccountInput,
   ManageProgrammeRoleInput,
+  SelectedStudentPortalAccessRequest,
   StudentPortalAccessStatusRequest,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
@@ -14,7 +15,10 @@ import {
   ProgrammeRoleAssignmentError,
   ProvisioningError,
 } from "./service.ts";
-import { inviteAllEligibleStudents } from "./bulk-student-invitations.ts";
+import {
+  inviteAllEligibleStudents,
+  sendStudentPortalAccessToSelected,
+} from "./bulk-student-invitations.ts";
 import {
   resendLecturerInvitation,
   resendStudentInvitation,
@@ -87,6 +91,27 @@ export function createAuthRouter(): Router {
         res.json(await getStudentPortalAccessStatuses(parsed.data.studentIds));
       } catch {
         res.status(500).json({ error: "Could not load Student Portal access status" });
+      }
+    },
+  );
+
+  router.post(
+    "/students/invitations/selected",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = SelectedStudentPortalAccessRequest.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid selected student invitation request", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.json(await sendStudentPortalAccessToSelected(parsed.data.studentIds));
+      } catch (err) {
+        if (err instanceof ProvisioningError) {
+          res.status(502).json({ error: err.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not send selected Student Portal invitations" });
       }
     },
   );
