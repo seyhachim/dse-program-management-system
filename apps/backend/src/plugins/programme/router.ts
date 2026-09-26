@@ -1,7 +1,9 @@
 import { Router } from "express";
 import {
+  BindProgrammeCurriculumCompetencyFrameworkSchema,
   CreateCurriculumRevisionSchema,
   CreateInitialCurriculumSchema,
+  CreateProgrammeCompetencyFrameworkVersionSchema,
   UpdatePloTaxonomySchema,
   UpdateProgramCompetencyPlosSchema,
   UpdateProgramPolicySchema,
@@ -21,6 +23,12 @@ import {
   curriculumService,
 } from "./curriculum-service.ts";
 import { InvalidPloCodesError, programmeService } from "./service.ts";
+import {
+  CompetencyFrameworkConflictError,
+  CompetencyFrameworkNotFoundError,
+  InvalidCompetencyFrameworkAssignmentError,
+  competencyFrameworkService,
+} from "./competency-framework-service.ts";
 
 const CURRICULUM_READ_ROLES: Role[] = [
   "admin",
@@ -68,6 +76,108 @@ export function createProgrammeRouter(): Router {
       });
     }
   });
+
+
+  router.get(
+    "/competency-frameworks/programmes/:programmeId",
+    requirePermission("programme:read"),
+    async (req, res) => {
+      const programmeId = req.params.programmeId;
+      if (!programmeId) {
+        res.status(400).json({ error: "Programme id is required" });
+        return;
+      }
+      if (!hasCurriculumScope(req.user, programmeId, CURRICULUM_READ_ROLES)) {
+        res.status(403).json({ error: "No competency framework access for this programme" });
+        return;
+      }
+      try {
+        res.json(await competencyFrameworkService.listForProgramme(programmeId));
+      } catch {
+        res.status(500).json({ error: "Could not load competency framework versions" });
+      }
+    },
+  );
+
+  router.post(
+    "/competency-frameworks/programmes/:programmeId",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const programmeId = req.params.programmeId;
+      if (!programmeId || !req.user) {
+        res.status(400).json({ error: "Programme id is required" });
+        return;
+      }
+      if (!hasCurriculumScope(req.user, programmeId, CURRICULUM_WRITE_ROLES)) {
+        res.status(403).json({ error: "No competency framework write access for this programme" });
+        return;
+      }
+      const parsed = CreateProgrammeCompetencyFrameworkVersionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid competency framework snapshot", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.status(201).json(
+          await competencyFrameworkService.createSnapshot(programmeId, req.user.id, parsed.data),
+        );
+      } catch (error) {
+        if (error instanceof CompetencyFrameworkNotFoundError) {
+          res.status(404).json({ error: error.message });
+          return;
+        }
+        if (error instanceof CompetencyFrameworkConflictError) {
+          res.status(409).json({ error: error.message });
+          return;
+        }
+        if (error instanceof InvalidCompetencyFrameworkAssignmentError) {
+          res.status(400).json({ error: error.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not create competency framework snapshot" });
+      }
+    },
+  );
+
+  router.put(
+    "/curricula/versions/:versionId/competency-framework",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const versionId = req.params.versionId;
+      if (!versionId || !req.user) {
+        res.status(400).json({ error: "Curriculum version id is required" });
+        return;
+      }
+      const parsed = BindProgrammeCurriculumCompetencyFrameworkSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid competency framework assignment", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        const context = await competencyFrameworkService.getCurriculumVersionContext(versionId);
+        if (!hasCurriculumScope(req.user, context.programmeId, CURRICULUM_WRITE_ROLES)) {
+          res.status(403).json({ error: "No curriculum write access for this programme" });
+          return;
+        }
+        await competencyFrameworkService.bindToCurriculumVersion(
+          versionId,
+          parsed.data.frameworkVersionId,
+          req.user.id,
+        );
+        res.json(await curriculumService.getById(context.curriculumId, versionId));
+      } catch (error) {
+        if (error instanceof CompetencyFrameworkNotFoundError) {
+          res.status(404).json({ error: error.message });
+          return;
+        }
+        if (error instanceof InvalidCompetencyFrameworkAssignmentError) {
+          res.status(400).json({ error: error.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not assign competency framework" });
+      }
+    },
+  );
 
   router.get(
     "/curricula/programmes/:programmeId",
