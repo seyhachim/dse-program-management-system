@@ -136,7 +136,11 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
             courseSpecId: offering.courseSpec?.id ?? "",
             term: offering.term,
             sectionCode: offering.sectionCode,
-            meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, building, room, ...meeting }) => ({ ...meeting, building: building ?? "", room: room ?? "" })),
+            meetings: offering.meetings.map(({ id: _id, durationHours: _durationHours, lecturers: _lecturers, building, room, ...meeting }) => ({
+              ...meeting,
+              building: building ?? "",
+              room: room ?? "",
+            })),
             lecturerId: offering.lecturer?.id ?? null,
             coLecturerIds: offering.coLecturers.map((lecturer) => lecturer.id),
             capacity: offering.capacity,
@@ -198,6 +202,23 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
       setValue("coLecturerIds", nextCoLecturerIds, { shouldDirty: true });
     }
   }, [coLecturerIds, editing, lecturerId, setValue]);
+
+  // Meeting ownership must always remain inside the Offering teaching team.
+  // When an Admin changes the team, remove now-invalid meeting selections from
+  // the form instead of allowing stale ownership to be submitted.
+  useEffect(() => {
+    const team = new Set(
+      [lecturerId, ...coLecturerIds].filter((id): id is string => Boolean(id)),
+    );
+    const current = getValues("meetings") ?? [];
+    let changed = false;
+    const next = current.map((meeting) => {
+      const lecturerIds = (meeting.lecturerIds ?? []).filter((id) => team.has(id));
+      if (lecturerIds.length !== (meeting.lecturerIds ?? []).length) changed = true;
+      return { ...meeting, lecturerIds };
+    });
+    if (changed) setValue("meetings", next, { shouldDirty: true });
+  }, [coLecturerIds, getValues, lecturerId, setValue]);
 
   useEffect(() => {
     let cancelled = false;
@@ -371,6 +392,7 @@ export function OfferingFormPage({ offeringId }: { offeringId: string | null }) 
                 status={status}
                 lecturers={lecturers}
                 lecturerId={lecturerId}
+                coLecturerIds={coLecturerIds}
                 academicYears={academicYears}
                 selectedAcademicYearId={selectedAcademicYearId}
                 onAcademicYearChange={(academicYearId) => { setSelectedAcademicYearId(academicYearId); setValue("academicCalendarPeriodId", null); }}
