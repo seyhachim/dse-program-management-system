@@ -75,12 +75,12 @@ export const OfferingMeetingInput = z
     lecturerIds: z
       .array(z.string().uuid())
       .max(20, "Use at most 20 lecturers per weekly meeting")
-      .default([])
       .superRefine((ids, ctx) => {
         if (new Set(ids).size !== ids.length) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Duplicate meeting lecturer", path: [] });
         }
-      }),
+      })
+      .optional(),
   })
   .superRefine((meeting, ctx) => {
     if (meeting.endTime <= meeting.startTime) {
