@@ -61,12 +61,12 @@ async function assertLecturersExist(lecturerIds: string[]): Promise<void> {
 }
 
 export function invalidMeetingLecturerId(
-  meetings: Array<{ lecturerIds: string[] }>,
+  meetings: Array<{ lecturerIds?: string[] }>,
   teamIds: string[],
 ): string | null {
   const allowed = new Set(teamIds);
   for (const meeting of meetings) {
-    for (const lecturerId of meeting.lecturerIds) {
+    for (const lecturerId of meeting.lecturerIds ?? []) {
       if (!allowed.has(lecturerId)) return lecturerId;
     }
   }
@@ -74,7 +74,7 @@ export function invalidMeetingLecturerId(
 }
 
 function assertMeetingLecturersBelongToTeam(
-  meetings: Array<{ lecturerIds: string[] }>,
+  meetings: Array<{ lecturerIds?: string[] }>,
   lecturerId: string | null | undefined,
   coLecturerIds: string[],
 ): void {
@@ -82,6 +82,15 @@ function assertMeetingLecturersBelongToTeam(
   if (invalidMeetingLecturerId(meetings, teamIds)) {
     throw new ReferenceError("Meeting lecturers must belong to the Offering teaching team");
   }
+}
+
+function offeringMeetingSignature(meeting: {
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  activityType: string;
+}): string {
+  return [meeting.dayOfWeek, meeting.startTime, meeting.endTime, meeting.activityType].join("\u0000");
 }
 
 async function resolveCoursePlacement(
@@ -419,7 +428,7 @@ export const offeringService = {
                 ...meeting,
                 building: meeting.building || null,
                 room: meeting.room || null,
-                lecturers: lecturerIds.length
+                lecturers: lecturerIds?.length
                   ? { create: lecturerIds.map((lecturerId) => ({ lecturerId })) }
                   : undefined,
               })),
@@ -475,7 +484,20 @@ export const offeringService = {
       throw new ReferenceError("The primary lecturer cannot also be a co-lecturer");
     }
     if (coLecturerIds?.length) await assertLecturersExist(coLecturerIds);
-    const nextMeetingAssignments = meetings ?? existing.meetings.map((meeting) => ({
+    const existingMeetingLecturers = new Map(
+      existing.meetings.map((meeting) => [
+        offeringMeetingSignature(meeting),
+        meeting.lecturers.map((item) => item.lecturerId),
+      ] as const),
+    );
+    const resolvedMeetings = meetings?.map((meeting) => ({
+      ...meeting,
+      lecturerIds:
+        meeting.lecturerIds ??
+        existingMeetingLecturers.get(offeringMeetingSignature(meeting)) ??
+        [],
+    }));
+    const nextMeetingAssignments = resolvedMeetings ?? existing.meetings.map((meeting) => ({
       lecturerIds: meeting.lecturers.map((item) => item.lecturerId),
     }));
     assertMeetingLecturersBelongToTeam(nextMeetingAssignments, nextLecturerId, nextCoLecturerIds);
@@ -531,9 +553,9 @@ export const offeringService = {
         await tx.offeringCoLecturer.deleteMany({ where: { offeringId: id } });
         if (coLecturerIds.length) await tx.offeringCoLecturer.createMany({ data: coLecturerIds.map((lecturerId) => ({ offeringId: id, lecturerId })) });
       }
-      if (meetings !== undefined) {
+      if (resolvedMeetings !== undefined) {
         await tx.offeringMeeting.deleteMany({ where: { offeringId: id } });
-        for (const { lecturerIds, ...meeting } of meetings) {
+        for (const { lecturerIds, ...meeting } of resolvedMeetings) {
           await tx.offeringMeeting.create({
             data: {
               offeringId: id,
