@@ -435,6 +435,21 @@ export const unassignedTeachingRequestService = {
     input: ReviewUnassignedTeachingRequest,
   ): Promise<UnassignedTeachingReviewResult> {
     const outcome = await prisma.$transaction(async (tx) => {
+      // Lock the shared meeting before the individual request. Competing
+      // approvals then acquire locks in one deterministic order, avoiding the
+      // request-A/request-B deadlock pattern when one approval supersedes the
+      // other pending request.
+      const requestMeeting = await tx.$queryRaw<Array<{ meetingId: string }>>`
+        SELECT "meetingId"
+        FROM "pms_attendance"."OfferingMeetingTeachingRequest"
+        WHERE "id" = ${id}
+        LIMIT 1
+      `;
+      if (!requestMeeting[0]) {
+        throw new UnassignedTeachingNotFoundError("Teaching assignment request not found");
+      }
+      await meetingForUpdate(tx, requestMeeting[0].meetingId);
+
       const rows = await tx.$queryRaw<RequestRow[]>`
         SELECT request."id", request."status", request."requesterId",
                requester."name" AS "requesterName", request."requestedAt",
@@ -456,7 +471,7 @@ export const unassignedTeachingRequestService = {
         JOIN "User" requester ON requester."id" = request."requesterId"
         LEFT JOIN "User" reviewer ON reviewer."id" = request."reviewedById"
         WHERE request."id" = ${id}
-        FOR UPDATE OF request, meeting
+        FOR UPDATE OF request
       `;
       const request = rows[0];
       if (!request) throw new UnassignedTeachingNotFoundError("Teaching assignment request not found");
