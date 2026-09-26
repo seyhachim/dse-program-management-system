@@ -172,6 +172,23 @@ export async function resendLecturerInvitation(userId: string): Promise<{ email:
   return { email: result.email };
 }
 
+
+/**
+ * Bulk-safe lecturer invitation refresh. Pending invitations are rotated and
+ * sent again; linked identities that are no longer pending are reported as
+ * existing accounts and are never deleted or modified.
+ */
+export async function refreshLecturerInvitation(
+  userId: string,
+): Promise<StudentPortalInvitationRefreshResult> {
+  return resendRoleInvitation(
+    userId,
+    "lecturer",
+    undefined,
+    { skipNonPending: true },
+  );
+}
+
 async function requireStudentInvitationContext(
   studentId: string,
 ): Promise<{ email: string; userId: string }> {

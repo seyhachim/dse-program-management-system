@@ -28,6 +28,66 @@ export const ResendInvitationResponse = z.object({
 });
 export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
 
+
+/** Admin-only live account state for lecturer onboarding. */
+export const LecturerAccessState = z.enum([
+  "no-access",
+  "invitation-pending",
+  "active-account",
+  "needs-attention",
+  "status-unavailable",
+]);
+export type LecturerAccessState = z.infer<typeof LecturerAccessState>;
+
+export const LecturerAccessStatusRequest = z.object({
+  lecturerIds: z.array(z.string().uuid()).min(1).max(100),
+}).strict().refine(
+  (value) => new Set(value.lecturerIds).size === value.lecturerIds.length,
+  { message: "Lecturer IDs must be unique", path: ["lecturerIds"] },
+);
+export type LecturerAccessStatusRequest = z.infer<typeof LecturerAccessStatusRequest>;
+
+export const LecturerAccessStatusItem = z.object({
+  lecturerId: z.string().uuid(),
+  status: LecturerAccessState,
+});
+export type LecturerAccessStatusItem = z.infer<typeof LecturerAccessStatusItem>;
+
+export const LecturerAccessStatusResponse = z.object({
+  items: z.array(LecturerAccessStatusItem).max(100),
+});
+export type LecturerAccessStatusResponse = z.infer<typeof LecturerAccessStatusResponse>;
+
+/**
+ * Bounded lecturer onboarding batch. The cap keeps invitation delivery
+ * intentional and avoids turning selection into an unrestricted send-all.
+ */
+export const SelectedLecturerInvitationRequest = z.object({
+  lecturerIds: z.array(z.string().uuid()).min(1).max(20),
+}).strict().refine(
+  (value) => new Set(value.lecturerIds).size === value.lecturerIds.length,
+  { message: "Lecturer IDs must be unique", path: ["lecturerIds"] },
+);
+export type SelectedLecturerInvitationRequest = z.infer<typeof SelectedLecturerInvitationRequest>;
+
+export const LecturerInvitationBatchResponse = z.object({
+  totalLecturers: z.number().int().nonnegative(),
+  newlyInvited: z.number().int().nonnegative(),
+  resent: z.number().int().nonnegative(),
+  existingAccountSkipped: z.number().int().nonnegative(),
+  missingLecturerSkipped: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+}).refine(
+  (value) => value.totalLecturers ===
+    value.newlyInvited +
+      value.resent +
+      value.existingAccountSkipped +
+      value.missingLecturerSkipped +
+      value.failed,
+  { message: "Total lecturers must equal all selected invitation outcomes" },
+);
+export type LecturerInvitationBatchResponse = z.infer<typeof LecturerInvitationBatchResponse>;
+
 /**
  * Aggregate result for the admin-only Student Portal bulk access action.
  * The response never contains recipient identity, invitation URLs, tokens, or

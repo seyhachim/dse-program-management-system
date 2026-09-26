@@ -2,9 +2,14 @@ import { expect, test } from "bun:test";
 import {
   BulkStudentPortalAccessResponse,
   CreateAccountInput,
+  LecturerAccessState,
+  LecturerAccessStatusRequest,
+  LecturerAccessStatusResponse,
+  LecturerInvitationBatchResponse,
   ManageProgrammeRoleInput,
   ResendInvitationResponse,
   Role,
+  SelectedLecturerInvitationRequest,
   StudentPortalAccessState,
   StudentPortalAccessStatusRequest,
   StudentPortalAccessStatusResponse,
@@ -94,6 +99,74 @@ test("CreateAccountInput accepts the programme/QA account roles", () => {
 test("ResendInvitationResponse accepts the invited email and rejects invalid email", () => {
   expect(ResendInvitationResponse.safeParse({ email: "ada@dse.dev" }).success).toBe(true);
   expect(ResendInvitationResponse.safeParse({ email: "not-an-email" }).success).toBe(false);
+});
+
+
+test("SelectedLecturerInvitationRequest accepts unique batches of up to 20 lecturers", () => {
+  const ids = Array.from({ length: 20 }, (_, index) =>
+    `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`,
+  );
+  expect(SelectedLecturerInvitationRequest.safeParse({ lecturerIds: ids.slice(0, 5) }).success).toBe(true);
+  expect(SelectedLecturerInvitationRequest.safeParse({ lecturerIds: [] }).success).toBe(false);
+  expect(
+    SelectedLecturerInvitationRequest.safeParse({
+      lecturerIds: [...ids, "22222222-2222-4222-8222-222222222222"],
+    }).success,
+  ).toBe(false);
+  expect(SelectedLecturerInvitationRequest.safeParse({ lecturerIds: [ids[0], ids[0]] }).success).toBe(false);
+  expect(SelectedLecturerInvitationRequest.safeParse({ lecturerIds: ["not-a-uuid"] }).success).toBe(false);
+});
+
+test("LecturerInvitationBatchResponse accounts for every selected lecturer", () => {
+  const valid = {
+    totalLecturers: 5,
+    newlyInvited: 2,
+    resent: 1,
+    existingAccountSkipped: 1,
+    missingLecturerSkipped: 0,
+    failed: 1,
+  };
+  expect(LecturerInvitationBatchResponse.safeParse(valid).success).toBe(true);
+  expect(
+    LecturerInvitationBatchResponse.safeParse({ ...valid, totalLecturers: 6 }).success,
+  ).toBe(false);
+});
+
+test("LecturerAccessState exposes fail-closed onboarding states", () => {
+  expect(LecturerAccessState.options).toEqual([
+    "no-access",
+    "invitation-pending",
+    "active-account",
+    "needs-attention",
+    "status-unavailable",
+  ]);
+});
+
+test("LecturerAccessStatusRequest accepts unique bounded lecturer UUID batches", () => {
+  const lecturerId = "11111111-1111-4111-8111-111111111111";
+  expect(LecturerAccessStatusRequest.safeParse({ lecturerIds: [lecturerId] }).success).toBe(true);
+  expect(LecturerAccessStatusRequest.safeParse({ lecturerIds: [] }).success).toBe(false);
+  expect(
+    LecturerAccessStatusRequest.safeParse({
+      lecturerIds: Array.from(
+        { length: 101 },
+        (_, index) => `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`,
+      ),
+    }).success,
+  ).toBe(false);
+  expect(
+    LecturerAccessStatusRequest.safeParse({ lecturerIds: [lecturerId, lecturerId] }).success,
+  ).toBe(false);
+});
+
+test("LecturerAccessStatusResponse strips unexpected auth fields", () => {
+  const lecturerId = "11111111-1111-4111-8111-111111111111";
+  const parsed = LecturerAccessStatusResponse.parse({
+    items: [{ lecturerId, status: "invitation-pending", authId: "secret-auth-id" }],
+  });
+  expect(parsed).toEqual({
+    items: [{ lecturerId, status: "invitation-pending" }],
+  });
 });
 
 test("BulkStudentPortalAccessResponse requires every student to have exactly one outcome", () => {

@@ -2,11 +2,22 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { formatLecturerDisplayName, type Lecturer } from "@dse-pms/shared-types";
-import { Button, DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
+import {
+  formatLecturerDisplayName,
+  type Lecturer,
+  type LecturerAccessState,
+} from "@dse-pms/shared-types";
+import {
+  Button,
+  DataTable,
+  StatusBadge,
+  TableToolbar,
+  type DataTableColumn,
+} from "@dse-pms/ui";
 import { lecturersApi } from "@/lib/lecturers";
 import { authApi, useMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { lecturerAccessPresentation } from "./lecturer-access-status";
 import { LecturerForm, type LecturerFormValues } from "./lecturer-form";
 
 interface TemporaryCredential {
@@ -21,32 +32,68 @@ export function LecturersClient() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [accountStatuses, setAccountStatuses] = useState<Map<string, LecturerAccessState>>(
+    new Map(),
+  );
+  const [accountStatusLoading, setAccountStatusLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [selectedInviting, setSelectedInviting] = useState(false);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [temporaryCredential, setTemporaryCredential] = useState<TemporaryCredential | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   // Creating/editing/deleting a lecturer record needs `lecturers:write`
-  // (admin, program_coordinator); account provisioning/recovery needs
+  // (admin, program_coordinator); live Auth status and account provisioning need
   // `accounts:create` (admin only).
   const { me } = useMe();
   const canWrite = me?.permissions.includes("lecturers:write") ?? false;
   const canCreateAccount = me?.permissions.includes("accounts:create") ?? false;
 
+  const loadAccountStatuses = useCallback(
+    async (lecturers: Lecturer[]) => {
+      if (!canCreateAccount || lecturers.length === 0) {
+        setAccountStatuses(new Map());
+        setAccountStatusLoading(false);
+        return;
+      }
+
+      setAccountStatusLoading(true);
+      setAccountStatuses(new Map());
+      try {
+        const result = await authApi.lecturerAccessStatuses(lecturers.map((lecturer) => lecturer.id));
+        setAccountStatuses(
+          new Map(result.items.map((item) => [item.lecturerId, item.status])),
+        );
+      } catch {
+        setAccountStatuses(
+          new Map(lecturers.map((lecturer) => [lecturer.id, "status-unavailable" as const])),
+        );
+      } finally {
+        setAccountStatusLoading(false);
+      }
+    },
+    [canCreateAccount],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setRows(await lecturersApi.list(search));
+      const lecturers = await lecturersApi.list(search);
+      setRows(lecturers);
+      setLoading(false);
+      await loadAccountStatuses(lecturers);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load lecturers");
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [loadAccountStatuses, search]);
 
   useEffect(() => {
     const t = setTimeout(load, 200);
@@ -98,6 +145,60 @@ export function LecturersClient() {
     }
   };
 
+  const handleResendInvite = async (lecturer: Lecturer) => {
+    if (!confirm(`Resend the pending DSE invitation to ${lecturer.email}?`)) return;
+
+    setResendingId(lecturer.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.resendInvitation(lecturer.id);
+      setNotice(`Fresh invitation sent to ${result.email}.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to resend lecturer invitation");
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const handleSendSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (selectedIds.length > 20) {
+      setError("Select at most 20 lecturers for one invitation batch.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `Send DSE access to the ${selectedIds.length} selected lecturer${selectedIds.length === 1 ? "" : "s"}?\n\n` +
+        "Only checked rows will be processed. No-access lecturers receive a first invitation, pending invitations are refreshed, and active accounts are left unchanged.",
+    );
+    if (!confirmed) return;
+
+    setSelectedInviting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.sendLecturerInvitationsToSelected(selectedIds);
+      setNotice(
+        `Selected lecturer delivery complete. Checked ${result.totalLecturers}: ${result.newlyInvited} new invitation${result.newlyInvited === 1 ? "" : "s"}, ${result.resent} refreshed pending invitation${result.resent === 1 ? "" : "s"}, ${result.existingAccountSkipped} active account${result.existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${result.missingLecturerSkipped} missing/wrong-role selection${result.missingLecturerSkipped === 1 ? "" : "s"} skipped.`,
+      );
+      if (result.failed > 0) {
+        setError(
+          `${result.failed} selected lecturer${result.failed === 1 ? "" : "s"} failed safely. Retry after resolving the provider or account-data error; successful and active accounts will not be reprovisioned.`,
+        );
+      }
+      if (result.failed === 0) setSelectedIds([]);
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Failed to send selected lecturer invitations",
+      );
+    } finally {
+      setSelectedInviting(false);
+    }
+  };
+
   const handleSetTemporaryPassword = async (lecturer: Lecturer) => {
     const confirmed = window.confirm(
       `Set a new temporary password for ${lecturer.name}? Their current password will stop working immediately and they must choose a new password at the next login.`,
@@ -138,22 +239,94 @@ export function LecturersClient() {
     setNotice(null);
     try {
       await lecturersApi.remove(lecturer.id);
+      setSelectedIds((current) => current.filter((id) => id !== lecturer.id));
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to delete lecturer");
     }
   };
 
+  const accountMutationBusy = Boolean(
+    invitingId || resendingId || resettingId || selectedInviting || submitting,
+  );
+
+  const accountCell = (lecturer: Lecturer) => {
+    if (!canCreateAccount) {
+      return lecturer.accountAccess === "has_access" ? (
+        <StatusBadge tone="live" label="Has access" icon={false} />
+      ) : (
+        <StatusBadge tone="upcoming" label="No access" icon={false} />
+      );
+    }
+
+    const status = accountStatuses.get(lecturer.id);
+    if (!status) {
+      return (
+        <StatusBadge
+          tone={accountStatusLoading ? "neutral" : "danger"}
+          label={accountStatusLoading ? "Checking…" : "Status unavailable"}
+        />
+      );
+    }
+
+    const presentation = lecturerAccessPresentation(status);
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <span title={presentation.description}>
+          <StatusBadge tone={presentation.tone} label={presentation.label} />
+        </span>
+        {status === "no-access" ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={accountMutationBusy}
+            onClick={() => handleInvite(lecturer)}
+          >
+            {invitingId === lecturer.id ? "Inviting…" : "Invite to DSE"}
+          </Button>
+        ) : null}
+        {status === "invitation-pending" ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={accountMutationBusy}
+            onClick={() => handleResendInvite(lecturer)}
+          >
+            {resendingId === lecturer.id ? "Resending…" : "Resend invitation"}
+          </Button>
+        ) : null}
+        {status === "active-account" ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={accountMutationBusy}
+            onClick={() => handleSetTemporaryPassword(lecturer)}
+          >
+            {resettingId === lecturer.id ? "Setting…" : "Set temporary password"}
+          </Button>
+        ) : null}
+      </div>
+    );
+  };
+
   const columns: DataTableColumn<Lecturer>[] = [
     {
       key: "name",
       header: "Name",
-      render: (l) => (
+      render: (lecturer) => (
         <div>
-          <span className="font-medium">{formatLecturerDisplayName(l.name, l.honorific)}</span>
+          <span className="font-medium">
+            {formatLecturerDisplayName(lecturer.name, lecturer.honorific)}
+          </span>
           {canWrite ? (
             <div>
-              <Link href={`/lecturers/${l.id}/portfolio`} className="text-xs font-medium text-primary hover:underline">
+              <Link
+                href={`/lecturers/${lecturer.id}/portfolio`}
+                className="text-xs font-medium text-primary hover:underline"
+              >
                 Review portfolio evidence
               </Link>
             </div>
@@ -164,67 +337,45 @@ export function LecturersClient() {
     {
       key: "title",
       header: "Academic position",
-      render: (l) => (l.title ? l.title : <span className="text-muted-foreground">—</span>),
+      render: (lecturer) =>
+        lecturer.title ? lecturer.title : <span className="text-muted-foreground">—</span>,
     },
-    { key: "email", header: "Email", render: (l) => l.email },
+    { key: "email", header: "Email", render: (lecturer) => lecturer.email },
     {
       key: "qualification",
       header: "Qualification",
-      render: (l) =>
-        l.qualification ? l.qualification : <span className="text-muted-foreground">—</span>,
+      render: (lecturer) =>
+        lecturer.qualification
+          ? lecturer.qualification
+          : <span className="text-muted-foreground">—</span>,
     },
     {
       key: "phone",
       header: "Telephone",
-      render: (l) => (l.phone ? l.phone : <span className="text-muted-foreground">—</span>),
+      render: (lecturer) =>
+        lecturer.phone ? lecturer.phone : <span className="text-muted-foreground">—</span>,
     },
     {
       key: "accountAccess",
       header: "Account",
-      render: (l) =>
-        l.accountAccess === "has_access" ? (
-          <div className="flex items-center gap-2">
-            <StatusBadge tone="live" label="Has access" icon={false} />
-            {canCreateAccount ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={resettingId === l.id}
-                onClick={() => handleSetTemporaryPassword(l)}
-              >
-                {resettingId === l.id ? "Setting…" : "Set temporary password"}
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <StatusBadge tone="upcoming" label="No access" icon={false} />
-            {canCreateAccount ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={invitingId === l.id}
-                onClick={() => handleInvite(l)}
-              >
-                {invitingId === l.id ? "Inviting…" : "Invite to DSE"}
-              </Button>
-            ) : null}
-          </div>
-        ),
+      render: accountCell,
     },
   ];
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Add each lecturer once. Admins can grant or recover DSE access; program coordinators can maintain the academic profile and review professional portfolio evidence without controlling login credentials.
+        Add each lecturer once. Admins can grant or recover DSE access; program coordinators can
+        maintain the academic profile and review professional portfolio evidence without controlling
+        login credentials.
       </p>
 
       <TableToolbar
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setSelectedIds([]);
+        }}
         searchPlaceholder="Search lecturers…"
         addLabel={canWrite ? "Add Lecturer" : undefined}
         onAdd={
@@ -237,8 +388,35 @@ export function LecturersClient() {
         }
       />
 
+      {canCreateAccount ? (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+            {selectedIds.length > 20
+              ? "Select at most 20 lecturers for one invitation batch."
+              : selectedIds.length > 0
+                ? `${selectedIds.length} lecturer${selectedIds.length === 1 ? "" : "s"} selected. No-access lecturers will be invited, pending invitations refreshed, and active accounts left unchanged.`
+                : "Select up to 20 lecturers for a controlled invitation batch. Account status is verified against Supabase before actions are offered."}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={
+              selectedIds.length === 0 ||
+              selectedIds.length > 20 ||
+              accountMutationBusy
+            }
+            onClick={handleSendSelected}
+          >
+            {selectedInviting ? "Sending selected…" : `Send selected (${selectedIds.length})`}
+          </Button>
+        </div>
+      ) : null}
+
       {error ? (
-        <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
+        <div
+          role="alert"
+          className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming"
+        >
           {error}
         </div>
       ) : null}
@@ -254,14 +432,16 @@ export function LecturersClient() {
           <div>
             <p className="font-medium text-foreground">Temporary password created</p>
             <p className="text-sm text-muted-foreground">
-              {temporaryCredential.lecturerName} ({temporaryCredential.email}) must use this once, then DSE PMS will require a new personal password.
+              {temporaryCredential.lecturerName} ({temporaryCredential.email}) must use this once,
+              then DSE PMS will require a new personal password.
             </p>
           </div>
           <code className="block select-all break-all rounded-md bg-muted px-3 py-2 text-sm text-foreground">
             {temporaryCredential.password}
           </code>
           <p className="text-xs text-muted-foreground">
-            This password is shown only in this browser state. It is not stored by DSE PMS. Share it securely, then dismiss it.
+            This password is shown only in this browser state. It is not stored by DSE PMS. Share it
+            securely, then dismiss it.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={handleCopyTemporaryPassword}>
@@ -282,11 +462,14 @@ export function LecturersClient() {
       <DataTable
         columns={columns}
         rows={rows}
-        getRowId={(l) => l.id}
+        getRowId={(lecturer) => lecturer.id}
+        selectable={canCreateAccount}
+        selectedIds={selectedIds}
+        onSelectedChange={setSelectedIds}
         onEdit={
           canWrite
-            ? (l) => {
-                setEditing(l);
+            ? (lecturer) => {
+                setEditing(lecturer);
                 setFormOpen(true);
               }
             : undefined
@@ -298,9 +481,9 @@ export function LecturersClient() {
 
       <LecturerForm
         open={formOpen}
-        onOpenChange={(o) => {
-          setFormOpen(o);
-          if (!o) setEditing(null);
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditing(null);
         }}
         editing={editing}
         onSubmit={handleSubmit}
