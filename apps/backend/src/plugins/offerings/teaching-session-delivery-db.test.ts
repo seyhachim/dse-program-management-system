@@ -176,6 +176,52 @@ describeDb("monitor teaching session delivery integrity", () => {
     expect(await teachingSessionDeliveryService.getHistory(context.occurrence.id)).toHaveLength(1);
   });
 
+  test("records multiple actual lecturers for a genuinely co-taught occurrence", async () => {
+    const fixture = await createDeliveryOffering("co-taught");
+    const monitor = await assignMonitor(fixture.offering.id, "co-taught");
+
+    const saved = await teachingSessionDeliveryService.saveMonitorDelivery(
+      fixture.offering.id,
+      fixture.meeting.id,
+      "2026-09-08",
+      {
+        classOccurred: true,
+        actualLecturerIds: [fixture.lead.id, fixture.co.id],
+        actualLecturerId: fixture.lead.id,
+        actualStartTime: "09:00",
+        actualEndTime: "11:00",
+        actualTopic: "Joint agronomy and data-science interpretation",
+        learningSummary: "Both perspectives were taught in the same class.",
+        coverage: "TAUGHT_AS_PLANNED",
+        note: "",
+      },
+      monitor.user.id,
+    );
+
+    expect(saved.delivery.actualLecturers.map((lecturer) => lecturer.id).sort()).toEqual(
+      [fixture.lead.id, fixture.co.id].sort(),
+    );
+    expect(saved.delivery.actualLecturer?.id).toBe(fixture.lead.id);
+
+    const links = await prisma.$queryRaw<Array<{ lecturerId: string }>>`
+      SELECT "lecturerId"
+      FROM "pms_attendance"."TeachingSessionDeliveryLecturer"
+      WHERE "deliveryId" = ${saved.delivery.id}
+      ORDER BY "lecturerId"
+    `;
+    expect(links.map((row) => row.lecturerId)).toEqual(
+      [fixture.lead.id, fixture.co.id].sort(),
+    );
+
+    const history = await teachingSessionDeliveryService.getHistory(
+      saved.delivery.occurrenceId,
+    );
+    expect(history).toHaveLength(1);
+    expect(history[0]?.newSnapshot.actualLecturerIds?.sort()).toEqual(
+      [fixture.lead.id, fixture.co.id].sort(),
+    );
+  });
+
   test("retains immutable actor/time audit history for material monitor edits", async () => {
     const fixture = await createDeliveryOffering("history");
     const monitor = await assignMonitor(fixture.offering.id, "history");
@@ -333,6 +379,25 @@ describeDb("monitor teaching session delivery integrity", () => {
         monitor.user.id,
       ),
     ).rejects.toThrow("Actual end time must be after actual start time");
+
+    await expect(
+      teachingSessionDeliveryService.saveMonitorDelivery(
+        fixture.offering.id,
+        fixture.meeting.id,
+        "2026-09-08",
+        {
+          classOccurred: true,
+          actualLecturerIds: [fixture.lead.id, outsider.id],
+          actualLecturerId: fixture.lead.id,
+          actualStartTime: "09:00",
+          actualEndTime: "10:00",
+          actualTopic: "Topic",
+          coverage: "TAUGHT_AS_PLANNED",
+          note: "",
+        },
+        monitor.user.id,
+      ),
+    ).rejects.toBeInstanceOf(TeachingSessionDeliveryValidationError);
 
     const attendanceAfter = await prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count FROM "pms_attendance"."AttendanceRecord"
