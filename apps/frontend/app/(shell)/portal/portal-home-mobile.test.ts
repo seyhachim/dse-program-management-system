@@ -37,8 +37,7 @@ describe("Student Portal mobile home contract", () => {
   test("right-aligns active monitor responsibilities beside the student name", () => {
     expect(portalHomeSource).toContain("monitorDeliveryApi");
     expect(portalHomeSource).toContain(".assignments()");
-    expect(portalHomeSource).toContain("Class Monitor");
-    expect(portalHomeSource).toContain("Deputy Class Monitor");
+    expect(portalHomeSource).toContain("classResponsibilityLabel");
     expect(portalHomeSource).not.toContain("Sub-class Monitor");
     expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
     expect(portalHomeSource).toContain("Crown");
