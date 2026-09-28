@@ -24,6 +24,25 @@ describe("teaching session delivery contracts", () => {
     expect(parsed.coverage).toBe("PARTIALLY_COVERED");
   });
 
+  test("accepts multiple actual lecturers for a co-taught occurrence", () => {
+    const parsed = SaveTeachingSessionDeliveryInputSchema.parse({
+      classOccurred: true,
+      actualLecturerId: "11111111-1111-4111-8111-111111111111",
+      actualLecturerIds: [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+      ],
+      actualStartTime: "09:00",
+      actualEndTime: "11:00",
+      actualTopic: "Joint field-data interpretation",
+      learningSummary: "Agronomy and data-science perspectives were taught together.",
+      coverage: "TAUGHT_AS_PLANNED",
+      note: "",
+    });
+
+    expect(parsed.actualLecturerIds).toHaveLength(2);
+  });
+
   test("requires lecturer and ordered actual times when the class occurred", () => {
     const missing = SaveTeachingSessionDeliveryInputSchema.safeParse({
       classOccurred: true,
