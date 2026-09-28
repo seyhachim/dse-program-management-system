@@ -32,8 +32,8 @@ interface DeliveryRow {
   classOccurred: boolean;
   actualLecturerId: string | null;
   actualLecturerName: string | null;
-  actualLecturerIds: string[];
-  actualLecturerNames: string[];
+  actualLecturerIds?: string[];
+  actualLecturerNames?: string[];
   actualStartTime: string | null;
   actualEndTime: string | null;
   deliveredMinutes: number;
@@ -116,8 +116,8 @@ function deliverySnapshot(row: Pick<
     classOccurred: row.classOccurred,
     actualLecturerId: row.actualLecturerId,
     actualLecturerIds:
-      row.actualLecturerIds.length > 0
-        ? [...row.actualLecturerIds].sort()
+      (row.actualLecturerIds?.length ?? 0) > 0
+        ? [...(row.actualLecturerIds ?? [])].sort()
         : row.actualLecturerId
           ? [row.actualLecturerId]
           : [],
@@ -148,9 +148,9 @@ function plannedWeekFromRow(row: DeliveryRow): TeachingSessionPlannedWeekView | 
 }
 
 function deliveryView(row: DeliveryRow): TeachingSessionDeliveryView {
-  const actualLecturers = row.actualLecturerIds.map((id, index) => ({
+  const actualLecturers = (row.actualLecturerIds ?? []).map((id, index) => ({
     id,
-    name: row.actualLecturerNames[index] ?? id,
+    name: row.actualLecturerNames?.[index] ?? id,
   }));
   const legacyActualLecturer =
     row.actualLecturerId && row.actualLecturerName
