@@ -201,7 +201,7 @@ export function CohortSectionClient() {
       return;
     }
 
-    const label = leadershipRole === "ClassMonitor" ? "Class Monitor" : "Sub-class Monitor";
+    const label = leadershipRole === "ClassMonitor" ? "Class Monitor" : "Deputy Class Monitor";
     if (!window.confirm(
       `Assign ${member.studentName} as ${label} for ${targets.length} current ${section.code} offering${targets.length === 1 ? "" : "s"}? Existing holders of this role will be replaced with audit history preserved.`,
     )) return;
@@ -288,7 +288,7 @@ export function CohortSectionClient() {
         <div className="border-t border-border pt-5">
           <h3 className="font-semibold">Class leadership</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Assign a Class Monitor or Sub-class Monitor using existing audited Offering responsibilities. Only non-completed offerings for this section where the selected student is enrolled are updated.
+            Assign a Class Monitor or Deputy Class Monitor using existing audited Offering responsibilities. Only non-completed offerings for this section where the selected student is enrolled are updated.
           </p>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <select
@@ -308,7 +308,7 @@ export function CohortSectionClient() {
               onChange={(event) => setLeadershipRole(event.target.value as ClassResponsibilityRole)}
             >
               <option value="ClassMonitor">Class Monitor</option>
-              <option value="SubClassMonitor">Sub-class Monitor</option>
+              <option value="SubClassMonitor">Deputy Class Monitor</option>
             </select>
             <select
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
