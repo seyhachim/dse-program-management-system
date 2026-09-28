@@ -220,6 +220,52 @@ describeDb("monitor teaching session delivery integrity", () => {
     expect(history[0]?.newSnapshot.actualLecturerIds?.sort()).toEqual(
       [fixture.lead.id, fixture.co.id].sort(),
     );
+
+    const unchanged = await teachingSessionDeliveryService.saveMonitorDelivery(
+      fixture.offering.id,
+      fixture.meeting.id,
+      "2026-09-08",
+      {
+        classOccurred: true,
+        actualLecturerIds: [fixture.co.id, fixture.lead.id],
+        actualLecturerId: fixture.lead.id,
+        actualStartTime: "09:00",
+        actualEndTime: "11:00",
+        actualTopic: "Joint agronomy and data-science interpretation",
+        learningSummary: "Both perspectives were taught in the same class.",
+        coverage: "TAUGHT_AS_PLANNED",
+        note: "",
+      },
+      monitor.user.id,
+    );
+    expect(unchanged.changed).toBe(false);
+    expect(await teachingSessionDeliveryService.getHistory(saved.delivery.occurrenceId)).toHaveLength(1);
+
+    const corrected = await teachingSessionDeliveryService.saveMonitorDelivery(
+      fixture.offering.id,
+      fixture.meeting.id,
+      "2026-09-08",
+      {
+        classOccurred: true,
+        actualLecturerIds: [fixture.lead.id, fixture.co.id],
+        actualLecturerId: fixture.lead.id,
+        actualStartTime: "09:05",
+        actualEndTime: "11:00",
+        actualTopic: "Joint agronomy and data-science interpretation",
+        learningSummary: "Both perspectives were taught in the same class.",
+        coverage: "TAUGHT_AS_PLANNED",
+        note: "Corrected start time",
+      },
+      monitor.user.id,
+    );
+    expect(corrected.changed).toBe(true);
+    const correctedHistory = await teachingSessionDeliveryService.getHistory(
+      saved.delivery.occurrenceId,
+    );
+    expect(correctedHistory).toHaveLength(2);
+    expect(correctedHistory[1]?.previousSnapshot?.actualLecturerIds?.sort()).toEqual(
+      [fixture.lead.id, fixture.co.id].sort(),
+    );
   });
 
   test("retains immutable actor/time audit history for material monitor edits", async () => {
