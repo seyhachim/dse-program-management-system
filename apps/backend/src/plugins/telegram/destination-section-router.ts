@@ -17,7 +17,7 @@ const ClassSectionDestinationCreateRequestSchema = z.object({
 
 export function createTelegramDestinationSectionRouter(): Router {
   const router = Router();
-  router.use(requireAuth);
+  router.use("/destinations", requireAuth);
 
   router.get("/destinations/scopes/sections", async (req, res) => {
     const parsed = ProgrammeQuery.safeParse(req.query);
