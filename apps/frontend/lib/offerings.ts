@@ -113,7 +113,18 @@ export function workloadForTerm(
   return {
     scheduleRows,
     scheduledWeeklyHours:
-      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
+      Math.round(
+        scheduleRows
+          .filter((row) => !row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedWeeklyHours:
+      Math.round(
+        scheduleRows
+          .filter((row) => row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedMeetingCount: scheduleRows.filter((row) => row.sharedResponsibility).length,
     rows,
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),

@@ -78,6 +78,8 @@ describe("Telegram phase 2 contracts", () => {
   test("accepts workload projection payloads", () => {
     expect(TelegramLecturerWorkloadSchema.safeParse({
       scheduledWeeklyHours: 2,
+      sharedWeeklyHours: 3,
+      sharedMeetingCount: 1,
       peakWeeklyHours: 4,
       totalHours: 24,
       coLecturerAssumption: "full",
@@ -94,6 +96,7 @@ describe("Telegram phase 2 contracts", () => {
         room: "301",
         activityType: "Lecture",
         durationHours: 2,
+        sharedResponsibility: false,
       }],
       weeklyTotals: [{ term: "2026-S1", week: 1, totalContactHours: 4 }],
     }).success).toBe(true);

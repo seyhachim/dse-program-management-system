@@ -94,6 +94,8 @@ export type TelegramStudentAttendanceHistory = z.infer<typeof TelegramStudentAtt
 
 export const TelegramLecturerWorkloadSchema = z.object({
   scheduledWeeklyHours: z.number().nonnegative(),
+  sharedWeeklyHours: z.number().nonnegative(),
+  sharedMeetingCount: z.number().int().nonnegative(),
   peakWeeklyHours: z.number().nonnegative(),
   totalHours: z.number().nonnegative(),
   coLecturerAssumption: z.string(),
@@ -110,6 +112,7 @@ export const TelegramLecturerWorkloadSchema = z.object({
     room: z.string().nullable(),
     activityType: z.string(),
     durationHours: z.number(),
+    sharedResponsibility: z.boolean(),
   })),
   weeklyTotals: z.array(z.object({
     term: z.string(),

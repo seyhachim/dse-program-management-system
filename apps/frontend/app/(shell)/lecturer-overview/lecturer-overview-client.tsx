@@ -152,10 +152,12 @@ export function LecturerOverviewClient() {
     (offering) => offering.lecturer?.id === me?.id,
   ).length;
   const coLecturerSections = visibleOfferings.length - primarySections;
-  const scheduledHours = visibleScheduleRows.reduce(
-    (total, row) => total + row.durationHours,
-    0,
-  );
+  const fixedScheduledHours = visibleScheduleRows
+    .filter((row) => !row.sharedResponsibility)
+    .reduce((total, row) => total + row.durationHours, 0);
+  const sharedScheduleHours = visibleScheduleRows
+    .filter((row) => row.sharedResponsibility)
+    .reduce((total, row) => total + row.durationHours, 0);
   const enrolledStudents = visibleOfferings.reduce(
     (sum, offering) => sum + offering.enrolledCount,
     0,
@@ -312,7 +314,10 @@ export function LecturerOverviewClient() {
                     },
                     {
                       label: "Hours / week",
-                      value: `${formatHours(scheduledHours)} h`,
+                      value:
+                        sharedScheduleHours > 0
+                          ? `${formatHours(fixedScheduledHours)} h fixed + ${formatHours(sharedScheduleHours)} h shared`
+                          : `${formatHours(fixedScheduledHours)} h`,
                     },
                   ]}
                 />
@@ -336,9 +341,16 @@ export function LecturerOverviewClient() {
                 />
                 <SummaryCard
                   icon={<Clock3 className="h-4 w-4" />}
-                  label="Scheduled hours / week"
-                  value={`${formatHours(scheduledHours)} h`}
+                  label="Fixed hours / week"
+                  value={`${formatHours(fixedScheduledHours)} h`}
                 />
+                {sharedScheduleHours > 0 ? (
+                  <SummaryCard
+                    icon={<Clock3 className="h-4 w-4" />}
+                    label="Shared / flexible timetable"
+                    value={`${formatHours(sharedScheduleHours)} h`}
+                  />
+                ) : null}
                 <SummaryCard
                   icon={<UsersRound className="h-4 w-4" />}
                   label="Students"

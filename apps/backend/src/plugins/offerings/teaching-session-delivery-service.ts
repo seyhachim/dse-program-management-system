@@ -32,6 +32,8 @@ interface DeliveryRow {
   classOccurred: boolean;
   actualLecturerId: string | null;
   actualLecturerName: string | null;
+  actualLecturerIds?: string[];
+  actualLecturerNames?: string[];
   actualStartTime: string | null;
   actualEndTime: string | null;
   deliveredMinutes: number;
@@ -101,6 +103,7 @@ function deliverySnapshot(row: Pick<
   DeliveryRow,
   | "classOccurred"
   | "actualLecturerId"
+  | "actualLecturerIds"
   | "actualStartTime"
   | "actualEndTime"
   | "deliveredMinutes"
@@ -112,6 +115,12 @@ function deliverySnapshot(row: Pick<
   return {
     classOccurred: row.classOccurred,
     actualLecturerId: row.actualLecturerId,
+    actualLecturerIds:
+      (row.actualLecturerIds?.length ?? 0) > 0
+        ? [...(row.actualLecturerIds ?? [])].sort()
+        : row.actualLecturerId
+          ? [row.actualLecturerId]
+          : [],
     actualStartTime: row.actualStartTime,
     actualEndTime: row.actualEndTime,
     deliveredMinutes: row.deliveredMinutes,
@@ -139,15 +148,27 @@ function plannedWeekFromRow(row: DeliveryRow): TeachingSessionPlannedWeekView | 
 }
 
 function deliveryView(row: DeliveryRow): TeachingSessionDeliveryView {
+  const actualLecturers = (row.actualLecturerIds ?? []).map((id, index) => ({
+    id,
+    name: row.actualLecturerNames?.[index] ?? id,
+  }));
+  const legacyActualLecturer =
+    row.actualLecturerId && row.actualLecturerName
+      ? { id: row.actualLecturerId, name: row.actualLecturerName }
+      : null;
+
   return {
     id: row.id,
     occurrenceId: row.occurrenceId,
     offeringId: row.offeringId,
     classOccurred: row.classOccurred,
-    actualLecturer:
-      row.actualLecturerId && row.actualLecturerName
-        ? { id: row.actualLecturerId, name: row.actualLecturerName }
-        : null,
+    actualLecturer: legacyActualLecturer ?? actualLecturers[0] ?? null,
+    actualLecturers:
+      actualLecturers.length > 0
+        ? actualLecturers
+        : legacyActualLecturer
+          ? [legacyActualLecturer]
+          : [],
     actualStartTime: row.actualStartTime,
     actualEndTime: row.actualEndTime,
     deliveredMinutes: row.deliveredMinutes,
@@ -182,6 +203,19 @@ async function readDelivery(occurrenceId: string): Promise<DeliveryRow | null> {
     SELECT
       d."id", d."occurrenceId", d."offeringId", d."classOccurred",
       d."actualLecturerId", lecturer."name" AS "actualLecturerName",
+      ARRAY(
+        SELECT link."lecturerId"
+        FROM "pms_attendance"."TeachingSessionDeliveryLecturer" link
+        WHERE link."deliveryId" = d."id"
+        ORDER BY link."lecturerId"
+      ) AS "actualLecturerIds",
+      ARRAY(
+        SELECT linked_user."name"
+        FROM "pms_attendance"."TeachingSessionDeliveryLecturer" link
+        JOIN "User" linked_user ON linked_user."id" = link."lecturerId"
+        WHERE link."deliveryId" = d."id"
+        ORDER BY link."lecturerId"
+      ) AS "actualLecturerNames",
       d."actualStartTime", d."actualEndTime", d."deliveredMinutes",
       d."actualTopic", d."learningSummary", d."coverage", d."note",
       d."plannedCourseSpecId", d."plannedWeekId", d."plannedWeekNumber", d."plannedTopic",
@@ -328,10 +362,18 @@ async function assertEligibleActualLecturerInTransaction(
 function normalizedSnapshot(
   input: SaveTeachingSessionDeliveryInput,
 ): TeachingSessionDeliverySnapshot {
+  const actualLecturerIds = [
+    ...new Set([
+      ...(input.actualLecturerIds ?? []),
+      ...(input.actualLecturerId ? [input.actualLecturerId] : []),
+    ]),
+  ].sort();
+
   if (!input.classOccurred) {
     return {
       classOccurred: false,
       actualLecturerId: null,
+      actualLecturerIds: [],
       actualStartTime: null,
       actualEndTime: null,
       deliveredMinutes: 0,
@@ -341,14 +383,19 @@ function normalizedSnapshot(
       note: input.note,
     };
   }
-  if (!input.actualLecturerId || !input.actualStartTime || !input.actualEndTime) {
+  if (actualLecturerIds.length === 0 || !input.actualStartTime || !input.actualEndTime) {
     throw new TeachingSessionDeliveryValidationError(
-      "Actual lecturer, start time, and end time are required when the class occurred",
+      "At least one actual lecturer, start time, and end time are required when the class occurred",
     );
   }
+  const representativeLecturerId =
+    input.actualLecturerId && actualLecturerIds.includes(input.actualLecturerId)
+      ? input.actualLecturerId
+      : actualLecturerIds[0]!;
   return {
     classOccurred: true,
-    actualLecturerId: input.actualLecturerId,
+    actualLecturerId: representativeLecturerId,
+    actualLecturerIds,
     actualStartTime: input.actualStartTime,
     actualEndTime: input.actualEndTime,
     deliveredMinutes: teachingSessionDeliveredMinutes(input.actualStartTime, input.actualEndTime),
@@ -472,11 +519,11 @@ export const teachingSessionDeliveryService = {
         );
       }
 
-      if (snapshot.actualLecturerId) {
+      for (const lecturerId of snapshot.actualLecturerIds ?? []) {
         await assertEligibleActualLecturerInTransaction(
           tx,
           offeringId,
-          snapshot.actualLecturerId,
+          lecturerId,
         );
       }
 
@@ -484,6 +531,19 @@ export const teachingSessionDeliveryService = {
         SELECT
           d."id", d."occurrenceId", d."offeringId", d."classOccurred",
           d."actualLecturerId", lecturer."name" AS "actualLecturerName",
+          ARRAY(
+            SELECT link."lecturerId"
+            FROM "pms_attendance"."TeachingSessionDeliveryLecturer" link
+            WHERE link."deliveryId" = d."id"
+            ORDER BY link."lecturerId"
+          ) AS "actualLecturerIds",
+          ARRAY(
+            SELECT linked_user."name"
+            FROM "pms_attendance"."TeachingSessionDeliveryLecturer" link
+            JOIN "User" linked_user ON linked_user."id" = link."lecturerId"
+            WHERE link."deliveryId" = d."id"
+            ORDER BY link."lecturerId"
+          ) AS "actualLecturerNames",
           d."actualStartTime", d."actualEndTime", d."deliveredMinutes",
           d."actualTopic", d."learningSummary", d."coverage", d."note",
           d."plannedCourseSpecId", d."plannedWeekId", d."plannedWeekNumber", d."plannedTopic",
@@ -613,6 +673,21 @@ export const teachingSessionDeliveryService = {
       if (!saved) throw new Error("Teaching session delivery was not persisted");
 
       await tx.$executeRaw`
+        DELETE FROM "pms_attendance"."TeachingSessionDeliveryLecturer"
+        WHERE "deliveryId" = ${deliveryId}
+      `;
+      for (const lecturerId of snapshot.actualLecturerIds ?? []) {
+        await tx.$executeRaw`
+          INSERT INTO "pms_attendance"."TeachingSessionDeliveryLecturer" (
+            "deliveryId", "lecturerId"
+          ) VALUES (
+            ${deliveryId}, ${lecturerId}
+          )
+          ON CONFLICT ("deliveryId", "lecturerId") DO NOTHING
+        `;
+      }
+
+      await tx.$executeRaw`
         INSERT INTO "pms_attendance"."TeachingSessionDeliveryAuditEvent" (
           "id", "deliveryId", "occurrenceId", "actorId", "revision",
           "previousSnapshot", "newSnapshot", "createdAt"
@@ -627,7 +702,9 @@ export const teachingSessionDeliveryService = {
       return { row: saved, changed: true };
     });
 
-    return { delivery: deliveryView(result.row), changed: result.changed };
+    const saved = await readDelivery(occurrence.id);
+    if (!saved) throw new Error("Teaching session delivery was not readable after save");
+    return { delivery: deliveryView(saved), changed: result.changed };
   },
 };
 

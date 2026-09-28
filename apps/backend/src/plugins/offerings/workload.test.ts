@@ -82,6 +82,8 @@ test("scheduled weekly workload is calculated from class meeting duration", () =
   const result = summarizeLecturerWorkload(LECTURER_ID, [classA, classB]);
   expect(result.scheduledWeeklyHours).toBe(3.5);
   expect(result.scheduleRows.map((row) => row.durationHours)).toEqual([2, 1.5]);
+  expect(result.sharedWeeklyHours).toBe(0);
+  expect(result.sharedMeetingCount).toBe(0);
   expect(result.scheduleRows.map((row) => row.building)).toEqual(["STEM Building", "Engineering Building"]);
   expect(result.scheduleRows.map((row) => row.room)).toEqual(["A203", "B105"]);
 });
@@ -142,7 +144,10 @@ test("co-taught meetings appear for every explicitly assigned lecturer", () => {
 
   const result = summarizeLecturerWorkload(LECTURER_ID, [coTaught]);
   expect(result.scheduleRows.map((row) => row.meetingId)).toEqual(["meeting-co-taught"]);
-  expect(result.scheduledWeeklyHours).toBe(2);
+  expect(result.scheduledWeeklyHours).toBe(0);
+  expect(result.sharedWeeklyHours).toBe(2);
+  expect(result.sharedMeetingCount).toBe(1);
+  expect(result.scheduleRows[0]?.sharedResponsibility).toBe(true);
 });
 
 test("legacy unallocated meetings do not fabricate lecturer ownership", () => {
@@ -161,4 +166,6 @@ test("legacy unallocated meetings do not fabricate lecturer ownership", () => {
   const result = summarizeLecturerWorkload(LECTURER_ID, [unallocated]);
   expect(result.scheduleRows).toEqual([]);
   expect(result.scheduledWeeklyHours).toBe(0);
+  expect(result.sharedWeeklyHours).toBe(0);
+  expect(result.sharedMeetingCount).toBe(0);
 });

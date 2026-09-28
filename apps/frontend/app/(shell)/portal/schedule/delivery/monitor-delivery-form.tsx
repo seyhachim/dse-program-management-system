@@ -28,7 +28,8 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
     return {
       lecturerArrivalStatus: null,
       classOccurred: existing.classOccurred,
-      actualLecturerId: existing.actualLecturer?.id ?? null,
+      actualLecturerId: existing.actualLecturer?.id ?? existing.actualLecturers[0]?.id ?? null,
+      actualLecturerIds: existing.actualLecturers.map((lecturer) => lecturer.id),
       actualStartTime: existing.actualStartTime,
       actualEndTime: existing.actualEndTime,
       actualTopic: existing.actualTopic,
@@ -41,6 +42,7 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
     lecturerArrivalStatus: null,
     classOccurred: true,
     actualLecturerId: null,
+    actualLecturerIds: [],
     actualStartTime: context.timing?.startedAt
       ? phnomPenhTimeFromIso(context.timing.startedAt)
       : null,
@@ -150,6 +152,7 @@ export function MonitorDeliveryForm() {
           ...current,
           classOccurred: false,
           actualLecturerId: null,
+          actualLecturerIds: [],
           actualStartTime: null,
           actualEndTime: null,
           learningSummary: "",
@@ -328,21 +331,48 @@ export function MonitorDeliveryForm() {
               onChanged={refreshTiming}
             />
 
-            <label className="block text-sm font-medium text-foreground">
-              Actual lecturer
-              <select
-                value={input.actualLecturerId ?? ""}
-                onChange={(event) =>
-                  setInput((current) => current ? { ...current, actualLecturerId: event.target.value || null } : current)
-                }
-                className="mt-2 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-              >
-                <option value="">Select lecturer</option>
-                {context.eligibleLecturers.map((lecturer) => (
-                  <option key={lecturer.id} value={lecturer.id}>{lecturer.name}</option>
-                ))}
-              </select>
-            </label>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-foreground">Actual lecturer(s)</legend>
+              <p className="text-xs text-muted-foreground">
+                Select everyone who actually taught this class. This may be one lecturer or a co-teaching team.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {context.eligibleLecturers.map((lecturer) => {
+                  const selectedIds = input.actualLecturerIds ?? (
+                    input.actualLecturerId ? [input.actualLecturerId] : []
+                  );
+                  const checked = selectedIds.includes(lecturer.id);
+                  return (
+                    <label
+                      key={lecturer.id}
+                      className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) =>
+                          setInput((current) => {
+                            if (!current) return current;
+                            const currentIds = current.actualLecturerIds ?? (
+                              current.actualLecturerId ? [current.actualLecturerId] : []
+                            );
+                            const nextIds = event.target.checked
+                              ? [...new Set([...currentIds, lecturer.id])]
+                              : currentIds.filter((id) => id !== lecturer.id);
+                            return {
+                              ...current,
+                              actualLecturerIds: nextIds,
+                              actualLecturerId: nextIds[0] ?? null,
+                            };
+                          })
+                        }
+                      />
+                      <span>{lecturer.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium text-foreground">
