@@ -531,6 +531,19 @@ export const teachingSessionDeliveryService = {
         SELECT
           d."id", d."occurrenceId", d."offeringId", d."classOccurred",
           d."actualLecturerId", lecturer."name" AS "actualLecturerName",
+          ARRAY(
+            SELECT link."lecturerId"
+            FROM "pms_attendance"."TeachingSessionDeliveryLecturer" link
+            WHERE link."deliveryId" = d."id"
+            ORDER BY link."lecturerId"
+          ) AS "actualLecturerIds",
+          ARRAY(
+            SELECT linked_user."name"
+            FROM "pms_attendance"."TeachingSessionDeliveryLecturer" link
+            JOIN "User" linked_user ON linked_user."id" = link."lecturerId"
+            WHERE link."deliveryId" = d."id"
+            ORDER BY link."lecturerId"
+          ) AS "actualLecturerNames",
           d."actualStartTime", d."actualEndTime", d."deliveredMinutes",
           d."actualTopic", d."learningSummary", d."coverage", d."note",
           d."plannedCourseSpecId", d."plannedWeekId", d."plannedWeekNumber", d."plannedTopic",
