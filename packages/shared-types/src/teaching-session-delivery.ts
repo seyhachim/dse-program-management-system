@@ -35,7 +35,7 @@ export const SaveTeachingSessionDeliveryInputSchema = z
     lecturerArrivalStatus: LecturerArrivalStatusSchema.nullable().optional(),
     classOccurred: z.boolean(),
     actualLecturerId: z.string().uuid().nullable().default(null),
-    actualLecturerIds: z.array(z.string().uuid()).max(20).default([]),
+    actualLecturerIds: z.array(z.string().uuid()).max(20).optional(),
     actualStartTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualEndTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualTopic: z.string().trim().max(1000).default(""),
@@ -45,7 +45,7 @@ export const SaveTeachingSessionDeliveryInputSchema = z
   })
   .superRefine((value, ctx) => {
     if (!value.classOccurred) {
-      if (value.actualLecturerId !== null || value.actualLecturerIds.length > 0) {
+      if (value.actualLecturerId !== null || (value.actualLecturerIds?.length ?? 0) > 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["actualLecturerIds"],
@@ -77,7 +77,7 @@ export const SaveTeachingSessionDeliveryInputSchema = z
     }
 
     const lecturerIds = [
-      ...value.actualLecturerIds,
+      ...(value.actualLecturerIds ?? []),
       ...(value.actualLecturerId ? [value.actualLecturerId] : []),
     ];
     if (new Set(lecturerIds).size === 0) {
