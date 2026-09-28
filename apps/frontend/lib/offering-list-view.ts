@@ -21,6 +21,7 @@ export type OfferingScheduleEntry = {
   endTime: string;
   building: string | null;
   room: string | null;
+  assignedLecturerCount: number;
 };
 
 const DAY_ORDER = new Map(
@@ -82,6 +83,23 @@ export function filterOfferingGroups(
   });
 }
 
+/** Count recurring meetings that have no explicit meeting-level lecturer ownership. */
+export function countUnassignedMeetings(groups: OfferingGroup[]): number {
+  return groups.reduce(
+    (groupTotal, group) =>
+      groupTotal +
+      group.offerings.reduce(
+        (offeringTotal, offering) =>
+          offeringTotal +
+          offering.meetings.filter(
+            (meeting) => (meeting.lecturerIds?.length ?? 0) === 0,
+          ).length,
+        0,
+      ),
+    0,
+  );
+}
+
 /**
  * Flatten every real weekly meeting in a grouped course row. Class identity is
  * retained so M1/M2 schedules stay understandable without expanding the row.
@@ -99,6 +117,7 @@ export function offeringScheduleEntries(
         endTime: meeting.endTime,
         building: meeting.building,
         room: meeting.room,
+        assignedLecturerCount: meeting.lecturerIds?.length ?? 0,
       })),
     )
     .sort((a, b) => {

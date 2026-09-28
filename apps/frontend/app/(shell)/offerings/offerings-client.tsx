@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { BookOpen, Pencil, Trash2, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, Pencil, Trash2, Users } from "lucide-react";
 import type { OfferingView, Student } from "@dse-pms/shared-types";
 import { semesterLabel } from "@dse-pms/shared-types";
 import {
@@ -19,6 +19,7 @@ import {
   type OfferingGroup,
 } from "@/lib/offering-groups";
 import {
+  countUnassignedMeetings,
   filterOfferingGroups,
   offeringScheduleEntries,
   OFFERING_YEAR_FILTER_OPTIONS,
@@ -165,6 +166,10 @@ export function OfferingsClient() {
   };
 
   const groups = useMemo(() => groupOfferings(rows), [rows]);
+  const unassignedMeetingCount = useMemo(
+    () => countUnassignedMeetings(groups),
+    [groups],
+  );
   const visibleGroups = useMemo(
     () => filterOfferingGroups(groups, search, yearFilter),
     [groups, search, yearFilter],
@@ -247,6 +252,11 @@ export function OfferingsClient() {
                 {entry.startTime}–{entry.endTime}
                 {entry.building ? ` · ${entry.building}` : ""}
                 {entry.room ? ` · Room ${entry.room}` : ""}
+                {entry.assignedLecturerCount === 0 ? (
+                  <span className="font-medium text-status-upcoming">
+                    {" "}· No lecturer assigned
+                  </span>
+                ) : null}
               </div>
             ))}
           </div>
@@ -413,6 +423,11 @@ export function OfferingsClient() {
                             {meeting.startTime}–{meeting.endTime}
                             {meeting.building ? ` · ${meeting.building}` : ""}
                             {meeting.room ? ` · Room ${meeting.room}` : ""}
+                            {(meeting.lecturerIds?.length ?? 0) === 0 ? (
+                              <span className="font-medium text-status-upcoming">
+                                {" "}· No lecturer assigned
+                              </span>
+                            ) : null}
                           </div>
                         ))}
                       </div>
@@ -529,6 +544,25 @@ export function OfferingsClient() {
           className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming"
         >
           {actionError}
+        </div>
+      ) : null}
+
+      {canManage && unassignedMeetingCount > 0 ? (
+        <div
+          role="status"
+          className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-3 text-sm text-status-upcoming"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="font-semibold">
+                {unassignedMeetingCount} weekly {unassignedMeetingCount === 1 ? "session has" : "sessions have"} no assigned lecturer
+              </p>
+              <p className="mt-0.5 text-xs">
+                Lecturer Overview, workload, Teaching Schedule, and leave exclude these sessions until meeting-level ownership is assigned. Expand the course and edit the affected class.
+              </p>
+            </div>
+          </div>
         </div>
       ) : null}
 
