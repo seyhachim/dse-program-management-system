@@ -72,6 +72,15 @@ export const OfferingMeetingInput = z
     building: z.string().trim().max(120, "Building must be 120 characters or fewer").optional(),
     room: z.string().trim().max(80, "Room must be 80 characters or fewer").optional(),
     activityType: MeetingActivityTypeSchema.default("Lecture"),
+    lecturerIds: z
+      .array(z.string().uuid())
+      .max(20, "Use at most 20 lecturers per weekly meeting")
+      .superRefine((ids, ctx) => {
+        if (new Set(ids).size !== ids.length) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Duplicate meeting lecturer", path: [] });
+        }
+      })
+      .optional(),
   })
   .superRefine((meeting, ctx) => {
     if (meeting.endTime <= meeting.startTime) {
@@ -92,6 +101,9 @@ export interface OfferingMeetingView {
   building: string | null;
   room: string | null;
   activityType: MeetingActivityType;
+  /** Explicit recurring-meeting ownership. Empty means intentionally unallocated. */
+  lecturerIds: string[];
+  lecturers: LecturerRef[];
   /** Derived from start/end time; callers never enter duration separately. */
   durationHours: number;
 }
@@ -342,6 +354,6 @@ export interface LecturerWorkloadSummary {
   peakWeeklyHours: number;
   /** Sum across every returned teaching week; useful for term-level reporting. */
   totalHours: number;
-  /** Until workload-sharing rules are configured, each co-lecturer counts fully. */
-  coLecturerAssumption: "full";
+  /** Meeting-level ownership is authoritative for recurring timetable load. */
+  coLecturerAssumption: "full" | "meeting-assignment";
 }

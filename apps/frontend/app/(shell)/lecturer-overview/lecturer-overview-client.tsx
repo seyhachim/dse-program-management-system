@@ -58,7 +58,7 @@ function teachingPeriodLabel(offering: OfferingView): string {
 }
 
 function scheduleLabel(offering: OfferingView): string {
-  if (offering.meetings.length === 0) return "Schedule not set";
+  if (offering.meetings.length === 0) return "No weekly session assigned to you";
   return offering.meetings
     .map(
       (meeting) =>
@@ -71,7 +71,7 @@ function roomsLabel(offering: OfferingView): string {
   const rooms = [
     ...new Set(offering.meetings.map((meeting) => meeting.room).filter(Boolean)),
   ];
-  return rooms.length > 0 ? rooms.join(", ") : "Room not set";
+  return rooms.length > 0 ? rooms.join(", ") : offering.meetings.length === 0 ? "No assigned session" : "Room not set";
 }
 
 export function LecturerOverviewClient() {

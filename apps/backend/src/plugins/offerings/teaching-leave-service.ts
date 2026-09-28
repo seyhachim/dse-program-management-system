@@ -297,14 +297,24 @@ export const teachingLeaveService = {
           sectionCode: true,
           course: { select: { programmeId: true } },
           coLecturers: { select: { lecturerId: true } },
-          meetings: { where: { id: requested.offeringMeetingId }, select: { id: true } },
+          meetings: {
+            where: { id: requested.offeringMeetingId },
+            select: {
+              id: true,
+              lecturers: { select: { lecturerId: true } },
+            },
+          },
         },
       });
       if (!offering || offering.meetings.length !== 1) {
         throw new TeachingLeaveNotFoundError("The selected teaching session is no longer in the current timetable");
       }
-      const assigned = offering.lecturerId === user.id || offering.coLecturers.some((item) => item.lecturerId === user.id);
-      if (!assigned) throw new TeachingLeaveAuthorizationError("You can request teaching leave only for your own assigned sessions");
+      const assigned = offering.meetings[0]!.lecturers.some((item) => item.lecturerId === user.id);
+      if (!assigned) {
+        throw new TeachingLeaveAuthorizationError(
+          "You can request teaching leave only for a weekly meeting explicitly assigned to you",
+        );
+      }
 
       const occurrence = await classDeliveryService.resolveTeachingSessionOccurrence(
         requested.offeringId,

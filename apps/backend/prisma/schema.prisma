@@ -376,6 +376,7 @@ model User {
   offeringsLed                       Offering[]                                @relation("OfferingLecturer")
   rubricsOwned                       Rubric[]                                  @relation("RubricOwner")
   coLecturerOf                       OfferingCoLecturer[]                      @relation("OfferingCoLecturer")
+  offeringMeetingAssignments             OfferingMeetingLecturer[]                 @relation("OfferingMeetingLecturerUser")
   roleAssignments                    UserRoleAssignment[]
   courseSpecSubmissions              CourseSpec[]                              @relation("CourseSpecSubmittedBy")
   courseSpecReviewActions            CourseSpecReviewAction[]                  @relation("CourseSpecReviewActor")
@@ -2485,8 +2486,23 @@ model OfferingMeeting {
   building     String?
   room         String?
   activityType String   @default("Lecture")
+  lecturers    OfferingMeetingLecturer[]
 
   @@index([offeringId, dayOfWeek, startTime])
+}
+
+/// Explicit ownership of a recurring weekly meeting by one or more members of
+/// the Offering teaching team. Existing meetings are intentionally left with no
+/// rows so historical split-teaching ownership is never inferred.
+model OfferingMeetingLecturer {
+  meetingId  String
+  meeting    OfferingMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  lecturerId String
+  lecturer   User            @relation("OfferingMeetingLecturerUser", fields: [lecturerId], references: [id], onDelete: Restrict)
+  createdAt  DateTime        @default(now())
+
+  @@id([meetingId, lecturerId])
+  @@index([lecturerId])
 }
 
 /// Join table (issue #79, supersedes #73's Course-level table): co-lecturers are
