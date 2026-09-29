@@ -27,7 +27,6 @@ describe("Course Specification Part 2 continuation rows", () => {
       'number="15">Mapping of the Course Learning Outcomes',
       'number="16">Distribution of Student Learning Time (SLT)',
       'number="17">Course Assessment Plan',
-      'number="18">Course Outline / Detailed Lesson Plan',
       'number="19">Required Resources to Deliver the Course',
       'number="20">References / Textbooks',
       'number="21">Student Responsibility',
@@ -38,6 +37,8 @@ describe("Course Specification Part 2 continuation rows", () => {
     ]) {
       expect(source).toContain(section);
     }
+    expect(source).toContain('<SectionTitle number="18">');
+    expect(source).toContain("Course Outline / Detailed Lesson Plan");
   });
 
   test("matches the official Course Information and CLO presentation", async () => {
