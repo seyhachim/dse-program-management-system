@@ -6,10 +6,7 @@ import { MonitorDeliveryForm } from "./monitor-delivery-form";
 export default function MonitorDeliveryPage() {
   return (
     <>
-      <Topbar
-        title="Class delivery"
-        subtitle="Confirm what happened in this class"
-      />
+      <Topbar title="Class delivery" />
       <main className="flex-1 overflow-y-auto bg-muted/20 p-3 sm:p-4 md:p-6">
         <Suspense fallback={<PortalLoading />}>
           <MonitorDeliveryForm />

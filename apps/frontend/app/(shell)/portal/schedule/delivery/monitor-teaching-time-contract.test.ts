@@ -9,9 +9,8 @@ describe("monitor teaching timing UI contract", () => {
 
     expect(source).toContain("markTeachingStarted");
     expect(source).toContain("markTeachingEnded");
-    expect(source).toContain("Teaching starts now");
-    expect(source).toContain("Teaching ends now");
-    expect(source).toContain("PMS uses server time automatically");
+    expect(source).toContain("Start class");
+    expect(source).toContain("End class");
   });
 
   test("does not silently prefill new actual times from the scheduled meeting", async () => {
@@ -23,8 +22,7 @@ describe("monitor teaching timing UI contract", () => {
     expect(source).not.toContain("actualEndTime: context.occurrence.scheduledEndTime");
     expect(source).not.toContain('actualTopic: context.plannedWeek?.topic ?? ""');
     expect(source).toContain("context.eligibleLecturers.length === 1");
-    expect(source).toContain("Timing correction or missed punch");
-    expect(source).toContain("audited delivery revision history");
+    expect(source).toContain("Correct time");
   });
 });
 
@@ -42,13 +40,28 @@ describe("monitor delivery UX contract", () => {
     );
   });
 
+  test("keeps the monitor form concise", async () => {
+    const source = await Bun.file(formPath).text();
+
+    expect(source).toContain("Was this class held?");
+    expect(source).toContain("Topic taught");
+    expect(source).toContain("Learning note");
+    expect(source).toContain("More details");
+    expect(source).toContain('{saving ? "Saving…" : "Save"}');
+    expect(source).not.toContain("Confirm what happened in this class");
+    expect(source).not.toContain("Record the session clearly and factually.");
+    expect(source).not.toContain("Selected automatically");
+    expect(source).not.toContain("Required for every class that was held.");
+    expect(source).not.toContain("Delivery history");
+    expect(source).not.toContain("Held as scheduled");
+  });
+
   test("keeps taught topic required and learning summary optional", async () => {
     const source = await Bun.file(formPath).text();
 
     expect(source).toContain("Topic taught");
     expect(source).toContain("Topic taught is required.");
-    expect(source).toContain("Required for every class that was held.");
-    expect(source).toContain("What students learned");
+    expect(source).toContain("Learning note");
     expect(source).toContain("(optional)");
   });
 });
