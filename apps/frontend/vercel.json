@@ -8,7 +8,10 @@
   },
   "build": {
     "env": {
-      "NEXT_PUBLIC_API_URL": "https://dse-pms-pr-1144-backend.onrender.com"
+      "NEXT_PUBLIC_AUTH_MODE": "supabase",
+      "NEXT_PUBLIC_API_URL": "https://dse-pms-pr-1144-backend.onrender.com",
+      "NEXT_PUBLIC_SUPABASE_URL": "https://dwiqdvxfmzklhrviuzem.supabase.co",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_kGzTbbPovGtW37a9BUeJQA_W_028IFp"
     }
   }
 }
