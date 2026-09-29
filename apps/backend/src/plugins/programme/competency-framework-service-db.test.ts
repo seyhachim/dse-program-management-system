@@ -118,10 +118,16 @@ describeDb("curriculum competency framework versioning", () => {
       ),
     ).rejects.toBeInstanceOf(InvalidCompetencyFrameworkAssignmentError);
     await expect(
-      prisma.programmeCurriculumVersion.update({
-        where: { id: curriculum.selectedVersion.id },
-        data: { competencyFrameworkVersionId: null, competencyFrameworkAssignedById: null, competencyFrameworkAssignedAt: null },
-      }),
+      Promise.resolve(
+        prisma.programmeCurriculumVersion.update({
+          where: { id: curriculum.selectedVersion.id },
+          data: {
+            competencyFrameworkVersionId: null,
+            competencyFrameworkAssignedById: null,
+            competencyFrameworkAssignedAt: null,
+          },
+        }),
+      ),
     ).rejects.toThrow();
 
     const revision = await curriculumService.createRevision(
@@ -157,10 +163,12 @@ describeDb("curriculum competency framework versioning", () => {
     ).rejects.toBeInstanceOf(InvalidCompetencyFrameworkAssignmentError);
 
     await expect(
-      prisma.programmeCompetencyFrameworkVersion.update({
-        where: { id: snapshot.frameworkVersionId },
-        data: { changeNote: "rewrite history" },
-      }),
+      Promise.resolve(
+        prisma.programmeCompetencyFrameworkVersion.update({
+          where: { id: snapshot.frameworkVersionId },
+          data: { changeNote: "rewrite history" },
+        }),
+      ),
     ).rejects.toThrow();
   });
 });
