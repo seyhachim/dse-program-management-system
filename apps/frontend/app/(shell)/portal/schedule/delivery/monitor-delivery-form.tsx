@@ -8,6 +8,7 @@ import type {
   TeachingSessionMonitorContextView,
 } from "@dse-pms/shared-types";
 import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, History } from "lucide-react";
+import { classResponsibilityLabel } from "@/lib/class-responsibility-label";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { PortalError, PortalLoading } from "../../portal-state";
 import { MonitorTeachingTimeCard } from "./monitor-teaching-time-card";
@@ -271,7 +272,10 @@ export function MonitorDeliveryForm() {
         Back to schedule
       </button>
 
-      <section className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm sm:p-5">
+      <section
+        aria-label={classResponsibilityLabel(context.responsibility.role)}
+        className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm sm:p-5"
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold leading-snug text-foreground">
