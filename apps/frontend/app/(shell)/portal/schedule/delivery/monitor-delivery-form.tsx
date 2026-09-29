@@ -172,7 +172,11 @@ export function MonitorDeliveryForm() {
   const deliveryRecorded = Boolean(context.delivery);
   const timingSummary = deliveryTimingSummary(input, context);
   const selectedLecturerIds =
-    input.actualLecturerIds ?? (input.actualLecturerId ? [input.actualLecturerId] : []);
+    input.actualLecturerIds?.length
+      ? input.actualLecturerIds
+      : input.actualLecturerId
+        ? [input.actualLecturerId]
+        : [];
 
   const refreshArrival = async () => {
     const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
