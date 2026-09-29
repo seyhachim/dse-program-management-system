@@ -9,9 +9,9 @@ describe("monitor teaching timing UI contract", () => {
 
     expect(source).toContain("markTeachingStarted");
     expect(source).toContain("markTeachingEnded");
-    expect(source).toContain("Start teaching now");
-    expect(source).toContain("End teaching now");
-    expect(source).toContain("Captured timestamps are preserved");
+    expect(source).toContain("Teaching started now");
+    expect(source).toContain("Teaching ended now");
+    expect(source).toContain("PMS uses server time automatically");
   });
 
   test("does not silently prefill new actual times from the scheduled meeting", async () => {
@@ -21,8 +21,22 @@ describe("monitor teaching timing UI contract", () => {
     expect(source).toContain("context.timing?.endedAt");
     expect(source).not.toContain("actualStartTime: context.occurrence.scheduledStartTime");
     expect(source).not.toContain("actualEndTime: context.occurrence.scheduledEndTime");
-    expect(source).not.toContain("actualLecturerId: context.eligibleLecturers[0]");
     expect(source).not.toContain('actualTopic: context.plannedWeek?.topic ?? ""');
+    expect(source).toContain("context.eligibleLecturers.length === 1");
+    expect(source).toContain("Timing correction or missed punch");
     expect(source).toContain("audited delivery revision history");
+  });
+});
+
+
+describe("monitor delivery UX contract", () => {
+  test("keeps taught topic required and learning summary optional", async () => {
+    const source = await Bun.file(formPath).text();
+
+    expect(source).toContain("Topic taught");
+    expect(source).toContain("Topic taught is required.");
+    expect(source).toContain("Required for every class that was held.");
+    expect(source).toContain("What students learned");
+    expect(source).toContain("(optional)");
   });
 });
