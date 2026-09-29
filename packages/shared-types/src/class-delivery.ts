@@ -29,8 +29,19 @@ export type TeachingSessionOccurrenceDate = z.infer<typeof TeachingSessionOccurr
 export const TeachingSessionOccurrenceIdSchema = z.string().uuid();
 export type TeachingSessionOccurrenceId = z.infer<typeof TeachingSessionOccurrenceIdSchema>;
 
+/**
+ * OfferingMeeting.id is an opaque persisted string. New rows default to UUIDs,
+ * but legacy rows may use stable non-UUID identifiers that must remain addressable.
+ */
+export const OfferingMeetingIdSchema = z
+  .string()
+  .min(1, "Offering meeting id is required")
+  .max(255, "Offering meeting id is too long")
+  .refine((value) => value.trim().length > 0, "Offering meeting id is required");
+export type OfferingMeetingId = z.infer<typeof OfferingMeetingIdSchema>;
+
 export const ResolveTeachingSessionOccurrenceInputSchema = z.object({
-  offeringMeetingId: z.string().uuid(),
+  offeringMeetingId: OfferingMeetingIdSchema,
   date: TeachingSessionOccurrenceDateSchema,
 });
 export type ResolveTeachingSessionOccurrenceInput = z.infer<
@@ -42,7 +53,7 @@ const SessionTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const TeachingSessionOccurrenceViewSchema = z.object({
   id: TeachingSessionOccurrenceIdSchema,
   offeringId: z.string().uuid(),
-  offeringMeetingId: z.string().uuid(),
+  offeringMeetingId: OfferingMeetingIdSchema,
   date: TeachingSessionOccurrenceDateSchema,
   scheduledDayOfWeek: MeetingDaySchema,
   scheduledStartTime: SessionTimeSchema,
