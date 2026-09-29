@@ -35,6 +35,8 @@ export async function saveAttendanceWithTimeout(
     );
   } catch (error) {
     if (controller.signal.aborted) {
+      // A network timeout is not proof of rollback: the server may have committed.
+      // Never retry automatically or clear the local Roll Call marks.
       throw new ApiError(
         504,
         "Attendance save response timed out. Your marks remain on this device, but the server may have saved them. Check this date in another tab before retrying.",
@@ -111,6 +113,7 @@ export const offeringsApi = {
   },
 };
 
+/** Apply the My Courses term selection to a server-provided workload summary. */
 export function workloadForTerm(
   summary: LecturerWorkloadSummary,
   term: string | null,
@@ -125,15 +128,27 @@ export function workloadForTerm(
   return {
     scheduleRows,
     scheduledWeeklyHours:
-      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
+      Math.round(
+        scheduleRows
+          .filter((row) => !row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedWeeklyHours:
+      Math.round(
+        scheduleRows
+          .filter((row) => row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedMeetingCount: scheduleRows.filter((row) => row.sharedResponsibility).length,
     rows,
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),
     totalHours: rows.reduce((total, row) => total + row.totalContactHours, 0),
-    coLecturerAssumption: "full",
+    coLecturerAssumption: summary.coLecturerAssumption,
   };
 }
 
+/** Map an offering status to a StatusBadge tone. */
 export function offeringTone(status: OfferingStatus): "live" | "upcoming" | "neutral" {
   if (status === "Active") return "live";
   if (status === "Planned") return "upcoming";

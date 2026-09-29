@@ -92,8 +92,11 @@ function offeringsFixture(overrides: Partial<OfferingsContract> = {}): Offerings
           room: "301",
           activityType: "Lecture",
           durationHours: 2,
+          sharedResponsibility: false,
         }],
         scheduledWeeklyHours: 2,
+        sharedWeeklyHours: 0,
+        sharedMeetingCount: 0,
         rows: [],
         weeklyTotals: [],
         peakWeeklyHours: 0,
@@ -159,6 +162,31 @@ describe("Telegram phase 2 services", () => {
     const service = createTelegramPhase2Service({ portal: portalFixture(), offerings });
     await service.attendanceHistory(student, offeringB);
     expect(capture.seen).toEqual([student.id, offeringB]);
+  });
+
+  test("attendance history preserves provisional students with a pending official number", async () => {
+    const student = user("student");
+    const offerings = offeringsFixture({
+      studentAttendanceHistory: {
+        async forUser(userId, offeringId) {
+          return {
+            offeringId,
+            studentId: userId,
+            studentNumber: null,
+            totalSessions: 1,
+            markedSessions: 1,
+            attendanceRate: 100,
+            counts: { Present: 1, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 },
+            health: healthyHealth(),
+            history: [],
+          };
+        },
+      },
+    });
+    const service = createTelegramPhase2Service({ portal: portalFixture(), offerings });
+    const result = await service.attendanceHistory(student, offeringA);
+    expect(result.studentId).toBe(student.id);
+    expect(result.studentNumber).toBeNull();
   });
 
   test("removed enrollment or inactive student maps to a non-leaking not-found response", async () => {

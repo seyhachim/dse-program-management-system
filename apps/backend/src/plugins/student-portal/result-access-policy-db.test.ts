@@ -128,7 +128,7 @@ dbDescribe("provisional result access policy", () => {
       description: null,
       credits: 3,
       term: offering.term,
-      sectionCode: offering.sectionCode,
+      sectionCode: offering.sectionCode, teachingStartDate: null, teachingEndDate: null,
       lifecycle: "current",
       lecturer: null,
       coLecturers: [],

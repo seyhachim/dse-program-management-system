@@ -18,9 +18,28 @@ const summary: LecturerWorkloadSummary = {
       room: "A203",
       activityType: "Lecture",
       durationHours: 2,
+      sharedResponsibility: false,
+    },
+    {
+      meetingId: "meeting-shared",
+      offeringId: "offering-shared",
+      course: { id: "course-shared", code: "DSS301", title: "Data Science for Smart Agriculture" },
+      term: "2026-Fall",
+      sectionCode: "M1",
+      role: "Co-Lecturer",
+      dayOfWeek: "Friday",
+      startTime: "07:00",
+      endTime: "10:00",
+      building: "STEM Building",
+      room: "306",
+      activityType: "Lecture",
+      durationHours: 3,
+      sharedResponsibility: true,
     },
   ],
   scheduledWeeklyHours: 2,
+  sharedWeeklyHours: 3,
+  sharedMeetingCount: 1,
   rows: [
     {
       offeringId: "offering-a",
@@ -68,5 +87,7 @@ test("selected term filters workload rows and recalculates the total", () => {
     { term: "2026-Fall", week: 1, totalContactHours: 3 },
   ]);
   expect(filtered.scheduledWeeklyHours).toBe(2);
-  expect(filtered.scheduleRows).toHaveLength(1);
+  expect(filtered.sharedWeeklyHours).toBe(3);
+  expect(filtered.sharedMeetingCount).toBe(1);
+  expect(filtered.scheduleRows).toHaveLength(2);
 });

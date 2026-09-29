@@ -18,13 +18,14 @@ const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
   // through shadcn -> @modelcontextprotocol/sdk / @hono/node-server. shadcn is
   // explicitly dev-only in both frontend and UI workspaces.
   hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731]),
-  "ip-address": new Set([1130722, 1130723, 1130724]),
+  // New 2026-09-29 advisories affect the same dev-only copy previously traced through shadcn tooling.
+  "ip-address": new Set([1130722, 1130723, 1130724, 1239948, 1239949]),
   // `bun pm why js-yaml` resolves this copy only through ESLint/eslint-config-next
   // and shadcn/cosmiconfig, all development tooling; it is not in the deployed
   // Next.js or Bun backend runtime path.
   "js-yaml": new Set([1138115, 1193727]),
   postcss: new Set([1130709]),
-  undici: new Set([1130715, 1130718, 1130726, 1130729, 1130731]),
+  undici: new Set([1130715, 1130718, 1130726, 1130729, 1130731, 1239933]),
 };
 
 // GHSA-2v37-7h3g-55p8 / CVE-2026-67213 is conditional on calling

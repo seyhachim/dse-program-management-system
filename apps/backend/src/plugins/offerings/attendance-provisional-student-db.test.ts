@@ -5,6 +5,7 @@ import { studentsManifest, type StudentsServiceContract } from "@dse-pms/shared-
 import { registry } from "../../core/plugins/registry.ts";
 import { attendanceRecheckService } from "./attendance-recheck-service.ts";
 import { attendanceService } from "./attendance-service.ts";
+import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
 
 const dbTestsEnabled = process.env.ATTENDANCE_DB_TESTS === "1";
 const describeDb = dbTestsEnabled ? describe : describe.skip;
@@ -74,15 +75,12 @@ describeDb("attendance for students with pending official IDs", () => {
     });
     offeringId = offering.id;
 
-    // Current main still carries the pre-#1032 Student constraint, while production
-    // already permits Active + null official ID. Attendance itself is status-agnostic;
-    // this fixture isolates the contract under test: canonical UUID + nullable ID snapshot.
     const student = await prisma.student.create({
       data: {
         name: "Provisional Attendance Student",
         email: `attendance-provisional-${token}@rupp.edu.kh`,
         studentId: null,
-        status: "Pending",
+        status: "Active",
       },
     });
     studentId = student.id;
@@ -199,5 +197,38 @@ describeDb("attendance for students with pending official IDs", () => {
         AND pending."resolvedAt" IS NULL
     `;
     expect(storedPending[0]?.studentNumber).toBeNull();
+
+    await attendanceService.save(
+      offering.id,
+      "2026-09-16",
+      { records: [{ studentId: student.id, status: "Late", note: "Late check 2" }] },
+      actor.id,
+    );
+    await attendanceService.save(
+      offering.id,
+      "2026-09-17",
+      { records: [{ studentId: student.id, status: "Late", note: "Late check 3" }] },
+      actor.id,
+    );
+
+    const individualHealth = await studentAttendanceHistoryService.healthForStudent(
+      student.id,
+      offering.id,
+    );
+    expect(individualHealth).not.toBeNull();
+    expect(individualHealth?.history.studentNumber).toBeNull();
+    expect(individualHealth?.history.counts.Late).toBe(3);
+    expect(individualHealth?.warningCandidates).toContainEqual(
+      expect.objectContaining({ kind: "punctuality", count: 3 }),
+    );
+
+    const warningHealth = await studentAttendanceHistoryService.warningHealthForStudents(
+      [student.id],
+      offering.id,
+    );
+    expect(warningHealth.get(student.id)?.counts.Late).toBe(3);
+    expect(warningHealth.get(student.id)?.warningCandidates).toContainEqual(
+      expect.objectContaining({ kind: "punctuality", count: 3 }),
+    );
   });
 });

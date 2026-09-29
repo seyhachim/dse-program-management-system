@@ -42,15 +42,16 @@ function CourseCard({
   calendar: StudentAcademicCalendarView;
 }) {
   const meeting = course.meetings[0];
+  const showProgress = course.lifecycle !== "planned";
 
   return (
     <Link
       href={`/portal/courses/${course.offeringId}`}
       className={MOBILE_STUDENT_PORTAL_LAYOUT.courseCard}
     >
-      <div className="flex min-w-0 items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-primary ring-1 ring-primary/15">
               {course.code}
             </span>
@@ -58,44 +59,68 @@ function CourseCard({
               {course.term}
             </span>
           </div>
-          <h3 className="mt-2 break-words text-[1.05rem] font-semibold leading-snug tracking-tight text-foreground">
+          <h3 className="mt-2.5 break-words text-lg font-semibold leading-snug tracking-tight text-foreground">
             {course.title}
           </h3>
         </div>
         <span className="shrink-0 rounded-full bg-muted/70 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground ring-1 ring-border/60">
-          {course.sectionCode}
+          Class {course.sectionCode}
         </span>
       </div>
 
-      <CourseAchievementBadges summary={achievement} />
-      <CourseAttendanceProgress
-        summary={achievement}
-        calendar={calendar}
-        term={course.term}
-      />
+      {showProgress ? (
+        <>
+          <CourseAchievementBadges summary={achievement} showLocked={false} />
+          <CourseAttendanceProgress
+            summary={achievement}
+            calendar={calendar}
+            term={course.term}
+            compact
+          />
+        </>
+      ) : null}
 
-      <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+      <div className="mt-4 grid min-w-0 gap-2 text-xs text-muted-foreground sm:grid-cols-2 sm:gap-x-4">
         <p className="flex min-w-0 items-center gap-2">
-          <UserRound className="h-3.5 w-3.5 shrink-0 text-primary/75" aria-hidden="true" />
+          <UserRound
+            className="h-3.5 w-3.5 shrink-0 text-primary/75"
+            aria-hidden="true"
+          />
           <span className="truncate">
             {course.lecturer?.name ?? "Lecturer TBA"}
           </span>
         </p>
         {meeting ? (
-          <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1.5">
-            <span className="inline-flex min-w-0 items-center gap-1.5">
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary/75" aria-hidden="true" />
-              <span className="break-words">{meetingLabel(meeting)}</span>
+          <p className="flex min-w-0 items-center gap-2">
+            <CalendarDays
+              className="h-3.5 w-3.5 shrink-0 text-primary/75"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 break-words">
+              {meetingLabel(meeting)}
             </span>
-            <span className="inline-flex min-w-0 items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/75" aria-hidden="true" />
-              <span className="break-words">{meeting.room || "Room TBA"}</span>
-            </span>
-          </div>
-        ) : null}
+          </p>
+        ) : (
+          <p className="flex min-w-0 items-center gap-2">
+            <CalendarDays
+              className="h-3.5 w-3.5 shrink-0 text-primary/75"
+              aria-hidden="true"
+            />
+            <span>Schedule TBA</span>
+          </p>
+        )}
+        <p className="flex min-w-0 items-center gap-2 sm:col-start-2">
+          <MapPin
+            className="h-3.5 w-3.5 shrink-0 text-primary/75"
+            aria-hidden="true"
+          />
+          <span className="break-words">
+            {meeting?.room || "Room TBA"}
+          </span>
+        </p>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-2.5 text-xs">
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3 text-xs">
         <span
           className={
             course.specAvailable
@@ -104,11 +129,15 @@ function CourseCard({
           }
         >
           {course.specAvailable
-            ? "Learning details available"
+            ? "Learning details ready"
             : "Learning details pending"}
         </span>
-        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:translate-x-0.5 group-hover:bg-primary group-hover:text-primary-foreground">
-          <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
+          Open course
+          <ChevronRight
+            className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
         </span>
       </div>
     </Link>
@@ -130,14 +159,28 @@ function CourseSection({
   calendar: StudentAcademicCalendarView;
   emptyMessage?: string;
 }) {
+  const gridClassName =
+    courses.length === 1
+      ? "grid max-w-3xl gap-4"
+      : "grid gap-4 lg:grid-cols-2";
+
   return (
-    <section className="space-y-3.5">
-      <div className="px-0.5">
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p>
+    <section className="space-y-4">
+      <div className="flex items-end justify-between gap-4 px-0.5">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
+            {description}
+          </p>
+        </div>
+        {courses.length ? (
+          <span className="shrink-0 rounded-full bg-muted/60 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+            {courses.length} {courses.length === 1 ? "course" : "courses"}
+          </span>
+        ) : null}
       </div>
       {courses.length ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className={gridClassName}>
           {courses.map((course) => (
             <CourseCard
               key={course.offeringId}
@@ -148,7 +191,7 @@ function CourseSection({
           ))}
         </div>
       ) : emptyMessage ? (
-        <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-6 text-sm text-muted-foreground">
+        <div className="max-w-3xl rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-6 text-sm text-muted-foreground">
           {emptyMessage}
         </div>
       ) : null}
@@ -203,19 +246,19 @@ export function PortalCourses() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-7 md:space-y-9">
+    <div className="mx-auto w-full max-w-6xl space-y-8 md:space-y-10">
       <CourseSection
         title="Current courses"
-        description="Active offerings for your current teaching period."
+        description="Courses you are enrolled in this term."
         courses={currentCourses}
         achievementsByOffering={achievementsByOffering}
         calendar={calendar}
-        emptyMessage="You do not have any active course offerings right now."
+        emptyMessage="You do not have any active courses right now."
       />
       {plannedCourses.length ? (
         <CourseSection
           title="Upcoming courses"
-          description="Planned offerings you are already enrolled in."
+          description="Courses already scheduled for a future term."
           courses={plannedCourses}
           achievementsByOffering={achievementsByOffering}
           calendar={calendar}
@@ -224,7 +267,7 @@ export function PortalCourses() {
       {historicalCourses.length ? (
         <CourseSection
           title="Course archive"
-          description="Completed offerings remain available for published learning information and academic records."
+          description="Past courses with published learning information and academic records."
           courses={historicalCourses}
           achievementsByOffering={achievementsByOffering}
           calendar={calendar}

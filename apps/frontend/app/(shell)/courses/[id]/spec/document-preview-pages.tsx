@@ -1,10 +1,11 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { PLOS, referenceKindLabel } from "@dse-pms/shared-types";
 import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
 } from "./course-document-model";
+import { formatCourseDocumentSltHours } from "./course-document-mapping";
 import {
   contiguousRowSpans,
   programmePloCountLabel,
@@ -15,6 +16,7 @@ export const PAGE_WIDTH = COURSE_DOCUMENT_STYLE.page.preview.width;
 const PAGE_HEIGHT = COURSE_DOCUMENT_STYLE.page.preview.height;
 const PAGE_GAP = 40;
 const SECTION16_WEEK_ROWS_PER_PAGE = 6;
+const SECTION18_WEEK_ROWS_PER_PAGE = 7;
 
 export function displayDocumentValue(
   value: string | number | null | undefined,
@@ -193,7 +195,7 @@ function CloPloMatrix({ mapping, mode }: { mapping: CourseDocumentModel["mapping
       <thead><tr><TH rowSpan={2}>CLO</TH><TH colSpan={PLOS.length} className="text-center">{heading}</TH></tr><tr>{PLOS.map((plo) => <TH key={plo.id} className="text-center">{plo.id}</TH>)}</tr></thead>
       <tbody>{mapping.map((row) => <tr key={row.cloCode}><TD className="font-medium text-center">{row.cloCode}</TD>{PLOS.map((plo) => {
         if (!row.ploCodes.includes(plo.id)) return <BlankTD key={plo.id} className="text-center" />;
-        return <TD key={plo.id} className="text-center">{mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "—" : displayDocumentValue(row.sltHours)}</TD>;
+        return <TD key={plo.id} className="text-center">{mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "—" : formatCourseDocumentSltHours(row.sltHours) || "—"}</TD>;
       })}</tr>)}</tbody>
     </Table>
   );
@@ -388,10 +390,12 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
   const assessmentPlanPage = section16AssessmentPage + 1;
 
   const weeklyPages: CourseDocumentModel["weeklyPlan"][] = [];
-  for (let i = 0; i < document.weeklyPlan.length; i += 7) weeklyPages.push(document.weeklyPlan.slice(i, i + 7));
+  for (let i = 0; i < document.weeklyPlan.length; i += SECTION18_WEEK_ROWS_PER_PAGE) {
+    weeklyPages.push(document.weeklyPlan.slice(i, i + SECTION18_WEEK_ROWS_PER_PAGE));
+  }
   if (!weeklyPages.length) weeklyPages.push([]);
   const weeklyStartPage = assessmentPlanPage + 1;
-  const resourcesPage = weeklyStartPage + weeklyPages.length;
+  const resourcesPage = weeklyStartPage + weeklyPages.length * 2;
   const referencesPage = resourcesPage + 1;
   const responsibilityPage = referencesPage + 1;
   const rubricPages: CourseDocumentModel["rubrics"][] = document.rubrics.length ? document.rubrics.map((rubric) => [rubric]) : [[]];
@@ -522,7 +526,119 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
 
       <Page zoom={zoom} pageNumber={assessmentPlanPage}><div id="assessment-plan" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[7%]" /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[23%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[10%]" /><col className="w-[14%]" /><col className="w-[14%]" /></colgroup><thead><tr><TH>CLOs</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Assessment &amp; Description</TH><TH>G/I</TH><TH>Weight (%)</TH><TH>SLT</TH><TH>Evaluation Definition</TH><TH>Rubric</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD><p className="font-semibold">{displayDocumentValue(assessment.name)}</p>{assessment.description ? <p className="mt-1 text-[9px] text-slate-700">{assessment.description}</p> : null}</TD><TD className="text-center">{assessment.mode === "group" ? "G" : "I"}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{assessment.totalSltHours > 0 ? `${assessment.totalSltHours} h` : "—"}</TD><TD>{displayDocumentValue(assessment.evaluationDefinition)}</TD><TD>{assessment.rubricName && assessment.rubricUrl ? <Link href={assessment.rubricUrl} className="font-semibold text-blue-700 underline underline-offset-2">{assessment.rubricName} ↗</Link> : assessment.rubricName ? assessment.rubricName : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={5} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD className="font-semibold">{document.totals.assessmentSlt} h</TD><TD colSpan={2}></TD></tr></tfoot></Table></PartTwoRow><PageFooter courseCode={info.courseCode} page={assessmentPlanPage} /></div></Page>
 
-      {weeklyPages.map((weeks, index) => <Page zoom={zoom} pageNumber={weeklyStartPage + index} key={`lesson-${index}`}><div id={index === 0 ? "lesson-plan" : undefined} className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="18">Course Outline / Detailed Lesson Plan{weeklyPages.length > 1 ? ` — Weeks ${weeks[0]?.week ?? ""}–${weeks[weeks.length - 1]?.week ?? ""}` : ""}</SectionTitle><Table><colgroup><col className="w-[5%]" /><col className="w-[9%]" /><col className="w-[15%]" /><col className="w-[8%]" /><col className="w-[20%]" /><col className="w-[18%]" /><col className="w-[15%]" /><col className="w-[10%]" /></colgroup><thead><tr><TH>Week</TH><TH>Hour (L/T/P/O)</TH><TH>Topic</TH><TH>CLO</TH><TH>Lesson Learning Outcomes</TH><TH>Teaching Method / Activity</TH><TH>Assessment</TH><TH>Resources</TH></tr></thead><tbody>{weeks.map((week) => <tr key={week.id}><TD>{week.week}</TD><TD>{[week.lectureHours, week.tutorialHours, week.practiceHours, week.otherHours].map((h) => h || "0").join("/")}</TD><TD>{week.topic}</TD><TD>{joinValues(week.cloCodes)}</TD><TD>{week.lloItems.length ? week.lloItems.map((item, i) => <div key={i}>LLO{i + 1}: {item}</div>) : "—"}</TD><TD>{joinValues(week.teachingMethods.length ? week.teachingMethods : week.learningActivities)}</TD><TD>{joinValues([week.assessment, ...week.assessmentMethods].filter(Boolean))}</TD><TD>{joinValues(week.resources)}</TD></tr>)}</tbody></Table><div className="mt-4 grid grid-cols-3 gap-3 text-[9px]"><div className="rounded border border-black p-2"><strong>Learning Activities</strong><p className="mt-1">{joinValues(weeks.flatMap((w) => w.learningActivities))}</p></div><div className="rounded border border-black p-2"><strong>Active Learning Strategies</strong><p className="mt-1">{joinValues(weeks.flatMap((w) => w.activeLearningStrategies))}</p></div><div className="rounded border border-black p-2"><strong>Teaching Resources</strong><p className="mt-1">{joinValues(weeks.flatMap((w) => w.resources))}</p></div></div></PartTwoRow><PageFooter courseCode={info.courseCode} page={weeklyStartPage + index} /></div></Page>)}
+      {weeklyPages.map((weeks, index) => {
+        const section18DetailPage = weeklyStartPage + index * 2;
+        const section18SummaryPage = section18DetailPage + 1;
+        const weekRange = `Weeks ${weeks[0]?.week ?? ""}–${weeks[weeks.length - 1]?.week ?? ""}`;
+
+        return (
+          <Fragment key={`lesson-${index}`}>
+            <Page zoom={zoom} pageNumber={section18DetailPage}>
+              <div
+                id={index === 0 ? "lesson-plan" : undefined}
+                className="h-full px-[54px] py-[42px]"
+              >
+                <PartTwoRow>
+                  <SectionTitle number="18">
+                    Course Outline / Detailed Lesson Plan
+                    {weeklyPages.length > 1 ? ` — ${weekRange}` : ""}
+                  </SectionTitle>
+                  <Table>
+                    <colgroup>
+                      <col className="w-[5%]" />
+                      <col className="w-[9%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[10%]" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <TH>Week</TH>
+                        <TH>Hour (L/T/P/O)</TH>
+                        <TH>Topic</TH>
+                        <TH>CLO</TH>
+                        <TH>Lesson Learning Outcomes</TH>
+                        <TH>Teaching Method / Activity</TH>
+                        <TH>Assessment</TH>
+                        <TH>Resources</TH>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeks.map((week) => (
+                        <tr key={week.id}>
+                          <TD>{week.week}</TD>
+                          <TD>
+                            {[week.lectureHours, week.tutorialHours, week.practiceHours, week.otherHours]
+                              .map((h) => h || "0")
+                              .join("/")}
+                          </TD>
+                          <TD>{week.topic}</TD>
+                          <TD>{joinValues(week.cloCodes)}</TD>
+                          <TD>
+                            {week.lloItems.length
+                              ? week.lloItems.map((item, i) => (
+                                  <div key={i}>LLO{i + 1}: {item}</div>
+                                ))
+                              : "—"}
+                          </TD>
+                          <TD>
+                            {joinValues(
+                              week.teachingMethods.length
+                                ? week.teachingMethods
+                                : week.learningActivities,
+                            )}
+                          </TD>
+                          <TD>
+                            {joinValues(
+                              [week.assessment, ...week.assessmentMethods].filter(Boolean),
+                            )}
+                          </TD>
+                          <TD>{joinValues(week.resources)}</TD>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </PartTwoRow>
+                <PageFooter courseCode={info.courseCode} page={section18DetailPage} />
+              </div>
+            </Page>
+
+            <Page zoom={zoom} pageNumber={section18SummaryPage}>
+              <div className="section18-summary-page h-full px-[54px] py-[42px]">
+                <PartTwoRow>
+                  <SectionTitle number="18">
+                    Course Outline / Detailed Lesson Plan — {weekRange} (continued)
+                  </SectionTitle>
+                  <div className="space-y-3 text-[9px]">
+                    <div className="rounded border border-black p-2">
+                      <strong>Learning Activities</strong>
+                      <p className="mt-1">
+                        {joinValues(weeks.flatMap((w) => w.learningActivities))}
+                      </p>
+                    </div>
+                    <div className="rounded border border-black p-2">
+                      <strong>Active Learning Strategies</strong>
+                      <p className="mt-1">
+                        {joinValues(weeks.flatMap((w) => w.activeLearningStrategies))}
+                      </p>
+                    </div>
+                    <div className="rounded border border-black p-2">
+                      <strong>Teaching Resources</strong>
+                      <p className="mt-1">
+                        {joinValues(weeks.flatMap((w) => w.resources))}
+                      </p>
+                    </div>
+                  </div>
+                </PartTwoRow>
+                <PageFooter courseCode={info.courseCode} page={section18SummaryPage} />
+              </div>
+            </Page>
+          </Fragment>
+        );
+      })}
       <Page zoom={zoom} pageNumber={resourcesPage}><div id="resources" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="19">Required Resources to Deliver the Course</SectionTitle>{document.resources.length === 0 ? <p className="text-[11px]">No required resources have been confirmed.</p> : <Table><colgroup><col className="w-[18%]" /><col className="w-[27%]" /><col className="w-[25%]" /><col className="w-[30%]" /></colgroup><thead><tr><TH>Resource Type</TH><TH>Resource Name / Description</TH><TH>Link</TH><TH>Notes</TH></tr></thead><tbody>{document.resources.map((resource) => <tr key={resource.id}><TD>{displayDocumentValue(resource.resourceType)}</TD><TD>{displayDocumentValue(resource.title)}</TD><TD>{displayDocumentValue(resource.url)}</TD><TD>{displayDocumentValue(resource.notes)}</TD></tr>)}</tbody></Table>}</PartTwoRow><PageFooter courseCode={info.courseCode} page={resourcesPage} /></div></Page>
       <Page zoom={zoom} pageNumber={referencesPage}><div id="references" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="20">References / Textbooks</SectionTitle>{document.references.length === 0 ? <p className="text-[11px]">No references have been recorded.</p> : <Table><colgroup><col className="w-[13%]" /><col className="w-[45%]" /><col className="w-[12%]" /><col className="w-[15%]" /><col className="w-[15%]" /></colgroup><thead><tr><TH>Kind</TH><TH>Citation</TH><TH>ISBN</TH><TH>Link</TH><TH>Notes</TH></tr></thead><tbody>{document.references.map((reference) => <tr key={reference.id}><TD>{referenceKindLabel(reference.kind)}</TD><TD>{referenceCitation(reference)}</TD><TD>{displayDocumentValue(reference.isbn)}</TD><TD>{displayDocumentValue(reference.url)}</TD><TD>{displayDocumentValue(reference.notes)}</TD></tr>)}</tbody></Table>}</PartTwoRow><PageFooter courseCode={info.courseCode} page={referencesPage} /></div></Page>
       <Page zoom={zoom} pageNumber={responsibilityPage}><div id="responsibility" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="21">Student Responsibility</SectionTitle>{document.responsibilities.length === 0 ? <p className="text-[11px]">No student responsibilities have been recorded.</p> : <ul className="list-disc space-y-1.5 pl-5 text-[11px] leading-[1.4]">{document.responsibilities.map((item, index) => <li key={index}>{item}</li>)}</ul>}</PartTwoRow><PageFooter courseCode={info.courseCode} page={responsibilityPage} /></div></Page>

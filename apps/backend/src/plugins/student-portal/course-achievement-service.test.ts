@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { AttendanceStatus } from "@dse-pms/shared-types";
-import { deriveCourseAchievementSummary } from "./course-achievement-service.ts";
+import {
+  CourseAchievementAccessError,
+  deriveCourseAchievementSummary,
+  requireCourseAchievementStudent,
+} from "./course-achievement-service.ts";
 
 type Counts = Record<AttendanceStatus, number> & { PermissionPending: number };
 
@@ -21,6 +25,38 @@ function achieved(
 ) {
   return result.badges.find((item) => item.kind === kind)?.achieved ?? false;
 }
+
+describe("Student Portal course achievement access", () => {
+  test("allows an Active email-backed student while the official Student ID is pending", () => {
+    expect(() =>
+      requireCourseAchievementStudent({
+        id: "student-record-1",
+        email: "student@example.edu",
+        status: "Active",
+      }),
+    ).not.toThrow();
+  });
+
+  test("fails closed for missing, inactive, or no-email student profiles", () => {
+    expect(() => requireCourseAchievementStudent(null)).toThrow(
+      CourseAchievementAccessError,
+    );
+    expect(() =>
+      requireCourseAchievementStudent({
+        id: "student-record-1",
+        email: "student@example.edu",
+        status: "Inactive",
+      }),
+    ).toThrow(CourseAchievementAccessError);
+    expect(() =>
+      requireCourseAchievementStudent({
+        id: "student-record-1",
+        email: null,
+        status: "Active",
+      }),
+    ).toThrow(CourseAchievementAccessError);
+  });
+});
 
 describe("Student Portal course achievement badges", () => {
   test("publishes the stable five v1 badge labels in milestone order", () => {
