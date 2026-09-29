@@ -1,6 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": {
+      "*": false,
+      "uat/1165-selected-student-invites": true
+    }
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_API_URL": "https://dse-pms-pr-1144-backend.onrender.com"
+    }
   }
 }
