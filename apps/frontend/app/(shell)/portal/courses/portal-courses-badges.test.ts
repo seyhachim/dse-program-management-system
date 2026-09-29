@@ -55,7 +55,7 @@ describe("Student Portal compact course cards", () => {
     expect(source).toContain("calendar={calendar}");
     expect(source).toContain('"grid max-w-3xl gap-4"');
     expect(source).toContain('"grid gap-4 lg:grid-cols-2"');
-    expect(source).toContain("Section {course.sectionCode}");
+    expect(source).toContain("Class {course.sectionCode}");
     expect(source).toContain("Open course");
     expect(attendanceSource).toContain("gridTemplateColumns");
     expect(attendanceSource).toContain(
