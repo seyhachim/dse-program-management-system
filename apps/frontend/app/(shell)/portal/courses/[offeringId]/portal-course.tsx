@@ -34,6 +34,9 @@ import { PortalError, PortalLoading, usePortalData } from "../../portal-state";
 import { PortalCourseAttendance } from "./portal-course-attendance";
 import { PortalCourseWeeklyNotes } from "./portal-course-weekly-notes";
 
+const COURSE_TAB_CLASS =
+  "h-9 flex-none px-3 text-sm sm:px-4 data-active:bg-primary/10 data-active:text-primary data-active:shadow-none";
+
 export function PortalCourse({ offeringId }: { offeringId: string }) {
   const load = useCallback(
     () => studentPortalApi.course(offeringId),
