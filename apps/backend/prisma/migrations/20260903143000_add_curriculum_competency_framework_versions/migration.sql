@@ -110,14 +110,9 @@ DECLARE
   curriculum_programme_id TEXT;
   framework_programme_id TEXT;
 BEGIN
-  IF NEW."competencyFrameworkVersionId" IS NULL THEN
-    IF NEW."competencyFrameworkAssignedById" IS NOT NULL
-       OR NEW."competencyFrameworkAssignedAt" IS NOT NULL THEN
-      RAISE EXCEPTION 'Competency framework provenance requires a framework version';
-    END IF;
-    RETURN NEW;
-  END IF;
-
+  -- Historical versions are immutable even when an UPDATE tries to clear the
+  -- framework and its provenance together. Check history before the nullable
+  -- association fast-path.
   IF NEW."status" <> 'Draft' THEN
     IF TG_OP = 'INSERT'
        OR NEW."competencyFrameworkVersionId" IS DISTINCT FROM OLD."competencyFrameworkVersionId"
@@ -125,6 +120,14 @@ BEGIN
        OR NEW."competencyFrameworkAssignedAt" IS DISTINCT FROM OLD."competencyFrameworkAssignedAt" THEN
       RAISE EXCEPTION 'Competency framework assignment can only change on Draft curriculum versions';
     END IF;
+  END IF;
+
+  IF NEW."competencyFrameworkVersionId" IS NULL THEN
+    IF NEW."competencyFrameworkAssignedById" IS NOT NULL
+       OR NEW."competencyFrameworkAssignedAt" IS NOT NULL THEN
+      RAISE EXCEPTION 'Competency framework provenance requires a framework version';
+    END IF;
+    RETURN NEW;
   END IF;
 
   IF NEW."competencyFrameworkAssignedById" IS NULL OR NEW."competencyFrameworkAssignedAt" IS NULL THEN
