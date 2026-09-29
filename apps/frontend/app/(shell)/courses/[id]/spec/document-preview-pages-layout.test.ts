@@ -16,8 +16,8 @@ describe("Course Specification Part 2 continuation rows", () => {
       '<ValueCell colSpan={4} className="part-two-continuation-cell">',
     );
 
-    expect(source.match(/<PartTwoRow>/g)?.length).toBe(14);
-    expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(14);
+    expect(source.match(/<PartTwoRow>/g)?.length).toBe(15);
+    expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(15);
 
     expect(source).toContain(
       '<span>14.</span><span className="font-bold">Course Learning Outcomes</span>',
@@ -27,7 +27,6 @@ describe("Course Specification Part 2 continuation rows", () => {
       'number="15">Mapping of the Course Learning Outcomes',
       'number="16">Distribution of Student Learning Time (SLT)',
       'number="17">Course Assessment Plan',
-      'number="18">Course Outline / Detailed Lesson Plan',
       'number="19">Required Resources to Deliver the Course',
       'number="20">References / Textbooks',
       'number="21">Student Responsibility',
@@ -38,6 +37,8 @@ describe("Course Specification Part 2 continuation rows", () => {
     ]) {
       expect(source).toContain(section);
     }
+    expect(source).toContain('<SectionTitle number="18">');
+    expect(source).toContain("Course Outline / Detailed Lesson Plan");
   });
 
   test("matches the official Course Information and CLO presentation", async () => {
@@ -99,6 +100,47 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source).toContain("document.totals.continuousAssessmentSlt");
     expect(source).toContain("document.totals.finalAssessmentSlt");
     expect(source).not.toContain("Assessment SLT</p>");
+  });
+
+
+  test("keeps Section 18 summaries off the weekly detail page", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+
+    expect(source).toContain("const SECTION18_WEEK_ROWS_PER_PAGE = 7;");
+    expect(source).toContain(
+      "const resourcesPage = weeklyStartPage + weeklyPages.length * 2;",
+    );
+    expect(source).toContain(
+      "const section18DetailPage = weeklyStartPage + index * 2;",
+    );
+    expect(source).toContain(
+      "const section18SummaryPage = section18DetailPage + 1;",
+    );
+    expect(source).toContain('className="section18-summary-page h-full px-[54px] py-[42px]"');
+    expect(source).toContain("Learning Activities");
+    expect(source).toContain("Active Learning Strategies");
+    expect(source).toContain("Teaching Resources");
+
+    const section18Start = source.indexOf(
+      "{weeklyPages.map((weeks, index) => {",
+    );
+    const detailFooter = source.indexOf(
+      "<PageFooter courseCode={info.courseCode} page={section18DetailPage} />",
+      section18Start,
+    );
+    const summaryPage = source.indexOf(
+      'className="section18-summary-page h-full px-[54px] py-[42px]"',
+      section18Start,
+    );
+    const learningActivities = source.indexOf(
+      "<strong>Learning Activities</strong>",
+      section18Start,
+    );
+
+    expect(section18Start).toBeGreaterThan(-1);
+    expect(detailFooter).toBeGreaterThan(section18Start);
+    expect(summaryPage).toBeGreaterThan(detailFooter);
+    expect(learningActivities).toBeGreaterThan(summaryPage);
   });
 
   test("shows persisted assessment SLT in Section 17", async () => {
