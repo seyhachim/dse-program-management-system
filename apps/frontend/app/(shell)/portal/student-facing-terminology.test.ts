@@ -32,7 +32,7 @@ describe("core Student Portal terminology", () => {
   test("course list uses generic learning-information availability wording", () => {
     const contents = source("./courses/portal-courses.tsx");
 
-    expect(contents).toContain("Learning details available");
+    expect(contents).toContain("Learning details ready");
     expect(contents).toContain("Learning details pending");
   });
 

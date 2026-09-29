@@ -34,6 +34,9 @@ import { PortalError, PortalLoading, usePortalData } from "../../portal-state";
 import { PortalCourseAttendance } from "./portal-course-attendance";
 import { PortalCourseWeeklyNotes } from "./portal-course-weekly-notes";
 
+const COURSE_TAB_CLASS =
+  "h-9 flex-none px-3 text-sm sm:px-4 data-active:bg-primary/10 data-active:text-primary data-active:shadow-none";
+
 export function PortalCourse({ offeringId }: { offeringId: string }) {
   const load = useCallback(
     () => studentPortalApi.course(offeringId),
@@ -50,7 +53,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
   const publishedResults = data.assessments.filter((item) => item.result);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4">
       <section className="rounded-2xl border border-border bg-card p-4 md:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div className="min-w-0">
@@ -96,15 +99,53 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
         </div>
       </section>
 
-      <Tabs defaultValue="overview">
-        <TabsList className="max-w-full justify-start overflow-x-auto whitespace-nowrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="weekly-notes">Weekly Notes</TabsTrigger>
-          <TabsTrigger value="learning">Learning</TabsTrigger>
-          <TabsTrigger value="assessments">Assessments</TabsTrigger>
-          <TabsTrigger value="grades">Grades</TabsTrigger>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
+      <Tabs defaultValue="overview" className="gap-3">
+        <TabsList
+          aria-label="Course sections"
+          className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-sm group-data-horizontal/tabs:h-auto"
+        >
+          <TabsTrigger
+            value="overview"
+            className={COURSE_TAB_CLASS}
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="attendance"
+            className={COURSE_TAB_CLASS}
+          >
+            Attendance
+          </TabsTrigger>
+          <TabsTrigger
+            value="weekly-notes"
+            className={COURSE_TAB_CLASS}
+          >
+            Weekly Notes
+          </TabsTrigger>
+          <TabsTrigger
+            value="learning"
+            className={COURSE_TAB_CLASS}
+          >
+            Learning
+          </TabsTrigger>
+          <TabsTrigger
+            value="assessments"
+            className={COURSE_TAB_CLASS}
+          >
+            Assessments
+          </TabsTrigger>
+          <TabsTrigger
+            value="grades"
+            className={COURSE_TAB_CLASS}
+          >
+            Grades
+          </TabsTrigger>
+          <TabsTrigger
+            value="resources"
+            className={COURSE_TAB_CLASS}
+          >
+            Resources
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-3 space-y-3">
