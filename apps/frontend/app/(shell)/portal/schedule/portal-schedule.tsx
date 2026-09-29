@@ -32,6 +32,7 @@ import {
   formatMeetingTime,
   formatTeachingWeekRange,
   isMeetingInProgress,
+  isPortalMeetingScheduledOnDate,
   normalizeTeachingDate,
   parseLocalDateKey,
   toLocalDateKey,
@@ -129,7 +130,7 @@ export function PortalSchedule() {
     weekday: "long",
   });
   const dayEntries = entries
-    .filter((item) => item.meeting.dayOfWeek === selectedWeekday)
+    .filter((item) => isPortalMeetingScheduledOnDate(item.course, item.meeting.dayOfWeek, selectedDateKey, selectedWeekday))
     .sort((a, b) => a.meeting.startTime.localeCompare(b.meeting.startTime));
   const selectedDateLabel = selectedDate.toLocaleDateString("en-US", {
     weekday: "long",
@@ -156,7 +157,7 @@ export function PortalSchedule() {
     .map((option) => ({
       option,
       entries: entries
-        .filter((item) => item.meeting.dayOfWeek === option.weekdayLong)
+        .filter((item) => isPortalMeetingScheduledOnDate(item.course, item.meeting.dayOfWeek, option.key, option.weekdayLong))
         .sort((a, b) => a.meeting.startTime.localeCompare(b.meeting.startTime)),
     }))
     .filter((group) => group.entries.length > 0);
