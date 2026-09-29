@@ -49,7 +49,7 @@ describe("teaching session delivery contracts", () => {
       actualLecturerId: null,
       actualStartTime: null,
       actualEndTime: null,
-      actualTopic: "",
+      actualTopic: "Topic",
       learningSummary: "",
       coverage: "TAUGHT_AS_PLANNED",
     });
@@ -60,7 +60,7 @@ describe("teaching session delivery contracts", () => {
       actualLecturerId: "11111111-1111-4111-8111-111111111111",
       actualStartTime: "11:00",
       actualEndTime: "10:00",
-      actualTopic: "",
+      actualTopic: "Topic",
       learningSummary: "",
       coverage: "TAUGHT_AS_PLANNED",
     });
