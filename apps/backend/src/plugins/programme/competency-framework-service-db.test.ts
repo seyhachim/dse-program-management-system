@@ -31,6 +31,31 @@ async function createBase() {
 }
 
 describeDb("curriculum competency framework versioning", () => {
+  test("database immutability and assignment triggers are installed and enabled", async () => {
+    const triggers = await prisma.$queryRaw<
+      Array<{ tgname: string; tgenabled: string }>
+    >`
+      SELECT tgname, tgenabled
+      FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgname IN (
+          'ProgrammeCompetencyFramework_protect_history',
+          'ProgrammeCompetencyFrameworkVersion_protect_history',
+          'ProgrammeCompetencyFrameworkCompetency_protect_history',
+          'ProgrammeCurriculumVersion_validate_competency_framework'
+        )
+      ORDER BY tgname
+    `;
+
+    expect(triggers.map((trigger) => trigger.tgname)).toEqual([
+      "ProgrammeCompetencyFrameworkCompetency_protect_history",
+      "ProgrammeCompetencyFrameworkVersion_protect_history",
+      "ProgrammeCompetencyFramework_protect_history",
+      "ProgrammeCurriculumVersion_validate_competency_framework",
+    ]);
+    expect(triggers.every((trigger) => trigger.tgenabled !== "D")).toBe(true);
+  });
+
   test("snapshots canonical competencies including active-state context and PLO order, versions append-only, binds Draft only, and revision inherits the exact snapshot", async () => {
     const { user, programme, curriculum, token } = await createBase();
     const frameworkCode = `framework-${token}`;
