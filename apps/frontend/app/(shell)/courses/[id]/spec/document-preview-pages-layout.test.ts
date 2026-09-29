@@ -76,6 +76,7 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source.indexOf(hours)).toBeGreaterThan(-1);
     expect(source.indexOf(percent)).toBeGreaterThan(source.indexOf(hours));
     expect(source).toContain("including learning and assessment");
+    expect(source).toContain("formatCourseDocumentSltHours(row.sltHours)");
     expect(source).toContain("function BlankTD");
     expect(source).not.toContain(
       "The mapping shown here is generated from the current CLO, PLO, teaching-method and assessment-method records stored in the PMS.",

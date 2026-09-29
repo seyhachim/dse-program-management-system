@@ -13,6 +13,19 @@ function positiveNumber(value: string | number): number {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 }
 
+export function formatCourseDocumentSltHours(
+  value: string | number | null | undefined,
+): string {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return "";
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return String(value);
+
+  return String(Number(numeric.toFixed(2)));
+}
+
 function allocatedShare(
   cloCode: string,
   cloCodes: readonly string[],
