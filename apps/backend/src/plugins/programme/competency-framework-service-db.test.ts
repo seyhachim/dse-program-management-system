@@ -145,6 +145,37 @@ describeDb("curriculum competency framework versioning", () => {
     expect(revision.competencyFramework?.assignedById).toBe(user.id);
   });
 
+  test("allows historical curriculum versions to be inserted without a framework assignment", async () => {
+    const { user, curriculum, token } = await createBase();
+
+    const historical = await prisma.programmeCurriculumVersion.create({
+      data: {
+        curriculumId: curriculum.curriculum.id,
+        versionMajor: 99,
+        versionMinor: Number.parseInt(token.slice(0, 2), 16),
+        status: "Approved",
+        revisionType: "Minor",
+        revisionTriggers: [],
+        revisionReason: "Historical fixture without competency framework context",
+        changeSummary: "Preserve pre-framework curriculum history",
+        cohortLabel: "",
+        academicYear: "",
+        approvedAt: new Date(),
+        createdById: user.id,
+      },
+      select: {
+        id: true,
+        competencyFrameworkVersionId: true,
+        competencyFrameworkAssignedById: true,
+        competencyFrameworkAssignedAt: true,
+      },
+    });
+
+    expect(historical.competencyFrameworkVersionId).toBeNull();
+    expect(historical.competencyFrameworkAssignedById).toBeNull();
+    expect(historical.competencyFrameworkAssignedAt).toBeNull();
+  });
+
   test("rejects cross-programme framework assignment and immutable snapshot mutation", async () => {
     const first = await createBase();
     const second = await createBase();
