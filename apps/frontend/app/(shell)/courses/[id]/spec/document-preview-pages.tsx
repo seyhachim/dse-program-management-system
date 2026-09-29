@@ -5,6 +5,7 @@ import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
 } from "./course-document-model";
+import { formatCourseDocumentSltHours } from "./course-document-mapping";
 import {
   contiguousRowSpans,
   programmePloCountLabel,
@@ -194,7 +195,7 @@ function CloPloMatrix({ mapping, mode }: { mapping: CourseDocumentModel["mapping
       <thead><tr><TH rowSpan={2}>CLO</TH><TH colSpan={PLOS.length} className="text-center">{heading}</TH></tr><tr>{PLOS.map((plo) => <TH key={plo.id} className="text-center">{plo.id}</TH>)}</tr></thead>
       <tbody>{mapping.map((row) => <tr key={row.cloCode}><TD className="font-medium text-center">{row.cloCode}</TD>{PLOS.map((plo) => {
         if (!row.ploCodes.includes(plo.id)) return <BlankTD key={plo.id} className="text-center" />;
-        return <TD key={plo.id} className="text-center">{mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "—" : displayDocumentValue(row.sltHours)}</TD>;
+        return <TD key={plo.id} className="text-center">{mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "—" : formatCourseDocumentSltHours(row.sltHours) || "—"}</TD>;
       })}</tr>)}</tbody>
     </Table>
   );
