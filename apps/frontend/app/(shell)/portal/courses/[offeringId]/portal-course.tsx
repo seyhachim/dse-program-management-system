@@ -96,15 +96,53 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
         </div>
       </section>
 
-      <Tabs defaultValue="overview">
-        <TabsList className="max-w-full justify-start overflow-x-auto whitespace-nowrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="weekly-notes">Weekly Notes</TabsTrigger>
-          <TabsTrigger value="learning">Learning</TabsTrigger>
-          <TabsTrigger value="assessments">Assessments</TabsTrigger>
-          <TabsTrigger value="grades">Grades</TabsTrigger>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
+      <Tabs defaultValue="overview" className="gap-3">
+        <TabsList
+          aria-label="Course sections"
+          className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-sm"
+        >
+          <TabsTrigger
+            value="overview"
+            className="h-9 flex-none px-3 text-sm sm:px-4"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="attendance"
+            className="h-9 flex-none px-3 text-sm sm:px-4"
+          >
+            Attendance
+          </TabsTrigger>
+          <TabsTrigger
+            value="weekly-notes"
+            className="h-9 flex-none px-3 text-sm sm:px-4"
+          >
+            Weekly Notes
+          </TabsTrigger>
+          <TabsTrigger
+            value="learning"
+            className="h-9 flex-none px-3 text-sm sm:px-4"
+          >
+            Learning
+          </TabsTrigger>
+          <TabsTrigger
+            value="assessments"
+            className="h-9 flex-none px-3 text-sm sm:px-4"
+          >
+            Assessments
+          </TabsTrigger>
+          <TabsTrigger
+            value="grades"
+            className="h-9 flex-none px-3 text-sm sm:px-4"
+          >
+            Grades
+          </TabsTrigger>
+          <TabsTrigger
+            value="resources"
+            className="h-9 flex-none px-3 text-sm sm:px-4"
+          >
+            Resources
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-3 space-y-3">
