@@ -64,7 +64,7 @@ function CourseCard({
           </h3>
         </div>
         <span className="shrink-0 rounded-full bg-muted/70 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground ring-1 ring-border/60">
-          Section {course.sectionCode}
+          Class {course.sectionCode}
         </span>
       </div>
 
@@ -129,7 +129,7 @@ function CourseCard({
           }
         >
           {course.specAvailable
-            ? "Learning details ready"
+            ? "Learning details available"
             : "Learning details pending"}
         </span>
         <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
