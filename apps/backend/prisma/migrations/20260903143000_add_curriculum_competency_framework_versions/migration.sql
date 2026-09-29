@@ -110,14 +110,20 @@ DECLARE
   curriculum_programme_id TEXT;
   framework_programme_id TEXT;
 BEGIN
-  -- Historical versions are immutable even when an UPDATE tries to clear the
-  -- framework and its provenance together. Check history before the nullable
-  -- association fast-path.
+  -- Historical versions may exist without competency-framework context. Reject
+  -- only an actual framework/provenance assignment on INSERT, and reject any
+  -- assignment/provenance change on a non-Draft UPDATE.
   IF NEW."status" <> 'Draft' THEN
-    IF TG_OP = 'INSERT'
-       OR NEW."competencyFrameworkVersionId" IS DISTINCT FROM OLD."competencyFrameworkVersionId"
-       OR NEW."competencyFrameworkAssignedById" IS DISTINCT FROM OLD."competencyFrameworkAssignedById"
-       OR NEW."competencyFrameworkAssignedAt" IS DISTINCT FROM OLD."competencyFrameworkAssignedAt" THEN
+    IF (TG_OP = 'INSERT' AND (
+          NEW."competencyFrameworkVersionId" IS NOT NULL
+          OR NEW."competencyFrameworkAssignedById" IS NOT NULL
+          OR NEW."competencyFrameworkAssignedAt" IS NOT NULL
+        ))
+       OR (TG_OP = 'UPDATE' AND (
+          NEW."competencyFrameworkVersionId" IS DISTINCT FROM OLD."competencyFrameworkVersionId"
+          OR NEW."competencyFrameworkAssignedById" IS DISTINCT FROM OLD."competencyFrameworkAssignedById"
+          OR NEW."competencyFrameworkAssignedAt" IS DISTINCT FROM OLD."competencyFrameworkAssignedAt"
+        )) THEN
       RAISE EXCEPTION 'Competency framework assignment can only change on Draft curriculum versions';
     END IF;
   END IF;
