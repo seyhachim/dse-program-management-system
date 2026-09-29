@@ -175,6 +175,62 @@ export type CurriculumVersionSummary = z.infer<
   typeof CurriculumVersionSummarySchema
 >;
 
+export const ProgrammeCompetencyFrameworkCompetencySchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  order: z.number().int(),
+  sourceActive: z.boolean(),
+  ploCodes: z.array(z.string()),
+});
+export type ProgrammeCompetencyFrameworkCompetency = z.infer<
+  typeof ProgrammeCompetencyFrameworkCompetencySchema
+>;
+
+export const ProgrammeCompetencyFrameworkVersionSchema = z.object({
+  frameworkId: z.string().uuid(),
+  programmeId: z.string(),
+  frameworkCode: z.string(),
+  frameworkVersionId: z.string().uuid(),
+  version: z.number().int().min(1),
+  name: z.string(),
+  changeNote: z.string(),
+  createdById: z.string().uuid(),
+  createdAt: z.string(),
+  competencies: z.array(ProgrammeCompetencyFrameworkCompetencySchema),
+});
+export type ProgrammeCompetencyFrameworkVersion = z.infer<
+  typeof ProgrammeCompetencyFrameworkVersionSchema
+>;
+
+export const CurriculumCompetencyFrameworkBindingSchema =
+  ProgrammeCompetencyFrameworkVersionSchema.extend({
+    assignedById: z.string().uuid(),
+    assignedAt: z.string(),
+  });
+export type CurriculumCompetencyFrameworkBinding = z.infer<
+  typeof CurriculumCompetencyFrameworkBindingSchema
+>;
+
+export const CreateProgrammeCompetencyFrameworkVersionSchema = z
+  .object({
+    code: z.string().trim().min(1).max(64),
+    name: z.string().trim().min(1).max(240),
+    changeNote: z.string().trim().max(2000).default(""),
+  })
+  .strict();
+export type CreateProgrammeCompetencyFrameworkVersionInput = z.infer<
+  typeof CreateProgrammeCompetencyFrameworkVersionSchema
+>;
+
+export const BindProgrammeCurriculumCompetencyFrameworkSchema = z
+  .object({ frameworkVersionId: z.string().uuid() })
+  .strict();
+export type BindProgrammeCurriculumCompetencyFrameworkInput = z.infer<
+  typeof BindProgrammeCurriculumCompetencyFrameworkSchema
+>;
+
 export const ProgrammeCurriculumReadSchema = z.object({
   curriculum: z.object({
     id: z.string().uuid(),
@@ -184,6 +240,7 @@ export const ProgrammeCurriculumReadSchema = z.object({
   }),
   selectedVersion: CurriculumVersionSummarySchema,
   versions: z.array(CurriculumVersionSummarySchema),
+  competencyFramework: CurriculumCompetencyFrameworkBindingSchema.nullable(),
   years: z.array(CurriculumYearGroupSchema),
   pathways: z.array(CurriculumPathwaySchema),
   totals: z.object({
