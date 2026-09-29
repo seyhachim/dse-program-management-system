@@ -8,7 +8,7 @@ const attendanceSource = readFileSync(
 );
 
 describe("Student Course Detail tabs", () => {
-  test("keeps the richer tab set visible even when optional data is missing", () => {
+  test("keeps the richer tab set visible without a horizontal scrollbar", () => {
     for (const tab of [
       ["overview", "Overview"],
       ["attendance", "Attendance"],
@@ -18,13 +18,15 @@ describe("Student Course Detail tabs", () => {
       ["grades", "Grades"],
       ["resources", "Resources"],
     ] as const) {
-      expect(courseSource).toContain(
-        `<TabsTrigger value="${tab[0]}">${tab[1]}</TabsTrigger>`,
-      );
+      expect(courseSource).toContain(`value="${tab[0]}"`);
+      expect(courseSource).toContain(tab[1]);
     }
-    expect(courseSource).toContain(
-      'className="max-w-full justify-start overflow-x-auto whitespace-nowrap"',
-    );
+    expect(courseSource).toContain('aria-label="Course sections"');
+    expect(courseSource).toContain("flex h-auto w-full flex-wrap");
+    expect(courseSource).toContain("group-data-horizontal/tabs:h-auto");
+    expect(courseSource).toContain("const COURSE_TAB_CLASS");
+    expect(courseSource).toContain("data-active:bg-primary/10");
+    expect(courseSource).not.toContain("overflow-x-auto");
   });
 
   test("moves the course description into Overview and removes the global warning", () => {
@@ -54,6 +56,30 @@ describe("Student Course Detail tabs", () => {
     expect(attendanceSource).not.toContain("studentId");
     expect(attendanceSource).not.toContain("sessionId");
     expect(attendanceSource).not.toContain("permissionPendingSince");
+  });
+
+  test("attendance tab emphasizes the rate and makes status evidence easy to scan", () => {
+    expect(attendanceSource).toContain('role="progressbar"');
+    expect(attendanceSource).toContain('aria-label="Attendance rate"');
+    expect(attendanceSource).toContain("Session breakdown");
+    expect(attendanceSource).toContain("attendedSessions");
+    expect(attendanceSource).toContain("AttendanceStatusPill");
+    for (const status of ["Present", "Late", "Absent", "Excused", "Pending"]) {
+      expect(attendanceSource).toContain(status);
+    }
+    expect(attendanceSource).toContain("bg-emerald-50");
+    expect(attendanceSource).toContain("bg-amber-50");
+    expect(attendanceSource).toContain("bg-rose-50");
+    expect(attendanceSource).toContain("bg-sky-50");
+    expect(attendanceSource).toContain("bg-violet-50");
+  });
+
+  test("attendance history keeps a clear empty state and responsive session count", () => {
+    expect(attendanceSource).toContain("Attendance history");
+    expect(attendanceSource).toContain("Your recorded status for each class session.");
+    expect(attendanceSource).toContain("No attendance recorded yet");
+    expect(attendanceSource).toContain("Your attendance history will appear here after a class register is saved.");
+    expect(attendanceSource).toContain('data.history.length === 1 ? "session" : "sessions"');
   });
 
   test("grades remain downstream of published assessment results", () => {

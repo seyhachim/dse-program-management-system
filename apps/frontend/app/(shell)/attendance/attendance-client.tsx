@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Play, Save, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Clock3, Play, Save, Search, UserCheck, UserMinus, UsersRound } from "lucide-react";
 import type { AttendanceRecordView, AttendanceSessionSummary, AttendanceSessionView, AttendanceStatus, OfferingView } from "@dse-pms/shared-types";
 import { ATTENDANCE_STATUSES } from "@dse-pms/shared-types";
 import { QueryRefreshStatus } from "@/components/query-refresh-status";
@@ -14,6 +14,7 @@ import { Topbar } from "../topbar";
 import { attendanceRecheckState, recheckStateLabel, type AttendanceRecheckState } from "./attendance-recheck-state";
 import { attendanceDraftKey, clearAttendanceDraft, readAttendanceDraft, writeAttendanceDraft } from "./attendance-draft";
 import { offeringsScheduledOnDate } from "./attendance-schedule";
+import { AttendanceSummary } from "./attendance-summary";
 import { MOBILE_ATTENDANCE_LAYOUT } from "./mobile-attendance-layout";
 import { RollCallDialog } from "./roll-call-dialog";
 import {
@@ -342,7 +343,10 @@ export function AttendanceClient() {
       <main className={MOBILE_ATTENDANCE_LAYOUT.main}>
         <div className={MOBILE_ATTENDANCE_LAYOUT.content}>
           <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <p className="mb-4 text-sm font-medium text-foreground">{sessionContext}</p>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="min-w-0 text-sm font-medium leading-6 text-foreground">{sessionContext}</p>
+              <button type="button" onClick={startRollCall} disabled={records.length === 0 || loading || saving} className={`${MOBILE_ATTENDANCE_LAYOUT.primaryAction} shrink-0`}><Play className="h-4 w-4" />Start Roll Call</button>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_160px_210px_minmax(0,1fr)] lg:gap-4">
               <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Class scheduled on date</label>
@@ -383,23 +387,15 @@ export function AttendanceClient() {
           {draftWriteError ? <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">Could not save this draft on your device. Keep the page open and save attendance to the server.</div> : null}
           {savedMessage ? <div className="rounded-xl border border-status-live/30 bg-status-live-bg px-4 py-3 text-sm text-status-live">{savedMessage}</div> : null}
 
-          <section className={MOBILE_ATTENDANCE_LAYOUT.summary}>
-            <SummaryCard icon={<UserCheck className="h-4 w-4" />} label="Present" value={counts.Present} />
-            <SummaryCard icon={<UserMinus className="h-4 w-4" />} label="Absent" value={counts.Absent} />
-            <SummaryCard icon={<Clock3 className="h-4 w-4" />} label="Late" value={counts.Late} />
-            <SummaryCard icon={<CheckCircle2 className="h-4 w-4" />} label="Permission / Excused" value={counts.Excused} />
-            <SummaryCard icon={<Clock3 className="h-4 w-4" />} label="Permission Pending" value={counts.PermissionPending} />
-            <SummaryCard icon={<UsersRound className="h-4 w-4" />} label="Unmarked" value={counts.Unmarked} />
-          </section>
+          <AttendanceSummary counts={counts} hasUnsavedChanges={hasUnsavedChanges} saving={saving} />
 
           <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
-              <div>
+            <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Permission Pending means the student said they have permission but the paper letter has not yet been confirmed.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Permission Pending means a reported permission whose paper letter has not yet been confirmed.</p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 md:flex md:flex-wrap">
-                <button type="button" onClick={startRollCall} disabled={records.length === 0 || loading || saving} className={MOBILE_ATTENDANCE_LAYOUT.primaryAction}><Play className="h-4 w-4" />Start Roll Call</button>
+              <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => markAll("Present")} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Mark all present</button>
                 <button type="button" onClick={() => markAll(null)} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Clear marks</button>
                 <button type="button" onClick={() => void save()} disabled={!offeringId || loading || saving || records.length === 0 || !canSaveAttendance} title={records.length > 0 && !canSaveAttendance ? "Mark at least one student before saving attendance" : undefined} className={`${MOBILE_ATTENDANCE_LAYOUT.secondaryAction} gap-2 border-primary text-primary`}><Save className="h-4 w-4" />{saving ? "Saving…" : "Save attendance"}</button>
@@ -413,7 +409,7 @@ export function AttendanceClient() {
                 <div className={MOBILE_ATTENDANCE_LAYOUT.mobileRegister}>
                   {filteredRecords.map((record) => <article key={record.studentId} className={MOBILE_ATTENDANCE_LAYOUT.mobileStudentCard}>
                     <div className="min-w-0">
-                      {record.studentKhmerName ? <p lang="km" className="break-words font-semibold text-foreground">{record.studentKhmerName}</p> : null}
+                      {record.studentKhmerName ? <p lang="km" className="break-words text-base font-semibold leading-relaxed text-foreground">{record.studentKhmerName}</p> : null}
                       <p className={record.studentKhmerName ? "mt-0.5 break-words text-sm font-medium text-foreground" : "break-words font-semibold text-foreground"}>{record.studentName}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span className="font-mono">{record.studentNumber ?? "Pending ID"}</span>
@@ -434,24 +430,25 @@ export function AttendanceClient() {
                   </article>)}
                 </div>
                 <div className={MOBILE_ATTENDANCE_LAYOUT.desktopRegister}>
-                  <table className="w-full min-w-[1460px] text-sm">
+                  <table className="w-full min-w-[990px] table-fixed text-sm">
                     <thead className="bg-muted/30 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      <tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Student ID</th><th className="px-4 py-3">English Name</th><th className="px-4 py-3">Khmer Name</th><th className="px-4 py-3">Sex</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Note</th><th className="px-4 py-3">Recheck</th></tr>
+                      <tr><th className="w-12 px-3 py-3">#</th><th className="w-[34%] px-3 py-3">Student</th><th className="w-[20%] px-3 py-3">Status</th><th className="px-3 py-3">Note</th><th className="w-[16%] px-3 py-3">Recheck</th></tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {filteredRecords.map((record, index) => <tr key={record.studentId} className="align-middle hover:bg-muted/20">
-                        <td className="w-12 px-4 py-3 text-xs tabular-nums text-muted-foreground">{index + 1}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{record.studentNumber ?? "Pending ID"}</td>
-                        <td className="px-4 py-3 font-medium text-foreground">{record.studentName}</td>
-                        <td className="px-4 py-3 font-medium text-foreground">{record.studentKhmerName ? <span lang="km">{record.studentKhmerName}</span> : <span className="text-muted-foreground">—</span>}</td>
-                        <td className="px-4 py-3 text-foreground">{record.studentGender ?? "—"}</td>
-                        <td className="px-4 py-3"><select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`h-9 min-w-[180px] rounded-md border px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>
+                        <td className="px-3 py-2.5 text-xs tabular-nums text-muted-foreground">{index + 1}</td>
+                        <td className="px-3 py-2.5">
+                          {record.studentKhmerName ? <p lang="km" className="break-words text-base font-semibold leading-relaxed text-foreground">{record.studentKhmerName}</p> : null}
+                          <p className="break-words text-sm font-medium text-foreground">{record.studentName}</p>
+                          <p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{record.studentNumber ?? "Pending ID"}</span> · {record.studentGender ?? "—"}</p>
+                        </td>
+                        <td className="px-3 py-2.5"><select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`h-10 w-full min-w-0 rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>
                           <option value="">Unmarked</option>
                           {ATTENDANCE_STATUSES.map((status) => <option key={status} value={status}>{attendanceStatusLabel(status)}</option>)}
                           <option value={PENDING_VALUE}>Permission Pending</option>
                         </select></td>
-                        <td className="px-4 py-3"><input value={record.note} maxLength={300} placeholder={record.permissionPending ? "Optional pending-permission note" : "Optional note"} onChange={(event) => updateRecord(record.studentId, { note: event.target.value })} className="h-9 w-full min-w-[240px] rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" /></td>
-                        <td className="px-4 py-3"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td>
+                        <td className="px-3 py-2.5"><input aria-label={`Attendance note for ${record.studentName}`} value={record.note} maxLength={300} placeholder={record.permissionPending ? "Pending-permission note" : "Optional note"} onChange={(event) => updateRecord(record.studentId, { note: event.target.value })} className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" /></td>
+                        <td className="px-3 py-2.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td>
                       </tr>)}
                     </tbody>
                   </table>
@@ -505,10 +502,6 @@ function recheckTone(state: AttendanceRecheckState): string {
   if (state === "checked-twice") return "border-status-live/30 bg-status-live-bg text-status-live";
   if (state === "changed") return "border-amber-300/60 bg-amber-50/50 text-amber-800";
   return "border-border bg-muted/30 text-muted-foreground";
-}
-
-function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return <div className={MOBILE_ATTENDANCE_LAYOUT.summaryCard}><div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">{icon}<span className="leading-tight">{label}</span></div><p className="text-2xl font-semibold tracking-tight text-foreground">{value}</p></div>;
 }
 
 function HistoryCount({ label, value }: { label: string; value: number }) {

@@ -29,6 +29,19 @@ export const ResendInvitationResponse = z.object({
 export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
 
 
+/**
+ * Bounded admin request for sending Student Portal access only to explicitly
+ * selected roster rows. The small cap protects provider rate limits and makes
+ * pilot rollouts intentional rather than turning selection into another send-all.
+ */
+export const SelectedStudentPortalAccessRequest = z.object({
+  studentIds: z.array(z.string().uuid()).min(1).max(20),
+}).strict().refine(
+  (value) => new Set(value.studentIds).size === value.studentIds.length,
+  { message: "Student IDs must be unique", path: ["studentIds"] },
+);
+export type SelectedStudentPortalAccessRequest = z.infer<typeof SelectedStudentPortalAccessRequest>;
+
 /** Admin-only live account state for lecturer onboarding. */
 export const LecturerAccessState = z.enum([
   "no-access",

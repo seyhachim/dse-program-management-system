@@ -67,6 +67,24 @@ describe("bulk Student Portal access", () => {
     });
   });
 
+  test("processes only the explicitly selected student ids", async () => {
+    const selected = ["student-b", "student-d"];
+    const attempted: string[] = [];
+    const result = await runBulkStudentPortalAccessBatch(selected, async (studentId) => {
+      attempted.push(studentId);
+      return studentId === "student-b" ? "invited" : "existing-account";
+    }, 1);
+
+    expect(attempted).toEqual(selected);
+    expect(result).toEqual({
+      newlyInvited: 1,
+      resent: 0,
+      existingAccountSkipped: 1,
+      ineligibleSkipped: 0,
+      failed: 0,
+    });
+  });
+
   test("never exceeds the configured portal-delivery concurrency", async () => {
     let active = 0;
     let maxActive = 0;
@@ -100,4 +118,13 @@ describe("bulk Student Portal access", () => {
 
     expect(attempted).toEqual(["student-a", "student-b"]);
   });
+});
+
+test("selected-invitation route keeps the accounts:create permission boundary", async () => {
+  const source = await Bun.file(new URL("./router.ts", import.meta.url)).text();
+  const routeStart = source.indexOf('"/students/invitations/selected"');
+  expect(routeStart).toBeGreaterThan(-1);
+  const routeSnippet = source.slice(routeStart, routeStart + 800);
+  expect(routeSnippet).toContain('requirePermission("accounts:create")');
+  expect(routeSnippet).toContain("SelectedStudentPortalAccessRequest.safeParse(req.body)");
 });

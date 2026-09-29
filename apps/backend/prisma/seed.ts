@@ -10,6 +10,7 @@ import {
 import { syncNormalizedRubricTables } from "../src/plugins/rubrics/service.ts";
 import { DEFAULT_PROGRAMME_ID } from "../src/core/programme.ts";
 import { defaultProgrammeIdForRole } from "../src/core/auth/token.ts";
+import { shouldSeedDemoOffering } from "./seed-demo-offering-policy.ts";
 
 /**
  * Seeds dev users (incl. several lecturers), students, courses, offerings and a
@@ -1177,7 +1178,11 @@ async function main() {
     },
   });
 
-  if (cs101) {
+  const seedDemoOffering = shouldSeedDemoOffering(
+    process.env.DATABASE_URL,
+    process.env.DSE_SEED_DEMO_OFFERING === "1",
+  );
+  if (cs101 && seedDemoOffering) {
     const offering = await prisma.offering.upsert({
       where: {
         courseId_term_sectionCode: {
@@ -1440,7 +1445,7 @@ async function main() {
       `${teachingMethods.length} teaching + ` +
       `${assessmentMethods.length} assessment methods, ` +
       `${rubrics.length} rubrics, ` +
-      `1 offering, ` +
+      `${cs101 && seedDemoOffering ? 1 : 0} demo offering, ` +
       `${roleDefs.length} roles, ` +
       `${permissionSlugs.length} permissions, ` +
       `${PLOS.length} PLOs, ` +

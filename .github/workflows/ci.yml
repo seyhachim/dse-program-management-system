@@ -133,6 +133,22 @@ jobs:
       - name: Apply migrations
         run: bun run db:migrate:deploy
 
+      - name: Reapply committed migrations safely
+        run: bun run db:migrate:deploy
+
+      - name: Reject backend startup when migration fails
+        run: |
+          set +e
+          DATABASE_URL='postgresql://ci:ci@127.0.0.1:1/dse_ci?schema=public&connect_timeout=2' \
+            timeout 30s bun run --cwd apps/backend start > startup-failure.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ] || [ "$status" -eq 124 ] || grep -q 'DSE-PMS backend listening' startup-failure.log; then
+            cat startup-failure.log
+            exit 1
+          fi
+
+
       - name: Seed clean database
         run: bun run seed
 
