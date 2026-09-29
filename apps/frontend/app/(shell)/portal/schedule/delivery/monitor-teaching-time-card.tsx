@@ -96,9 +96,9 @@ export function MonitorTeachingTimeCard({
     <div className="rounded-xl border border-border bg-muted/20 p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">Teaching time</p>
+          <p className="text-sm font-semibold text-foreground">Class timing</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Capture the real start and end with server time.
+            Tap once when teaching starts and once when it ends.
           </p>
         </div>
         <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -117,7 +117,7 @@ export function MonitorTeachingTimeCard({
                 disabled
                 className="mt-2 min-h-11 w-full rounded-xl bg-muted px-4 text-sm font-semibold text-muted-foreground"
               >
-                Start teaching now
+                Teaching starts now
               </button>
             </>
           ) : startWindow.status === "closed" ? (
@@ -133,7 +133,7 @@ export function MonitorTeachingTimeCard({
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Play className="h-4 w-4" aria-hidden="true" />
-              {saving === "start" ? "Recording start…" : "Start teaching now"}
+              {saving === "start" ? "Recording start…" : "Teaching starts now"}
             </button>
           )}
         </div>
@@ -155,7 +155,7 @@ export function MonitorTeachingTimeCard({
             {saving === "end"
               ? "Recording end…"
               : endWindow.canRecord
-                ? "End teaching now"
+                ? "Teaching ends now"
                 : `End available in ${endWindow.secondsRemaining}s`}
           </button>
         </div>
@@ -176,8 +176,7 @@ export function MonitorTeachingTimeCard({
       )}
 
       <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
-        Captured timestamps are preserved. Final actual-time fields below remain editable only for
-        an audited correction or missed-punch fallback.
+        PMS uses server time automatically. If a punch is missed, use the timing correction below.
       </p>
 
       {error ? (

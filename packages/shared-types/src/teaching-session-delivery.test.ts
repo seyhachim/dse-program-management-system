@@ -49,7 +49,7 @@ describe("teaching session delivery contracts", () => {
       actualLecturerId: null,
       actualStartTime: null,
       actualEndTime: null,
-      actualTopic: "",
+      actualTopic: "Topic",
       learningSummary: "",
       coverage: "TAUGHT_AS_PLANNED",
     });
@@ -60,11 +60,35 @@ describe("teaching session delivery contracts", () => {
       actualLecturerId: "11111111-1111-4111-8111-111111111111",
       actualStartTime: "11:00",
       actualEndTime: "10:00",
-      actualTopic: "",
+      actualTopic: "Topic",
       learningSummary: "",
       coverage: "TAUGHT_AS_PLANNED",
     });
     expect(reversed.success).toBe(false);
+  });
+
+  test("requires a taught topic when the class occurred", () => {
+    const missingTopic = SaveTeachingSessionDeliveryInputSchema.safeParse({
+      classOccurred: true,
+      actualLecturerId: "11111111-1111-4111-8111-111111111111",
+      actualStartTime: "09:00",
+      actualEndTime: "10:00",
+      actualTopic: "   ",
+      learningSummary: "",
+      coverage: "TAUGHT_AS_PLANNED",
+    });
+    expect(missingTopic.success).toBe(false);
+
+    const notHeld = SaveTeachingSessionDeliveryInputSchema.safeParse({
+      classOccurred: false,
+      actualLecturerId: null,
+      actualStartTime: null,
+      actualEndTime: null,
+      actualTopic: "",
+      learningSummary: "",
+      coverage: "NOT_COVERED",
+    });
+    expect(notHeld.success).toBe(true);
   });
 
   test("a class that did not occur cannot carry lecturer, time, positive coverage, or learning summary", () => {

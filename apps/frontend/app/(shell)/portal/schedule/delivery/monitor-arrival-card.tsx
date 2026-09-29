@@ -94,10 +94,10 @@ export function MonitorArrivalCard({
     <section className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Step 1 · Arrival</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Quick check-in</p>
           <h3 className="mt-0.5 text-base font-semibold text-foreground">Lecturer arrival</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Scheduled {context.occurrence.scheduledStartTime}
+            Scheduled {context.occurrence.scheduledStartTime} · tap once when the lecturer arrives
           </p>
         </div>
         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -114,13 +114,13 @@ export function MonitorArrivalCard({
               <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground">Arrived {punctuality.time}</p>
+              <p className="text-sm font-semibold text-foreground">Lecturer arrived at {punctuality.time}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {recordedOutsideWindow ? "Recorded outside the current arrival window" : punctuality.label}
               </p>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${recordedOutsideWindow ? "bg-background text-muted-foreground" : "bg-background/70 text-primary"}`}>
-              {recordedOutsideWindow ? "Review" : "Recorded"}
+              Recorded
             </span>
           </div>
           {recordedOutsideWindow ? (
@@ -144,9 +144,9 @@ export function MonitorArrivalCard({
         </div>
       ) : recordingWindow.status === "closed" ? (
         <div className="mt-3 rounded-xl bg-muted/45 px-3 py-3">
-          <p className="text-sm font-semibold text-foreground">Arrival window closed</p>
+          <p className="text-sm font-semibold text-foreground">No arrival time recorded</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            The scheduled class ended at {recordingWindow.closesAtTime}. Continue with the class record below.
+            The check-in window closed at {recordingWindow.closesAtTime}. Continue with the class record below.
           </p>
         </div>
       ) : (
@@ -157,10 +157,10 @@ export function MonitorArrivalCard({
             onClick={() => void markArrived()}
             className="min-h-12 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Recording…" : "Lecturer arrived now"}
+            {saving ? "Recording…" : "Confirm lecturer arrived"}
           </button>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Server time is recorded automatically; the monitor does not classify late or absent.
+            PMS records the server time automatically and compares it with the schedule.
           </p>
         </div>
       )}

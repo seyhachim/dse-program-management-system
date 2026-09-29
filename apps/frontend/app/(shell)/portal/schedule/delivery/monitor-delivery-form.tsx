@@ -7,7 +7,7 @@ import type {
   TeachingSessionCoverage,
   TeachingSessionMonitorContextView,
 } from "@dse-pms/shared-types";
-import { ArrowLeft, CheckCircle2, ChevronDown, Circle, Clock3, History } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, History } from "lucide-react";
 import { classResponsibilityLabel } from "@/lib/class-responsibility-label";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { PortalError, PortalLoading } from "../../portal-state";
@@ -21,6 +21,8 @@ const COVERAGE_OPTIONS: Array<{ value: TeachingSessionCoverage; label: string }>
   { value: "DIFFERENT_TOPIC", label: "Different topic taught" },
   { value: "NOT_COVERED", label: "Planned topic not covered" },
 ];
+
+const TIMING_TOLERANCE_MINUTES = 10;
 
 function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingSessionDeliveryInput {
   const existing = context.delivery;
@@ -38,11 +40,15 @@ function initialInput(context: TeachingSessionMonitorContextView): SaveTeachingS
       note: existing.note,
     };
   }
+
+  const defaultLecturer =
+    context.eligibleLecturers.length === 1 ? context.eligibleLecturers[0] : null;
+
   return {
     lecturerArrivalStatus: null,
     classOccurred: true,
-    actualLecturerId: null,
-    actualLecturerIds: [],
+    actualLecturerId: defaultLecturer?.id ?? null,
+    actualLecturerIds: defaultLecturer ? [defaultLecturer.id] : [],
     actualStartTime: context.timing?.startedAt
       ? phnomPenhTimeFromIso(context.timing.startedAt)
       : null,
@@ -65,6 +71,54 @@ function formatSessionDate(date: string): string {
     day: "numeric",
     month: "short",
   }).format(parsed);
+}
+
+function minutesFromClock(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return (hours ?? 0) * 60 + (minutes ?? 0);
+}
+
+function deliveryTimingSummary(
+  input: SaveTeachingSessionDeliveryInput,
+  context: TeachingSessionMonitorContextView,
+): { title: string; detail: string } | null {
+  if (!input.classOccurred || !input.actualStartTime || !input.actualEndTime) return null;
+
+  const lateBy =
+    minutesFromClock(input.actualStartTime) -
+    minutesFromClock(context.occurrence.scheduledStartTime);
+  const earlyBy =
+    minutesFromClock(context.occurrence.scheduledEndTime) -
+    minutesFromClock(input.actualEndTime);
+
+  const startedLate = lateBy > TIMING_TOLERANCE_MINUTES;
+  const endedEarly = earlyBy > TIMING_TOLERANCE_MINUTES;
+
+  if (!startedLate && !endedEarly) {
+    return {
+      title: "Held as scheduled",
+      detail: "No significant late start or early finish was recorded.",
+    };
+  }
+
+  if (startedLate && endedEarly) {
+    return {
+      title: "Timing differed from schedule",
+      detail: `Started ${lateBy} min late and ended ${earlyBy} min early.`,
+    };
+  }
+
+  if (startedLate) {
+    return {
+      title: "Started later than scheduled",
+      detail: `Started ${lateBy} minutes after the scheduled start.`,
+    };
+  }
+
+  return {
+    title: "Ended earlier than scheduled",
+    detail: `Ended ${earlyBy} minutes before the scheduled end.`,
+  };
 }
 
 export function MonitorDeliveryForm() {
@@ -105,17 +159,24 @@ export function MonitorDeliveryForm() {
 
   const deliveredMinutes = useMemo(() => {
     if (!input?.classOccurred || !input.actualStartTime || !input.actualEndTime) return 0;
-    const [sh, sm] = input.actualStartTime.split(":").map(Number);
-    const [eh, em] = input.actualEndTime.split(":").map(Number);
-    return Math.max(0, eh! * 60 + em! - (sh! * 60 + sm!));
+    return Math.max(
+      0,
+      minutesFromClock(input.actualEndTime) - minutesFromClock(input.actualStartTime),
+    );
   }, [input]);
 
   if (loading) return <PortalLoading />;
   if (error && (!context || !input)) return <PortalError message={error} />;
   if (!context || !input) return <PortalError message="Could not load class delivery" />;
 
-  const arrivalRecorded = context.lecturerArrival?.status === "Present";
   const deliveryRecorded = Boolean(context.delivery);
+  const timingSummary = deliveryTimingSummary(input, context);
+  const selectedLecturerIds =
+    input.actualLecturerIds?.length
+      ? input.actualLecturerIds
+      : input.actualLecturerId
+        ? [input.actualLecturerId]
+        : [];
 
   const refreshArrival = async () => {
     const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
@@ -145,6 +206,7 @@ export function MonitorDeliveryForm() {
 
   const setOccurred = (occurred: boolean) => {
     setNotice(null);
+    setError(null);
     setInput((current) => {
       if (!current) return current;
       if (!occurred) {
@@ -159,10 +221,24 @@ export function MonitorDeliveryForm() {
           coverage: "NOT_COVERED",
         };
       }
+
+      const defaultLecturer =
+        current.actualLecturerIds?.length || current.actualLecturerId
+          ? null
+          : context.eligibleLecturers.length === 1
+            ? context.eligibleLecturers[0]
+            : null;
+
       return {
         ...current,
         classOccurred: true,
-        actualLecturerId: current.actualLecturerId,
+        actualLecturerId: current.actualLecturerId ?? defaultLecturer?.id ?? null,
+        actualLecturerIds:
+          current.actualLecturerIds?.length
+            ? current.actualLecturerIds
+            : defaultLecturer
+              ? [defaultLecturer.id]
+              : [],
         actualStartTime:
           current.actualStartTime ??
           (context.timing?.startedAt ? phnomPenhTimeFromIso(context.timing.startedAt) : null),
@@ -175,12 +251,28 @@ export function MonitorDeliveryForm() {
   };
 
   const save = async () => {
+    if (input.classOccurred) {
+      if (selectedLecturerIds.length === 0) {
+        setError("Select who actually taught this class.");
+        return;
+      }
+      if (!input.actualStartTime || !input.actualEndTime) {
+        setError("Record the teaching start and end time, or add a timing correction.");
+        return;
+      }
+      if (!input.actualTopic.trim()) {
+        setError("Topic taught is required.");
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setError(null);
       setNotice(null);
       const result = await monitorDeliveryApi.save(offeringId, meetingId, date, {
         ...input,
+        actualTopic: input.actualTopic.trim(),
         lecturerArrivalStatus: null,
       });
       const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
@@ -195,7 +287,7 @@ export function MonitorDeliveryForm() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-3 pb-8">
+    <div className="mx-auto w-full max-w-3xl space-y-3 pb-8">
       <button
         type="button"
         onClick={() => router.back()}
@@ -205,51 +297,39 @@ export function MonitorDeliveryForm() {
         Back to schedule
       </button>
 
-      <section className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-              {classResponsibilityLabel(context.responsibility.role)}
-            </span>
-            <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
-              Section {context.course.sectionCode}
-            </span>
-            {context.plannedWeek ? (
-              <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
-                Week {context.plannedWeek.week}
+      <section className="rounded-[1.5rem] border border-border bg-card p-4 shadow-sm sm:p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                {classResponsibilityLabel(context.responsibility.role)}
               </span>
-            ) : null}
+              <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                Section {context.course.sectionCode}
+              </span>
+              {context.plannedWeek ? (
+                <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                  Week {context.plannedWeek.week}
+                </span>
+              ) : null}
+            </div>
+            <h2 className="mt-2 text-lg font-semibold leading-snug text-foreground">
+              {context.course.code} · {context.course.title}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {formatSessionDate(context.occurrence.date)} · {context.occurrence.scheduledStartTime}–{context.occurrence.scheduledEndTime}
+              {context.occurrence.scheduledRoom ? ` · Room ${context.occurrence.scheduledRoom}` : ""}
+            </p>
           </div>
-          <h2 className="mt-2 text-lg font-semibold leading-snug text-foreground">
-            {context.course.code} · {context.course.title}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {formatSessionDate(context.occurrence.date)} · {context.occurrence.scheduledStartTime}–{context.occurrence.scheduledEndTime}
-            {context.occurrence.scheduledRoom ? ` · Room ${context.occurrence.scheduledRoom}` : ""}
-          </p>
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2 rounded-xl bg-muted/45 px-3 py-2 text-xs">
-            {arrivalRecorded ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            ) : (
-              <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            )}
-            <span className={arrivalRecorded ? "font-medium text-foreground" : "text-muted-foreground"}>
-              Arrival {arrivalRecorded ? "recorded" : "pending"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl bg-muted/45 px-3 py-2 text-xs">
-            {deliveryRecorded ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            ) : (
-              <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            )}
-            <span className={deliveryRecorded ? "font-medium text-foreground" : "text-muted-foreground"}>
-              Class record {deliveryRecorded ? "saved" : "pending"}
-            </span>
-          </div>
+          <span
+            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
+              deliveryRecorded
+                ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {deliveryRecorded ? "Recorded" : "Pending"}
+          </span>
         </div>
       </section>
 
@@ -266,57 +346,67 @@ export function MonitorDeliveryForm() {
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Week {context.plannedWeek.week} plan
+                Planned topic · Week {context.plannedWeek.week}
               </p>
               <p className="mt-0.5 truncate text-sm font-medium text-foreground">
                 {context.plannedWeek.topic || "No planned topic entered"}
               </p>
             </div>
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
           </summary>
           <div className="border-t border-border px-4 py-3">
             <p className="text-sm leading-6 text-muted-foreground">
               {context.plannedWeek.topic || "No planned topic entered"}
             </p>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Read-only plan from the approved Course Specification.
+              Read-only from the approved Course Specification.
             </p>
           </div>
         </details>
-      ) : (
-        <div className="rounded-[1.25rem] border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
-          No approved Weekly Plan found. Record what actually happened in class normally.
-        </div>
-      )}
+      ) : null}
 
-      <section className="space-y-4 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
+      <section className="space-y-5 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm sm:p-5">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Step 2 · Class record</p>
-          <h3 className="mt-0.5 text-base font-semibold text-foreground">What happened in class?</h3>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+            Class record
+          </p>
+          <h3 className="mt-0.5 text-base font-semibold text-foreground">
+            Confirm what happened in this class
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Record the session clearly and factually.
+          </p>
         </div>
 
         <div>
-          <p className="text-sm font-semibold text-foreground">Did the class occur?</p>
+          <p className="text-sm font-semibold text-foreground">Was this class held?</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
               type="button"
               aria-pressed={input.classOccurred}
               onClick={() => setOccurred(true)}
               className={`min-h-11 rounded-xl border px-3 text-sm font-medium ${
-                input.classOccurred ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"
+                input.classOccurred
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background"
               }`}
             >
-              Yes
+              Held
             </button>
             <button
               type="button"
               aria-pressed={!input.classOccurred}
               onClick={() => setOccurred(false)}
               className={`min-h-11 rounded-xl border px-3 text-sm font-medium ${
-                !input.classOccurred ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"
+                !input.classOccurred
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background"
               }`}
             >
-              No
+              Not held
             </button>
           </div>
         </div>
@@ -331,117 +421,193 @@ export function MonitorDeliveryForm() {
               onChanged={refreshTiming}
             />
 
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-foreground">Actual lecturer(s)</legend>
-              <p className="text-xs text-muted-foreground">
-                Select everyone who actually taught this class. This may be one lecturer or a co-teaching team.
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {context.eligibleLecturers.map((lecturer) => {
-                  const selectedIds = input.actualLecturerIds ?? (
-                    input.actualLecturerId ? [input.actualLecturerId] : []
-                  );
-                  const checked = selectedIds.includes(lecturer.id);
-                  return (
-                    <label
-                      key={lecturer.id}
-                      className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(event) =>
-                          setInput((current) => {
-                            if (!current) return current;
-                            const currentIds = current.actualLecturerIds ?? (
-                              current.actualLecturerId ? [current.actualLecturerId] : []
-                            );
-                            const nextIds = event.target.checked
-                              ? [...new Set([...currentIds, lecturer.id])]
-                              : currentIds.filter((id) => id !== lecturer.id);
-                            return {
-                              ...current,
-                              actualLecturerIds: nextIds,
-                              actualLecturerId: nextIds[0] ?? null,
-                            };
-                          })
-                        }
-                      />
-                      <span>{lecturer.name}</span>
-                    </label>
-                  );
-                })}
+            {timingSummary ? (
+              <div className="rounded-xl bg-muted/45 px-3 py-3">
+                <div className="flex items-start gap-2">
+                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{timingSummary.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{timingSummary.detail}</p>
+                  </div>
+                </div>
               </div>
+            ) : null}
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-semibold text-foreground">Who taught this class?</legend>
+              {context.eligibleLecturers.length === 1 ? (
+                <div className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-muted/25 px-3 py-2 text-sm">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="font-medium text-foreground">{context.eligibleLecturers[0]?.name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Selected automatically</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Select everyone who actually taught. Shared classes may have more than one lecturer.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {context.eligibleLecturers.map((lecturer) => {
+                      const checked = selectedLecturerIds.includes(lecturer.id);
+                      return (
+                        <label
+                          key={lecturer.id}
+                          className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setInput((current) => {
+                                if (!current) return current;
+                                const currentIds =
+                                  current.actualLecturerIds ??
+                                  (current.actualLecturerId ? [current.actualLecturerId] : []);
+                                const nextIds = event.target.checked
+                                  ? [...new Set([...currentIds, lecturer.id])]
+                                  : currentIds.filter((id) => id !== lecturer.id);
+                                return {
+                                  ...current,
+                                  actualLecturerIds: nextIds,
+                                  actualLecturerId: nextIds[0] ?? null,
+                                };
+                              })
+                            }
+                          />
+                          <span>{lecturer.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </fieldset>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-sm font-medium text-foreground">
-                Final actual start
-                <input
-                  type="time"
-                  value={input.actualStartTime ?? ""}
-                  onChange={(event) => setInput((current) => current ? { ...current, actualStartTime: event.target.value || null } : current)}
-                  className="mt-2 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+            <label className="block text-sm font-semibold text-foreground">
+              Topic taught <span className="text-destructive">*</span>
+              <textarea
+                required
+                value={input.actualTopic}
+                maxLength={1000}
+                rows={2}
+                onChange={(event) => {
+                  setError(null);
+                  setInput((current) =>
+                    current ? { ...current, actualTopic: event.target.value } : current,
+                  );
+                }}
+                placeholder="What topic or content was actually taught?"
+                className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
+              />
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                Required for every class that was held.
+              </span>
+            </label>
+
+            <label className="block text-sm font-medium text-foreground">
+              What students learned <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+              <textarea
+                value={input.learningSummary}
+                maxLength={1000}
+                rows={3}
+                onChange={(event) =>
+                  setInput((current) =>
+                    current ? { ...current, learningSummary: event.target.value } : current,
+                  )
+                }
+                placeholder="Short student-safe summary"
+                className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
+              />
+            </label>
+
+            <details className="group rounded-xl border border-border bg-background">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-medium text-foreground">
+                <span>
+                  Timing correction or missed punch
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    Only when needed
+                  </span>
+                </span>
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                  aria-hidden="true"
                 />
-              </label>
-              <label className="block text-sm font-medium text-foreground">
-                Final actual end
-                <input
-                  type="time"
-                  value={input.actualEndTime ?? ""}
-                  onChange={(event) => setInput((current) => current ? { ...current, actualEndTime: event.target.value || null } : current)}
-                  className="mt-2 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                />
-              </label>
-            </div>
-            <div className="rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Clock3 className="h-4 w-4" aria-hidden="true" />
-                {deliveredMinutes > 0
-                  ? `${deliveredMinutes} min · ${Math.round((deliveredMinutes / 60) * 100) / 100} contact hours`
-                  : "Capture start/end above or enter a valid correction/fallback time."}
+              </summary>
+              <div className="space-y-3 border-t border-border px-3 py-3">
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Use these fields only when a start/end punch was missed or an authorized correction is needed.
+                  Changes remain in the audited delivery revision history.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block text-sm font-medium text-foreground">
+                    Actual start
+                    <input
+                      type="time"
+                      value={input.actualStartTime ?? ""}
+                      onChange={(event) =>
+                        setInput((current) =>
+                          current
+                            ? { ...current, actualStartTime: event.target.value || null }
+                            : current,
+                        )
+                      }
+                      className="mt-2 min-h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-foreground">
+                    Actual end
+                    <input
+                      type="time"
+                      value={input.actualEndTime ?? ""}
+                      onChange={(event) =>
+                        setInput((current) =>
+                          current
+                            ? { ...current, actualEndTime: event.target.value || null }
+                            : current,
+                        )
+                      }
+                      className="mt-2 min-h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
+                    />
+                  </label>
+                </div>
+                <div className="rounded-lg bg-muted/45 px-3 py-2 text-xs text-muted-foreground">
+                  {deliveredMinutes > 0
+                    ? `${deliveredMinutes} min · ${Math.round((deliveredMinutes / 60) * 100) / 100} contact hours`
+                    : "Start and end time are both required for a held class."}
+                </div>
               </div>
-              <p className="mt-1 pl-6 text-[11px]">
-                Server punches prefill these fields. Manual edits are saved through the existing
-                audited delivery revision history.
-              </p>
-            </div>
+            </details>
           </>
-        ) : null}
-
-        <label className="block text-sm font-medium text-foreground">
-          Topic actually taught
-          <textarea
-            value={input.actualTopic}
-            maxLength={1000}
-            rows={2}
-            onChange={(event) => setInput((current) => current ? { ...current, actualTopic: event.target.value } : current)}
-            placeholder={input.classOccurred ? "Actual topic/content taught" : "Optional factual note about the class not being held"}
-            className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
-          />
-        </label>
-
-        {input.classOccurred ? (
+        ) : (
           <label className="block text-sm font-medium text-foreground">
-            What we learned
+            What happened? <span className="text-xs font-normal text-muted-foreground">(optional)</span>
             <textarea
-              value={input.learningSummary}
+              value={input.actualTopic}
               maxLength={1000}
-              rows={3}
-              onChange={(event) => setInput((current) => current ? { ...current, learningSummary: event.target.value } : current)}
-              placeholder="Short student-safe summary of what the class learned"
+              rows={2}
+              onChange={(event) =>
+                setInput((current) =>
+                  current ? { ...current, actualTopic: event.target.value } : current,
+                )
+              }
+              placeholder="Short factual note, e.g. class cancelled or moved"
               className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
             />
           </label>
-        ) : null}
+        )}
 
         <details className="group rounded-xl border border-border bg-background">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-medium text-foreground">
             <span>
               More details
-              <span className="ml-2 text-xs font-normal text-muted-foreground">Coverage & private note</span>
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                Coverage & private note
+              </span>
             </span>
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
           </summary>
           <div className="space-y-4 border-t border-border px-3 py-3">
             {input.classOccurred ? (
@@ -449,11 +615,22 @@ export function MonitorDeliveryForm() {
                 Planned-topic coverage
                 <select
                   value={input.coverage}
-                  onChange={(event) => setInput((current) => current ? { ...current, coverage: event.target.value as TeachingSessionCoverage } : current)}
+                  onChange={(event) =>
+                    setInput((current) =>
+                      current
+                        ? {
+                            ...current,
+                            coverage: event.target.value as TeachingSessionCoverage,
+                          }
+                        : current,
+                    )
+                  }
                   className="mt-2 min-h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
                 >
                   {COVERAGE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -465,7 +642,9 @@ export function MonitorDeliveryForm() {
                 value={input.note}
                 maxLength={500}
                 rows={2}
-                onChange={(event) => setInput((current) => current ? { ...current, note: event.target.value } : current)}
+                onChange={(event) =>
+                  setInput((current) => (current ? { ...current, note: event.target.value } : current))
+                }
                 placeholder="Optional note for authorized staff"
                 className="mt-2 w-full rounded-xl border border-border bg-card px-3 py-3 text-sm"
               />
@@ -476,7 +655,11 @@ export function MonitorDeliveryForm() {
           </div>
         </details>
 
-        {error ? <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
         {notice ? (
           <p className="flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-sm text-primary">
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
@@ -490,7 +673,7 @@ export function MonitorDeliveryForm() {
           onClick={() => void save()}
           className="min-h-12 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Saving…" : context.delivery ? "Save correction" : "Save class record"}
+          {saving ? "Saving…" : context.delivery ? "Save correction" : "Submit class record"}
         </button>
       </section>
 
@@ -502,12 +685,20 @@ export function MonitorDeliveryForm() {
               <span className="text-sm font-semibold text-foreground">Delivery history</span>
               <span className="text-xs text-muted-foreground">{context.history.length}</span>
             </div>
-            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+            <ChevronDown
+              className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
           </summary>
           <div className="space-y-2 border-t border-border px-4 py-3">
             {[...context.history].reverse().map((event) => (
-              <div key={event.id} className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">Revision {event.revision} · {event.actor.name}</p>
+              <div
+                key={event.id}
+                className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+              >
+                <p className="font-medium text-foreground">
+                  Revision {event.revision} · {event.actor.name}
+                </p>
                 <p className="mt-0.5">{new Date(event.createdAt).toLocaleString()}</p>
               </div>
             ))}
