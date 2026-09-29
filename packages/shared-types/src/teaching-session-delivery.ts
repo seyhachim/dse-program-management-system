@@ -87,6 +87,13 @@ export const SaveTeachingSessionDeliveryInputSchema = z
         message: "At least one actual lecturer is required when the class occurred",
       });
     }
+    if (value.actualTopic.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["actualTopic"],
+        message: "Topic taught is required when the class occurred",
+      });
+    }
     if (!value.actualStartTime) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
