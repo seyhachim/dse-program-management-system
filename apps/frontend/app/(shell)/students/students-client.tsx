@@ -36,6 +36,7 @@ export function StudentsClient() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [selectedInviting, setSelectedInviting] = useState(false);
   const [bulkInviting, setBulkInviting] = useState(false);
   const [resending, setResending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -187,6 +188,41 @@ export function StudentsClient() {
     }
   };
 
+  const handleSendPortalAccessToSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (selectedIds.length > 20) {
+      setActionError("Select at most 20 students for one invitation batch.");
+      return;
+    }
+    const confirmed = confirm(
+      `Send Student Portal access to the ${selectedIds.length} selected student${selectedIds.length === 1 ? "" : "s"}?\n\n` +
+      "Only the checked rows will be processed. Active students with an email can receive access; inactive/no-email records are skipped, pending invitations are refreshed, and activated accounts are unchanged.",
+    );
+    if (!confirmed) return;
+
+    setSelectedInviting(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.sendStudentPortalAccessToSelected(selectedIds);
+      await portalAccessQuery.refetch();
+      setNotice(
+        `Selected portal access delivery complete. Checked ${result.totalStudents}: ${result.newlyInvited} new invitation${result.newlyInvited === 1 ? "" : "s"}, ${result.resent} refreshed pending invitation${result.resent === 1 ? "" : "s"}, ${result.existingAccountSkipped} existing account${result.existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${result.ineligibleSkipped} inactive/no-email record${result.ineligibleSkipped === 1 ? "" : "s"} skipped.`,
+      );
+      if (result.failed > 0) {
+        setActionError(
+          `${result.failed} selected student${result.failed === 1 ? "" : "s"} failed safely. Retry after resolving the provider or account-data error; successful and activated accounts will not be reprovisioned.`,
+        );
+      }
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : "Failed to send Student Portal access to selected students",
+      );
+    } finally {
+      setSelectedInviting(false);
+    }
+  };
+
   const handleSendPortalAccessToAll = async () => {
     const confirmed = confirm(
       "Send Student Portal access to all students who still need an invitation?\n\n" +
@@ -319,7 +355,7 @@ export function StudentsClient() {
     },
   ];
 
-  const inviteBusy = inviting || bulkInviting || resending;
+  const inviteBusy = inviting || selectedInviting || bulkInviting || resending;
   const selectedInviteEligible = Boolean(
     selectedStudent?.email && selectedStudent.status === "Active",
   );
@@ -350,13 +386,17 @@ export function StudentsClient() {
       {canManagePortalAccess ? (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            {selectedStudent && selectedStudent.status !== "Active"
-              ? "Portal invitations are available only after the student is Active."
-              : selectedStudent && !selectedStudent.email
-                ? "This roster record has no official email yet. Add one before provisioning portal access."
-                : selectedStudent
-                  ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
-                  : "Select one Active student with an official email, or send portal access across the full PMS roster. The Portal Access column shows who is pending, active, not invited, or needs attention."}
+            {selectedIds.length > 20
+              ? "Select at most 20 students for one invitation batch."
+              : selectedIds.length > 1
+                ? `${selectedIds.length} students selected. Send portal access only to these checked rows; inactive/no-email records are skipped safely.`
+                : selectedStudent && selectedStudent.status !== "Active"
+                  ? "Portal invitations are available only after the student is Active."
+                  : selectedStudent && !selectedStudent.email
+                    ? "This roster record has no official email yet. Add one before provisioning portal access."
+                    : selectedStudent
+                      ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
+                      : "Select up to 20 students for a controlled portal-access batch, or use the full-roster action when you are ready. The Portal Access column shows who is pending, active, not invited, or needs attention."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -366,13 +406,23 @@ export function StudentsClient() {
             >
               <MailPlus />{bulkInviting ? "Sending to all…" : "Send portal access to all"}
             </Button>
-            <Button
-              variant="outline"
-              disabled={!selectedInviteEligible || inviteBusy}
-              onClick={handleInvite}
-            >
-              <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
-            </Button>
+            {selectedIds.length > 1 ? (
+              <Button
+                variant="outline"
+                disabled={selectedIds.length > 20 || inviteBusy}
+                onClick={handleSendPortalAccessToSelected}
+              >
+                <UserPlus />{selectedInviting ? "Sending selected…" : `Send selected (${selectedIds.length})`}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                disabled={!selectedInviteEligible || inviteBusy}
+                onClick={handleInvite}
+              >
+                <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
+              </Button>
+            )}
             <Button
               variant="outline"
               disabled={!selectedInviteEligible || inviteBusy}

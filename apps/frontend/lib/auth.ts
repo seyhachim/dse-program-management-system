@@ -26,6 +26,12 @@ export const authApi = {
       { studentIds },
     );
   },
+  sendStudentPortalAccessToSelected(studentIds: string[]): Promise<BulkStudentPortalAccessResponse> {
+    return api.post<BulkStudentPortalAccessResponse>(
+      "/api/auth/students/invitations/selected",
+      { studentIds },
+    );
+  },
   sendStudentPortalAccessToAll(): Promise<BulkStudentPortalAccessResponse> {
     return api.post<BulkStudentPortalAccessResponse>("/api/auth/students/invitations/bulk", {});
   },
