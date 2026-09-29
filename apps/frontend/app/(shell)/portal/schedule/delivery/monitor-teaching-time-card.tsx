@@ -96,10 +96,7 @@ export function MonitorTeachingTimeCard({
     <div className="rounded-xl border border-border bg-muted/20 p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">Class timing</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Tap once when teaching starts and once when it ends.
-          </p>
+          <p className="text-sm font-semibold text-foreground">Class time</p>
         </div>
         <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
@@ -109,7 +106,7 @@ export function MonitorTeachingTimeCard({
           {startWindow.status === "too-early" ? (
             <>
               <p className="rounded-lg bg-background px-3 py-2 text-xs text-muted-foreground">
-                Start recording opens at{" "}
+                Available at{" "}
                 <span className="font-semibold text-foreground">{startWindow.opensAtTime}</span>.
               </p>
               <button
@@ -117,13 +114,12 @@ export function MonitorTeachingTimeCard({
                 disabled
                 className="mt-2 min-h-11 w-full rounded-xl bg-muted px-4 text-sm font-semibold text-muted-foreground"
               >
-                Teaching starts now
+                Start class
               </button>
             </>
           ) : startWindow.status === "closed" ? (
             <p className="rounded-lg bg-background px-3 py-2 text-xs text-muted-foreground">
-              The start-punch window is closed. Use the final actual-time fields below only as an
-              audited correction or fallback.
+              Start time not recorded. Add it in More details.
             </p>
           ) : (
             <button
@@ -133,7 +129,7 @@ export function MonitorTeachingTimeCard({
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Play className="h-4 w-4" aria-hidden="true" />
-              {saving === "start" ? "Recording start…" : "Teaching starts now"}
+              {saving === "start" ? "Saving…" : "Start class"}
             </button>
           )}
         </div>
@@ -153,9 +149,9 @@ export function MonitorTeachingTimeCard({
           >
             <Square className="h-4 w-4" aria-hidden="true" />
             {saving === "end"
-              ? "Recording end…"
+              ? "Saving…"
               : endWindow.canRecord
-                ? "Teaching ends now"
+                ? "End class"
                 : `End available in ${endWindow.secondsRemaining}s`}
           </button>
         </div>
@@ -168,16 +164,10 @@ export function MonitorTeachingTimeCard({
             </p>
           </div>
           {duration ? (
-            <p className="mt-1 pl-6 text-xs text-muted-foreground">
-              {duration} min · {Math.round((duration / 60) * 100) / 100} contact hours
-            </p>
+            <p className="mt-1 pl-6 text-xs text-muted-foreground">{duration} min</p>
           ) : null}
         </div>
       )}
-
-      <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
-        PMS uses server time automatically. If a punch is missed, use the timing correction below.
-      </p>
 
       {error ? (
         <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
