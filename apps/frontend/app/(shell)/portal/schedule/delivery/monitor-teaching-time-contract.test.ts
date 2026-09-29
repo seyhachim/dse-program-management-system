@@ -9,8 +9,8 @@ describe("monitor teaching timing UI contract", () => {
 
     expect(source).toContain("markTeachingStarted");
     expect(source).toContain("markTeachingEnded");
-    expect(source).toContain("Teaching started now");
-    expect(source).toContain("Teaching ended now");
+    expect(source).toContain("Teaching starts now");
+    expect(source).toContain("Teaching ends now");
     expect(source).toContain("PMS uses server time automatically");
   });
 
