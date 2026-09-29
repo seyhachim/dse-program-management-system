@@ -8,7 +8,7 @@ const attendanceSource = readFileSync(
 );
 
 describe("Student Course Detail tabs", () => {
-  test("keeps the richer tab set visible even when optional data is missing", () => {
+  test("keeps the richer tab set visible without a horizontal scrollbar", () => {
     for (const tab of [
       ["overview", "Overview"],
       ["attendance", "Attendance"],
@@ -18,13 +18,13 @@ describe("Student Course Detail tabs", () => {
       ["grades", "Grades"],
       ["resources", "Resources"],
     ] as const) {
-      expect(courseSource).toContain(
-        `<TabsTrigger value="${tab[0]}">${tab[1]}</TabsTrigger>`,
-      );
+      expect(courseSource).toContain(`value="${tab[0]}"`);
+      expect(courseSource).toContain(tab[1]);
     }
-    expect(courseSource).toContain(
-      'className="max-w-full justify-start overflow-x-auto whitespace-nowrap"',
-    );
+    expect(courseSource).toContain('aria-label="Course sections"');
+    expect(courseSource).toContain("flex h-auto w-full flex-wrap");
+    expect(courseSource).toContain("h-9 flex-none px-3 text-sm sm:px-4");
+    expect(courseSource).not.toContain("overflow-x-auto");
   });
 
   test("moves the course description into Overview and removes the global warning", () => {
