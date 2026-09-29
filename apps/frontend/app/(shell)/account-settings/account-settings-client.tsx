@@ -11,6 +11,7 @@ import { invalidateMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { lecturersApi } from "@/lib/lecturers";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
+import { LecturerAvatar } from "@/components/lecturer-avatar";
 
 type ProfileForm = {
   name: string;
@@ -19,9 +20,12 @@ type ProfileForm = {
   title: string;
   qualification: string;
   phone: string;
+  profileImageUrl: string;
   employmentType: string;
   fieldOfSpecialization: string;
   yearsOfExperience: string;
+  shortBio: string;
+  programmeStartDate: string;
 };
 
 const EMPTY: ProfileForm = {
@@ -31,9 +35,12 @@ const EMPTY: ProfileForm = {
   title: "",
   qualification: "",
   phone: "",
+  profileImageUrl: "",
   employmentType: "",
   fieldOfSpecialization: "",
   yearsOfExperience: "",
+  shortBio: "",
+  programmeStartDate: "",
 };
 
 export function AccountSettingsClient() {
@@ -55,9 +62,12 @@ export function AccountSettingsClient() {
         title: profile.title ?? "",
         qualification: profile.qualification ?? "",
         phone: profile.phone ?? "",
+        profileImageUrl: profile.profileImageUrl ?? "",
         employmentType: profile.professionalProfile?.employmentType ?? "",
         fieldOfSpecialization: profile.professionalProfile?.fieldOfSpecialization ?? "",
         yearsOfExperience: profile.professionalProfile?.yearsOfExperience?.toString() ?? "",
+        shortBio: profile.professionalProfile?.shortBio ?? "",
+        programmeStartDate: profile.professionalProfile?.programmeStartDate ?? "",
       }))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load your profile"))
       .finally(() => setLoading(false));
@@ -85,9 +95,12 @@ export function AccountSettingsClient() {
         title: form.title || null,
         qualification: form.qualification || null,
         phone: form.phone || null,
+        profileImageUrl: form.profileImageUrl || null,
         employmentType: form.employmentType || null,
         fieldOfSpecialization: form.fieldOfSpecialization || null,
         yearsOfExperience,
+        shortBio: form.shortBio || null,
+        programmeStartDate: form.programmeStartDate || null,
       });
       setForm((current) => ({
         ...current,
@@ -96,9 +109,12 @@ export function AccountSettingsClient() {
         title: profile.title ?? "",
         qualification: profile.qualification ?? "",
         phone: profile.phone ?? "",
+        profileImageUrl: profile.profileImageUrl ?? "",
         employmentType: profile.professionalProfile?.employmentType ?? "",
         fieldOfSpecialization: profile.professionalProfile?.fieldOfSpecialization ?? "",
         yearsOfExperience: profile.professionalProfile?.yearsOfExperience?.toString() ?? "",
+        shortBio: profile.professionalProfile?.shortBio ?? "",
+        programmeStartDate: profile.professionalProfile?.programmeStartDate ?? "",
       }));
       invalidateMe();
       setMessage("Professional profile updated successfully.");
@@ -148,6 +164,20 @@ export function AccountSettingsClient() {
           </p>
         </div>
         <form onSubmit={saveProfile} className="space-y-4">
+          <div className="flex items-center gap-4 rounded-lg border border-border bg-muted/20 p-4">
+            <LecturerAvatar name={form.name || "Lecturer"} imageUrl={form.profileImageUrl || null} size="lg" />
+            <div className="min-w-0 flex-1">
+              <Field label="Profile image URL">
+                <Input
+                  type="url"
+                  value={form.profileImageUrl}
+                  onChange={(e) => setField("profileImageUrl", e.target.value)}
+                  placeholder="https://…"
+                />
+                <span className="text-xs text-muted-foreground">Use a stable HTTPS image URL. Expiring signed URLs are rejected.</span>
+              </Field>
+            </div>
+          </div>
           <Field label="Name" required><Input value={form.name} onChange={(e) => setField("name", e.target.value)} required /></Field>
           <Field label="Email"><Input type="email" value={form.email} disabled aria-describedby="email-help" /><span id="email-help" className="text-xs text-muted-foreground">Contact an administrator to change your email.</span></Field>
           <Field label="Honorific">
@@ -170,9 +200,23 @@ export function AccountSettingsClient() {
             <h3 className="text-sm font-semibold text-foreground">Portfolio details</h3>
             <p className="mt-1 text-xs text-muted-foreground">These fields describe your professional background; they do not change teaching assignments.</p>
           </div>
-          <Field label="Employment type"><Input value={form.employmentType} onChange={(e) => setField("employmentType", e.target.value)} placeholder="Full-time" /></Field>
+          <Field label="Employment type"><Input value={form.employmentType} onChange={(e) => setField("employmentType", e.target.value)} placeholder="Full Time" /></Field>
           <Field label="Field of specialization"><Input value={form.fieldOfSpecialization} onChange={(e) => setField("fieldOfSpecialization", e.target.value)} placeholder="Machine Learning, Time Series, Smart Agriculture" /></Field>
           <Field label="Years of experience"><Input type="number" min={0} max={80} step={1} value={form.yearsOfExperience} onChange={(e) => setField("yearsOfExperience", e.target.value)} placeholder="8" /></Field>
+          <Field label="DSE programme start date">
+            <Input type="date" value={form.programmeStartDate} onChange={(e) => setField("programmeStartDate", e.target.value)} />
+            <span className="text-xs text-muted-foreground">Used to derive whether dated professional evidence is prior to DSE or during DSE service. It does not change employment records elsewhere.</span>
+          </Field>
+          <Field label="Short bio">
+            <textarea
+              value={form.shortBio}
+              onChange={(e) => setField("shortBio", e.target.value)}
+              maxLength={4000}
+              rows={5}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="Brief professional biography"
+            />
+          </Field>
 
           <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save professional profile"}</Button>
         </form>

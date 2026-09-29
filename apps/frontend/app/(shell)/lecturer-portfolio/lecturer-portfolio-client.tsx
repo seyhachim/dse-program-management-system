@@ -19,6 +19,7 @@ import {
 } from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
 import { lecturersApi } from "@/lib/lecturers";
+import { LecturerAvatar } from "@/components/lecturer-avatar";
 import { offeringsApi } from "@/lib/offerings";
 import { Topbar } from "../topbar";
 import {
@@ -153,8 +154,12 @@ export function LecturerPortfolioClient() {
                         label="Years of experience"
                         value={lecturer.professionalProfile?.yearsOfExperience == null ? null : `${lecturer.professionalProfile.yearsOfExperience} years`}
                       />
+                      <Detail label="DSE programme start date" value={lecturer.professionalProfile?.programmeStartDate} />
                       <div className="sm:col-span-2">
                         <Detail label="Field of specialization" value={lecturer.professionalProfile?.fieldOfSpecialization} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Detail label="Short bio" value={lecturer.professionalProfile?.shortBio} />
                       </div>
                     </div>
                   </section>
@@ -220,9 +225,7 @@ function PortfolioHero({ lecturer }: { lecturer: Lecturer }) {
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/10 text-xl font-semibold text-primary">
-            {initials || "L"}
-          </div>
+          <LecturerAvatar name={lecturer.name} imageUrl={lecturer.profileImageUrl} size="lg" />
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               {formatLecturerDisplayName(lecturer.name, lecturer.honorific)}
