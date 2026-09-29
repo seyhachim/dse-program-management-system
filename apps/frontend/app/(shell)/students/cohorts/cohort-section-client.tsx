@@ -15,6 +15,7 @@ import { studentCohortsApi } from "@/lib/student-cohorts";
 import { offeringsApi } from "@/lib/offerings";
 import {
   activeSectionMembers,
+  classifyResponsibilityAssignment,
   eligibleOfferingsForSectionResponsibility,
 } from "@/lib/section-class-leadership";
 import {
@@ -207,15 +208,49 @@ export function CohortSectionClient() {
     )) return;
 
     setBusy(true); setError(null); setNotice(null);
-    const results = await Promise.allSettled(
-      targets.map((offering) => offeringsApi.assignResponsibility(offering.id, member.studentId, leadershipRole)),
+
+    const currentResults = await Promise.allSettled(
+      targets.map(async (offering) => ({
+        offering,
+        responsibilities: await offeringsApi.responsibilities(offering.id),
+      })),
     );
-    const succeeded = results.filter((result) => result.status === "fulfilled").length;
-    const failed = results.length - succeeded;
+
+    const toAssign: OfferingView[] = [];
+    let alreadyAssigned = 0;
+    let failed = 0;
+
+    for (const result of currentResults) {
+      if (result.status === "rejected") {
+        failed += 1;
+        continue;
+      }
+      const decision = classifyResponsibilityAssignment(
+        result.value.responsibilities,
+        member.studentId,
+        leadershipRole,
+      );
+      if (decision === "already-assigned") {
+        alreadyAssigned += 1;
+      } else if (decision === "blocked-by-other-role") {
+        failed += 1;
+      } else {
+        toAssign.push(result.value.offering);
+      }
+    }
+
+    const assignmentResults = await Promise.allSettled(
+      toAssign.map((offering) => offeringsApi.assignResponsibility(offering.id, member.studentId, leadershipRole)),
+    );
+    const updated = assignmentResults.filter((result) => result.status === "fulfilled").length;
+    failed += assignmentResults.length - updated;
+
     if (failed > 0) {
-      setError(`${succeeded} of ${targets.length} offerings updated; ${failed} failed. Review the failed offering(s) before retrying so successful audited assignments are not treated as rolled back.`);
+      setError(`${updated} updated, ${alreadyAssigned} already correct, ${failed} failed across ${targets.length} offering${targets.length === 1 ? "" : "s"}. Review the failed offering(s) before retrying; successful audited assignments were not rolled back.`);
+    } else if (updated === 0) {
+      setNotice(`${member.studentName} is already ${label} across all ${alreadyAssigned} current ${section.code} offering${alreadyAssigned === 1 ? "" : "s"}. No changes were needed.`);
     } else {
-      setNotice(`${member.studentName} assigned as ${label} across ${succeeded} current ${section.code} offering${succeeded === 1 ? "" : "s"}.`);
+      setNotice(`${member.studentName}: ${updated} offering${updated === 1 ? "" : "s"} updated as ${label}${alreadyAssigned ? `; ${alreadyAssigned} already correct` : ""}.`);
     }
     setBusy(false);
   }

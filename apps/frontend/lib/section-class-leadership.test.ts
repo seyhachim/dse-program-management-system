@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { OfferingView, StudentCohortSectionMemberView } from "@dse-pms/shared-types";
 import {
   activeSectionMembers,
+  classifyResponsibilityAssignment,
   eligibleOfferingsForSectionResponsibility,
 } from "./section-class-leadership";
 
@@ -85,4 +86,52 @@ test("lists only members currently assigned to the selected canonical section", 
     },
   ] satisfies StudentCohortSectionMemberView[];
   expect(activeSectionMembers(members, "section-m2").map((row) => row.studentId)).toEqual(["student-a"]);
+});
+
+test("treats an existing identical responsibility as already assigned", () => {
+  expect(classifyResponsibilityAssignment([
+    {
+      id: "assignment-a",
+      offeringId: "offering-a",
+      role: "ClassMonitor",
+      student: { id: "student-a", userId: null, studentId: null, name: "A" },
+      assignedAt: "2026-09-01T00:00:00.000Z",
+      assignedBy: { id: "admin-a", name: "Admin" },
+      revokedAt: null,
+      revokedBy: null,
+      revokeReason: "",
+    },
+  ], "student-a", "ClassMonitor")).toBe("already-assigned");
+});
+
+test("blocks assigning a second active responsibility to the same student", () => {
+  expect(classifyResponsibilityAssignment([
+    {
+      id: "assignment-a",
+      offeringId: "offering-a",
+      role: "SubClassMonitor",
+      student: { id: "student-a", userId: null, studentId: null, name: "A" },
+      assignedAt: "2026-09-01T00:00:00.000Z",
+      assignedBy: { id: "admin-a", name: "Admin" },
+      revokedAt: null,
+      revokedBy: null,
+      revokeReason: "",
+    },
+  ], "student-a", "ClassMonitor")).toBe("blocked-by-other-role");
+});
+
+test("allows replacing another student who currently holds the selected role", () => {
+  expect(classifyResponsibilityAssignment([
+    {
+      id: "assignment-a",
+      offeringId: "offering-a",
+      role: "ClassMonitor",
+      student: { id: "student-b", userId: null, studentId: null, name: "B" },
+      assignedAt: "2026-09-01T00:00:00.000Z",
+      assignedBy: { id: "admin-a", name: "Admin" },
+      revokedAt: null,
+      revokedBy: null,
+      revokeReason: "",
+    },
+  ], "student-a", "ClassMonitor")).toBe("assign");
 });
