@@ -23,7 +23,9 @@ describe("Student Course Detail tabs", () => {
     }
     expect(courseSource).toContain('aria-label="Course sections"');
     expect(courseSource).toContain("flex h-auto w-full flex-wrap");
-    expect(courseSource).toContain("h-9 flex-none px-3 text-sm sm:px-4");
+    expect(courseSource).toContain("group-data-horizontal/tabs:h-auto");
+    expect(courseSource).toContain("const COURSE_TAB_CLASS");
+    expect(courseSource).toContain("data-active:bg-primary/10");
     expect(courseSource).not.toContain("overflow-x-auto");
   });
 
