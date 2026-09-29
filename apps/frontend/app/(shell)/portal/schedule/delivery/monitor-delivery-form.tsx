@@ -97,7 +97,7 @@ function deliveryTimingSummary(
   if (!startedLate && !endedEarly) {
     return {
       title: "Held as scheduled",
-      detail: `Start and end are within ${TIMING_TOLERANCE_MINUTES} minutes of the schedule.`,
+      detail: "No significant late start or early finish was recorded.",
     };
   }
 
