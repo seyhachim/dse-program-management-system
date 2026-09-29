@@ -11,7 +11,6 @@ import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, History } from "lucide-re
 import { classResponsibilityLabel } from "@/lib/class-responsibility-label";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import { PortalError, PortalLoading } from "../../portal-state";
-import { MonitorArrivalCard } from "./monitor-arrival-card";
 import { MonitorTeachingTimeCard } from "./monitor-teaching-time-card";
 import { phnomPenhTimeFromIso } from "./monitor-teaching-time-utils";
 
@@ -178,11 +177,6 @@ export function MonitorDeliveryForm() {
         ? [input.actualLecturerId]
         : [];
 
-  const refreshArrival = async () => {
-    const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
-    setContext(refreshed);
-  };
-
   const refreshTiming = async () => {
     const refreshed = await monitorDeliveryApi.context(offeringId, meetingId, date);
     setContext(refreshed);
@@ -333,40 +327,6 @@ export function MonitorDeliveryForm() {
         </div>
       </section>
 
-      <MonitorArrivalCard
-        context={context}
-        offeringId={offeringId}
-        meetingId={meetingId}
-        date={date}
-        onRecorded={refreshArrival}
-      />
-
-      {context.plannedWeek ? (
-        <details className="group rounded-[1.25rem] border border-border bg-card shadow-sm">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Planned topic · Week {context.plannedWeek.week}
-              </p>
-              <p className="mt-0.5 truncate text-sm font-medium text-foreground">
-                {context.plannedWeek.topic || "No planned topic entered"}
-              </p>
-            </div>
-            <ChevronDown
-              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-              aria-hidden="true"
-            />
-          </summary>
-          <div className="border-t border-border px-4 py-3">
-            <p className="text-sm leading-6 text-muted-foreground">
-              {context.plannedWeek.topic || "No planned topic entered"}
-            </p>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Read-only from the approved Course Specification.
-            </p>
-          </div>
-        </details>
-      ) : null}
 
       <section className="space-y-5 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm sm:p-5">
         <div>
@@ -411,6 +371,32 @@ export function MonitorDeliveryForm() {
           </div>
         </div>
 
+      {context.plannedWeek ? (
+        <details className="group rounded-[1.25rem] border border-border bg-card shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Planned topic · Week {context.plannedWeek.week}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+                {context.plannedWeek.topic || "No planned topic entered"}
+              </p>
+            </div>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="border-t border-border px-4 py-3">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {context.plannedWeek.topic || "No planned topic entered"}
+            </p>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Read-only from the approved Course Specification.
+            </p>
+          </div>
+        </details>
+      ) : null}
         {input.classOccurred ? (
           <>
             <MonitorTeachingTimeCard
