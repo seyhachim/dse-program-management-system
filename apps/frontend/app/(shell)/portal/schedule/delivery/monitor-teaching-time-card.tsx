@@ -117,7 +117,7 @@ export function MonitorTeachingTimeCard({
                 disabled
                 className="mt-2 min-h-11 w-full rounded-xl bg-muted px-4 text-sm font-semibold text-muted-foreground"
               >
-                Teaching started now
+                Teaching starts now
               </button>
             </>
           ) : startWindow.status === "closed" ? (
@@ -133,7 +133,7 @@ export function MonitorTeachingTimeCard({
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Play className="h-4 w-4" aria-hidden="true" />
-              {saving === "start" ? "Recording start…" : "Teaching started now"}
+              {saving === "start" ? "Recording start…" : "Teaching starts now"}
             </button>
           )}
         </div>
@@ -155,7 +155,7 @@ export function MonitorTeachingTimeCard({
             {saving === "end"
               ? "Recording end…"
               : endWindow.canRecord
-                ? "Teaching ended now"
+                ? "Teaching ends now"
                 : `End available in ${endWindow.secondsRemaining}s`}
           </button>
         </div>
