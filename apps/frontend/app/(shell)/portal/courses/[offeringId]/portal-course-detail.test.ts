@@ -58,6 +58,30 @@ describe("Student Course Detail tabs", () => {
     expect(attendanceSource).not.toContain("permissionPendingSince");
   });
 
+  test("attendance tab emphasizes the rate and makes status evidence easy to scan", () => {
+    expect(attendanceSource).toContain('role="progressbar"');
+    expect(attendanceSource).toContain('aria-label="Attendance rate"');
+    expect(attendanceSource).toContain("Session breakdown");
+    expect(attendanceSource).toContain("attendedSessions");
+    expect(attendanceSource).toContain("AttendanceStatusPill");
+    for (const status of ["Present", "Late", "Absent", "Excused", "Pending"]) {
+      expect(attendanceSource).toContain(status);
+    }
+    expect(attendanceSource).toContain("bg-emerald-50");
+    expect(attendanceSource).toContain("bg-amber-50");
+    expect(attendanceSource).toContain("bg-rose-50");
+    expect(attendanceSource).toContain("bg-sky-50");
+    expect(attendanceSource).toContain("bg-violet-50");
+  });
+
+  test("attendance history keeps a clear empty state and responsive session count", () => {
+    expect(attendanceSource).toContain("Attendance history");
+    expect(attendanceSource).toContain("Your recorded status for each class session.");
+    expect(attendanceSource).toContain("No attendance recorded yet");
+    expect(attendanceSource).toContain("Your attendance history will appear here after a class register is saved.");
+    expect(attendanceSource).toContain('data.history.length === 1 ? "session" : "sessions"');
+  });
+
   test("grades remain downstream of published assessment results", () => {
     expect(courseSource).toContain("const publishedResults = data.assessments.filter((item) => item.result)");
     expect(courseSource).toContain("data.courseGradeComplete && data.totalCourseGrade !== null");
