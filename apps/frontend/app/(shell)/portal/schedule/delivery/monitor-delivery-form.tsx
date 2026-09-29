@@ -373,7 +373,7 @@ export function MonitorDeliveryForm() {
             Confirm what happened in this class
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Record the teaching session, not a staff performance judgement.
+            Record the session clearly and factually.
           </p>
         </div>
 
