@@ -50,7 +50,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
   const publishedResults = data.assessments.filter((item) => item.result);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4">
       <section className="rounded-2xl border border-border bg-card p-4 md:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div className="min-w-0">
