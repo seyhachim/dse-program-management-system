@@ -2,6 +2,8 @@ import type {
   AttendanceSessionSummary,
   AttendanceSessionView,
   AttendanceStudentHistoryView,
+  ClassResponsibilityRole,
+  ClassResponsibilityView,
   CreateOfferingInput,
   LecturerWorkloadSummary,
   OfferingStatus,
@@ -72,6 +74,19 @@ export const offeringsApi = {
   unenroll(id: string, studentId: string): Promise<OfferingView> {
     return api.delete<OfferingView>(`/api/offerings/${id}/enrollments/${studentId}`);
   },
+  responsibilities(id: string): Promise<ClassResponsibilityView[]> {
+    return api.get<ClassResponsibilityView[]>(`/api/offerings/${id}/responsibilities`);
+  },
+  assignResponsibility(
+    id: string,
+    studentId: string,
+    role: ClassResponsibilityRole,
+  ): Promise<ClassResponsibilityView> {
+    return api.post<ClassResponsibilityView>(`/api/offerings/${id}/responsibilities`, {
+      studentId,
+      role,
+    });
+  },
   attendanceSessions(id: string): Promise<AttendanceSessionSummary[]> {
     return api.get<AttendanceSessionSummary[]>(`/api/offerings/${id}/attendance`);
   },
@@ -113,7 +128,18 @@ export function workloadForTerm(
   return {
     scheduleRows,
     scheduledWeeklyHours:
-      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
+      Math.round(
+        scheduleRows
+          .filter((row) => !row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedWeeklyHours:
+      Math.round(
+        scheduleRows
+          .filter((row) => row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedMeetingCount: scheduleRows.filter((row) => row.sharedResponsibility).length,
     rows,
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),

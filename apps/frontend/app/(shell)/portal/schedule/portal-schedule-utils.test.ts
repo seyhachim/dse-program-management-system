@@ -4,6 +4,7 @@ import {
   formatMeetingTime,
   formatTeachingWeekRange,
   isMeetingInProgress,
+  isPortalMeetingScheduledOnDate,
   normalizeTeachingDate,
   parseLocalDateKey,
   teachingWeekStart,
@@ -80,6 +81,31 @@ describe("Student Portal schedule helpers", () => {
         "12:00",
       ),
     ).toBe(false);
+  });
+
+  test("projects current and planned meetings only on matching weekdays within inclusive teaching dates", () => {
+    const period = { teachingStartDate: "2026-09-07", teachingEndDate: "2026-12-12" };
+    expect(isPortalMeetingScheduledOnDate(period, "Monday", "2026-09-07", "Monday")).toBe(true);
+    expect(isPortalMeetingScheduledOnDate(period, "Saturday", "2026-12-12", "Saturday")).toBe(true);
+    expect(isPortalMeetingScheduledOnDate(period, "Monday", "2026-09-14", "Tuesday")).toBe(false);
+    expect(isPortalMeetingScheduledOnDate(period, "Monday", "2026-09-06", "Monday")).toBe(false);
+    expect(isPortalMeetingScheduledOnDate(period, "Monday", "2026-12-14", "Monday")).toBe(false);
+  });
+
+  test("keeps historical meetings in their own dates but suppresses them in a later year", () => {
+    const historical = { teachingStartDate: "2025-09-01", teachingEndDate: "2025-12-20" };
+    expect(isPortalMeetingScheduledOnDate(historical, "Monday", "2025-09-08", "Monday")).toBe(true);
+    expect(isPortalMeetingScheduledOnDate(historical, "Monday", "2026-09-07", "Monday")).toBe(false);
+  });
+
+  test("does not project undated or partially dated offerings", () => {
+    for (const period of [
+      { teachingStartDate: null, teachingEndDate: null },
+      { teachingStartDate: "2025-09-01", teachingEndDate: null },
+      { teachingStartDate: null, teachingEndDate: "2025-12-20" },
+    ]) {
+      expect(isPortalMeetingScheduledOnDate(period, "Monday", "2026-09-07", "Monday")).toBe(false);
+    }
   });
 
   test("formats 24-hour meeting times for the mobile timetable", () => {

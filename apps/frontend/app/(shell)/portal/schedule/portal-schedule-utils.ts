@@ -23,6 +23,20 @@ export function toLocalDateKey(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+export function isPortalMeetingScheduledOnDate(
+  teachingPeriod: { teachingStartDate: string | null; teachingEndDate: string | null },
+  meetingWeekday: string,
+  dateKey: string,
+  weekday: string,
+): boolean {
+  const { teachingStartDate, teachingEndDate } = teachingPeriod;
+  return meetingWeekday === weekday
+    && teachingStartDate !== null
+    && teachingEndDate !== null
+    && teachingStartDate <= dateKey
+    && dateKey <= teachingEndDate;
+}
+
 export function parseLocalDateKey(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;

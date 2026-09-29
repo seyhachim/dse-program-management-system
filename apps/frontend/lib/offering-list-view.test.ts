@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { OfferingGroup } from "./offering-groups";
 import {
+  countUnassignedMeetings,
   filterOfferingGroups,
   offeringScheduleEntries,
 } from "./offering-list-view";
@@ -122,6 +123,26 @@ describe("Course Offerings list view", () => {
     ]);
   });
 
+  test("counts only meetings without explicit lecturer ownership", () => {
+    const ownershipGroup = {
+      id: "ownership",
+      term: "2026-2027-S1",
+      course: null,
+      offerings: [
+        {
+          id: "m1",
+          sectionCode: "M1",
+          meetings: [
+            { id: "assigned", lecturerIds: ["lecturer-1"] },
+            { id: "unassigned", lecturerIds: [] },
+          ],
+        },
+      ],
+    } as unknown as OfferingGroup;
+
+    expect(countUnassignedMeetings([ownershipGroup])).toBe(1);
+  });
+
   test("keeps class identity and every meeting block in grouped schedules", () => {
     const scheduleGroup = {
       id: "dss301",
@@ -184,6 +205,7 @@ describe("Course Offerings list view", () => {
         endTime: "08:30",
         building: null,
         room: "306",
+        assignedLecturerCount: 0,
       },
       {
         key: "m1:m1-late",
@@ -193,6 +215,7 @@ describe("Course Offerings list view", () => {
         endTime: "10:00",
         building: "STEM Building",
         room: "306",
+        assignedLecturerCount: 0,
       },
       {
         key: "m2:m2-early",
@@ -202,6 +225,7 @@ describe("Course Offerings list view", () => {
         endTime: "08:30",
         building: "STEM Building",
         room: "305",
+        assignedLecturerCount: 0,
       },
       {
         key: "m2:m2-late",
@@ -211,6 +235,7 @@ describe("Course Offerings list view", () => {
         endTime: "10:00",
         building: "STEM Building",
         room: "305",
+        assignedLecturerCount: 0,
       },
     ]);
   });

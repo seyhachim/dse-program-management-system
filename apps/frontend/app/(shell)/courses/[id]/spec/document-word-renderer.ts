@@ -29,6 +29,7 @@ import {
   COURSE_DOCUMENT_STYLE,
   type CourseDocumentModel,
 } from "./course-document-model";
+import { formatCourseDocumentSltHours } from "./course-document-mapping";
 import { resolveCourseSpecWordTheme } from "./document-word-theme";
 import {
   contiguousRowSpans,
@@ -278,7 +279,7 @@ function officialCloPloMatrixTable(document: CourseDocumentModel, mode: "percent
     new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text("CLO", false, SMALL)] })] }), new TableCell({ columnSpan: 10, width: { size: ploWidth, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text(matrixTitle, false, SMALL)] })] })] }),
     new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }), ...PLOS.map((plo, index) => new TableCell({ width: { size: w[index + 1]!, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text(plo.id === "PLO9" ? "PLO 9" : plo.id, false, SMALL)] })] }))] }),
   ];
-  for (const row of document.mapping) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(row.cloCode, w[0]!, AlignmentType.CENTER), ...PLOS.map((plo, index) => { const width = w[index + 1]!; if (!row.ploCodes.includes(plo.id)) return compactWordCell("", width, AlignmentType.CENTER); const value = mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "" : row.sltHours || ""; return compactWordCell(value, width, AlignmentType.CENTER); })] }));
+  for (const row of document.mapping) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(row.cloCode, w[0]!, AlignmentType.CENTER), ...PLOS.map((plo, index) => { const width = w[index + 1]!; if (!row.ploCodes.includes(plo.id)) return compactWordCell("", width, AlignmentType.CENTER); const value = mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "" : formatCourseDocumentSltHours(row.sltHours); return compactWordCell(value, width, AlignmentType.CENTER); })] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
 }
 

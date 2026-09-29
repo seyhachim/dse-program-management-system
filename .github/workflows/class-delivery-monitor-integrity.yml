@@ -8,6 +8,8 @@ on:
       - "apps/backend/src/plugins/offerings/**"
       - "apps/frontend/app/(shell)/portal/schedule/**"
       - "apps/frontend/lib/monitor-delivery.ts"
+      - "packages/shared-types/src/class-delivery.ts"
+      - "packages/shared-types/src/class-delivery.test.ts"
       - "packages/shared-types/src/teaching-session-delivery.ts"
       - "packages/shared-types/src/teaching-session-delivery.test.ts"
       - ".github/workflows/class-delivery-monitor-integrity.yml"

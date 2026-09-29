@@ -1,9 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
-    "deploymentEnabled": {
-      "*": false,
-      "feat/1164-selected-student-portal-invites": true
-    }
+    "deploymentEnabled": false
   }
 }

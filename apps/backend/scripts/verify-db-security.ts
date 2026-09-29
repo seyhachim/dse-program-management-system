@@ -164,6 +164,7 @@ const EXPECTED_ATTENDANCE_TABLES = [
   "TeachingSessionOccurrence",
   "TeachingSessionTiming",
   "TeachingSessionDelivery",
+  "TeachingSessionDeliveryLecturer",
   "TeachingSessionDeliveryAuditEvent",
   "TeachingLeaveRequest",
   "TeachingLeaveRequestOccurrence",

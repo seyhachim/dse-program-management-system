@@ -27,18 +27,22 @@ describe("Student Portal compact course cards", () => {
     expect(source).not.toContain("monitorRolesByOffering");
   });
 
-  test("keeps achievements course-specific and adds attendance progress", () => {
+  test("keeps achievements useful without filling cards with locked badges", () => {
     expect(source).toContain("summary.offeringId");
     expect(source).toContain(
       "achievementsByOffering.get(course.offeringId) ?? null",
     );
-    expect(source).toContain("<CourseAchievementBadges summary={achievement} />");
+    expect(source).toContain(
+      "<CourseAchievementBadges summary={achievement} showLocked={false} />",
+    );
+    expect(source).toContain('const showProgress = course.lifecycle !== "planned";');
     expect(source).toContain("<CourseAttendanceProgress");
+    expect(source).toContain("compact");
     expect(badgeSource).not.toContain("Course role:");
     expect(badgeSource).not.toContain("ClassResponsibilityRole");
   });
 
-  test("uses compact wrapping cards for current, planned, and historical sections", () => {
+  test("uses a readable desktop layout for current, planned, and historical sections", () => {
     expect(source).toContain("courses={currentCourses}");
     expect(source).toContain("courses={plannedCourses}");
     expect(source).toContain("courses={historicalCourses}");
@@ -49,10 +53,20 @@ describe("Student Portal compact course cards", () => {
     ).toBe(3);
     expect(source).toContain("achievementsByOffering={achievementsByOffering}");
     expect(source).toContain("calendar={calendar}");
-    expect(source).toContain("flex min-w-0 flex-wrap gap-x-3 gap-y-1.5");
+    expect(source).toContain('"grid max-w-3xl gap-4"');
+    expect(source).toContain('"grid gap-4 lg:grid-cols-2"');
+    expect(source).toContain("Class {course.sectionCode}");
+    expect(source).toContain("Open course");
     expect(attendanceSource).toContain("gridTemplateColumns");
     expect(attendanceSource).toContain(
       'aria-label="Teaching-week attendance progress"',
     );
+  });
+
+  test("uses student-facing copy instead of lecturer/admin terminology", () => {
+    expect(source).toContain("Courses you are enrolled in this term.");
+    expect(source).toContain("Courses already scheduled for a future term.");
+    expect(source).not.toContain("current teaching period");
+    expect(source).not.toContain("Active offerings");
   });
 });
