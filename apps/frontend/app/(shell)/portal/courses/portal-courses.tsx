@@ -129,7 +129,7 @@ function CourseCard({
           }
         >
           {course.specAvailable
-            ? "Learning details available"
+            ? "Learning details ready"
             : "Learning details pending"}
         </span>
         <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
