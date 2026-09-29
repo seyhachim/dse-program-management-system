@@ -36,7 +36,6 @@ export function CohortSectionClient() {
   const [sections, setSections] = useState<StudentCohortSectionView[]>([]);
   const [members, setMembers] = useState<StudentCohortSectionMemberView[]>([]);
   const [history, setHistory] = useState<StudentCohortSectionHistoryView[]>([]);
-  const [offerings, setOfferings] = useState<OfferingView[]>([]);
   const [leadershipSectionId, setLeadershipSectionId] = useState("");
   const [leadershipStudentId, setLeadershipStudentId] = useState("");
   const [leadershipRole, setLeadershipRole] = useState<ClassResponsibilityRole>("ClassMonitor");
@@ -65,16 +64,14 @@ export function CohortSectionClient() {
       setSections([]); setMembers([]); setHistory([]);
       return;
     }
-    const [sectionRows, memberRows, historyRows, offeringRows] = await Promise.all([
+    const [sectionRows, memberRows, historyRows] = await Promise.all([
       studentCohortSectionsApi.list(selectedCohortId),
       studentCohortSectionsApi.members(selectedCohortId),
       studentCohortSectionsApi.history(selectedCohortId),
-      canManageLeadership ? offeringsApi.list() : Promise.resolve([]),
     ]);
     setSections(sectionRows);
     setMembers(memberRows);
     setHistory(historyRows);
-    setOfferings(offeringRows);
     setSectionId((current) => sectionRows.some((item) => item.id === current && item.active) ? current : sectionRows.find((item) => item.active)?.id ?? "");
     setStudentId((current) => memberRows.some((item) => item.studentId === current && !item.currentSectionMembership) ? current : memberRows.find((item) => !item.currentSectionMembership)?.studentId ?? "");
     const firstActiveSection = sectionRows.find((item) => item.active);
@@ -196,63 +193,75 @@ export function CohortSectionClient() {
     const member = leadershipMembers.find((item) => item.studentId === leadershipStudentId);
     if (!section || !member) return;
 
-    const targets = eligibleOfferingsForSectionResponsibility(offerings, section.code, member.studentId);
-    if (targets.length === 0) {
-      setError(`No current ${section.code} offering currently enrolls ${member.studentName}. Nothing was changed.`);
-      return;
-    }
-
-    const label = leadershipRole === "ClassMonitor" ? "Class Monitor" : "Deputy Class Monitor";
-    if (!window.confirm(
-      `Assign ${member.studentName} as ${label} for ${targets.length} current ${section.code} offering${targets.length === 1 ? "" : "s"}? Existing holders of this role will be replaced with audit history preserved.`,
-    )) return;
-
     setBusy(true); setError(null); setNotice(null);
-
-    const currentResults = await Promise.allSettled(
-      targets.map(async (offering) => ({
-        offering,
-        responsibilities: await offeringsApi.responsibilities(offering.id),
-      })),
-    );
-
-    const toAssign: OfferingView[] = [];
-    let alreadyAssigned = 0;
-    let failed = 0;
-
-    for (const result of currentResults) {
-      if (result.status === "rejected") {
-        failed += 1;
-        continue;
-      }
-      const decision = classifyResponsibilityAssignment(
-        result.value.responsibilities,
+    try {
+      // Fetch the current Offering roster only when the admin acts. This avoids
+      // depending on whether /me had resolved during the page's initial load and
+      // keeps target selection fresh at mutation time.
+      const currentOfferings = await offeringsApi.list();
+      const targets = eligibleOfferingsForSectionResponsibility(
+        currentOfferings,
+        section.code,
         member.studentId,
-        leadershipRole,
       );
-      if (decision === "already-assigned") {
-        alreadyAssigned += 1;
-      } else if (decision === "blocked-by-other-role") {
-        failed += 1;
-      } else {
-        toAssign.push(result.value.offering);
+      if (targets.length === 0) {
+        setError(`No current ${section.code} offering currently enrolls ${member.studentName}. Nothing was changed.`);
+        return;
       }
-    }
 
-    const assignmentResults = await Promise.allSettled(
-      toAssign.map((offering) => offeringsApi.assignResponsibility(offering.id, member.studentId, leadershipRole)),
-    );
-    const updated = assignmentResults.filter((result) => result.status === "fulfilled").length;
-    failed += assignmentResults.length - updated;
+      const label = leadershipRole === "ClassMonitor" ? "Class Monitor" : "Deputy Class Monitor";
+      if (!window.confirm(
+        `Assign ${member.studentName} as ${label} for ${targets.length} current ${section.code} offering${targets.length === 1 ? "" : "s"}? Existing holders of this role will be replaced with audit history preserved.`,
+      )) return;
 
-    if (failed > 0) {
-      setError(`${updated} updated, ${alreadyAssigned} already correct, ${failed} failed across ${targets.length} offering${targets.length === 1 ? "" : "s"}. Review the failed offering(s) before retrying; successful audited assignments were not rolled back.`);
-    } else if (updated === 0) {
-      setNotice(`${member.studentName} is already ${label} across all ${alreadyAssigned} current ${section.code} offering${alreadyAssigned === 1 ? "" : "s"}. No changes were needed.`);
-    } else {
-      setNotice(`${member.studentName}: ${updated} offering${updated === 1 ? "" : "s"} updated as ${label}${alreadyAssigned ? `; ${alreadyAssigned} already correct` : ""}.`);
+      const currentResults = await Promise.allSettled(
+        targets.map(async (offering) => ({
+          offering,
+          responsibilities: await offeringsApi.responsibilities(offering.id),
+        })),
+      );
+
+      const toAssign: OfferingView[] = [];
+      let alreadyAssigned = 0;
+      let failed = 0;
+
+      for (const result of currentResults) {
+        if (result.status === "rejected") {
+          failed += 1;
+          continue;
+        }
+        const decision = classifyResponsibilityAssignment(
+          result.value.responsibilities,
+          member.studentId,
+          leadershipRole,
+        );
+        if (decision === "already-assigned") {
+          alreadyAssigned += 1;
+        } else if (decision === "blocked-by-other-role") {
+          failed += 1;
+        } else {
+          toAssign.push(result.value.offering);
+        }
+      }
+
+      const assignmentResults = await Promise.allSettled(
+        toAssign.map((offering) => offeringsApi.assignResponsibility(offering.id, member.studentId, leadershipRole)),
+      );
+      const updated = assignmentResults.filter((result) => result.status === "fulfilled").length;
+      failed += assignmentResults.length - updated;
+
+      if (failed > 0) {
+        setError(`${updated} updated, ${alreadyAssigned} already correct, ${failed} failed across ${targets.length} offering${targets.length === 1 ? "" : "s"}. Review the failed offering(s) before retrying; successful audited assignments were not rolled back.`);
+      } else if (updated === 0) {
+        setNotice(`${member.studentName} is already ${label} across all ${alreadyAssigned} current ${section.code} offering${alreadyAssigned === 1 ? "" : "s"}. No changes were needed.`);
+      } else {
+        setNotice(`${member.studentName}: ${updated} offering${updated === 1 ? "" : "s"} updated as ${label}${alreadyAssigned ? `; ${alreadyAssigned} already correct` : ""}.`);
+      }
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
