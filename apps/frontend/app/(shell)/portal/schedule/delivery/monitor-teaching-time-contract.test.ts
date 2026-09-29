@@ -30,6 +30,18 @@ describe("monitor teaching timing UI contract", () => {
 
 
 describe("monitor delivery UX contract", () => {
+  test("puts class status first and removes lecturer arrival check-in", async () => {
+    const source = await Bun.file(formPath).text();
+
+    expect(source).not.toContain("MonitorArrivalCard");
+    expect(source).not.toContain("refreshArrival");
+    expect(source).toContain("Was this class held?");
+    expect(source).toContain("Planned topic · Week");
+    expect(source.indexOf("Was this class held?")).toBeLessThan(
+      source.indexOf("Planned topic · Week"),
+    );
+  });
+
   test("keeps taught topic required and learning summary optional", async () => {
     const source = await Bun.file(formPath).text();
 
