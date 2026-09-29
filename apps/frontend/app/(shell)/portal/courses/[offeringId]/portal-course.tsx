@@ -99,47 +99,47 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
       <Tabs defaultValue="overview" className="gap-3">
         <TabsList
           aria-label="Course sections"
-          className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-sm"
+          className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-sm group-data-horizontal/tabs:h-auto"
         >
           <TabsTrigger
             value="overview"
-            className="h-9 flex-none px-3 text-sm sm:px-4"
+            className={COURSE_TAB_CLASS}
           >
             Overview
           </TabsTrigger>
           <TabsTrigger
             value="attendance"
-            className="h-9 flex-none px-3 text-sm sm:px-4"
+            className={COURSE_TAB_CLASS}
           >
             Attendance
           </TabsTrigger>
           <TabsTrigger
             value="weekly-notes"
-            className="h-9 flex-none px-3 text-sm sm:px-4"
+            className={COURSE_TAB_CLASS}
           >
             Weekly Notes
           </TabsTrigger>
           <TabsTrigger
             value="learning"
-            className="h-9 flex-none px-3 text-sm sm:px-4"
+            className={COURSE_TAB_CLASS}
           >
             Learning
           </TabsTrigger>
           <TabsTrigger
             value="assessments"
-            className="h-9 flex-none px-3 text-sm sm:px-4"
+            className={COURSE_TAB_CLASS}
           >
             Assessments
           </TabsTrigger>
           <TabsTrigger
             value="grades"
-            className="h-9 flex-none px-3 text-sm sm:px-4"
+            className={COURSE_TAB_CLASS}
           >
             Grades
           </TabsTrigger>
           <TabsTrigger
             value="resources"
-            className="h-9 flex-none px-3 text-sm sm:px-4"
+            className={COURSE_TAB_CLASS}
           >
             Resources
           </TabsTrigger>
