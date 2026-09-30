@@ -40,6 +40,18 @@ export type ProgrammeCurriculumRevisionTrigger = z.infer<
 export const CurriculumSemesterSchema = z.enum(["First", "Second"]);
 export type CurriculumSemester = z.infer<typeof CurriculumSemesterSchema>;
 
+export const CURRICULUM_COMPETENCY_LEVELS = [
+  "Basic",
+  "Intermediate",
+  "Advanced",
+] as const;
+export const CurriculumCompetencyLevelSchema = z.enum(
+  CURRICULUM_COMPETENCY_LEVELS,
+);
+export type CurriculumCompetencyLevel = z.infer<
+  typeof CurriculumCompetencyLevelSchema
+>;
+
 export const CreateInitialCurriculumSchema = z.object({
   code: z.string().trim().min(1).max(64),
   name: z.string().trim().min(1).max(240),
@@ -229,6 +241,81 @@ export const BindProgrammeCurriculumCompetencyFrameworkSchema = z
   .strict();
 export type BindProgrammeCurriculumCompetencyFrameworkInput = z.infer<
   typeof BindProgrammeCurriculumCompetencyFrameworkSchema
+>;
+
+export const CurriculumCourseCompetencyMappingSchema = z.object({
+  id: z.string().uuid(),
+  curriculumVersionId: z.string().uuid(),
+  placementId: z.string().uuid(),
+  competencyId: z.string().uuid(),
+  teachLevel: CurriculumCompetencyLevelSchema.nullable(),
+  useLevel: CurriculumCompetencyLevelSchema.nullable(),
+  assessLevel: CurriculumCompetencyLevelSchema.nullable(),
+  note: z.string(),
+  updatedById: z.string().uuid(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type CurriculumCourseCompetencyMapping = z.infer<
+  typeof CurriculumCourseCompetencyMappingSchema
+>;
+
+export const CurriculumCompetencyMapCourseSchema = CurriculumCourseSchema.extend({
+  mappings: z.array(CurriculumCourseCompetencyMappingSchema),
+});
+export type CurriculumCompetencyMapCourse = z.infer<
+  typeof CurriculumCompetencyMapCourseSchema
+>;
+
+export const CurriculumCompetencyMapPathwaySchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  name: z.string(),
+  yearLevel: z.number().int().min(1).max(4),
+  semester: CurriculumSemesterSchema,
+  isDefault: z.boolean(),
+});
+export type CurriculumCompetencyMapPathway = z.infer<
+  typeof CurriculumCompetencyMapPathwaySchema
+>;
+
+export const CurriculumCompetencyMapSummarySchema = z.object({
+  courseCount: z.number().int().min(0),
+  competencyCount: z.number().int().min(0),
+  mappedCourseCount: z.number().int().min(0),
+  unmappedCourseCount: z.number().int().min(0),
+  mappedCompetencyCount: z.number().int().min(0),
+  unmappedCompetencyCount: z.number().int().min(0),
+});
+export type CurriculumCompetencyMapSummary = z.infer<
+  typeof CurriculumCompetencyMapSummarySchema
+>;
+
+export const CurriculumCompetencyMapSchema = z.object({
+  curriculumVersion: z.object({
+    id: z.string().uuid(),
+    status: ProgrammeCurriculumStatusSchema,
+    version: z.string(),
+  }),
+  framework: CurriculumCompetencyFrameworkBindingSchema.nullable(),
+  courses: z.array(CurriculumCompetencyMapCourseSchema),
+  pathways: z.array(CurriculumCompetencyMapPathwaySchema),
+  summary: CurriculumCompetencyMapSummarySchema,
+});
+export type CurriculumCompetencyMap = z.infer<
+  typeof CurriculumCompetencyMapSchema
+>;
+
+export const UpdateCurriculumCourseCompetencyMappingSchema = z
+  .object({
+    teachLevel: CurriculumCompetencyLevelSchema.nullable().default(null),
+    useLevel: CurriculumCompetencyLevelSchema.nullable().default(null),
+    assessLevel: CurriculumCompetencyLevelSchema.nullable().default(null),
+    note: z.string().trim().max(1000).default(""),
+  })
+  .strict();
+export type UpdateCurriculumCourseCompetencyMappingInput = z.infer<
+  typeof UpdateCurriculumCourseCompetencyMappingSchema
 >;
 
 export const ProgrammeCurriculumReadSchema = z.object({
