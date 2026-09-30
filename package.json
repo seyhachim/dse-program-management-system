@@ -24,8 +24,7 @@
     "db:migrate:deploy": "bun run --cwd apps/backend db:migrate:deploy",
     "db:generate": "bun run --cwd apps/backend db:generate",
     "seed": "bun run --cwd apps/backend seed",
-    "gen-token": "bun run --cwd apps/backend gen-token",
-    "test:browser": "bun run --cwd tests/browser test"
+    "gen-token": "bun run --cwd apps/backend gen-token"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
