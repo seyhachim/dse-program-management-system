@@ -352,6 +352,80 @@ jobs:
       - name: Verify database security after fail-closed probes
         run: bun run --cwd apps/backend db:security:verify
 
+  browser-smoke:
+    name: Authenticated browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dse_browser
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d dse_browser"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/dse_browser?schema=public
+      AUTH_MODE: dev
+      JWT_SECRET: issue-823-browser-smoke-secret-at-least-32-characters
+      NEXT_PUBLIC_AUTH_MODE: dev
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
+      - name: Install application dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install pinned browser-smoke dependencies
+        run: bun install --cwd tests/browser --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: bun run db:generate
+
+      - name: Apply migrations to isolated browser database
+        run: bun run db:migrate:deploy
+
+      - name: Seed isolated browser database
+        run: bun run seed
+
+      - name: Mint role-scoped dev tokens
+        run: |
+          echo "BROWSER_SMOKE_ADMIN_TOKEN=$(bun run gen-token --role admin | tail -n 1)" >> "$GITHUB_ENV"
+          echo "BROWSER_SMOKE_COORDINATOR_TOKEN=$(bun run gen-token --role program_coordinator | tail -n 1)" >> "$GITHUB_ENV"
+          echo "BROWSER_SMOKE_READONLY_TOKEN=$(bun run gen-token --role program_secretary | tail -n 1)" >> "$GITHUB_ENV"
+
+      - name: Install Chromium
+        run: cd tests/browser && bunx playwright install --with-deps chromium
+
+      - name: Run authenticated Chromium smoke
+        run: bun run --cwd tests/browser test
+
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-failure-${{ github.run_id }}
+          path: |
+            tests/browser/test-results
+            tests/browser/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
   backend-integration:
     name: Backend integration authorization
     runs-on: ubuntu-latest

@@ -14,7 +14,7 @@ export const curriculumWorkspaceManifest: PluginManifest = {
       label: "Curriculum",
       path: "/curriculum",
       icon: "layers",
-      roles: ["admin", "program_coordinator"],
+      roles: ["admin", "program_coordinator", "program_secretary", "qa_reviewer"],
       group: "Academic",
     },
   ],
