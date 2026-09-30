@@ -14,5 +14,5 @@ Run after preparing an isolated PostgreSQL database and dev tokens:
 bun install --cwd tests/browser --frozen-lockfile
 cd tests/browser && bunx playwright install chromium
 cd ../..
-bun run test:browser
+bun run --cwd tests/browser test
 ```
