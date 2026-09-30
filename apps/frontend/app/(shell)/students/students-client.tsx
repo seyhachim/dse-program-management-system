@@ -196,7 +196,7 @@ export function StudentsClient() {
     }
     const confirmed = confirm(
       `Send Student Portal access to the ${selectedIds.length} selected student${selectedIds.length === 1 ? "" : "s"}?\n\n` +
-      "Only the checked rows will be processed. Active students with an email can receive access; inactive/no-email records are skipped, pending invitations are refreshed, and activated accounts are unchanged.",
+      "Only the checked rows will be processed. Active students with an email can receive access; expired invitations are refreshed, still-valid pending invitations are left unchanged, inactive/no-email records are skipped, and activated accounts are unchanged.",
     );
     if (!confirmed) return;
 
@@ -207,7 +207,7 @@ export function StudentsClient() {
       const result = await authApi.sendStudentPortalAccessToSelected(selectedIds);
       await portalAccessQuery.refetch();
       setNotice(
-        `Selected portal access delivery complete. Checked ${result.totalStudents}: ${result.newlyInvited} new invitation${result.newlyInvited === 1 ? "" : "s"}, ${result.resent} refreshed pending invitation${result.resent === 1 ? "" : "s"}, ${result.existingAccountSkipped} existing account${result.existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${result.ineligibleSkipped} inactive/no-email record${result.ineligibleSkipped === 1 ? "" : "s"} skipped.`,
+        `Selected portal access delivery complete. Checked ${result.totalStudents}: ${result.newlyInvited} new invitation${result.newlyInvited === 1 ? "" : "s"}, ${result.resent} expired invitation${result.resent === 1 ? "" : "s"} refreshed, ${result.pendingInvitationSkipped} still-valid pending invitation${result.pendingInvitationSkipped === 1 ? "" : "s"} unchanged, ${result.existingAccountSkipped} existing account${result.existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${result.ineligibleSkipped} inactive/no-email record${result.ineligibleSkipped === 1 ? "" : "s"} skipped.`,
       );
       if (result.failed > 0) {
         setActionError(
@@ -228,7 +228,7 @@ export function StudentsClient() {
       "Send Student Portal access to all students who still need an invitation?\n\n" +
       "This checks the full Student database, not only this page or filter.\n\n" +
       "• Active students with an email and no portal account receive their first invitation.\n" +
-      "• Pending invitations are replaced with a fresh email; the old pending link becomes invalid.\n" +
+      "• Expired invitations are replaced with a fresh email; still-valid pending invitations are left unchanged.\n" +
       "• Existing/activated accounts are not changed.\n" +
       "• Inactive students or students without email are skipped.",
     );
@@ -247,10 +247,11 @@ export function StudentsClient() {
       const newlyInvited = compatible.newlyInvited ?? compatible.invited ?? 0;
       const resent = compatible.resent ?? 0;
       const existingAccountSkipped = compatible.existingAccountSkipped ?? 0;
+      const pendingInvitationSkipped = compatible.pendingInvitationSkipped ?? 0;
       const ineligibleSkipped = compatible.ineligibleSkipped ?? compatible.skipped ?? 0;
 
       setNotice(
-        `Portal access delivery complete. Checked ${result.totalStudents} students: ${newlyInvited} new invitation${newlyInvited === 1 ? "" : "s"}, ${resent} refreshed pending invitation${resent === 1 ? "" : "s"}, ${existingAccountSkipped} existing account${existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${ineligibleSkipped} inactive/no-email record${ineligibleSkipped === 1 ? "" : "s"} skipped.`,
+        `Portal access delivery complete. Checked ${result.totalStudents} students: ${newlyInvited} new invitation${newlyInvited === 1 ? "" : "s"}, ${resent} expired invitation${resent === 1 ? "" : "s"} refreshed, ${pendingInvitationSkipped} still-valid pending invitation${pendingInvitationSkipped === 1 ? "" : "s"} unchanged, ${existingAccountSkipped} existing account${existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${ineligibleSkipped} inactive/no-email record${ineligibleSkipped === 1 ? "" : "s"} skipped.`,
       );
       if (result.failed > 0) {
         setActionError(
@@ -268,7 +269,7 @@ export function StudentsClient() {
 
   const handleResendInvite = async () => {
     if (!validateSelectedInviteStudent(selectedStudent)) return;
-    if (!confirm(`Resend the pending Student Portal invitation to ${selectedStudent.email}?`)) return;
+    if (!confirm(`Resend the expired Student Portal invitation to ${selectedStudent.email}?`)) return;
     setResending(true);
     setActionError(null);
     setNotice(null);
@@ -356,8 +357,18 @@ export function StudentsClient() {
   ];
 
   const inviteBusy = inviting || selectedInviting || bulkInviting || resending;
+  const selectedPortalStatus = selectedStudent
+    ? portalAccessByStudentId.get(selectedStudent.id)
+    : undefined;
   const selectedInviteEligible = Boolean(
-    selectedStudent?.email && selectedStudent.status === "Active",
+    selectedStudent?.email &&
+      selectedStudent.status === "Active" &&
+      selectedPortalStatus === "not-invited",
+  );
+  const selectedResendEligible = Boolean(
+    selectedStudent?.email &&
+      selectedStudent.status === "Active" &&
+      selectedPortalStatus === "invitation-expired",
   );
 
   return (
@@ -394,9 +405,15 @@ export function StudentsClient() {
                   ? "Portal invitations are available only after the student is Active."
                   : selectedStudent && !selectedStudent.email
                     ? "This roster record has no official email yet. Add one before provisioning portal access."
-                    : selectedStudent
-                      ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
-                      : "Select up to 20 students for a controlled portal-access batch, or use the full-roster action when you are ready. The Portal Access column shows who is pending, active, not invited, or needs attention."}
+                    : selectedStudent && selectedPortalStatus === "invitation-expired"
+                      ? "This invitation has expired and can be safely resent. Activated accounts are never rotated."
+                      : selectedStudent && selectedPortalStatus === "invitation-pending"
+                        ? "This invitation is still valid. Ask the student to use the current email link; PMS will not rotate it yet."
+                        : selectedStudent && selectedPortalStatus === "active-account"
+                          ? "This student already has an active portal account."
+                          : selectedStudent
+                            ? "Send the first portal invitation only when Portal Access is Not invited."
+                            : "Select up to 20 students for a controlled portal-access batch, or use the full-roster action when you are ready. The Portal Access column shows who is pending, expired, active, not invited, or needs attention."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -425,7 +442,7 @@ export function StudentsClient() {
             )}
             <Button
               variant="outline"
-              disabled={!selectedInviteEligible || inviteBusy}
+              disabled={!selectedResendEligible || inviteBusy}
               onClick={handleResendInvite}
             >
               {resending ? "Resending…" : "Resend expired invite"}
