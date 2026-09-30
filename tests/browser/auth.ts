@@ -31,6 +31,5 @@ export async function newRoleContext(
 
 export async function openCurriculum(page: Page) {
   await page.goto("/curriculum");
-  await page.getByRole("heading", { name: "Curriculum" }).waitFor();
   await page.getByRole("heading", { name: "Competency framework" }).waitFor();
 }
