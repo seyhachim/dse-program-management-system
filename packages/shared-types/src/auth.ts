@@ -46,7 +46,6 @@ export type SelectedStudentPortalAccessRequest = z.infer<typeof SelectedStudentP
 export const LecturerAccessState = z.enum([
   "no-access",
   "invitation-pending",
-  "invitation-expired",
   "active-account",
   "needs-attention",
   "status-unavailable",
@@ -152,6 +151,7 @@ export type BulkStudentPortalAccessResponse = z.infer<typeof BulkStudentPortalAc
 export const StudentPortalAccessState = z.enum([
   "not-invited",
   "invitation-pending",
+  "invitation-expired",
   "active-account",
   "no-email",
   "inactive-student",
