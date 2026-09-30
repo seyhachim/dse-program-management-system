@@ -206,8 +206,9 @@ export function StudentsClient() {
     try {
       const result = await authApi.sendStudentPortalAccessToSelected(selectedIds);
       await portalAccessQuery.refetch();
+      const pendingInvitationSkipped = result.pendingInvitationSkipped ?? 0;
       setNotice(
-        `Selected portal access delivery complete. Checked ${result.totalStudents}: ${result.newlyInvited} new invitation${result.newlyInvited === 1 ? "" : "s"}, ${result.resent} expired invitation${result.resent === 1 ? "" : "s"} refreshed, ${result.pendingInvitationSkipped} still-valid pending invitation${result.pendingInvitationSkipped === 1 ? "" : "s"} unchanged, ${result.existingAccountSkipped} existing account${result.existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${result.ineligibleSkipped} inactive/no-email record${result.ineligibleSkipped === 1 ? "" : "s"} skipped.`,
+        `Selected portal access delivery complete. Checked ${result.totalStudents}: ${result.newlyInvited} new invitation${result.newlyInvited === 1 ? "" : "s"}, ${result.resent} expired invitation${result.resent === 1 ? "" : "s"} refreshed, ${pendingInvitationSkipped} still-valid pending invitation${pendingInvitationSkipped === 1 ? "" : "s"} unchanged, ${result.existingAccountSkipped} existing account${result.existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${result.ineligibleSkipped} inactive/no-email record${result.ineligibleSkipped === 1 ? "" : "s"} skipped.`,
       );
       if (result.failed > 0) {
         setActionError(
