@@ -4,6 +4,7 @@ import {
   CreateCurriculumRevisionSchema,
   CreateInitialCurriculumSchema,
   CreateProgrammeCompetencyFrameworkVersionSchema,
+  UpdateCurriculumCourseCompetencyMappingSchema,
   UpdatePloTaxonomySchema,
   UpdateProgramCompetencyPlosSchema,
   UpdateProgramPolicySchema,
@@ -29,6 +30,12 @@ import {
   InvalidCompetencyFrameworkAssignmentError,
   competencyFrameworkService,
 } from "./competency-framework-service.ts";
+import {
+  CurriculumCompetencyMapConflictError,
+  CurriculumCompetencyMapNotFoundError,
+  InvalidCurriculumCompetencyMappingError,
+  curriculumCompetencyMapService,
+} from "./curriculum-competency-map-service.ts";
 
 const CURRICULUM_READ_ROLES: Role[] = [
   "admin",
@@ -60,6 +67,25 @@ function sendCurriculumError(res: Parameters<Parameters<Router["get"]>[1]>[1], e
     return;
   }
   res.status(500).json({ error: "Could not process curriculum request" });
+}
+
+function sendCurriculumCompetencyMapError(
+  res: Parameters<Parameters<Router["get"]>[1]>[1],
+  error: unknown,
+) {
+  if (error instanceof CurriculumCompetencyMapNotFoundError) {
+    res.status(404).json({ error: error.message });
+    return;
+  }
+  if (error instanceof CurriculumCompetencyMapConflictError) {
+    res.status(409).json({ error: error.message });
+    return;
+  }
+  if (error instanceof InvalidCurriculumCompetencyMappingError) {
+    res.status(400).json({ error: error.message });
+    return;
+  }
+  res.status(500).json({ error: "Could not process curriculum competency map request" });
 }
 
 export function createProgrammeRouter(): Router {
@@ -175,6 +201,91 @@ export function createProgrammeRouter(): Router {
           return;
         }
         res.status(500).json({ error: "Could not assign competency framework" });
+      }
+    },
+  );
+
+  router.get(
+    "/curricula/versions/:versionId/competency-map",
+    requirePermission("programme:read"),
+    async (req, res) => {
+      const versionId = req.params.versionId;
+      if (!versionId) {
+        res.status(400).json({ error: "Curriculum version id is required" });
+        return;
+      }
+      try {
+        const context =
+          await curriculumCompetencyMapService.getVersionContext(versionId);
+        if (
+          !hasCurriculumScope(
+            req.user,
+            context.programmeId,
+            CURRICULUM_READ_ROLES,
+          )
+        ) {
+          res.status(403).json({
+            error: "No curriculum competency map access for this programme",
+          });
+          return;
+        }
+        res.json(await curriculumCompetencyMapService.getMap(versionId));
+      } catch (error) {
+        sendCurriculumCompetencyMapError(res, error);
+      }
+    },
+  );
+
+  router.put(
+    "/curricula/versions/:versionId/competency-map/courses/:placementId/competencies/:competencyId",
+    requirePermission("programme:write"),
+    async (req, res) => {
+      const versionId = req.params.versionId;
+      const placementId = req.params.placementId;
+      const competencyId = req.params.competencyId;
+      if (!versionId || !placementId || !competencyId || !req.user) {
+        res.status(400).json({
+          error: "Curriculum version, course placement, and competency ids are required",
+        });
+        return;
+      }
+
+      const parsed =
+        UpdateCurriculumCourseCompetencyMappingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid course competency mapping",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      try {
+        const context =
+          await curriculumCompetencyMapService.getVersionContext(versionId);
+        if (
+          !hasCurriculumScope(
+            req.user,
+            context.programmeId,
+            CURRICULUM_WRITE_ROLES,
+          )
+        ) {
+          res.status(403).json({
+            error: "No curriculum competency map write access for this programme",
+          });
+          return;
+        }
+        res.json(
+          await curriculumCompetencyMapService.updateMapping(
+            versionId,
+            placementId,
+            competencyId,
+            req.user.id,
+            parsed.data,
+          ),
+        );
+      } catch (error) {
+        sendCurriculumCompetencyMapError(res, error);
       }
     },
   );
