@@ -43,7 +43,7 @@ export function pendingInvitationValidity(
 export function configuredInviteExpirySeconds(): number {
   const raw = process.env.SUPABASE_INVITE_EXPIRY_SECONDS?.trim();
   const seconds = raw ? Number(raw) : Number.NaN;
-  if (!Number.isFinite(seconds) || seconds <= 0) {
+  if (!Number.isInteger(seconds) || seconds <= 0 || seconds > 86_400) {
     throw new ProvisioningError(
       "SUPABASE_INVITE_EXPIRY_SECONDS must match the Supabase Email OTP Expiration setting",
     );
