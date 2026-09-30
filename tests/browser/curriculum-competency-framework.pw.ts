@@ -71,33 +71,33 @@ test.describe.serial("#812 competency framework browser smoke", () => {
     await adminApi?.dispose();
   });
 
-  test("programme writer assigns a Draft snapshot and the binding survives reload", async ({
+  test("Draft assignment persists, then Approved history is read-only for writer and reader", async ({
     browser,
   }) => {
-    const context = await newRoleContext(browser, "coordinator");
-    const page = await context.newPage();
+    const writer = await newRoleContext(browser, "coordinator");
+    const writerPage = await writer.newPage();
 
-    await openCurriculum(page);
-    await expect(page.getByText("Draft design context")).toBeVisible();
+    await openCurriculum(writerPage);
+    await expect(writerPage.getByText("Draft design context")).toBeVisible();
 
-    await page.getByLabel("Framework code").fill("browser-smoke-competencies");
-    await page.getByLabel("Framework name").fill(smokeFrameworkName);
-    await page.getByLabel("Framework change note").fill("#823 Playwright smoke");
-    await page.getByRole("button", { name: "Create snapshot & assign" }).click();
+    await writerPage.getByLabel("Framework code").fill("browser-smoke-competencies");
+    await writerPage.getByLabel("Framework name").fill(smokeFrameworkName);
+    await writerPage.getByLabel("Framework change note").fill("#823 Playwright smoke");
+    await writerPage
+      .getByRole("button", { name: "Create snapshot & assign" })
+      .click();
 
-    await expect(page.getByText(smokeFrameworkName, { exact: true })).toBeVisible();
-    await expect(page.getByText(/Framework v1/)).toBeVisible();
+    await expect(
+      writerPage.getByText(smokeFrameworkName, { exact: true }),
+    ).toBeVisible();
+    await expect(writerPage.getByText(/Framework v1/)).toBeVisible();
 
-    await page.reload();
-    await expect(page.getByText(smokeFrameworkName, { exact: true })).toBeVisible();
-    await expect(page.getByText("Draft design context")).toBeVisible();
+    await writerPage.reload();
+    await expect(
+      writerPage.getByText(smokeFrameworkName, { exact: true }),
+    ).toBeVisible();
+    await expect(writerPage.getByText("Draft design context")).toBeVisible();
 
-    await context.close();
-  });
-
-  test("Approved history and a read-only programme role expose no management controls", async ({
-    browser,
-  }) => {
     const submit = await adminApi.post(
       `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/workflow/submit`,
       { data: { comment: "Browser smoke review" } },
@@ -110,9 +110,7 @@ test.describe.serial("#812 competency framework browser smoke", () => {
     );
     await expectOk(approve);
 
-    const writer = await newRoleContext(browser, "coordinator");
-    const writerPage = await writer.newPage();
-    await openCurriculum(writerPage);
+    await writerPage.reload();
     await expect(writerPage.getByText("Read-only historical snapshot")).toBeVisible();
     await expect(
       writerPage.getByRole("button", { name: "Create snapshot & assign" }),
@@ -125,8 +123,12 @@ test.describe.serial("#812 competency framework browser smoke", () => {
     const readOnly = await newRoleContext(browser, "readOnly");
     const readOnlyPage = await readOnly.newPage();
     await openCurriculum(readOnlyPage);
-    await expect(readOnlyPage.getByText(smokeFrameworkName, { exact: true })).toBeVisible();
-    await expect(readOnlyPage.getByText("Read-only historical snapshot")).toBeVisible();
+    await expect(
+      readOnlyPage.getByText(smokeFrameworkName, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      readOnlyPage.getByText("Read-only historical snapshot"),
+    ).toBeVisible();
     await expect(readOnlyPage.getByLabel("Framework code")).toHaveCount(0);
     await expect(
       readOnlyPage.getByRole("button", { name: "Create snapshot & assign" }),
