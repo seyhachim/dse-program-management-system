@@ -112,8 +112,18 @@ async function mapWithConcurrency<T, R>(
  * the canonical Student UUID and a small status enum — never User/Auth ids,
  * tokens, links, provider errors, or email addresses.
  */
+export function studentPortalStatusForClient(
+  status: StudentPortalAccessState,
+  includeExpired: boolean,
+): StudentPortalAccessState {
+  return status === "invitation-expired" && !includeExpired
+    ? "invitation-pending"
+    : status;
+}
+
 export async function getStudentPortalAccessStatuses(
   requestedStudentIds: readonly string[],
+  includeExpired = false,
 ): Promise<StudentPortalAccessStatusResponse> {
   const studentIds = [...new Set(requestedStudentIds)];
   if (studentIds.length === 0) return { items: [] };
@@ -208,5 +218,10 @@ export async function getStudentPortalAccessStatuses(
     STATUS_LOOKUP_CONCURRENCY,
   );
 
-  return { items };
+  return {
+    items: items.map((item) => ({
+      ...item,
+      status: studentPortalStatusForClient(item.status, includeExpired),
+    })),
+  };
 }
