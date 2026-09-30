@@ -303,6 +303,29 @@ integrationDescribe("backend integration authorization boundaries", () => {
     }
   });
 
+  test("CourseSpec competency evidence stays course-scoped without granting lecturers programme-map access", async () => {
+    const lecturerToken = signToken(context.users.lecturer);
+
+    const ownCourse = await request(
+      `/api/courses/${context.courses.cs101.id}/spec/competency-evidence`,
+      { token: lecturerToken },
+    );
+    expect(ownCourse.status).toBe(200);
+
+    const otherCourse = await request(
+      `/api/courses/${context.courses.cs201.id}/spec/competency-evidence`,
+      { token: lecturerToken },
+    );
+    expect(otherCourse.status).toBe(403);
+    expect(errorMessage(otherCourse.body)).toContain("only access your own courses");
+
+    const programmeMap = await request(
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/competency-map`,
+      { token: lecturerToken },
+    );
+    expect(programmeMap.status).toBe(403);
+  });
+
   test("submitted and approved course specifications reject ordinary lecturer edits", async () => {
     const original = await prisma.courseSpec.findUniqueOrThrow({
       where: { id: context.cs101SpecId },
