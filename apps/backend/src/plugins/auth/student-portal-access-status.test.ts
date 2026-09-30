@@ -90,7 +90,37 @@ describe("classifyStudentPortalAccess", () => {
     ).toBe("needs-attention");
   });
 
-  test("uses the canonical pending invitation definition", () => {
+  test("distinguishes valid and expired pending invitations at the configured boundary", () => {
+    const pendingUser = {
+      email: "student@dse.dev",
+      invited_at: "2026-09-30T00:00:00Z",
+      email_confirmed_at: null,
+      confirmed_at: null,
+      last_sign_in_at: null,
+    };
+
+    expect(
+      classifyStudentPortalAccess({
+        student: ACTIVE,
+        linkedUser: LINKED_USER,
+        authLookup: { kind: "ok", user: pendingUser },
+        inviteExpirySeconds: 86_400,
+        nowMs: Date.parse("2026-09-30T23:59:59.999Z"),
+      }),
+    ).toBe("invitation-pending");
+
+    expect(
+      classifyStudentPortalAccess({
+        student: ACTIVE,
+        linkedUser: LINKED_USER,
+        authLookup: { kind: "ok", user: pendingUser },
+        inviteExpirySeconds: 86_400,
+        nowMs: Date.parse("2026-10-01T00:00:00.000Z"),
+      }),
+    ).toBe("invitation-expired");
+  });
+
+  test("fails closed instead of guessing pending expiry when configuration is missing", () => {
     expect(
       classifyStudentPortalAccess({
         student: ACTIVE,
@@ -99,14 +129,15 @@ describe("classifyStudentPortalAccess", () => {
           kind: "ok",
           user: {
             email: "student@dse.dev",
-            invited_at: "2026-09-14T00:00:00Z",
+            invited_at: "2026-09-30T00:00:00Z",
             email_confirmed_at: null,
             confirmed_at: null,
             last_sign_in_at: null,
           },
         },
+        inviteExpirySeconds: null,
       }),
-    ).toBe("invitation-pending");
+    ).toBe("status-unavailable");
   });
 
   test("treats confirmed, signed-in, or other non-pending identities as an existing active account", () => {
