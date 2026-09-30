@@ -205,6 +205,16 @@ export const competencyFrameworkService = {
     });
     if (current.competencyFrameworkVersionId === frameworkVersionId) return context;
 
+    const mappingCount =
+      await prisma.programmeCurriculumCourseCompetencyMapping.count({
+        where: { curriculumVersionId: versionId },
+      });
+    if (mappingCount > 0) {
+      throw new InvalidCompetencyFrameworkAssignmentError(
+        "Clear existing course competency mappings before changing the competency framework version",
+      );
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.programmeCurriculumVersion.update({
         where: { id: versionId },

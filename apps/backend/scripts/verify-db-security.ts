@@ -49,6 +49,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "ProgrammeCurriculumVersion",
   "ProgrammeCurriculumPathway",
   "ProgrammeCurriculumCourse",
+  "ProgrammeCurriculumCourseCompetencyMapping",
   "ProgrammeCurriculumAuditAction",
   "ProgrammeGradingScale",
   "ProgrammeGradingScaleVersion",

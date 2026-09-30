@@ -203,9 +203,17 @@ enum ProgrammeCurriculumAuditActionType {
   CourseAdded
   CourseUpdated
   CourseRemoved
+  CompetencyMappingUpdated
+  CompetencyMappingCleared
   Approved
   Activated
   Superseded
+}
+
+enum CurriculumCompetencyLevel {
+  Basic
+  Intermediate
+  Advanced
 }
 
 enum ProgrammeGradingScaleVersionStatus {
@@ -383,6 +391,7 @@ model User {
   courseSpecRevisionRequests         CourseSpecRevisionRequest[]               @relation("CourseSpecRevisionRequestedBy")
   curriculumVersionsCreated          ProgrammeCurriculumVersion[]              @relation("ProgrammeCurriculumVersionCreatedBy")
   curriculumAuditActions             ProgrammeCurriculumAuditAction[]          @relation("ProgrammeCurriculumAuditActor")
+  curriculumCompetencyMappingsUpdated ProgrammeCurriculumCourseCompetencyMapping[] @relation("ProgrammeCurriculumCourseCompetencyUpdatedBy")
   competencyFrameworkVersionsCreated ProgrammeCompetencyFrameworkVersion[]     @relation("ProgrammeCompetencyFrameworkVersionCreatedBy")
   competencyFrameworkAssignments     ProgrammeCurriculumVersion[]              @relation("ProgrammeCurriculumCompetencyFrameworkAssignedBy")
   gradingScaleVersionsCreated        ProgrammeGradingScaleVersion[]            @relation("ProgrammeGradingScaleVersionCreatedBy")
@@ -679,6 +688,8 @@ model ProgrammeCompetencyFrameworkCompetency {
   ploCodes           String[]                            @default([])
   createdAt          DateTime                            @default(now())
 
+  curriculumCourseMappings ProgrammeCurriculumCourseCompetencyMapping[]
+
   @@unique([frameworkVersionId, code])
   @@unique([frameworkVersionId, order])
   @@index([frameworkVersionId])
@@ -733,9 +744,10 @@ model ProgrammeCurriculumVersion {
   createdAt        DateTime                             @default(now())
   updatedAt        DateTime                             @updatedAt
 
-  courses      ProgrammeCurriculumCourse[]
-  pathways     ProgrammeCurriculumPathway[]
-  auditActions ProgrammeCurriculumAuditAction[]
+  courses             ProgrammeCurriculumCourse[]
+  pathways            ProgrammeCurriculumPathway[]
+  competencyMappings  ProgrammeCurriculumCourseCompetencyMapping[]
+  auditActions        ProgrammeCurriculumAuditAction[]
 
   @@unique([curriculumId, versionMajor, versionMinor])
   @@index([curriculumId, status])
@@ -790,11 +802,41 @@ model ProgrammeCurriculumCourse {
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
+  competencyMappings ProgrammeCurriculumCourseCompetencyMapping[]
+
   @@unique([curriculumVersionId, courseId])
   @@index([courseId])
   @@index([courseSpecVersionId])
   @@index([pathwayId])
   @@index([curriculumVersionId, yearLevel, semester, sortOrder])
+}
+
+/// One exact course × competency contribution within one curriculum version.
+/// Teach / Use / Assess are independent dimensions and each may be Basic,
+/// Intermediate, or Advanced. Historical rows become read-only with the
+/// curriculum version; Draft changes are audited through ProgrammeCurriculumAuditAction.
+model ProgrammeCurriculumCourseCompetencyMapping {
+  id                  String                               @id @default(uuid())
+  curriculumVersionId String
+  curriculumVersion   ProgrammeCurriculumVersion           @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
+  curriculumCourseId  String
+  curriculumCourse    ProgrammeCurriculumCourse            @relation(fields: [curriculumCourseId], references: [id], onDelete: Cascade)
+  competencyId        String
+  competency          ProgrammeCompetencyFrameworkCompetency @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+  teachLevel          CurriculumCompetencyLevel?
+  useLevel            CurriculumCompetencyLevel?
+  assessLevel         CurriculumCompetencyLevel?
+  note                String                               @default("")
+  updatedById         String
+  updatedBy           User                                 @relation("ProgrammeCurriculumCourseCompetencyUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt           DateTime                             @default(now())
+  updatedAt           DateTime                             @updatedAt
+
+  @@unique([curriculumVersionId, curriculumCourseId, competencyId])
+  @@index([curriculumVersionId])
+  @@index([curriculumCourseId])
+  @@index([competencyId])
+  @@index([updatedById])
 }
 
 /// Append-only workflow/revision history for curriculum versions. Database

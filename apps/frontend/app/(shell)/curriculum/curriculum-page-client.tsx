@@ -15,6 +15,7 @@ import {
 } from "@/lib/curriculum";
 import { CurriculumPathwayView } from "./curriculum-pathway-view";
 import { CurriculumCompetencyFrameworkPanel } from "./curriculum-competency-framework-panel";
+import { CurriculumCompetencyMapPanel } from "./curriculum-competency-map";
 import {
   normalizeStudyYear,
   pickPreferredCurriculumVersion,
@@ -596,6 +597,8 @@ export function CurriculumPageClient() {
         canManage={editable}
         onUpdated={applyData}
       />
+
+      <CurriculumCompetencyMapPanel data={data} canManage={editable} />
 
       <section className="rounded-xl border bg-card p-4">
         <div className="hidden gap-2 sm:flex" role="tablist" aria-label="Study year">

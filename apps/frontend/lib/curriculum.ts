@@ -6,6 +6,7 @@ import type {
   CreateProgrammeCompetencyFrameworkVersionInput,
   CurriculumArtifactView,
   CurriculumComparison,
+  CurriculumCompetencyMap,
   CurriculumCourseSpecBindings,
   CurriculumImportApplyInput,
   CurriculumImportPreview,
@@ -16,6 +17,7 @@ import type {
   ProgrammeCompetencyFrameworkVersion,
   ProgrammeCurriculumRead,
   ReorderCurriculumCoursesInput,
+  UpdateCurriculumCourseCompetencyMappingInput,
   UpdateCurriculumCourseInput,
   UpdateCurriculumWorkflowMetadataInput,
 } from "@dse-pms/shared-types";
@@ -68,6 +70,22 @@ export const curriculumApi = {
   ): Promise<ProgrammeCurriculumRead> {
     return api.put<ProgrammeCurriculumRead>(
       `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/competency-framework`,
+      input,
+    );
+  },
+  competencyMap(versionId: string): Promise<CurriculumCompetencyMap> {
+    return api.get<CurriculumCompetencyMap>(
+      `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/competency-map`,
+    );
+  },
+  updateCompetencyMapping(
+    versionId: string,
+    placementId: string,
+    competencyId: string,
+    input: UpdateCurriculumCourseCompetencyMappingInput,
+  ): Promise<CurriculumCompetencyMap> {
+    return api.put<CurriculumCompetencyMap>(
+      `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/competency-map/courses/${encodeURIComponent(placementId)}/competencies/${encodeURIComponent(competencyId)}`,
       input,
     );
   },
