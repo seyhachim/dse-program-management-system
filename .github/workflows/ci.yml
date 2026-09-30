@@ -192,6 +192,16 @@ jobs:
         env:
           CURRICULUM_DB_TESTS: "1"
 
+      - name: Verify CourseSpec programme competency context resolution
+        run: bun test apps/backend/src/plugins/programme/course-competency-context-service-db.test.ts
+        env:
+          CURRICULUM_DB_TESTS: "1"
+
+      - name: Verify CourseSpec competency evidence and revision provenance
+        run: bun test apps/backend/src/plugins/courses/competency-evidence-service-db.test.ts
+        env:
+          COURSE_SPEC_COMPETENCY_DB_TESTS: "1"
+
       - name: Verify programme grading-scale history and CourseSpec binding integrity
         run: bun test apps/backend/src/plugins/programme/grading-scale-db.test.ts
         env:

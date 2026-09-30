@@ -73,6 +73,8 @@ const EXPECTED_PUBLIC_TABLES = [
   "CourseSpecAssessmentItem",
   "CourseSpecCriterionCloMapping",
   "CourseSpecMappingCell",
+  "CourseSpecCompetencyEvidence",
+  "CourseSpecCompetencyEvidenceClo",
   "CourseSpecResource",
   "CourseSpecStudentResponsibility",
   "CourseSpecDocumentTheme",

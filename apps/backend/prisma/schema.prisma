@@ -2094,6 +2094,7 @@ model CourseSpec {
   weeks                   CourseSpecWeek[]
   assessmentItems         CourseSpecAssessmentItem[]
   mappingCells            CourseSpecMappingCell[]
+  competencyEvidence      CourseSpecCompetencyEvidence[]
   resources               CourseSpecResource[]
   studentResponsibilities CourseSpecStudentResponsibility[]
   courseInfo              CourseSpecCourseInfo?
@@ -2306,6 +2307,7 @@ model CourseSpecClo {
   activeLearningStrategyIds String[]                        @default([])
   assessmentMethods         CourseSpecCloAssessmentMethod[]
   attainmentSnapshots       QaCloAttainmentSnapshot[]
+  competencyEvidenceLinks    CourseSpecCompetencyEvidenceClo[]
 
   @@id([courseSpecId, id])
 }
@@ -2460,6 +2462,51 @@ model CourseSpecMappingCell {
   strength     Int
 
   @@id([courseSpecId, cloCode, kind, ref])
+}
+
+/// CourseSpec-owned evidence that explains how one programme competency
+/// expectation is supported by this exact academic CourseSpec version.
+/// Programme T/U/A values and provenance are snapshotted here; they are never
+/// authoritative programme mappings and never update the curriculum.
+model CourseSpecCompetencyEvidence {
+  id                        String                    @id @default(uuid())
+  courseSpecId              String
+  courseSpec                CourseSpec                @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  competencyId              String
+  competencyCode            String
+  competencyName            String
+  sourceMappingId           String?
+  sourceCurriculumVersionId String
+  sourcePlacementId         String
+  sourceFrameworkVersionId  String
+  teachLevel                CurriculumCompetencyLevel?
+  useLevel                  CurriculumCompetencyLevel?
+  assessLevel               CurriculumCompetencyLevel?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  cloLinks                  CourseSpecCompetencyEvidenceClo[]
+
+  @@unique([courseSpecId, competencyId])
+  @@unique([id, courseSpecId])
+  @@index([sourceCurriculumVersionId])
+  @@index([sourcePlacementId])
+  @@index([sourceFrameworkVersionId])
+  @@index([sourceMappingId])
+}
+
+/// Explicit lecturer-selected CLO evidence for one CourseSpec competency.
+/// This is the only authoritative competency→CLO link in the CourseSpec;
+/// shared PLO codes are never used to fabricate this relationship.
+model CourseSpecCompetencyEvidenceClo {
+  evidenceId   String
+  courseSpecId String
+  cloId        String
+  evidence     CourseSpecCompetencyEvidence @relation(fields: [evidenceId, courseSpecId], references: [id, courseSpecId], onDelete: Cascade)
+  clo          CourseSpecClo                @relation(fields: [courseSpecId, cloId], references: [courseSpecId, id], onDelete: Cascade)
+  createdAt    DateTime                     @default(now())
+
+  @@id([evidenceId, cloId])
+  @@index([courseSpecId, cloId])
 }
 
 /// §19 Required Resources. Each row supplies the actual material/link for a

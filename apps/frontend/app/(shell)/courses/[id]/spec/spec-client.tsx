@@ -795,6 +795,8 @@ export function SpecClient({
             value={mapping}
             onChange={setMapping}
             courseName={`${course.code} - ${course.title}`}
+            courseId={courseId}
+            readOnly={editingLocked}
           />
         </TabsContent>
 

@@ -41,6 +41,7 @@ import {
   type MappingColumn,
   type MappingForm,
 } from "./mapping-model";
+import { ProgrammeCompetencyExpectations } from "./programme-competency-expectations";
 import {
   ALIGNMENT_STATUS_LABELS,
   deriveConstructiveAlignmentAudit,
@@ -84,6 +85,8 @@ export function MappingSection({
   value,
   onChange,
   courseName,
+  courseId,
+  readOnly = false,
 }: {
   clos: CloForm[];
   weeklyPlan: WeekForm[];
@@ -91,6 +94,8 @@ export function MappingSection({
   value: MappingForm;
   onChange: (cells: MappingForm) => void;
   courseName?: string;
+  courseId: string;
+  readOnly?: boolean;
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [viewBy, setViewBy] = useState<ViewBy>("clo");
@@ -155,6 +160,12 @@ export function MappingSection({
           </Button>
         </div>
       </header>
+
+      <ProgrammeCompetencyExpectations
+        courseId={courseId}
+        clos={clos}
+        readOnly={readOnly}
+      />
 
       <AlignmentSummary audit={audit} />
       <SourceAvailability audit={audit} />

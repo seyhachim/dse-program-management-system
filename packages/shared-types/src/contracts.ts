@@ -1,5 +1,6 @@
 import type { StudentProfile, StudentStatus } from "./students.ts";
 import type { UserHonorific } from "./lecturers.ts";
+import type { CourseSpecCompetencyContext } from "./course-spec-competency.ts";
 
 /**
  * Cross-plugin service contracts. A plugin that needs another plugin's data
@@ -112,6 +113,14 @@ export interface OfferingsServiceContract {
   courseIdsWithOfferings(courseIds: readonly string[]): Promise<string[]>;
   /** Read-only evidence projection; never creates a portfolio-owned teaching copy. */
   portfolioTeachingForLecturer(lecturerId: string): Promise<LecturerTeachingEvidenceRef[]>;
+}
+
+export interface ProgrammeCompetencyContextServiceContract {
+  /** Narrow course-scoped curriculum expectation projection for CourseSpec. */
+  getCourseSpecCompetencyContext(
+    courseId: string,
+    courseSpecId: string | null,
+  ): Promise<CourseSpecCompetencyContext>;
 }
 
 export interface AuthServiceContract {

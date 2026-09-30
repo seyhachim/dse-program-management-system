@@ -53,6 +53,7 @@ const SOURCE_INCLUDE = {
     include: { criterionCloMappings: true },
   },
   mappingCells: true,
+  competencyEvidence: { include: { cloLinks: true } },
   resources: { orderBy: { order: "asc" as const } },
   studentResponsibilities: { orderBy: { order: "asc" as const } },
   policy: true,
@@ -381,6 +382,50 @@ async function cloneNormalizedContent(
         strength: row.strength,
       })),
     });
+  }
+
+  if (source.competencyEvidence.length > 0) {
+    const evidenceIdMap = new Map(
+      source.competencyEvidence.map((row) => [row.id, randomUUID()]),
+    );
+
+    await tx.courseSpecCompetencyEvidence.createMany({
+      data: source.competencyEvidence.map((row) => ({
+        id: evidenceIdMap.get(row.id)!,
+        courseSpecId: targetCourseSpecId,
+        competencyId: row.competencyId,
+        competencyCode: row.competencyCode,
+        competencyName: row.competencyName,
+        sourceMappingId: row.sourceMappingId,
+        sourceCurriculumVersionId: row.sourceCurriculumVersionId,
+        sourcePlacementId: row.sourcePlacementId,
+        sourceFrameworkVersionId: row.sourceFrameworkVersionId,
+        teachLevel: row.teachLevel,
+        useLevel: row.useLevel,
+        assessLevel: row.assessLevel,
+      })),
+    });
+
+    const evidenceCloLinks: Prisma.CourseSpecCompetencyEvidenceCloCreateManyInput[] =
+      source.competencyEvidence.flatMap((row) =>
+        row.cloLinks.flatMap((link) => {
+          const clonedCloId = cloIdMap.get(link.cloId);
+          return clonedCloId
+            ? [
+                {
+                  evidenceId: evidenceIdMap.get(row.id)!,
+                  courseSpecId: targetCourseSpecId,
+                  cloId: clonedCloId,
+                },
+              ]
+            : [];
+        }),
+      );
+    if (evidenceCloLinks.length > 0) {
+      await tx.courseSpecCompetencyEvidenceClo.createMany({
+        data: evidenceCloLinks,
+      });
+    }
   }
 
   if (source.resources.length > 0) {
