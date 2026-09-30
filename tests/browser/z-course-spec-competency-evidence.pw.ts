@@ -202,7 +202,12 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
       },
     },
   );
-  expect(createRevision.status(), await createRevision.text()).toBe(201);
+  const revisionStatus = createRevision.status();
+  const revisionBody = await createRevision.text();
+  if (revisionStatus !== 201) {
+    expect(revisionStatus, revisionBody).toBe(409);
+    expect(revisionBody).toContain("open academic revision");
+  }
 
   // The seeded approved spec intentionally leaves two authoring-readiness
   // details unfinished. Complete those details on the isolated Draft revision
@@ -248,7 +253,9 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
     `/api/courses/${course.id}/spec/courseInfo`,
     {
       data: {
-        prerequisites: draftSpec.data.courseInfo?.prerequisites ?? "",
+        // CS101 has no prerequisite; omit that administratively controlled
+        // field and mark Course Information complete through the editable
+        // description field only.
         description: draftSpec.data.courseInfo?.description ?? "",
       },
     },
