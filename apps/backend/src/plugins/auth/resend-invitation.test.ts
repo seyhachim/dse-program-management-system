@@ -76,13 +76,13 @@ describe("pendingInvitationValidity", () => {
 
   it("keeps an invitation valid immediately before the configured boundary", () => {
     expect(
-      pendingInvitationValidity(pending, 86_400, Date.parse("2026-09-30T23:59:59.999Z")),
+      pendingInvitationValidity(pending, 3_600, Date.parse("2026-09-30T00:59:59.999Z")),
     ).toBe("valid");
   });
 
   it("expires an invitation exactly at the configured boundary", () => {
     expect(
-      pendingInvitationValidity(pending, 86_400, Date.parse("2026-10-01T00:00:00.000Z")),
+      pendingInvitationValidity(pending, 3_600, Date.parse("2026-09-30T01:00:00.000Z")),
     ).toBe("expired");
   });
 
@@ -94,7 +94,7 @@ describe("pendingInvitationValidity", () => {
     expect(
       pendingInvitationValidity(
         { ...pending, confirmed_at: "2026-09-30T00:10:00.000Z" },
-        86_400,
+        3_600,
       ),
     ).toBe("not-pending");
   });
