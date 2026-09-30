@@ -148,7 +148,6 @@ test("LecturerAccessState exposes fail-closed onboarding states", () => {
   expect(LecturerAccessState.options).toEqual([
     "no-access",
     "invitation-pending",
-    "invitation-expired",
     "active-account",
     "needs-attention",
     "status-unavailable",
@@ -207,6 +206,7 @@ test("StudentPortalAccessState exposes the roster-safe portal states", () => {
   expect(StudentPortalAccessState.options).toEqual([
     "not-invited",
     "invitation-pending",
+    "invitation-expired",
     "active-account",
     "no-email",
     "inactive-student",
