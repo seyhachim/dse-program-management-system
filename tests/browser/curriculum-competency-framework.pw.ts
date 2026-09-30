@@ -85,11 +85,11 @@ test.describe.serial("#812 competency framework browser smoke", () => {
     await page.getByLabel("Framework change note").fill("#823 Playwright smoke");
     await page.getByRole("button", { name: "Create snapshot & assign" }).click();
 
-    await expect(page.getByText(smokeFrameworkName)).toBeVisible();
+    await expect(page.getByText(smokeFrameworkName, { exact: true })).toBeVisible();
     await expect(page.getByText(/Framework v1/)).toBeVisible();
 
     await page.reload();
-    await expect(page.getByText(smokeFrameworkName)).toBeVisible();
+    await expect(page.getByText(smokeFrameworkName, { exact: true })).toBeVisible();
     await expect(page.getByText("Draft design context")).toBeVisible();
 
     await context.close();
@@ -125,7 +125,7 @@ test.describe.serial("#812 competency framework browser smoke", () => {
     const readOnly = await newRoleContext(browser, "readOnly");
     const readOnlyPage = await readOnly.newPage();
     await openCurriculum(readOnlyPage);
-    await expect(readOnlyPage.getByText(smokeFrameworkName)).toBeVisible();
+    await expect(readOnlyPage.getByText(smokeFrameworkName, { exact: true })).toBeVisible();
     await expect(readOnlyPage.getByText("Read-only historical snapshot")).toBeVisible();
     await expect(readOnlyPage.getByLabel("Framework code")).toHaveCount(0);
     await expect(
