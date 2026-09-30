@@ -148,6 +148,7 @@ test("LecturerAccessState exposes fail-closed onboarding states", () => {
   expect(LecturerAccessState.options).toEqual([
     "no-access",
     "invitation-pending",
+    "invitation-expired",
     "active-account",
     "needs-attention",
     "status-unavailable",
@@ -187,7 +188,8 @@ test("BulkStudentPortalAccessResponse requires every student to have exactly one
     newlyInvited: 3,
     resent: 2,
     existingAccountSkipped: 2,
-    ineligibleSkipped: 2,
+    pendingInvitationSkipped: 1,
+    ineligibleSkipped: 1,
     failed: 1,
     eligible: 6,
     invited: 5,
