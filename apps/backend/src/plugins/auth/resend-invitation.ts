@@ -234,7 +234,7 @@ export async function refreshLecturerInvitation(
     userId,
     "lecturer",
     undefined,
-    { skipNonPending: true, requireExpired: true },
+    { skipNonPending: true },
   );
 }
 
@@ -287,6 +287,6 @@ export async function refreshStudentPortalInvitation(
     student.userId,
     "student",
     student.email,
-    { skipNonPending: true },
+    { skipNonPending: true, requireExpired: true },
   );
 }
