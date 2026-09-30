@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { classifyStudentPortalAccess } from "./student-portal-access-status.ts";
+import {
+  classifyStudentPortalAccess,
+  studentPortalStatusForClient,
+} from "./student-portal-access-status.ts";
 
 const ACTIVE = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -162,5 +165,17 @@ describe("classifyStudentPortalAccess", () => {
         }),
       ).toBe("active-account");
     }
+  });
+});
+
+
+describe("studentPortalStatusForClient", () => {
+  test("downgrades expired status for legacy clients", () => {
+    expect(studentPortalStatusForClient("invitation-expired", false)).toBe("invitation-pending");
+  });
+
+  test("exposes expired status only to opted-in clients", () => {
+    expect(studentPortalStatusForClient("invitation-expired", true)).toBe("invitation-expired");
+    expect(studentPortalStatusForClient("active-account", false)).toBe("active-account");
   });
 });

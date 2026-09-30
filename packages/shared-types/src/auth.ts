@@ -162,6 +162,7 @@ export type StudentPortalAccessState = z.infer<typeof StudentPortalAccessState>;
 
 export const StudentPortalAccessStatusRequest = z.object({
   studentIds: z.array(z.string().uuid()).min(1).max(100),
+  includeExpired: z.boolean().optional().default(false),
 }).strict();
 export type StudentPortalAccessStatusRequest = z.infer<typeof StudentPortalAccessStatusRequest>;
 
