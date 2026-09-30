@@ -131,7 +131,12 @@ export function createAuthRouter(): Router {
       }
       try {
         res.set("Cache-Control", "no-store");
-        res.json(await getStudentPortalAccessStatuses(parsed.data.studentIds));
+        res.json(
+          await getStudentPortalAccessStatuses(
+            parsed.data.studentIds,
+            parsed.data.includeExpired,
+          ),
+        );
       } catch {
         res.status(500).json({ error: "Could not load Student Portal access status" });
       }
