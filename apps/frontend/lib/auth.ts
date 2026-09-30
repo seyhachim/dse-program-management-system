@@ -39,7 +39,7 @@ export const authApi = {
   studentPortalAccessStatuses(studentIds: string[]): Promise<StudentPortalAccessStatusResponse> {
     return api.post<StudentPortalAccessStatusResponse>(
       "/api/auth/students/portal-access-status",
-      { studentIds },
+      { studentIds, includeExpired: true },
     );
   },
   sendStudentPortalAccessToSelected(studentIds: string[]): Promise<BulkStudentPortalAccessResponse> {
