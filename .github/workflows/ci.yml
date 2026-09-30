@@ -413,7 +413,7 @@ jobs:
         run: cd tests/browser && bunx playwright install --with-deps chromium
 
       - name: Run authenticated Chromium smoke
-        run: bun run test:browser
+        run: bun run --cwd tests/browser test
 
       - name: Upload browser failure artifacts
         if: failure()
