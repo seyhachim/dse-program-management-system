@@ -5,6 +5,7 @@ import {
   invitationIsPending,
   invitationMetadata,
   invitationRefreshAction,
+  pendingInvitationValidity,
 } from "./resend-invitation.ts";
 
 describe("invitationIsPending", () => {
@@ -61,6 +62,41 @@ describe("invitationIsPending", () => {
         last_sign_in_at: "2026-08-25T03:01:00.000Z",
       }),
     ).toBe(false);
+  });
+});
+
+
+describe("pendingInvitationValidity", () => {
+  const pending = {
+    invited_at: "2026-09-30T00:00:00.000Z",
+    email_confirmed_at: null,
+    confirmed_at: null,
+    last_sign_in_at: null,
+  };
+
+  it("keeps an invitation valid immediately before the configured boundary", () => {
+    expect(
+      pendingInvitationValidity(pending, 86_400, Date.parse("2026-09-30T23:59:59.999Z")),
+    ).toBe("valid");
+  });
+
+  it("expires an invitation exactly at the configured boundary", () => {
+    expect(
+      pendingInvitationValidity(pending, 86_400, Date.parse("2026-10-01T00:00:00.000Z")),
+    ).toBe("expired");
+  });
+
+  it("fails closed when expiry configuration is missing", () => {
+    expect(pendingInvitationValidity(pending, null)).toBe("unknown");
+  });
+
+  it("does not apply expiry to an activated account", () => {
+    expect(
+      pendingInvitationValidity(
+        { ...pending, confirmed_at: "2026-09-30T00:10:00.000Z" },
+        86_400,
+      ),
+    ).toBe("not-pending");
   });
 });
 
