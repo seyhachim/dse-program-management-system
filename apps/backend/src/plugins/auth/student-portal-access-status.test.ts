@@ -104,8 +104,8 @@ describe("classifyStudentPortalAccess", () => {
         student: ACTIVE,
         linkedUser: LINKED_USER,
         authLookup: { kind: "ok", user: pendingUser },
-        inviteExpirySeconds: 86_400,
-        nowMs: Date.parse("2026-09-30T23:59:59.999Z"),
+        inviteExpirySeconds: 3_600,
+        nowMs: Date.parse("2026-09-30T00:59:59.999Z"),
       }),
     ).toBe("invitation-pending");
 
@@ -114,8 +114,8 @@ describe("classifyStudentPortalAccess", () => {
         student: ACTIVE,
         linkedUser: LINKED_USER,
         authLookup: { kind: "ok", user: pendingUser },
-        inviteExpirySeconds: 86_400,
-        nowMs: Date.parse("2026-10-01T00:00:00.000Z"),
+        inviteExpirySeconds: 3_600,
+        nowMs: Date.parse("2026-09-30T01:00:00.000Z"),
       }),
     ).toBe("invitation-expired");
   });
