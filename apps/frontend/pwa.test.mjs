@@ -7,6 +7,7 @@ import manifest from "./app/manifest.ts";
 import nextConfig from "./next.config.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const STATIC_CACHE = "dse-pms-static-v1";
 const PUBLIC_DATA_CACHE = "dse-pms-public-data-v1";
 
 async function readServiceWorker() {
@@ -187,7 +188,42 @@ describe("DSE PMS PWA", () => {
     expect(source).toContain('if (url.pathname.startsWith("/api/")) return;');
     expect(navigationBlock).toContain("fetch(request)");
     expect(navigationBlock).toContain("caches.match(OFFLINE_URL)");
+    expect(navigationBlock).toContain("createInlineOfflineResponse()");
+    expect(navigationBlock).not.toContain("Response.error()");
     expect(navigationBlock).not.toContain("cache.put");
+  });
+
+  test("failed navigation prefers the cached data-free offline page", async () => {
+    const harness = await serviceWorkerHarness({
+      fetchImpl: async () => {
+        throw new Error("offline");
+      },
+    });
+    await harness.seed(STATIC_CACHE, "/offline", fakeResponse("cached-offline"));
+
+    const event = harness.dispatchFetch(requestFor("/", { mode: "navigate" }));
+    const response = await event.responsePromise;
+
+    expect(await response.text()).toBe("cached-offline");
+  });
+
+  test("failed navigation renders a non-cacheable inline fallback when offline cache is missing", async () => {
+    const harness = await serviceWorkerHarness({
+      fetchImpl: async () => {
+        throw new Error("offline");
+      },
+    });
+
+    const event = harness.dispatchFetch(requestFor("/", { mode: "navigate" }));
+    const response = await event.responsePromise;
+    const body = await response.text();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(body).toContain("DSE PMS is temporarily unavailable");
+    expect(body).toContain("Check your internet connection");
+    expect(body).toContain('href=""');
   });
 
   test("runtime static caching remains limited to build and explicit branding assets", async () => {
