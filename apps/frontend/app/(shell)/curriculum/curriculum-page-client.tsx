@@ -14,6 +14,7 @@ import {
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
 import { CurriculumPathwayView } from "./curriculum-pathway-view";
+import { CurriculumCompetencyFrameworkPanel } from "./curriculum-competency-framework-panel";
 import {
   normalizeStudyYear,
   pickPreferredCurriculumVersion,
@@ -589,6 +590,12 @@ export function CurriculumPageClient() {
         <Stat label="Elective" value={data.totals.electiveCredits} />
         <Stat label="Specialization" value={data.totals.specializationCredits} />
       </section>
+
+      <CurriculumCompetencyFrameworkPanel
+        data={data}
+        canManage={editable}
+        onUpdated={applyData}
+      />
 
       <section className="rounded-xl border bg-card p-4">
         <div className="hidden gap-2 sm:flex" role="tablist" aria-label="Study year">

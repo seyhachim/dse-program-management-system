@@ -11,6 +11,7 @@ import { AUTH_MODE, getSupabase } from "./supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
+export const DEV_TOKEN_STORAGE_KEY = "dse-pms-dev-token";
 const runInflightGet = createInflightGetDeduper();
 const runInflightAuthHeader = createInflightLoader<Record<string, string>>();
 
@@ -23,7 +24,12 @@ async function authHeader(): Promise<Record<string, string>> {
       return { Authorization: `Bearer ${token}` };
     });
   }
-  return DEV_TOKEN ? { Authorization: `Bearer ${DEV_TOKEN}` } : {};
+  const browserOverride =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem(DEV_TOKEN_STORAGE_KEY)?.trim()
+      : "";
+  const token = browserOverride || DEV_TOKEN;
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export class ApiError extends Error {

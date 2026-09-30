@@ -1,0 +1,209 @@
+import { afterAll, describe, expect, test } from "bun:test";
+import { PrismaClient } from "@prisma/client";
+import { curriculumService } from "./curriculum-service.ts";
+import {
+  InvalidCompetencyFrameworkAssignmentError,
+  competencyFrameworkService,
+} from "./competency-framework-service.ts";
+
+const dbTestsEnabled = process.env.CURRICULUM_DB_TESTS === "1";
+const describeDb = dbTestsEnabled ? describe : describe.skip;
+const prisma = new PrismaClient();
+const suffix = () => crypto.randomUUID().slice(0, 8);
+
+async function createBase() {
+  const token = suffix();
+  const user = await prisma.user.create({
+    data: { email: `competency-framework-${token}@example.test`, name: `Competency Framework ${token}` },
+  });
+  const programme = await prisma.programme.create({
+    data: { id: `competency-framework-${token}`, code: `CF${token}`, name: `Competency Framework Programme ${token}` },
+  });
+  const curriculum = await curriculumService.createInitial(programme.id, user.id, {
+    code: `CURR-${token}`,
+    name: `Curriculum ${token}`,
+    cohortLabel: "",
+    intakeYear: null,
+    academicYear: "",
+    effectiveFrom: null,
+  });
+  return { user, programme, curriculum, token };
+}
+
+describeDb("curriculum competency framework versioning", () => {
+  test("database immutability and assignment triggers are installed and enabled", async () => {
+    const triggers = await prisma.$queryRaw<
+      Array<{ tgname: string; tgenabled: string }>
+    >`
+      SELECT tgname, tgenabled
+      FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgname IN (
+          'ProgrammeCompetencyFramework_protect_history',
+          'ProgrammeCompetencyFrameworkVersion_protect_history',
+          'ProgrammeCompetencyFrameworkCompetency_protect_history',
+          'ProgrammeCurriculumVersion_validate_competency_framework'
+        )
+      ORDER BY tgname
+    `;
+
+    expect(triggers.map((trigger) => trigger.tgname)).toEqual([
+      "ProgrammeCompetencyFrameworkCompetency_protect_history",
+      "ProgrammeCompetencyFrameworkVersion_protect_history",
+      "ProgrammeCompetencyFramework_protect_history",
+      "ProgrammeCurriculumVersion_validate_competency_framework",
+    ]);
+    expect(triggers.every((trigger) => trigger.tgenabled !== "D")).toBe(true);
+  });
+
+  test("snapshots canonical competencies including active-state context and PLO order, versions append-only, binds Draft only, and revision inherits the exact snapshot", async () => {
+    const { user, programme, curriculum, token } = await createBase();
+    const frameworkCode = `framework-${token}`;
+    const canonical = await prisma.programCompetency.findMany({
+      include: { ploLinks: { include: { plo: true } } },
+      orderBy: [{ order: "asc" }, { code: "asc" }],
+    });
+    expect(canonical.length).toBeGreaterThan(0);
+
+    const snapshot = await competencyFrameworkService.createSnapshot(programme.id, user.id, {
+      code: frameworkCode,
+      name: "Graduate Competencies",
+      changeNote: "Initial curriculum design baseline",
+    });
+    expect(snapshot.version).toBe(1);
+    expect(snapshot.competencies.map((item) => item.code)).toEqual(canonical.map((item) => item.code));
+    expect(snapshot.competencies.map((item) => item.sourceActive)).toEqual(
+      canonical.map((item) => item.active),
+    );
+    expect(snapshot.competencies[0]?.ploCodes).toEqual(
+      canonical[0]!.ploLinks
+        .slice()
+        .sort((a, b) => a.plo.order - b.plo.order)
+        .map((link) => link.plo.code),
+    );
+
+    const secondSnapshot = await competencyFrameworkService.createSnapshot(programme.id, user.id, {
+      code: frameworkCode,
+      name: "Graduate Competencies 2027",
+      changeNote: "Scheduled framework review",
+    });
+    expect(secondSnapshot.frameworkId).toBe(snapshot.frameworkId);
+    expect(secondSnapshot.version).toBe(2);
+    expect(secondSnapshot.frameworkVersionId).not.toBe(snapshot.frameworkVersionId);
+    expect((await competencyFrameworkService.getById(snapshot.frameworkVersionId)).changeNote).toBe(
+      "Initial curriculum design baseline",
+    );
+
+    await competencyFrameworkService.bindToCurriculumVersion(
+      curriculum.selectedVersion.id,
+      snapshot.frameworkVersionId,
+      user.id,
+    );
+    const bound = await curriculumService.getById(curriculum.curriculum.id, curriculum.selectedVersion.id);
+    expect(bound.competencyFramework).toMatchObject({
+      frameworkVersionId: snapshot.frameworkVersionId,
+      frameworkCode,
+      version: 1,
+    });
+
+    await prisma.programmeCurriculumVersion.update({
+      where: { id: curriculum.selectedVersion.id },
+      data: { status: "Approved", approvedAt: new Date() },
+    });
+    await expect(
+      competencyFrameworkService.bindToCurriculumVersion(
+        curriculum.selectedVersion.id,
+        secondSnapshot.frameworkVersionId,
+        user.id,
+      ),
+    ).rejects.toBeInstanceOf(InvalidCompetencyFrameworkAssignmentError);
+    await expect(
+      Promise.resolve(
+        prisma.programmeCurriculumVersion.update({
+          where: { id: curriculum.selectedVersion.id },
+          data: {
+            competencyFrameworkVersionId: null,
+            competencyFrameworkAssignedById: null,
+            competencyFrameworkAssignedAt: null,
+          },
+        }),
+      ),
+    ).rejects.toThrow();
+
+    const revision = await curriculumService.createRevision(
+      curriculum.curriculum.id,
+      curriculum.selectedVersion.id,
+      user.id,
+      {
+        revisionType: "Minor",
+        revisionTriggers: ["ScheduledReview"],
+        revisionReason: "Periodic review",
+        changeSummary: "Start a new auditable design revision",
+      },
+    );
+    expect(revision.competencyFramework?.frameworkVersionId).toBe(snapshot.frameworkVersionId);
+    expect(revision.competencyFramework?.assignedById).toBe(user.id);
+  });
+
+  test("allows historical curriculum versions to be inserted without a framework assignment", async () => {
+    const { user, curriculum, token } = await createBase();
+
+    const historical = await prisma.programmeCurriculumVersion.create({
+      data: {
+        curriculumId: curriculum.curriculum.id,
+        versionMajor: 99,
+        versionMinor: Number.parseInt(token.slice(0, 2), 16),
+        status: "Approved",
+        revisionType: "Minor",
+        revisionTriggers: [],
+        revisionReason: "Historical fixture without competency framework context",
+        changeSummary: "Preserve pre-framework curriculum history",
+        cohortLabel: "",
+        academicYear: "",
+        approvedAt: new Date(),
+        createdById: user.id,
+      },
+      select: {
+        id: true,
+        competencyFrameworkVersionId: true,
+        competencyFrameworkAssignedById: true,
+        competencyFrameworkAssignedAt: true,
+      },
+    });
+
+    expect(historical.competencyFrameworkVersionId).toBeNull();
+    expect(historical.competencyFrameworkAssignedById).toBeNull();
+    expect(historical.competencyFrameworkAssignedAt).toBeNull();
+  });
+
+  test("rejects cross-programme framework assignment and immutable snapshot mutation", async () => {
+    const first = await createBase();
+    const second = await createBase();
+    const snapshot = await competencyFrameworkService.createSnapshot(
+      second.programme.id,
+      second.user.id,
+      { code: `framework-${second.token}`, name: "Other programme framework", changeNote: "" },
+    );
+
+    await expect(
+      competencyFrameworkService.bindToCurriculumVersion(
+        first.curriculum.selectedVersion.id,
+        snapshot.frameworkVersionId,
+        first.user.id,
+      ),
+    ).rejects.toBeInstanceOf(InvalidCompetencyFrameworkAssignmentError);
+
+    await expect(
+      Promise.resolve(
+        prisma.programmeCompetencyFrameworkVersion.update({
+          where: { id: snapshot.frameworkVersionId },
+          data: { changeNote: "rewrite history" },
+        }),
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});

@@ -6,6 +6,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { formatProgrammeCurriculumVersion } from "./curriculum-domain.ts";
+import { competencyFrameworkService } from "./competency-framework-service.ts";
 
 const versionSelect = {
   id: true,
@@ -307,6 +308,13 @@ export const curriculumService = {
                   ? predecessor.effectiveFrom
                   : parseEffectiveFrom(input.effectiveFrom),
               createdById: actorId,
+              competencyFrameworkVersionId: predecessor.competencyFrameworkVersionId,
+              competencyFrameworkAssignedById: predecessor.competencyFrameworkVersionId
+                ? actorId
+                : null,
+              competencyFrameworkAssignedAt: predecessor.competencyFrameworkVersionId
+                ? new Date()
+                : null,
             },
             select: { id: true },
           });
@@ -388,7 +396,7 @@ export const curriculumService = {
     }
 
     const visiblePlacementIds = await defaultRoutePlacementIds(selectedSummary.id);
-    const [placements, pathwayRows] = await Promise.all([
+    const [placements, pathwayRows, competencyFramework] = await Promise.all([
       prisma.programmeCurriculumCourse.findMany({
         where: {
           curriculumVersionId: selectedSummary.id,
@@ -425,6 +433,7 @@ export const curriculumService = {
           },
         },
       }),
+      competencyFrameworkService.getBindingForCurriculumVersion(selectedSummary.id),
     ]);
 
     const pathways = pathwayRows.map((pathway) => {
@@ -507,6 +516,7 @@ export const curriculumService = {
       },
       selectedVersion: toVersionSummary(selectedSummary),
       versions: curriculum.versions.map(toVersionSummary),
+      competencyFramework,
       years,
       pathways,
       totals,
