@@ -22,6 +22,7 @@ export type StudentPortalAccessPlan = "invite" | "refresh" | "ineligible";
 export type BulkStudentPortalAccessOutcome =
   | "invited"
   | "resent"
+  | "pending-valid"
   | "existing-account"
   | "ineligible";
 
@@ -58,7 +59,9 @@ async function deliverStudentPortalAccess(
 
   if (plan === "refresh") {
     const result = await refreshStudentPortalInvitation(student.id);
-    return result.status === "resent" ? "resent" : "existing-account";
+    if (result.status === "resent") return "resent";
+    if (result.status === "pending-valid") return "pending-valid";
+    return "existing-account";
   }
 
   if (!student.email) return "ineligible";
@@ -74,6 +77,7 @@ export type BulkStudentPortalAccessBatchResult = {
   newlyInvited: number;
   resent: number;
   existingAccountSkipped: number;
+  pendingInvitationSkipped: number;
   ineligibleSkipped: number;
   failed: number;
 };
@@ -83,7 +87,10 @@ function bulkStudentPortalAccessResponse(
   counts: BulkStudentPortalAccessBatchResult,
 ): BulkStudentPortalAccessResponse {
   const invited = counts.newlyInvited + counts.resent;
-  const skipped = counts.existingAccountSkipped + counts.ineligibleSkipped;
+  const skipped =
+    counts.existingAccountSkipped +
+    counts.pendingInvitationSkipped +
+    counts.ineligibleSkipped;
   return {
     totalStudents,
     ...counts,
@@ -115,6 +122,7 @@ export async function runBulkStudentPortalAccessBatch(
     newlyInvited: 0,
     resent: 0,
     existingAccountSkipped: 0,
+    pendingInvitationSkipped: 0,
     ineligibleSkipped: 0,
     failed: 0,
   };
@@ -139,6 +147,7 @@ export async function runBulkStudentPortalAccessBatch(
         const outcome = await deliver(studentId);
         if (outcome === "invited") counts.newlyInvited += 1;
         else if (outcome === "resent") counts.resent += 1;
+        else if (outcome === "pending-valid") counts.pendingInvitationSkipped += 1;
         else if (outcome === "existing-account") counts.existingAccountSkipped += 1;
         else counts.ineligibleSkipped += 1;
       } catch (error) {
@@ -159,9 +168,9 @@ export async function runBulkStudentPortalAccessBatch(
 
 /**
  * Send/refresh Student Portal access across the complete PMS Student dataset.
- * New students receive a first invitation, still-pending linked invitations are
- * rotated to a fresh email, and existing/non-pending portal accounts are left
- * unchanged. Inactive students and students without email are skipped.
+ * New students receive a first invitation, expired linked invitations are
+ * rotated to a fresh email, still-valid pending invitations are left unchanged,
+ * and existing/non-pending portal accounts are left unchanged. Inactive students and students without email are skipped.
  */
 export async function sendStudentPortalAccessToAll(): Promise<BulkStudentPortalAccessResponse> {
   requireStudentPortalProvisioningConfig();

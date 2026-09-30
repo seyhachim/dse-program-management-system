@@ -187,7 +187,8 @@ test("BulkStudentPortalAccessResponse requires every student to have exactly one
     newlyInvited: 3,
     resent: 2,
     existingAccountSkipped: 2,
-    ineligibleSkipped: 2,
+    pendingInvitationSkipped: 1,
+    ineligibleSkipped: 1,
     failed: 1,
     eligible: 6,
     invited: 5,
@@ -205,6 +206,7 @@ test("StudentPortalAccessState exposes the roster-safe portal states", () => {
   expect(StudentPortalAccessState.options).toEqual([
     "not-invited",
     "invitation-pending",
+    "invitation-expired",
     "active-account",
     "no-email",
     "inactive-student",

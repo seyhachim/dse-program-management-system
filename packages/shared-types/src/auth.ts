@@ -115,6 +115,7 @@ export const BulkStudentPortalAccessResponse = z.object({
   newlyInvited: z.number().int().nonnegative(),
   resent: z.number().int().nonnegative(),
   existingAccountSkipped: z.number().int().nonnegative(),
+  pendingInvitationSkipped: z.number().int().nonnegative(),
   ineligibleSkipped: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
   eligible: z.number().int().nonnegative(),
@@ -125,6 +126,7 @@ export const BulkStudentPortalAccessResponse = z.object({
     value.newlyInvited +
       value.resent +
       value.existingAccountSkipped +
+      value.pendingInvitationSkipped +
       value.ineligibleSkipped +
       value.failed,
   { message: "Total students must equal all bulk portal-access outcomes" },
@@ -132,7 +134,7 @@ export const BulkStudentPortalAccessResponse = z.object({
   (value) => value.invited === value.newlyInvited + value.resent,
   { message: "Legacy invited count must equal newly invited plus resent" },
 ).refine(
-  (value) => value.skipped === value.existingAccountSkipped + value.ineligibleSkipped,
+  (value) => value.skipped === value.existingAccountSkipped + value.pendingInvitationSkipped + value.ineligibleSkipped,
   { message: "Legacy skipped count must equal both safe skip outcomes" },
 ).refine(
   (value) => value.eligible === value.invited + value.failed,
@@ -149,6 +151,7 @@ export type BulkStudentPortalAccessResponse = z.infer<typeof BulkStudentPortalAc
 export const StudentPortalAccessState = z.enum([
   "not-invited",
   "invitation-pending",
+  "invitation-expired",
   "active-account",
   "no-email",
   "inactive-student",

@@ -15,7 +15,12 @@ const PRESENTATION: Record<StudentPortalAccessState, PortalAccessPresentation> =
   "invitation-pending": {
     label: "Invitation pending",
     tone: "warning",
-    description: "Invitation sent; the student has not activated the account yet.",
+    description: "Invitation sent and still valid; the student has not activated the account yet.",
+  },
+  "invitation-expired": {
+    label: "Invitation expired",
+    tone: "danger",
+    description: "The invitation link has expired and can be safely resent.",
   },
   "active-account": {
     label: "Active account",
