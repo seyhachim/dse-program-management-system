@@ -215,9 +215,13 @@ test("StudentPortalAccessState exposes the roster-safe portal states", () => {
   ]);
 });
 
-test("StudentPortalAccessStatusRequest accepts bounded student UUID batches", () => {
+test("StudentPortalAccessStatusRequest accepts bounded student UUID batches and defaults legacy status mode", () => {
   const studentId = "11111111-1111-4111-8111-111111111111";
-  expect(StudentPortalAccessStatusRequest.safeParse({ studentIds: [studentId] }).success).toBe(true);
+  expect(StudentPortalAccessStatusRequest.parse({ studentIds: [studentId] })).toEqual({
+    studentIds: [studentId],
+    includeExpired: false,
+  });
+  expect(StudentPortalAccessStatusRequest.parse({ studentIds: [studentId], includeExpired: true }).includeExpired).toBe(true);
   expect(StudentPortalAccessStatusRequest.safeParse({ studentIds: [] }).success).toBe(false);
   expect(
     StudentPortalAccessStatusRequest.safeParse({ studentIds: Array.from({ length: 101 }, () => studentId) }).success,
