@@ -144,6 +144,19 @@ test("meeting lecturer assignments accept backward-compatible omission and rejec
   expect(OfferingMeetingInput.safeParse({ ...VALID_MEETING, lecturerIds: [A, A] }).success).toBe(false);
 });
 
+test("an explicit teaching vacancy must remain unassigned", () => {
+  expect(OfferingMeetingInput.safeParse({
+    ...VALID_MEETING,
+    lecturerIds: [],
+    openForAssignment: true,
+  }).success).toBe(true);
+  expect(OfferingMeetingInput.safeParse({
+    ...VALID_MEETING,
+    lecturerIds: [A],
+    openForAssignment: true,
+  }).success).toBe(false);
+});
+
 test("meeting building is optional, trimmed, and length-limited", () => {
   expect(OfferingMeetingInput.parse({ ...VALID_MEETING, building: undefined }).building).toBeUndefined();
   expect(OfferingMeetingInput.parse({ ...VALID_MEETING, building: "  STEM Building  " }).building).toBe("STEM Building");
