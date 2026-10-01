@@ -26,6 +26,7 @@ export function CohortCurrentStudyYearClient() {
   const [periodEnd, setPeriodEnd] = useState("");
   const [preview, setPreview] = useState<StudentCurrentStudyYearPreview | null>(null);
   const [assignments, setAssignments] = useState<Record<string, StudentProgrammeYear>>({});
+  const [selectedMemberships, setSelectedMemberships] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState<StudentCurrentStudyYearApplyResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function CohortCurrentStudyYearClient() {
   const resetPreview = () => {
     setPreview(null);
     setAssignments({});
+    setSelectedMemberships({});
     setResult(null);
   };
 
@@ -71,6 +73,11 @@ export function CohortCurrentStudyYearClient() {
           .filter((member) => member.eligible && member.proposedProgrammeYear !== null)
           .map((member) => [member.membershipId, member.proposedProgrammeYear as StudentProgrammeYear]),
       ));
+      setSelectedMemberships(Object.fromEntries(
+        next.members
+          .filter((member) => member.eligible)
+          .map((member) => [member.membershipId, true]),
+      ));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to preview current study year initialization");
     } finally {
@@ -80,13 +87,19 @@ export function CohortCurrentStudyYearClient() {
 
   const handleApply = async () => {
     if (!preview?.canApply || !canWrite) return;
-    const eligible = preview.members.filter((member) => member.eligible);
-    if (eligible.some((member) => assignments[member.membershipId] === undefined)) {
-      setError("Choose a programme year for every eligible student before confirming.");
+    const selected = preview.members.filter(
+      (member) => member.eligible && selectedMemberships[member.membershipId],
+    );
+    if (selected.length === 0) {
+      setError("Select at least one eligible student to initialize.");
+      return;
+    }
+    if (selected.some((member) => assignments[member.membershipId] === undefined)) {
+      setError("Choose a programme year for every selected student before confirming.");
       return;
     }
     if (!confirm(
-      `Initialize current study year for ${eligible.length} student(s) in ${preview.cohortCode}? This appends permanent academic history and does not infer from intake year.`,
+      `Initialize current study year for ${selected.length} selected student(s) in ${preview.cohortCode}? This appends permanent academic history and does not infer from intake year.`,
     )) return;
 
     setLoading(true);
@@ -97,7 +110,7 @@ export function CohortCurrentStudyYearClient() {
         academicYear,
         periodStart,
         periodEnd,
-        assignments: eligible.map((member) => ({
+        assignments: selected.map((member) => ({
           membershipId: member.membershipId,
           programmeYear: assignments[member.membershipId]!,
           note: "",
@@ -106,6 +119,7 @@ export function CohortCurrentStudyYearClient() {
       setResult(applied);
       setPreview(null);
       setAssignments({});
+      setSelectedMemberships({});
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to initialize current study year");
     } finally {
@@ -222,6 +236,7 @@ export function CohortCurrentStudyYearClient() {
             <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="px-2 py-2">Initialize</th>
                   <th className="px-2 py-2">Student</th>
                   <th className="px-2 py-2">Latest history</th>
                   <th className="px-2 py-2">Current study year</th>
@@ -239,6 +254,19 @@ export function CohortCurrentStudyYearClient() {
                     : "No progression history";
                   return (
                     <tr key={member.membershipId} className="border-b border-border/70">
+                      <td className="px-2 py-3">
+                        {member.eligible ? (
+                          <input
+                            type="checkbox"
+                            aria-label={`Initialize current study year for ${member.studentName}`}
+                            checked={selectedMemberships[member.membershipId] ?? false}
+                            onChange={(event) => setSelectedMemberships((current) => ({
+                              ...current,
+                              [member.membershipId]: event.target.checked,
+                            }))}
+                          />
+                        ) : "—"}
+                      </td>
                       <td className="px-2 py-3">
                         <div className="font-medium">{member.studentName}</div>
                         <div className="text-xs text-muted-foreground">{member.studentNumber ?? "No student number"}</div>
@@ -274,7 +302,8 @@ export function CohortCurrentStudyYearClient() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Confirmation appends neutral Continuing records only. It does not promote, retain, enroll, graduate, or rewrite any prior academic record.
+            Eligible students are selected by default, but you can leave an uncertain case unchecked for later review.
+            Confirmation appends neutral Continuing records only; it does not promote, retain, enroll, graduate, or rewrite any prior academic record.
           </p>
         </section>
       ) : null}
