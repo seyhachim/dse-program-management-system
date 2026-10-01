@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  ApplyStudentCurrentStudyYearInput,
   ApplyStudentPromotionInput,
   AppendStudentProgressionInput,
   CreateStudentCohortInput,
   ExitStudentCohortMembershipInput,
+  PreviewStudentCurrentStudyYearInput,
   PreviewStudentPromotionInput,
 } from "./student-progression.ts";
 
@@ -31,6 +33,15 @@ describe("student progression contracts", () => {
       periodStart: "2026-09-01",
       periodEnd: "2027-01-31",
       status: "Progressed",
+    }).success).toBe(false);
+    expect(AppendStudentProgressionInput.safeParse({
+      membershipId: "00000000-0000-4000-8000-000000000001",
+      programmeYear: 1,
+      academicYear: "2026-2027",
+      term: "Academic year",
+      periodStart: "2026-09-01",
+      periodEnd: "2027-06-30",
+      status: "Continuing",
     }).success).toBe(false);
   });
 
@@ -99,6 +110,36 @@ describe("student progression contracts", () => {
       periodStart: "2028-09-01",
       periodEnd: "2029-06-30",
       decisions: [{ membershipId, status: "Graduated" }],
+    }).success).toBe(false);
+  });
+
+
+  test("validates current study year preview and unique explicit assignments", () => {
+    const membershipId = "00000000-0000-4000-8000-000000000001";
+    const preview = {
+      defaultProgrammeYear: 3,
+      academicYear: "2026-2027",
+      periodStart: "2026-09-01",
+      periodEnd: "2027-06-30",
+    };
+    expect(PreviewStudentCurrentStudyYearInput.safeParse(preview).success).toBe(true);
+    expect(PreviewStudentCurrentStudyYearInput.safeParse({
+      ...preview,
+      periodStart: "2027-07-01",
+      periodEnd: "2027-06-30",
+    }).success).toBe(false);
+
+    expect(ApplyStudentCurrentStudyYearInput.safeParse({
+      ...preview,
+      assignments: [{ membershipId, programmeYear: 3 }],
+    }).success).toBe(true);
+
+    expect(ApplyStudentCurrentStudyYearInput.safeParse({
+      ...preview,
+      assignments: [
+        { membershipId, programmeYear: 3 },
+        { membershipId, programmeYear: 4 },
+      ],
     }).success).toBe(false);
   });
 });

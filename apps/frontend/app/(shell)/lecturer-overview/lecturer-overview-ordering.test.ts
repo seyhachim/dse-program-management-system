@@ -3,7 +3,9 @@ import type { OfferingView } from "@dse-pms/shared-types";
 import {
   compactScheduleLabel,
   groupOfferingsForMobile,
+  lecturerSectionRole,
   nextTeachingOccurrence,
+  sharedLecturerRole,
   upcomingTeachingLabel,
   type LecturerOverviewOffering,
 } from "./lecturer-overview-ordering";
@@ -58,6 +60,14 @@ function offering(
       title: "Data Science for Smart Agriculture",
       programmeId: "programme-dse",
     },
+    lecturer: {
+      id: "lecturer-phat",
+      name: "Phat Phanna",
+      email: "phat@example.com",
+      title: null,
+      qualification: null,
+      phone: null,
+    },
     ...rest,
   };
 }
@@ -107,6 +117,33 @@ describe("lecturer mobile overview ordering", () => {
       "2026-2027-S1",
       "2026-2027-S2",
     ]);
+  });
+
+  test("collapses a common lecturer role but preserves mixed section roles", () => {
+    const now = new Date(2026, 8, 10, 12, 0);
+    const m1 = offering({ id: "m1", sectionCode: "M1" });
+    const m2 = offering({ id: "m2", sectionCode: "M2" });
+    const sharedGroup = groupOfferingsForMobile([m1, m2], now)[0]!;
+
+    expect(lecturerSectionRole(m1, "lecturer-seyha")).toBe("Co-Lecturer");
+    expect(sharedLecturerRole(sharedGroup, "lecturer-seyha")).toBe("Co-Lecturer");
+
+    const primaryM2 = offering({
+      id: "m2-primary",
+      sectionCode: "M2",
+      lecturer: {
+        id: "lecturer-seyha",
+        name: "Chim Seyha",
+        email: "seyha@example.com",
+        title: null,
+        qualification: null,
+        phone: null,
+      },
+    });
+    const mixedGroup = groupOfferingsForMobile([m1, primaryM2], now)[0]!;
+
+    expect(lecturerSectionRole(primaryM2, "lecturer-seyha")).toBe("Primary");
+    expect(sharedLecturerRole(mixedGroup, "lecturer-seyha")).toBeNull();
   });
 
   test("respects teaching windows and never treats a completed offering as upcoming", () => {

@@ -8,9 +8,20 @@ describe("parent academic projection", () => {
     expect(parentAcademicStatusForProgression("Graduated")).toBe("ON_TRACK");
     expect(parentAcademicStatusForProgression("Retained")).toBe("NEEDS_ATTENTION");
     expect(parentAcademicStatusForProgression("Inactive")).toBe("NEEDS_ATTENTION");
+    expect(parentAcademicStatusForProgression("Continuing")).toBe("ON_TRACK");
+    expect(parentAcademicStatusForProgression("Continuing", "Progressed")).toBe("ON_TRACK");
+    expect(parentAcademicStatusForProgression("Continuing", "Retained")).toBe("NEEDS_ATTENTION");
+    expect(parentAcademicStatusForProgression("Continuing", "Inactive")).toBe("NEEDS_ATTENTION");
     expect(parentAcademicStatusForProgression("Withdrawn")).toBe("UNAVAILABLE");
     expect(parentAcademicStatusForProgression("Transferred")).toBe("UNAVAILABLE");
     expect(parentAcademicStatusForProgression(null)).toBe("UNAVAILABLE");
+  });
+
+  test("Continuing uses the latest prior non-neutral outcome for parent status", () => {
+    const source = readFileSync(new URL("./parent-projection.ts", import.meta.url), "utf8");
+    expect(source).toContain('progression?.status === "Continuing"');
+    expect(source).toContain('record.status !== "Continuing"');
+    expect(source).toContain("previousProgressionStatus");
   });
 
   test("official results are finalized, published, approved-spec course totals only", () => {

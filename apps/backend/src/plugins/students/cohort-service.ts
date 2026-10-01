@@ -1,5 +1,7 @@
+import { STUDENT_CURRENT_STUDY_YEAR_TERM } from "@dse-pms/shared-types";
 import type {
   AddStudentCohortMembershipInput,
+  ApplyStudentCurrentStudyYearInput,
   ApplyStudentPromotionInput,
   AppendStudentProgressionInput,
   CreateStudentCohortInput,
@@ -7,8 +9,11 @@ import type {
   ListStudentCohortsQuery,
   ListStudentProgressionQuery,
   ListStudentCompletionOutcomesQuery,
+  PreviewStudentCurrentStudyYearInput,
   PreviewStudentPromotionInput,
   RecordStudentCompletionOutcomeInput,
+  StudentCurrentStudyYearApplyResult,
+  StudentCurrentStudyYearPreview,
   StudentProgrammeYear,
   StudentPromotionApplyResult,
   StudentPromotionDecision,
@@ -26,6 +31,12 @@ export class StudentPromotionConflictError extends Error {
   }
 }
 
+export class StudentCurrentStudyYearConflictError extends Error {
+  constructor(public readonly blockers: string[]) {
+    super(blockers.join("; ") || "Current study year initialization is blocked");
+  }
+}
+
 function resultingYear(status: StudentPromotionDecision, source: StudentProgrammeYear, target: StudentProgrammeYear) {
   if (status === "Progressed") return target;
   if (status === "Retained") return source;
@@ -36,9 +47,146 @@ function currentYearFromLatest(
   latest: { programmeYear: number | null; status: string } | undefined,
 ): StudentProgrammeYear | null {
   if (!latest || latest.programmeYear === null) return null;
-  if (latest.status === "Retained") return latest.programmeYear as StudentProgrammeYear;
+  if (latest.status === "Continuing" || latest.status === "Retained") {
+    return latest.programmeYear as StudentProgrammeYear;
+  }
   if (latest.status === "Progressed") return Math.min(4, latest.programmeYear + 1) as StudentProgrammeYear;
   return null;
+}
+
+const terminalProgressionStatuses = new Set(["Withdrawn", "Inactive", "Transferred", "Graduated"]);
+
+async function buildCurrentStudyYearPreview(
+  db: PromotionDb,
+  cohortId: string,
+  input: PreviewStudentCurrentStudyYearInput,
+): Promise<StudentCurrentStudyYearPreview> {
+  const cohort = await db.studentCohort.findUnique({
+    where: { id: cohortId },
+    include: {
+      memberships: {
+        include: {
+          student: true,
+          progressionRecords: { orderBy: [{ periodStart: "desc" }, { recordedAt: "desc" }] },
+        },
+        orderBy: { joinedAt: "asc" },
+      },
+    },
+  });
+  if (!cohort) throw Object.assign(new Error("Cohort not found"), { code: "P2025" });
+
+  const members = cohort.memberships.map((membership) => {
+    const latest = membership.progressionRecords[0];
+    const base = {
+      membershipId: membership.id,
+      studentId: membership.student.id,
+      studentNumber: membership.student.studentId,
+      studentName: membership.student.name,
+      latestAcademicYear: latest?.academicYear ?? null,
+      latestTerm: latest?.term ?? null,
+      latestProgrammeYear:
+        latest?.programmeYear === null || latest?.programmeYear === undefined
+          ? null
+          : latest.programmeYear as StudentProgrammeYear,
+      latestStatus: latest?.status ?? null,
+    };
+
+    const existingAcademicYear = membership.progressionRecords.find(
+      (record) => record.academicYear === input.academicYear,
+    );
+    if (existingAcademicYear) {
+      return {
+        ...base,
+        proposedProgrammeYear: null,
+        programmeYearLockedByHistory: false,
+        eligible: false,
+        blocker: `Study year is already recorded for ${input.academicYear}`,
+      };
+    }
+
+    if (membership.exitedAt) {
+      return {
+        ...base,
+        proposedProgrammeYear: null,
+        programmeYearLockedByHistory: false,
+        eligible: false,
+        blocker: "Cohort membership is closed",
+      };
+    }
+
+    if (membership.student.status !== "Active") {
+      return {
+        ...base,
+        proposedProgrammeYear: null,
+        programmeYearLockedByHistory: false,
+        eligible: false,
+        blocker: `Student status is ${membership.student.status}`,
+      };
+    }
+
+    if (latest && terminalProgressionStatuses.has(latest.status)) {
+      return {
+        ...base,
+        proposedProgrammeYear: null,
+        programmeYearLockedByHistory: false,
+        eligible: false,
+        blocker: `Latest progression status is ${latest.status}`,
+      };
+    }
+
+    if (latest && latest.periodStart > asDate(input.periodStart)) {
+      return {
+        ...base,
+        proposedProgrammeYear: null,
+        programmeYearLockedByHistory: false,
+        eligible: false,
+        blocker: "Later progression history already exists; earlier study-year context cannot be initialized here",
+      };
+    }
+
+    if (asDate(input.periodStart) < membership.joinedAt) {
+      return {
+        ...base,
+        proposedProgrammeYear: null,
+        programmeYearLockedByHistory: false,
+        eligible: false,
+        blocker: "Initialization period starts before cohort membership",
+      };
+    }
+
+    let proposedProgrammeYear = input.defaultProgrammeYear;
+    let programmeYearLockedByHistory = false;
+    if (latest?.programmeYear !== null && latest?.programmeYear !== undefined) {
+      if (latest.status === "Progressed") {
+        proposedProgrammeYear = Math.min(4, latest.programmeYear + 1) as StudentProgrammeYear;
+        programmeYearLockedByHistory = true;
+      } else if (latest.status === "Retained") {
+        proposedProgrammeYear = latest.programmeYear as StudentProgrammeYear;
+        programmeYearLockedByHistory = true;
+      }
+    }
+
+    return {
+      ...base,
+      proposedProgrammeYear,
+      programmeYearLockedByHistory,
+      eligible: true,
+      blocker: null,
+    };
+  });
+
+  const eligibleCount = members.filter((member) => member.eligible).length;
+  return {
+    cohortId: cohort.id,
+    cohortCode: cohort.code,
+    defaultProgrammeYear: input.defaultProgrammeYear,
+    academicYear: input.academicYear,
+    term: STUDENT_CURRENT_STUDY_YEAR_TERM,
+    members,
+    eligibleCount,
+    excludedCount: members.length - eligibleCount,
+    canApply: eligibleCount > 0,
+  };
 }
 
 async function buildPromotionPreview(
@@ -281,6 +429,73 @@ export const studentCohortService = {
       include: { membership: { include: { student: true } } },
       orderBy: [{ periodStart: "asc" }, { recordedAt: "asc" }],
     });
+  },
+
+  previewCurrentStudyYear(cohortId: string, input: PreviewStudentCurrentStudyYearInput) {
+    return buildCurrentStudyYearPreview(prisma, cohortId, input);
+  },
+
+  async applyCurrentStudyYear(
+    cohortId: string,
+    input: ApplyStudentCurrentStudyYearInput,
+  ): Promise<StudentCurrentStudyYearApplyResult> {
+    return prisma.$transaction(async (tx) => {
+      const preview = await buildCurrentStudyYearPreview(tx, cohortId, input);
+      if (!preview.canApply) {
+        throw new StudentCurrentStudyYearConflictError(["No eligible students need current study year initialization"]);
+      }
+
+      const eligible = preview.members.filter((member) => member.eligible);
+      const eligibleIds = new Set(eligible.map((member) => member.membershipId));
+      const assignmentIds = new Set(input.assignments.map((assignment) => assignment.membershipId));
+      const extra = [...assignmentIds].filter((id) => !eligibleIds.has(id));
+      const selected = eligible.filter((member) => assignmentIds.has(member.membershipId));
+      const blockers = [
+        ...(extra.length ? [`Current study year assignments include ${extra.length} ineligible/cross-cohort membership(s)`] : []),
+        ...(selected.length === 0 ? ["Select at least one eligible student to initialize"] : []),
+      ];
+
+      const assignmentByMembership = new Map(
+        input.assignments.map((assignment) => [assignment.membershipId, assignment]),
+      );
+      for (const member of selected) {
+        const assignment = assignmentByMembership.get(member.membershipId);
+        if (
+          assignment &&
+          member.programmeYearLockedByHistory &&
+          member.proposedProgrammeYear !== null &&
+          assignment.programmeYear !== member.proposedProgrammeYear
+        ) {
+          blockers.push(
+            `${member.studentNumber ?? member.studentName}: prior progression requires Year ${member.proposedProgrammeYear}`,
+          );
+        }
+      }
+      if (blockers.length) throw new StudentCurrentStudyYearConflictError(blockers);
+
+      await tx.studentProgressionRecord.createMany({
+        data: selected.map((member) => {
+          const assignment = assignmentByMembership.get(member.membershipId)!;
+          return {
+            membershipId: member.membershipId,
+            programmeYear: assignment.programmeYear,
+            academicYear: input.academicYear,
+            term: STUDENT_CURRENT_STUDY_YEAR_TERM,
+            periodStart: asDate(input.periodStart),
+            periodEnd: asDate(input.periodEnd),
+            status: "Continuing" as const,
+            note: assignment.note,
+          };
+        }),
+      });
+
+      return {
+        cohortId,
+        academicYear: input.academicYear,
+        term: STUDENT_CURRENT_STUDY_YEAR_TERM,
+        recordsCreated: selected.length,
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   },
 
   previewPromotion(cohortId: string, input: PreviewStudentPromotionInput) {

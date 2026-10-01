@@ -66,14 +66,23 @@ export const studentsManifest: PluginManifest = {
   name: "Students",
   version: "0.1.0",
   description: "Student records — CRUD, list, profile.",
-  // Program Secretary maintains student/class lists (issue #101 §6); Program
-  // Coordinator's proposed sidebar has no Students entry, so it's left off.
+  // Program Secretary maintains student CRUD/class lists (issue #101 §6).
+  // Cohort progression is a narrower academic-decision workspace: Programme
+  // Coordinators already hold students:read + programme:write, so expose only
+  // the nested cohorts route to them without broadening the /students CRUD page.
   routes: [
     {
       label: "Students",
       path: "/students",
       icon: "users",
       roles: ["admin", "program_secretary"],
+      group: "Academic",
+    },
+    {
+      label: "Cohorts & Progression",
+      path: "/students/cohorts",
+      icon: "graduation-cap",
+      roles: ["admin", "program_coordinator", "program_secretary"],
       group: "Academic",
     },
   ],

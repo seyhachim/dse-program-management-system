@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   AddStudentCohortMembershipInput,
+  ApplyStudentCurrentStudyYearInput,
   ApplyStudentPromotionInput,
   AppendStudentProgressionInput,
   CreateStudentCohortInput,
@@ -8,11 +9,16 @@ import {
   ListStudentCohortsQuery,
   ListStudentProgressionQuery,
   ListStudentCompletionOutcomesQuery,
+  PreviewStudentCurrentStudyYearInput,
   PreviewStudentPromotionInput,
   RecordStudentCompletionOutcomeInput,
 } from "@dse-pms/shared-types";
 import { requirePermission } from "../../core/permissions/index.ts";
-import { StudentPromotionConflictError, studentCohortService } from "./cohort-service.ts";
+import {
+  StudentCurrentStudyYearConflictError,
+  StudentPromotionConflictError,
+  studentCohortService,
+} from "./cohort-service.ts";
 
 const notFound = (err: unknown) => typeof err === "object" && err !== null && (err as { code?: string }).code === "P2025";
 const conflict = (err: unknown) => typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
@@ -64,6 +70,27 @@ export function createStudentCohortRouter(): Router {
     if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
     try { res.status(201).json(await studentCohortService.appendProgression(req.params.cohortId!, parsed.data)); }
     catch (err) { res.status(notFound(err) ? 404 : conflict(err) ? 409 : 400).json({ error: notFound(err) ? "Cohort membership not found" : conflict(err) ? "Progression already recorded for this academic period" : "Could not append progression record" }); }
+  });
+
+  router.post("/:cohortId/current-study-year/preview", requirePermission("students:read"), async (req, res) => {
+    const parsed = PreviewStudentCurrentStudyYearInput.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+    try { res.json(await studentCohortService.previewCurrentStudyYear(req.params.cohortId!, parsed.data)); }
+    catch (err) { res.status(notFound(err) ? 404 : 400).json({ error: notFound(err) ? "Cohort not found" : "Could not preview current study year initialization" }); }
+  });
+
+  router.post("/:cohortId/current-study-year/apply", requirePermission("programme:write"), async (req, res) => {
+    const parsed = ApplyStudentCurrentStudyYearInput.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+    try { res.status(201).json(await studentCohortService.applyCurrentStudyYear(req.params.cohortId!, parsed.data)); }
+    catch (err) {
+      if (notFound(err)) return void res.status(404).json({ error: "Cohort not found" });
+      if (err instanceof StudentCurrentStudyYearConflictError) {
+        return void res.status(409).json({ error: "Current study year initialization is blocked", blockers: err.blockers });
+      }
+      if (conflict(err)) return void res.status(409).json({ error: "Current study year is already recorded for this academic period" });
+      res.status(400).json({ error: err instanceof Error ? err.message : "Could not initialize current study year" });
+    }
   });
 
   router.post("/:cohortId/promotion/preview", requirePermission("students:read"), async (req, res) => {

@@ -15,6 +15,7 @@ export type LecturerOverviewOffering = Pick<
   | "endDate"
   | "meetings"
   | "course"
+  | "lecturer"
 >;
 
 export interface UpcomingTeaching<
@@ -41,6 +42,29 @@ export interface MobileOfferingGroup<
     next: UpcomingTeaching<TOffering> | null;
   }>;
   next: UpcomingTeaching<TOffering> | null;
+}
+
+export type LecturerSectionRole = "Primary" | "Co-Lecturer";
+
+export function lecturerSectionRole(
+  offering: Pick<LecturerOverviewOffering, "lecturer">,
+  lecturerId: string | undefined,
+): LecturerSectionRole | null {
+  if (!lecturerId) return null;
+  return offering.lecturer?.id === lecturerId ? "Primary" : "Co-Lecturer";
+}
+
+export function sharedLecturerRole(
+  group: Pick<MobileOfferingGroup, "sections">,
+  lecturerId: string | undefined,
+): LecturerSectionRole | null {
+  const roles = group.sections
+    .map(({ offering }) => lecturerSectionRole(offering, lecturerId))
+    .filter((role): role is LecturerSectionRole => role !== null);
+
+  if (roles.length !== group.sections.length) return null;
+  const uniqueRoles = new Set(roles);
+  return uniqueRoles.size === 1 ? roles[0] ?? null : null;
 }
 
 const DAY_INDEX: Record<string, number> = {
