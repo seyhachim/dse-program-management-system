@@ -3,7 +3,10 @@ import { z } from "zod";
 import {
   ChangePasswordInput,
   CreateAccountInput,
+  LecturerAccessStatusRequest,
   ManageProgrammeRoleInput,
+  SelectedLecturerInvitationRequest,
+  SelectedStudentPortalAccessRequest,
   StudentPortalAccessStatusRequest,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
@@ -14,7 +17,12 @@ import {
   ProgrammeRoleAssignmentError,
   ProvisioningError,
 } from "./service.ts";
-import { inviteAllEligibleStudents } from "./bulk-student-invitations.ts";
+import {
+  inviteAllEligibleStudents,
+  sendStudentPortalAccessToSelected,
+} from "./bulk-student-invitations.ts";
+import { getLecturerAccessStatuses } from "./lecturer-access-status.ts";
+import { sendLecturerInvitationsToSelected } from "./selected-lecturer-invitations.ts";
 import {
   resendLecturerInvitation,
   resendStudentInvitation,
@@ -74,6 +82,45 @@ export function createAuthRouter(): Router {
   });
 
   router.post(
+    "/lecturers/access-status",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = LecturerAccessStatusRequest.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid lecturer access-status request", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.set("Cache-Control", "no-store");
+        res.json(await getLecturerAccessStatuses(parsed.data.lecturerIds));
+      } catch {
+        res.status(500).json({ error: "Could not load lecturer account status" });
+      }
+    },
+  );
+
+  router.post(
+    "/lecturers/invitations/selected",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = SelectedLecturerInvitationRequest.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid selected lecturer invitation request", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.json(await sendLecturerInvitationsToSelected(parsed.data.lecturerIds));
+      } catch (err) {
+        if (err instanceof ProvisioningError) {
+          res.status(502).json({ error: err.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not send selected lecturer invitations" });
+      }
+    },
+  );
+
+  router.post(
     "/students/portal-access-status",
     requirePermission("accounts:create"),
     async (req, res) => {
@@ -84,9 +131,35 @@ export function createAuthRouter(): Router {
       }
       try {
         res.set("Cache-Control", "no-store");
-        res.json(await getStudentPortalAccessStatuses(parsed.data.studentIds));
+        res.json(
+          await getStudentPortalAccessStatuses(
+            parsed.data.studentIds,
+            parsed.data.includeExpired,
+          ),
+        );
       } catch {
         res.status(500).json({ error: "Could not load Student Portal access status" });
+      }
+    },
+  );
+
+  router.post(
+    "/students/invitations/selected",
+    requirePermission("accounts:create"),
+    async (req, res) => {
+      const parsed = SelectedStudentPortalAccessRequest.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid selected student invitation request", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        res.json(await sendStudentPortalAccessToSelected(parsed.data.studentIds));
+      } catch (err) {
+        if (err instanceof ProvisioningError) {
+          res.status(502).json({ error: err.message });
+          return;
+        }
+        res.status(500).json({ error: "Could not send selected Student Portal invitations" });
       }
     },
   );

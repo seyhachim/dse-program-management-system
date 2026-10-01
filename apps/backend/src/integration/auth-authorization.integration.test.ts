@@ -35,6 +35,7 @@ type SeededContext = {
   curriculum: {
     draftVersionId: string;
     approvedVersionId: string;
+    draftPlacementId: string;
   };
 };
 
@@ -97,6 +98,150 @@ integrationDescribe("backend integration authorization boundaries", () => {
     await prisma.$disconnect();
   });
 
+  test("curriculum competency framework and map routes enforce programme authorization", async () => {
+    const lecturerToken = signToken(context.users.lecturer);
+    const coordinatorToken = signToken(context.users.coordinator);
+
+    const deniedRead = await request("/api/programme/competency-frameworks/programmes/dse", {
+      token: lecturerToken,
+    });
+    expect(deniedRead.status).toBe(403);
+
+    const allowedRead = await request("/api/programme/competency-frameworks/programmes/dse", {
+      token: coordinatorToken,
+    });
+    expect(allowedRead.status).toBe(200);
+
+    const deniedCreate = await request("/api/programme/competency-frameworks/programmes/dse", {
+      method: "POST",
+      token: lecturerToken,
+      body: { code: "integration-framework", name: "Integration Framework", changeNote: "" },
+    });
+    expect(deniedCreate.status).toBe(403);
+
+    const created = await request("/api/programme/competency-frameworks/programmes/dse", {
+      method: "POST",
+      token: coordinatorToken,
+      body: {
+        code: `integration-framework-${crypto.randomUUID().slice(0, 8)}`,
+        name: "Integration Framework",
+        changeNote: "Authorization smoke",
+      },
+    });
+    expect(created.status).toBe(201);
+    const createdBody = created.body as {
+      frameworkVersionId?: string;
+      competencies?: Array<{ id: string }>;
+    };
+    const frameworkVersionId = createdBody.frameworkVersionId;
+    const competencyId = createdBody.competencies?.[0]?.id;
+    expect(frameworkVersionId).toBeTruthy();
+    expect(competencyId).toBeTruthy();
+
+    const deniedBind = await request(
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/competency-framework`,
+      { method: "PUT", token: lecturerToken, body: { frameworkVersionId } },
+    );
+    expect(deniedBind.status).toBe(403);
+
+    const allowedBind = await request(
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/competency-framework`,
+      { method: "PUT", token: coordinatorToken, body: { frameworkVersionId } },
+    );
+    expect(allowedBind.status).toBe(200);
+
+    const mapPath =
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/competency-map`;
+    for (const actor of [
+      context.users.admin,
+      context.users.coordinator,
+      context.users.secretary,
+      context.users.qaReviewer,
+    ]) {
+      const response = await request(mapPath, {
+        token: signToken(actor),
+      });
+      expect(response.status).toBe(200);
+    }
+
+    for (const actor of [context.users.lecturer, context.users.student]) {
+      const response = await request(mapPath, {
+        token: signToken(actor),
+      });
+      expect(response.status).toBe(403);
+    }
+
+    const mappingPath =
+      `${mapPath}/courses/${context.curriculum.draftPlacementId}/competencies/${competencyId}`;
+
+    const deniedMapWrite = await request(mappingPath, {
+      method: "PUT",
+      token: lecturerToken,
+      body: {
+        teachLevel: "Basic",
+        useLevel: "Intermediate",
+        assessLevel: "Advanced",
+      },
+    });
+    expect(deniedMapWrite.status).toBe(403);
+
+    const allowedMapWrite = await request(mappingPath, {
+      method: "PUT",
+      token: coordinatorToken,
+      body: {
+        teachLevel: "Basic",
+        useLevel: "Intermediate",
+        assessLevel: "Advanced",
+      },
+    });
+    expect(allowedMapWrite.status).toBe(200);
+    expect(
+      (
+        allowedMapWrite.body as {
+          courses?: Array<{
+            mappings?: Array<{ assessLevel?: string }>;
+          }>;
+        }
+      ).courses?.[0]?.mappings?.[0]?.assessLevel,
+    ).toBe("Advanced");
+
+    for (const actor of [
+      context.users.secretary,
+      context.users.qaReviewer,
+      context.users.student,
+    ]) {
+      const response = await request(mappingPath, {
+        method: "PUT",
+        token: signToken(actor),
+        body: { teachLevel: "Basic" },
+      });
+      expect(response.status).toBe(403);
+    }
+
+    const crossProgrammeCoordinator: AuthUser = {
+      ...context.users.coordinator,
+      programmeRoles: [
+        { role: "program_coordinator", programmeId: "other-programme" },
+      ],
+    };
+    expect(
+      (
+        await request(mapPath, {
+          token: signToken(crossProgrammeCoordinator),
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(mappingPath, {
+          method: "PUT",
+          token: signToken(crossProgrammeCoordinator),
+          body: { teachLevel: "Basic" },
+        })
+      ).status,
+    ).toBe(403);
+  });
+
   test("missing, invalid, and expired bearer tokens return 401", async () => {
     const missing = await request("/api/courses");
     expect(missing.status).toBe(401);
@@ -156,6 +301,29 @@ integrationDescribe("backend integration authorization boundaries", () => {
       expect(response.status).toBe(200);
       expect((response.body as { id?: string }).id).toBe(context.courses.cs101.id);
     }
+  });
+
+  test("CourseSpec competency evidence stays course-scoped without granting lecturers programme-map access", async () => {
+    const lecturerToken = signToken(context.users.lecturer);
+
+    const ownCourse = await request(
+      `/api/courses/${context.courses.cs101.id}/spec/competency-evidence`,
+      { token: lecturerToken },
+    );
+    expect(ownCourse.status).toBe(200);
+
+    const otherCourse = await request(
+      `/api/courses/${context.courses.cs201.id}/spec/competency-evidence`,
+      { token: lecturerToken },
+    );
+    expect(otherCourse.status).toBe(403);
+    expect(errorMessage(otherCourse.body)).toContain("only access your own courses");
+
+    const programmeMap = await request(
+      `/api/programme/curricula/versions/${context.curriculum.draftVersionId}/competency-map`,
+      { token: lecturerToken },
+    );
+    expect(programmeMap.status).toBe(403);
   });
 
   test("submitted and approved course specifications reject ordinary lecturer edits", async () => {
@@ -435,6 +603,19 @@ async function loadSeededContext(): Promise<SeededContext> {
     }),
   ]);
 
+  const draftPlacement = await prisma.programmeCurriculumCourse.create({
+    data: {
+      curriculumVersionId: draftVersion.id,
+      courseId: cs101.id,
+      yearLevel: 1,
+      semester: "First",
+      creditsSnapshot: 3,
+      courseTypeSnapshot: "Core",
+      sortOrder: 0,
+    },
+    select: { id: true },
+  });
+
   return {
     users: { admin, lecturer, coLecturer, coordinator, secretary, qaReviewer, student },
     courses: { cs101, cs201 },
@@ -442,6 +623,7 @@ async function loadSeededContext(): Promise<SeededContext> {
     curriculum: {
       draftVersionId: draftVersion.id,
       approvedVersionId: approvedVersion.id,
+      draftPlacementId: draftPlacement.id,
     },
   };
 }

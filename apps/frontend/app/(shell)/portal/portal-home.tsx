@@ -27,6 +27,7 @@ import {
   formatAcademicShortDateRange,
   resolveStudentTeachingContext,
 } from "@/lib/academic-calendar";
+import { classResponsibilityLabel } from "@/lib/class-responsibility-label";
 import { monitorDeliveryApi } from "@/lib/monitor-delivery";
 import {
   assessmentDeadline,
@@ -50,11 +51,6 @@ const HOME_PREFETCH = [
   { resource: "assessments", loader: studentPortalApi.assessments },
   { resource: "academic-calendar", loader: studentPortalApi.academicCalendar },
 ] as const;
-
-const MONITOR_ROLE_LABELS = {
-  ClassMonitor: "Class Monitor",
-  SubClassMonitor: "Sub-class Monitor",
-} as const;
 
 const WEEKDAY_INDEX = new Map(
   ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
@@ -156,7 +152,7 @@ export function PortalHome() {
     ? `/portal/schedule?date=${encodeURIComponent(nextMeeting.impact.sessionDate)}&focus=${encodeURIComponent(nextMeeting.impact.occurrenceId)}`
     : "/portal/schedule";
   const monitorRoleBadges = [...new Set(data.monitorAssignments.map((item) => item.role))].map(
-    (role) => ({ role, label: MONITOR_ROLE_LABELS[role] }),
+    (role) => ({ role, label: classResponsibilityLabel(role) }),
   );
   const nextCourseAchievement = nextMeeting
     ? data.courseAchievements.find(

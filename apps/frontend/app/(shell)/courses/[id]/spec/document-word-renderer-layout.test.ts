@@ -55,6 +55,15 @@ describe("Course Specification Word layout", () => {
     }
   });
 
+
+  test("formats Section 15 SLT hours before DOCX rendering", async () => {
+    const source = await Bun.file(SOURCE_PATH).text();
+
+    expect(source).toContain(
+      "formatCourseDocumentSltHours(row.sltHours)",
+    );
+  });
+
   test("keeps Part 2 as one Word table and lets Word paginate rows 14 through 25", async () => {
     const source = await Bun.file(SOURCE_PATH).text();
 

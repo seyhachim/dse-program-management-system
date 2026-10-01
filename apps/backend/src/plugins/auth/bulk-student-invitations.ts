@@ -22,6 +22,7 @@ export type StudentPortalAccessPlan = "invite" | "refresh" | "ineligible";
 export type BulkStudentPortalAccessOutcome =
   | "invited"
   | "resent"
+  | "pending-valid"
   | "existing-account"
   | "ineligible";
 
@@ -58,7 +59,9 @@ async function deliverStudentPortalAccess(
 
   if (plan === "refresh") {
     const result = await refreshStudentPortalInvitation(student.id);
-    return result.status === "resent" ? "resent" : "existing-account";
+    if (result.status === "resent") return "resent";
+    if (result.status === "pending-valid") return "pending-valid";
+    return "existing-account";
   }
 
   if (!student.email) return "ineligible";
@@ -74,9 +77,36 @@ export type BulkStudentPortalAccessBatchResult = {
   newlyInvited: number;
   resent: number;
   existingAccountSkipped: number;
+  pendingInvitationSkipped: number;
   ineligibleSkipped: number;
   failed: number;
 };
+
+function bulkStudentPortalAccessResponse(
+  totalStudents: number,
+  counts: BulkStudentPortalAccessBatchResult,
+): BulkStudentPortalAccessResponse {
+  const invited = counts.newlyInvited + counts.resent;
+  const skipped =
+    counts.existingAccountSkipped +
+    counts.pendingInvitationSkipped +
+    counts.ineligibleSkipped;
+  return {
+    totalStudents,
+    ...counts,
+    eligible: invited + counts.failed,
+    invited,
+    skipped,
+  };
+}
+
+function requireStudentPortalProvisioningConfig(): void {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new ProvisioningError(
+      "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for account administration",
+    );
+  }
+}
 
 /**
  * Run a bounded worker pool. Expected provider/eligibility failures are counted
@@ -92,6 +122,7 @@ export async function runBulkStudentPortalAccessBatch(
     newlyInvited: 0,
     resent: 0,
     existingAccountSkipped: 0,
+    pendingInvitationSkipped: 0,
     ineligibleSkipped: 0,
     failed: 0,
   };
@@ -116,6 +147,7 @@ export async function runBulkStudentPortalAccessBatch(
         const outcome = await deliver(studentId);
         if (outcome === "invited") counts.newlyInvited += 1;
         else if (outcome === "resent") counts.resent += 1;
+        else if (outcome === "pending-valid") counts.pendingInvitationSkipped += 1;
         else if (outcome === "existing-account") counts.existingAccountSkipped += 1;
         else counts.ineligibleSkipped += 1;
       } catch (error) {
@@ -136,16 +168,12 @@ export async function runBulkStudentPortalAccessBatch(
 
 /**
  * Send/refresh Student Portal access across the complete PMS Student dataset.
- * New students receive a first invitation, still-pending linked invitations are
- * rotated to a fresh email, and existing/non-pending portal accounts are left
- * unchanged. Inactive students and students without email are skipped.
+ * New students receive a first invitation, expired linked invitations are
+ * rotated to a fresh email, still-valid pending invitations are left unchanged,
+ * and existing/non-pending portal accounts are left unchanged. Inactive students and students without email are skipped.
  */
 export async function sendStudentPortalAccessToAll(): Promise<BulkStudentPortalAccessResponse> {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new ProvisioningError(
-      "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for account administration",
-    );
-  }
+  requireStudentPortalProvisioningConfig();
 
   const students = await prisma.student.findMany({
     orderBy: { id: "asc" },
@@ -156,16 +184,24 @@ export async function sendStudentPortalAccessToAll(): Promise<BulkStudentPortalA
     students.map((student) => student.id),
     deliverStudentPortalAccess,
   );
-  const invited = counts.newlyInvited + counts.resent;
-  const skipped = counts.existingAccountSkipped + counts.ineligibleSkipped;
+  return bulkStudentPortalAccessResponse(students.length, counts);
+}
 
-  return {
-    totalStudents: students.length,
-    ...counts,
-    eligible: invited + counts.failed,
-    invited,
-    skipped,
-  };
+/**
+ * Send/refresh Student Portal access only for the explicitly selected roster rows.
+ * The shared request contract caps this at 20 unique Student ids; each id is
+ * re-read at execution time and follows the same fail-closed delivery rules as
+ * the full-roster action.
+ */
+export async function sendStudentPortalAccessToSelected(
+  studentIds: string[],
+): Promise<BulkStudentPortalAccessResponse> {
+  requireStudentPortalProvisioningConfig();
+  const counts = await runBulkStudentPortalAccessBatch(
+    studentIds,
+    deliverStudentPortalAccess,
+  );
+  return bulkStudentPortalAccessResponse(studentIds.length, counts);
 }
 
 /**

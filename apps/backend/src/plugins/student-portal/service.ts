@@ -40,6 +40,7 @@ const enrollmentInclude = {
       lecturer: { select: lecturerSelect },
       coLecturers: { include: { lecturer: { select: lecturerSelect } } },
       meetings: true,
+      academicCalendarPeriod: { select: { teachingStart: true, teachingEnd: true } },
       assessmentDeadlines: true,
       announcements: {
         where: { publishedAt: { not: null } },
@@ -301,8 +302,20 @@ function approvedSpec(row: EnrollmentRow) {
   return spec?.reviewStatus === "Approved" ? spec : null;
 }
 
+export function portalOfferingTeachingPeriod(offering: {
+  academicCalendarPeriod: { teachingStart: Date; teachingEnd: Date } | null;
+  startDate: Date | null;
+  endDate: Date | null;
+}): { startDate: string; endDate: string } | null {
+  const start = offering.academicCalendarPeriod?.teachingStart ?? offering.startDate;
+  const end = offering.academicCalendarPeriod?.teachingEnd ?? offering.endDate;
+  if (!start || !end || start > end) return null;
+  return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) };
+}
+
 function toSummary(row: EnrollmentRow): PortalCourseSummary {
   const { offering } = row;
+  const teachingPeriod = portalOfferingTeachingPeriod(offering);
   const spec = approvedSpec(row);
   const deadlines = new Map(
     offering.assessmentDeadlines
@@ -333,6 +346,8 @@ function toSummary(row: EnrollmentRow): PortalCourseSummary {
     credits: offering.course.credits,
     term: offering.term,
     sectionCode: offering.sectionCode,
+    teachingStartDate: teachingPeriod?.startDate ?? null,
+    teachingEndDate: teachingPeriod?.endDate ?? null,
     lifecycle: offering.status === "Completed" ? "historical" : offering.status === "Planned" ? "planned" : "current",
     lecturer: offering.lecturer,
     coLecturers: offering.coLecturers.map((item) => item.lecturer),

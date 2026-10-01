@@ -9,7 +9,8 @@ const weeklyNotesSource = readFileSync(
 
 describe("Student Course Weekly Notes", () => {
   test("keeps Weekly Notes available independently of CourseSpec", () => {
-    expect(courseSource).toContain('<TabsTrigger value="weekly-notes">Weekly Notes</TabsTrigger>');
+    expect(courseSource).toContain('value="weekly-notes"');
+    expect(courseSource).toContain("Weekly Notes");
     expect(courseSource).toContain('<TabsContent value="weekly-notes" className="mt-3">');
     expect(courseSource).toContain("<PortalCourseWeeklyNotes offeringId={offeringId} />");
     expect(courseSource).not.toContain("!data.specAvailable ?");

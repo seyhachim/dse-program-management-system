@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import express from "express";
 import type { Server } from "node:http";
+import { telegramPlugin } from "./index.ts";
 import { TelegramInitDataError } from "./init-data.ts";
 import { TelegramInitDataReplayError } from "./replay-store.ts";
 import { createTelegramRouter } from "./router.ts";
@@ -66,6 +67,44 @@ async function jsonBody(response: Response): Promise<Record<string, any>> {
 }
 
 describe("Telegram router", () => {
+
+  test("keeps Mini App bootstrap public in the composed Telegram plugin router", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/telegram", telegramPlugin.router);
+
+    const compositeServer = await new Promise<Server>((resolve) => {
+      const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+    });
+    try {
+      const address = compositeServer.address();
+      if (!address || typeof address === "string") throw new Error("composite test server did not bind");
+      const url = `http://127.0.0.1:${address.port}`;
+
+      const configResponse = await fetch(`${url}/api/telegram/config`);
+      expect(configResponse.status).toBe(200);
+
+      const healthResponse = await fetch(`${url}/api/telegram/health`);
+      expect(healthResponse.status).toBe(200);
+
+      const verifyResponse = await fetch(`${url}/api/telegram/auth/verify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(verifyResponse.status).toBe(400);
+      expect((await jsonBody(verifyResponse)).error.code).toBe("INVALID_INIT_DATA");
+
+      const destinationResponse = await fetch(`${url}/api/telegram/destinations/scopes/sections`);
+      expect(destinationResponse.status).toBe(401);
+      expect((await jsonBody(destinationResponse)).error).toBe("Missing or malformed Authorization header");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        compositeServer.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+  });
+
   test("returns public configuration without secrets", async () => {
     const response = await fetch(`${baseUrl}/api/telegram/config`);
     expect(response.status).toBe(200);

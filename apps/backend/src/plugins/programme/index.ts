@@ -3,6 +3,7 @@ import { programmeManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { createAcademicCalendarRouter } from "./academic-calendar-router.ts";
 import { academicCalendarService } from "./academic-calendar-service.ts";
+import { courseCompetencyContextService } from "./course-competency-context-service.ts";
 import { createCurriculumCourseSpecRouter } from "./curriculum-course-spec-router.ts";
 import { createCurriculumDraftRouter } from "./curriculum-draft-router.ts";
 import { createCurriculumHistoryRouter } from "./curriculum-history-router.ts";
@@ -47,6 +48,7 @@ export const programmeBackendService = {
   publicQuestionAnalytics: publicQuestionAnalyticsService,
   academicCalendar: academicCalendarService,
   offeringCurriculum: offeringCurriculumService,
+  getCourseSpecCompetencyContext: courseCompetencyContextService.getCourseSpecCompetencyContext,
 };
 
 export type ProgrammeBackendService = typeof programmeBackendService;

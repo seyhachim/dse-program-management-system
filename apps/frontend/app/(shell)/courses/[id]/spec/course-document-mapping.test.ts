@@ -4,6 +4,7 @@ import {
   courseDocumentCloAssessmentSltHours,
   courseDocumentCloLearningSltHours,
   courseDocumentCloSltHours,
+  formatCourseDocumentSltHours,
 } from "./course-document-mapping";
 
 describe("course document CLO SLT allocation", () => {
@@ -65,4 +66,14 @@ describe("course document CLO SLT allocation", () => {
       ),
     ).toBe("6");
   });
+  it("formats official SLT hours without floating-point noise", () => {
+    expect(formatCourseDocumentSltHours("41.666666666666664")).toBe("41.67");
+    expect(formatCourseDocumentSltHours("37.833333333333336")).toBe("37.83");
+    expect(formatCourseDocumentSltHours("22.666666666666668")).toBe("22.67");
+    expect(formatCourseDocumentSltHours("9.333333333333332")).toBe("9.33");
+    expect(formatCourseDocumentSltHours("10")).toBe("10");
+    expect(formatCourseDocumentSltHours("10.5")).toBe("10.5");
+    expect(formatCourseDocumentSltHours("")).toBe("");
+  });
+
 });

@@ -551,6 +551,8 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
                   value={mapping}
                   onChange={() => undefined}
                   courseName={`${course.code} - ${course.title}`}
+                  courseId={courseId}
+                  readOnly
                 />
               </CourseSpecReadOnlyBoundary>
             </TabsContent>

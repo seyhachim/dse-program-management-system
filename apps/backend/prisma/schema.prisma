@@ -203,9 +203,17 @@ enum ProgrammeCurriculumAuditActionType {
   CourseAdded
   CourseUpdated
   CourseRemoved
+  CompetencyMappingUpdated
+  CompetencyMappingCleared
   Approved
   Activated
   Superseded
+}
+
+enum CurriculumCompetencyLevel {
+  Basic
+  Intermediate
+  Advanced
 }
 
 enum ProgrammeGradingScaleVersionStatus {
@@ -383,6 +391,9 @@ model User {
   courseSpecRevisionRequests         CourseSpecRevisionRequest[]               @relation("CourseSpecRevisionRequestedBy")
   curriculumVersionsCreated          ProgrammeCurriculumVersion[]              @relation("ProgrammeCurriculumVersionCreatedBy")
   curriculumAuditActions             ProgrammeCurriculumAuditAction[]          @relation("ProgrammeCurriculumAuditActor")
+  curriculumCompetencyMappingsUpdated ProgrammeCurriculumCourseCompetencyMapping[] @relation("ProgrammeCurriculumCourseCompetencyUpdatedBy")
+  competencyFrameworkVersionsCreated ProgrammeCompetencyFrameworkVersion[]     @relation("ProgrammeCompetencyFrameworkVersionCreatedBy")
+  competencyFrameworkAssignments     ProgrammeCurriculumVersion[]              @relation("ProgrammeCurriculumCompetencyFrameworkAssignedBy")
   gradingScaleVersionsCreated        ProgrammeGradingScaleVersion[]            @relation("ProgrammeGradingScaleVersionCreatedBy")
   gradingScaleVersionsApproved       ProgrammeGradingScaleVersion[]            @relation("ProgrammeGradingScaleVersionApprovedBy")
   gradingScaleAuditActions           ProgrammeGradingScaleAuditAction[]        @relation("ProgrammeGradingScaleAuditActor")
@@ -475,6 +486,7 @@ model Programme {
   roleAssignments          UserRoleAssignment[]
   courses                  Course[]
   curricula                ProgrammeCurriculum[]
+  competencyFrameworks     ProgrammeCompetencyFramework[]
   gradingScales            ProgrammeGradingScale[]
   qaCycles                 QaAssessmentCycle[]
   qaEvidence               QaEvidence[]
@@ -625,6 +637,64 @@ model AcademicCalendarAuditAction {
   @@index([actorId])
 }
 
+/// Stable programme-owned identity for a graduate competency framework. The
+/// mutable/current ProgramCompetency catalogue remains the authoring source; these
+/// framework versions snapshot that source for reproducible curriculum history.
+model ProgrammeCompetencyFramework {
+  id          String    @id @default(uuid())
+  programmeId String
+  programme   Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  code        String
+  createdAt   DateTime  @default(now())
+
+  versions ProgrammeCompetencyFrameworkVersion[]
+
+  @@unique([programmeId, code])
+  @@index([programmeId])
+}
+
+/// Immutable snapshot of the programme competency/PLO design context. Corrections
+/// create a new framework version rather than rewriting historical snapshots.
+model ProgrammeCompetencyFrameworkVersion {
+  id          String                       @id @default(uuid())
+  frameworkId String
+  framework   ProgrammeCompetencyFramework @relation(fields: [frameworkId], references: [id], onDelete: Restrict)
+  version     Int
+  name        String
+  changeNote  String                       @default("")
+  createdById String
+  createdBy   User                         @relation("ProgrammeCompetencyFrameworkVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime                     @default(now())
+
+  competencies       ProgrammeCompetencyFrameworkCompetency[]
+  curriculumVersions ProgrammeCurriculumVersion[]
+
+  @@unique([frameworkId, version])
+  @@index([frameworkId])
+  @@index([createdById])
+}
+
+/// One competency copied from the canonical current ProgramCompetency catalogue
+/// into an immutable framework version, including the PLO codes applicable then.
+model ProgrammeCompetencyFrameworkCompetency {
+  id                 String                              @id @default(uuid())
+  frameworkVersionId String
+  frameworkVersion   ProgrammeCompetencyFrameworkVersion @relation(fields: [frameworkVersionId], references: [id], onDelete: Restrict)
+  code               String
+  name               String
+  description        String?
+  order              Int
+  sourceActive       Boolean                             @default(true)
+  ploCodes           String[]                            @default([])
+  createdAt          DateTime                            @default(now())
+
+  curriculumCourseMappings ProgrammeCurriculumCourseCompetencyMapping[]
+
+  @@unique([frameworkVersionId, code])
+  @@unique([frameworkVersionId, order])
+  @@index([frameworkVersionId])
+}
+
 /// Canonical curriculum identity for one programme. Versions are immutable
 /// academic snapshots once approved; the root remains stable across revisions.
 model ProgrammeCurriculum {
@@ -666,17 +736,25 @@ model ProgrammeCurriculumVersion {
   approvedAt       DateTime?
   createdById      String
   createdBy        User                                 @relation("ProgrammeCurriculumVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  competencyFrameworkVersionId String?
+  competencyFrameworkVersion   ProgrammeCompetencyFrameworkVersion? @relation(fields: [competencyFrameworkVersionId], references: [id], onDelete: Restrict)
+  competencyFrameworkAssignedById String?
+  competencyFrameworkAssignedBy   User? @relation("ProgrammeCurriculumCompetencyFrameworkAssignedBy", fields: [competencyFrameworkAssignedById], references: [id], onDelete: Restrict)
+  competencyFrameworkAssignedAt   DateTime?
   createdAt        DateTime                             @default(now())
   updatedAt        DateTime                             @updatedAt
 
-  courses      ProgrammeCurriculumCourse[]
-  pathways     ProgrammeCurriculumPathway[]
-  auditActions ProgrammeCurriculumAuditAction[]
+  courses             ProgrammeCurriculumCourse[]
+  pathways            ProgrammeCurriculumPathway[]
+  competencyMappings  ProgrammeCurriculumCourseCompetencyMapping[]
+  auditActions        ProgrammeCurriculumAuditAction[]
 
   @@unique([curriculumId, versionMajor, versionMinor])
   @@index([curriculumId, status])
   @@index([basedOnVersionId])
   @@index([createdById])
+  @@index([competencyFrameworkVersionId])
+  @@index([competencyFrameworkAssignedById])
 }
 
 /// A version-scoped mutually exclusive curriculum route. Pathway identity is
@@ -724,11 +802,41 @@ model ProgrammeCurriculumCourse {
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
+  competencyMappings ProgrammeCurriculumCourseCompetencyMapping[]
+
   @@unique([curriculumVersionId, courseId])
   @@index([courseId])
   @@index([courseSpecVersionId])
   @@index([pathwayId])
   @@index([curriculumVersionId, yearLevel, semester, sortOrder])
+}
+
+/// One exact course × competency contribution within one curriculum version.
+/// Teach / Use / Assess are independent dimensions and each may be Basic,
+/// Intermediate, or Advanced. Historical rows become read-only with the
+/// curriculum version; Draft changes are audited through ProgrammeCurriculumAuditAction.
+model ProgrammeCurriculumCourseCompetencyMapping {
+  id                  String                               @id @default(uuid())
+  curriculumVersionId String
+  curriculumVersion   ProgrammeCurriculumVersion           @relation(fields: [curriculumVersionId], references: [id], onDelete: Restrict)
+  curriculumCourseId  String
+  curriculumCourse    ProgrammeCurriculumCourse            @relation(fields: [curriculumCourseId], references: [id], onDelete: Cascade)
+  competencyId        String
+  competency          ProgrammeCompetencyFrameworkCompetency @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+  teachLevel          CurriculumCompetencyLevel?
+  useLevel            CurriculumCompetencyLevel?
+  assessLevel         CurriculumCompetencyLevel?
+  note                String                               @default("")
+  updatedById         String
+  updatedBy           User                                 @relation("ProgrammeCurriculumCourseCompetencyUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt           DateTime                             @default(now())
+  updatedAt           DateTime                             @updatedAt
+
+  @@unique([curriculumVersionId, curriculumCourseId, competencyId])
+  @@index([curriculumVersionId])
+  @@index([curriculumCourseId])
+  @@index([competencyId])
+  @@index([updatedById])
 }
 
 /// Append-only workflow/revision history for curriculum versions. Database
@@ -1986,6 +2094,7 @@ model CourseSpec {
   weeks                   CourseSpecWeek[]
   assessmentItems         CourseSpecAssessmentItem[]
   mappingCells            CourseSpecMappingCell[]
+  competencyEvidence      CourseSpecCompetencyEvidence[]
   resources               CourseSpecResource[]
   studentResponsibilities CourseSpecStudentResponsibility[]
   courseInfo              CourseSpecCourseInfo?
@@ -2198,6 +2307,7 @@ model CourseSpecClo {
   activeLearningStrategyIds String[]                        @default([])
   assessmentMethods         CourseSpecCloAssessmentMethod[]
   attainmentSnapshots       QaCloAttainmentSnapshot[]
+  competencyEvidenceLinks    CourseSpecCompetencyEvidenceClo[]
 
   @@id([courseSpecId, id])
 }
@@ -2352,6 +2462,51 @@ model CourseSpecMappingCell {
   strength     Int
 
   @@id([courseSpecId, cloCode, kind, ref])
+}
+
+/// CourseSpec-owned evidence that explains how one programme competency
+/// expectation is supported by this exact academic CourseSpec version.
+/// Programme T/U/A values and provenance are snapshotted here; they are never
+/// authoritative programme mappings and never update the curriculum.
+model CourseSpecCompetencyEvidence {
+  id                        String                    @id @default(uuid())
+  courseSpecId              String
+  courseSpec                CourseSpec                @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
+  competencyId              String
+  competencyCode            String
+  competencyName            String
+  sourceMappingId           String?
+  sourceCurriculumVersionId String
+  sourcePlacementId         String
+  sourceFrameworkVersionId  String
+  teachLevel                CurriculumCompetencyLevel?
+  useLevel                  CurriculumCompetencyLevel?
+  assessLevel               CurriculumCompetencyLevel?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  cloLinks                  CourseSpecCompetencyEvidenceClo[]
+
+  @@unique([courseSpecId, competencyId])
+  @@unique([id, courseSpecId])
+  @@index([sourceCurriculumVersionId])
+  @@index([sourcePlacementId])
+  @@index([sourceFrameworkVersionId])
+  @@index([sourceMappingId])
+}
+
+/// Explicit lecturer-selected CLO evidence for one CourseSpec competency.
+/// This is the only authoritative competency→CLO link in the CourseSpec;
+/// shared PLO codes are never used to fabricate this relationship.
+model CourseSpecCompetencyEvidenceClo {
+  evidenceId   String
+  courseSpecId String
+  cloId        String
+  evidence     CourseSpecCompetencyEvidence @relation(fields: [evidenceId, courseSpecId], references: [id, courseSpecId], onDelete: Cascade)
+  clo          CourseSpecClo                @relation(fields: [courseSpecId, cloId], references: [courseSpecId, id], onDelete: Cascade)
+  createdAt    DateTime                     @default(now())
+
+  @@id([evidenceId, cloId])
+  @@index([courseSpecId, cloId])
 }
 
 /// §19 Required Resources. Each row supplies the actual material/link for a

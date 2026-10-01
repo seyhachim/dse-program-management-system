@@ -35,6 +35,7 @@ export const SaveTeachingSessionDeliveryInputSchema = z
     lecturerArrivalStatus: LecturerArrivalStatusSchema.nullable().optional(),
     classOccurred: z.boolean(),
     actualLecturerId: z.string().uuid().nullable().default(null),
+    actualLecturerIds: z.array(z.string().uuid()).max(20).optional(),
     actualStartTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualEndTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualTopic: z.string().trim().max(1000).default(""),
@@ -44,11 +45,11 @@ export const SaveTeachingSessionDeliveryInputSchema = z
   })
   .superRefine((value, ctx) => {
     if (!value.classOccurred) {
-      if (value.actualLecturerId !== null) {
+      if (value.actualLecturerId !== null || (value.actualLecturerIds?.length ?? 0) > 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["actualLecturerId"],
-          message: "Actual lecturer must be empty when the class did not occur",
+          path: ["actualLecturerIds"],
+          message: "Actual lecturers must be empty when the class did not occur",
         });
       }
       if (value.actualStartTime !== null || value.actualEndTime !== null) {
@@ -75,11 +76,22 @@ export const SaveTeachingSessionDeliveryInputSchema = z
       return;
     }
 
-    if (!value.actualLecturerId) {
+    const lecturerIds = [
+      ...(value.actualLecturerIds ?? []),
+      ...(value.actualLecturerId ? [value.actualLecturerId] : []),
+    ];
+    if (new Set(lecturerIds).size === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["actualLecturerId"],
-        message: "Actual lecturer is required when the class occurred",
+        path: ["actualLecturerIds"],
+        message: "At least one actual lecturer is required when the class occurred",
+      });
+    }
+    if (value.actualTopic.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["actualTopic"],
+        message: "Topic taught is required when the class occurred",
       });
     }
     if (!value.actualStartTime) {
@@ -133,6 +145,8 @@ export type TeachingSessionDeliveryLecturerView = z.infer<
 export const TeachingSessionDeliverySnapshotSchema = z.object({
   classOccurred: z.boolean(),
   actualLecturerId: z.string().uuid().nullable(),
+  /** Full actual teaching team for this occurrence. Older audit snapshots may omit it. */
+  actualLecturerIds: z.array(z.string().uuid()).optional(),
   actualStartTime: TeachingSessionActualTimeSchema.nullable(),
   actualEndTime: TeachingSessionActualTimeSchema.nullable(),
   deliveredMinutes: z.number().int().min(0),
@@ -150,7 +164,10 @@ export const TeachingSessionDeliveryViewSchema = z.object({
   occurrenceId: z.string().uuid(),
   offeringId: z.string().uuid(),
   classOccurred: z.boolean(),
+  /** Backward-compatible first/lead actual lecturer. */
   actualLecturer: TeachingSessionDeliveryLecturerViewSchema.nullable(),
+  /** All lecturers recorded as actually teaching this occurrence. */
+  actualLecturers: z.array(TeachingSessionDeliveryLecturerViewSchema),
   actualStartTime: TeachingSessionActualTimeSchema.nullable(),
   actualEndTime: TeachingSessionActualTimeSchema.nullable(),
   deliveredMinutes: z.number().int().min(0),

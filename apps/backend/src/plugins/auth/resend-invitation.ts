@@ -5,6 +5,7 @@ import { ProvisioningError } from "./service.ts";
 export type ResendableInvitationRole = "lecturer" | "student";
 export type StudentPortalInvitationRefreshResult =
   | { status: "resent"; email: string }
+  | { status: "pending-valid"; email: string }
   | { status: "existing-account"; email: string };
 
 type InvitationState = {
@@ -21,6 +22,33 @@ export function invitationIsPending(user: InvitationState): boolean {
       !user.confirmed_at &&
       !user.last_sign_in_at,
   );
+}
+
+export type PendingInvitationValidity = "valid" | "expired" | "unknown" | "not-pending";
+
+export function pendingInvitationValidity(
+  user: InvitationState,
+  expirySeconds: number | null | undefined,
+  nowMs = Date.now(),
+): PendingInvitationValidity {
+  if (!invitationIsPending(user)) return "not-pending";
+  if (!expirySeconds || !Number.isFinite(expirySeconds) || expirySeconds <= 0) return "unknown";
+
+  const invitedAtMs = Date.parse(user.invited_at!);
+  if (!Number.isFinite(invitedAtMs)) return "unknown";
+
+  return nowMs >= invitedAtMs + expirySeconds * 1000 ? "expired" : "valid";
+}
+
+export function configuredInviteExpirySeconds(): number {
+  const raw = process.env.SUPABASE_INVITE_EXPIRY_SECONDS?.trim();
+  const seconds = raw ? Number(raw) : Number.NaN;
+  if (!Number.isInteger(seconds) || seconds <= 0 || seconds > 86_400) {
+    throw new ProvisioningError(
+      "SUPABASE_INVITE_EXPIRY_SECONDS must match the Supabase Email OTP Expiration setting",
+    );
+  }
+  return seconds;
 }
 
 export function invitationRefreshAction(
@@ -46,6 +74,7 @@ function accountLabel(role: ResendableInvitationRole): string {
 
 type ResendRoleInvitationOptions = {
   skipNonPending?: boolean;
+  requireExpired?: boolean;
 };
 
 async function clearStaleInvitationBinding(userId: string, staleAuthId: string): Promise<void> {
@@ -128,6 +157,26 @@ async function resendRoleInvitation(
       );
     }
 
+    if (options.requireExpired) {
+      const validity = pendingInvitationValidity(
+        existingAuth.user,
+        configuredInviteExpirySeconds(),
+      );
+      if (validity === "valid") {
+        if (options.skipNonPending) {
+          return { status: "pending-valid", email: user.email };
+        }
+        throw new ProvisioningError(
+          "This student portal invitation is still valid. Resend only after it expires.",
+        );
+      }
+      if (validity !== "expired") {
+        throw new ProvisioningError(
+          "Student portal invitation expiry could not be verified. No invitation was changed.",
+        );
+      }
+    }
+
     const { error: deleteError } = await admin.auth.admin.deleteUser(existingAuth.user.id);
     if (deleteError && deleteError.status !== 404) {
       throw new ProvisioningError(deleteError.message);
@@ -172,6 +221,23 @@ export async function resendLecturerInvitation(userId: string): Promise<{ email:
   return { email: result.email };
 }
 
+
+/**
+ * Bulk-safe lecturer invitation refresh. Pending invitations are rotated and
+ * sent again; linked identities that are no longer pending are reported as
+ * existing accounts and are never deleted or modified.
+ */
+export async function refreshLecturerInvitation(
+  userId: string,
+): Promise<StudentPortalInvitationRefreshResult> {
+  return resendRoleInvitation(
+    userId,
+    "lecturer",
+    undefined,
+    { skipNonPending: true },
+  );
+}
+
 async function requireStudentInvitationContext(
   studentId: string,
 ): Promise<{ email: string; userId: string }> {
@@ -199,7 +265,12 @@ async function requireStudentInvitationContext(
  */
 export async function resendStudentInvitation(studentId: string): Promise<{ email: string }> {
   const student = await requireStudentInvitationContext(studentId);
-  const result = await resendRoleInvitation(student.userId, "student", student.email);
+  const result = await resendRoleInvitation(
+    student.userId,
+    "student",
+    student.email,
+    { requireExpired: true },
+  );
   return { email: result.email };
 }
 
@@ -216,6 +287,6 @@ export async function refreshStudentPortalInvitation(
     student.userId,
     "student",
     student.email,
-    { skipNonPending: true },
+    { skipNonPending: true, requireExpired: true },
   );
 }

@@ -39,7 +39,7 @@ It does **not** persist:
 - arbitrary `/_next/image` responses;
 - academic mutations.
 
-All normal navigations are network-first. If the network is unavailable, the cached data-free offline page is shown instead of a stale authenticated page.
+All normal navigations are network-first. If the network is unavailable, the cached data-free offline page is shown instead of a stale authenticated page. If that cache entry is unavailable (for example, storage was cleared while the service worker remains registered), the service worker returns a minimal non-cacheable inline offline response rather than a browser-level navigation error.
 
 Authorization remains server-side. A cache hit never grants access.
 

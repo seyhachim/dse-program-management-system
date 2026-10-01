@@ -47,8 +47,8 @@ describe("bulk Student Portal access", () => {
     const outcomes = new Map<string, BulkStudentPortalAccessOutcome>([
       ["student-a", "invited"],
       ["student-b", "resent"],
-      ["student-c", "existing-account"],
-      ["student-d", "ineligible"],
+      ["student-c", "pending-valid"],
+      ["student-d", "existing-account"],
     ]);
 
     const result = await runBulkStudentPortalAccessBatch(studentIds, async (studentId) => {
@@ -62,8 +62,51 @@ describe("bulk Student Portal access", () => {
       newlyInvited: 1,
       resent: 1,
       existingAccountSkipped: 1,
-      ineligibleSkipped: 1,
+      pendingInvitationSkipped: 1,
+      ineligibleSkipped: 0,
       failed: 1,
+    });
+  });
+
+  test("processes only the explicitly selected student ids", async () => {
+    const selected = ["student-b", "student-d"];
+    const attempted: string[] = [];
+    const result = await runBulkStudentPortalAccessBatch(selected, async (studentId) => {
+      attempted.push(studentId);
+      return studentId === "student-b" ? "invited" : "existing-account";
+    }, 1);
+
+    expect(attempted).toEqual(selected);
+    expect(result).toEqual({
+      newlyInvited: 1,
+      resent: 0,
+      existingAccountSkipped: 1,
+      pendingInvitationSkipped: 0,
+      ineligibleSkipped: 0,
+      failed: 0,
+    });
+  });
+
+
+  test("keeps still-valid pending invitations unchanged in a selected batch", async () => {
+    const attempted: string[] = [];
+    const result = await runBulkStudentPortalAccessBatch(
+      ["student-a"],
+      async (studentId) => {
+        attempted.push(studentId);
+        return "pending-valid";
+      },
+      1,
+    );
+
+    expect(attempted).toEqual(["student-a"]);
+    expect(result).toEqual({
+      newlyInvited: 0,
+      resent: 0,
+      existingAccountSkipped: 0,
+      pendingInvitationSkipped: 1,
+      ineligibleSkipped: 0,
+      failed: 0,
     });
   });
 
@@ -83,6 +126,7 @@ describe("bulk Student Portal access", () => {
       newlyInvited: studentIds.length,
       resent: 0,
       existingAccountSkipped: 0,
+      pendingInvitationSkipped: 0,
       ineligibleSkipped: 0,
       failed: 0,
     });
@@ -100,4 +144,13 @@ describe("bulk Student Portal access", () => {
 
     expect(attempted).toEqual(["student-a", "student-b"]);
   });
+});
+
+test("selected-invitation route keeps the accounts:create permission boundary", async () => {
+  const source = await Bun.file(new URL("./router.ts", import.meta.url)).text();
+  const routeStart = source.indexOf('"/students/invitations/selected"');
+  expect(routeStart).toBeGreaterThan(-1);
+  const routeSnippet = source.slice(routeStart, routeStart + 800);
+  expect(routeSnippet).toContain('requirePermission("accounts:create")');
+  expect(routeSnippet).toContain("SelectedStudentPortalAccessRequest.safeParse(req.body)");
 });

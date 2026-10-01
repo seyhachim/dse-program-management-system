@@ -1,4 +1,9 @@
-import type { CourseSpecView, SpecSectionId } from "@dse-pms/shared-types";
+import type {
+  CourseSpecCompetencyAlignment,
+  CourseSpecView,
+  SaveCourseSpecCompetencyEvidenceInput,
+  SpecSectionId,
+} from "@dse-pms/shared-types";
 import { api } from "./api";
 
 type AssessmentTemplateItem = {
@@ -70,6 +75,21 @@ async function fetchCourseSpec(courseId: string): Promise<CourseSpecView> {
 export const courseSpecApi = {
   get(courseId: string): Promise<CourseSpecView> {
     return fetchCourseSpec(courseId);
+  },
+  competencyEvidence(courseId: string): Promise<CourseSpecCompetencyAlignment> {
+    return api.get<CourseSpecCompetencyAlignment>(
+      `/api/courses/${courseId}/spec/competency-evidence`,
+    );
+  },
+  saveCompetencyEvidence(
+    courseId: string,
+    competencyId: string,
+    input: SaveCourseSpecCompetencyEvidenceInput,
+  ): Promise<CourseSpecCompetencyAlignment> {
+    return api.put<CourseSpecCompetencyAlignment>(
+      `/api/courses/${courseId}/spec/competency-evidence/${competencyId}`,
+      input,
+    );
   },
   submit(courseId: string, note: string) {
     return api.post<CourseSpecView>(`/api/courses/${courseId}/spec/submit`, {

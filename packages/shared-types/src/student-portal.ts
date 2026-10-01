@@ -89,6 +89,8 @@ export interface PortalCourseSummary {
   credits: number | null;
   term: string;
   sectionCode: string;
+  teachingStartDate: string | null;
+  teachingEndDate: string | null;
   lifecycle: PortalCourseLifecycle;
   lecturer: PortalLecturer | null;
   coLecturers: PortalLecturer[];

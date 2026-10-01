@@ -61,9 +61,12 @@ SUPABASE_JWKS_URL=https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.jso
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
 SUPABASE_INVITE_REDIRECT_URL=https://<frontend-domain>/auth/callback
+SUPABASE_INVITE_EXPIRY_SECONDS=3600
 CORS_ORIGIN=https://<frontend-domain>
 PORT=<provided-by-host-or-4000>
 ```
+
+Set `SUPABASE_INVITE_EXPIRY_SECONDS` to the exact value configured in Supabase Auth → Providers → Email → Email OTP Expiration. DSE PMS uses it only to distinguish a still-valid pending invitation from an expired one; it must be kept in sync with Supabase. The hosted Supabase default is 1 hour (3600 seconds); keep the backend value synchronized if the dashboard setting is changed.
 
 Do not configure production authentication around `JWT_SECRET`. `JWT_SECRET` and locally generated DSE-PMS JWTs are development/test tooling only.
 

@@ -8,6 +8,7 @@ import {
   teachingLearningIsReady,
   courseTypeLabel,
   semesterLabel,
+  type CourseSpecCompetencyAlignment,
   type CourseType,
   type Semester,
   type SpecSectionId,
@@ -37,6 +38,7 @@ import {
   type OverviewReadinessSectionId,
 } from "./overview-sections";
 import { ProgrammeSection } from "./programme-section";
+import { courseSpecApi } from "@/lib/course-spec";
 
 export function OverviewTab({
   courseInfo,
@@ -102,12 +104,29 @@ export function OverviewTab({
   const planTotals = weeklyPlanFormTotals(instructionalPlan);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState(courseInfo.description);
+  const [competencyAlignment, setCompetencyAlignment] =
+    useState<CourseSpecCompetencyAlignment | null>(null);
   const hasResponsibleLecturer = courseInfo.instructorName.trim().length > 0;
   const hasCourseTeam = courseInfo.otherLecturers.trim().length > 0;
 
   useEffect(() => {
     if (!editingDescription) setDescriptionDraft(courseInfo.description);
   }, [courseInfo.description, editingDescription]);
+
+  useEffect(() => {
+    let active = true;
+    void courseSpecApi
+      .competencyEvidence(courseId)
+      .then((value) => {
+        if (active) setCompetencyAlignment(value);
+      })
+      .catch(() => {
+        if (active) setCompetencyAlignment(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [courseId]);
 
   const saveDescription = async () => {
     const ok = await onSaveCourseDescription(descriptionDraft);
@@ -587,6 +606,47 @@ export function OverviewTab({
             <QuickAction label="Assessment" onClick={() => onGoToTab("assessmentPlan")} />
             <QuickAction label="Weekly Plan" onClick={() => onGoToTab("slt")} />
           </ul>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Programme Competency Alignment"
+            action={
+              <button
+                type="button"
+                onClick={() => onGoToTab("mapping")}
+                className="text-sm font-medium text-accent-foreground hover:underline"
+              >
+                View Alignment
+              </button>
+            }
+          />
+          {competencyAlignment ? (
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg border bg-background p-2">
+                <p className="text-lg font-semibold">
+                  {competencyAlignment.summary.expectedCompetencies}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Expected</p>
+              </div>
+              <div className="rounded-lg border bg-background p-2">
+                <p className="text-lg font-semibold">
+                  {competencyAlignment.summary.evidencedCompetencies}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Evidenced</p>
+              </div>
+              <div className="rounded-lg border bg-background p-2">
+                <p className="text-lg font-semibold">
+                  {competencyAlignment.summary.needsAttention}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Needs attention</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Programme competency context is not available yet.
+            </p>
+          )}
         </Card>
 
         <Card>

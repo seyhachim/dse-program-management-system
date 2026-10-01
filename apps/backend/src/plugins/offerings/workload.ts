@@ -41,7 +41,7 @@ export function summarizeLecturerWorkload(
     .flatMap((assignment) =>
       assignment.meetings
         .filter((meeting) => meeting.lecturerIds.includes(lecturerId))
-        .map(({ lecturerIds: _lecturerIds, ...meeting }) => ({
+        .map(({ lecturerIds, ...meeting }) => ({
           meetingId: meeting.id,
           offeringId: assignment.id,
           course: {
@@ -54,6 +54,7 @@ export function summarizeLecturerWorkload(
           role: assignment.lecturerId === lecturerId ? "Primary" as const : "Co-Lecturer" as const,
           ...meeting,
           durationHours: durationHours(meeting.startTime, meeting.endTime),
+          sharedResponsibility: lecturerIds.length > 1,
         })),
     )
     .sort(
@@ -104,7 +105,18 @@ export function summarizeLecturerWorkload(
   return {
     scheduleRows,
     scheduledWeeklyHours:
-      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
+      Math.round(
+        scheduleRows
+          .filter((row) => !row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedWeeklyHours:
+      Math.round(
+        scheduleRows
+          .filter((row) => row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedMeetingCount: scheduleRows.filter((row) => row.sharedResponsibility).length,
     rows,
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),

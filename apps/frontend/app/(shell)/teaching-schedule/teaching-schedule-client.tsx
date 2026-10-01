@@ -134,7 +134,7 @@ export function TeachingScheduleClient() {
             <div>
               <p className="text-sm font-medium text-foreground">Weekly timetable</p>
               <p className="text-sm text-muted-foreground">
-                Shows only recurring meetings explicitly assigned to you. Teaching leave is requested for an exact session date, not the recurring timetable itself.
+                Includes meetings explicitly assigned to you. Shared/flexible meetings stay on your timetable but are not counted as fixed individual workload. Teaching leave is requested for an exact session date.
               </p>
             </div>
 
@@ -183,10 +183,10 @@ export function TeachingScheduleClient() {
           ) : (
             <>
               <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <SummaryCard icon={<Clock3 className="h-4 w-4" />} label="Scheduled weekly hours" value={`${formatHours(filteredSummary.scheduledWeeklyHours)} h`} />
+                <SummaryCard icon={<Clock3 className="h-4 w-4" />} label="Fixed weekly hours" value={`${formatHours(filteredSummary.scheduledWeeklyHours)} h`} />
+                <SummaryCard icon={<Clock3 className="h-4 w-4" />} label="Shared / flexible timetable" value={`${formatHours(filteredSummary.sharedWeeklyHours)} h`} />
                 <SummaryCard icon={<CalendarDays className="h-4 w-4" />} label="Teaching days" value={String(activeDays.length)} />
                 <SummaryCard icon={<UsersRound className="h-4 w-4" />} label="Weekly meetings" value={String(filteredSummary.scheduleRows.length)} />
-                <SummaryCard icon={<Clock3 className="h-4 w-4" />} label="Peak planned week" value={`${formatHours(filteredSummary.peakWeeklyHours)} h`} />
               </section>
 
               <section className="space-y-4">
@@ -207,7 +207,9 @@ export function TeachingScheduleClient() {
                             <div className="grid gap-3 px-4 py-4 md:grid-cols-[120px_minmax(0,1fr)_180px_200px] md:items-center">
                               <div>
                                 <p className="font-semibold text-foreground">{row.startTime}–{row.endTime}</p>
-                                <p className="text-xs text-muted-foreground">{formatHours(row.durationHours)} h</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatHours(row.durationHours)} h{row.sharedResponsibility ? " · shared/flexible" : ""}
+                                </p>
                               </div>
 
                               <div className="min-w-0">
@@ -225,6 +227,9 @@ export function TeachingScheduleClient() {
 
                               <div className="flex flex-wrap items-center gap-2 md:justify-end">
                                 <span className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground">{row.role}</span>
+                                {row.sharedResponsibility ? (
+                                  <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">Shared / flexible</span>
+                                ) : null}
                                 <button type="button" onClick={() => leaveMeetingId === row.meetingId ? setLeaveMeetingId(undefined) : openLeave(row)} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent">
                                   {leaveMeetingId === row.meetingId ? "Cancel" : "Request leave"}
                                 </button>
@@ -278,7 +283,11 @@ export function TeachingScheduleClient() {
                 })}
               </section>
 
-              {filteredSummary.coLecturerAssumption === "full" ? <p className="text-xs text-muted-foreground">Co-lecturer schedule entries are shown in full until workload-sharing rules are configured.</p> : null}
+              {filteredSummary.sharedMeetingCount > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Shared/flexible timetable hours represent responsibility and access, not fixed individual workload credit. Actual delivery remains recorded per teaching occurrence.
+                </p>
+              ) : null}
             </>
           )}
         </div>

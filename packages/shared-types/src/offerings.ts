@@ -347,12 +347,18 @@ export interface LecturerScheduleRow {
   room: string | null;
   activityType: MeetingActivityType;
   durationHours: number;
+  /** True when multiple lecturers share responsibility for this recurring meeting. */
+  sharedResponsibility: boolean;
 }
 
 export interface LecturerWorkloadSummary {
-  /** Actual recurring timetable used for the lecturer's weekly scheduled load. */
+  /** Recurring timetable rows assigned to the lecturer, including shared/flexible meetings. */
   scheduleRows: LecturerScheduleRow[];
+  /** Fixed individual timetable hours. Shared/flexible meetings are deliberately excluded. */
   scheduledWeeklyHours: number;
+  /** Timetable hours for meetings shared by multiple lecturers. This is responsibility/access, not fixed individual workload credit. */
+  sharedWeeklyHours: number;
+  sharedMeetingCount: number;
   rows: LecturerWorkloadRow[];
   weeklyTotals: { term: string; week: number; totalContactHours: number }[];
   peakWeeklyHours: number;

@@ -3,6 +3,8 @@ import type {
   BulkStudentPortalAccessResponse,
   ChangePasswordInput,
   CreateAccountInput,
+  LecturerAccessStatusResponse,
+  LecturerInvitationBatchResponse,
   MeResponse,
   ResendInvitationResponse,
   StudentPortalAccessStatusResponse,
@@ -20,9 +22,29 @@ export const authApi = {
   createAccount(input: CreateAccountInput): Promise<MeResponse> {
     return api.post<MeResponse>("/api/auth/accounts", input);
   },
+  lecturerAccessStatuses(lecturerIds: string[]): Promise<LecturerAccessStatusResponse> {
+    return api.post<LecturerAccessStatusResponse>(
+      "/api/auth/lecturers/access-status",
+      { lecturerIds },
+    );
+  },
+  sendLecturerInvitationsToSelected(
+    lecturerIds: string[],
+  ): Promise<LecturerInvitationBatchResponse> {
+    return api.post<LecturerInvitationBatchResponse>(
+      "/api/auth/lecturers/invitations/selected",
+      { lecturerIds },
+    );
+  },
   studentPortalAccessStatuses(studentIds: string[]): Promise<StudentPortalAccessStatusResponse> {
     return api.post<StudentPortalAccessStatusResponse>(
       "/api/auth/students/portal-access-status",
+      { studentIds, includeExpired: true },
+    );
+  },
+  sendStudentPortalAccessToSelected(studentIds: string[]): Promise<BulkStudentPortalAccessResponse> {
+    return api.post<BulkStudentPortalAccessResponse>(
+      "/api/auth/students/invitations/selected",
       { studentIds },
     );
   },
