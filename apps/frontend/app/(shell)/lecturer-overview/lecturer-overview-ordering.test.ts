@@ -28,6 +28,7 @@ function meeting(
     activityType: "Lecture",
     lecturerIds: [],
     lecturers: [],
+    openForAssignment: false,
     durationHours:
       endHour - startHour + (endMinute - startMinute) / 60,
   };
