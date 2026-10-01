@@ -177,6 +177,7 @@ const initStudents = {
   inactive: makeInitStudent("inactive"),
   closed: makeInitStudent("closed"),
   terminal: makeInitStudent("terminal"),
+  laterHistory: makeInitStudent("later-history"),
   otherCohort: makeInitStudent("other-cohort"),
 };
 const initPeriod = {
@@ -224,6 +225,7 @@ describe.skipIf(!enabled)("current study year initialization database integrity"
       initStudents.retained,
       initStudents.inactive,
       initStudents.terminal,
+      initStudents.laterHistory,
     ]) {
       await initDb.studentCohortMembership.create({
         data: {
@@ -283,6 +285,15 @@ describe.skipIf(!enabled)("current study year initialization database integrity"
           periodEnd: new Date("2027-06-30"),
           status: "Withdrawn",
         },
+        {
+          membershipId: initStudents.laterHistory.membershipId,
+          programmeYear: 4,
+          academicYear: "2028-2029",
+          term: "Academic year",
+          periodStart: new Date("2028-09-01"),
+          periodEnd: new Date("2029-06-30"),
+          status: "Continuing",
+        },
       ],
     });
   });
@@ -296,7 +307,7 @@ describe.skipIf(!enabled)("current study year initialization database integrity"
     const preview = await studentCohortService.previewCurrentStudyYear(initCohortId, initPeriod);
 
     expect(preview.eligibleCount).toBe(3);
-    expect(preview.excludedCount).toBe(3);
+    expect(preview.excludedCount).toBe(4);
     expect(await countInitRows()).toBe(before);
 
     const noHistory = preview.members.find((member) => member.membershipId === initStudents.noHistory.membershipId)!;
@@ -314,6 +325,8 @@ describe.skipIf(!enabled)("current study year initialization database integrity"
     expect(preview.members.find((member) => member.membershipId === initStudents.inactive.membershipId)?.blocker).toContain("Inactive");
     expect(preview.members.find((member) => member.membershipId === initStudents.closed.membershipId)?.blocker).toContain("closed");
     expect(preview.members.find((member) => member.membershipId === initStudents.terminal.membershipId)?.blocker).toContain("Withdrawn");
+    expect(preview.members.find((member) => member.membershipId === initStudents.laterHistory.membershipId)?.blocker)
+      .toContain("Later progression history");
   });
 
   test("blocks cross-cohort and history-conflicting assignments atomically", async () => {
