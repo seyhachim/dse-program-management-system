@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Controller, useFieldArray, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
+import { Controller, useFieldArray, useWatch, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
 import {
   DEFAULT_OFFERING_BUILDING,
   MEETING_ACTIVITY_TYPES,
@@ -103,6 +103,7 @@ export function OfferingFormFields({
     control,
     name: "meetings",
   });
+  const watchedMeetings = useWatch({ control, name: "meetings" });
   const dayItems = Object.fromEntries(MEETING_DAYS.map((day) => [day, day]));
   const activityItems = Object.fromEntries(
     MEETING_ACTIVITY_TYPES.map((activity) => [activity, activity]),
@@ -278,7 +279,7 @@ export function OfferingFormFields({
       <fieldset className="space-y-3 rounded-2xl border border-border p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
           <div><legend className="text-sm font-semibold text-foreground"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">3</span>Weekly class schedule <span className="ml-1 text-status-live" aria-label="required">*</span></legend><p className="text-xs text-muted-foreground">Academic Calendar defines the semester boundary; these rows define the recurring class timetable.</p></div>
-          <Button type="button" variant="outline" size="sm" onClick={() => appendMeeting({ dayOfWeek: "Monday", startTime: "08:00", endTime: "09:00", building: DEFAULT_OFFERING_BUILDING, room: "", activityType: "Lecture", lecturerIds: [] })}>Add session</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => appendMeeting({ dayOfWeek: "Monday", startTime: "08:00", endTime: "09:00", building: DEFAULT_OFFERING_BUILDING, room: "", activityType: "Lecture", lecturerIds: [], openForAssignment: false })}>Add session</Button>
         </div>
         {meetingFields.length === 0 ? <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Add at least one weekly session before saving this offering.</p> : null}
         {meetingsError ? <p className="text-xs text-status-live">{meetingsError}</p> : null}
@@ -311,6 +312,30 @@ export function OfferingFormFields({
             {errors.meetings?.[index]?.lecturerIds?.message ? (
               <p className="text-xs text-status-live">{errors.meetings[index]?.lecturerIds?.message}</p>
             ) : null}
+            <Controller
+              control={control}
+              name={`meetings.${index}.openForAssignment`}
+              render={({ field }) => {
+                const hasAssignedLecturer = (watchedMeetings?.[index]?.lecturerIds?.length ?? 0) > 0;
+                return (
+                  <label className="flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(field.value)}
+                      disabled={hasAssignedLecturer && !field.value}
+                      onChange={(event) => field.onChange(event.target.checked)}
+                      className="mt-0.5 h-4 w-4"
+                    />
+                    <span>
+                      <span className="font-medium">Open for lecturer requests</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Explicitly advertise this unallocated weekly session in Available Classes. Existing unallocated sessions stay closed unless programme staff opt in.
+                      </span>
+                    </span>
+                  </label>
+                );
+              }}
+            />
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground">
                 Meeting-level ownership controls lecturer timetable, workload, and teaching-leave access. Empty means unallocated.
