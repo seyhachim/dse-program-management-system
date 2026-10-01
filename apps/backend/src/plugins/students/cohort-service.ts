@@ -134,6 +134,16 @@ async function buildCurrentStudyYearPreview(
       };
     }
 
+    if (latest && latest.periodStart > asDate(input.periodStart)) {
+      return {
+        ...base,
+        proposedProgrammeYear: null,
+        programmeYearLockedByHistory: false,
+        eligible: false,
+        blocker: "Later progression history already exists; earlier study-year context cannot be initialized here",
+      };
+    }
+
     if (asDate(input.periodStart) < membership.joinedAt) {
       return {
         ...base,
@@ -438,17 +448,17 @@ export const studentCohortService = {
       const eligible = preview.members.filter((member) => member.eligible);
       const eligibleIds = new Set(eligible.map((member) => member.membershipId));
       const assignmentIds = new Set(input.assignments.map((assignment) => assignment.membershipId));
-      const missing = [...eligibleIds].filter((id) => !assignmentIds.has(id));
       const extra = [...assignmentIds].filter((id) => !eligibleIds.has(id));
+      const selected = eligible.filter((member) => assignmentIds.has(member.membershipId));
       const blockers = [
-        ...(missing.length ? [`Current study year assignments are missing ${missing.length} eligible student(s)`] : []),
         ...(extra.length ? [`Current study year assignments include ${extra.length} ineligible/cross-cohort membership(s)`] : []),
+        ...(selected.length === 0 ? ["Select at least one eligible student to initialize"] : []),
       ];
 
       const assignmentByMembership = new Map(
         input.assignments.map((assignment) => [assignment.membershipId, assignment]),
       );
-      for (const member of eligible) {
+      for (const member of selected) {
         const assignment = assignmentByMembership.get(member.membershipId);
         if (
           assignment &&
@@ -464,7 +474,7 @@ export const studentCohortService = {
       if (blockers.length) throw new StudentCurrentStudyYearConflictError(blockers);
 
       await tx.studentProgressionRecord.createMany({
-        data: eligible.map((member) => {
+        data: selected.map((member) => {
           const assignment = assignmentByMembership.get(member.membershipId)!;
           return {
             membershipId: member.membershipId,
@@ -483,7 +493,7 @@ export const studentCohortService = {
         cohortId,
         academicYear: input.academicYear,
         term: STUDENT_CURRENT_STUDY_YEAR_TERM,
-        recordsCreated: eligible.length,
+        recordsCreated: selected.length,
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   },
