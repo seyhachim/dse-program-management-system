@@ -36,6 +36,7 @@ type MeetingRow = {
   building: string | null;
   room: string | null;
   activityType: UnassignedTeachingMeetingView["activityType"];
+  openForAssignment: boolean;
   primaryLecturerId: string | null;
 };
 
@@ -139,7 +140,7 @@ const requestSelect = `
          offering."term", offering."sectionCode", offering."status" AS "offeringStatus",
          offering."academicCalendarPeriodId", meeting."dayOfWeek",
          meeting."startTime", meeting."endTime", meeting."building",
-         meeting."room", meeting."activityType",
+         meeting."room", meeting."activityType", meeting."openForAssignment",
          offering."lecturerId" AS "primaryLecturerId"
   FROM "pms_attendance"."OfferingMeetingTeachingRequest" request
   JOIN "OfferingMeeting" meeting ON meeting."id" = request."meetingId"
@@ -170,7 +171,7 @@ async function meetingForUpdate(
            offering."term", offering."sectionCode", offering."status" AS "offeringStatus",
            offering."academicCalendarPeriodId", meeting."dayOfWeek",
            meeting."startTime", meeting."endTime", meeting."building",
-           meeting."room", meeting."activityType",
+           meeting."room", meeting."activityType", meeting."openForAssignment",
            offering."lecturerId" AS "primaryLecturerId"
     FROM "OfferingMeeting" meeting
     JOIN "Offering" offering ON offering."id" = meeting."offeringId"
@@ -319,13 +320,14 @@ export const unassignedTeachingRequestService = {
              offering."term", offering."sectionCode", offering."status" AS "offeringStatus",
              offering."academicCalendarPeriodId", meeting."dayOfWeek",
              meeting."startTime", meeting."endTime", meeting."building",
-             meeting."room", meeting."activityType",
+             meeting."room", meeting."activityType", meeting."openForAssignment",
              offering."lecturerId" AS "primaryLecturerId"
       FROM "OfferingMeeting" meeting
       JOIN "Offering" offering ON offering."id" = meeting."offeringId"
       JOIN "Course" course ON course."id" = offering."courseId"
       LEFT JOIN "AcademicCalendarPeriod" period ON period."id" = offering."academicCalendarPeriodId"
       WHERE offering."status" IN ('Planned','Active')
+        AND meeting."openForAssignment" = TRUE
         AND (COALESCE(period."teachingEnd", offering."endDate") IS NULL
              OR COALESCE(period."teachingEnd", offering."endDate") >= CURRENT_DATE)
         AND NOT EXISTS (
@@ -383,6 +385,9 @@ export const unassignedTeachingRequestService = {
       const meeting = await meetingForUpdate(tx, meetingId);
       if (meeting.offeringStatus === "Completed") {
         throw new UnassignedTeachingConflictError("This class is no longer available for assignment");
+      }
+      if (!meeting.openForAssignment) {
+        throw new UnassignedTeachingConflictError("This weekly class is not open for lecturer requests");
       }
       if (!(await hasPersistedLecturerRole(tx, user.id, meeting.programmeId))) {
         throw new UnassignedTeachingAuthorizationError(
@@ -462,7 +467,7 @@ export const unassignedTeachingRequestService = {
                offering."term", offering."sectionCode", offering."status" AS "offeringStatus",
                offering."academicCalendarPeriodId", meeting."dayOfWeek",
                meeting."startTime", meeting."endTime", meeting."building",
-               meeting."room", meeting."activityType",
+               meeting."room", meeting."activityType", meeting."openForAssignment",
                offering."lecturerId" AS "primaryLecturerId"
         FROM "pms_attendance"."OfferingMeetingTeachingRequest" request
         JOIN "OfferingMeeting" meeting ON meeting."id" = request."meetingId"
@@ -505,6 +510,9 @@ export const unassignedTeachingRequestService = {
       if (request.offeringStatus === "Completed") {
         throw new UnassignedTeachingConflictError("This class is no longer available for assignment");
       }
+      if (!request.openForAssignment) {
+        throw new UnassignedTeachingConflictError("This weekly class is no longer open for lecturer requests");
+      }
       if (await isMeetingAllocated(tx, request.meetingId)) {
         throw new UnassignedTeachingConflictError("This weekly class has already been assigned");
       }
@@ -525,6 +533,11 @@ export const unassignedTeachingRequestService = {
       await tx.$executeRaw`
         INSERT INTO "OfferingMeetingLecturer" ("meetingId","lecturerId")
         VALUES (${request.meetingId}, ${request.requesterId})
+      `;
+      await tx.$executeRaw`
+        UPDATE "OfferingMeeting"
+        SET "openForAssignment" = FALSE
+        WHERE "id" = ${request.meetingId}
       `;
       await tx.$executeRaw`
         UPDATE "pms_attendance"."OfferingMeetingTeachingRequest"
