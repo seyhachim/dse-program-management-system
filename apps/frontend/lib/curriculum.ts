@@ -1,9 +1,12 @@
 import type {
   AddCurriculumCourseInput,
   BindCurriculumCourseSpecInput,
+  BindProgrammeCurriculumCompetencyFrameworkInput,
   CreateInitialCurriculumInput,
+  CreateProgrammeCompetencyFrameworkVersionInput,
   CurriculumArtifactView,
   CurriculumComparison,
+  CurriculumCompetencyMap,
   CurriculumCourseSpecBindings,
   CurriculumImportApplyInput,
   CurriculumImportPreview,
@@ -11,8 +14,10 @@ import type {
   CurriculumVersionHistory,
   CurriculumVersionSummary,
   CurriculumWorkflowState,
+  ProgrammeCompetencyFrameworkVersion,
   ProgrammeCurriculumRead,
   ReorderCurriculumCoursesInput,
+  UpdateCurriculumCourseCompetencyMappingInput,
   UpdateCurriculumCourseInput,
   UpdateCurriculumWorkflowMetadataInput,
 } from "@dse-pms/shared-types";
@@ -45,6 +50,44 @@ export const curriculumApi = {
   get(curriculumId: string, versionId?: string): Promise<ProgrammeCurriculumRead> {
     const query = versionId ? `?versionId=${encodeURIComponent(versionId)}` : "";
     return api.get<ProgrammeCurriculumRead>(`/api/programme/curricula/${encodeURIComponent(curriculumId)}${query}`);
+  },
+  listCompetencyFrameworkVersions(): Promise<ProgrammeCompetencyFrameworkVersion[]> {
+    return api.get<ProgrammeCompetencyFrameworkVersion[]>(
+      `/api/programme/competency-frameworks/programmes/${CURRENT_PROGRAMME_ID}`,
+    );
+  },
+  createCompetencyFrameworkSnapshot(
+    input: CreateProgrammeCompetencyFrameworkVersionInput,
+  ): Promise<ProgrammeCompetencyFrameworkVersion> {
+    return api.post<ProgrammeCompetencyFrameworkVersion>(
+      `/api/programme/competency-frameworks/programmes/${CURRENT_PROGRAMME_ID}`,
+      input,
+    );
+  },
+  bindCompetencyFramework(
+    versionId: string,
+    input: BindProgrammeCurriculumCompetencyFrameworkInput,
+  ): Promise<ProgrammeCurriculumRead> {
+    return api.put<ProgrammeCurriculumRead>(
+      `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/competency-framework`,
+      input,
+    );
+  },
+  competencyMap(versionId: string): Promise<CurriculumCompetencyMap> {
+    return api.get<CurriculumCompetencyMap>(
+      `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/competency-map`,
+    );
+  },
+  updateCompetencyMapping(
+    versionId: string,
+    placementId: string,
+    competencyId: string,
+    input: UpdateCurriculumCourseCompetencyMappingInput,
+  ): Promise<CurriculumCompetencyMap> {
+    return api.put<CurriculumCompetencyMap>(
+      `/api/programme/curricula/versions/${encodeURIComponent(versionId)}/competency-map/courses/${encodeURIComponent(placementId)}/competencies/${encodeURIComponent(competencyId)}`,
+      input,
+    );
   },
   addCourse(versionId: string, input: AddCurriculumCourseInput): Promise<ProgrammeCurriculumRead> {
     return api.post<ProgrammeCurriculumRead>(`/api/programme/curricula/versions/${encodeURIComponent(versionId)}/courses`, input);

@@ -1,7 +1,15 @@
 import { studentsManifest } from "@dse-pms/shared-types";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { createStudentRouter } from "./router.ts";
-import { studentService, type StudentService } from "./service.ts";
+import { getCanonicalSectionRoster } from "./section-roster-read.ts";
+import { studentService } from "./service.ts";
+
+const studentsPluginService = {
+  ...studentService,
+  getSectionRoster: getCanonicalSectionRoster,
+};
+
+export type StudentService = typeof studentsPluginService;
 
 /**
  * Students plugin definition: the shared manifest + this plugin's Express router
@@ -10,5 +18,5 @@ import { studentService, type StudentService } from "./service.ts";
 export const studentsPlugin: BackendPlugin<StudentService> = {
   manifest: studentsManifest,
   router: createStudentRouter(),
-  service: studentService,
+  service: studentsPluginService,
 };

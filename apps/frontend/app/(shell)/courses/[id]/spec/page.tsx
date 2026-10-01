@@ -7,7 +7,7 @@ export default async function CourseSpecPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   return (
     <>
-      <Topbar title="Course Specification" subtitle="Fill the full syllabus — save each section, continue later" />
+      <Topbar title="Course Specification" subtitle="Manage the Course Specification — save each section and continue later" />
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-7xl space-y-4">
           <VersionHistoryBar courseId={id} />

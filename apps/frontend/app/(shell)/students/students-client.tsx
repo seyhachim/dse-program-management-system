@@ -36,6 +36,7 @@ export function StudentsClient() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [selectedInviting, setSelectedInviting] = useState(false);
   const [bulkInviting, setBulkInviting] = useState(false);
   const [resending, setResending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -187,12 +188,48 @@ export function StudentsClient() {
     }
   };
 
+  const handleSendPortalAccessToSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (selectedIds.length > 20) {
+      setActionError("Select at most 20 students for one invitation batch.");
+      return;
+    }
+    const confirmed = confirm(
+      `Send Student Portal access to the ${selectedIds.length} selected student${selectedIds.length === 1 ? "" : "s"}?\n\n` +
+      "Only the checked rows will be processed. Active students with an email can receive access; expired invitations are refreshed, still-valid pending invitations are left unchanged, inactive/no-email records are skipped, and activated accounts are unchanged.",
+    );
+    if (!confirmed) return;
+
+    setSelectedInviting(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.sendStudentPortalAccessToSelected(selectedIds);
+      await portalAccessQuery.refetch();
+      const pendingInvitationSkipped = result.pendingInvitationSkipped ?? 0;
+      setNotice(
+        `Selected portal access delivery complete. Checked ${result.totalStudents}: ${result.newlyInvited} new invitation${result.newlyInvited === 1 ? "" : "s"}, ${result.resent} expired invitation${result.resent === 1 ? "" : "s"} refreshed, ${pendingInvitationSkipped} still-valid pending invitation${pendingInvitationSkipped === 1 ? "" : "s"} unchanged, ${result.existingAccountSkipped} existing account${result.existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${result.ineligibleSkipped} inactive/no-email record${result.ineligibleSkipped === 1 ? "" : "s"} skipped.`,
+      );
+      if (result.failed > 0) {
+        setActionError(
+          `${result.failed} selected student${result.failed === 1 ? "" : "s"} failed safely. Retry after resolving the provider or account-data error; successful and activated accounts will not be reprovisioned.`,
+        );
+      }
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : "Failed to send Student Portal access to selected students",
+      );
+    } finally {
+      setSelectedInviting(false);
+    }
+  };
+
   const handleSendPortalAccessToAll = async () => {
     const confirmed = confirm(
       "Send Student Portal access to all students who still need an invitation?\n\n" +
       "This checks the full Student database, not only this page or filter.\n\n" +
       "• Active students with an email and no portal account receive their first invitation.\n" +
-      "• Pending invitations are replaced with a fresh email; the old pending link becomes invalid.\n" +
+      "• Expired invitations are replaced with a fresh email; still-valid pending invitations are left unchanged.\n" +
       "• Existing/activated accounts are not changed.\n" +
       "• Inactive students or students without email are skipped.",
     );
@@ -211,10 +248,11 @@ export function StudentsClient() {
       const newlyInvited = compatible.newlyInvited ?? compatible.invited ?? 0;
       const resent = compatible.resent ?? 0;
       const existingAccountSkipped = compatible.existingAccountSkipped ?? 0;
+      const pendingInvitationSkipped = compatible.pendingInvitationSkipped ?? 0;
       const ineligibleSkipped = compatible.ineligibleSkipped ?? compatible.skipped ?? 0;
 
       setNotice(
-        `Portal access delivery complete. Checked ${result.totalStudents} students: ${newlyInvited} new invitation${newlyInvited === 1 ? "" : "s"}, ${resent} refreshed pending invitation${resent === 1 ? "" : "s"}, ${existingAccountSkipped} existing account${existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${ineligibleSkipped} inactive/no-email record${ineligibleSkipped === 1 ? "" : "s"} skipped.`,
+        `Portal access delivery complete. Checked ${result.totalStudents} students: ${newlyInvited} new invitation${newlyInvited === 1 ? "" : "s"}, ${resent} expired invitation${resent === 1 ? "" : "s"} refreshed, ${pendingInvitationSkipped} still-valid pending invitation${pendingInvitationSkipped === 1 ? "" : "s"} unchanged, ${existingAccountSkipped} existing account${existingAccountSkipped === 1 ? "" : "s"} unchanged, and ${ineligibleSkipped} inactive/no-email record${ineligibleSkipped === 1 ? "" : "s"} skipped.`,
       );
       if (result.failed > 0) {
         setActionError(
@@ -232,7 +270,7 @@ export function StudentsClient() {
 
   const handleResendInvite = async () => {
     if (!validateSelectedInviteStudent(selectedStudent)) return;
-    if (!confirm(`Resend the pending Student Portal invitation to ${selectedStudent.email}?`)) return;
+    if (!confirm(`Resend the expired Student Portal invitation to ${selectedStudent.email}?`)) return;
     setResending(true);
     setActionError(null);
     setNotice(null);
@@ -319,9 +357,19 @@ export function StudentsClient() {
     },
   ];
 
-  const inviteBusy = inviting || bulkInviting || resending;
+  const inviteBusy = inviting || selectedInviting || bulkInviting || resending;
+  const selectedPortalStatus = selectedStudent
+    ? portalAccessByStudentId.get(selectedStudent.id)
+    : undefined;
   const selectedInviteEligible = Boolean(
-    selectedStudent?.email && selectedStudent.status === "Active",
+    selectedStudent?.email &&
+      selectedStudent.status === "Active" &&
+      selectedPortalStatus === "not-invited",
+  );
+  const selectedResendEligible = Boolean(
+    selectedStudent?.email &&
+      selectedStudent.status === "Active" &&
+      selectedPortalStatus === "invitation-expired",
   );
 
   return (
@@ -350,13 +398,23 @@ export function StudentsClient() {
       {canManagePortalAccess ? (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            {selectedStudent && selectedStudent.status !== "Active"
-              ? "Portal invitations are available only after the student is Active."
-              : selectedStudent && !selectedStudent.email
-                ? "This roster record has no official email yet. Add one before provisioning portal access."
-                : selectedStudent
-                  ? "Send the first portal invitation, or resend only when a previous pending invitation expired. Activated accounts are never rotated by resend."
-                  : "Select one Active student with an official email, or send portal access across the full PMS roster. The Portal Access column shows who is pending, active, not invited, or needs attention."}
+            {selectedIds.length > 20
+              ? "Select at most 20 students for one invitation batch."
+              : selectedIds.length > 1
+                ? `${selectedIds.length} students selected. Send portal access only to these checked rows; inactive/no-email records are skipped safely.`
+                : selectedStudent && selectedStudent.status !== "Active"
+                  ? "Portal invitations are available only after the student is Active."
+                  : selectedStudent && !selectedStudent.email
+                    ? "This roster record has no official email yet. Add one before provisioning portal access."
+                    : selectedStudent && selectedPortalStatus === "invitation-expired"
+                      ? "This invitation has expired and can be safely resent. Activated accounts are never rotated."
+                      : selectedStudent && selectedPortalStatus === "invitation-pending"
+                        ? "This invitation is still valid. Ask the student to use the current email link; PMS will not rotate it yet."
+                        : selectedStudent && selectedPortalStatus === "active-account"
+                          ? "This student already has an active portal account."
+                          : selectedStudent
+                            ? "Send the first portal invitation only when Portal Access is Not invited."
+                            : "Select up to 20 students for a controlled portal-access batch, or use the full-roster action when you are ready. The Portal Access column shows who is pending, expired, active, not invited, or needs attention."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -366,16 +424,26 @@ export function StudentsClient() {
             >
               <MailPlus />{bulkInviting ? "Sending to all…" : "Send portal access to all"}
             </Button>
+            {selectedIds.length > 1 ? (
+              <Button
+                variant="outline"
+                disabled={selectedIds.length > 20 || inviteBusy}
+                onClick={handleSendPortalAccessToSelected}
+              >
+                <UserPlus />{selectedInviting ? "Sending selected…" : `Send selected (${selectedIds.length})`}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                disabled={!selectedInviteEligible || inviteBusy}
+                onClick={handleInvite}
+              >
+                <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
+              </Button>
+            )}
             <Button
               variant="outline"
-              disabled={!selectedInviteEligible || inviteBusy}
-              onClick={handleInvite}
-            >
-              <UserPlus />{inviting ? "Inviting…" : "Send portal invite"}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!selectedInviteEligible || inviteBusy}
+              disabled={!selectedResendEligible || inviteBusy}
               onClick={handleResendInvite}
             >
               {resending ? "Resending…" : "Resend expired invite"}

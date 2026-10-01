@@ -12,9 +12,8 @@ const activeStudent = {
 };
 
 describe("requirePortfolioStudent", () => {
-  test("accepts only an active student with an official email", () => {
-    const row = { ...activeStudent };
-    expect(() => requirePortfolioStudent(row)).not.toThrow();
+  test("accepts an active email-backed student while the official Student ID is pending", () => {
+    expect(() => requirePortfolioStudent({ ...activeStudent, studentId: null })).not.toThrow();
   });
 
   test("denies missing and inactive student identities", () => {

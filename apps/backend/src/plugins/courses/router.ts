@@ -3,6 +3,7 @@ import {
   CreateCourseInput,
   CreateCourseSpecRevisionRequestSchema,
   ListCoursesQuery,
+  SaveCourseSpecCompetencyEvidenceSchema,
   SPEC_SECTION_SCHEMAS,
   UpdateCourseInput,
   type SpecSectionId,
@@ -15,6 +16,7 @@ import { overlayCourseSpecTeachingAssignment } from "./teaching-assignment.ts";
 import { CourseSpecLockedError } from "./spec-lock.ts";
 import { canCreateCourseSpecRevision } from "./revision-authorization.ts";
 import { courseSpecRevisionRequestService } from "./revision-request-service.ts";
+import { courseSpecCompetencyEvidenceService } from "./competency-evidence-service.ts";
 
 /**
  * Get a required route parameter.
@@ -404,6 +406,63 @@ export function createCourseRouter(): Router {
       );
 
       res.json(spec);
+    },
+  );
+
+  router.get(
+    "/:id/spec/competency-evidence",
+    requirePermission("courses:read"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      if (!courseId) return;
+      if (!(await ensureCourseAccess(req, res, courseId))) return;
+
+      try {
+        res.json(await courseSpecCompetencyEvidenceService.get(courseId));
+      } catch (err) {
+        res.status(errStatus(err)).json({
+          error:
+            errMessage(err, "") ??
+            "Could not load Course Specification competency evidence",
+        });
+      }
+    },
+  );
+
+  router.put(
+    "/:id/spec/competency-evidence/:competencyId",
+    requirePermission("courses:write"),
+    async (req, res) => {
+      const courseId = getRequiredParam(req, res, "id");
+      const competencyId = getRequiredParam(req, res, "competencyId");
+      if (!courseId || !competencyId) return;
+      if (!(await ensureCourseAccess(req, res, courseId))) return;
+      if (!(await ensureSpecEditable(req, res, courseId))) return;
+
+      const parsed = SaveCourseSpecCompetencyEvidenceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid competency evidence",
+          details: parsed.error.flatten(),
+        });
+        return;
+      }
+
+      try {
+        res.json(
+          await courseSpecCompetencyEvidenceService.save(
+            courseId,
+            competencyId,
+            parsed.data,
+          ),
+        );
+      } catch (err) {
+        res.status(errStatus(err)).json({
+          error:
+            errMessage(err, "") ??
+            "Could not save Course Specification competency evidence",
+        });
+      }
     },
   );
 

@@ -1,5 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { prisma } from "../db/prisma.ts";
+import { AccountLinkingError, assertEmailOnlySupabaseIdentity, assertLegacyEmailClaim, type ConfirmedAuthUser } from "./account-linking.ts";
+import { resolveRequestAuthOnce } from "./request-auth-cache.ts";
 import {
   getAuthMode,
   verifySupabaseToken,
@@ -19,6 +22,22 @@ declare global {
 }
 
 class UnprovisionedAccountError extends Error {}
+class PasswordChangeRequiredError extends Error {}
+
+let verificationClient: SupabaseClient | undefined;
+
+function getVerificationClient(): SupabaseClient {
+  if (verificationClient) return verificationClient;
+  const url = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new AccountLinkingError("Supabase identity verification is unavailable");
+  }
+  verificationClient = createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return verificationClient;
+}
 
 async function mustChangePassword(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
@@ -50,20 +69,35 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    req.user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
+    await resolveRequestAuthOnce(req, async () => {
+      const user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
 
-    if (await mustChangePassword(req.user.id) && !isPasswordRecoveryRoute(req)) {
+      // Cache this request only after the complete authentication boundary has
+      // succeeded. A password-gated or failed identity request is never marked
+      // verified and therefore cannot bypass a later middleware invocation.
+      if (await mustChangePassword(user.id) && !isPasswordRecoveryRoute(req)) {
+        throw new PasswordChangeRequiredError();
+      }
+
+      return user;
+    });
+
+    next();
+  } catch (err) {
+    if (err instanceof PasswordChangeRequiredError) {
       res.status(403).json({
         error: "Password change required before using DSE PMS",
         code: "PASSWORD_CHANGE_REQUIRED",
       });
       return;
     }
-
-    next();
-  } catch (err) {
     if (err instanceof UnprovisionedAccountError) {
       res.status(403).json({ error: err.message });
+      return;
+    }
+    if (err instanceof AccountLinkingError) {
+      // Deliberately do not reveal whether a PMS user exists or why verification failed.
+      res.status(403).json({ error: "No account provisioned for this sign-in identity" });
       return;
     }
     res.status(401).json({ error: "Invalid or expired token" });
@@ -71,23 +105,36 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 async function resolveSupabaseUser(token: string): Promise<AuthUser> {
+  // Signature and expiry are checked before the token's UID is trusted.
   const { authId, email } = await verifySupabaseToken(token);
 
-  const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
+  // A currently auto-linked provider can inherit the SAME UID, even when an
+  // old JWT still advertises email/password. Never authorize solely on UID or
+  // token metadata: read the live Supabase Admin identity set every request.
+  let verifiedAuthUser: ConfirmedAuthUser | null = null;
+  try {
+    const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
+    if (error) throw error;
+    verifiedAuthUser = data?.user ?? null;
+  } catch {
+    throw new AccountLinkingError("Supabase identity verification failed");
+  }
+  assertEmailOnlySupabaseIdentity({ authId, email }, verifiedAuthUser);
 
-  // Prefer the stable auth uid; fall back to email so pre-existing seeded
-  // profiles (created before they ever logged in) link on first login.
+  const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
   let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
   if (!user) {
     const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
     if (byEmail) {
-      user = byEmail.authId
-        ? byEmail
-        : await prisma.user.update({
-            where: { id: byEmail.id },
-            data: { authId },
-            include: roleAssignmentsInclude,
-          });
+      // An existing auth UID must NEVER be replaced or accepted on email match.
+      assertLegacyEmailClaim({ authId, email }, byEmail.authId, verifiedAuthUser);
+      const claimed = await prisma.user.updateMany({
+        where: { id: byEmail.id, authId: null },
+        data: { authId },
+      });
+      if (claimed.count !== 1) throw new AccountLinkingError("Concurrent account linking conflict");
+      user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
+      if (!user || user.id !== byEmail.id) throw new AccountLinkingError("Account linking conflict");
     }
   }
 

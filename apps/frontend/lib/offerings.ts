@@ -2,6 +2,8 @@ import type {
   AttendanceSessionSummary,
   AttendanceSessionView,
   AttendanceStudentHistoryView,
+  ClassResponsibilityRole,
+  ClassResponsibilityView,
   CreateOfferingInput,
   LecturerWorkloadSummary,
   OfferingStatus,
@@ -10,7 +12,41 @@ import type {
   SaveAttendanceInput,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
-import { api } from "./api";
+import { ApiError, api } from "./api";
+
+export const ATTENDANCE_SAVE_TIMEOUT_MS = 65_000;
+
+type AttendancePut = <T>(path: string, body: unknown, signal?: AbortSignal) => Promise<T>;
+
+export async function saveAttendanceWithTimeout(
+  id: string,
+  date: string,
+  input: SaveAttendanceInput,
+  timeoutMs = ATTENDANCE_SAVE_TIMEOUT_MS,
+  put: AttendancePut = api.put,
+): Promise<AttendanceSessionView> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await put<AttendanceSessionView>(
+      `/api/offerings/${id}/attendance/${encodeURIComponent(date)}`,
+      input,
+      controller.signal,
+    );
+  } catch (error) {
+    if (controller.signal.aborted) {
+      // A network timeout is not proof of rollback: the server may have committed.
+      // Never retry automatically or clear the local Roll Call marks.
+      throw new ApiError(
+        504,
+        "Attendance save response timed out. Your marks remain on this device, but the server may have saved them. Check this date in another tab before retrying.",
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export const offeringsApi = {
   list(): Promise<OfferingView[]> {
@@ -38,14 +74,27 @@ export const offeringsApi = {
   unenroll(id: string, studentId: string): Promise<OfferingView> {
     return api.delete<OfferingView>(`/api/offerings/${id}/enrollments/${studentId}`);
   },
+  responsibilities(id: string): Promise<ClassResponsibilityView[]> {
+    return api.get<ClassResponsibilityView[]>(`/api/offerings/${id}/responsibilities`);
+  },
+  assignResponsibility(
+    id: string,
+    studentId: string,
+    role: ClassResponsibilityRole,
+  ): Promise<ClassResponsibilityView> {
+    return api.post<ClassResponsibilityView>(`/api/offerings/${id}/responsibilities`, {
+      studentId,
+      role,
+    });
+  },
   attendanceSessions(id: string): Promise<AttendanceSessionSummary[]> {
     return api.get<AttendanceSessionSummary[]>(`/api/offerings/${id}/attendance`);
   },
   attendance(id: string, date: string): Promise<AttendanceSessionView> {
     return api.get<AttendanceSessionView>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}`);
   },
-  saveAttendance(id: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
-    return api.put<AttendanceSessionView>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}`, input);
+  async saveAttendance(id: string, date: string, input: SaveAttendanceInput): Promise<AttendanceSessionView> {
+    return saveAttendanceWithTimeout(id, date, input);
   },
   recheckAttendance(
     id: string,
@@ -79,7 +128,18 @@ export function workloadForTerm(
   return {
     scheduleRows,
     scheduledWeeklyHours:
-      Math.round(scheduleRows.reduce((total, row) => total + row.durationHours, 0) * 100) / 100,
+      Math.round(
+        scheduleRows
+          .filter((row) => !row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedWeeklyHours:
+      Math.round(
+        scheduleRows
+          .filter((row) => row.sharedResponsibility)
+          .reduce((total, row) => total + row.durationHours, 0) * 100,
+      ) / 100,
+    sharedMeetingCount: scheduleRows.filter((row) => row.sharedResponsibility).length,
     rows,
     weeklyTotals,
     peakWeeklyHours: Math.max(0, ...weeklyTotals.map((week) => week.totalContactHours)),

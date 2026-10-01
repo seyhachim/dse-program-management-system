@@ -37,6 +37,18 @@ export type AttendanceAggregatePendingRow = {
   sessionId: string;
 };
 
+export type AttendanceWarningAggregateRow = {
+  studentId: string;
+  sessionId: string;
+  sessionDate: Date;
+  status: AttendanceStatus;
+};
+
+export type AttendanceWarningEvaluation = {
+  counts: Record<AttendanceStatus, number>;
+  warningCandidates: ReturnType<typeof evaluateAttendanceHealth>["warningCandidates"];
+};
+
 export type StudentAttendanceHealthSummary = {
   offeringId: string;
   history: {
@@ -56,7 +68,7 @@ export type StudentAttendanceHealthSummary = {
 type StudentLookup = {
   getByUserId(userId: string): Promise<{
     id: string;
-    studentId: string;
+    studentId: string | null;
     status: string;
   } | null>;
 };
@@ -65,6 +77,43 @@ const students = () => registry.get<StudentLookup>("students").service;
 
 function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: number } {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 };
+}
+
+function emptyFinalCounts(): Record<AttendanceStatus, number> {
+  return { Present: 0, Absent: 0, Late: 0, Excused: 0 };
+}
+
+/**
+ * Evaluate warning candidates for many students from one set-based attendance history read.
+ * This keeps the synchronous save path bounded instead of issuing per-student/per-session queries.
+ */
+export function evaluateAttendanceWarningsByStudent(
+  studentIds: string[],
+  rows: AttendanceWarningAggregateRow[],
+): Map<string, AttendanceWarningEvaluation> {
+  const uniqueStudentIds = [...new Set(studentIds)];
+  const recordsByStudent = new Map<string, AttendanceHealthRecord[]>();
+  const countsByStudent = new Map<string, Record<AttendanceStatus, number>>();
+
+  for (const row of rows) {
+    const records = recordsByStudent.get(row.studentId) ?? [];
+    records.push({
+      sessionId: row.sessionId,
+      date: row.sessionDate.toISOString().slice(0, 10),
+      status: row.status,
+    });
+    recordsByStudent.set(row.studentId, records);
+
+    const counts = countsByStudent.get(row.studentId) ?? emptyFinalCounts();
+    counts[row.status] += 1;
+    countsByStudent.set(row.studentId, counts);
+  }
+
+  return new Map(uniqueStudentIds.map((studentId) => {
+    const counts = countsByStudent.get(studentId) ?? emptyFinalCounts();
+    const evaluation = evaluateAttendanceHealth(recordsByStudent.get(studentId) ?? [], counts);
+    return [studentId, { counts, warningCandidates: evaluation.warningCandidates }];
+  }));
 }
 
 export function summarizeStudentAttendanceHealthByOffering(
@@ -126,10 +175,17 @@ export function summarizeStudentAttendanceHealthByOffering(
   });
 }
 
+type CanonicalStudentAttendanceHistory = Omit<
+  TelegramStudentAttendanceHistory,
+  "studentNumber"
+> & {
+  studentNumber: string | null;
+};
+
 async function historyForStudent(
-  student: { id: string; studentId: string },
+  student: { id: string; studentId: string | null },
   offeringId: string,
-): Promise<TelegramStudentAttendanceHistory> {
+): Promise<CanonicalStudentAttendanceHistory> {
   const sessions = await prisma.$queryRaw<SessionRow[]>`
     SELECT "id", "sessionDate", "updatedAt"
     FROM "pms_attendance"."AttendanceSession"
@@ -193,18 +249,35 @@ async function historyForStudent(
   };
 }
 
-export const studentAttendanceHistoryService = {
-  async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
-    const student = await students().getByUserId(userId);
-    if (!student || student.status !== "Active" || !student.studentId) {
-      throw new ReferenceError("No active student profile with an official Student ID is linked to this account");
-    }
+async function activeStudentForUser(userId: string) {
+  const student = await students().getByUserId(userId);
+  if (!student || student.status !== "Active") {
+    throw new ReferenceError("No active student profile is linked to this account");
+  }
+  return student;
+}
 
-    const enrollment = await prisma.enrollment.findUnique({
-      where: { offeringId_studentId: { offeringId, studentId: student.id } },
-      select: { id: true },
-    });
-    if (!enrollment) throw new ReferenceError("Student is not enrolled in this offering");
+async function requireOfferingEnrollment(studentId: string, offeringId: string): Promise<void> {
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { offeringId_studentId: { offeringId, studentId } },
+    select: { id: true },
+  });
+  if (!enrollment) throw new ReferenceError("Student is not enrolled in this offering");
+}
+
+export const studentAttendanceHistoryService = {
+  async forPortalUser(
+    userId: string,
+    offeringId: string,
+  ): Promise<CanonicalStudentAttendanceHistory> {
+    const student = await activeStudentForUser(userId);
+    await requireOfferingEnrollment(student.id, offeringId);
+    return historyForStudent(student, offeringId);
+  },
+
+  async forUser(userId: string, offeringId: string): Promise<TelegramStudentAttendanceHistory> {
+    const student = await activeStudentForUser(userId);
+    await requireOfferingEnrollment(student.id, offeringId);
     return historyForStudent(student, offeringId);
   },
 
@@ -213,13 +286,37 @@ export const studentAttendanceHistoryService = {
       where: { id: studentId },
       select: { id: true, studentId: true },
     });
-    if (!student?.studentId) return null;
-    const history = await historyForStudent({ id: student.id, studentId: student.studentId }, offeringId);
+    if (!student) return null;
+    const history = await historyForStudent(student, offeringId);
     const finalized = history.history
       .filter((row): row is typeof row & { status: AttendanceStatus } => row.status !== null)
       .map((row) => ({ sessionId: row.sessionId, date: row.date, status: row.status }));
     const evaluation = evaluateAttendanceHealth(finalized, history.counts);
     return { history, ...evaluation };
+  },
+
+  async warningHealthForStudents(
+    studentIds: string[],
+    offeringId: string,
+  ): Promise<Map<string, AttendanceWarningEvaluation>> {
+    const uniqueStudentIds = [...new Set(studentIds)];
+    if (uniqueStudentIds.length === 0) return new Map();
+
+    const rows = await prisma.$queryRaw<AttendanceWarningAggregateRow[]>(Prisma.sql`
+      SELECT
+        record."studentId",
+        record."sessionId",
+        session."sessionDate",
+        record."status"
+      FROM "pms_attendance"."AttendanceRecord" record
+      INNER JOIN "pms_attendance"."AttendanceSession" session
+        ON session."id" = record."sessionId"
+      WHERE session."offeringId" = ${offeringId}
+        AND record."studentId" IN (${Prisma.join(uniqueStudentIds)})
+      ORDER BY record."studentId", session."sessionDate" DESC
+    `);
+
+    return evaluateAttendanceWarningsByStudent(uniqueStudentIds, rows);
   },
 
   async healthForStudentOfferings(

@@ -285,7 +285,7 @@ export const attendanceRecheckService = {
 
       await tx.$executeRaw`
         UPDATE "pms_attendance"."AttendanceSession"
-        SET "updatedAt" = CURRENT_TIMESTAMP
+        SET "updatedAt" = GREATEST(CURRENT_TIMESTAMP, "updatedAt" + INTERVAL '1 millisecond')
         WHERE "id" = ${session.id}
       `;
     });

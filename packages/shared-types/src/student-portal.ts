@@ -89,6 +89,8 @@ export interface PortalCourseSummary {
   credits: number | null;
   term: string;
   sectionCode: string;
+  teachingStartDate: string | null;
+  teachingEndDate: string | null;
   lifecycle: PortalCourseLifecycle;
   lecturer: PortalLecturer | null;
   coLecturers: PortalLecturer[];
@@ -179,7 +181,7 @@ export interface PortalAnnouncement {
 }
 
 export interface StudentPortalHome {
-  student: { id: string; name: string; studentId: string; email: string };
+  student: { id: string; name: string; studentId: string | null; email: string };
   courses: PortalCourseSummary[];
   upcomingAssessments: Array<{
     offeringId: string;

@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import {
   invitationEmailsMatch,
   invitationIsPending,
   invitationMetadata,
   invitationRefreshAction,
+  pendingInvitationValidity,
 } from "./resend-invitation.ts";
 
 describe("invitationIsPending", () => {
@@ -63,6 +65,41 @@ describe("invitationIsPending", () => {
   });
 });
 
+
+describe("pendingInvitationValidity", () => {
+  const pending = {
+    invited_at: "2026-09-30T00:00:00.000Z",
+    email_confirmed_at: null,
+    confirmed_at: null,
+    last_sign_in_at: null,
+  };
+
+  it("keeps an invitation valid immediately before the configured boundary", () => {
+    expect(
+      pendingInvitationValidity(pending, 3_600, Date.parse("2026-09-30T00:59:59.999Z")),
+    ).toBe("valid");
+  });
+
+  it("expires an invitation exactly at the configured boundary", () => {
+    expect(
+      pendingInvitationValidity(pending, 3_600, Date.parse("2026-09-30T01:00:00.000Z")),
+    ).toBe("expired");
+  });
+
+  it("fails closed when expiry configuration is missing", () => {
+    expect(pendingInvitationValidity(pending, null)).toBe("unknown");
+  });
+
+  it("does not apply expiry to an activated account", () => {
+    expect(
+      pendingInvitationValidity(
+        { ...pending, confirmed_at: "2026-09-30T00:10:00.000Z" },
+        3_600,
+      ),
+    ).toBe("not-pending");
+  });
+});
+
 describe("invitationRefreshAction", () => {
   it("resends only a still-pending invitation", () => {
     expect(invitationRefreshAction({
@@ -119,5 +156,24 @@ describe("invitationMetadata", () => {
       name: "Student One",
       role: "student",
     });
+  });
+});
+
+
+describe("pending invitation resend compensation", () => {
+  it("clears only the exact stale PMS auth binding when replacement invite creation fails", () => {
+    const source = readFileSync(new URL("./resend-invitation.ts", import.meta.url), "utf8");
+    expect(source).toContain("await clearStaleInvitationBinding(user.id, staleAuthId)");
+    expect(source).toContain("where: { id: userId, authId: staleAuthId }");
+    expect(source).toContain("data: { authId: null }");
+    expect(source).toContain("if (inviteError || !invited?.user)");
+  });
+
+  it("also compensates if linking the newly-created replacement identity fails", () => {
+    const source = readFileSync(new URL("./resend-invitation.ts", import.meta.url), "utf8");
+    const deleteReplacementAt = source.indexOf("await admin.auth.admin.deleteUser(invited.user.id)");
+    const clearStaleAt = source.lastIndexOf("await clearStaleInvitationBinding(user.id, staleAuthId)");
+    expect(deleteReplacementAt).toBeGreaterThan(0);
+    expect(clearStaleAt).toBeGreaterThan(deleteReplacementAt);
   });
 });

@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { SaveTeachingSessionDeliveryInputSchema } from "./teaching-session-delivery.ts";
+import {
+  SaveTeachingSessionDeliveryInputSchema,
+  TeachingSessionTimingViewSchema,
+} from "./teaching-session-delivery.ts";
 
 describe("teaching session delivery contracts", () => {
   test("accepts an occurred class with neutral arrival, learning summary, lecturer and ordered times", () => {
@@ -21,13 +24,32 @@ describe("teaching session delivery contracts", () => {
     expect(parsed.coverage).toBe("PARTIALLY_COVERED");
   });
 
+  test("accepts multiple actual lecturers for a co-taught occurrence", () => {
+    const parsed = SaveTeachingSessionDeliveryInputSchema.parse({
+      classOccurred: true,
+      actualLecturerId: "11111111-1111-4111-8111-111111111111",
+      actualLecturerIds: [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+      ],
+      actualStartTime: "09:00",
+      actualEndTime: "11:00",
+      actualTopic: "Joint field-data interpretation",
+      learningSummary: "Agronomy and data-science perspectives were taught together.",
+      coverage: "TAUGHT_AS_PLANNED",
+      note: "",
+    });
+
+    expect(parsed.actualLecturerIds).toHaveLength(2);
+  });
+
   test("requires lecturer and ordered actual times when the class occurred", () => {
     const missing = SaveTeachingSessionDeliveryInputSchema.safeParse({
       classOccurred: true,
       actualLecturerId: null,
       actualStartTime: null,
       actualEndTime: null,
-      actualTopic: "",
+      actualTopic: "Topic",
       learningSummary: "",
       coverage: "TAUGHT_AS_PLANNED",
     });
@@ -38,11 +60,35 @@ describe("teaching session delivery contracts", () => {
       actualLecturerId: "11111111-1111-4111-8111-111111111111",
       actualStartTime: "11:00",
       actualEndTime: "10:00",
-      actualTopic: "",
+      actualTopic: "Topic",
       learningSummary: "",
       coverage: "TAUGHT_AS_PLANNED",
     });
     expect(reversed.success).toBe(false);
+  });
+
+  test("requires a taught topic when the class occurred", () => {
+    const missingTopic = SaveTeachingSessionDeliveryInputSchema.safeParse({
+      classOccurred: true,
+      actualLecturerId: "11111111-1111-4111-8111-111111111111",
+      actualStartTime: "09:00",
+      actualEndTime: "10:00",
+      actualTopic: "   ",
+      learningSummary: "",
+      coverage: "TAUGHT_AS_PLANNED",
+    });
+    expect(missingTopic.success).toBe(false);
+
+    const notHeld = SaveTeachingSessionDeliveryInputSchema.safeParse({
+      classOccurred: false,
+      actualLecturerId: null,
+      actualStartTime: null,
+      actualEndTime: null,
+      actualTopic: "",
+      learningSummary: "",
+      coverage: "NOT_COVERED",
+    });
+    expect(notHeld.success).toBe(true);
   });
 
   test("a class that did not occur cannot carry lecturer, time, positive coverage, or learning summary", () => {
@@ -96,5 +142,64 @@ describe("teaching session delivery contracts", () => {
       note: "x".repeat(501),
     });
     expect(tooLongPrivate.success).toBe(false);
+  });
+  test("validates partial and completed server timing views", () => {
+    const partial = TeachingSessionTimingViewSchema.parse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: "2026-09-25T00:40:00.000Z",
+      startedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+      endedAt: null,
+      endedBy: null,
+    });
+    expect(partial.startedAt).toContain("2026-09-25");
+
+    const tooShort = TeachingSessionTimingViewSchema.safeParse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: "2026-09-25T00:40:30.000Z",
+      startedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+      endedAt: "2026-09-25T00:41:29.000Z",
+      endedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+    });
+    expect(tooShort.success).toBe(false);
+
+    const validOneMinute = TeachingSessionTimingViewSchema.safeParse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: "2026-09-25T00:40:30.000Z",
+      startedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+      endedAt: "2026-09-25T00:41:30.000Z",
+      endedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+    });
+    expect(validOneMinute.success).toBe(true);
+
+    const invalidEndOnly = TeachingSessionTimingViewSchema.safeParse({
+      occurrenceId: "11111111-1111-4111-8111-111111111111",
+      offeringId: "22222222-2222-4222-8222-222222222222",
+      startedAt: null,
+      startedBy: null,
+      endedAt: "2026-09-25T04:20:00.000Z",
+      endedBy: {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Class Monitor",
+      },
+    });
+    expect(invalidEndOnly.success).toBe(false);
   });
 });

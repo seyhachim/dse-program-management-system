@@ -10,7 +10,11 @@ import type {
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import {
-  captureAttendanceCheck1,
+  insertAttendanceCheck1Batch,
+  replaceAttendanceRecordsBatch,
+  type AttendanceWriteRow,
+} from "./attendance-batch-writes.ts";
+import {
   loadAttendanceCheckpoints,
   toCheckpointView,
 } from "./attendance-recheck-service.ts";
@@ -78,6 +82,13 @@ function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: 
 
 function emptyStudentCounts(): Record<AttendanceStatus, number> {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0 };
+}
+
+function logAttendanceSaveTiming(phase: string, startedAt: number): void {
+  if (process.env.PERF_ATTENDANCE_SAVE_TIMING !== "true") return;
+  const durationMs = Math.max(0, performance.now() - startedAt);
+  // Performance-only metadata: never log offering/date/student IDs or attendance payloads.
+  console.warn(`[perf] attendance-save phase=${phase} duration=${durationMs.toFixed(1)}ms`);
 }
 
 function buildStudentAttendanceSummary(counts: Record<AttendanceStatus, number>): AttendanceStudentSummary {
@@ -158,16 +169,21 @@ async function getAttendance(offeringId: string, date: string): Promise<Attendan
     courseAttendanceSummaries(offeringId),
   ]);
   const currentStudentIds = enrollments.map((row) => row.studentId);
-  const studentRows = await students().findByIds(currentStudentIds);
+  // These reads are independent once the roster/session baseline is known.
+  // Run them together so post-save readback costs one network round-trip window
+  // instead of serially waiting on student identity, records, pending and checkpoints.
+  const [studentRows, recordRows, pendingRows, checkpointByStudent] = await Promise.all([
+    students().findByIds(currentStudentIds),
+    session
+      ? prisma.$queryRaw<RecordRow[]>`
+          SELECT "studentId", "studentNumber", "studentName", "status", "note"
+          FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${session.id}
+        `
+      : Promise.resolve([] as RecordRow[]),
+    session ? activePending(session.id) : Promise.resolve([] as PendingRow[]),
+    session ? loadAttendanceCheckpoints(session.id) : Promise.resolve(new Map()),
+  ]);
   const studentById = new Map(studentRows.map((student) => [student.id, student]));
-  const recordRows = session ? await prisma.$queryRaw<RecordRow[]>`
-    SELECT "studentId", "studentNumber", "studentName", "status", "note"
-    FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${session.id}
-  ` : [];
-  const pendingRows = session ? await activePending(session.id) : [];
-  const checkpointByStudent = session
-    ? await loadAttendanceCheckpoints(session.id)
-    : new Map();
   const recordByStudent = new Map(recordRows.map((record) => [record.studentId, record]));
   const pendingByStudent = new Map(pendingRows.map((pending) => [pending.studentId, pending]));
   const counts = { ...emptyCounts(), Unmarked: 0 };
@@ -268,8 +284,16 @@ async function deliverPostSaveNotifications(
   const work: Array<Promise<void>> = newlyPending.map((pending) =>
     telegram.notifications.deliverPermissionPending({ ...pending, offeringId, date }),
   );
+
+  // Warning evaluation used to await one full attendance-history read per student.
+  // Fetch all warning-relevant students in one set-based query so save latency is
+  // bounded by a constant number of DB round trips rather than class size/history.
+  const evaluations = await studentAttendanceHistoryService.warningHealthForStudents(
+    requestedStudentIds,
+    offeringId,
+  );
   for (const studentId of requestedStudentIds) {
-    const evaluation = await studentAttendanceHistoryService.healthForStudent(studentId, offeringId);
+    const evaluation = evaluations.get(studentId);
     if (!evaluation) continue;
     for (const candidate of evaluation.warningCandidates) {
       work.push(telegram.notifications.deliverAttendanceWarning({
@@ -278,12 +302,19 @@ async function deliverPostSaveNotifications(
         warningKind: candidate.kind,
         count: candidate.count,
         eventSessionId: candidate.eventSessionId,
-        absentCount: evaluation.history.counts.Absent,
-        excusedCount: evaluation.history.counts.Excused,
+        absentCount: evaluation.counts.Absent,
+        excusedCount: evaluation.counts.Excused,
       }));
     }
   }
   await Promise.allSettled(work);
+}
+
+export class AttendanceSaveConflictError extends Error {
+  constructor() {
+    super("Attendance has changed since it was loaded. Reload and review the latest register before saving.");
+    this.name = "AttendanceSaveConflictError";
+  }
 }
 
 export const attendanceService = {
@@ -321,11 +352,13 @@ export const attendanceService = {
   get: getAttendance,
 
   async save(offeringId: string, date: string, input: SaveAttendanceInput, actorUserId?: string): Promise<AttendanceSessionView> {
+    const saveStartedAt = performance.now();
     const requestedStudentIds = [...new Set(input.records.map((record) => record.studentId))];
     const studentRows = await students().findByIds(requestedStudentIds);
     const studentById = new Map(studentRows.map((student) => [student.id, student]));
     const newlyPending: Array<{ permissionPendingId: string; studentId: string }> = [];
 
+    const transactionStartedAt = performance.now();
     await prisma.$transaction(async (tx) => {
       const enrollments = await tx.$queryRaw<EnrollmentRow[]>`
         SELECT "studentId" FROM "Enrollment" WHERE "offeringId" = ${offeringId} FOR SHARE
@@ -337,6 +370,12 @@ export const attendanceService = {
         WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${dateValue(date)} LIMIT 1 FOR UPDATE
       `;
       const existingSession = existing[0] ?? null;
+      // Compare inside the same transaction, after locking the session row.
+      // A stale request cannot delete records, alter Check 1 or send alerts.
+      if (input.expectedUpdatedAt !== undefined &&
+          (existingSession?.updatedAt.toISOString() ?? null) !== input.expectedUpdatedAt) {
+        throw new AttendanceSaveConflictError();
+      }
       const historicalRows = existingSession ? await tx.$queryRaw<RecordRow[]>`
         SELECT "studentId", "studentNumber", "studentName", "status", "note"
         FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${existingSession.id}
@@ -356,6 +395,21 @@ export const attendanceService = {
         if (isCurrent && !studentById.has(record.studentId)) throw new ReferenceError("One or more attendance students no longer exist");
       }
 
+      // Resolve identity only after validating the entire replacement. Keep the
+      // historical snapshot for students no longer enrolled in this exact session.
+      const writeRows: AttendanceWriteRow[] = input.records.map((requested) => {
+        const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
+        const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
+        return {
+          studentId: requested.studentId,
+          studentNumber: currentStudent?.studentId ?? historical?.studentNumber ?? null,
+          studentName: currentStudent?.name ?? historical!.studentName,
+          status: requested.status ?? null,
+          permissionPending: requested.permissionPending ?? false,
+          note: requested.note ?? "",
+        };
+      });
+
       const sessionId = existingSession?.id ?? crypto.randomUUID();
       if (!existingSession) {
         await tx.$executeRaw`
@@ -364,7 +418,9 @@ export const attendanceService = {
           VALUES (${sessionId}, ${offeringId}, ${dateValue(date)}, CURRENT_TIMESTAMP)
         `;
       } else {
-        await tx.$executeRaw`UPDATE "pms_attendance"."AttendanceSession" SET "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${sessionId}`;
+        await tx.$executeRaw`UPDATE "pms_attendance"."AttendanceSession"
+          SET "updatedAt" = GREATEST(CURRENT_TIMESTAMP, "updatedAt" + INTERVAL '1 millisecond')
+          WHERE "id" = ${sessionId}`;
       }
 
       // Only sessions explicitly created in the checkpoint era receive Check 1.
@@ -372,22 +428,7 @@ export const attendanceService = {
       // corrections never manufacture observations that did not happen.
       const checkpointTracking = !existingSession || existingSession.checkpointTrackingStartedAt !== null;
       if (checkpointTracking) {
-        for (const requested of input.records) {
-          const currentStudent = currentStudentIds.has(requested.studentId) ? studentById.get(requested.studentId) : null;
-          const historical = historicalByStudent.get(requested.studentId) ?? pendingHistoryByStudent.get(requested.studentId);
-          const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
-          const studentName = currentStudent?.name ?? historical!.studentName;
-          await captureAttendanceCheck1(tx, {
-            sessionId,
-            studentId: requested.studentId,
-            studentNumber,
-            studentName,
-            status: requested.status ?? null,
-            permissionPending: requested.permissionPending ?? false,
-            note: requested.note ?? "",
-            actorUserId,
-          });
-        }
+        await insertAttendanceCheck1Batch(tx, sessionId, writeRows, actorUserId);
       }
 
       const requestedByStudent = new Map(input.records.map((record) => [record.studentId, record]));
@@ -423,27 +464,23 @@ export const attendanceService = {
         }
       }
 
-      await tx.$executeRaw`DELETE FROM "pms_attendance"."AttendanceRecord" WHERE "sessionId" = ${sessionId}`;
-      for (const record of input.records) {
-        if (record.status === null) continue;
-        const currentStudent = currentStudentIds.has(record.studentId) ? studentById.get(record.studentId) : null;
-        const historical = historicalByStudent.get(record.studentId) ?? pendingHistoryByStudent.get(record.studentId);
-        const studentNumber = currentStudent?.studentId ?? historical?.studentNumber ?? null;
-        const studentName = currentStudent?.name ?? historical!.studentName;
-        await tx.$executeRaw`
-          INSERT INTO "pms_attendance"."AttendanceRecord"
-            ("sessionId", "studentId", "studentNumber", "studentName", "status", "note")
-          VALUES (${sessionId}, ${record.studentId}, ${studentNumber}, ${studentName}, ${record.status}, ${record.note})
-        `;
-      }
+      await replaceAttendanceRecordsBatch(tx, sessionId, writeRows);
     });
+    logAttendanceSaveTiming("transaction", transactionStartedAt);
 
+    const notificationsStartedAt = performance.now();
     await deliverPostSaveNotifications(
       offeringId,
       date,
       attendanceWarningStudentIds(input.records),
       newlyPending,
     );
-    return getAttendance(offeringId, date);
+    logAttendanceSaveTiming("notifications", notificationsStartedAt);
+
+    const readbackStartedAt = performance.now();
+    const view = await getAttendance(offeringId, date);
+    logAttendanceSaveTiming("readback", readbackStartedAt);
+    logAttendanceSaveTiming("total", saveStartedAt);
+    return view;
   },
 };

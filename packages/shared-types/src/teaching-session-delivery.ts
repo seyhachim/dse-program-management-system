@@ -19,6 +19,12 @@ export const TeachingSessionActualTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
+/** Earliest a monitor may punch teaching start before the scheduled class start. */
+export const TEACHING_START_EARLY_WINDOW_MINUTES = 60;
+
+/** Minimum captured teaching duration so minute-precision final times stay ordered. */
+export const TEACHING_TIMING_MIN_DURATION_SECONDS = 60;
+
 export const TeachingSessionLearningSummarySchema = z.string().trim().max(1000);
 export type TeachingSessionLearningSummary = z.infer<
   typeof TeachingSessionLearningSummarySchema
@@ -29,6 +35,7 @@ export const SaveTeachingSessionDeliveryInputSchema = z
     lecturerArrivalStatus: LecturerArrivalStatusSchema.nullable().optional(),
     classOccurred: z.boolean(),
     actualLecturerId: z.string().uuid().nullable().default(null),
+    actualLecturerIds: z.array(z.string().uuid()).max(20).optional(),
     actualStartTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualEndTime: TeachingSessionActualTimeSchema.nullable().default(null),
     actualTopic: z.string().trim().max(1000).default(""),
@@ -38,11 +45,11 @@ export const SaveTeachingSessionDeliveryInputSchema = z
   })
   .superRefine((value, ctx) => {
     if (!value.classOccurred) {
-      if (value.actualLecturerId !== null) {
+      if (value.actualLecturerId !== null || (value.actualLecturerIds?.length ?? 0) > 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["actualLecturerId"],
-          message: "Actual lecturer must be empty when the class did not occur",
+          path: ["actualLecturerIds"],
+          message: "Actual lecturers must be empty when the class did not occur",
         });
       }
       if (value.actualStartTime !== null || value.actualEndTime !== null) {
@@ -69,11 +76,22 @@ export const SaveTeachingSessionDeliveryInputSchema = z
       return;
     }
 
-    if (!value.actualLecturerId) {
+    const lecturerIds = [
+      ...(value.actualLecturerIds ?? []),
+      ...(value.actualLecturerId ? [value.actualLecturerId] : []),
+    ];
+    if (new Set(lecturerIds).size === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["actualLecturerId"],
-        message: "Actual lecturer is required when the class occurred",
+        path: ["actualLecturerIds"],
+        message: "At least one actual lecturer is required when the class occurred",
+      });
+    }
+    if (value.actualTopic.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["actualTopic"],
+        message: "Topic taught is required when the class occurred",
       });
     }
     if (!value.actualStartTime) {
@@ -127,6 +145,8 @@ export type TeachingSessionDeliveryLecturerView = z.infer<
 export const TeachingSessionDeliverySnapshotSchema = z.object({
   classOccurred: z.boolean(),
   actualLecturerId: z.string().uuid().nullable(),
+  /** Full actual teaching team for this occurrence. Older audit snapshots may omit it. */
+  actualLecturerIds: z.array(z.string().uuid()).optional(),
   actualStartTime: TeachingSessionActualTimeSchema.nullable(),
   actualEndTime: TeachingSessionActualTimeSchema.nullable(),
   deliveredMinutes: z.number().int().min(0),
@@ -144,7 +164,10 @@ export const TeachingSessionDeliveryViewSchema = z.object({
   occurrenceId: z.string().uuid(),
   offeringId: z.string().uuid(),
   classOccurred: z.boolean(),
+  /** Backward-compatible first/lead actual lecturer. */
   actualLecturer: TeachingSessionDeliveryLecturerViewSchema.nullable(),
+  /** All lecturers recorded as actually teaching this occurrence. */
+  actualLecturers: z.array(TeachingSessionDeliveryLecturerViewSchema),
   actualStartTime: TeachingSessionActualTimeSchema.nullable(),
   actualEndTime: TeachingSessionActualTimeSchema.nullable(),
   deliveredMinutes: z.number().int().min(0),
@@ -194,6 +217,67 @@ export type TeachingSessionMonitorCourseView = z.infer<
   typeof TeachingSessionMonitorCourseViewSchema
 >;
 
+export const TeachingSessionTimingActorViewSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+});
+export type TeachingSessionTimingActorView = z.infer<
+  typeof TeachingSessionTimingActorViewSchema
+>;
+
+export const TeachingSessionTimingViewSchema = z
+  .object({
+    occurrenceId: z.string().uuid(),
+    offeringId: z.string().uuid(),
+    startedAt: z.string().datetime().nullable(),
+    startedBy: TeachingSessionTimingActorViewSchema.nullable(),
+    endedAt: z.string().datetime().nullable(),
+    endedBy: TeachingSessionTimingActorViewSchema.nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if ((value.startedAt === null) !== (value.startedBy === null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["startedAt"],
+        message: "Teaching start timestamp and actor must be recorded together",
+      });
+    }
+    if ((value.endedAt === null) !== (value.endedBy === null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endedAt"],
+        message: "Teaching end timestamp and actor must be recorded together",
+      });
+    }
+    if (value.endedAt !== null && value.startedAt === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endedAt"],
+        message: "Teaching cannot end before a teaching start is recorded",
+      });
+    }
+    if (value.startedAt !== null && value.endedAt !== null) {
+      const durationMs =
+        new Date(value.endedAt).getTime() - new Date(value.startedAt).getTime();
+      if (durationMs < TEACHING_TIMING_MIN_DURATION_SECONDS * 1000) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["endedAt"],
+          message: "Teaching end must be at least one minute after teaching start",
+        });
+      }
+    }
+  });
+export type TeachingSessionTimingView = z.infer<typeof TeachingSessionTimingViewSchema>;
+
+export const SaveTeachingSessionTimingResultSchema = z.object({
+  timing: TeachingSessionTimingViewSchema,
+  changed: z.boolean(),
+});
+export type SaveTeachingSessionTimingResult = z.infer<
+  typeof SaveTeachingSessionTimingResultSchema
+>;
+
 export const TeachingSessionMonitorContextViewSchema = z.object({
   responsibility: MonitorClassResponsibilityViewSchema,
   course: TeachingSessionMonitorCourseViewSchema,
@@ -201,6 +285,7 @@ export const TeachingSessionMonitorContextViewSchema = z.object({
   plannedWeek: TeachingSessionPlannedWeekViewSchema.nullable(),
   eligibleLecturers: z.array(TeachingSessionDeliveryLecturerViewSchema),
   lecturerArrival: LecturerArrivalConfirmationViewSchema.nullable(),
+  timing: TeachingSessionTimingViewSchema.nullable(),
   delivery: TeachingSessionDeliveryViewSchema.nullable(),
   history: z.array(TeachingSessionDeliveryAuditEventViewSchema),
 });

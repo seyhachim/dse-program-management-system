@@ -29,14 +29,16 @@ describe("Student Portal mobile home contract", () => {
     expect(portalHomeSource).toContain('alt="DSE logo"');
     expect(portalHomeSource).toContain("DSE Student Portal");
     expect(portalHomeSource).toContain('aria-label="Student identity"');
-    expect(portalHomeSource).toContain("Student ID · {data.student.studentId}");
+    expect(portalHomeSource).toContain("data.student.studentId");
+    expect(portalHomeSource).toContain("Student ID · ${data.student.studentId}");
+    expect(portalHomeSource).toContain('"Pending ID"');
   });
 
   test("right-aligns active monitor responsibilities beside the student name", () => {
     expect(portalHomeSource).toContain("monitorDeliveryApi");
     expect(portalHomeSource).toContain(".assignments()");
-    expect(portalHomeSource).toContain("Class Monitor");
-    expect(portalHomeSource).toContain("Sub-class Monitor");
+    expect(portalHomeSource).toContain("classResponsibilityLabel");
+    expect(portalHomeSource).not.toContain("Sub-class Monitor");
     expect(portalHomeSource).toContain('aria-label="Student responsibilities"');
     expect(portalHomeSource).toContain("Crown");
     expect(portalHomeSource).toContain("ShieldCheck");

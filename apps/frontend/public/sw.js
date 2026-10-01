@@ -3,6 +3,41 @@ const STATIC_CACHE_NAME = `${STATIC_CACHE_PREFIX}v1`;
 const PUBLIC_DATA_CACHE_PREFIX = "dse-pms-public-data-";
 const PUBLIC_DATA_CACHE_NAME = `${PUBLIC_DATA_CACHE_PREFIX}v1`;
 const OFFLINE_URL = "/offline";
+const INLINE_OFFLINE_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>DSE PMS temporarily unavailable</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0f172a; color: #f8fafc; }
+      main { width: min(28rem, calc(100% - 2rem)); box-sizing: border-box; padding: 2rem; border: 1px solid #334155; border-radius: 1rem; background: #111827; }
+      h1 { margin: 0 0 0.75rem; font-size: 1.5rem; line-height: 1.25; }
+      p { margin: 0 0 1.25rem; color: #cbd5e1; line-height: 1.6; }
+      a { display: inline-block; min-height: 2.75rem; box-sizing: border-box; padding: 0.7rem 1rem; border-radius: 0.65rem; background: #f8fafc; color: #0f172a; font-weight: 600; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>DSE PMS is temporarily unavailable</h1>
+      <p>We could not load this page. Check your internet connection, then try again.</p>
+      <a href="">Try again</a>
+    </main>
+  </body>
+</html>`;
+
+function createInlineOfflineResponse() {
+  return new Response(INLINE_OFFLINE_HTML, {
+    status: 503,
+    statusText: "Service Unavailable",
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
 const PRECACHE_URLS = [
   OFFLINE_URL,
   "/dse-logo.svg",
@@ -100,7 +135,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request).catch(async () => {
         const offline = await caches.match(OFFLINE_URL);
-        return offline ?? Response.error();
+        return offline ?? createInlineOfflineResponse();
       }),
     );
     return;

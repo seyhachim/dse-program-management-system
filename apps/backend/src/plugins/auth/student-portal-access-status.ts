@@ -4,7 +4,12 @@ import type {
   StudentPortalAccessStatusResponse,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
-import { invitationEmailsMatch, invitationIsPending } from "./resend-invitation.ts";
+import {
+  configuredInviteExpirySeconds,
+  invitationEmailsMatch,
+  invitationIsPending,
+  pendingInvitationValidity,
+} from "./resend-invitation.ts";
 
 const STATUS_LOOKUP_CONCURRENCY = 3;
 
@@ -42,6 +47,8 @@ export function classifyStudentPortalAccess(input: {
   student: PortalStudent;
   linkedUser?: PortalUser | null;
   authLookup?: AuthLookup;
+  inviteExpirySeconds?: number | null;
+  nowMs?: number;
 }): StudentPortalAccessState {
   const { student } = input;
   if (student.status !== "Active") return "inactive-student";
@@ -66,9 +73,16 @@ export function classifyStudentPortalAccess(input: {
     return "needs-attention";
   }
 
-  return invitationIsPending(input.authLookup.user)
-    ? "invitation-pending"
-    : "active-account";
+  if (!invitationIsPending(input.authLookup.user)) return "active-account";
+
+  const validity = pendingInvitationValidity(
+    input.authLookup.user,
+    input.inviteExpirySeconds,
+    input.nowMs,
+  );
+  if (validity === "valid") return "invitation-pending";
+  if (validity === "expired") return "invitation-expired";
+  return "status-unavailable";
 }
 
 async function mapWithConcurrency<T, R>(
@@ -98,8 +112,18 @@ async function mapWithConcurrency<T, R>(
  * the canonical Student UUID and a small status enum — never User/Auth ids,
  * tokens, links, provider errors, or email addresses.
  */
+export function studentPortalStatusForClient(
+  status: StudentPortalAccessState,
+  includeExpired: boolean,
+): StudentPortalAccessState {
+  return status === "invitation-expired" && !includeExpired
+    ? "invitation-pending"
+    : status;
+}
+
 export async function getStudentPortalAccessStatuses(
   requestedStudentIds: readonly string[],
+  includeExpired = false,
 ): Promise<StudentPortalAccessStatusResponse> {
   const studentIds = [...new Set(requestedStudentIds)];
   if (studentIds.length === 0) return { items: [] };
@@ -151,6 +175,13 @@ export async function getStudentPortalAccessStatuses(
         auth: { autoRefreshToken: false, persistSession: false },
       })
     : null;
+  let inviteExpirySeconds: number | null = null;
+  try {
+    inviteExpirySeconds = configuredInviteExpirySeconds();
+  } catch {
+    // Missing/malformed config is fail-closed: linked pending identities are
+    // reported as status unavailable rather than guessed as valid or expired.
+  }
 
   const items = await mapWithConcurrency(
     orderedStudents,
@@ -176,11 +207,21 @@ export async function getStudentPortalAccessStatuses(
 
       return {
         studentId: student.id,
-        status: classifyStudentPortalAccess({ student, linkedUser, authLookup }),
+        status: classifyStudentPortalAccess({
+          student,
+          linkedUser,
+          authLookup,
+          inviteExpirySeconds,
+        }),
       };
     },
     STATUS_LOOKUP_CONCURRENCY,
   );
 
-  return { items };
+  return {
+    items: items.map((item) => ({
+      ...item,
+      status: studentPortalStatusForClient(item.status, includeExpired),
+    })),
+  };
 }

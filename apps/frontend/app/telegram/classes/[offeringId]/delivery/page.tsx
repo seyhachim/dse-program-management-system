@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
+import { classResponsibilityLabel } from "@/lib/class-responsibility-label";
 import { telegramApi } from "../../../telegram-client";
 
 type LecturerArrivalStatus = "Present" | "NotYet";
@@ -67,6 +68,14 @@ function localDate() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function actorLabel(actorKind: ActorKind): string {
+  if (actorKind === "ClassMonitor" || actorKind === "SubClassMonitor") {
+    return classResponsibilityLabel(actorKind);
+  }
+  if (actorKind === "ProgrammeManager") return "Programme Manager";
+  return "Lecturer";
 }
 
 function sessionLabel(status: ClassSessionStatus) {
@@ -177,7 +186,7 @@ export default function TelegramClassDeliveryPage({ params }: { params: Promise<
         <>
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Your authorization</p>
-            <p className="mt-1 font-semibold">{data.access.actorKind}</p>
+            <p className="mt-1 font-semibold">{actorLabel(data.access.actorKind)}</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
               {data.access.canRecordArrival ? "Can record lecturer arrival. " : "Lecturer arrival is read-only. "}
               {data.access.canManageSession ? "Can manage official class-session status." : "Official session status is read-only."}

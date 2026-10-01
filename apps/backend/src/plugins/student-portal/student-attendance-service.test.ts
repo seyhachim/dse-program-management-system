@@ -1,5 +1,18 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { toPortalStudentAttendanceHistory } from "./student-attendance-service.ts";
+
+const serviceSource = readFileSync(
+  new URL("./student-attendance-service.ts", import.meta.url),
+  "utf8",
+);
+
+describe("Student Portal attendance access wiring", () => {
+  test("uses the provisional-safe Offerings read path", () => {
+    expect(serviceSource).toContain("studentAttendanceHistory.forPortalUser(");
+    expect(serviceSource).not.toContain("studentAttendanceHistory.forUser(");
+  });
+});
 
 describe("Student Portal attendance projection", () => {
   test("keeps canonical attendance semantics but strips private record detail", () => {

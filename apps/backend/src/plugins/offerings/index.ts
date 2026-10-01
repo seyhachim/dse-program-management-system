@@ -10,6 +10,8 @@ import { courseSectionPresenceService } from "./course-section-presence-service.
 import { curriculumBoundOfferingService } from "./curriculum-bound-service.ts";
 import { createCurriculumBoundOfferingRouter } from "./curriculum-bound-router.ts";
 import { portfolioTeachingEvidenceService } from "./portfolio-evidence-service.ts";
+import { createRosterSyncRouter } from "./roster-sync-router.ts";
+import { rosterSyncService } from "./roster-sync-service.ts";
 import { createOfferingRouter } from "./router.ts";
 import { offeringService } from "./service.ts";
 import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
@@ -34,18 +36,19 @@ export const offeringsService = {
   teachingSessionDelivery: teachingSessionDeliveryService,
   teachingLeave: teachingLeaveService,
   curriculumBound: curriculumBoundOfferingService,
+  rosterSync: rosterSyncService,
 };
 
 export type OfferingsService = typeof offeringsService;
 
 const router = Router();
-// Static class-delivery, attendance-recheck, and curriculum-bound workflow routes
-// must be mounted before the legacy /:id offering router so their more-specific
-// paths retain their own validation and authorization behavior.
+// Static workflow routes must be mounted before the legacy /:id offering router
+// so their more-specific paths retain their own validation and authorization.
 router.use(createTeachingLeaveRouter());
 router.use(createTeachingSessionDeliveryRouter());
 router.use(createCurriculumBoundOfferingRouter());
 router.use(createAttendanceRecheckRouter());
+router.use(createRosterSyncRouter());
 router.use(createOfferingRouter());
 
 export const offeringsPlugin: BackendPlugin<OfferingsService> = {

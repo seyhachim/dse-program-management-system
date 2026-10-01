@@ -14,7 +14,7 @@ import {
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
-import { attendanceService } from "./attendance-service.ts";
+import { AttendanceSaveConflictError, attendanceService } from "./attendance-service.ts";
 import {
   ClassResponsibilityConflictError,
   ClassResponsibilityEligibilityError,
@@ -143,9 +143,19 @@ export function createOfferingRouter(): Router {
       });
       return;
     }
+    // Existing browsers without a server version must fail closed instead of
+    // silently overwriting attendance saved by a different lecturer.
+    if (parsedBody.data.expectedUpdatedAt === undefined) {
+      res.status(428).json({ error: "Reload attendance before saving; the expected server version is missing" });
+      return;
+    }
     try {
       res.json(await attendanceService.save(req.params.id!, parsedDate.data, parsedBody.data, req.user!.id));
     } catch (err) {
+      if (err instanceof AttendanceSaveConflictError) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
       handleError(err, res, "Could not save attendance");
     }
   });
@@ -307,16 +317,16 @@ async function assertOwnOfferingOrAdmin(
   res: import("express").Response,
   action = "manage enrollment for",
 ): Promise<boolean> {
-  const offering = await offeringService.getById(req.params.id!);
-  if (!offering) {
+  const access = await offeringService.accessScope(req.params.id!);
+  if (!access) {
     res.status(404).json({ error: "Offering not found" });
     return false;
   }
-  if (hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, offering.course?.programmeId ?? null)) {
+  if (hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, access.programmeId)) {
     return true;
   }
   const isAssigned =
-    offering.lecturer?.id === req.user!.id || offering.coLecturers.some((c) => c.id === req.user!.id);
+    access.lecturerId === req.user!.id || access.coLecturerIds.includes(req.user!.id);
   if (!isAssigned) {
     res.status(403).json({ error: `You can only ${action} your own offerings` });
     return false;

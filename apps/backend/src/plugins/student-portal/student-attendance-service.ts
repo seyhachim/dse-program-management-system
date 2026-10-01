@@ -24,7 +24,10 @@ type CanonicalAttendanceHistory = {
 
 interface OfferingsAttendanceReadContract {
   studentAttendanceHistory: {
-    forUser(userId: string, offeringId: string): Promise<CanonicalAttendanceHistory>;
+    forPortalUser(
+      userId: string,
+      offeringId: string,
+    ): Promise<CanonicalAttendanceHistory>;
   };
 }
 
@@ -55,7 +58,10 @@ export const studentPortalAttendanceService = {
     // cross-offering IDs fail before attendance evidence is read.
     await studentPortalService.course(userId, offeringId);
     const offerings = registry.get<OfferingsAttendanceReadContract>("offerings").service;
-    const canonical = await offerings.studentAttendanceHistory.forUser(userId, offeringId);
+    const canonical = await offerings.studentAttendanceHistory.forPortalUser(
+      userId,
+      offeringId,
+    );
     return toPortalStudentAttendanceHistory(canonical);
   },
 };

@@ -28,6 +28,79 @@ export const ResendInvitationResponse = z.object({
 });
 export type ResendInvitationResponse = z.infer<typeof ResendInvitationResponse>;
 
+
+/**
+ * Bounded admin request for sending Student Portal access only to explicitly
+ * selected roster rows. The small cap protects provider rate limits and makes
+ * pilot rollouts intentional rather than turning selection into another send-all.
+ */
+export const SelectedStudentPortalAccessRequest = z.object({
+  studentIds: z.array(z.string().uuid()).min(1).max(20),
+}).strict().refine(
+  (value) => new Set(value.studentIds).size === value.studentIds.length,
+  { message: "Student IDs must be unique", path: ["studentIds"] },
+);
+export type SelectedStudentPortalAccessRequest = z.infer<typeof SelectedStudentPortalAccessRequest>;
+
+/** Admin-only live account state for lecturer onboarding. */
+export const LecturerAccessState = z.enum([
+  "no-access",
+  "invitation-pending",
+  "active-account",
+  "needs-attention",
+  "status-unavailable",
+]);
+export type LecturerAccessState = z.infer<typeof LecturerAccessState>;
+
+export const LecturerAccessStatusRequest = z.object({
+  lecturerIds: z.array(z.string().uuid()).min(1).max(100),
+}).strict().refine(
+  (value) => new Set(value.lecturerIds).size === value.lecturerIds.length,
+  { message: "Lecturer IDs must be unique", path: ["lecturerIds"] },
+);
+export type LecturerAccessStatusRequest = z.infer<typeof LecturerAccessStatusRequest>;
+
+export const LecturerAccessStatusItem = z.object({
+  lecturerId: z.string().uuid(),
+  status: LecturerAccessState,
+});
+export type LecturerAccessStatusItem = z.infer<typeof LecturerAccessStatusItem>;
+
+export const LecturerAccessStatusResponse = z.object({
+  items: z.array(LecturerAccessStatusItem).max(100),
+});
+export type LecturerAccessStatusResponse = z.infer<typeof LecturerAccessStatusResponse>;
+
+/**
+ * Bounded lecturer onboarding batch. The cap keeps invitation delivery
+ * intentional and avoids turning selection into an unrestricted send-all.
+ */
+export const SelectedLecturerInvitationRequest = z.object({
+  lecturerIds: z.array(z.string().uuid()).min(1).max(20),
+}).strict().refine(
+  (value) => new Set(value.lecturerIds).size === value.lecturerIds.length,
+  { message: "Lecturer IDs must be unique", path: ["lecturerIds"] },
+);
+export type SelectedLecturerInvitationRequest = z.infer<typeof SelectedLecturerInvitationRequest>;
+
+export const LecturerInvitationBatchResponse = z.object({
+  totalLecturers: z.number().int().nonnegative(),
+  newlyInvited: z.number().int().nonnegative(),
+  resent: z.number().int().nonnegative(),
+  existingAccountSkipped: z.number().int().nonnegative(),
+  missingLecturerSkipped: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+}).refine(
+  (value) => value.totalLecturers ===
+    value.newlyInvited +
+      value.resent +
+      value.existingAccountSkipped +
+      value.missingLecturerSkipped +
+      value.failed,
+  { message: "Total lecturers must equal all selected invitation outcomes" },
+);
+export type LecturerInvitationBatchResponse = z.infer<typeof LecturerInvitationBatchResponse>;
+
 /**
  * Aggregate result for the admin-only Student Portal bulk access action.
  * The response never contains recipient identity, invitation URLs, tokens, or
@@ -42,6 +115,7 @@ export const BulkStudentPortalAccessResponse = z.object({
   newlyInvited: z.number().int().nonnegative(),
   resent: z.number().int().nonnegative(),
   existingAccountSkipped: z.number().int().nonnegative(),
+  pendingInvitationSkipped: z.number().int().nonnegative(),
   ineligibleSkipped: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
   eligible: z.number().int().nonnegative(),
@@ -52,6 +126,7 @@ export const BulkStudentPortalAccessResponse = z.object({
     value.newlyInvited +
       value.resent +
       value.existingAccountSkipped +
+      value.pendingInvitationSkipped +
       value.ineligibleSkipped +
       value.failed,
   { message: "Total students must equal all bulk portal-access outcomes" },
@@ -59,7 +134,7 @@ export const BulkStudentPortalAccessResponse = z.object({
   (value) => value.invited === value.newlyInvited + value.resent,
   { message: "Legacy invited count must equal newly invited plus resent" },
 ).refine(
-  (value) => value.skipped === value.existingAccountSkipped + value.ineligibleSkipped,
+  (value) => value.skipped === value.existingAccountSkipped + value.pendingInvitationSkipped + value.ineligibleSkipped,
   { message: "Legacy skipped count must equal both safe skip outcomes" },
 ).refine(
   (value) => value.eligible === value.invited + value.failed,
@@ -76,6 +151,7 @@ export type BulkStudentPortalAccessResponse = z.infer<typeof BulkStudentPortalAc
 export const StudentPortalAccessState = z.enum([
   "not-invited",
   "invitation-pending",
+  "invitation-expired",
   "active-account",
   "no-email",
   "inactive-student",
@@ -86,6 +162,7 @@ export type StudentPortalAccessState = z.infer<typeof StudentPortalAccessState>;
 
 export const StudentPortalAccessStatusRequest = z.object({
   studentIds: z.array(z.string().uuid()).min(1).max(100),
+  includeExpired: z.boolean().optional().default(false),
 }).strict();
 export type StudentPortalAccessStatusRequest = z.infer<typeof StudentPortalAccessStatusRequest>;
 

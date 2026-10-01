@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { classifyStudentPortalAccess } from "./student-portal-access-status.ts";
+import {
+  classifyStudentPortalAccess,
+  studentPortalStatusForClient,
+} from "./student-portal-access-status.ts";
 
 const ACTIVE = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -90,7 +93,37 @@ describe("classifyStudentPortalAccess", () => {
     ).toBe("needs-attention");
   });
 
-  test("uses the canonical pending invitation definition", () => {
+  test("distinguishes valid and expired pending invitations at the configured boundary", () => {
+    const pendingUser = {
+      email: "student@dse.dev",
+      invited_at: "2026-09-30T00:00:00Z",
+      email_confirmed_at: null,
+      confirmed_at: null,
+      last_sign_in_at: null,
+    };
+
+    expect(
+      classifyStudentPortalAccess({
+        student: ACTIVE,
+        linkedUser: LINKED_USER,
+        authLookup: { kind: "ok", user: pendingUser },
+        inviteExpirySeconds: 3_600,
+        nowMs: Date.parse("2026-09-30T00:59:59.999Z"),
+      }),
+    ).toBe("invitation-pending");
+
+    expect(
+      classifyStudentPortalAccess({
+        student: ACTIVE,
+        linkedUser: LINKED_USER,
+        authLookup: { kind: "ok", user: pendingUser },
+        inviteExpirySeconds: 3_600,
+        nowMs: Date.parse("2026-09-30T01:00:00.000Z"),
+      }),
+    ).toBe("invitation-expired");
+  });
+
+  test("fails closed instead of guessing pending expiry when configuration is missing", () => {
     expect(
       classifyStudentPortalAccess({
         student: ACTIVE,
@@ -99,14 +132,15 @@ describe("classifyStudentPortalAccess", () => {
           kind: "ok",
           user: {
             email: "student@dse.dev",
-            invited_at: "2026-09-14T00:00:00Z",
+            invited_at: "2026-09-30T00:00:00Z",
             email_confirmed_at: null,
             confirmed_at: null,
             last_sign_in_at: null,
           },
         },
+        inviteExpirySeconds: null,
       }),
-    ).toBe("invitation-pending");
+    ).toBe("status-unavailable");
   });
 
   test("treats confirmed, signed-in, or other non-pending identities as an existing active account", () => {
@@ -131,5 +165,17 @@ describe("classifyStudentPortalAccess", () => {
         }),
       ).toBe("active-account");
     }
+  });
+});
+
+
+describe("studentPortalStatusForClient", () => {
+  test("downgrades expired status for legacy clients", () => {
+    expect(studentPortalStatusForClient("invitation-expired", false)).toBe("invitation-pending");
+  });
+
+  test("exposes expired status only to opted-in clients", () => {
+    expect(studentPortalStatusForClient("invitation-expired", true)).toBe("invitation-expired");
+    expect(studentPortalStatusForClient("active-account", false)).toBe("active-account");
   });
 });

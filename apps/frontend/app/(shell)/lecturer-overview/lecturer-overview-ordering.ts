@@ -257,7 +257,7 @@ export function groupOfferingsForMobile<
 export function compactScheduleLabel(
   offering: LecturerOverviewOffering,
 ): string {
-  if (offering.meetings.length === 0) return "Schedule not set";
+  if (offering.meetings.length === 0) return "No weekly session assigned to you";
 
   const byDay = new Map<string, LecturerOverviewOffering["meetings"]>();
   for (const meeting of offering.meetings) {

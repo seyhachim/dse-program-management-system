@@ -4,6 +4,7 @@ import { portalAccessPresentation } from "./student-portal-access-status.ts";
 test("portal access badges use clear roster labels", () => {
   expect(portalAccessPresentation("not-invited").label).toBe("Not invited");
   expect(portalAccessPresentation("invitation-pending").label).toBe("Invitation pending");
+  expect(portalAccessPresentation("invitation-expired").label).toBe("Invitation expired");
   expect(portalAccessPresentation("active-account").label).toBe("Active account");
   expect(portalAccessPresentation("no-email").label).toBe("No email");
   expect(portalAccessPresentation("inactive-student").label).toBe("Inactive student");
@@ -13,6 +14,7 @@ test("portal access badges use clear roster labels", () => {
 
 test("pending and account states use distinct semantic tones", () => {
   expect(portalAccessPresentation("invitation-pending").tone).toBe("warning");
+  expect(portalAccessPresentation("invitation-expired").tone).toBe("danger");
   expect(portalAccessPresentation("active-account").tone).toBe("success");
   expect(portalAccessPresentation("status-unavailable").tone).toBe("danger");
 });
