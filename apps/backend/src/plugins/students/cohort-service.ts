@@ -84,7 +84,10 @@ async function buildCurrentStudyYearPreview(
       studentName: membership.student.name,
       latestAcademicYear: latest?.academicYear ?? null,
       latestTerm: latest?.term ?? null,
-      latestProgrammeYear: latest?.programmeYear as StudentProgrammeYear | null | undefined ?? null,
+      latestProgrammeYear:
+        latest?.programmeYear === null || latest?.programmeYear === undefined
+          ? null
+          : latest.programmeYear as StudentProgrammeYear,
       latestStatus: latest?.status ?? null,
     };
 
