@@ -8,14 +8,17 @@ test.describe("#1224 current study year browser smoke", () => {
 
     await page.goto("/students/cohorts");
 
-    await expect(page.getByRole("heading", { name: "Initialize current study year" })).toBeVisible();
-    await expect(page.getByText("PMS never derives programme year from cohort intake.")).toBeVisible();
-    await expect(page.getByText("Cohort", { exact: true })).toBeVisible();
-    await expect(page.getByText("Default study year", { exact: true })).toBeVisible();
-    await expect(page.getByText("Academic year", { exact: true })).toBeVisible();
-    await expect(page.getByText("Period start", { exact: true })).toBeVisible();
-    await expect(page.getByText("Period end", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Preview current study year" })).toBeVisible();
+    const heading = page.getByRole("heading", { name: "Initialize current study year" });
+    await expect(heading).toBeVisible();
+    const initializer = heading.locator("..").locator("..");
+
+    await expect(initializer.getByText("PMS never derives programme year from cohort intake.")).toBeVisible();
+    await expect(initializer.getByText("Cohort", { exact: true })).toBeVisible();
+    await expect(initializer.getByText("Default study year", { exact: true })).toBeVisible();
+    await expect(initializer.getByText("Academic year", { exact: true })).toBeVisible();
+    await expect(initializer.getByText("Period start", { exact: true })).toBeVisible();
+    await expect(initializer.getByText("Period end", { exact: true })).toBeVisible();
+    await expect(initializer.getByRole("button", { name: "Preview current study year" })).toBeVisible();
 
     await coordinator.close();
   });
