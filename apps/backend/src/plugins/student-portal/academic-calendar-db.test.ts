@@ -92,7 +92,7 @@ dbDescribe("Student Portal Academic Calendar publication boundary", () => {
         programmeYear: 4,
         periodStart: new Date("2026-09-01T00:00:00.000Z"),
         periodEnd: new Date("2027-01-31T00:00:00.000Z"),
-        status: "Progressed",
+        status: "Continuing",
       },
     });
 
@@ -111,7 +111,7 @@ dbDescribe("Student Portal Academic Calendar publication boundary", () => {
         programmeYear: 3,
         periodStart: new Date("2027-02-01T00:00:00.000Z"),
         periodEnd: new Date("2027-06-30T00:00:00.000Z"),
-        status: "Progressed",
+        status: "Continuing",
       },
     });
 
