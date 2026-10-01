@@ -37,6 +37,7 @@ type MeetingRow = {
   room: string | null;
   activityType: UnassignedTeachingMeetingView["activityType"];
   openForAssignment: boolean;
+  assignmentInScope: boolean;
   primaryLecturerId: string | null;
 };
 
@@ -141,11 +142,14 @@ const requestSelect = `
          offering."academicCalendarPeriodId", meeting."dayOfWeek",
          meeting."startTime", meeting."endTime", meeting."building",
          meeting."room", meeting."activityType", meeting."openForAssignment",
+         (COALESCE(period."teachingEnd", offering."endDate") IS NULL
+          OR COALESCE(period."teachingEnd", offering."endDate") >= CURRENT_DATE) AS "assignmentInScope",
          offering."lecturerId" AS "primaryLecturerId"
   FROM "pms_attendance"."OfferingMeetingTeachingRequest" request
   JOIN "OfferingMeeting" meeting ON meeting."id" = request."meetingId"
   JOIN "Offering" offering ON offering."id" = request."offeringId"
   JOIN "Course" course ON course."id" = offering."courseId"
+  LEFT JOIN "AcademicCalendarPeriod" period ON period."id" = offering."academicCalendarPeriodId"
   JOIN "User" requester ON requester."id" = request."requesterId"
   LEFT JOIN "User" reviewer ON reviewer."id" = request."reviewedById"
 `;
@@ -172,10 +176,13 @@ async function meetingForUpdate(
            offering."academicCalendarPeriodId", meeting."dayOfWeek",
            meeting."startTime", meeting."endTime", meeting."building",
            meeting."room", meeting."activityType", meeting."openForAssignment",
+         (COALESCE(period."teachingEnd", offering."endDate") IS NULL
+          OR COALESCE(period."teachingEnd", offering."endDate") >= CURRENT_DATE) AS "assignmentInScope",
            offering."lecturerId" AS "primaryLecturerId"
     FROM "OfferingMeeting" meeting
     JOIN "Offering" offering ON offering."id" = meeting."offeringId"
     JOIN "Course" course ON course."id" = offering."courseId"
+    LEFT JOIN "AcademicCalendarPeriod" period ON period."id" = offering."academicCalendarPeriodId"
     WHERE meeting."id" = ${meetingId}
     FOR UPDATE OF meeting
   `;
@@ -321,6 +328,8 @@ export const unassignedTeachingRequestService = {
              offering."academicCalendarPeriodId", meeting."dayOfWeek",
              meeting."startTime", meeting."endTime", meeting."building",
              meeting."room", meeting."activityType", meeting."openForAssignment",
+         (COALESCE(period."teachingEnd", offering."endDate") IS NULL
+          OR COALESCE(period."teachingEnd", offering."endDate") >= CURRENT_DATE) AS "assignmentInScope",
              offering."lecturerId" AS "primaryLecturerId"
       FROM "OfferingMeeting" meeting
       JOIN "Offering" offering ON offering."id" = meeting."offeringId"
@@ -385,6 +394,9 @@ export const unassignedTeachingRequestService = {
       const meeting = await meetingForUpdate(tx, meetingId);
       if (meeting.offeringStatus === "Completed") {
         throw new UnassignedTeachingConflictError("This class is no longer available for assignment");
+      }
+      if (!meeting.assignmentInScope) {
+        throw new UnassignedTeachingConflictError("This weekly class is outside its active teaching period");
       }
       if (!meeting.openForAssignment) {
         throw new UnassignedTeachingConflictError("This weekly class is not open for lecturer requests");
@@ -468,11 +480,14 @@ export const unassignedTeachingRequestService = {
                offering."academicCalendarPeriodId", meeting."dayOfWeek",
                meeting."startTime", meeting."endTime", meeting."building",
                meeting."room", meeting."activityType", meeting."openForAssignment",
+         (COALESCE(period."teachingEnd", offering."endDate") IS NULL
+          OR COALESCE(period."teachingEnd", offering."endDate") >= CURRENT_DATE) AS "assignmentInScope",
                offering."lecturerId" AS "primaryLecturerId"
         FROM "pms_attendance"."OfferingMeetingTeachingRequest" request
         JOIN "OfferingMeeting" meeting ON meeting."id" = request."meetingId"
         JOIN "Offering" offering ON offering."id" = request."offeringId"
         JOIN "Course" course ON course."id" = offering."courseId"
+        LEFT JOIN "AcademicCalendarPeriod" period ON period."id" = offering."academicCalendarPeriodId"
         JOIN "User" requester ON requester."id" = request."requesterId"
         LEFT JOIN "User" reviewer ON reviewer."id" = request."reviewedById"
         WHERE request."id" = ${id}
@@ -509,6 +524,9 @@ export const unassignedTeachingRequestService = {
 
       if (request.offeringStatus === "Completed") {
         throw new UnassignedTeachingConflictError("This class is no longer available for assignment");
+      }
+      if (!request.assignmentInScope) {
+        throw new UnassignedTeachingConflictError("This weekly class is outside its active teaching period");
       }
       if (!request.openForAssignment) {
         throw new UnassignedTeachingConflictError("This weekly class is no longer open for lecturer requests");
