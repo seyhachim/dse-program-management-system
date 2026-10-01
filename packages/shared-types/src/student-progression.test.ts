@@ -15,7 +15,7 @@ describe("student progression contracts", () => {
   });
 
   test("requires explicit programme year and accepts progression lifecycle states", () => {
-    for (const status of ["Continuing", "Progressed", "Retained", "Withdrawn", "Inactive", "Graduated", "Transferred"]) {
+    for (const status of ["Progressed", "Retained", "Withdrawn", "Inactive", "Graduated", "Transferred"]) {
       expect(AppendStudentProgressionInput.safeParse({
         membershipId: "00000000-0000-4000-8000-000000000001",
         programmeYear: 1,
@@ -33,6 +33,15 @@ describe("student progression contracts", () => {
       periodStart: "2026-09-01",
       periodEnd: "2027-01-31",
       status: "Progressed",
+    }).success).toBe(false);
+    expect(AppendStudentProgressionInput.safeParse({
+      membershipId: "00000000-0000-4000-8000-000000000001",
+      programmeYear: 1,
+      academicYear: "2026-2027",
+      term: "Academic year",
+      periodStart: "2026-09-01",
+      periodEnd: "2027-06-30",
+      status: "Continuing",
     }).success).toBe(false);
   });
 
