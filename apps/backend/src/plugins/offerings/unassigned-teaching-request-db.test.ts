@@ -45,6 +45,7 @@ async function createUnassignedMeeting(label: string, options: {
   endTime?: string;
   primaryLecturerId?: string | null;
   openForAssignment?: boolean;
+  startDate?: Date | null;
   endDate?: Date | null;
 } = {}) {
   const programmeId = options.programmeId ?? "dse";
@@ -62,6 +63,7 @@ async function createUnassignedMeeting(label: string, options: {
       term: options.term ?? `2026-UAR-${crypto.randomUUID().slice(0, 6)}`,
       sectionCode: "M1",
       status: "Active",
+      startDate: options.startDate ?? null,
       endDate: options.endDate ?? null,
       meetings: {
         create: {
@@ -127,6 +129,7 @@ describeDb("unassigned weekly teaching request integrity", () => {
     ).rejects.toThrow("not open for lecturer requests");
 
     const expiredFixture = await createUnassignedMeeting("expired", {
+      startDate: new Date("2019-08-01T00:00:00.000Z"),
       endDate: new Date("2020-01-01T00:00:00.000Z"),
     });
     const refreshedAvailable = await unassignedTeachingRequestService.available(lecturer.auth);
