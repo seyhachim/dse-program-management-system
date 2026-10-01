@@ -48,6 +48,8 @@ const EMPTY_MEETING: OfferingMeetingInput = {
   building: DEFAULT_OFFERING_BUILDING,
   room: "",
   activityType: "Lecture",
+  lecturerIds: [],
+  openForAssignment: false,
 };
 
 function message(error: unknown, fallback: string): string {
@@ -501,6 +503,21 @@ export function CurriculumBoundOfferingFormPage({ offeringId }: { offeringId: st
                       {["Lecture", "Tutorial", "Practice", "Lab", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
                     <Button type="button" variant="ghost" size="sm" onClick={() => setMeetings((items) => items.filter((_, i) => i !== index))}>Remove</Button>
+                    <label className="flex items-start gap-2 rounded-md border border-border bg-muted/20 p-2 text-sm md:col-span-7">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(meeting.openForAssignment)}
+                        disabled={(meeting.lecturerIds?.length ?? 0) > 0 && !meeting.openForAssignment}
+                        onChange={(event) => changeMeeting(index, { openForAssignment: event.target.checked })}
+                        className="mt-0.5 h-4 w-4"
+                      />
+                      <span>
+                        <span className="font-medium">Open for lecturer requests</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          Explicitly advertise this unallocated weekly session in Available Classes. Existing unallocated sessions remain closed unless programme staff opt in.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 ))}
                 {meetings.length === 0 ? <p className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">Add at least one weekly session.</p> : null}
