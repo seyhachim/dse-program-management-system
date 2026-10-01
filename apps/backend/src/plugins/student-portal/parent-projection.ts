@@ -15,7 +15,17 @@ export interface ParentAcademicProjectionData {
 
 export function parentAcademicStatusForProgression(
   progressionStatus: string | null,
+  previousProgressionStatus: string | null = null,
 ): ParentAcademicStatus {
+  if (progressionStatus === "Continuing") {
+    // "Continuing" is the neutral current-year baseline introduced by #1224.
+    // It should make the current academic context available to guardians, but
+    // must not erase a previously recorded Retained/Inactive concern.
+    if (previousProgressionStatus === "Retained" || previousProgressionStatus === "Inactive") {
+      return "NEEDS_ATTENTION";
+    }
+    return "ON_TRACK";
+  }
   if (progressionStatus === "Progressed" || progressionStatus === "Graduated") {
     return "ON_TRACK";
   }
@@ -104,8 +114,14 @@ export const parentAcademicProjectionService = {
     });
 
     const progression = membership?.progressionRecords[0] ?? null;
+    const previousProgressionStatus = progression?.status === "Continuing"
+      ? membership?.progressionRecords.find((record) => record.status !== "Continuing")?.status ?? null
+      : null;
     return {
-      academicStatus: parentAcademicStatusForProgression(progression?.status ?? null),
+      academicStatus: parentAcademicStatusForProgression(
+        progression?.status ?? null,
+        previousProgressionStatus,
+      ),
       progressionStatus: progression?.status ?? null,
       academicYear: progression?.academicYear ?? null,
       programmeYear: progression?.programmeYear ?? null,

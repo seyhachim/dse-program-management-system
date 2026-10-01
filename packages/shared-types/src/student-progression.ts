@@ -4,9 +4,15 @@ export const STUDENT_COHORT_STATUSES = ["Planned", "Active", "Completed", "Archi
 export const StudentCohortStatusSchema = z.enum(STUDENT_COHORT_STATUSES);
 
 export const STUDENT_PROGRESSION_STATUSES = [
-  "Progressed", "Retained", "Withdrawn", "Inactive", "Graduated", "Transferred",
+  "Continuing", "Progressed", "Retained", "Withdrawn", "Inactive", "Graduated", "Transferred",
 ] as const;
 export const StudentProgressionStatusSchema = z.enum(STUDENT_PROGRESSION_STATUSES);
+export type StudentProgressionStatus = z.infer<typeof StudentProgressionStatusSchema>;
+
+const STUDENT_APPEND_PROGRESSION_STATUSES = [
+  "Progressed", "Retained", "Withdrawn", "Inactive", "Graduated", "Transferred",
+] as const;
+const StudentAppendProgressionStatusSchema = z.enum(STUDENT_APPEND_PROGRESSION_STATUSES);
 
 export const STUDENT_PROMOTION_DECISIONS = [
   "Progressed", "Retained", "Withdrawn", "Inactive", "Transferred",
@@ -63,7 +69,7 @@ export const AppendStudentProgressionInput = z.object({
   term: z.string().trim().min(1).max(80),
   periodStart: DateOnlySchema,
   periodEnd: DateOnlySchema,
-  status: StudentProgressionStatusSchema,
+  status: StudentAppendProgressionStatusSchema,
   note: z.string().trim().max(2000).default(""),
 }).superRefine((value, ctx) => {
   if (value.periodEnd < value.periodStart) {
@@ -163,6 +169,88 @@ export interface StudentPromotionApplyResult {
   targetProgrammeYear: StudentProgrammeYear;
   recordsCreated: number;
   summary: Record<StudentPromotionDecision, number>;
+}
+
+export const STUDENT_CURRENT_STUDY_YEAR_TERM = "Academic year" as const;
+
+const CurrentStudyYearPeriodFields = {
+  defaultProgrammeYear: StudentProgrammeYearSchema,
+  academicYear: z.string().trim().min(4).max(20),
+  periodStart: DateOnlySchema,
+  periodEnd: DateOnlySchema,
+} as const;
+
+function validateCurrentStudyYearPeriod(
+  value: { periodStart: string; periodEnd: string },
+  ctx: z.RefinementCtx,
+) {
+  if (value.periodEnd < value.periodStart) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["periodEnd"], message: "Period end cannot precede period start" });
+  }
+}
+
+export const PreviewStudentCurrentStudyYearInput = z.object(CurrentStudyYearPeriodFields)
+  .superRefine(validateCurrentStudyYearPeriod);
+export type PreviewStudentCurrentStudyYearInput = z.infer<typeof PreviewStudentCurrentStudyYearInput>;
+
+export const StudentCurrentStudyYearAssignmentInput = z.object({
+  membershipId: z.string().uuid(),
+  programmeYear: StudentProgrammeYearSchema,
+  note: z.string().trim().max(2000).default(""),
+});
+export type StudentCurrentStudyYearAssignmentInput = z.infer<typeof StudentCurrentStudyYearAssignmentInput>;
+
+export const ApplyStudentCurrentStudyYearInput = z.object({
+  ...CurrentStudyYearPeriodFields,
+  assignments: z.array(StudentCurrentStudyYearAssignmentInput).min(1),
+}).superRefine((value, ctx) => {
+  validateCurrentStudyYearPeriod(value, ctx);
+  const seen = new Set<string>();
+  value.assignments.forEach((assignment, index) => {
+    if (seen.has(assignment.membershipId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["assignments", index, "membershipId"],
+        message: "Each membership may appear only once",
+      });
+    }
+    seen.add(assignment.membershipId);
+  });
+});
+export type ApplyStudentCurrentStudyYearInput = z.infer<typeof ApplyStudentCurrentStudyYearInput>;
+
+export interface StudentCurrentStudyYearPreviewMember {
+  membershipId: string;
+  studentId: string;
+  studentNumber: string | null;
+  studentName: string;
+  latestAcademicYear: string | null;
+  latestTerm: string | null;
+  latestProgrammeYear: StudentProgrammeYear | null;
+  latestStatus: StudentProgressionStatus | null;
+  proposedProgrammeYear: StudentProgrammeYear | null;
+  programmeYearLockedByHistory: boolean;
+  eligible: boolean;
+  blocker: string | null;
+}
+
+export interface StudentCurrentStudyYearPreview {
+  cohortId: string;
+  cohortCode: string;
+  defaultProgrammeYear: StudentProgrammeYear;
+  academicYear: string;
+  term: typeof STUDENT_CURRENT_STUDY_YEAR_TERM;
+  members: StudentCurrentStudyYearPreviewMember[];
+  eligibleCount: number;
+  excludedCount: number;
+  canApply: boolean;
+}
+
+export interface StudentCurrentStudyYearApplyResult {
+  cohortId: string;
+  academicYear: string;
+  term: typeof STUDENT_CURRENT_STUDY_YEAR_TERM;
+  recordsCreated: number;
 }
 
 export interface StudentCohortSummaryView {

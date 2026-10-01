@@ -74,6 +74,33 @@ suite("cohort promotion authorization", () => {
     }
   });
 
+  test("current study year apply uses the same programme decision boundary", async () => {
+    const cohortId = "00000000-0000-4000-8000-000000001224";
+    const body = {
+      defaultProgrammeYear: 3,
+      academicYear: "2026-2027",
+      periodStart: "2026-09-01",
+      periodEnd: "2027-06-30",
+      assignments: [{
+        membershipId: "00000000-0000-4000-8000-000000001225",
+        programmeYear: 3,
+        note: "Authorization probe",
+      }],
+    };
+
+    for (const actor of [users.admin, users.coordinator]) {
+      const response = await request(`${COHORTS_API}/${cohortId}/current-study-year/apply`, actor, body);
+      expect(response.status).toBe(404);
+      expect(response.error).toContain("Cohort not found");
+    }
+
+    for (const actor of [users.secretary, users.lecturer, users.student]) {
+      const response = await request(`${COHORTS_API}/${cohortId}/current-study-year/apply`, actor, body);
+      expect(response.status).toBe(403);
+      expect(response.error).toContain("programme:write");
+    }
+  });
+
   async function request(path: string, actor: AuthUser, body: unknown) {
     const response = await fetch(`${baseUrl}${path}`, {
       method: "POST",

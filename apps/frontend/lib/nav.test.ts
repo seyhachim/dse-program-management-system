@@ -32,6 +32,21 @@ test("Rubric Bank is visible only to programme leadership", () => {
   expect(student).toBeUndefined();
 });
 
+test("Cohort progression is reachable by programme leadership without exposing student CRUD", () => {
+  const adminPaths = sidebarPaths(["admin"]);
+  const coordinatorPaths = sidebarPaths(["program_coordinator"]);
+  const secretaryPaths = sidebarPaths(["program_secretary"]);
+
+  expect(adminPaths).toContain("/students/cohorts");
+  expect(coordinatorPaths).toContain("/students/cohorts");
+  expect(secretaryPaths).toContain("/students/cohorts");
+
+  expect(coordinatorPaths).not.toContain("/students");
+  expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === "/students")).toBeUndefined();
+  expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === "/students/cohorts")?.label)
+    .toBe("Cohorts & Progression");
+});
+
 test("Rating Scales management is visible only to Admin and Programme Coordinator", () => {
   const path = "/programme-settings/rating-scales";
   expect(getNavRoutes(["admin"]).find((route) => route.path === path)?.label).toBe("Rating Scales");
