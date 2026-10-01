@@ -42,7 +42,8 @@ test("Cohort progression is reachable by programme leadership without exposing s
   expect(secretaryPaths).toContain("/students/cohorts");
 
   expect(coordinatorPaths).not.toContain("/students");
-  expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === "/students")?.label)
+  expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === "/students")).toBeUndefined();
+  expect(getNavRoutes(["program_coordinator"]).find((route) => route.path === "/students/cohorts")?.label)
     .toBe("Cohorts & Progression");
 });
 
