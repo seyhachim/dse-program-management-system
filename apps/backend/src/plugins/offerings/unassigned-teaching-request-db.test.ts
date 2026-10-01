@@ -45,6 +45,7 @@ async function createUnassignedMeeting(label: string, options: {
   endTime?: string;
   primaryLecturerId?: string | null;
   openForAssignment?: boolean;
+  endDate?: Date | null;
 } = {}) {
   const programmeId = options.programmeId ?? "dse";
   const course = await prisma.course.create({
@@ -61,6 +62,7 @@ async function createUnassignedMeeting(label: string, options: {
       term: options.term ?? `2026-UAR-${crypto.randomUUID().slice(0, 6)}`,
       sectionCode: "M1",
       status: "Active",
+      endDate: options.endDate ?? null,
       meetings: {
         create: {
           dayOfWeek: options.dayOfWeek ?? "Monday",
@@ -123,6 +125,15 @@ describeDb("unassigned weekly teaching request integrity", () => {
     await expect(
       unassignedTeachingRequestService.submit(lecturer.auth, closedFixture.meeting.id),
     ).rejects.toThrow("not open for lecturer requests");
+
+    const expiredFixture = await createUnassignedMeeting("expired", {
+      endDate: new Date("2020-01-01T00:00:00.000Z"),
+    });
+    const refreshedAvailable = await unassignedTeachingRequestService.available(lecturer.auth);
+    expect(refreshedAvailable.some((meeting) => meeting.meetingId === expiredFixture.meeting.id)).toBe(false);
+    await expect(
+      unassignedTeachingRequestService.submit(lecturer.auth, expiredFixture.meeting.id),
+    ).rejects.toThrow("outside its active teaching period");
   });
 
   test("rejects wrong-programme lecturers, duplicate pending requests, allocated meetings, and timetable conflicts", async () => {
