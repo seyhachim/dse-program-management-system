@@ -27,6 +27,8 @@ import { Topbar } from "../topbar";
 import {
   compactScheduleLabel,
   groupOfferingsForMobile,
+  lecturerSectionRole,
+  sharedLecturerRole,
   upcomingTeachingLabel,
   type MobileOfferingGroup,
 } from "./lecturer-overview-ordering";
@@ -309,8 +311,12 @@ export function LecturerOverviewClient() {
                   title="Role & load"
                   metrics={[
                     {
-                      label: "Primary / Co",
-                      value: `${primarySections} / ${coLecturerSections}`,
+                      label: "Primary classes",
+                      value: String(primarySections),
+                    },
+                    {
+                      label: "Co-taught classes",
+                      value: String(coLecturerSections),
                     },
                     {
                       label: "Hours / week",
@@ -336,7 +342,7 @@ export function LecturerOverviewClient() {
                 />
                 <SummaryCard
                   icon={<Presentation className="h-4 w-4" />}
-                  label="Primary / Co"
+                  label="Primary / Co-taught"
                   value={`${primarySections} / ${coLecturerSections}`}
                 />
                 <SummaryCard
@@ -594,6 +600,7 @@ function MobileCourseGroupCard({
     teachingWindows.size === 1
       ? teachingPeriodLabel(firstOffering)
       : "Teaching dates vary by class";
+  const sharedRole = sharedLecturerRole(group, lecturerId);
 
   return (
     <article className="p-4 sm:p-5">
@@ -615,7 +622,10 @@ function MobileCourseGroupCard({
             </span>
           )}
         </div>
-        {sharedStatus ? <OfferingStatus status={sharedStatus} /> : null}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {sharedStatus ? <OfferingStatus status={sharedStatus} /> : null}
+          {sharedRole ? <LecturerRoleBadge role={sharedRole} /> : null}
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -635,7 +645,7 @@ function MobileCourseGroupCard({
       <div className="mt-3 overflow-hidden rounded-2xl border border-border/70 bg-muted/15">
         {group.sections.map(({ offering, next }, index) => {
           const isNextClass = nextOfferingId === offering.id && Boolean(next);
-          const isPrimary = offering.lecturer?.id === lecturerId;
+          const sectionRole = lecturerSectionRole(offering, lecturerId);
           return (
             <div
               key={offering.id}
@@ -648,9 +658,9 @@ function MobileCourseGroupCard({
                   <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
                     Class {offering.sectionCode}
                   </span>
-                  <span className="rounded-full bg-muted/70 px-2.5 py-1 text-[11px] text-muted-foreground">
-                    {isPrimary ? "Primary" : "Co-Lecturer"}
-                  </span>
+                  {!sharedRole && sectionRole ? (
+                    <LecturerRoleBadge role={sectionRole} />
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {isNextClass ? (
@@ -697,6 +707,18 @@ function MobileCourseGroupCard({
         })}
       </div>
     </article>
+  );
+}
+
+function LecturerRoleBadge({
+  role,
+}: {
+  role: "Primary" | "Co-Lecturer";
+}) {
+  return (
+    <span className="rounded-full bg-muted/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+      {role}
+    </span>
   );
 }
 
