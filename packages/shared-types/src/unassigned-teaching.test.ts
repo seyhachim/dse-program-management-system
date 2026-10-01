@@ -22,7 +22,7 @@ test("teaching assignment review is approve or reject with bounded optional comm
 });
 
 test("request status distinguishes reviewed and competing-request outcomes", () => {
-  for (const status of ["PENDING", "APPROVED", "REJECTED", "SUPERSEDED"]) {
+  for (const status of ["PENDING", "APPROVED", "REJECTED", "SUPERSEDED"] as const) {
     expect(UnassignedTeachingRequestStatusSchema.parse(status)).toBe(status);
   }
 });
