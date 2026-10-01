@@ -1,4 +1,4 @@
-export const CHIM_SEYHA_PROFILE_IMAGE = "/staff/chim-seyha.jpg";
+export const CHIM_SEYHA_PROFILE_IMAGE = "/staff/chim-seyha.svg";
 
 const PROFILE_IMAGES_BY_EMAIL: Readonly<Record<string, string>> = {
   "chim.seyha@rupp.edu.kh": CHIM_SEYHA_PROFILE_IMAGE,
