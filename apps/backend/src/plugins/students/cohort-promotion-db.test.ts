@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { PrismaClient } from "@prisma/client";
-import { StudentPromotionConflictError, studentCohortService } from "./cohort-service.ts";
+import {
+  StudentCurrentStudyYearConflictError,
+  StudentPromotionConflictError,
+  studentCohortService,
+} from "./cohort-service.ts";
 
 const enabled = process.env.COHORT_PROGRESSION_DB_TESTS === "1";
 const db = new PrismaClient();
@@ -161,3 +165,249 @@ describe.skipIf(!enabled)("cohort promotion database integrity", () => {
     })).toBe(before);
   });
 });
+
+
+const initDb = new PrismaClient();
+const initCohortId = crypto.randomUUID();
+const initOtherCohortId = crypto.randomUUID();
+const initStudents = {
+  noHistory: makeInitStudent("no-history"),
+  progressed: makeInitStudent("progressed"),
+  retained: makeInitStudent("retained"),
+  inactive: makeInitStudent("inactive"),
+  closed: makeInitStudent("closed"),
+  terminal: makeInitStudent("terminal"),
+  otherCohort: makeInitStudent("other-cohort"),
+};
+const initPeriod = {
+  defaultProgrammeYear: 3 as const,
+  academicYear: "2027-2028",
+  periodStart: "2027-09-01",
+  periodEnd: "2028-06-30",
+};
+
+describe.skipIf(!enabled)("current study year initialization database integrity", () => {
+  beforeAll(async () => {
+    await initDb.studentCohort.createMany({
+      data: [
+        {
+          id: initCohortId,
+          programmeId: "dse",
+          code: `I1224-${initCohortId.slice(0, 6)}`,
+          name: "Issue 1224 current study year cohort",
+          intakeYear: 2025,
+          expectedGraduationYear: 2029,
+        },
+        {
+          id: initOtherCohortId,
+          programmeId: "dse",
+          code: `I1224-X-${initOtherCohortId.slice(0, 6)}`,
+          name: "Issue 1224 other cohort",
+          intakeYear: 2025,
+          expectedGraduationYear: 2029,
+        },
+      ],
+    });
+
+    await initDb.student.createMany({
+      data: Object.values(initStudents).map((student) => ({
+        id: student.id,
+        name: student.name,
+        studentId: student.studentId,
+        status: student === initStudents.inactive ? "Inactive" : "Active",
+      })),
+    });
+
+    for (const student of [
+      initStudents.noHistory,
+      initStudents.progressed,
+      initStudents.retained,
+      initStudents.inactive,
+      initStudents.terminal,
+    ]) {
+      await initDb.studentCohortMembership.create({
+        data: {
+          id: student.membershipId,
+          cohortId: initCohortId,
+          studentId: student.id,
+          joinedAt: new Date("2025-09-01"),
+        },
+      });
+    }
+
+    await initDb.studentCohortMembership.create({
+      data: {
+        id: initStudents.closed.membershipId,
+        cohortId: initCohortId,
+        studentId: initStudents.closed.id,
+        joinedAt: new Date("2025-09-01"),
+        exitedAt: new Date("2027-06-30"),
+        exitReason: "Other",
+      },
+    });
+    await initDb.studentCohortMembership.create({
+      data: {
+        id: initStudents.otherCohort.membershipId,
+        cohortId: initOtherCohortId,
+        studentId: initStudents.otherCohort.id,
+        joinedAt: new Date("2025-09-01"),
+      },
+    });
+
+    await initDb.studentProgressionRecord.createMany({
+      data: [
+        {
+          membershipId: initStudents.progressed.membershipId,
+          programmeYear: 2,
+          academicYear: "2026-2027",
+          term: "Year end",
+          periodStart: new Date("2026-09-01"),
+          periodEnd: new Date("2027-06-30"),
+          status: "Progressed",
+        },
+        {
+          membershipId: initStudents.retained.membershipId,
+          programmeYear: 2,
+          academicYear: "2026-2027",
+          term: "Year end",
+          periodStart: new Date("2026-09-01"),
+          periodEnd: new Date("2027-06-30"),
+          status: "Retained",
+        },
+        {
+          membershipId: initStudents.terminal.membershipId,
+          programmeYear: 2,
+          academicYear: "2026-2027",
+          term: "Year end",
+          periodStart: new Date("2026-09-01"),
+          periodEnd: new Date("2027-06-30"),
+          status: "Withdrawn",
+        },
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await initDb.$disconnect();
+  });
+
+  test("previews only eligible members and constrains explicit prior outcomes without writing", async () => {
+    const before = await countInitRows();
+    const preview = await studentCohortService.previewCurrentStudyYear(initCohortId, initPeriod);
+
+    expect(preview.eligibleCount).toBe(3);
+    expect(preview.excludedCount).toBe(3);
+    expect(await countInitRows()).toBe(before);
+
+    const noHistory = preview.members.find((member) => member.membershipId === initStudents.noHistory.membershipId)!;
+    expect(noHistory.proposedProgrammeYear).toBe(3);
+    expect(noHistory.programmeYearLockedByHistory).toBe(false);
+
+    const progressed = preview.members.find((member) => member.membershipId === initStudents.progressed.membershipId)!;
+    expect(progressed.proposedProgrammeYear).toBe(3);
+    expect(progressed.programmeYearLockedByHistory).toBe(true);
+
+    const retained = preview.members.find((member) => member.membershipId === initStudents.retained.membershipId)!;
+    expect(retained.proposedProgrammeYear).toBe(2);
+    expect(retained.programmeYearLockedByHistory).toBe(true);
+
+    expect(preview.members.find((member) => member.membershipId === initStudents.inactive.membershipId)?.blocker).toContain("Inactive");
+    expect(preview.members.find((member) => member.membershipId === initStudents.closed.membershipId)?.blocker).toContain("closed");
+    expect(preview.members.find((member) => member.membershipId === initStudents.terminal.membershipId)?.blocker).toContain("Withdrawn");
+  });
+
+  test("blocks cross-cohort and history-conflicting assignments atomically", async () => {
+    const before = await countInitRows();
+
+    await expect(studentCohortService.applyCurrentStudyYear(initCohortId, {
+      ...initPeriod,
+      assignments: [
+        { membershipId: initStudents.noHistory.membershipId, programmeYear: 3, note: "" },
+        { membershipId: initStudents.progressed.membershipId, programmeYear: 4, note: "contradicts history" },
+        { membershipId: initStudents.retained.membershipId, programmeYear: 2, note: "" },
+        { membershipId: initStudents.otherCohort.membershipId, programmeYear: 3, note: "cross cohort" },
+      ],
+    })).rejects.toBeInstanceOf(StudentCurrentStudyYearConflictError);
+
+    expect(await countInitRows()).toBe(before);
+  });
+
+  test("appends neutral Continuing context and feeds the later promotion workflow", async () => {
+    const result = await studentCohortService.applyCurrentStudyYear(initCohortId, {
+      ...initPeriod,
+      assignments: [
+        { membershipId: initStudents.noHistory.membershipId, programmeYear: 3, note: "" },
+        { membershipId: initStudents.progressed.membershipId, programmeYear: 3, note: "Prior Year 2 progression" },
+        { membershipId: initStudents.retained.membershipId, programmeYear: 2, note: "Prior retention preserved" },
+      ],
+    });
+
+    expect(result.recordsCreated).toBe(3);
+    const rows = await initDb.studentProgressionRecord.findMany({
+      where: {
+        membership: { cohortId: initCohortId },
+        academicYear: initPeriod.academicYear,
+        term: "Academic year",
+      },
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows.every((row) => row.status === "Continuing")).toBe(true);
+    expect(new Map(rows.map((row) => [row.membershipId, row.programmeYear]))).toEqual(new Map([
+      [initStudents.noHistory.membershipId, 3],
+      [initStudents.progressed.membershipId, 3],
+      [initStudents.retained.membershipId, 2],
+    ]));
+
+    const promotion = await studentCohortService.previewPromotion(initCohortId, {
+      sourceProgrammeYear: 3,
+      targetProgrammeYear: 4,
+      academicYear: initPeriod.academicYear,
+      term: "Year end",
+      periodStart: initPeriod.periodStart,
+      periodEnd: initPeriod.periodEnd,
+    });
+    expect(promotion.members.filter((member) => member.eligible).map((member) => member.membershipId).sort())
+      .toEqual([initStudents.noHistory.membershipId, initStudents.progressed.membershipId].sort());
+    expect(promotion.members.find((member) => member.membershipId === initStudents.retained.membershipId)?.blocker)
+      .toContain("Current programme year is 2");
+
+    expect(await initDb.studentCompletionOutcome.count({
+      where: { membership: { cohortId: initCohortId } },
+    })).toBe(0);
+    expect(await initDb.enrollment.count({
+      where: { studentId: { in: [initStudents.noHistory.id, initStudents.progressed.id, initStudents.retained.id] } },
+    })).toBe(0);
+  });
+
+  test("replay is blocked without duplicate current-year rows", async () => {
+    const before = await countInitRows();
+    await expect(studentCohortService.applyCurrentStudyYear(initCohortId, {
+      ...initPeriod,
+      assignments: [
+        { membershipId: initStudents.noHistory.membershipId, programmeYear: 3, note: "" },
+        { membershipId: initStudents.progressed.membershipId, programmeYear: 3, note: "" },
+        { membershipId: initStudents.retained.membershipId, programmeYear: 2, note: "" },
+      ],
+    })).rejects.toBeInstanceOf(StudentCurrentStudyYearConflictError);
+    expect(await countInitRows()).toBe(before);
+  });
+});
+
+function countInitRows() {
+  return initDb.studentProgressionRecord.count({
+    where: {
+      membership: { cohortId: initCohortId },
+      academicYear: initPeriod.academicYear,
+    },
+  });
+}
+
+function makeInitStudent(label: string) {
+  const id = crypto.randomUUID();
+  return {
+    id,
+    membershipId: crypto.randomUUID(),
+    studentId: `I1224-${label}-${id.slice(0, 6)}`,
+    name: `Issue 1224 ${label}`,
+  };
+}
