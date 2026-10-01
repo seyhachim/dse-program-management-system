@@ -9,11 +9,7 @@ import { createInflightLoader } from "./inflight-value";
 import { runConfirmedMutation } from "./mutation-invalidation";
 import { AUTH_MODE, getSupabase } from "./supabase";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === "production"
-    ? "https://dse-pms-native-prod-candidate.onrender.com"
-    : "http://localhost:4000");
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
 export const DEV_TOKEN_STORAGE_KEY = "dse-pms-dev-token";
 const runInflightGet = createInflightGetDeduper();
