@@ -1,9 +1,13 @@
 import type {
   AddStudentCohortMembershipInput,
+  ApplyStudentCurrentStudyYearInput,
   ApplyStudentPromotionInput,
+  PreviewStudentCurrentStudyYearInput,
   PreviewStudentPromotionInput,
   Student,
   StudentCohortSummaryView,
+  StudentCurrentStudyYearApplyResult,
+  StudentCurrentStudyYearPreview,
   StudentPromotionApplyResult,
   StudentPromotionPreview,
 } from "@dse-pms/shared-types";
@@ -52,6 +56,26 @@ export const studentCohortsApi = {
   ): Promise<StudentCohortMembershipView> {
     return api.post<StudentCohortMembershipView>(
       `${COHORTS_API}/${encodeURIComponent(cohortId)}/memberships`,
+      input,
+    );
+  },
+
+  previewCurrentStudyYear(
+    cohortId: string,
+    input: PreviewStudentCurrentStudyYearInput,
+  ): Promise<StudentCurrentStudyYearPreview> {
+    return api.post<StudentCurrentStudyYearPreview>(
+      `${COHORTS_API}/${cohortId}/current-study-year/preview`,
+      input,
+    );
+  },
+
+  applyCurrentStudyYear(
+    cohortId: string,
+    input: ApplyStudentCurrentStudyYearInput,
+  ): Promise<StudentCurrentStudyYearApplyResult> {
+    return api.post<StudentCurrentStudyYearApplyResult>(
+      `${COHORTS_API}/${cohortId}/current-study-year/apply`,
       input,
     );
   },
