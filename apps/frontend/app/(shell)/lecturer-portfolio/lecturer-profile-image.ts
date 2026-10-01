@@ -1,3 +1,4 @@
+/** Initial static staff-photo mapping; replace with the shared profile-image workflow when it lands. */
 export const CHIM_SEYHA_PROFILE_IMAGE = "/staff/chim-seyha.jpg";
 
 const PROFILE_IMAGES_BY_EMAIL: Readonly<Record<string, string>> = {
