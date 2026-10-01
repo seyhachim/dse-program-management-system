@@ -92,6 +92,13 @@ export const OfferingMeetingInput = z
         path: ["endTime"],
       });
     }
+    if (meeting.openForAssignment && (meeting.lecturerIds?.length ?? 0) > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "An open teaching vacancy cannot already have an assigned lecturer",
+        path: ["openForAssignment"],
+      });
+    }
   });
 export type OfferingMeetingInput = z.infer<typeof OfferingMeetingInput>;
 
