@@ -44,6 +44,7 @@ async function createUnassignedMeeting(label: string, options: {
   startTime?: string;
   endTime?: string;
   primaryLecturerId?: string | null;
+  openForAssignment?: boolean;
 } = {}) {
   const programmeId = options.programmeId ?? "dse";
   const course = await prisma.course.create({
@@ -68,6 +69,7 @@ async function createUnassignedMeeting(label: string, options: {
           building: "STEM Building",
           room: "101",
           activityType: "Lecture",
+          openForAssignment: options.openForAssignment ?? true,
         },
       },
     },
@@ -110,12 +112,17 @@ async function createAssignedConflict(userId: string, target: {
 }
 
 describeDb("unassigned weekly teaching request integrity", () => {
-  test("lists a real unallocated meeting for a persisted same-programme lecturer", async () => {
+  test("lists only explicitly opened unallocated meetings for a persisted same-programme lecturer", async () => {
     const lecturer = await createUser("available", "lecturer", "dse");
     const fixture = await createUnassignedMeeting("available");
+    const closedFixture = await createUnassignedMeeting("closed", { openForAssignment: false });
 
     const available = await unassignedTeachingRequestService.available(lecturer.auth);
     expect(available.some((meeting) => meeting.meetingId === fixture.meeting.id)).toBe(true);
+    expect(available.some((meeting) => meeting.meetingId === closedFixture.meeting.id)).toBe(false);
+    await expect(
+      unassignedTeachingRequestService.submit(lecturer.auth, closedFixture.meeting.id),
+    ).rejects.toThrow("not open for lecturer requests");
   });
 
   test("rejects wrong-programme lecturers, duplicate pending requests, allocated meetings, and timetable conflicts", async () => {
@@ -286,6 +293,12 @@ describeDb("unassigned weekly teaching request integrity", () => {
         where: { offeringId: fixture.offering.id, lecturerId: approved.requesterId },
       }),
     ).toBe(1);
+    expect(
+      await prisma.offeringMeeting.findUnique({
+        where: { id: fixture.meeting.id },
+        select: { openForAssignment: true },
+      }),
+    ).toEqual({ openForAssignment: false });
   });
 
   test("audit history is append-only", async () => {
