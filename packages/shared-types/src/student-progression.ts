@@ -9,6 +9,11 @@ export const STUDENT_PROGRESSION_STATUSES = [
 export const StudentProgressionStatusSchema = z.enum(STUDENT_PROGRESSION_STATUSES);
 export type StudentProgressionStatus = z.infer<typeof StudentProgressionStatusSchema>;
 
+const STUDENT_APPEND_PROGRESSION_STATUSES = [
+  "Progressed", "Retained", "Withdrawn", "Inactive", "Graduated", "Transferred",
+] as const;
+const StudentAppendProgressionStatusSchema = z.enum(STUDENT_APPEND_PROGRESSION_STATUSES);
+
 export const STUDENT_PROMOTION_DECISIONS = [
   "Progressed", "Retained", "Withdrawn", "Inactive", "Transferred",
 ] as const;
@@ -64,7 +69,7 @@ export const AppendStudentProgressionInput = z.object({
   term: z.string().trim().min(1).max(80),
   periodStart: DateOnlySchema,
   periodEnd: DateOnlySchema,
-  status: StudentProgressionStatusSchema,
+  status: StudentAppendProgressionStatusSchema,
   note: z.string().trim().max(2000).default(""),
 }).superRefine((value, ctx) => {
   if (value.periodEnd < value.periodStart) {
