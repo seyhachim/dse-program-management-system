@@ -21,6 +21,8 @@ import { createTeachingLeaveRouter } from "./teaching-leave-router.ts";
 import { teachingLeaveService } from "./teaching-leave-service.ts";
 import { createTeachingSessionDeliveryRouter } from "./teaching-session-delivery-router.ts";
 import { teachingSessionDeliveryService } from "./teaching-session-delivery-service.ts";
+import { createUnassignedTeachingRequestRouter } from "./unassigned-teaching-request-router.ts";
+import { unassignedTeachingRequestService } from "./unassigned-teaching-request-service.ts";
 
 export const offeringsService = {
   ...offeringService,
@@ -35,6 +37,7 @@ export const offeringsService = {
   classDelivery: classDeliveryService,
   teachingSessionDelivery: teachingSessionDeliveryService,
   teachingLeave: teachingLeaveService,
+  unassignedTeachingRequests: unassignedTeachingRequestService,
   curriculumBound: curriculumBoundOfferingService,
   rosterSync: rosterSyncService,
 };
@@ -45,6 +48,7 @@ const router = Router();
 // Static workflow routes must be mounted before the legacy /:id offering router
 // so their more-specific paths retain their own validation and authorization.
 router.use(createTeachingLeaveRouter());
+router.use(createUnassignedTeachingRequestRouter());
 router.use(createTeachingSessionDeliveryRouter());
 router.use(createCurriculumBoundOfferingRouter());
 router.use(createAttendanceRecheckRouter());

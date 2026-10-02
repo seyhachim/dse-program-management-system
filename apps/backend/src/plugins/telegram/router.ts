@@ -4,6 +4,7 @@ import {
   SaveAttendanceInput,
   SaveClassSessionStatusInputSchema,
   SaveLecturerArrivalConfirmationInputSchema,
+  ReviewUnassignedTeachingRequestSchema,
   TelegramInitDataVerifyRequestSchema,
   TelegramLinkRequestSchema,
 } from "@dse-pms/shared-types";
@@ -160,6 +161,37 @@ export function createTelegramRouter(service: TelegramService = telegramService)
       const offerings = registry.get<OfferingsService>("offerings").service;
       res.json(await offerings.teachingLeave.get(req.telegramUser!, req.params.requestId!));
     } catch (error) { sendMiniAppError(res, error); }
+  });
+  router.get("/mini/unassigned-teaching/requests/:requestId/review", async (req, res) => {
+    const offerings = registry.get<OfferingsService>("offerings").service;
+    try {
+      res.json(await offerings.unassignedTeachingRequests.getForReview(
+        req.telegramUser!,
+        req.params.requestId!,
+      ));
+    } catch (error) {
+      const status = offerings.unassignedTeachingRequests.errorStatus(error);
+      if (status) return void res.status(status).json({ error: error instanceof Error ? error.message : "Request denied" });
+      sendMiniAppError(res, error);
+    }
+  });
+  router.post("/mini/unassigned-teaching/requests/:requestId/review", async (req, res) => {
+    const parsed = ReviewUnassignedTeachingRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return void res.status(400).json({ error: "Invalid teaching assignment review", details: parsed.error.flatten() });
+    }
+    const offerings = registry.get<OfferingsService>("offerings").service;
+    try {
+      res.json(await offerings.unassignedTeachingRequests.review(
+        req.telegramUser!,
+        req.params.requestId!,
+        parsed.data,
+      ));
+    } catch (error) {
+      const status = offerings.unassignedTeachingRequests.errorStatus(error);
+      if (status) return void res.status(status).json({ error: error instanceof Error ? error.message : "Request denied" });
+      sendMiniAppError(res, error);
+    }
   });
   router.get("/mini/teaching-leave-impact/:occurrenceId", async (req, res) => {
     try {

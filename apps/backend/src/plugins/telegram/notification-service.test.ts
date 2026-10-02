@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   attendanceWarningEventKey,
+  sendTelegramPmsActionMessage,
   sendTelegramPmsMessage,
   teachingLeaveRequesterPath,
   teachingLeaveStudentPath,
+  unassignedTeachingReviewPath,
+  unassignedTeachingReviewerText,
 } from "./notification-service.ts";
 
 const original = {
@@ -96,6 +99,52 @@ describe("Telegram PMS notifications", () => {
     expect(teachingLeaveRequesterPath("request/with spaces")).toBe(
       "/telegram/teaching-leave?requestId=request%2Fwith%20spaces",
     );
+  });
+
+  test("routes unassigned teaching reviewer alerts to the exact Mini App request", () => {
+    expect(unassignedTeachingReviewPath("request/with spaces")).toBe(
+      "/telegram/teaching-assignment-review?requestId=request%2Fwith%20spaces",
+    );
+  });
+
+  test("uses a review-specific Web App button and privacy-safe teaching request text", async () => {
+    configurePmsBot();
+    let body: any;
+    const fakeFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 88 } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const text = unassignedTeachingReviewerText({
+      requesterName: "Lecturer Example",
+      courseCode: "TSA301",
+      courseTitle: "Time Series Analysis",
+      sectionCode: "M1",
+      dayOfWeek: "Monday",
+      startTime: "07:30",
+      endTime: "11:30",
+      room: "101",
+    });
+    await sendTelegramPmsActionMessage(
+      "123",
+      text,
+      "https://example.com/telegram?startapp=signed-review",
+      "Review teaching request",
+      fakeFetch,
+    );
+
+    expect(text).toContain("Lecturer: Lecturer Example");
+    expect(text).toContain("TSA301 · Time Series Analysis · Class M1");
+    expect(text).toContain("Monday · 07:30–11:30");
+    expect(text).not.toContain("token");
+    expect(text).not.toContain("credential");
+    expect(body.reply_markup.inline_keyboard[0][0]).toEqual({
+      text: "Review teaching request",
+      web_app: { url: "https://example.com/telegram?startapp=signed-review" },
+    });
   });
 
   test("routes student teaching leave updates to an exact occurrence impact surface", () => {

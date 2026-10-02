@@ -36,6 +36,7 @@ function offering(): OfferingView {
         activityType: "Lecture",
         lecturerIds: [LECTURER_A],
         lecturers: [],
+        openForAssignment: false,
         durationHours: 2,
       },
       {
@@ -48,6 +49,7 @@ function offering(): OfferingView {
         activityType: "Lecture",
         lecturerIds: [LECTURER_B],
         lecturers: [],
+        openForAssignment: false,
         durationHours: 3,
       },
       {
@@ -60,6 +62,7 @@ function offering(): OfferingView {
         activityType: "Lab",
         lecturerIds: [],
         lecturers: [],
+        openForAssignment: false,
         durationHours: 2,
       },
     ],
