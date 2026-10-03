@@ -1,6 +1,7 @@
 export const MOBILE_ATTENDANCE_LAYOUT = {
   main: "flex-1 overflow-y-auto p-3 sm:p-4 md:p-6",
   content: "mx-auto max-w-7xl space-y-4 md:space-y-6",
+  contextHeader: "mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between",
   control: "h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring md:h-10",
   summary: "grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-6",
   summaryCard: "rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4",

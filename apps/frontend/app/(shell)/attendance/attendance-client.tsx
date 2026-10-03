@@ -343,7 +343,7 @@ export function AttendanceClient() {
       <main className={MOBILE_ATTENDANCE_LAYOUT.main}>
         <div className={MOBILE_ATTENDANCE_LAYOUT.content}>
           <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className={MOBILE_ATTENDANCE_LAYOUT.contextHeader}>
               <p className="min-w-0 text-sm font-medium leading-6 text-foreground">{sessionContext}</p>
               <button type="button" onClick={startRollCall} disabled={records.length === 0 || loading || saving} className={`${MOBILE_ATTENDANCE_LAYOUT.primaryAction} shrink-0`}><Play className="h-4 w-4" />Start Roll Call</button>
             </div>
