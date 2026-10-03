@@ -1,6 +1,6 @@
 import type { StudentHandbookSourceKind } from "@dse-pms/shared-types";
 
-export type StudentHandbookSourceCategory = "Programme" | "Curriculum";
+export type StudentHandbookSourceCategory = "Programme" | "Curriculum" | "Academic Calendar";
 
 export type StudentHandbookSourceOption = {
   kind: StudentHandbookSourceKind;
@@ -19,6 +19,14 @@ export const STUDENT_HANDBOOK_SOURCE_OPTIONS: StudentHandbookSourceOption[] = [
     category: "Curriculum",
     keywords: ["curriculum", "study plan", "courses", "credits", "degree"],
     recommendedSections: ["degree", "study-plan"],
+  },
+  {
+    kind: "ACADEMIC_CALENDAR_LINKS",
+    label: "Official Academic Calendar",
+    description: "Stable public links for the current Academic Year, Years 1–4. Dates stay in the canonical Academic Calendar instead of being copied into the handbook.",
+    category: "Academic Calendar",
+    keywords: ["academic calendar", "semester", "exam", "break", "dates", "year"],
+    recommendedSections: ["study-plan"],
   },
   {
     kind: "PROGRAMME_PROFILE",

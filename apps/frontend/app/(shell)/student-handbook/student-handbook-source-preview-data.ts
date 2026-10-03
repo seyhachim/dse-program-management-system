@@ -48,14 +48,19 @@ export function studentHandbookSourceValueKind(key: string, value: unknown): Stu
   if (!trimmed) return "text";
   if (normalizedKey.includes("email") || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "email";
   if (normalizedKey.includes("phone")) return "phone";
+  if (trimmed.startsWith("/calendar/")) return "url";
   if (normalizedKey.endsWith("url")) return /^https?:\/\//i.test(trimmed) ? "url" : "text";
   if (/^https?:\/\//i.test(trimmed)) return "url";
   return "text";
 }
 
 export function safeStudentHandbookSourceUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (/^\/calendar\/[A-Za-z0-9%._~-]+\/[A-Za-z0-9%._~-]+\/year-[1-4]$/.test(trimmed)) {
+    return trimmed;
+  }
   try {
-    const parsed = new URL(value);
+    const parsed = new URL(trimmed);
     return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
   } catch {
     return null;
