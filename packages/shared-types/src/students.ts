@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { StudentProgrammeYearSchema } from "./student-progression.ts";
 
 /**
  * Student domain schemas. Defined once here and imported by both the backend
@@ -74,6 +75,10 @@ export const StudentSchema = z.object({
   category: StudentCategorySchema,
   status: StudentStatusSchema,
   createdAt: z.string().datetime(),
+  /** Current authoritative programme year projected for roster display. */
+  currentStudyYear: StudentProgrammeYearSchema.nullable().optional(),
+  /** Active cohort-section code projected for roster display. */
+  currentClassCode: z.string().min(1).nullable().optional(),
   profile: StudentProfileSchema.nullable().optional(),
 });
 export type Student = z.infer<typeof StudentSchema>;
