@@ -427,6 +427,7 @@ jobs:
         run: |
           echo "BROWSER_SMOKE_ADMIN_TOKEN=$(bun run gen-token --role admin | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_COORDINATOR_TOKEN=$(bun run gen-token --role program_coordinator | tail -n 1)" >> "$GITHUB_ENV"
+          echo "BROWSER_SMOKE_LECTURER_TOKEN=$(bun run gen-token --role lecturer | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_READONLY_TOKEN=$(bun run gen-token --role program_secretary | tail -n 1)" >> "$GITHUB_ENV"
 
       - name: Install Chromium

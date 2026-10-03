@@ -9,6 +9,16 @@ describe("mobile Attendance layout", () => {
     expect(MOBILE_ATTENDANCE_LAYOUT.secondaryAction).toContain("min-h-11");
   });
 
+
+  test("keeps the Roll Call context stacked until the primary action can become auto-width", () => {
+    expect(MOBILE_ATTENDANCE_LAYOUT.contextHeader).toContain("flex-col");
+    expect(MOBILE_ATTENDANCE_LAYOUT.contextHeader).toContain("md:flex-row");
+    expect(MOBILE_ATTENDANCE_LAYOUT.contextHeader).toContain("md:items-center");
+    expect(MOBILE_ATTENDANCE_LAYOUT.contextHeader).not.toContain("sm:flex-row");
+    expect(MOBILE_ATTENDANCE_LAYOUT.primaryAction).toContain("w-full");
+    expect(MOBILE_ATTENDANCE_LAYOUT.primaryAction).toContain("md:w-auto");
+  });
+
   test("register and history switch from cards to desktop tables at md", () => {
     expect(MOBILE_ATTENDANCE_LAYOUT.mobileRegister).toContain("md:hidden");
     expect(MOBILE_ATTENDANCE_LAYOUT.mobileHistory).toContain("md:hidden");
