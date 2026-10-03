@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   CreateStudentInput,
   ListStudentsPageQuery,
+  StudentSchema,
   UpdateStudentInput,
 } from "./students.ts";
 
@@ -64,6 +65,23 @@ describe("student roster contracts", () => {
       email: null,
       profile: { latinGivenName: null },
     });
+  });
+
+  test("accepts current roster study year and class projection", () => {
+    const parsed = StudentSchema.parse({
+      id: "11111111-1111-4111-8111-111111111111",
+      name: "Roster Student",
+      email: "roster@example.edu",
+      studentId: "RUPP-123",
+      category: "Regular",
+      status: "Active",
+      createdAt: "2026-10-03T00:00:00.000Z",
+      currentStudyYear: 3,
+      currentClassCode: "M1",
+    });
+
+    expect(parsed.currentStudyYear).toBe(3);
+    expect(parsed.currentClassCode).toBe("M1");
   });
 
   test("bounds cursor page size and coerces query-string values", () => {

@@ -304,13 +304,35 @@ export function StudentsClient() {
   };
 
   const columns: DataTableColumn<Student>[] = [
-    { key: "name", header: "Name", render: (s) => <span className="font-medium">{s.name}</span> },
+    {
+      key: "name",
+      header: "Name",
+      render: (s) => (
+        <div className="min-w-[9rem]">
+          <p className="font-medium">{s.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{s.category}</p>
+        </div>
+      ),
+    },
     {
       key: "studentId",
       header: "Student ID",
       render: (s) => s.studentId ?? <span className="text-muted-foreground">Pending ID</span>,
     },
-    { key: "category", header: "Category", render: (s) => s.category },
+    {
+      key: "placement",
+      header: "Study Year / Class",
+      render: (s) => (
+        <div className="min-w-[8rem]">
+          <p className={s.currentStudyYear ? "font-medium" : "text-muted-foreground"}>
+            {s.currentStudyYear ? `Year ${s.currentStudyYear}` : "Study year not set"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {s.currentClassCode ?? "Class not assigned"}
+          </p>
+        </div>
+      ),
+    },
     {
       key: "email",
       header: "Email",
@@ -341,18 +363,16 @@ export function StudentsClient() {
       : []),
     {
       key: "status",
-      header: "Status",
-      render: (s) => <StatusBadge tone={statusTone(s.status)} label={s.status} />,
-    },
-    {
-      key: "active",
-      header: "Active",
+      header: "Student Status",
       render: (s) => (
-        <Switch
-          checked={s.status === "Active"}
-          onCheckedChange={(checked) => handleToggleStatus(s, checked)}
-          aria-label={`Toggle ${s.name} active`}
-        />
+        <div className="flex items-center gap-2">
+          <StatusBadge tone={statusTone(s.status)} label={s.status} />
+          <Switch
+            checked={s.status === "Active"}
+            onCheckedChange={(checked) => handleToggleStatus(s, checked)}
+            aria-label={`Set ${s.name} ${s.status === "Active" ? "inactive" : "active"}`}
+          />
+        </div>
       ),
     },
   ];

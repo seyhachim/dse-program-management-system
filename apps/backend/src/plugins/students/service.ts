@@ -8,6 +8,7 @@ import type {
   StudentStatus,
   UpdateStudentInput,
 } from "@dse-pms/shared-types";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import {
   canonicalStudentDisplayName,
@@ -18,6 +19,7 @@ import {
   pageStudentRosterRows,
   sortStudentRosterRows,
 } from "./roster-order.ts";
+import { currentProgrammeYearFromLatest } from "./cohort-service.ts";
 
 const withProfile = { profile: true } as const;
 
@@ -54,6 +56,13 @@ export const STUDENT_REF_SELECT = {
 } as const;
 
 type StudentPageCursor = { id: string };
+
+type StudentRosterPlacementRow = {
+  studentId: string;
+  programmeYear: number | null;
+  progressionStatus: string | null;
+  classCode: string | null;
+};
 
 export class InvalidStudentPageCursorError extends Error {}
 export class InvalidStudentIdentityError extends Error {}
@@ -138,6 +147,57 @@ function compactStudentListRow(row: {
   };
 }
 
+async function currentRosterPlacements(studentIds: string[]) {
+  if (studentIds.length === 0) {
+    return new Map<string, { currentStudyYear: 1 | 2 | 3 | 4 | null; currentClassCode: string | null }>();
+  }
+
+  // Section membership is intentionally stored outside the generated Prisma schema,
+  // so the roster reads the two authoritative histories in one bounded query.
+  const rows = await prisma.$queryRaw<StudentRosterPlacementRow[]>(Prisma.sql`
+    WITH "currentMembership" AS (
+      SELECT DISTINCT ON (membership."studentId")
+        membership."id", membership."cohortId", membership."studentId", membership."joinedAt"
+      FROM "StudentCohortMembership" membership
+      WHERE membership."exitedAt" IS NULL
+        AND membership."studentId" IN (${Prisma.join(studentIds)})
+      ORDER BY membership."studentId", membership."joinedAt" DESC
+    )
+    SELECT
+      membership."studentId" AS "studentId",
+      progression."programmeYear" AS "programmeYear",
+      progression."status"::text AS "progressionStatus",
+      section."code" AS "classCode"
+    FROM "currentMembership" membership
+    LEFT JOIN LATERAL (
+      SELECT record."programmeYear", record."status"
+      FROM "StudentProgressionRecord" record
+      WHERE record."membershipId" = membership."id"
+      ORDER BY record."periodStart" DESC, record."recordedAt" DESC
+      LIMIT 1
+    ) progression ON TRUE
+    LEFT JOIN "StudentCohortSectionMembership" section_membership
+      ON section_membership."cohortId" = membership."cohortId"
+      AND section_membership."studentId" = membership."studentId"
+      AND section_membership."exitedAt" IS NULL
+    LEFT JOIN "StudentCohortSection" section
+      ON section."id" = section_membership."sectionId"
+      AND section."active" = TRUE
+  `);
+
+  return new Map(rows.map((row) => [
+    row.studentId,
+    {
+      currentStudyYear: currentProgrammeYearFromLatest(
+        row.progressionStatus
+          ? { programmeYear: row.programmeYear, status: row.progressionStatus }
+          : undefined,
+      ),
+      currentClassCode: row.classCode,
+    },
+  ]));
+}
+
 function hasProfileValues(profile: StudentProfileInput | undefined): boolean {
   return Boolean(profile && Object.values(profile).some((value) => value !== null && value !== undefined));
 }
@@ -178,8 +238,13 @@ export const studentService = {
     }
 
     const pageRows = page.items.map(compactStudentListRow);
+    const placements = await currentRosterPlacements(pageRows.map((row) => row.id));
     return {
-      items: pageRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
+      items: pageRows.map((row) => ({
+        ...row,
+        ...(placements.get(row.id) ?? { currentStudyYear: null, currentClassCode: null }),
+        createdAt: row.createdAt.toISOString(),
+      })),
       nextCursor:
         page.hasNextPage && page.items.length > 0
           ? encodeStudentPageCursor(page.items[page.items.length - 1]!)

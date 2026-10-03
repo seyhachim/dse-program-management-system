@@ -21,4 +21,14 @@ describe("compact student list edit safety", () => {
     expect(clientSource).toContain("setEditing(detail)");
     expect(clientSource).not.toContain("setEditing(s);\n            setFormOpen(true)");
   });
+  test("keeps the roster compact while surfacing current placement", () => {
+    expect(clientSource).toContain('header: "Study Year / Class"');
+    expect(clientSource).toContain('s.currentStudyYear ? `Year ${s.currentStudyYear}` : "Study year not set"');
+    expect(clientSource).toContain('s.currentClassCode ?? "Class not assigned"');
+    expect(clientSource).toContain('<p className="mt-0.5 text-xs text-muted-foreground">{s.category}</p>');
+    expect(clientSource).not.toContain('{ key: "category", header: "Category"');
+    expect(clientSource).not.toContain('key: "active"');
+    expect(clientSource).toContain('header: "Student Status"');
+  });
+
 });
