@@ -239,6 +239,10 @@ export function teachingLeaveRequesterPath(requestId: string): string {
   return `/telegram/teaching-leave?requestId=${encodeURIComponent(requestId)}`;
 }
 
+export function teachingLeaveReviewerPath(requestId: string): string {
+  return `/telegram/teaching-leave-review?requestId=${encodeURIComponent(requestId)}`;
+}
+
 export function unassignedTeachingReviewPath(requestId: string): string {
   return `/telegram/teaching-assignment-review?requestId=${encodeURIComponent(requestId)}`;
 }
@@ -265,6 +269,24 @@ export function unassignedTeachingReviewerText(input: {
   ].join("\n");
 }
 
+export function teachingLeaveReviewerText(input: {
+  requesterName: string;
+  submittedLate: boolean;
+  firstOccurrence: TeachingLeaveOperationalImpact;
+}): string {
+  const impact = input.firstOccurrence;
+  return [
+    "New teaching leave request",
+    "",
+    `Lecturer: ${input.requesterName}`,
+    `${impact.courseCode} · Class ${impact.sectionCode}`,
+    `${impact.sessionDate} · ${impact.startTime}–${impact.endTime}`,
+    ...(input.submittedLate ? ["Late/current-session request"] : []),
+    "",
+    "Open DSE PMS to review confidential details and record a decision.",
+  ].join("\n");
+}
+
 export function teachingLeaveStudentPath(occurrenceId: string): string {
   return `/telegram/schedule-impact?occurrenceId=${encodeURIComponent(occurrenceId)}`;
 }
@@ -280,6 +302,36 @@ function leaveDecisionLabel(status: TeachingLeaveStatus): string {
 export const telegramNotificationService = {
   workflowUrl(path: string) {
     return createTelegramDeepLink(path);
+  },
+
+  async deliverTeachingLeaveReviewers(input: {
+    requestId: string;
+    programmeId: string;
+    requesterId: string;
+    requesterName: string;
+    submittedLate: boolean;
+    submissionVersion: string;
+    firstOccurrence: TeachingLeaveOperationalImpact;
+  }): Promise<{ sent: number; failed: number; duplicate: number }> {
+    const recipients = await eligibleProgrammeReviewerRecipients(input.programmeId, input.requesterId);
+    const summary = { sent: 0, failed: 0, duplicate: 0 };
+    if (recipients.length === 0) return summary;
+
+    const eventKey = `teaching-leave:${input.requestId}:reviewer:${input.submissionVersion}`;
+    const link = createTelegramDeepLink(teachingLeaveReviewerPath(input.requestId));
+    const text = teachingLeaveReviewerText(input);
+    const statuses = await Promise.all(recipients.map((recipient) =>
+      deliverToRecipient(
+        recipient,
+        eventKey,
+        "teaching_leave_reviewer",
+        input.requestId,
+        text,
+        link,
+        "Review leave request",
+      )));
+    for (const status of statuses) summary[status] += 1;
+    return summary;
   },
 
   async deliverUnassignedTeachingReviewers(input: {
