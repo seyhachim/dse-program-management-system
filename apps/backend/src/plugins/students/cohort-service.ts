@@ -43,7 +43,7 @@ function resultingYear(status: StudentPromotionDecision, source: StudentProgramm
   return null;
 }
 
-function currentYearFromLatest(
+export function currentProgrammeYearFromLatest(
   latest: { programmeYear: number | null; status: string } | undefined,
 ): StudentProgrammeYear | null {
   if (!latest || latest.programmeYear === null) return null;
@@ -221,7 +221,7 @@ async function buildPromotionPreview(
         studentId: membership.student.id,
         studentNumber: membership.student.studentId,
         studentName: membership.student.name,
-        currentProgrammeYear: currentYearFromLatest(membership.progressionRecords[0]),
+        currentProgrammeYear: currentProgrammeYearFromLatest(membership.progressionRecords[0]),
         proposedStatus: null,
         resultingProgrammeYear: null,
         eligible: false,
@@ -235,7 +235,7 @@ async function buildPromotionPreview(
         studentId: membership.student.id,
         studentNumber: membership.student.studentId,
         studentName: membership.student.name,
-        currentProgrammeYear: currentYearFromLatest(membership.progressionRecords[0]),
+        currentProgrammeYear: currentProgrammeYearFromLatest(membership.progressionRecords[0]),
         proposedStatus: null,
         resultingProgrammeYear: null,
         eligible: false,
@@ -249,7 +249,7 @@ async function buildPromotionPreview(
         studentId: membership.student.id,
         studentNumber: membership.student.studentId,
         studentName: membership.student.name,
-        currentProgrammeYear: currentYearFromLatest(membership.progressionRecords[0]),
+        currentProgrammeYear: currentProgrammeYearFromLatest(membership.progressionRecords[0]),
         proposedStatus: null,
         resultingProgrammeYear: null,
         eligible: false,
@@ -288,7 +288,7 @@ async function buildPromotionPreview(
     }
 
     const currentProgrammeYear = latest
-      ? currentYearFromLatest(latest)
+      ? currentProgrammeYearFromLatest(latest)
       : input.sourceProgrammeYear;
 
     if (currentProgrammeYear !== input.sourceProgrammeYear) {
