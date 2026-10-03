@@ -1,7 +1,16 @@
 import type { NextFunction, Request, Response } from "express";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { decodeJwt } from "jose";
 import { prisma } from "../db/prisma.ts";
-import { AccountLinkingError, assertEmailOnlySupabaseIdentity, assertLegacyEmailClaim, type ConfirmedAuthUser } from "./account-linking.ts";
+import {
+  AccountLinkingError,
+  assertCurrentSupabaseIdentity,
+  assertEmailOnlySupabaseIdentity,
+  assertLegacyEmailClaim,
+  type ConfirmedAuthUser,
+} from "./account-linking.ts";
+import { assertApprovedGoogleIdentity, tokenHasGoogleIdentity } from "./google-identity-approval.ts";
+import { getApprovedGoogleIdentity } from "./google-approval-store.ts";
 import { resolveRequestAuthOnce } from "./request-auth-cache.ts";
 import {
   getAuthMode,
@@ -11,7 +20,6 @@ import {
   type Role,
 } from "./token.ts";
 
-/** Augment Express Request with the authenticated user. */
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
@@ -48,17 +56,9 @@ async function mustChangePassword(userId: string): Promise<boolean> {
 }
 
 export function isPasswordRecoveryRoute(req: Pick<Request, "baseUrl" | "path">): boolean {
-  // The caller must still be able to inspect /me so the frontend can route to
-  // the recovery screen, and must be able to submit that one recovery action.
   return req.baseUrl === "/api/auth" && (req.path === "/me" || req.path === "/change-password");
 }
 
-/**
- * Verifies the Bearer token and attaches `req.user`. After authentication it
- * enforces the PMS-owned forced-password-change gate for every protected API.
- * A gated user may call only /api/auth/me and /api/auth/change-password until
- * the credential has been replaced successfully.
- */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization ?? "";
   const [scheme, token] = header.split(" ");
@@ -72,9 +72,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     await resolveRequestAuthOnce(req, async () => {
       const user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
 
-      // Cache this request only after the complete authentication boundary has
-      // succeeded. A password-gated or failed identity request is never marked
-      // verified and therefore cannot bypass a later middleware invocation.
+      // Preserve #1150: cache only after the complete authorization boundary
+      // succeeds. Failed, password-gated, or unapproved Google requests are
+      // never cached and therefore cannot bypass a later middleware invocation.
       if (await mustChangePassword(user.id) && !isPasswordRecoveryRoute(req)) {
         throw new PasswordChangeRequiredError();
       }
@@ -96,7 +96,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
     if (err instanceof AccountLinkingError) {
-      // Deliberately do not reveal whether a PMS user exists or why verification failed.
       res.status(403).json({ error: "No account provisioned for this sign-in identity" });
       return;
     }
@@ -105,12 +104,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 async function resolveSupabaseUser(token: string): Promise<AuthUser> {
-  // Signature and expiry are checked before the token's UID is trusted.
   const { authId, email } = await verifySupabaseToken(token);
+  const metadata = decodeJwt(token).app_metadata;
 
-  // A currently auto-linked provider can inherit the SAME UID, even when an
-  // old JWT still advertises email/password. Never authorize solely on UID or
-  // token metadata: read the live Supabase Admin identity set every request.
   let verifiedAuthUser: ConfirmedAuthUser | null = null;
   try {
     const { data, error } = await getVerificationClient().auth.admin.getUserById(authId);
@@ -119,22 +115,47 @@ async function resolveSupabaseUser(token: string): Promise<AuthUser> {
   } catch {
     throw new AccountLinkingError("Supabase identity verification failed");
   }
-  assertEmailOnlySupabaseIdentity({ authId, email }, verifiedAuthUser);
+
+  assertCurrentSupabaseIdentity({ authId, email }, verifiedAuthUser);
+
+  const currentGoogleIdentities =
+    verifiedAuthUser.identities?.filter((identity) => identity.provider === "google") ?? [];
+  const hasGoogleIdentity = tokenHasGoogleIdentity(metadata) || currentGoogleIdentities.length > 0;
 
   const roleAssignmentsInclude = { roleAssignments: { include: { role: true } } } as const;
   let user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
-  if (!user) {
-    const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
-    if (byEmail) {
-      // An existing auth UID must NEVER be replaced or accepted on email match.
-      assertLegacyEmailClaim({ authId, email }, byEmail.authId, verifiedAuthUser);
-      const claimed = await prisma.user.updateMany({
-        where: { id: byEmail.id, authId: null },
-        data: { authId },
-      });
-      if (claimed.count !== 1) throw new AccountLinkingError("Concurrent account linking conflict");
-      user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
-      if (!user || user.id !== byEmail.id) throw new AccountLinkingError("Account linking conflict");
+
+  if (hasGoogleIdentity) {
+    // Google never claims a PMS account by email. The exact UID must already be
+    // bound, student-only, and independently approved in the restricted store.
+    if (!user) throw new AccountLinkingError("Google identity cannot claim a PMS account by email");
+    if (user.roleAssignments.length !== 1 || user.roleAssignments[0]?.role.slug !== "student") {
+      throw new AccountLinkingError("Google pilot is restricted to nonprivileged students");
+    }
+    const approvedIdentityId = await getApprovedGoogleIdentity(authId, user.id).catch(() => {
+      throw new AccountLinkingError("Google approval lookup unavailable");
+    });
+    assertApprovedGoogleIdentity(
+      authId,
+      verifiedAuthUser.identities,
+      approvedIdentityId ? JSON.stringify({ [authId]: approvedIdentityId }) : undefined,
+    );
+  } else {
+    // Preserve the #1143 password-only fail-closed boundary.
+    assertEmailOnlySupabaseIdentity({ authId, email }, verifiedAuthUser);
+
+    if (!user) {
+      const byEmail = await prisma.user.findUnique({ where: { email }, include: roleAssignmentsInclude });
+      if (byEmail) {
+        assertLegacyEmailClaim({ authId, email }, byEmail.authId, verifiedAuthUser);
+        const claimed = await prisma.user.updateMany({
+          where: { id: byEmail.id, authId: null },
+          data: { authId },
+        });
+        if (claimed.count !== 1) throw new AccountLinkingError("Concurrent account linking conflict");
+        user = await prisma.user.findUnique({ where: { authId }, include: roleAssignmentsInclude });
+        if (!user || user.id !== byEmail.id) throw new AccountLinkingError("Account linking conflict");
+      }
     }
   }
 
