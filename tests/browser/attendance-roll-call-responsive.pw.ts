@@ -27,7 +27,7 @@ async function rollCallLayoutAt(page: import("@playwright/test").Page, width: nu
 
 test.describe("#1205 Attendance Roll Call responsive smoke", () => {
   test("keeps the CTA contained at the 640–767px risk range and switches to a row on desktop", async ({ browser }) => {
-    const admin = await newRoleContext(browser, "admin");
+    const admin = await newRoleContext(browser, "lecturer");
     const page = await admin.newPage();
 
     const narrow = await rollCallLayoutAt(page, 700);
