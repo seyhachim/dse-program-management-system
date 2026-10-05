@@ -138,15 +138,17 @@ dbDescribe("enrollment academic-evidence integrity", () => {
       )
     `;
 
-    await expect(
-      offeringService.unenroll(source.id, attendanceStudent.id),
-    ).rejects.toBeInstanceOf(EnrollmentIntegrityError);
-    await expectDatabaseRejection(() =>
-      prisma.enrollment.delete({ where: { id: attendanceEnrollment.id } }),
-    );
+    await prisma.enrollment.delete({ where: { id: attendanceEnrollment.id } });
     expect(
       await prisma.enrollment.findUnique({ where: { id: attendanceEnrollment.id } }),
-    ).not.toBeNull();
+    ).toBeNull();
+    const attendanceRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "pms_attendance"."AttendanceRecord"
+      WHERE "sessionId" = ${attendanceSessionId}
+        AND "studentId" = ${attendanceStudent.id}
+    `;
+    expect(Number(attendanceRows[0]?.count ?? 0n)).toBe(1);
 
     const plainStudent = await prisma.student.create({
       data: {
