@@ -4,8 +4,13 @@ import type {
   ProgrammeCurriculumRevisionType,
 } from "@dse-pms/shared-types";
 
+export type CurriculumRevisionKind = Exclude<
+  ProgrammeCurriculumRevisionType,
+  "Initial"
+>;
+
 export interface CurriculumRevisionDraft {
-  revisionType: ProgrammeCurriculumRevisionType;
+  revisionType: CurriculumRevisionKind;
   revisionTriggers: ProgrammeCurriculumRevisionTrigger[];
   revisionReason: string;
   changeSummary: string;
@@ -21,7 +26,7 @@ export function canCreateCurriculumRevision(
 export function nextCurriculumRevisionVersion(
   versions: CurriculumVersionSummary[],
   predecessor: CurriculumVersionSummary,
-  revisionType: ProgrammeCurriculumRevisionType,
+  revisionType: CurriculumRevisionKind,
 ): string {
   if (revisionType === "Minor") {
     const latestMinor = Math.max(
