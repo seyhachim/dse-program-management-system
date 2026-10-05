@@ -185,38 +185,6 @@ type EnrollmentIdentity = {
   studentId: string;
 };
 
-async function hasAttendanceEvidence(
-  tx: Prisma.TransactionClient,
-  offeringId: string,
-  studentId: string,
-): Promise<boolean> {
-  const rows = await tx.$queryRaw<Array<{ hasEvidence: boolean }>>`
-    SELECT EXISTS (
-      SELECT 1
-      FROM "pms_attendance"."AttendanceSession" session
-      WHERE session."offeringId" = ${offeringId}
-        AND (
-          EXISTS (
-            SELECT 1 FROM "pms_attendance"."AttendanceRecord" record
-            WHERE record."sessionId" = session."id"
-              AND record."studentId" = ${studentId}
-          )
-          OR EXISTS (
-            SELECT 1 FROM "pms_attendance"."AttendancePermissionPending" pending
-            WHERE pending."sessionId" = session."id"
-              AND pending."studentId" = ${studentId}
-          )
-          OR EXISTS (
-            SELECT 1 FROM "pms_attendance"."AttendanceCheckpoint" checkpoint
-            WHERE checkpoint."sessionId" = session."id"
-              AND checkpoint."studentId" = ${studentId}
-          )
-        )
-    ) AS "hasEvidence"
-  `;
-  return rows[0]?.hasEvidence ?? false;
-}
-
 async function assertEnrollmentCanLeaveOffering(
   tx: Prisma.TransactionClient,
   enrollment: EnrollmentIdentity,
@@ -238,7 +206,6 @@ async function assertEnrollmentCanLeaveOffering(
     activeResponsibilityCount,
     finalizedResultCount,
     lockedGroupCount,
-    attendanceEvidence,
   ] = await Promise.all([
     tx.assessmentResult.count({ where: { enrollmentId: enrollment.id } }),
     tx.assessmentGroupMember.count({ where: { enrollmentId: enrollment.id } }),
@@ -263,7 +230,6 @@ async function assertEnrollmentCanLeaveOffering(
         membershipLockedAt: { not: null },
       },
     }),
-    hasAttendanceEvidence(tx, enrollment.offeringId, enrollment.studentId),
   ]);
 
   if (finalizedResultCount > 0 || lockedGroupCount > 0) {
@@ -274,11 +240,6 @@ async function assertEnrollmentCanLeaveOffering(
   if (resultCount > 0 || groupMembershipCount > 0 || individualComponentCount > 0 || groupAuditCount > 0) {
     throw new EnrollmentIntegrityError(
       "Enrollment cannot be removed or moved because assessment evidence exists",
-    );
-  }
-  if (attendanceEvidence) {
-    throw new EnrollmentIntegrityError(
-      "Enrollment cannot be removed or moved because attendance evidence exists",
     );
   }
   if (activeResponsibilityCount > 0) {
