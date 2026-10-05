@@ -222,6 +222,49 @@ dbDescribe("enrollment academic-evidence integrity", () => {
         data: { offeringId: completed.id, studentId: lateStudent.id },
       }),
     );
+
+    const capacityOffering = await prisma.offering.create({
+      data: {
+        courseId: spec.courseId,
+        courseSpecId: spec.id,
+        lecturerId: actor.id,
+        term: `${term}-capacity`,
+        sectionCode: "I1243-CAP",
+        capacity: 1,
+        status: "Planned",
+        semester: "First",
+        programmeYear: 3,
+      },
+    });
+    const [capacityStudentOne, capacityStudentTwo] = await Promise.all([
+      prisma.student.create({
+        data: {
+          name: "Issue 1243 Capacity Student One",
+          email: `issue1243-cap1-${suffix}@dse.invalid`,
+          studentId: `I1243-CP1-${suffix}`,
+          status: "Active",
+        },
+      }),
+      prisma.student.create({
+        data: {
+          name: "Issue 1243 Capacity Student Two",
+          email: `issue1243-cap2-${suffix}@dse.invalid`,
+          studentId: `I1243-CP2-${suffix}`,
+          status: "Active",
+        },
+      }),
+    ]);
+    await prisma.enrollment.create({
+      data: { offeringId: capacityOffering.id, studentId: capacityStudentOne.id },
+    });
+    await expectDatabaseRejection(() =>
+      prisma.enrollment.create({
+        data: { offeringId: capacityOffering.id, studentId: capacityStudentTwo.id },
+      }),
+    );
+    expect(
+      await prisma.enrollment.count({ where: { offeringId: capacityOffering.id } }),
+    ).toBe(1);
   });
 
   test("keeps placement-correction history append-only", async () => {
