@@ -62,9 +62,13 @@ DECLARE
   source_completed BOOLEAN;
   target_completed BOOLEAN;
 BEGIN
-  identity_change := TG_OP = 'DELETE'
-    OR NEW."offeringId" IS DISTINCT FROM OLD."offeringId"
-    OR NEW."studentId" IS DISTINCT FROM OLD."studentId";
+  IF TG_OP = 'DELETE' THEN
+    identity_change := TRUE;
+  ELSE
+    identity_change :=
+      NEW."offeringId" IS DISTINCT FROM OLD."offeringId"
+      OR NEW."studentId" IS DISTINCT FROM OLD."studentId";
+  END IF;
 
   IF NOT identity_change THEN
     RETURN NEW;
