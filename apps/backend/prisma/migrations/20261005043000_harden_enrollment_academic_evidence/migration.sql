@@ -65,9 +65,10 @@ BEGIN
   IF TG_OP = 'DELETE' THEN
     identity_change := TRUE;
   ELSE
-    identity_change :=
-      NEW."offeringId" IS DISTINCT FROM OLD."offeringId"
-      OR NEW."studentId" IS DISTINCT FROM OLD."studentId";
+    IF NEW."studentId" IS DISTINCT FROM OLD."studentId" THEN
+      RAISE EXCEPTION 'Enrollment student identity cannot be reassigned';
+    END IF;
+    identity_change := NEW."offeringId" IS DISTINCT FROM OLD."offeringId";
   END IF;
 
   IF NOT identity_change THEN
@@ -89,6 +90,36 @@ BEGIN
 
     IF target_completed THEN
       RAISE EXCEPTION 'Students cannot be reassigned into a completed offering';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM "Offering" source
+      JOIN "Offering" target ON target."id" = NEW."offeringId"
+      WHERE source."id" = OLD."offeringId"
+        AND source."courseId" = target."courseId"
+        AND source."courseSpecId" IS NOT DISTINCT FROM target."courseSpecId"
+        AND source."term" = target."term"
+        AND source."semester" IS NOT DISTINCT FROM target."semester"
+        AND source."programmeYear" IS NOT DISTINCT FROM target."programmeYear"
+        AND source."academicCalendarPeriodId" IS NOT DISTINCT FROM target."academicCalendarPeriodId"
+        AND source."sectionCode" IS DISTINCT FROM target."sectionCode"
+    )
+    THEN
+      RAISE EXCEPTION 'Enrollment placement correction must stay in the same academic context and change section';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM "EnrollmentPlacementCorrection" correction
+      WHERE correction."id" = NULLIF(current_setting('dse.enrollment_placement_correction_id', true), '')
+        AND correction."enrollmentId" = OLD."id"
+        AND correction."studentId" = OLD."studentId"
+        AND correction."fromOfferingId" = OLD."offeringId"
+        AND correction."toOfferingId" = NEW."offeringId"
+    )
+    THEN
+      RAISE EXCEPTION 'Enrollment placement correction requires matching append-only audit provenance';
     END IF;
   END IF;
 
