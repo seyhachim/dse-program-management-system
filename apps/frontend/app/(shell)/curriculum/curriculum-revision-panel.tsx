@@ -45,6 +45,7 @@ export function CurriculumRevisionPanel({
   const [revisionReason, setRevisionReason] = useState("");
   const [changeSummary, setChangeSummary] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [createdVersion, setCreatedVersion] = useState<string | null>(null);
 
   useEffect(() => {
     setOpen(false);
@@ -53,6 +54,7 @@ export function CurriculumRevisionPanel({
     setRevisionReason("");
     setChangeSummary("");
     setError(null);
+    setCreatedVersion(null);
   }, [predecessor.id]);
 
   if (!canCreateCurriculumRevision(canWrite, predecessor.status)) {
@@ -95,8 +97,10 @@ export function CurriculumRevisionPanel({
     if (!ready) return;
     onBusyChange(true);
     setError(null);
+
+    let created: ProgrammeCurriculumRead;
     try {
-      const created = await curriculumApi.createRevision(
+      created = await curriculumApi.createRevision(
         curriculum.id,
         predecessor.id,
         {
@@ -106,12 +110,24 @@ export function CurriculumRevisionPanel({
           changeSummary: changeSummary.trim(),
         },
       );
-      await onCreated(created);
     } catch (err) {
       setError(
         err instanceof ApiError
           ? err.message
           : "Could not create curriculum revision",
+      );
+      onBusyChange(false);
+      return;
+    }
+
+    setCreatedVersion(created.selectedVersion.version);
+    setOpen(false);
+
+    try {
+      await onCreated(created);
+    } catch {
+      setError(
+        `v${created.selectedVersion.version} Draft was created, but this page could not refresh. Reload the page before continuing.`,
       );
     } finally {
       onBusyChange(false);
@@ -120,7 +136,13 @@ export function CurriculumRevisionPanel({
 
   return (
     <div className="mt-4 border-t border-border pt-4">
-      {!open ? (
+      {createdVersion ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200">
+          <p className="font-medium">v{createdVersion} Draft was created.</p>
+          <p className="mt-1 text-xs">The approved predecessor remains unchanged. If the new Draft is not selected automatically, reload this page before continuing.</p>
+          {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+        </div>
+      ) : !open ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">Need to change this curriculum?</p>
