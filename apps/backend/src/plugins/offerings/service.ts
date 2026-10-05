@@ -850,29 +850,46 @@ export const offeringService = {
   },
 
   async enroll(id: string, input: EnrollInput): Promise<OfferingView> {
-    const offering = await prisma.offering.findUnique({ where: { id }, include: withRelations });
-    if (!offering) throw new ReferenceError("Offering not found");
-
-    // Validate students exist via the registry.
+    // Resolve student eligibility before taking the Offering lock so registry
+    // lookups do not lengthen the critical section.
     const found = await students().findByIds(input.studentIds);
     if (found.length !== input.studentIds.length) {
       throw new ReferenceError("One or more students do not exist");
     }
     assertOfferingEnrollmentStudentsEligible(found);
 
-    // Capacity check against not-yet-enrolled students.
-    const already = new Set(offering.enrollments.map((e) => e.studentId));
-    const toAdd = input.studentIds.filter((sid) => !already.has(sid));
-    if (offering.enrollments.length + toAdd.length > offering.capacity) {
-      throw new CapacityError(
-        `Capacity ${offering.capacity} exceeded (${offering.enrollments.length} enrolled, adding ${toAdd.length})`,
-      );
-    }
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "Offering"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `;
+      const offering = await tx.offering.findUnique({
+        where: { id },
+        select: {
+          capacity: true,
+          enrollments: { select: { studentId: true } },
+        },
+      });
+      if (!offering) throw new ReferenceError("Offering not found");
 
-    await prisma.enrollment.createMany({
-      data: toAdd.map((studentId) => ({ offeringId: id, studentId })),
-      skipDuplicates: true,
-    });
+      const already = new Set(offering.enrollments.map((item) => item.studentId));
+      const toAdd = [...new Set(input.studentIds)].filter((studentId) => !already.has(studentId));
+      if (offering.enrollments.length + toAdd.length > offering.capacity) {
+        throw new CapacityError(
+          `Capacity ${offering.capacity} exceeded (${offering.enrollments.length} enrolled, adding ${toAdd.length})`,
+        );
+      }
+
+      if (toAdd.length) {
+        await tx.enrollment.createMany({
+          data: toAdd.map((studentId) => ({ offeringId: id, studentId })),
+          skipDuplicates: true,
+        });
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
     return (await this.getById(id))!;
   },
 
