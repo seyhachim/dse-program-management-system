@@ -2701,11 +2701,9 @@ model Enrollment {
   @@index([studentId])
 }
 
-/**
- * Append-only audit trail for a controlled current-term section/offering placement correction.
- * The Enrollment id is intentionally snapshotted rather than FK-bound so a later legitimate
- * lifecycle change cannot erase correction provenance.
- */
+/// Append-only audit trail for a controlled current-term section/offering placement correction.
+/// The Enrollment id is intentionally snapshotted rather than FK-bound so a later legitimate
+/// lifecycle change cannot erase correction provenance.
 model EnrollmentPlacementCorrection {
   id             String   @id @default(uuid())
   enrollmentId   String
