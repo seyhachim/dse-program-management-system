@@ -1569,6 +1569,7 @@ model Student {
   enrollments                    Enrollment[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
+  enrollmentPlacementCorrections EnrollmentPlacementCorrection[]
   cohortMemberships              StudentCohortMembership[]
 
   @@index([status])
