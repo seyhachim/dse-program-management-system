@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
-import { portalAccessPresentation } from "./student-portal-access-status.ts";
+import {
+  canRepairPortalAccess,
+  portalAccessPresentation,
+} from "./student-portal-access-status.ts";
 
 test("portal access badges use clear roster labels", () => {
   expect(portalAccessPresentation("not-invited").label).toBe("Not invited");
@@ -17,4 +20,16 @@ test("pending and account states use distinct semantic tones", () => {
   expect(portalAccessPresentation("invitation-expired").tone).toBe("danger");
   expect(portalAccessPresentation("active-account").tone).toBe("success");
   expect(portalAccessPresentation("status-unavailable").tone).toBe("danger");
+});
+
+test("portal repair is offered only for needs-attention", () => {
+  expect(canRepairPortalAccess("needs-attention")).toBe(true);
+  expect(canRepairPortalAccess("not-invited")).toBe(false);
+  expect(canRepairPortalAccess("invitation-pending")).toBe(false);
+  expect(canRepairPortalAccess("invitation-expired")).toBe(false);
+  expect(canRepairPortalAccess("active-account")).toBe(false);
+  expect(canRepairPortalAccess("no-email")).toBe(false);
+  expect(canRepairPortalAccess("inactive-student")).toBe(false);
+  expect(canRepairPortalAccess("status-unavailable")).toBe(false);
+  expect(canRepairPortalAccess(undefined)).toBe(false);
 });
