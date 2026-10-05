@@ -162,3 +162,20 @@ EXECUTE FUNCTION "protect_enrollment_academic_evidence"();
 
 -- Backend-only audit history. Data API roles receive no permissive policy.
 ALTER TABLE "EnrollmentPlacementCorrection" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE "EnrollmentPlacementCorrection" FROM PUBLIC;
+
+DO $
+DECLARE api_role text;
+BEGIN
+  FOR api_role IN
+    SELECT rolname
+    FROM pg_roles
+    WHERE rolname = ANY (ARRAY['anon','authenticated','service_role'])
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON TABLE public.%I FROM %I',
+      'EnrollmentPlacementCorrection',
+      api_role
+    );
+  END LOOP;
+END $;
