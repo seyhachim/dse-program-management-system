@@ -6,6 +6,7 @@ import {
   EnrollInput,
   ListLecturerWorkloadQuery,
   ListOfferingsQuery,
+  MoveEnrollmentInput,
   ResolveTeachingSessionOccurrenceInputSchema,
   RevokeClassResponsibilityInput,
   SaveAttendanceInput,
@@ -26,7 +27,12 @@ import {
   TeachingSessionOccurrenceReferenceError,
   TeachingSessionOccurrenceValidationError,
 } from "./class-delivery-service.ts";
-import { CapacityError, offeringService, ReferenceError } from "./service.ts";
+import {
+  CapacityError,
+  EnrollmentIntegrityError,
+  offeringService,
+  ReferenceError,
+} from "./service.ts";
 
 export function createOfferingRouter(): Router {
   const router = Router();
@@ -275,6 +281,31 @@ export function createOfferingRouter(): Router {
     }
   });
 
+  router.post(
+    "/:id/enrollments/:studentId/move",
+    requirePermission("offerings:manage"),
+    async (req, res) => {
+      const parsed = MoveEnrollmentInput.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid enrollment correction", details: parsed.error.flatten() });
+        return;
+      }
+      if (!(await assertProgrammeRosterCorrection(req, res, parsed.data.targetOfferingId))) return;
+      try {
+        res.json(
+          await offeringService.moveEnrollment(
+            req.params.id!,
+            req.params.studentId!,
+            parsed.data,
+            req.user!.id,
+          ),
+        );
+      } catch (err) {
+        handleError(err, res, "Could not correct enrollment placement");
+      }
+    },
+  );
+
   router.delete(
     "/:id/enrollments/:studentId",
     requirePermission("offerings:write"),
@@ -293,6 +324,30 @@ export function createOfferingRouter(): Router {
 
 const CLASS_RESPONSIBILITY_ADMIN_ROLES: Role[] = ["admin", "program_coordinator"];
 const OFFERING_ROSTER_WIDE_ROLES: Role[] = ["admin", "program_coordinator", "program_secretary"];
+
+async function assertProgrammeRosterCorrection(
+  req: import("express").Request,
+  res: import("express").Response,
+  targetOfferingId: string,
+): Promise<boolean> {
+  const [source, target] = await Promise.all([
+    offeringService.accessScope(req.params.id!),
+    offeringService.accessScope(targetOfferingId),
+  ]);
+  if (!source || !target) {
+    res.status(404).json({ error: "Source or target offering not found" });
+    return false;
+  }
+  if (!source.programmeId || source.programmeId !== target.programmeId) {
+    res.status(400).json({ error: "Enrollment correction must stay within one programme" });
+    return false;
+  }
+  if (!hasAnyRoleInProgramme(req.user!, OFFERING_ROSTER_WIDE_ROLES, source.programmeId)) {
+    res.status(403).json({ error: "Only programme roster managers can correct enrollment placement" });
+    return false;
+  }
+  return true;
+}
 
 async function assertCanManageClassResponsibilities(
   req: import("express").Request,
@@ -374,7 +429,7 @@ function handleError(err: unknown, res: import("express").Response, fallback: st
     res.status(400).json({ error: err.message });
     return;
   }
-  if (err instanceof CapacityError) {
+  if (err instanceof CapacityError || err instanceof EnrollmentIntegrityError) {
     res.status(409).json({ error: err.message });
     return;
   }
