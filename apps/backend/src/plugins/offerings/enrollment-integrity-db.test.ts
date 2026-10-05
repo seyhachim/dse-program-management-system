@@ -197,6 +197,12 @@ dbDescribe("enrollment academic-evidence integrity", () => {
     await expectDatabaseRejection(() =>
       prisma.enrollment.delete({ where: { id: completedEnrollment.id } }),
     );
+    await expectDatabaseRejection(() =>
+      prisma.offering.delete({ where: { id: completed.id } }),
+    );
+    expect(
+      await prisma.enrollment.findUnique({ where: { id: completedEnrollment.id } }),
+    ).not.toBeNull();
   });
 
   test("keeps placement-correction history append-only", async () => {
