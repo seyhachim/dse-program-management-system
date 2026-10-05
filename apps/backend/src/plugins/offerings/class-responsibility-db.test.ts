@@ -171,7 +171,7 @@ describeDb("class responsibility PostgreSQL integrity", () => {
     ).rejects.toBeInstanceOf(ClassResponsibilityConflictError);
   });
 
-  test("revocation and enrollment removal immediately remove runtime authority", async () => {
+  test("revocation removes runtime authority and active responsibility blocks enrollment removal", async () => {
     const actor = await createUser("revocation-actor");
     const monitorUser = await createUser("revocation-monitor");
     const monitor = await createStudent("revocation", { userId: monitorUser.id });
@@ -194,7 +194,28 @@ describeDb("class responsibility PostgreSQL integrity", () => {
 
     const reassigned = await classResponsibilityService.assign(offering.id, monitor.id, "SubClassMonitor", actor.id);
     expect(reassigned.id).not.toBe(assignment.id);
-    await prisma.enrollment.delete({ where: { offeringId_studentId: { offeringId: offering.id, studentId: monitor.id } } });
+
+    await expect(
+      prisma.enrollment.delete({
+        where: { offeringId_studentId: { offeringId: offering.id, studentId: monitor.id } },
+      }),
+    ).rejects.toBeDefined();
+    expect(await classResponsibilityService.getActiveForUser(monitorUser.id, offering.id)).toMatchObject({
+      id: reassigned.id,
+      role: "SubClassMonitor",
+    });
+
+    expect(
+      await classResponsibilityService.revoke(
+        offering.id,
+        reassigned.id,
+        actor.id,
+        "Student leaves this offering",
+      ),
+    ).toBe(true);
+    await prisma.enrollment.delete({
+      where: { offeringId_studentId: { offeringId: offering.id, studentId: monitor.id } },
+    });
     expect(await classResponsibilityService.getActiveForUser(monitorUser.id, offering.id)).toBeNull();
   });
 });
