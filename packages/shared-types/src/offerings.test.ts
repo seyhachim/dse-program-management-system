@@ -4,6 +4,7 @@ import {
   CreateOfferingInput,
   DateOnlySchema,
   OfferingMeetingInput,
+  MoveEnrollmentInput,
   SectionCodeSchema,
   teachingPeriodViolation,
   UpdateOfferingInput,
@@ -197,5 +198,20 @@ test("UpdateOfferingInput validates ordering when both teaching-period dates are
   expect(UpdateOfferingInput.safeParse({
     startDate: "2026-11-28",
     endDate: "2026-08-10",
+  }).success).toBe(false);
+});
+
+test("MoveEnrollmentInput requires a target offering and meaningful reason", () => {
+  expect(MoveEnrollmentInput.safeParse({
+    targetOfferingId: B,
+    reason: "Wrong class section",
+  }).success).toBe(true);
+  expect(MoveEnrollmentInput.safeParse({
+    targetOfferingId: "not-a-uuid",
+    reason: "Wrong class section",
+  }).success).toBe(false);
+  expect(MoveEnrollmentInput.safeParse({
+    targetOfferingId: B,
+    reason: " x ",
   }).success).toBe(false);
 });
