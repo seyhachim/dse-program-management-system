@@ -179,32 +179,38 @@ export const classResponsibilityService = {
         );
       }
 
-      const current = await tx.$queryRaw<Array<{ id: string; studentId: string; role: ClassResponsibilityRole }>>`
-        SELECT "id", "studentId", "role"
-        FROM "ClassResponsibilityAssignment"
-        WHERE "offeringId" = ${offeringId}
-          AND "role" = ${role}::"ClassResponsibilityRole"
-          AND "revokedAt" IS NULL
-        FOR UPDATE
-      `;
+      if (role === "ClassMonitor") {
+        const current = await tx.$queryRaw<
+          Array<{ id: string; studentId: string; role: ClassResponsibilityRole }>
+        >`
+          SELECT "id", "studentId", "role"
+          FROM "ClassResponsibilityAssignment"
+          WHERE "offeringId" = ${offeringId}
+            AND "role" = 'ClassMonitor'::"ClassResponsibilityRole"
+            AND "revokedAt" IS NULL
+          FOR UPDATE
+        `;
 
-      if (current[0]) {
-        await tx.$executeRaw`
-          UPDATE "ClassResponsibilityAssignment"
-          SET "revokedAt" = CURRENT_TIMESTAMP,
-              "revokedById" = ${actorId},
-              "revokeReason" = 'Replaced by a new assignment',
-              "updatedAt" = CURRENT_TIMESTAMP
-          WHERE "id" = ${current[0].id}
-        `;
-        await tx.$executeRaw`
-          INSERT INTO "ClassResponsibilityAuditEvent"
-            ("id", "assignmentId", "offeringId", "studentId", "actorId", "action", "previousRole", "newRole", "reason")
-          VALUES
-            (${crypto.randomUUID()}, ${current[0].id}, ${offeringId}, ${current[0].studentId}, ${actorId},
-             'Reassigned'::"ClassResponsibilityAuditAction", ${role}::"ClassResponsibilityRole", ${role}::"ClassResponsibilityRole",
-             'Replaced by a new assignment')
-        `;
+        if (current[0]) {
+          await tx.$executeRaw`
+            UPDATE "ClassResponsibilityAssignment"
+            SET "revokedAt" = CURRENT_TIMESTAMP,
+                "revokedById" = ${actorId},
+                "revokeReason" = 'Replaced by a new assignment',
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${current[0].id}
+          `;
+          await tx.$executeRaw`
+            INSERT INTO "ClassResponsibilityAuditEvent"
+              ("id", "assignmentId", "offeringId", "studentId", "actorId", "action", "previousRole", "newRole", "reason")
+            VALUES
+              (${crypto.randomUUID()}, ${current[0].id}, ${offeringId}, ${current[0].studentId}, ${actorId},
+               'Reassigned'::"ClassResponsibilityAuditAction",
+               'ClassMonitor'::"ClassResponsibilityRole",
+               'ClassMonitor'::"ClassResponsibilityRole",
+               'Replaced by a new assignment')
+          `;
+        }
       }
 
       await tx.$executeRaw`
