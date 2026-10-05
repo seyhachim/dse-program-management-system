@@ -260,8 +260,8 @@ export function createOfferingRouter(): Router {
     try {
       await offeringService.remove(req.params.id!);
       res.status(204).end();
-    } catch {
-      res.status(404).json({ error: "Offering not found" });
+    } catch (err) {
+      handleError(err, res, "Could not delete offering");
     }
   });
 
