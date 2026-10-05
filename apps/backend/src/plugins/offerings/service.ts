@@ -1013,7 +1013,7 @@ export const offeringService = {
           reason: input.reason,
         },
       });
-      await tx.$executeRaw`
+      await tx.$queryRaw`
         SELECT set_config(
           'dse.enrollment_placement_correction_id',
           ${correction.id},
