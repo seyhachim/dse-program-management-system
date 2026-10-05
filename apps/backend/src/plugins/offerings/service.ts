@@ -974,11 +974,7 @@ export const offeringService = {
 
       await assertEnrollmentCanLeaveOffering(tx, enrollment);
 
-      await tx.enrollment.update({
-        where: { id: enrollment.id },
-        data: { offeringId: target.id },
-      });
-      await tx.enrollmentPlacementCorrection.create({
+      const correction = await tx.enrollmentPlacementCorrection.create({
         data: {
           enrollmentId: enrollment.id,
           studentId,
@@ -987,6 +983,17 @@ export const offeringService = {
           correctedById,
           reason: input.reason,
         },
+      });
+      await tx.$executeRaw`
+        SELECT set_config(
+          'dse.enrollment_placement_correction_id',
+          ${correction.id},
+          true
+        )
+      `;
+      await tx.enrollment.update({
+        where: { id: enrollment.id },
+        data: { offeringId: target.id },
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
