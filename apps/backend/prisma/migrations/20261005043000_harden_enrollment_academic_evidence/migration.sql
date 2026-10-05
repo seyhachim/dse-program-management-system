@@ -70,6 +70,41 @@ BEFORE DELETE ON "Offering"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_completed_offering_history"();
 
+CREATE OR REPLACE FUNCTION "enforce_offering_enrollment_capacity"()
+RETURNS TRIGGER AS $$
+DECLARE
+  offering_capacity INTEGER;
+  existing_count INTEGER;
+BEGIN
+  SELECT "capacity"
+  INTO offering_capacity
+  FROM "Offering"
+  WHERE "id" = NEW."offeringId"
+  FOR UPDATE;
+
+  IF offering_capacity IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT COUNT(*)::INTEGER
+  INTO existing_count
+  FROM "Enrollment"
+  WHERE "offeringId" = NEW."offeringId"
+    AND "id" IS DISTINCT FROM NEW."id";
+
+  IF existing_count >= offering_capacity THEN
+    RAISE EXCEPTION 'Offering capacity exceeded';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "Enrollment_enforce_capacity"
+BEFORE INSERT OR UPDATE OF "offeringId" ON "Enrollment"
+FOR EACH ROW
+EXECUTE FUNCTION "enforce_offering_enrollment_capacity"();
+
 CREATE OR REPLACE FUNCTION "protect_completed_offering_enrollment_insert"()
 RETURNS TRIGGER AS $$
 BEGIN
