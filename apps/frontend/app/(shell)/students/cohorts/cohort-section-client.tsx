@@ -17,6 +17,7 @@ import {
   activeSectionMembers,
   classifyResponsibilityAssignment,
   eligibleOfferingsForSectionResponsibility,
+  responsibilityAssignmentBehavior,
 } from "@/lib/section-class-leadership";
 import {
   studentCohortSectionsApi,
@@ -210,8 +211,12 @@ export function CohortSectionClient() {
       }
 
       const label = leadershipRole === "ClassMonitor" ? "Class Monitor" : "Deputy Class Monitor";
+      const assignmentBehavior = responsibilityAssignmentBehavior(leadershipRole);
+      const impactMessage = assignmentBehavior === "replace"
+        ? "The current Class Monitor will be replaced with audit history preserved."
+        : "Existing Deputy Class Monitors will remain assigned.";
       if (!window.confirm(
-        `Assign ${member.studentName} as ${label} for ${targets.length} current ${section.code} offering${targets.length === 1 ? "" : "s"}? Existing holders of this role will be replaced with audit history preserved.`,
+        `Assign ${member.studentName} as ${label} for ${targets.length} current ${section.code} offering${targets.length === 1 ? "" : "s"}? ${impactMessage}`,
       )) return;
 
       const currentResults = await Promise.allSettled(
