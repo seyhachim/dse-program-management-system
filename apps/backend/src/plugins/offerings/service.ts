@@ -877,10 +877,14 @@ export const offeringService = {
         where: { id },
         select: {
           capacity: true,
+          status: true,
           enrollments: { select: { studentId: true } },
         },
       });
       if (!offering) throw new ReferenceError("Offering not found");
+      if (offering.status === "Completed") {
+        throw new EnrollmentIntegrityError("Completed offering roster cannot accept new enrollments");
+      }
 
       const already = new Set(offering.enrollments.map((item) => item.studentId));
       const toAdd = [...new Set(input.studentIds)].filter((studentId) => !already.has(studentId));
