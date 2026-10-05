@@ -159,6 +159,12 @@ dbDescribe("enrollment academic-evidence integrity", () => {
     const plainEnrollment = await prisma.enrollment.create({
       data: { offeringId: source.id, studentId: plainStudent.id },
     });
+    await expectDatabaseRejection(() =>
+      prisma.enrollment.update({
+        where: { id: plainEnrollment.id },
+        data: { offeringId: target.id },
+      }),
+    );
     await prisma.enrollment.delete({ where: { id: plainEnrollment.id } });
     expect(
       await prisma.enrollment.findUnique({ where: { id: plainEnrollment.id } }),
