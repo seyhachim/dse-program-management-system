@@ -18,7 +18,10 @@ import { ApiError } from "@/lib/api";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { StudentForm, type StudentFormValues } from "./student-form";
 import { authApi, useMe } from "@/lib/auth";
-import { portalAccessPresentation } from "./student-portal-access-status";
+import {
+  canRepairPortalAccess,
+  portalAccessPresentation,
+} from "./student-portal-access-status";
 
 const PAGE_SIZE = 50;
 
@@ -287,6 +290,46 @@ export function StudentsClient() {
     }
   };
 
+  const handleRepairPortalAccess = async () => {
+    if (!validateSelectedInviteStudent(selectedStudent)) return;
+    if (
+      !confirm(
+        `Repair Student Portal access for ${selectedStudent.email}?\n\n` +
+          "PMS will retry the existing protected delivery flow. A missing/stale Auth identity may receive a fresh invitation; mismatched or active accounts remain unchanged.",
+      )
+    ) {
+      return;
+    }
+
+    setSelectedInviting(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const result = await authApi.sendStudentPortalAccessToSelected([selectedStudent.id]);
+      await portalAccessQuery.refetch();
+
+      if (result.resent === 1 || result.newlyInvited === 1) {
+        setNotice(`Portal access repaired. A fresh invitation was sent to ${selectedStudent.email}.`);
+      } else if (result.failed > 0) {
+        setActionError(
+          "Portal access could not be repaired safely. The account was left unchanged; check the linked email/role or authentication provider and retry.",
+        );
+      } else if (result.existingAccountSkipped > 0) {
+        setNotice("No repair was needed because the linked portal account is already active.");
+      } else if ((result.pendingInvitationSkipped ?? 0) > 0) {
+        setNotice("No repair was needed because the current invitation is still valid.");
+      } else {
+        setActionError("Portal access was not changed. Refresh the status and review the student account linkage.");
+      }
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : "Failed to repair Student Portal access",
+      );
+    } finally {
+      setSelectedInviting(false);
+    }
+  };
+
   const handleNextPage = () => {
     const nextCursor = studentsQuery.data?.nextCursor;
     if (!nextCursor || !canAdvancePage) return;
@@ -391,6 +434,11 @@ export function StudentsClient() {
       selectedStudent.status === "Active" &&
       selectedPortalStatus === "invitation-expired",
   );
+  const selectedRepairEligible = Boolean(
+    selectedStudent?.email &&
+      selectedStudent.status === "Active" &&
+      canRepairPortalAccess(selectedPortalStatus),
+  );
 
   return (
     <div className="space-y-4">
@@ -426,9 +474,11 @@ export function StudentsClient() {
                   ? "Portal invitations are available only after the student is Active."
                   : selectedStudent && !selectedStudent.email
                     ? "This roster record has no official email yet. Add one before provisioning portal access."
-                    : selectedStudent && selectedPortalStatus === "invitation-expired"
-                      ? "This invitation has expired and can be safely resent. Activated accounts are never rotated."
-                      : selectedStudent && selectedPortalStatus === "invitation-pending"
+                    : selectedStudent && selectedPortalStatus === "needs-attention"
+                      ? "The linked authentication identity is missing or inconsistent. Repair portal access retries the existing server-side safeguards; mismatched or active accounts remain unchanged."
+                      : selectedStudent && selectedPortalStatus === "invitation-expired"
+                        ? "This invitation has expired and can be safely resent. Activated accounts are never rotated."
+                        : selectedStudent && selectedPortalStatus === "invitation-pending"
                         ? "This invitation is still valid. Ask the student to use the current email link; PMS will not rotate it yet."
                         : selectedStudent && selectedPortalStatus === "active-account"
                           ? "This student already has an active portal account."
@@ -444,7 +494,15 @@ export function StudentsClient() {
             >
               <MailPlus />{bulkInviting ? "Sending to all…" : "Send portal access to all"}
             </Button>
-            {selectedIds.length > 1 ? (
+            {selectedRepairEligible ? (
+              <Button
+                variant="outline"
+                disabled={inviteBusy}
+                onClick={handleRepairPortalAccess}
+              >
+                <MailPlus />{selectedInviting ? "Repairing…" : "Repair portal access"}
+              </Button>
+            ) : selectedIds.length > 1 ? (
               <Button
                 variant="outline"
                 disabled={selectedIds.length > 20 || inviteBusy}
