@@ -195,11 +195,15 @@ describeDb("class responsibility PostgreSQL integrity", () => {
     const reassigned = await classResponsibilityService.assign(offering.id, monitor.id, "SubClassMonitor", actor.id);
     expect(reassigned.id).not.toBe(assignment.id);
 
-    await expect(
-      prisma.enrollment.delete({
+    let enrollmentRemovalBlocked = false;
+    try {
+      await prisma.enrollment.delete({
         where: { offeringId_studentId: { offeringId: offering.id, studentId: monitor.id } },
-      }),
-    ).rejects.toBeDefined();
+      });
+    } catch {
+      enrollmentRemovalBlocked = true;
+    }
+    expect(enrollmentRemovalBlocked).toBe(true);
     expect(await classResponsibilityService.getActiveForUser(monitorUser.id, offering.id)).toMatchObject({
       id: reassigned.id,
       role: "SubClassMonitor",
