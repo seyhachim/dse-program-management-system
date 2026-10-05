@@ -215,32 +215,6 @@ BEGIN
   END IF;
 
   IF EXISTS (
-    SELECT 1
-    FROM "pms_attendance"."AttendanceSession" session
-    WHERE session."offeringId" = OLD."offeringId"
-      AND (
-        EXISTS (
-          SELECT 1 FROM "pms_attendance"."AttendanceRecord" record
-          WHERE record."sessionId" = session."id"
-            AND record."studentId" = OLD."studentId"
-        )
-        OR EXISTS (
-          SELECT 1 FROM "pms_attendance"."AttendancePermissionPending" pending
-          WHERE pending."sessionId" = session."id"
-            AND pending."studentId" = OLD."studentId"
-        )
-        OR EXISTS (
-          SELECT 1 FROM "pms_attendance"."AttendanceCheckpoint" checkpoint
-          WHERE checkpoint."sessionId" = session."id"
-            AND checkpoint."studentId" = OLD."studentId"
-        )
-      )
-  )
-  THEN
-    RAISE EXCEPTION 'Enrollment cannot be removed or reassigned because attendance evidence exists';
-  END IF;
-
-  IF EXISTS (
     SELECT 1 FROM "ClassResponsibilityAssignment"
     WHERE "offeringId" = OLD."offeringId"
       AND "studentId" = OLD."studentId"
