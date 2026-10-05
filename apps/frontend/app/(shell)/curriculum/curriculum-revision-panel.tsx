@@ -38,7 +38,7 @@ export function CurriculumRevisionPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [revisionType, setRevisionType] =
-    useState<ProgrammeCurriculumRevisionType>("Minor");
+    useState<CurriculumRevisionKind>("Minor");
   const [revisionTriggers, setRevisionTriggers] = useState<
     ProgrammeCurriculumRevisionTrigger[]
   >([]);
@@ -159,7 +159,7 @@ export function CurriculumRevisionPanel({
               value={revisionType}
               onChange={(event) =>
                 setRevisionType(
-                  event.target.value as ProgrammeCurriculumRevisionType,
+                  event.target.value as CurriculumRevisionKind,
                 )
               }
               className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:max-w-sm"
