@@ -1,14 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  PROGRAMME_CURRICULUM_REVISION_TRIGGERS,
-  type AcademicYearView,
-  type CurriculumWorkflowAction,
-  type CurriculumWorkflowState,
-  type ProgrammeCurriculumRevisionTrigger,
-  type ProgrammeCurriculumRevisionType,
-  type StudentCohortSummaryView,
+import type {
+  AcademicYearView,
+  CurriculumWorkflowAction,
+  CurriculumWorkflowState,
+  ProgrammeCurriculumRead,
+  StudentCohortSummaryView,
 } from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
 import { academicCalendarApi } from "@/lib/academic-calendar";
@@ -17,15 +15,10 @@ import {
   curriculumApi,
   curriculumStatusLabel,
   curriculumVersionLabel,
-  revisionTriggerLabel,
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
 import { studentsApi } from "@/lib/students";
-import {
-  canCreateCurriculumRevision,
-  isCurriculumRevisionReady,
-  nextCurriculumRevisionVersion,
-} from "./curriculum-revision-form";
+import { CurriculumRevisionPanel } from "./curriculum-revision-panel";
 
 const CURRENT_PROGRAMME_ID = "dse";
 
@@ -47,14 +40,6 @@ export function CurriculumWorkflowActions() {
   const [comment, setComment] = useState("");
   const [cohortId, setCohortId] = useState("");
   const [academicYearId, setAcademicYearId] = useState("");
-  const [revisionOpen, setRevisionOpen] = useState(false);
-  const [revisionType, setRevisionType] =
-    useState<ProgrammeCurriculumRevisionType>("Minor");
-  const [revisionTriggers, setRevisionTriggers] = useState<
-    ProgrammeCurriculumRevisionTrigger[]
-  >([]);
-  const [revisionReason, setRevisionReason] = useState("");
-  const [changeSummary, setChangeSummary] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -109,14 +94,6 @@ export function CurriculumWorkflowActions() {
     academicYears,
   ]);
 
-  useEffect(() => {
-    setRevisionOpen(false);
-    setRevisionType("Minor");
-    setRevisionTriggers([]);
-    setRevisionReason("");
-    setChangeSummary("");
-  }, [selectedVersion?.id]);
-
   const metadataMissing = !selectedCohort || !selectedAcademicYear;
   const metadataDirty = Boolean(
     selectedVersion &&
@@ -126,40 +103,6 @@ export function CurriculumWorkflowActions() {
         selectedCohort.intakeYear !== selectedVersion.intakeYear ||
         selectedAcademicYear.label !== selectedVersion.academicYear),
   );
-  const revisionEligible = Boolean(
-    selectedVersion &&
-      canCreateCurriculumRevision(canWrite, selectedVersion.status),
-  );
-  const nextRevisionVersion =
-    selectedVersion && selectedCurriculum
-      ? nextCurriculumRevisionVersion(
-          selectedCurriculum.versions,
-          selectedVersion,
-          revisionType,
-        )
-      : "";
-  const minorRevisionVersion =
-    selectedVersion && selectedCurriculum
-      ? nextCurriculumRevisionVersion(
-          selectedCurriculum.versions,
-          selectedVersion,
-          "Minor",
-        )
-      : "";
-  const majorRevisionVersion =
-    selectedVersion && selectedCurriculum
-      ? nextCurriculumRevisionVersion(
-          selectedCurriculum.versions,
-          selectedVersion,
-          "Major",
-        )
-      : "";
-  const revisionReady = isCurriculumRevisionReady({
-    revisionType,
-    revisionTriggers,
-    revisionReason,
-    changeSummary,
-  });
 
   const loadState = useCallback(async (id: string) => {
     if (!id) return;
@@ -245,59 +188,17 @@ export function CurriculumWorkflowActions() {
     }
   };
 
-  const toggleRevisionTrigger = (
-    trigger: ProgrammeCurriculumRevisionTrigger,
-    checked: boolean,
+  const handleRevisionCreated = async (
+    created: ProgrammeCurriculumRead,
+    predecessorVersion: string,
   ) => {
-    setRevisionTriggers((current) =>
-      checked
-        ? current.includes(trigger)
-          ? current
-          : [...current, trigger]
-        : current.filter((item) => item !== trigger),
-    );
-  };
-
-  const createRevision = async () => {
-    if (
-      !selectedCurriculum ||
-      !selectedVersion ||
-      !revisionEligible ||
-      !revisionReady
-    ) {
-      return;
-    }
-
-    setBusy(true);
+    setCurricula(await curriculumApi.list());
+    setVersionId(created.selectedVersion.id);
+    await loadState(created.selectedVersion.id);
     setError(null);
-    setNotice(null);
-    try {
-      const created = await curriculumApi.createRevision(
-        selectedCurriculum.id,
-        selectedVersion.id,
-        {
-          revisionType,
-          revisionTriggers,
-          revisionReason: revisionReason.trim(),
-          changeSummary: changeSummary.trim(),
-        },
-      );
-      const list = await curriculumApi.list();
-      setCurricula(list);
-      setVersionId(created.selectedVersion.id);
-      await loadState(created.selectedVersion.id);
-      setNotice(
-        `Created v${created.selectedVersion.version} Draft from v${selectedVersion.version}.`,
-      );
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Could not create curriculum revision",
-      );
-    } finally {
-      setBusy(false);
-    }
+    setNotice(
+      `Created v${created.selectedVersion.version} Draft from v${predecessorVersion}.`,
+    );
   };
 
   const run = async (action: CurriculumWorkflowAction) => {
@@ -400,141 +301,17 @@ export function CurriculumWorkflowActions() {
         </label>
       </div>
 
-      {revisionEligible && selectedVersion && selectedCurriculum && (
-        <div className="mt-4 border-t border-border pt-4">
-          {!revisionOpen ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Need to change this curriculum?</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Create a new Draft revision. The{" "}
-                  {curriculumVersionLabel(selectedVersion)}{" "}
-                  {selectedVersion.status} snapshot remains unchanged.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setRevisionOpen(true)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent disabled:opacity-50"
-              >
-                Create revision
-              </button>
-            </div>
-          ) : (
-            <div
-              className="space-y-4 rounded-lg border border-border bg-muted/20 p-4"
-              aria-label="Create curriculum revision"
-            >
-              <div>
-                <p className="text-sm font-semibold">Create Curriculum Revision</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Based on {curriculumVersionLabel(selectedVersion)} ·{" "}
-                  {selectedVersion.status}. The predecessor remains read-only and
-                  auditable.
-                </p>
-              </div>
-
-              <label className="block text-sm font-medium">
-                Revision type
-                <select
-                  value={revisionType}
-                  onChange={(event) =>
-                    setRevisionType(
-                      event.target.value as ProgrammeCurriculumRevisionType,
-                    )
-                  }
-                  className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:max-w-sm"
-                >
-                  <option value="Minor">
-                    Minor → v{minorRevisionVersion}
-                  </option>
-                  <option value="Major">
-                    Major → v{majorRevisionVersion}
-                  </option>
-                </select>
-              </label>
-
-              <fieldset>
-                <legend className="text-sm font-medium">
-                  Revision trigger
-                </legend>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Select at least one reason that initiated this revision.
-                </p>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {PROGRAMME_CURRICULUM_REVISION_TRIGGERS.map((trigger) => (
-                    <label
-                      key={trigger}
-                      className="flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-4 w-4"
-                        checked={revisionTriggers.includes(trigger)}
-                        onChange={(event) =>
-                          toggleRevisionTrigger(trigger, event.target.checked)
-                        }
-                      />
-                      <span>{revisionTriggerLabel(trigger)}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="grid gap-3 lg:grid-cols-2">
-                <label className="block text-sm font-medium">
-                  Revision reason
-                  <textarea
-                    value={revisionReason}
-                    onChange={(event) => setRevisionReason(event.target.value)}
-                    rows={3}
-                    maxLength={2000}
-                    placeholder="Why is a new curriculum revision needed?"
-                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="block text-sm font-medium">
-                  Change summary
-                  <textarea
-                    value={changeSummary}
-                    onChange={(event) => setChangeSummary(event.target.value)}
-                    rows={3}
-                    maxLength={2000}
-                    placeholder="Summarize the intended changes in this Draft."
-                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </label>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={busy || !revisionReady}
-                  onClick={() => void createRevision()}
-                  className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                >
-                  {busy
-                    ? "Creating revision…"
-                    : `Create v${nextRevisionVersion} Draft`}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setRevisionOpen(false)}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                {!revisionReady && (
-                  <p className="text-xs text-muted-foreground">
-                    Trigger, revision reason, and change summary are required.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+      {selectedCurriculum && selectedVersion && (
+        <CurriculumRevisionPanel
+          curriculum={selectedCurriculum}
+          predecessor={selectedVersion}
+          canWrite={canWrite}
+          busy={busy}
+          onBusyChange={setBusy}
+          onCreated={(created) =>
+            handleRevisionCreated(created, selectedVersion.version)
+          }
+        />
       )}
 
       {workflow?.status === "Draft" && (
