@@ -54,3 +54,9 @@ export function portalAccessPresentation(
 ): PortalAccessPresentation {
   return PRESENTATION[status];
 }
+
+export function canRepairPortalAccess(
+  status: StudentPortalAccessState | undefined,
+): boolean {
+  return status === "needs-attention";
+}
