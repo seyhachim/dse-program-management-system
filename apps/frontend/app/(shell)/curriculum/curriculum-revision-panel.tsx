@@ -6,7 +6,6 @@ import {
   type CurriculumVersionSummary,
   type ProgrammeCurriculumRead,
   type ProgrammeCurriculumRevisionTrigger,
-  type ProgrammeCurriculumRevisionType,
 } from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
 import {
@@ -16,6 +15,7 @@ import {
   type ProgrammeCurriculumListItem,
 } from "@/lib/curriculum";
 import {
+  type CurriculumRevisionKind,
   canCreateCurriculumRevision,
   isCurriculumRevisionReady,
   nextCurriculumRevisionVersion,
