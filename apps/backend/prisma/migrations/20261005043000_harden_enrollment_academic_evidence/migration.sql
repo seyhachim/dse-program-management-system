@@ -56,22 +56,43 @@ FOR EACH ROW
 EXECUTE FUNCTION "protect_enrollment_placement_correction_history"();
 
 CREATE OR REPLACE FUNCTION "protect_completed_offering_history"()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
   IF OLD."status" = 'Completed' THEN
     RAISE EXCEPTION 'Completed offering history cannot be deleted';
   END IF;
   RETURN OLD;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "Offering_protect_completed_history"
 BEFORE DELETE ON "Offering"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_completed_offering_history"();
 
+CREATE OR REPLACE FUNCTION "protect_completed_offering_enrollment_insert"()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM "Offering"
+    WHERE "id" = NEW."offeringId"
+      AND "status" = 'Completed'
+  )
+  THEN
+    RAISE EXCEPTION 'Completed offering roster cannot accept new enrollments';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "Enrollment_protect_completed_insert"
+BEFORE INSERT ON "Enrollment"
+FOR EACH ROW
+EXECUTE FUNCTION "protect_completed_offering_enrollment_insert"();
+
 CREATE OR REPLACE FUNCTION "protect_enrollment_academic_evidence"()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 DECLARE
   identity_change BOOLEAN;
   source_completed BOOLEAN;
@@ -210,7 +231,7 @@ EXECUTE FUNCTION "protect_enrollment_academic_evidence"();
 ALTER TABLE "EnrollmentPlacementCorrection" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL PRIVILEGES ON TABLE "EnrollmentPlacementCorrection" FROM PUBLIC;
 
-DO $
+DO $$
 DECLARE api_role text;
 BEGIN
   FOR api_role IN
@@ -224,4 +245,4 @@ BEGIN
       api_role
     );
   END LOOP;
-END $;
+END $$;
