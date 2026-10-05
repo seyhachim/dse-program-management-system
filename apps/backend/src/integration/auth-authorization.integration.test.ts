@@ -511,6 +511,87 @@ integrationDescribe("backend integration authorization boundaries", () => {
     }
   });
 
+  test("enrollment placement correction is programme-managed and preserves Enrollment identity", async () => {
+    const suffix = crypto.randomUUID();
+    const term = `issue1243-auth-${suffix}`;
+    const [source, target] = await Promise.all([
+      prisma.offering.create({
+        data: {
+          courseId: context.courses.cs101.id,
+          lecturerId: context.users.lecturer.id,
+          term,
+          sectionCode: "I1243-A",
+          capacity: 10,
+          status: "Planned",
+          semester: "First",
+          programmeYear: 3,
+        },
+      }),
+      prisma.offering.create({
+        data: {
+          courseId: context.courses.cs101.id,
+          lecturerId: context.users.lecturer.id,
+          term,
+          sectionCode: "I1243-B",
+          capacity: 10,
+          status: "Planned",
+          semester: "First",
+          programmeYear: 3,
+        },
+      }),
+    ]);
+    const student = await prisma.student.create({
+      data: {
+        name: "Issue 1243 Integration Student",
+        email: `issue1243-integration-${suffix}@dse.invalid`,
+        studentId: `I1243-${suffix}`,
+        status: "Active",
+      },
+    });
+    const enrollment = await prisma.enrollment.create({
+      data: { offeringId: source.id, studentId: student.id },
+    });
+    const path = `/api/offerings/${source.id}/enrollments/${student.id}/move`;
+    const body = {
+      targetOfferingId: target.id,
+      reason: "Correct current class section",
+    };
+
+    const lecturerDenied = await request(path, {
+      method: "POST",
+      token: signToken(context.users.lecturer),
+      body,
+    });
+    expect(lecturerDenied.status).toBe(403);
+
+    const coordinatorAllowed = await request(path, {
+      method: "POST",
+      token: signToken(context.users.coordinator),
+      body,
+    });
+    expect(coordinatorAllowed.status).toBe(200);
+
+    const stored = await prisma.enrollment.findUniqueOrThrow({
+      where: { id: enrollment.id },
+    });
+    expect(stored.id).toBe(enrollment.id);
+    expect(stored.offeringId).toBe(target.id);
+    expect(stored.studentId).toBe(student.id);
+
+    const corrections = await prisma.enrollmentPlacementCorrection.findMany({
+      where: { enrollmentId: enrollment.id },
+    });
+    expect(corrections).toHaveLength(1);
+    expect(corrections[0]).toMatchObject({
+      enrollmentId: enrollment.id,
+      studentId: student.id,
+      fromOfferingId: source.id,
+      toOfferingId: target.id,
+      correctedById: context.users.coordinator.id,
+      reason: "Correct current class section",
+    });
+  });
+
   async function request(
     path: string,
     options: {
