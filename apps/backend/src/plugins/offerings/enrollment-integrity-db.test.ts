@@ -178,7 +178,7 @@ dbDescribe("enrollment academic-evidence integrity", () => {
         term: `${term}-completed`,
         sectionCode: "I1243-C",
         capacity: 10,
-        status: "Completed",
+        status: "Planned",
         semester: "First",
         programmeYear: 3,
       },
@@ -194,6 +194,11 @@ dbDescribe("enrollment academic-evidence integrity", () => {
     const completedEnrollment = await prisma.enrollment.create({
       data: { offeringId: completed.id, studentId: completedStudent.id },
     });
+    await prisma.offering.update({
+      where: { id: completed.id },
+      data: { status: "Completed" },
+    });
+
     await expectDatabaseRejection(() =>
       prisma.enrollment.delete({ where: { id: completedEnrollment.id } }),
     );
@@ -203,6 +208,20 @@ dbDescribe("enrollment academic-evidence integrity", () => {
     expect(
       await prisma.enrollment.findUnique({ where: { id: completedEnrollment.id } }),
     ).not.toBeNull();
+
+    const lateStudent = await prisma.student.create({
+      data: {
+        name: "Issue 1243 Late Completed Student",
+        email: `issue1243-late-${suffix}@dse.invalid`,
+        studentId: `I1243-L-${suffix}`,
+        status: "Active",
+      },
+    });
+    await expectDatabaseRejection(() =>
+      prisma.enrollment.create({
+        data: { offeringId: completed.id, studentId: lateStudent.id },
+      }),
+    );
   });
 
   test("keeps placement-correction history append-only", async () => {
