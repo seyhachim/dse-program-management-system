@@ -755,6 +755,14 @@ export const offeringService = {
   },
 
   async remove(id: string) {
+    const offering = await prisma.offering.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!offering) throw new ReferenceError("Offering not found");
+    if (offering.status === "Completed") {
+      throw new EnrollmentIntegrityError("Completed offering history cannot be deleted");
+    }
     return prisma.offering.delete({ where: { id } });
   },
 
