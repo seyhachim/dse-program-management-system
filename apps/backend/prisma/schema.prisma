@@ -2697,8 +2697,10 @@ model Enrollment {
   @@index([studentId])
 }
 
-/// Offering-scoped Class Monitor/Sub-class Monitor responsibility. Runtime
-/// authorization is revalidated from Student + Enrollment + this active row.
+/// Offering-scoped Class Monitor/Deputy Class Monitor responsibility.
+/// A partial database index allows one active Class Monitor and multiple active
+/// Deputy Class Monitors, while runtime authorization is revalidated from
+/// Student + Enrollment + the student's active assignment row.
 model ClassResponsibilityAssignment {
   id           String                  @id @default(uuid())
   offeringId   String

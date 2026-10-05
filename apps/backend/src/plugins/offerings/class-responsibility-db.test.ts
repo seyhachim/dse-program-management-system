@@ -106,6 +106,48 @@ describeDb("class responsibility PostgreSQL integrity", () => {
     expect(history.some((event) => event.studentId === second.id && event.action === "Assigned")).toBe(true);
   });
 
+  test("allows multiple active deputy class monitors without replacing existing deputies", async () => {
+    const actor = await createUser("deputy-actor");
+    const firstUser = await createUser("first-deputy");
+    const secondUser = await createUser("second-deputy");
+    const first = await createStudent("first-deputy", { userId: firstUser.id });
+    const second = await createStudent("second-deputy", { userId: secondUser.id });
+    const offering = await createOffering("multiple-deputies");
+    await enroll(offering.id, first.id);
+    await enroll(offering.id, second.id);
+
+    const firstAssignment = await classResponsibilityService.assign(
+      offering.id,
+      first.id,
+      "SubClassMonitor",
+      actor.id,
+    );
+    const secondAssignment = await classResponsibilityService.assign(
+      offering.id,
+      second.id,
+      "SubClassMonitor",
+      actor.id,
+    );
+
+    expect(secondAssignment.id).not.toBe(firstAssignment.id);
+    expect(await classResponsibilityService.getActiveForUser(firstUser.id, offering.id)).toMatchObject({
+      role: "SubClassMonitor",
+    });
+    expect(await classResponsibilityService.getActiveForUser(secondUser.id, offering.id)).toMatchObject({
+      role: "SubClassMonitor",
+    });
+
+    const activeDeputies = (await classResponsibilityService.list(offering.id)).filter(
+      (row) => row.role === "SubClassMonitor",
+    );
+    expect(activeDeputies).toHaveLength(2);
+    expect(activeDeputies.map((row) => row.student.id).sort()).toEqual([first.id, second.id].sort());
+
+    const history = await classResponsibilityService.history(offering.id);
+    expect(history.filter((event) => event.action === "Assigned")).toHaveLength(2);
+    expect(history.filter((event) => event.action === "Reassigned")).toHaveLength(0);
+  });
+
   test("rejects ineligible students and prevents the same student holding both active responsibilities", async () => {
     const actor = await createUser("eligibility-actor");
     const studentUser = await createUser("eligibility-monitor");

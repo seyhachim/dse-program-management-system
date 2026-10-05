@@ -4,6 +4,7 @@ import {
   activeSectionMembers,
   classifyResponsibilityAssignment,
   eligibleOfferingsForSectionResponsibility,
+  responsibilityAssignmentBehavior,
 } from "./section-class-leadership";
 
 function offering(
@@ -86,6 +87,11 @@ test("lists only members currently assigned to the selected canonical section", 
     },
   ] satisfies StudentCohortSectionMemberView[];
   expect(activeSectionMembers(members, "section-m2").map((row) => row.studentId)).toEqual(["student-a"]);
+});
+
+test("distinguishes Class Monitor replacement from Deputy addition", () => {
+  expect(responsibilityAssignmentBehavior("ClassMonitor")).toBe("replace");
+  expect(responsibilityAssignmentBehavior("SubClassMonitor")).toBe("add");
 });
 
 test("treats an existing identical responsibility as already assigned", () => {

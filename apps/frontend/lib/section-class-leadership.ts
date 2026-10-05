@@ -26,6 +26,12 @@ export function eligibleOfferingsForSectionResponsibility(
   );
 }
 
+export function responsibilityAssignmentBehavior(
+  role: ClassResponsibilityRole,
+): "replace" | "add" {
+  return role === "ClassMonitor" ? "replace" : "add";
+}
+
 export type ResponsibilityAssignmentDecision =
   | "assign"
   | "already-assigned"
