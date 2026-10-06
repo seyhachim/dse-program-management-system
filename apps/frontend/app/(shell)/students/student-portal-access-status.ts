@@ -80,6 +80,13 @@ export function matchesPortalAccessFilter(
   return filter === "all" || status === filter;
 }
 
+export function resolvePortalAccessStatus(
+  cachedStatus: StudentPortalAccessState | undefined,
+  queryFailed: boolean,
+): StudentPortalAccessState | undefined {
+  return queryFailed ? "status-unavailable" : cachedStatus;
+}
+
 export function portalAccessPresentation(
   status: StudentPortalAccessState,
 ): PortalAccessPresentation {
