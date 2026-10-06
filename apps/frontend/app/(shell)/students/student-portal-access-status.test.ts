@@ -65,7 +65,6 @@ test("portal access filter matches exact status without guessing unknown state",
   expect(matchesPortalAccessFilter("status-unavailable", "status-unavailable")).toBe(true);
 });
 
-
 test("portal access status query failure overrides stale cached state", () => {
   expect(resolvePortalAccessStatus("not-invited", true)).toBe("status-unavailable");
   expect(resolvePortalAccessStatus("active-account", true)).toBe("status-unavailable");
