@@ -121,6 +121,16 @@ export function StudentsClient() {
       canManagePortalAccess ? portalAccessFilter : "all",
     ),
   );
+  const visibleStudentIds = visibleRows.map((student) => student.id).join(",");
+
+  useEffect(() => {
+    if (!portalFilterActive) return;
+    const visibleIdSet = new Set(visibleStudentIds ? visibleStudentIds.split(",") : []);
+    setSelectedIds((current) => {
+      const next = current.filter((id) => visibleIdSet.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [portalFilterActive, visibleStudentIds]);
 
   const handleSubmit = async (values: StudentFormValues) => {
     setSubmitting(true);
