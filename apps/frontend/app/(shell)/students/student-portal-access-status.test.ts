@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import {
   canRepairPortalAccess,
+  matchesPortalAccessFilter,
+  PORTAL_ACCESS_FILTER_OPTIONS,
   portalAccessPresentation,
 } from "./student-portal-access-status.ts";
 
@@ -32,4 +34,33 @@ test("portal repair is offered only for needs-attention", () => {
   expect(canRepairPortalAccess("inactive-student")).toBe(false);
   expect(canRepairPortalAccess("status-unavailable")).toBe(false);
   expect(canRepairPortalAccess(undefined)).toBe(false);
+});
+
+
+test("portal access filter exposes all live states with clear labels", () => {
+  expect(PORTAL_ACCESS_FILTER_OPTIONS).toEqual([
+    { value: "all", label: "All portal access" },
+    { value: "not-invited", label: "Not invited" },
+    { value: "invitation-pending", label: "Invitation pending" },
+    { value: "invitation-expired", label: "Invitation expired" },
+    { value: "active-account", label: "Active account" },
+    { value: "no-email", label: "No email" },
+    { value: "inactive-student", label: "Inactive student" },
+    { value: "needs-attention", label: "Needs attention" },
+    { value: "status-unavailable", label: "Status unavailable" },
+  ]);
+});
+
+test("portal access filter matches exact status without guessing unknown state", () => {
+  expect(matchesPortalAccessFilter("active-account", "all")).toBe(true);
+  expect(matchesPortalAccessFilter(undefined, "all")).toBe(true);
+
+  expect(matchesPortalAccessFilter("not-invited", "not-invited")).toBe(true);
+  expect(matchesPortalAccessFilter("active-account", "not-invited")).toBe(false);
+
+  expect(matchesPortalAccessFilter("invitation-expired", "invitation-expired")).toBe(true);
+  expect(matchesPortalAccessFilter("invitation-pending", "invitation-expired")).toBe(false);
+
+  expect(matchesPortalAccessFilter(undefined, "active-account")).toBe(false);
+  expect(matchesPortalAccessFilter("status-unavailable", "status-unavailable")).toBe(true);
 });
