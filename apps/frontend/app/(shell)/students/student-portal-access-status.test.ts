@@ -36,7 +36,6 @@ test("portal repair is offered only for needs-attention", () => {
   expect(canRepairPortalAccess(undefined)).toBe(false);
 });
 
-
 test("portal access filter exposes all live states with clear labels", () => {
   expect(PORTAL_ACCESS_FILTER_OPTIONS).toEqual([
     { value: "all", label: "All portal access" },
