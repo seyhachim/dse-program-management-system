@@ -4,6 +4,7 @@ import {
   matchesPortalAccessFilter,
   PORTAL_ACCESS_FILTER_OPTIONS,
   portalAccessPresentation,
+  resolvePortalAccessStatus,
 } from "./student-portal-access-status.ts";
 
 test("portal access badges use clear roster labels", () => {
@@ -62,4 +63,12 @@ test("portal access filter matches exact status without guessing unknown state",
 
   expect(matchesPortalAccessFilter(undefined, "active-account")).toBe(false);
   expect(matchesPortalAccessFilter("status-unavailable", "status-unavailable")).toBe(true);
+});
+
+
+test("portal access status query failure overrides stale cached state", () => {
+  expect(resolvePortalAccessStatus("not-invited", true)).toBe("status-unavailable");
+  expect(resolvePortalAccessStatus("active-account", true)).toBe("status-unavailable");
+  expect(resolvePortalAccessStatus("active-account", false)).toBe("active-account");
+  expect(resolvePortalAccessStatus(undefined, false)).toBeUndefined();
 });
