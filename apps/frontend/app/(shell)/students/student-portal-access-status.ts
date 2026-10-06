@@ -49,6 +49,37 @@ const PRESENTATION: Record<StudentPortalAccessState, PortalAccessPresentation> =
   },
 };
 
+export type PortalAccessFilter = "all" | StudentPortalAccessState;
+
+const PORTAL_ACCESS_FILTER_ORDER: StudentPortalAccessState[] = [
+  "not-invited",
+  "invitation-pending",
+  "invitation-expired",
+  "active-account",
+  "no-email",
+  "inactive-student",
+  "needs-attention",
+  "status-unavailable",
+];
+
+export const PORTAL_ACCESS_FILTER_OPTIONS: ReadonlyArray<{
+  value: PortalAccessFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All portal access" },
+  ...PORTAL_ACCESS_FILTER_ORDER.map((status) => ({
+    value: status,
+    label: PRESENTATION[status].label,
+  })),
+];
+
+export function matchesPortalAccessFilter(
+  status: StudentPortalAccessState | undefined,
+  filter: PortalAccessFilter,
+): boolean {
+  return filter === "all" || status === filter;
+}
+
 export function portalAccessPresentation(
   status: StudentPortalAccessState,
 ): PortalAccessPresentation {
