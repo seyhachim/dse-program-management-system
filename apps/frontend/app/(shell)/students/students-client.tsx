@@ -28,6 +28,7 @@ import {
   matchesPortalAccessFilter,
   PORTAL_ACCESS_FILTER_OPTIONS,
   portalAccessPresentation,
+  resolvePortalAccessStatus,
   type PortalAccessFilter,
 } from "./student-portal-access-status";
 
@@ -111,10 +112,13 @@ export function StudentsClient() {
     (portalAccessQuery.data?.items ?? []).map((item) => [item.studentId, item.status]),
   );
   const portalAccessStatusForStudent = (studentId: string) =>
-    portalAccessByStudentId.get(studentId) ??
-    (portalAccessQuery.isError ? "status-unavailable" : undefined);
+    resolvePortalAccessStatus(
+      portalAccessByStudentId.get(studentId),
+      portalAccessQuery.isError,
+    );
   const portalFilterActive = canManagePortalAccess && portalAccessFilter !== "all";
-  const portalFilterWaiting = portalFilterActive && portalAccessQuery.isPending;
+  const portalFilterWaiting =
+    portalFilterActive && portalStudentIds.length > 0 && portalAccessQuery.isPending;
   const visibleRows = rows.filter((student) =>
     matchesPortalAccessFilter(
       portalAccessStatusForStudent(student.id),
