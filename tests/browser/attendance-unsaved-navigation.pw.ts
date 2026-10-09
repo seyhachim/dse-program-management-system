@@ -47,8 +47,8 @@ for (const width of [390, 1280]) {
     await stubAttendance(page);
     await page.goto("/attendance");
 
-    const offering = page.getByLabel("Class scheduled on date");
-    const date = page.getByLabel("Attendance date");
+    const offering = page.locator("select").first();
+    const date = page.locator('input[type="date"]');
     await expect(page.getByText("Synthetic Student")).toBeVisible();
     await page.getByRole("button", { name: "Mark all present" }).click();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
