@@ -49,7 +49,7 @@ for (const width of [390, 1280]) {
 
     const offering = page.locator("select").first();
     const date = page.locator('input[type="date"]');
-    await expect(page.getByText("Synthetic Student")).toBeVisible();
+    await expect(page.getByText("Synthetic Student").filter({ visible: true })).toBeVisible();
     await page.getByRole("button", { name: "Mark all present" }).click();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
 
