@@ -186,6 +186,21 @@ export function AttendanceClient() {
   }, [records, search]);
   // Server query data is the render-safe authoritative baseline; refs are only read inside effects and handlers.
   const hasUnsavedChanges = !attendanceRecordsEqual(records, session?.records ?? []);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  function confirmContextChange(): boolean {
+    return !hasUnsavedChanges || window.confirm(
+      "You have unsaved attendance marks. Changing the class or date will discard the current in-memory changes. Continue?",
+    );
+  }
   const recheckIndex = recheckStudentId ? records.findIndex((record) => record.studentId === recheckStudentId) : -1;
   const recheckRecord = recheckIndex >= 0 ? records[recheckIndex] ?? null : null;
 
@@ -350,7 +365,7 @@ export function AttendanceClient() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_160px_210px_minmax(0,1fr)] lg:gap-4">
               <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Class scheduled on date</label>
-                <select value={offeringId} onChange={(event) => setOfferingId(event.target.value)} disabled={scheduledOfferings.length === 0} className={MOBILE_ATTENDANCE_LAYOUT.control}>
+                <select value={offeringId} onChange={(event) => { if (confirmContextChange()) setOfferingId(event.target.value); }} disabled={scheduledOfferings.length === 0} className={MOBILE_ATTENDANCE_LAYOUT.control}>
                   {scheduledOfferings.length === 0 ? <option value="">No classes scheduled for this date</option> : null}
                   {scheduledOfferings.map((offering) => <option key={offering.id} value={offering.id}>{offeringLabel(offering)}</option>)}
                 </select>
@@ -367,7 +382,7 @@ export function AttendanceClient() {
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance date</label>
-                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={MOBILE_ATTENDANCE_LAYOUT.control} />
+                <input type="date" value={date} onChange={(event) => { if (confirmContextChange()) setDate(event.target.value); }} className={MOBILE_ATTENDANCE_LAYOUT.control} />
                 <p className="hidden text-xs text-muted-foreground md:block">One register per section and date.</p>
               </div>
               <div className="space-y-2 sm:col-span-2 lg:col-span-1">
@@ -462,7 +477,7 @@ export function AttendanceClient() {
               : <>
                 <div className={MOBILE_ATTENDANCE_LAYOUT.mobileHistory}>
                   {history.map((item) => <article key={item.sessionId} className="space-y-3 p-4">
-                    <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-foreground">{formatSessionDate(item.date)}</p><p className="mt-0.5 text-xs text-muted-foreground">Saved attendance session</p></div><button type="button" onClick={() => setDate(item.date)} className="min-h-11 rounded-lg border border-primary/30 px-3 text-sm font-semibold text-primary">Open</button></div>
+                    <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-foreground">{formatSessionDate(item.date)}</p><p className="mt-0.5 text-xs text-muted-foreground">Saved attendance session</p></div><button type="button" onClick={() => { if (confirmContextChange()) setDate(item.date); }} className="min-h-11 rounded-lg border border-primary/30 px-3 text-sm font-semibold text-primary">Open</button></div>
                     <dl className="grid grid-cols-3 gap-2 rounded-xl bg-muted/30 p-3 text-center">
                       <HistoryCount label="Present" value={item.counts.Present} /><HistoryCount label="Absent" value={item.counts.Absent} /><HistoryCount label="Late" value={item.counts.Late} /><HistoryCount label="Permission" value={item.counts.Excused} /><HistoryCount label="Pending" value={item.counts.PermissionPending} />
                     </dl>
@@ -472,7 +487,7 @@ export function AttendanceClient() {
                   <table className="w-full min-w-[820px] text-sm">
                     <thead className="bg-muted/30 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Present</th><th className="px-4 py-3">Absent</th><th className="px-4 py-3">Late</th><th className="px-4 py-3">Permission</th><th className="px-4 py-3">Pending</th><th className="px-4 py-3">Action</th></tr></thead>
                     <tbody className="divide-y divide-border">{history.map((item) => <tr key={item.sessionId} className="hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium text-foreground">{formatSessionDate(item.date)}</td><td className="px-4 py-3 tabular-nums">{item.counts.Present}</td><td className="px-4 py-3 tabular-nums">{item.counts.Absent}</td><td className="px-4 py-3 tabular-nums">{item.counts.Late}</td><td className="px-4 py-3 tabular-nums">{item.counts.Excused}</td><td className="px-4 py-3 tabular-nums">{item.counts.PermissionPending}</td><td className="px-4 py-3"><button type="button" onClick={() => setDate(item.date)} className="text-sm font-medium text-primary hover:underline">Open register</button></td>
+                      <td className="px-4 py-3 font-medium text-foreground">{formatSessionDate(item.date)}</td><td className="px-4 py-3 tabular-nums">{item.counts.Present}</td><td className="px-4 py-3 tabular-nums">{item.counts.Absent}</td><td className="px-4 py-3 tabular-nums">{item.counts.Late}</td><td className="px-4 py-3 tabular-nums">{item.counts.Excused}</td><td className="px-4 py-3 tabular-nums">{item.counts.PermissionPending}</td><td className="px-4 py-3"><button type="button" onClick={() => { if (confirmContextChange()) setDate(item.date); }} className="text-sm font-medium text-primary hover:underline">Open register</button></td>
                     </tr>)}</tbody>
                   </table>
                 </div>
