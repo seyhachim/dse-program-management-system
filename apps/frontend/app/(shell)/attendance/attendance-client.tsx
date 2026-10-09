@@ -148,13 +148,17 @@ export function AttendanceClient() {
       ? readAttendanceDraft(window.localStorage, draftKey, session.updatedAt ?? null, serverRecords)
       : null;
     if (firstHydration) restoredContextRef.current = attendanceContext;
-    setRecords((current) => {
-      const dirty = !attendanceRecordsEqual(current, baselineRecordsRef.current);
-      if (dirty) return current;
+    // Capture the previous baseline before React invokes the updater. React may
+    // invoke a state updater twice in development; mutating refs inside it makes
+    // the second invocation incorrectly treat first hydration as a dirty draft.
+    const previousBaseline = baselineRecordsRef.current;
+    if (attendanceRecordsEqual(records, previousBaseline)) {
       baselineRecordsRef.current = serverRecords;
       baselineVersionRef.current = session.updatedAt ?? null;
-      return restored ?? serverRecords;
-    });
+      setRecords((current) =>
+        attendanceRecordsEqual(current, previousBaseline) ? (restored ?? serverRecords) : current,
+      );
+    }
     if (restored) setDraftRecovered(true);
   }, [attendanceContext, date, offeringId, session, draftKey]);
 
