@@ -79,7 +79,7 @@ dbDescribe("Offering exact CourseSpec version integrity", () => {
         lecturerId: actor.id,
         term: `issue211-${suffix}`,
         sectionCode: "A",
-        status: "Completed",
+        status: "Planned",
       },
     });
     const sharedVersionSection = await prisma.offering.create({
@@ -120,6 +120,10 @@ dbDescribe("Offering exact CourseSpec version integrity", () => {
         publishedAt: new Date(),
         publishedById: actor.id,
       },
+    });
+    await prisma.offering.update({
+      where: { id: offering.id },
+      data: { status: "Completed" },
     });
 
     const studentDetail = await studentPortalService.course(studentUser.id, offering.id);

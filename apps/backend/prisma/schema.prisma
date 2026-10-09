@@ -435,6 +435,7 @@ model User {
   academicCalendarAuditActions       AcademicCalendarAuditAction[]             @relation("AcademicCalendarAuditActor")
 securityAuditEventsAsActor         UserSecurityAuditEvent[]                  @relation("UserSecurityAuditActor")
 securityAuditEventsAsTarget        UserSecurityAuditEvent[]                  @relation("UserSecurityAuditTarget")
+  enrollmentPlacementCorrections     EnrollmentPlacementCorrection[]            @relation("EnrollmentPlacementCorrectionActor")
 }
 
 /// Lecturer-specific professional metadata used for AUN-QA staff evidence.
@@ -1568,6 +1569,7 @@ model Student {
   enrollments                    Enrollment[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
+  enrollmentPlacementCorrections EnrollmentPlacementCorrection[]
   cohortMemberships              StudentCohortMembership[]
 
   @@index([status])
@@ -2613,6 +2615,8 @@ model Offering {
   assessmentGroups               AssessmentGroup[]
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
+  enrollmentCorrectionsFrom       EnrollmentPlacementCorrection[] @relation("EnrollmentPlacementCorrectionFromOffering")
+  enrollmentCorrectionsTo         EnrollmentPlacementCorrection[] @relation("EnrollmentPlacementCorrectionToOffering")
   qaCloAttainmentSnapshots       QaCloAttainmentSnapshot[]
   portfolioEvidence              StudentPortfolioEvidence[]
 
@@ -2695,6 +2699,30 @@ model Enrollment {
 
   @@unique([offeringId, studentId])
   @@index([studentId])
+}
+
+/// Append-only audit trail for a controlled current-term section/offering placement correction.
+/// The Enrollment id is intentionally snapshotted rather than FK-bound so a later legitimate
+/// lifecycle change cannot erase correction provenance.
+model EnrollmentPlacementCorrection {
+  id             String   @id @default(uuid())
+  enrollmentId   String
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  fromOfferingId String
+  fromOffering   Offering @relation("EnrollmentPlacementCorrectionFromOffering", fields: [fromOfferingId], references: [id], onDelete: Restrict)
+  toOfferingId   String
+  toOffering     Offering @relation("EnrollmentPlacementCorrectionToOffering", fields: [toOfferingId], references: [id], onDelete: Restrict)
+  correctedById  String
+  correctedBy    User     @relation("EnrollmentPlacementCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
+  reason         String
+  createdAt      DateTime @default(now())
+
+  @@index([enrollmentId, createdAt])
+  @@index([studentId])
+  @@index([fromOfferingId])
+  @@index([toOfferingId])
+  @@index([correctedById])
 }
 
 /// Offering-scoped Class Monitor/Deputy Class Monitor responsibility.

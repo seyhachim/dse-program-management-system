@@ -6,6 +6,7 @@ import type {
   ClassResponsibilityView,
   CreateOfferingInput,
   LecturerWorkloadSummary,
+  MoveEnrollmentInput,
   OfferingStatus,
   OfferingView,
   RecheckAttendanceInput,
@@ -73,6 +74,16 @@ export const offeringsApi = {
   },
   unenroll(id: string, studentId: string): Promise<OfferingView> {
     return api.delete<OfferingView>(`/api/offerings/${id}/enrollments/${studentId}`);
+  },
+  moveEnrollment(
+    id: string,
+    studentId: string,
+    input: MoveEnrollmentInput,
+  ): Promise<OfferingView> {
+    return api.post<OfferingView>(
+      `/api/offerings/${id}/enrollments/${studentId}/move`,
+      input,
+    );
   },
   responsibilities(id: string): Promise<ClassResponsibilityView[]> {
     return api.get<ClassResponsibilityView[]>(`/api/offerings/${id}/responsibilities`);

@@ -12,10 +12,12 @@ import {
   type ListOfferingsQuery,
   type ListLecturerWorkloadQuery,
   type LecturerWorkloadSummary,
+  type MoveEnrollmentInput,
   type OfferingView,
   type StudentsServiceContract,
   type UpdateOfferingInput,
 } from "@dse-pms/shared-types";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { summarizeLecturerWorkload } from "./workload.ts";
@@ -30,6 +32,7 @@ import { summarizeLecturerWorkload } from "./workload.ts";
 
 export class ReferenceError extends Error {}
 export class CapacityError extends Error {}
+export class EnrollmentIntegrityError extends Error {}
 
 export function assertOfferingEnrollmentStudentsEligible(
   found: Array<{ studentId: string | null; status: string }>,
@@ -173,6 +176,103 @@ function dateOnly(value: Date | null): string | null {
 
 function toDate(value: string | null | undefined): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
+}
+
+
+type EnrollmentIdentity = {
+  id: string;
+  offeringId: string;
+  studentId: string;
+};
+
+async function assertEnrollmentCanLeaveOffering(
+  tx: Prisma.TransactionClient,
+  enrollment: EnrollmentIdentity,
+): Promise<void> {
+  const sourceOffering = await tx.offering.findUnique({
+    where: { id: enrollment.offeringId },
+    select: { status: true },
+  });
+  if (!sourceOffering) throw new ReferenceError("Offering not found");
+  if (sourceOffering.status === "Completed") {
+    throw new EnrollmentIntegrityError("Completed offering enrollment history cannot be changed");
+  }
+
+  const [
+    resultCount,
+    groupMembershipCount,
+    individualComponentCount,
+    groupAuditCount,
+    activeResponsibilityCount,
+    finalizedResultCount,
+    lockedGroupCount,
+  ] = await Promise.all([
+    tx.assessmentResult.count({ where: { enrollmentId: enrollment.id } }),
+    tx.assessmentGroupMember.count({ where: { enrollmentId: enrollment.id } }),
+    tx.assessmentIndividualComponent.count({ where: { enrollmentId: enrollment.id } }),
+    tx.assessmentGroupAuditEvent.count({ where: { enrollmentId: enrollment.id } }),
+    tx.classResponsibilityAssignment.count({
+      where: {
+        offeringId: enrollment.offeringId,
+        studentId: enrollment.studentId,
+        revokedAt: null,
+      },
+    }),
+    tx.assessmentResult.count({
+      where: {
+        enrollment: { offeringId: enrollment.offeringId },
+        finalizedAt: { not: null },
+      },
+    }),
+    tx.assessmentGroup.count({
+      where: {
+        offeringId: enrollment.offeringId,
+        membershipLockedAt: { not: null },
+      },
+    }),
+  ]);
+
+  if (finalizedResultCount > 0 || lockedGroupCount > 0) {
+    throw new EnrollmentIntegrityError(
+      "Offering roster is locked because finalized results or group scoring evidence exists",
+    );
+  }
+  if (resultCount > 0 || groupMembershipCount > 0 || individualComponentCount > 0 || groupAuditCount > 0) {
+    throw new EnrollmentIntegrityError(
+      "Enrollment cannot be removed or moved because assessment evidence exists",
+    );
+  }
+  if (activeResponsibilityCount > 0) {
+    throw new EnrollmentIntegrityError(
+      "Revoke the student's active class responsibility before changing this enrollment",
+    );
+  }
+}
+
+function samePlacementContext(
+  source: {
+    courseId: string;
+    courseSpecId: string | null;
+    term: string;
+    semester: string | null;
+    programmeYear: number | null;
+    academicCalendarPeriodId: string | null;
+  },
+  target: {
+    courseId: string;
+    courseSpecId: string | null;
+    term: string;
+    semester: string | null;
+    programmeYear: number | null;
+    academicCalendarPeriodId: string | null;
+  },
+): boolean {
+  return source.courseId === target.courseId
+    && source.courseSpecId === target.courseSpecId
+    && source.term === target.term
+    && source.semester === target.semester
+    && source.programmeYear === target.programmeYear
+    && source.academicCalendarPeriodId === target.academicCalendarPeriodId;
 }
 
 /**
@@ -616,6 +716,14 @@ export const offeringService = {
   },
 
   async remove(id: string) {
+    const offering = await prisma.offering.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!offering) throw new ReferenceError("Offering not found");
+    if (offering.status === "Completed") {
+      throw new EnrollmentIntegrityError("Completed offering history cannot be deleted");
+    }
     return prisma.offering.delete({ where: { id } });
   },
 
@@ -711,36 +819,176 @@ export const offeringService = {
   },
 
   async enroll(id: string, input: EnrollInput): Promise<OfferingView> {
-    const offering = await prisma.offering.findUnique({ where: { id }, include: withRelations });
-    if (!offering) throw new ReferenceError("Offering not found");
-
-    // Validate students exist via the registry.
+    // Resolve student eligibility before taking the Offering lock so registry
+    // lookups do not lengthen the critical section.
     const found = await students().findByIds(input.studentIds);
     if (found.length !== input.studentIds.length) {
       throw new ReferenceError("One or more students do not exist");
     }
     assertOfferingEnrollmentStudentsEligible(found);
 
-    // Capacity check against not-yet-enrolled students.
-    const already = new Set(offering.enrollments.map((e) => e.studentId));
-    const toAdd = input.studentIds.filter((sid) => !already.has(sid));
-    if (offering.enrollments.length + toAdd.length > offering.capacity) {
-      throw new CapacityError(
-        `Capacity ${offering.capacity} exceeded (${offering.enrollments.length} enrolled, adding ${toAdd.length})`,
-      );
-    }
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "Offering"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `;
+      const offering = await tx.offering.findUnique({
+        where: { id },
+        select: {
+          capacity: true,
+          status: true,
+          enrollments: { select: { studentId: true } },
+        },
+      });
+      if (!offering) throw new ReferenceError("Offering not found");
+      if (offering.status === "Completed") {
+        throw new EnrollmentIntegrityError("Completed offering roster cannot accept new enrollments");
+      }
 
-    await prisma.enrollment.createMany({
-      data: toAdd.map((studentId) => ({ offeringId: id, studentId })),
-      skipDuplicates: true,
-    });
+      const already = new Set(offering.enrollments.map((item) => item.studentId));
+      const toAdd = [...new Set(input.studentIds)].filter((studentId) => !already.has(studentId));
+      if (offering.enrollments.length + toAdd.length > offering.capacity) {
+        throw new CapacityError(
+          `Capacity ${offering.capacity} exceeded (${offering.enrollments.length} enrolled, adding ${toAdd.length})`,
+        );
+      }
+
+      if (toAdd.length) {
+        await tx.enrollment.createMany({
+          data: toAdd.map((studentId) => ({ offeringId: id, studentId })),
+          skipDuplicates: true,
+        });
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
     return (await this.getById(id))!;
   },
 
   async unenroll(id: string, studentId: string): Promise<OfferingView> {
-    await prisma.enrollment.deleteMany({ where: { offeringId: id, studentId } });
+    await prisma.$transaction(async (tx) => {
+      const enrollment = await tx.enrollment.findFirst({
+        where: { offeringId: id, studentId },
+        select: { id: true, offeringId: true, studentId: true },
+      });
+      if (!enrollment) return;
+
+      await assertEnrollmentCanLeaveOffering(tx, enrollment);
+      await tx.enrollment.delete({ where: { id: enrollment.id } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
     const view = await this.getById(id);
     if (!view) throw new ReferenceError("Offering not found");
+    return view;
+  },
+
+  async moveEnrollment(
+    id: string,
+    studentId: string,
+    input: MoveEnrollmentInput,
+    correctedById: string,
+  ): Promise<OfferingView> {
+    if (id === input.targetOfferingId) {
+      throw new ReferenceError("Choose a different target offering");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "Offering"
+        WHERE "id" IN (${id}, ${input.targetOfferingId})
+        ORDER BY "id"
+        FOR UPDATE
+      `;
+
+      const [enrollment, source, target] = await Promise.all([
+        tx.enrollment.findFirst({
+          where: { offeringId: id, studentId },
+          select: { id: true, offeringId: true, studentId: true },
+        }),
+        tx.offering.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            courseId: true,
+            courseSpecId: true,
+            term: true,
+            sectionCode: true,
+            semester: true,
+            programmeYear: true,
+            academicCalendarPeriodId: true,
+            status: true,
+          },
+        }),
+        tx.offering.findUnique({
+          where: { id: input.targetOfferingId },
+          select: {
+            id: true,
+            courseId: true,
+            courseSpecId: true,
+            term: true,
+            sectionCode: true,
+            semester: true,
+            programmeYear: true,
+            academicCalendarPeriodId: true,
+            status: true,
+            capacity: true,
+            _count: { select: { enrollments: true } },
+          },
+        }),
+      ]);
+
+      if (!source || !target) throw new ReferenceError("Source or target offering not found");
+      if (!enrollment) throw new ReferenceError("Student is not enrolled in the source offering");
+      if (source.status === "Completed" || target.status === "Completed") {
+        throw new EnrollmentIntegrityError("Completed offering enrollment history cannot be changed");
+      }
+      if (source.sectionCode === target.sectionCode) {
+        throw new ReferenceError("Target offering must use a different class section");
+      }
+      if (!samePlacementContext(source, target)) {
+        throw new ReferenceError(
+          "Enrollment correction must stay in the same course, term, study year, semester, calendar period, and CourseSpec",
+        );
+      }
+      if (target._count.enrollments >= target.capacity) {
+        throw new CapacityError(`Target offering capacity ${target.capacity} is full`);
+      }
+      if (await tx.enrollment.findFirst({
+        where: { offeringId: target.id, studentId },
+        select: { id: true },
+      })) {
+        throw new ReferenceError("Student is already enrolled in the target offering");
+      }
+
+      await assertEnrollmentCanLeaveOffering(tx, enrollment);
+
+      const correction = await tx.enrollmentPlacementCorrection.create({
+        data: {
+          enrollmentId: enrollment.id,
+          studentId,
+          fromOfferingId: source.id,
+          toOfferingId: target.id,
+          correctedById,
+          reason: input.reason,
+        },
+      });
+      await tx.$queryRaw`
+        SELECT set_config(
+          'dse.enrollment_placement_correction_id',
+          ${correction.id},
+          true
+        )
+      `;
+      await tx.enrollment.update({
+        where: { id: enrollment.id },
+        data: { offeringId: target.id },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    const view = await this.getById(input.targetOfferingId);
+    if (!view) throw new ReferenceError("Target offering not found");
     return view;
   },
 };
