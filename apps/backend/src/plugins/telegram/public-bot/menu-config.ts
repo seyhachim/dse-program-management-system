@@ -19,7 +19,7 @@ function cb(text: string, callbackData: CallbackData): CallbackButton {
 export const MAIN_REPLY_KEYBOARD = [
   [
     { text: "🏠 Home", route: "home" },
-    { text: "❓ Ask DSE", route: "ask" },
+    { text: "❓ Ask a Question", route: "ask" },
   ],
 ] as const satisfies ReadonlyArray<ReadonlyArray<ReplyButton>>;
 
@@ -30,6 +30,7 @@ const LEGACY_REPLY_TEXT_TO_ROUTE: Readonly<Record<string, RouteKey>> = {
   "💼 Careers": "careers",
   "💰 Fees & Scholarships": "fees",
   "☰ More": "more",
+  "❓ Ask DSE": "ask",
 };
 
 export const REPLY_TEXT_TO_ROUTE: Readonly<Record<string, RouteKey>> = {
@@ -48,7 +49,7 @@ export const MENUS = {
     rows: [
       [cb("🚀 Explore DSE", "explore:start"), cb("📝 Admission", "admission:menu")],
       [cb("📚 Study & Curriculum", "curriculum:menu"), cb("💼 Careers", "careers:menu")],
-      [cb("💰 Fees & Scholarships", "fees:menu"), cb("❓ Ask DSE", "ask:start")],
+      [cb("💰 Fees & Scholarships", "fees:menu"), cb("❓ Ask a Question", "ask:start")],
       [cb("☰ More", "nav:more")],
     ],
     navigation: { showBack: false, showHome: false },
@@ -229,7 +230,7 @@ export const MENUS = {
   ask: {
     route: "ask",
     parent: "home",
-    title: "Ask DSE",
+    title: "Ask about DSE",
     rows: [
       [cb("Popular questions", "faq:popular")],
       [cb("Admission", "faq:category:admission"), cb("Curriculum", "faq:category:curriculum")],
