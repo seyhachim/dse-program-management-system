@@ -73,7 +73,7 @@ EXECUTE FUNCTION "protect_completed_offering_history"();
 -- Enrollment inserts/moves lock their parent Offering row. A capacity/status
 -- update holds the same row lock and must respect the historical/roster boundary.
 CREATE OR REPLACE FUNCTION "protect_offering_roster_update"()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
   IF OLD."status" = 'Completed' AND NEW."status" IS DISTINCT FROM OLD."status" THEN
     RAISE EXCEPTION 'Completed offering status cannot be reversed';
@@ -92,7 +92,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "Offering_protect_roster_update"
 BEFORE UPDATE OF "status", "capacity" ON "Offering"
