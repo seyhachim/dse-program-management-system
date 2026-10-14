@@ -2,6 +2,7 @@ import type {
   AddCurriculumCourseInput,
   BindCurriculumCourseSpecInput,
   BindProgrammeCurriculumCompetencyFrameworkInput,
+  CreateCurriculumRevisionInput,
   CreateInitialCurriculumInput,
   CreateProgrammeCompetencyFrameworkVersionInput,
   CurriculumArtifactView,
@@ -50,6 +51,16 @@ export const curriculumApi = {
   get(curriculumId: string, versionId?: string): Promise<ProgrammeCurriculumRead> {
     const query = versionId ? `?versionId=${encodeURIComponent(versionId)}` : "";
     return api.get<ProgrammeCurriculumRead>(`/api/programme/curricula/${encodeURIComponent(curriculumId)}${query}`);
+  },
+  createRevision(
+    curriculumId: string,
+    predecessorVersionId: string,
+    input: CreateCurriculumRevisionInput,
+  ): Promise<ProgrammeCurriculumRead> {
+    return api.post<ProgrammeCurriculumRead>(
+      `/api/programme/curricula/${encodeURIComponent(curriculumId)}/versions/${encodeURIComponent(predecessorVersionId)}/revisions`,
+      input,
+    );
   },
   listCompetencyFrameworkVersions(): Promise<ProgrammeCompetencyFrameworkVersion[]> {
     return api.get<ProgrammeCompetencyFrameworkVersion[]>(

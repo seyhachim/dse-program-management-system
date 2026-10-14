@@ -8,11 +8,18 @@ const attendanceClientSource = readFileSync(
 
 describe("Attendance local record hydration", () => {
   test("server hydration reads the latest local register without subscribing to local record changes", () => {
-    expect(attendanceClientSource).toContain("setRecords((current) => {");
     expect(attendanceClientSource).toContain(
+      "const previousBaseline = baselineRecordsRef.current;",
+    );
+    expect(attendanceClientSource).toContain(
+      "if (attendanceRecordsEqual(records, previousBaseline)) {",
+    );
+    expect(attendanceClientSource).toContain(
+      "attendanceRecordsEqual(current, previousBaseline) ? (restored ?? serverRecords) : current",
+    );
+    expect(attendanceClientSource).not.toContain(
       "const dirty = !attendanceRecordsEqual(current, baselineRecordsRef.current);",
     );
-    expect(attendanceClientSource).toContain("if (dirty) return current;");
     expect(attendanceClientSource).toContain(
       "}, [attendanceContext, date, offeringId, session, draftKey]);",
     );

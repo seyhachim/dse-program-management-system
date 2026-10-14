@@ -7,6 +7,11 @@ import type { Student } from "@dse-pms/shared-types";
 import {
   DataTable,
   Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   StatusBadge,
   Switch,
   TableToolbar,
@@ -20,7 +25,11 @@ import { StudentForm, type StudentFormValues } from "./student-form";
 import { authApi, useMe } from "@/lib/auth";
 import {
   canRepairPortalAccess,
+  matchesPortalAccessFilter,
+  PORTAL_ACCESS_FILTER_OPTIONS,
   portalAccessPresentation,
+  resolvePortalAccessStatus,
+  type PortalAccessFilter,
 } from "./student-portal-access-status";
 
 const PAGE_SIZE = 50;
@@ -32,6 +41,7 @@ export function StudentsClient() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
+  const [portalAccessFilter, setPortalAccessFilter] = useState<PortalAccessFilter>("all");
   const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
   const [previousCursors, setPreviousCursors] = useState<Array<string | undefined>>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -101,6 +111,30 @@ export function StudentsClient() {
   const portalAccessByStudentId = new Map(
     (portalAccessQuery.data?.items ?? []).map((item) => [item.studentId, item.status]),
   );
+  const portalAccessStatusForStudent = (studentId: string) =>
+    resolvePortalAccessStatus(
+      portalAccessByStudentId.get(studentId),
+      portalAccessQuery.isError,
+    );
+  const portalFilterActive = canManagePortalAccess && portalAccessFilter !== "all";
+  const portalFilterWaiting =
+    portalFilterActive && portalStudentIds.length > 0 && portalAccessQuery.isPending;
+  const visibleRows = rows.filter((student) =>
+    matchesPortalAccessFilter(
+      portalAccessStatusForStudent(student.id),
+      canManagePortalAccess ? portalAccessFilter : "all",
+    ),
+  );
+  const visibleStudentIds = visibleRows.map((student) => student.id).join(",");
+
+  useEffect(() => {
+    if (!portalFilterActive) return;
+    const visibleIdSet = new Set(visibleStudentIds ? visibleStudentIds.split(",") : []);
+    setSelectedIds((current) => {
+      const next = current.filter((id) => visibleIdSet.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [portalFilterActive, visibleStudentIds]);
 
   const handleSubmit = async (values: StudentFormValues) => {
     setSubmitting(true);
@@ -386,7 +420,7 @@ export function StudentsClient() {
           key: "portalAccess",
           header: "Portal Access",
           render: (student: Student) => {
-            const status = portalAccessByStudentId.get(student.id);
+            const status = portalAccessStatusForStudent(student.id);
             if (!status) {
               return (
                 <StatusBadge
@@ -422,7 +456,7 @@ export function StudentsClient() {
 
   const inviteBusy = inviting || selectedInviting || bulkInviting || resending;
   const selectedPortalStatus = selectedStudent
-    ? portalAccessByStudentId.get(selectedStudent.id)
+    ? portalAccessStatusForStudent(selectedStudent.id)
     : undefined;
   const selectedInviteEligible = Boolean(
     selectedStudent?.email &&
@@ -449,6 +483,30 @@ export function StudentsClient() {
           setSelectedIds([]);
         }}
         searchPlaceholder="Search students…"
+        filters={
+          canManagePortalAccess ? (
+            <Select
+              value={portalAccessFilter}
+              onValueChange={(value) => {
+                setPortalAccessFilter(value as PortalAccessFilter);
+                setSelectedIds([]);
+                setPageCursor(undefined);
+                setPreviousCursors([]);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[13rem]" aria-label="Filter by Portal Access">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PORTAL_ACCESS_FILTER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : undefined
+        }
         activeOnly={activeOnly}
         onActiveOnlyChange={(checked) => {
           setSelectedIds([]);
@@ -556,11 +614,18 @@ export function StudentsClient() {
         label="Students"
       />
 
+      {portalFilterActive && !portalFilterWaiting ? (
+        <p className="text-sm text-muted-foreground">
+          Portal Access filtering applies to this roster page. Showing {visibleRows.length} of{" "}
+          {rows.length} loaded students.
+        </p>
+      ) : null}
+
       {!hardQueryError ? (
         <>
           <DataTable
             columns={columns}
-            rows={rows}
+            rows={visibleRows}
             getRowId={(s) => s.id}
             dragHandle
             selectable
@@ -570,8 +635,12 @@ export function StudentsClient() {
               void handleEdit(student);
             }}
             onDelete={handleDelete}
-            loading={coldLoading}
-            emptyMessage="No students yet. Add your first student."
+            loading={coldLoading || portalFilterWaiting}
+            emptyMessage={
+              portalFilterActive
+                ? "No students on this page match the selected Portal Access filter."
+                : "No students yet. Add your first student."
+            }
           />
           {hasData ? (
             <div className="flex items-center justify-between gap-3">
