@@ -289,6 +289,13 @@ export const EnrollInput = z.object({
 });
 export type EnrollInput = z.infer<typeof EnrollInput>;
 
+/** Programme-managed correction for a student placed in the wrong section Offering. */
+export const MoveEnrollmentInput = z.object({
+  targetOfferingId: z.string().uuid("Select a valid target offering"),
+  reason: z.string().trim().min(5, "Provide a correction reason").max(1000),
+});
+export type MoveEnrollmentInput = z.infer<typeof MoveEnrollmentInput>;
+
 /** Enriched offering as returned by the API (joined via the registry). */
 export interface OfferingView {
   id: string;

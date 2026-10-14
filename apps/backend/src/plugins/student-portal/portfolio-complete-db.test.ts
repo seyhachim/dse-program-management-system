@@ -104,7 +104,9 @@ dbDescribe("student portfolio integrated database boundary", () => {
           lecturerId: lecturer.id,
           term,
           sectionCode: "PORT",
-          status: "Completed",
+          // Portfolio visibility doesn't require a completed class; retaining
+          // an active source allows safe cleanup of this disposable test fixture.
+          status: "Active",
         },
       });
       await prisma.enrollment.create({ data: { offeringId: offering.id, studentId: student.id } });
