@@ -191,10 +191,10 @@ describeDb("student class enrollment import database integrity", () => {
 
       // A roster with two enrolled students cannot have its capacity
       // reduced to one. Exercise the new DB guard before filling the class.
-      await expect(prisma.offering.update({
+      await expect(Promise.resolve().then(() => prisma.offering.update({
         where: { id: offeringIds[1]! },
         data: { capacity: 1 },
-      })).rejects.toThrow();
+      }))).rejects.toThrow();
       await prisma.offering.update({
         where: { id: offeringIds[1]! },
         data: { capacity: 2 },
