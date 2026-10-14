@@ -46,7 +46,7 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
         term: `portal-mvp-history-${suffix}`,
         sectionCode: `H-${suffix.slice(0, 8)}`,
         capacity: 10,
-        status: "Completed",
+        status: "Active",
       },
     });
     const student = await prisma.student.create({
@@ -72,6 +72,11 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
         { offeringId: offering.id, studentId: student.id },
         { offeringId: historicalOffering.id, studentId: student.id },
       ],
+    });
+    // Historical enrollments must exist before the Offering is completed.
+    await prisma.offering.update({
+      where: { id: historicalOffering.id },
+      data: { status: "Completed" },
     });
 
     const now = Date.now();
@@ -117,9 +122,12 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
       await prisma.student.update({ where: { id: student.id }, data: { status: "Inactive" } });
       await expect(studentPortalService.courses(studentUser.id)).rejects.toBeInstanceOf(PortalAccessError);
     } finally {
-      await prisma.offering.deleteMany({ where: { id: { in: [offering.id, historicalOffering.id] } } }).catch(() => undefined);
-      await prisma.student.deleteMany({ where: { id: { in: [student.id, otherStudent.id] } } });
-      await prisma.user.deleteMany({ where: { id: { in: [lecturer.id, studentUser.id, otherUser.id] } } });
+      // A completed Offering and its roster are immutable academic history.
+      // This DB-only scenario retains that uniquely identified fixture in its
+      // disposable test database rather than bypassing the protection to clean up.
+      await prisma.offering.delete({ where: { id: offering.id } });
+      await prisma.student.delete({ where: { id: otherStudent.id } });
+      await prisma.user.delete({ where: { id: otherUser.id } });
     }
   });
 

@@ -210,6 +210,15 @@ dbDescribe("enrollment academic-evidence integrity", () => {
     expect(
       await prisma.enrollment.findUnique({ where: { id: completedEnrollment.id } }),
     ).not.toBeNull();
+    await expectDatabaseRejection(() =>
+      prisma.offering.update({
+        where: { id: completed.id },
+        data: { status: "Active" },
+      }),
+    );
+    expect((await prisma.offering.findUniqueOrThrow({
+      where: { id: completed.id }, select: { status: true },
+    })).status).toBe("Completed");
 
     const lateStudent = await prisma.student.create({
       data: {
@@ -267,6 +276,60 @@ dbDescribe("enrollment academic-evidence integrity", () => {
     expect(
       await prisma.enrollment.count({ where: { offeringId: capacityOffering.id } }),
     ).toBe(1);
+    await prisma.offering.update({ where: { id: capacityOffering.id }, data: { capacity: 2 } });
+    await prisma.enrollment.create({
+      data: { offeringId: capacityOffering.id, studentId: capacityStudentTwo.id },
+    });
+    await expectDatabaseRejection(() =>
+      prisma.offering.update({ where: { id: capacityOffering.id }, data: { capacity: 1 } }),
+    );
+    expect((await prisma.offering.findUniqueOrThrow({
+      where: { id: capacityOffering.id }, select: { capacity: true },
+    })).capacity).toBe(2);
+  });
+
+  test("writes a fresh correction event for every A-B-A-B move", async () => {
+    const suffix = randomUUID();
+    const actor = await prisma.user.findFirstOrThrow({ select: { id: true } });
+    const course = await prisma.course.findFirstOrThrow({ select: { id: true } });
+    const student = await prisma.student.create({
+      data: {
+        name: "Issue 1243 Replay Student",
+        email: `issue1243-replay-${suffix}@dse.invalid`,
+        studentId: `I1243-REPLAY-${suffix}`,
+        status: "Active",
+      },
+    });
+    const [from, to] = await Promise.all(["REPLAY-A", "REPLAY-B"].map(sectionCode =>
+      prisma.offering.create({
+        data: { courseId: course.id, lecturerId: actor.id,
+          term: `issue1243-replay-${suffix}`, sectionCode, capacity: 10, status: "Planned" },
+      }),
+    ));
+    const enrollment = await prisma.enrollment.create({
+      data: { offeringId: from!.id, studentId: student.id },
+    });
+    await expectDatabaseRejection(() => prisma.enrollment.update({
+      where: { id: enrollment.id }, data: { offeringId: to!.id },
+    }));
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT
+          set_config('dse.enrollment_placement_actor_id', ${actor.id}, true),
+          set_config('dse.enrollment_placement_reason', ${"Correct section placement"}, true)
+      `;
+      for (const offeringId of [to!.id, from!.id, to!.id]) {
+        await tx.enrollment.update({ where: { id: enrollment.id }, data: { offeringId } });
+      }
+    });
+    const events = await prisma.enrollmentPlacementCorrection.findMany({
+      where: { enrollmentId: enrollment.id }, orderBy: { createdAt: "asc" },
+    });
+    expect(events.length).toBe(3);
+    expect(new Set(events.map(event => event.id)).size).toBe(3);
+    expect(events.map(event => [event.fromOfferingId, event.toOfferingId])).toEqual([
+      [from!.id, to!.id], [to!.id, from!.id], [from!.id, to!.id],
+    ]);
   });
 
   test("keeps placement-correction history append-only", async () => {

@@ -70,6 +70,35 @@ BEFORE DELETE ON "Offering"
 FOR EACH ROW
 EXECUTE FUNCTION "protect_completed_offering_history"();
 
+-- Enrollment inserts/moves lock their parent Offering row. A capacity/status
+-- update holds the same row lock and must respect the historical/roster boundary.
+CREATE OR REPLACE FUNCTION "protect_offering_roster_update"()
+RETURNS TRIGGER AS $
+BEGIN
+  IF OLD."status" = 'Completed' AND NEW."status" IS DISTINCT FROM OLD."status" THEN
+    RAISE EXCEPTION 'Completed offering status cannot be reversed';
+  END IF;
+
+  IF NEW."capacity" IS DISTINCT FROM OLD."capacity"
+    AND NEW."capacity" IS NOT NULL
+    AND (
+      SELECT COUNT(*)::INTEGER
+      FROM "Enrollment"
+      WHERE "offeringId" = OLD."id"
+    ) > NEW."capacity"
+  THEN
+    RAISE EXCEPTION 'Offering capacity cannot be reduced below enrolled student count';
+  END IF;
+
+  RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "Offering_protect_roster_update"
+BEFORE UPDATE OF "status", "capacity" ON "Offering"
+FOR EACH ROW
+EXECUTE FUNCTION "protect_offering_roster_update"();
+
 CREATE OR REPLACE FUNCTION "enforce_offering_enrollment_capacity"()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -180,17 +209,12 @@ BEGIN
       RAISE EXCEPTION 'Enrollment placement correction must stay in the same academic context and change section';
     END IF;
 
-    IF NOT EXISTS (
-      SELECT 1
-      FROM "EnrollmentPlacementCorrection" correction
-      WHERE correction."id" = NULLIF(current_setting('dse.enrollment_placement_correction_id', true), '')
-        AND correction."enrollmentId" = OLD."id"
-        AND correction."studentId" = OLD."studentId"
-        AND correction."fromOfferingId" = OLD."offeringId"
-        AND correction."toOfferingId" = NEW."offeringId"
-    )
+    -- Trigger-owned provenance: a previous correction must never authorize a
+    -- later A->B move without creating a new immutable history event.
+    IF NULLIF(current_setting('dse.enrollment_placement_actor_id', true), '') IS NULL
+      OR length(btrim(COALESCE(current_setting('dse.enrollment_placement_reason', true), ''))) < 5
     THEN
-      RAISE EXCEPTION 'Enrollment placement correction requires matching append-only audit provenance';
+      RAISE EXCEPTION 'Enrollment placement correction requires actor and reason';
     END IF;
   END IF;
 
@@ -227,9 +251,22 @@ BEGIN
   IF TG_OP = 'DELETE' THEN
     RETURN OLD;
   END IF;
+
+  -- Audit insertion is atomic with this exact reassignment, rather than
+  -- trusting a reusable session-supplied correction-id reference.
+  INSERT INTO "EnrollmentPlacementCorrection" (
+    "id", "enrollmentId", "studentId", "fromOfferingId", "toOfferingId",
+    "correctedById", "reason"
+  ) VALUES (
+    gen_random_uuid()::text,
+    OLD."id", OLD."studentId", OLD."offeringId", NEW."offeringId",
+    current_setting('dse.enrollment_placement_actor_id', true),
+    btrim(current_setting('dse.enrollment_placement_reason', true))
+  );
+
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "Enrollment_protect_academic_evidence"
 BEFORE UPDATE OR DELETE ON "Enrollment"

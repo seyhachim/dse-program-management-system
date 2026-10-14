@@ -587,6 +587,9 @@ export const offeringService = {
     }
 
     const nextStatus = offeringInput.status ?? existing.status;
+    if (existing.status === "Completed" && nextStatus !== "Completed") {
+      throw new EnrollmentIntegrityError("Completed offering status cannot be reversed");
+    }
     const nextCourseSpecId = offeringInput.courseSpecId !== undefined
       ? offeringInput.courseSpecId
       : existing.courseSpecId;
@@ -964,22 +967,12 @@ export const offeringService = {
 
       await assertEnrollmentCanLeaveOffering(tx, enrollment);
 
-      const correction = await tx.enrollmentPlacementCorrection.create({
-        data: {
-          enrollmentId: enrollment.id,
-          studentId,
-          fromOfferingId: source.id,
-          toOfferingId: target.id,
-          correctedById,
-          reason: input.reason,
-        },
-      });
+      // The Enrollment trigger creates one audit event atomically per actual
+      // move. Pass only the validated actor and reason, never a reusable event ID.
       await tx.$queryRaw`
-        SELECT set_config(
-          'dse.enrollment_placement_correction_id',
-          ${correction.id},
-          true
-        )
+        SELECT
+          set_config('dse.enrollment_placement_actor_id', ${correctedById}, true),
+          set_config('dse.enrollment_placement_reason', ${input.reason}, true)
       `;
       await tx.enrollment.update({
         where: { id: enrollment.id },

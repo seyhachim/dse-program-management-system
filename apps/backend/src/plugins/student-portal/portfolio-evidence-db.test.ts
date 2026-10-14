@@ -57,7 +57,7 @@ dbDescribe("student portfolio evidence database boundary", () => {
         courseSpecId: spec.id,
         term: `portfolio-evidence-${suffix}`,
         sectionCode: `PE-${suffix.slice(0, 8)}`,
-        status: "Completed",
+        status: "Active",
       },
     });
     const enrollment = await prisma.enrollment.create({
