@@ -266,7 +266,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "Enrollment_protect_academic_evidence"
 BEFORE UPDATE OR DELETE ON "Enrollment"
