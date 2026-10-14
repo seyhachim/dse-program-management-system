@@ -327,9 +327,14 @@ dbDescribe("enrollment academic-evidence integrity", () => {
     });
     expect(events.length).toBe(3);
     expect(new Set(events.map(event => event.id)).size).toBe(3);
-    expect(events.map(event => [event.fromOfferingId, event.toOfferingId])).toEqual([
-      [from!.id, to!.id], [to!.id, from!.id], [from!.id, to!.id],
-    ]);
+    // PostgreSQL CURRENT_TIMESTAMP is constant within one transaction.
+    // Assert transition multiplicities instead of relying on timestamp ordering.
+    expect(events.filter(event =>
+      event.fromOfferingId === from!.id && event.toOfferingId === to!.id,
+    ).length).toBe(2);
+    expect(events.filter(event =>
+      event.fromOfferingId === to!.id && event.toOfferingId === from!.id,
+    ).length).toBe(1);
   });
 
   test("keeps placement-correction history append-only", async () => {
