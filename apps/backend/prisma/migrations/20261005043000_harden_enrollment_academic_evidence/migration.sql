@@ -277,7 +277,7 @@ EXECUTE FUNCTION "protect_enrollment_academic_evidence"();
 ALTER TABLE "EnrollmentPlacementCorrection" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL PRIVILEGES ON TABLE "EnrollmentPlacementCorrection" FROM PUBLIC;
 
-DO $$
+DO $revoke_roles$
 DECLARE api_role text;
 BEGIN
   FOR api_role IN
@@ -291,4 +291,5 @@ BEGIN
       api_role
     );
   END LOOP;
-END $$;
+END;
+$revoke_roles$;
