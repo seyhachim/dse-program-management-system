@@ -89,11 +89,11 @@ for (const width of [390, 1280]) {
     await page.goto("/attendance");
     await expect(page.getByText("Synthetic A", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(page.getByText(/Saved at /).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Recheck" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Recheck", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Advanced recheck" }).click();
     await expect(page.getByText(/Check 2: 1\/3 recorded/)).toBeVisible();
     await expect(page.getByText(/A second check is optional unless required by your class/)).toBeVisible();
-    const recheck = page.getByRole("button", { name: "Recheck" }).first();
+    const recheck = page.getByRole("button", { name: "Recheck", exact: true }).first();
     await expect(recheck).toBeEnabled();
     await expect(page.locator("#attendance-recheck-save-hint")).toHaveCount(0);
 
