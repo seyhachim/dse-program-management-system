@@ -36,6 +36,9 @@ async function stubAttendance(page: Page) {
         { checkNumber: 1, status: "Absent", permissionPending: false, checkedAt: "2026-10-15T02:00:00Z", note: "", checkedById: null },
       ] },
   ];
+  // API rosters are presented in canonical name order; matching that baseline
+  // prevents a synthetic ordering difference from looking like a dirty edit.
+  records.sort((a, b) => a.studentName.localeCompare(b.studentName, "en"));
 
   const response = (date: string) => ({
     sessionId: "77777777-7777-4777-8777-777777777777", offeringId, date, updatedAt, records,
@@ -103,6 +106,7 @@ for (const width of [390, 1280]) {
     const panel = page.getByRole("region", { name: "Late arrivals" });
     const action = panel.getByRole("button", { name: "Record late arrival" });
     await expect(action).toHaveCount(1);
+    await expect(action).toBeEnabled();
     await expect(panel.getByText("Synthetic B", { exact: true })).toBeVisible();
     await expect(panel.getByText("Synthetic C", { exact: true })).toHaveCount(0);
     await expect(panel.getByText("Historical D", { exact: true })).toHaveCount(0);
