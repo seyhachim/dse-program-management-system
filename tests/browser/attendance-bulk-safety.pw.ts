@@ -89,9 +89,13 @@ for (const width of [390, 1280]) {
     await page.goto("/attendance");
     await expect(page.getByText("Synthetic A", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(page.getByText(/Saved at /).first()).toBeVisible();
-    await expect(page.getByText("Check 2: 1/3 students")).toBeVisible();
+    await expect(page.getByText(/Check 2: 1\/3 recorded/)).toBeVisible();
+    await expect(page.getByText(/A second check is optional unless required by your class/)).toBeVisible();
+    const recheck = page.getByRole("button", { name: "Recheck" }).first();
+    await expect(recheck).toBeEnabled();
+    await expect(page.locator("#attendance-recheck-save-hint")).toHaveCount(0);
 
-    const needs = page.getByRole("checkbox", { name: "Needs recheck (2)" });
+    const needs = page.getByRole("checkbox", { name: "Awaiting Check 2 (2)" });
     await needs.check();
     await expect(page.getByText("Synthetic C", { exact: true }).filter({ visible: true })).toHaveCount(0);
     await needs.uncheck();
@@ -104,7 +108,12 @@ for (const width of [390, 1280]) {
     page.once("dialog", async (dialog) => { expect(dialog.message()).toContain("pending permission"); await dialog.accept(); });
     await page.getByRole("button", { name: "Mark all present" }).click();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
+    await expect(page.locator("#attendance-recheck-save-hint")).toBeVisible();
+    await expect(recheck).toBeDisabled();
+    await expect(recheck).toHaveAttribute("aria-describedby", "attendance-recheck-save-hint");
     await page.getByRole("button", { name: "Undo bulk change" }).click();
+    await expect(page.locator("#attendance-recheck-save-hint")).toHaveCount(0);
+    await expect(recheck).toBeEnabled();
     await expect(page.getByText(/Saved at /).first()).toBeVisible();
 
     page.once("dialog", async (dialog) => { expect(dialog.type()).toBe("confirm"); await dialog.accept(); });
@@ -117,6 +126,8 @@ for (const width of [390, 1280]) {
     await page.getByRole("button", { name: "Mark all present" }).click();
     await page.getByRole("button", { name: "Save attendance" }).click();
     await expect(page.getByText("Save failed")).toBeVisible();
+    await expect(page.locator("#attendance-recheck-save-hint")).toBeVisible();
+    await expect(recheck).toBeDisabled();
     expect(stub.saveCount()).toBe(0);
     await expect(page.getByRole("button", { name: "Save attendance" })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Undo bulk change" })).toBeVisible();
@@ -124,6 +135,8 @@ for (const width of [390, 1280]) {
     await page.getByRole("button", { name: "Save attendance" }).click();
     await expect(page.getByText(/Saved at /).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Save attendance" })).toBeDisabled();
+    await expect(page.locator("#attendance-recheck-save-hint")).toHaveCount(0);
+    await expect(recheck).toBeEnabled();
     expect(stub.saveCount()).toBe(1);
 
     await page.reload();
