@@ -24,7 +24,8 @@ const sourceRecords = [
 
 async function stubAttendance(page: Page): Promise<{ saveCount: () => number }> {
   let savedAt = "2026-10-15T03:00:00.000Z";
-  let currentRecords = structuredClone(sourceRecords);
+  // Deliberately reverse the backend order to regress false dirty warnings.
+  let currentRecords = structuredClone(sourceRecords).reverse();
   let saves = 0;
   let attempts = 0;
   await page.route("**/api/offerings", async (route) => {
