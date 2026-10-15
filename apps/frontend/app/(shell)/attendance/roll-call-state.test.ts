@@ -242,6 +242,35 @@ describe("save flow", () => {
     });
   });
 
+  test("ignores backend row order when marks match sorted Khmer register", () => {
+    const apiRecords = [records[2]!, records[0]!, records[1]!];
+    const khmerSorted = cloneAttendanceRecords(apiRecords);
+    expect(khmerSorted.map((record) => record.studentId)).not.toEqual(apiRecords.map((record) => record.studentId));
+    expect(attendanceRecordsEqual(khmerSorted, apiRecords)).toBe(true);
+    expect(attendanceRecordsEqual(apiRecords, khmerSorted)).toBe(true);
+  });
+
+  test("detects genuine changes despite reorder, including permission and notes", () => {
+    const unsorted = [records[2]!, records[0]!, records[1]!];
+    const sorted = cloneAttendanceRecords(unsorted);
+    const id = records[0]!.studentId;
+    expect(attendanceRecordsEqual(updateAttendanceRecord(sorted, id, { status: "Absent" }), unsorted)).toBe(false);
+    expect(attendanceRecordsEqual(updateAttendanceRecord(sorted, id, { permissionPending: true }), unsorted)).toBe(false);
+    expect(attendanceRecordsEqual(updateAttendanceRecord(sorted, id, { note: "Different note" }), unsorted)).toBe(false);
+    expect(attendanceRecordsEqual(sorted.slice(1), unsorted)).toBe(false);
+    expect(attendanceRecordsEqual(
+      sorted.map((record) => record.studentId === id ? { ...record, studentId: "ffffffff-ffff-4fff-8fff-ffffffffffff" } : record),
+      unsorted,
+    )).toBe(false);
+  });
+
+  test("never equates duplicate student IDs to an authoritative register", () => {
+    const duplicate = [records[0]!, records[0]!, records[2]!];
+    expect(attendanceRecordsEqual(duplicate, records)).toBe(false);
+    expect(attendanceRecordsEqual(records, duplicate)).toBe(false);
+    expect(attendanceRecordsEqual(duplicate, duplicate)).toBe(false);
+  });
+
   test("cloning a reopened register preserves pending state", () => {
     const pending = updateAttendanceRecord(records, records[1]!.studentId, { permissionPending: true });
     const reopened = cloneAttendanceRecords(pending);
