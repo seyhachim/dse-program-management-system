@@ -508,7 +508,7 @@ export function AttendanceClient() {
             <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Record the class once, then use Late arrivals for a student who arrives after being marked absent. Full Check 2 is optional unless required by your class. Permission Pending requires confirmation of the paper letter.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Record the class once, then use Late arrivals for a student who arrives after being marked absent. A second check is optional unless required by your class. Permission Pending requires confirmation of the paper letter.</p>
                 {hasUnsavedChanges && records.length > 0 ? <p id="attendance-recheck-save-hint" role="status" className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">Save attendance first to enable Recheck. Unsaved marks must be saved before opening Check 2.</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
