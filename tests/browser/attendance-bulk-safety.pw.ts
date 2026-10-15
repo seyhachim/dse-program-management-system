@@ -26,6 +26,7 @@ async function stubAttendance(page: Page): Promise<{ saveCount: () => number }> 
   let savedAt = "2026-10-15T03:00:00.000Z";
   let currentRecords = structuredClone(sourceRecords);
   let saves = 0;
+  let attempts = 0;
   await page.route("**/api/offerings", async (route) => {
     if (route.request().method() !== "GET") throw Error("Unexpected Offering mutation");
     await route.fulfill({ json: [{
@@ -58,6 +59,11 @@ async function stubAttendance(page: Page): Promise<{ saveCount: () => number }> 
       return;
     }
     if (request.method() !== "PUT") throw Error("Unexpected attendance mutation: " + request.method());
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({ status: 503, json: { message: "Synthetic temporary save failure" } });
+      return;
+    }
     const body = request.postDataJSON();
     expect(body.expectedUpdatedAt).toBe(savedAt);
     expect(body.records).toHaveLength(3);
@@ -109,6 +115,12 @@ for (const width of [390, 1280]) {
 
     page.once("dialog", async (dialog) => { await dialog.accept(); });
     await page.getByRole("button", { name: "Mark all present" }).click();
+    await page.getByRole("button", { name: "Save attendance" }).click();
+    await expect(page.getByText("Save failed")).toBeVisible();
+    expect(stub.saveCount()).toBe(0);
+    await expect(page.getByRole("button", { name: "Save attendance" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Undo bulk change" })).toBeVisible();
+
     await page.getByRole("button", { name: "Save attendance" }).click();
     await expect(page.getByText(/Saved at /).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Save attendance" })).toBeDisabled();
