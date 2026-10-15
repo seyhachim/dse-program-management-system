@@ -26,6 +26,17 @@ export function attendanceRecheckState(record: AttendanceRecordView): Attendance
   return changed ? "changed" : "checked-twice";
 }
 
+/** A targeted late arrival must start from an actual, saved Absent Check 1.
+ * Ordinary corrections and historical/view-only records cannot invent Check 2 evidence.
+ */
+export function isLateArrivalCandidate(record: AttendanceRecordView): boolean {
+  if (record.recheckEligible === false || record.status !== "Absent" || record.permissionPending) return false;
+  const checkpoints = record.checkpoints ?? [];
+  return checkpoints.some((check) =>
+    check.checkNumber === 1 && check.status === "Absent" && !check.permissionPending,
+  ) && !checkpoints.some((check) => check.checkNumber === 2);
+}
+
 export function recheckStateLabel(state: AttendanceRecheckState): string {
   if (state === "needs-recheck") return "Awaiting Check 2";
   if (state === "checked-twice") return "Checked twice";
