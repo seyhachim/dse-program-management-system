@@ -86,6 +86,34 @@ export function getAttendanceCounts(records: AttendanceRecordView[]): Attendance
   return counts;
 }
 
+/** Count the actual changes and existing observations a bulk action would replace. */
+export function getBulkAttendanceImpact(
+  records: readonly AttendanceRecordView[],
+  status: AttendanceStatus | null,
+): { changed: number; overwritten: number } {
+  let changed = 0;
+  let overwritten = 0;
+  for (const record of records) {
+    if (record.status === status && !record.permissionPending) continue;
+    changed += 1;
+    if (record.status !== null || record.permissionPending) overwritten += 1;
+  }
+  return { changed, overwritten };
+}
+
+/** Local-only bulk edit. Notes and immutable Check 1/2 observations are retained. */
+export function setAllAttendanceMarks(
+  records: readonly AttendanceRecordView[],
+  status: AttendanceStatus | null,
+): AttendanceRecordView[] {
+  return records.map((record) => ({
+    ...record,
+    status,
+    permissionPending: false,
+    permissionPendingSince: null,
+  }));
+}
+
 export function hasAttendanceObservation(records: AttendanceRecordView[]): boolean {
   return records.some(
     (record) => record.status !== null || record.permissionPending,

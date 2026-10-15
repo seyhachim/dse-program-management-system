@@ -16,7 +16,7 @@ const stateSource = readFileSync(
 
 describe("Attendance individual recheck UI", () => {
   test("register exposes per-student recheck state and action", () => {
-    expect(attendanceSource).toContain("View / Recheck");
+    expect(attendanceSource).toContain('state === "needs-recheck" ? "Recheck" : "View"');
     expect(stateSource).toContain("Needs recheck");
     expect(stateSource).toContain("Checked twice");
     expect(stateSource).toContain("Changed");

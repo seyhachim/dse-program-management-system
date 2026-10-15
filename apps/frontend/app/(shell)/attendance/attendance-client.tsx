@@ -18,8 +18,8 @@ import { AttendanceSummary } from "./attendance-summary";
 import { MOBILE_ATTENDANCE_LAYOUT } from "./mobile-attendance-layout";
 import { RollCallDialog } from "./roll-call-dialog";
 import {
-  attendanceRecordsEqual, cloneAttendanceRecords, getAttendanceCounts, getTeachingWeek,
-  hasAttendanceObservation, toSaveAttendanceRecords, updateAttendanceRecord,
+  attendanceRecordsEqual, cloneAttendanceRecords, getAttendanceCounts, getBulkAttendanceImpact, getTeachingWeek,
+  hasAttendanceObservation, setAllAttendanceMarks, toSaveAttendanceRecords, updateAttendanceRecord,
 } from "./roll-call-state";
 import { StudentRecheckDialog } from "./student-recheck-dialog";
 
@@ -68,6 +68,9 @@ export function AttendanceClient() {
   const [saving, setSaving] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [bulkUndo, setBulkUndo] = useState<AttendanceRecordView[] | null>(null);
+  const [onlyNeedsRecheck, setOnlyNeedsRecheck] = useState(false);
   const [search, setSearch] = useState("");
   const [rollCallOpen, setRollCallOpen] = useState(false);
   const [rollCallSnapshot, setRollCallSnapshot] = useState<AttendanceRecordView[] | null>(null);
@@ -129,6 +132,9 @@ export function AttendanceClient() {
     setRecords([]);
     setSavedMessage(null);
     setMutationError(null);
+    setSaveFailed(false);
+    setBulkUndo(null);
+    setOnlyNeedsRecheck(false);
     setDraftRecovered(false);
     setDraftWriteError(false);
     setRollCallOpen(false);
@@ -178,16 +184,21 @@ export function AttendanceClient() {
   const teachingWeek = getTeachingWeek(selectedOffering?.startDate, selectedOffering?.endDate, date);
   const counts = useMemo(() => getAttendanceCounts(records), [records]);
   const canSaveAttendance = hasAttendanceObservation(records);
+  const recheckPendingCount = records.filter((record) => attendanceRecheckState(record) === "needs-recheck").length;
+  const checkedTwiceCount = records.filter((record) => {
+    const state = attendanceRecheckState(record);
+    return state === "checked-twice" || state === "changed";
+  }).length;
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return records;
-    return records.filter(
-      (record) =>
+    return records.filter((record) => {
+      if (onlyNeedsRecheck && attendanceRecheckState(record) !== "needs-recheck") return false;
+      return !query ||
         record.studentName.toLowerCase().includes(query) ||
         (record.studentKhmerName ?? "").toLowerCase().includes(query) ||
-        (record.studentNumber ?? "").toLowerCase().includes(query),
-    );
-  }, [records, search]);
+        (record.studentNumber ?? "").toLowerCase().includes(query);
+    });
+  }, [records, search, onlyNeedsRecheck]);
   // Server query data is the render-safe authoritative baseline; refs are only read inside effects and handlers.
   const hasUnsavedChanges = !attendanceRecordsEqual(records, session?.records ?? []);
 
@@ -229,6 +240,8 @@ export function AttendanceClient() {
   ) {
     setSavedMessage(null);
     setMutationError(null);
+    setSaveFailed(false);
+    setBulkUndo(null);
     setRecords((current) => updateAttendanceRecord(current, studentId, patch));
   }
 
@@ -245,15 +258,36 @@ export function AttendanceClient() {
   }
 
   function markAll(status: AttendanceStatus | null) {
+    if (saving) return;
+    const impact = getBulkAttendanceImpact(records, status);
+    if (impact.changed === 0) return;
+    if (impact.overwritten > 0) {
+      const message = status === null
+        ? `Clear ${impact.overwritten} existing attendance marks? This changes only the on-screen register. An all-Unmarked register cannot be saved, so existing saved attendance stays on the server. You can undo this edit.`
+        : `Mark all ${records.length} students Present? This replaces ${impact.overwritten} existing mark(s), including any pending permission. Review the register before saving. You can undo this edit.`;
+      if (!window.confirm(message)) return;
+    }
+    setBulkUndo(cloneAttendanceRecords(records));
     setSavedMessage(null);
     setMutationError(null);
-    setRecords((current) => current.map((record) => ({
-      ...record, status, permissionPending: false, permissionPendingSince: null,
-    })));
+    setSaveFailed(false);
+    setRecords((current) => setAllAttendanceMarks(current, status));
+  }
+
+  function undoBulkMark() {
+    if (!bulkUndo || saving) return;
+    setRecords(cloneAttendanceRecords(bulkUndo));
+    setBulkUndo(null);
+    setSavedMessage(null);
+    setMutationError(null);
+    setSaveFailed(false);
   }
 
   async function save(): Promise<boolean> {
     if (!offeringId) return false;
+    // The Roll Call Save action may close an unchanged already-saved register,
+    // but must not issue an identical PUT or claim a new server write.
+    if (!hasUnsavedChanges) return true;
     if (!canSaveAttendance) {
       setSavedMessage(null);
       setMutationError("Mark at least one student before saving attendance.");
@@ -264,10 +298,12 @@ export function AttendanceClient() {
     const currentSession = queryClient.getQueryData<AttendanceSessionView>(sessionKey);
     if (restoredContextRef.current !== attendanceContext ||
         !currentSession || currentSession.updatedAt !== baselineVersionRef.current) {
+      setSaveFailed(true);
       setMutationError("Attendance changed on the server or is still loading. Your unsaved marks remain on this device. Review the latest register before saving.");
       return false;
     }
     setSaving(true);
+    setSaveFailed(false);
     setMutationError(null);
     setSavedMessage(null);
     try {
@@ -281,6 +317,8 @@ export function AttendanceClient() {
       if (draftKey) clearAttendanceDraft(window.localStorage, draftKey);
       setDraftRecovered(false);
       setDraftWriteError(false);
+      setSaveFailed(false);
+      setBulkUndo(null);
       setRecords(cloneAttendanceRecords(saved.records));
       void queryClient.invalidateQueries({ queryKey: historyKey, exact: true });
       const savedCounts = getAttendanceCounts(saved.records);
@@ -290,6 +328,7 @@ export function AttendanceClient() {
       );
       return true;
     } catch (err) {
+      setSaveFailed(true);
       setMutationError(err instanceof ApiError && err.status === 409
         ? "Attendance was saved by someone else while you were editing. Your unsaved marks are preserved. Review the latest register before attempting another save."
         : err instanceof ApiError ? err.message : "Failed to save attendance");
@@ -320,6 +359,8 @@ export function AttendanceClient() {
     baselineVersionRef.current = saved.updatedAt ?? null;
     if (draftKey) clearAttendanceDraft(window.localStorage, draftKey);
     setRecords(cloneAttendanceRecords(saved.records));
+    setSaveFailed(false);
+    setBulkUndo(null);
     setSavedMessage(`Check 2 saved for ${formatSessionDate(date)}.`);
     void queryClient.invalidateQueries({ queryKey: historyKey, exact: true });
     if (recheckStudentId) {
@@ -406,24 +447,29 @@ export function AttendanceClient() {
           {draftWriteError ? <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">Could not save this draft on your device. Keep the page open and save attendance to the server.</div> : null}
           {savedMessage ? <div className="rounded-xl border border-status-live/30 bg-status-live-bg px-4 py-3 text-sm text-status-live">{savedMessage}</div> : null}
 
-          <AttendanceSummary counts={counts} hasUnsavedChanges={hasUnsavedChanges} saving={saving} />
+          <AttendanceSummary counts={counts} hasUnsavedChanges={hasUnsavedChanges} saving={saving} saveFailed={saveFailed} lastSavedAt={session?.updatedAt ?? null} />
 
           <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Permission Pending means a reported permission whose paper letter has not yet been confirmed.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Check 2: {checkedTwiceCount}/{records.length} students · {recheckPendingCount} awaiting recheck. Permission Pending requires confirmation of the paper letter.</p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <input type="checkbox" checked={onlyNeedsRecheck} onChange={(event) => setOnlyNeedsRecheck(event.target.checked)} className="h-4 w-4 accent-primary" />
+                  Needs recheck ({recheckPendingCount})
+                </label>
                 <button type="button" onClick={() => markAll("Present")} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Mark all present</button>
                 <button type="button" onClick={() => markAll(null)} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Clear marks</button>
-                <button type="button" onClick={() => void save()} disabled={!offeringId || loading || saving || records.length === 0 || !canSaveAttendance} title={records.length > 0 && !canSaveAttendance ? "Mark at least one student before saving attendance" : undefined} className={`${MOBILE_ATTENDANCE_LAYOUT.secondaryAction} gap-2 border-primary text-primary`}><Save className="h-4 w-4" />{saving ? "Saving…" : "Save attendance"}</button>
+                {bulkUndo ? <button type="button" onClick={undoBulkMark} disabled={saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Undo bulk change</button> : null}
+                <button type="button" onClick={() => void save()} disabled={!offeringId || loading || saving || records.length === 0 || !canSaveAttendance || !hasUnsavedChanges} title={!canSaveAttendance ? "Mark at least one student before saving attendance" : !hasUnsavedChanges ? "No unsaved attendance changes" : undefined} className={`${MOBILE_ATTENDANCE_LAYOUT.secondaryAction} gap-2 border-primary text-primary`}><Save className="h-4 w-4" />{saving ? "Saving…" : "Save attendance"}</button>
               </div>
             </div>
             {loading ? <div className="p-10 text-center text-sm text-muted-foreground">Loading attendance…</div>
               : !offeringId ? <div className="p-10 text-center text-sm text-muted-foreground">No classes scheduled for this date. Choose another attendance date.</div>
               : records.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">This class has no enrolled students yet. Add students to the offering before recording attendance.</div>
-              : filteredRecords.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">No students match your search.</div>
+              : filteredRecords.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">{onlyNeedsRecheck ? "No students awaiting Check 2 match this filter." : "No students match your search."}</div>
               : <>
                 <div className={MOBILE_ATTENDANCE_LAYOUT.mobileRegister}>
                   {filteredRecords.map((record) => <article key={record.studentId} className={MOBILE_ATTENDANCE_LAYOUT.mobileStudentCard}>
@@ -455,19 +501,19 @@ export function AttendanceClient() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {filteredRecords.map((record, index) => <tr key={record.studentId} className="align-middle hover:bg-muted/20">
-                        <td className="px-3 py-2.5 text-xs tabular-nums text-muted-foreground">{index + 1}</td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-1.5 text-xs tabular-nums text-muted-foreground">{index + 1}</td>
+                        <td className="px-3 py-1.5">
                           {record.studentKhmerName ? <p lang="km" className="break-words text-base font-semibold leading-relaxed text-foreground">{record.studentKhmerName}</p> : null}
                           <p className="break-words text-sm font-medium text-foreground">{record.studentName}</p>
                           <p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{record.studentNumber ?? "Pending ID"}</span> · {record.studentGender ?? "—"}</p>
                         </td>
-                        <td className="px-3 py-2.5"><select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`h-10 w-full min-w-0 rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>
+                        <td className="px-3 py-1.5"><select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`h-10 w-full min-w-0 rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>
                           <option value="">Unmarked</option>
                           {ATTENDANCE_STATUSES.map((status) => <option key={status} value={status}>{attendanceStatusLabel(status)}</option>)}
                           <option value={PENDING_VALUE}>Permission Pending</option>
                         </select></td>
-                        <td className="px-3 py-2.5"><input aria-label={`Attendance note for ${record.studentName}`} value={record.note} maxLength={300} placeholder={record.permissionPending ? "Pending-permission note" : "Optional note"} onChange={(event) => updateRecord(record.studentId, { note: event.target.value })} className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" /></td>
-                        <td className="px-3 py-2.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td>
+                        <td className="px-3 py-1.5"><input aria-label={`Attendance note for ${record.studentName}`} value={record.note} maxLength={300} placeholder={record.permissionPending ? "Pending-permission note" : "Optional note"} onChange={(event) => updateRecord(record.studentId, { note: event.target.value })} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" /></td>
+                        <td className="px-3 py-1.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td>
                       </tr>)}
                     </tbody>
                   </table>
@@ -509,7 +555,7 @@ export function AttendanceClient() {
 function RecheckAction({ record, disabled, onOpen }: { record: AttendanceRecordView; disabled: boolean; onOpen: () => void }) {
   const state = attendanceRecheckState(record);
   const tone = recheckTone(state);
-  const buttonLabel = state === "needs-recheck" ? "View / Recheck" : "View";
+  const buttonLabel = state === "needs-recheck" ? "Recheck" : "View";
   return <div className="flex flex-wrap items-center gap-2">
     <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${tone}`}>{recheckStateLabel(state)}</span>
     <button type="button" onClick={onOpen} disabled={disabled} title={disabled ? "Save attendance changes before opening recheck" : undefined} className="min-h-9 rounded-md border border-primary/30 px-2.5 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45">{buttonLabel}</button>
