@@ -192,18 +192,30 @@ export function toSaveAttendanceRecords(records: AttendanceRecordView[]): SaveAt
     }));
 }
 
+/**
+ * Compare attendance observations by canonical Student.id, not roster position.
+ * The UI sorts names in Khmer order, while the API can return a different order.
+ * Ordering is presentation only and must never create a false unsaved draft.
+ */
 export function attendanceRecordsEqual(a: AttendanceRecordView[], b: AttendanceRecordView[]): boolean {
   if (a.length !== b.length) return false;
-  return a.every((record, index) => {
-    const other = b[index];
-    return (
-      other !== undefined &&
-      record.studentId === other.studentId &&
-      record.status === other.status &&
-      record.permissionPending === other.permissionPending &&
-      record.note === other.note
-    );
-  });
+  const byId = new Map<string, AttendanceRecordView>();
+  for (const record of b) {
+    // Duplicate IDs are invalid evidence: never report a corrupted register as clean.
+    if (byId.has(record.studentId)) return false;
+    byId.set(record.studentId, record);
+  }
+  const seen = new Set<string>();
+  for (const record of a) {
+    if (seen.has(record.studentId)) return false;
+    seen.add(record.studentId);
+    const other = byId.get(record.studentId);
+    if (!other ||
+        record.status !== other.status ||
+        record.permissionPending !== other.permissionPending ||
+        record.note !== other.note) return false;
+  }
+  return true;
 }
 
 export function cloneAttendanceRecords(records: AttendanceRecordView[]): AttendanceRecordView[] {
