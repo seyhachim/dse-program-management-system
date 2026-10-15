@@ -4,6 +4,8 @@ import {
   attendanceRecordsEqual,
   cloneAttendanceRecords,
   getAttendanceCounts,
+  getBulkAttendanceImpact,
+  setAllAttendanceMarks,
   getNextIndex,
   getPreviousIndex,
   getSkipFeedback,
@@ -82,6 +84,37 @@ describe("roll call counts and status", () => {
     const pending = updateAttendanceRecord(records, records[1]!.studentId, { permissionPending: true });
     expect(getUnmarkedStudentIds(pending)).toEqual([]);
     expect(getSkipFeedback(pending[1]!)).toBe("Student Two skipped; existing Permission Pending kept.");
+  });
+});
+
+describe("bulk attendance safeguards", () => {
+  test("first mark of an unmarked roster does not overwrite evidence", () => {
+    const unmarked = records.map((record) => ({ ...record, status: null }));
+    expect(getBulkAttendanceImpact(unmarked, "Present")).toEqual({ changed: 3, overwritten: 0 });
+  });
+
+  test("counts only actual overwrites, including permission pending", () => {
+    const withPending = records.map((record, index) => index === 1
+      ? { ...record, permissionPending: true }
+      : record);
+    expect(getBulkAttendanceImpact(withPending, "Present")).toEqual({ changed: 2, overwritten: 2 });
+    expect(getBulkAttendanceImpact(withPending, null)).toEqual({ changed: 3, overwritten: 3 });
+    expect(getBulkAttendanceImpact(setAllAttendanceMarks(records, "Present"), "Present"))
+      .toEqual({ changed: 0, overwritten: 0 });
+  });
+
+  test("bulk edits retain notes/checkpoints and do not mutate original records", () => {
+    const withPending = updateAttendanceRecord(records, records[1]!.studentId, {
+      permissionPending: true, permissionPendingSince: "2026-10-15T00:00:00Z",
+    });
+    const withCheckpoints = withPending.map((record) => ({ ...record, checkpoints: [] }));
+    const marked = setAllAttendanceMarks(withCheckpoints, "Present");
+    expect(marked.every((record) => record.status === "Present" && !record.permissionPending)).toBe(true);
+    expect(marked[1]!.permissionPendingSince).toBeNull();
+    expect(marked[1]!.note).toBe("  follow up  ");
+    expect(marked[1]!.checkpoints).toBe(withCheckpoints[1]!.checkpoints);
+    expect(withCheckpoints[1]!.permissionPending).toBe(true);
+    expect(setAllAttendanceMarks(marked, null).every((record) => record.status === null)).toBe(true);
   });
 });
 
