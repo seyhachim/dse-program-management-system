@@ -30,6 +30,7 @@ describe("mobile Attendance layout", () => {
     expect(MOBILE_ATTENDANCE_LAYOUT.summary).toContain("grid-cols-2");
     expect(MOBILE_ATTENDANCE_LAYOUT.summary).toContain("xl:grid-cols-6");
     expect(MOBILE_ATTENDANCE_LAYOUT.main).toContain("p-3");
-    expect(MOBILE_ATTENDANCE_LAYOUT.main).toContain("md:p-6");
+    expect(MOBILE_ATTENDANCE_LAYOUT.main).toContain("sm:p-4");
+    expect(MOBILE_ATTENDANCE_LAYOUT.main).toContain("xl:p-5");
   });
 });
