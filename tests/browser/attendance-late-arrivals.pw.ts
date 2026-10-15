@@ -104,6 +104,16 @@ for (const width of [390, 1280]) {
     await expect(panel.getByText("Historical D", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Recheck" })).toHaveCount(0);
 
+    // A local unsaved note must block late-arrival Check 2 without hiding the candidate.
+    const note = width < 768
+      ? page.getByRole("textbox", { name: "Note" }).first()
+      : page.getByRole("textbox", { name: "Attendance note for Synthetic A" });
+    await note.fill("Unsaved note");
+    await expect(action).toBeDisabled();
+    await expect(page.getByText("Save attendance first to enable the late-arrival action.")).toBeVisible();
+    await note.fill("");
+    await expect(action).toBeEnabled();
+
     await page.getByRole("button", { name: "Advanced recheck" }).click();
     await page.getByRole("checkbox", { name: "Awaiting Check 2 (2)" }).check();
     await expect(page.getByText("Synthetic C", { exact: true }).filter({ visible: true })).toHaveCount(0);
