@@ -70,7 +70,7 @@ for (const width of [390, 1280]) {
     page.once("dialog", async (dialog) => { expect(dialog.type()).toBe("confirm"); await dialog.accept(); });
     await offering.selectOption(offeringIds[1]);
     await expect(offering).toHaveValue(offeringIds[1]);
-    await expect(page.getByText("No unsaved changes")).toBeVisible();
+    await expect(page.getByText("Not saved yet")).toBeVisible();
 
     await context.close();
   });
