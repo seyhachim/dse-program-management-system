@@ -11,7 +11,7 @@ import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
-import { attendanceRecheckState, recheckStateLabel, type AttendanceRecheckState } from "./attendance-recheck-state";
+import { attendanceRecheckState, isLateArrivalCandidate, recheckStateLabel, type AttendanceRecheckState } from "./attendance-recheck-state";
 import { attendanceDraftKey, clearAttendanceDraft, readAttendanceDraft, writeAttendanceDraft } from "./attendance-draft";
 import { offeringsScheduledOnDate } from "./attendance-schedule";
 import { AttendanceSummary } from "./attendance-summary";
@@ -71,6 +71,8 @@ export function AttendanceClient() {
   const [saveFailed, setSaveFailed] = useState(false);
   const [bulkUndo, setBulkUndo] = useState<AttendanceRecordView[] | null>(null);
   const [onlyNeedsRecheck, setOnlyNeedsRecheck] = useState(false);
+  const [showAdvancedRecheck, setShowAdvancedRecheck] = useState(false);
+  const [recheckMode, setRecheckMode] = useState<"standard" | "late-arrival">("standard");
   const [search, setSearch] = useState("");
   const [rollCallOpen, setRollCallOpen] = useState(false);
   const [rollCallSnapshot, setRollCallSnapshot] = useState<AttendanceRecordView[] | null>(null);
@@ -135,6 +137,8 @@ export function AttendanceClient() {
     setSaveFailed(false);
     setBulkUndo(null);
     setOnlyNeedsRecheck(false);
+    setShowAdvancedRecheck(false);
+    setRecheckMode("standard");
     setDraftRecovered(false);
     setDraftWriteError(false);
     setRollCallOpen(false);
@@ -184,6 +188,7 @@ export function AttendanceClient() {
   const teachingWeek = getTeachingWeek(selectedOffering?.startDate, selectedOffering?.endDate, date);
   const counts = useMemo(() => getAttendanceCounts(records), [records]);
   const canSaveAttendance = hasAttendanceObservation(records);
+  const lateArrivalCandidates = useMemo(() => records.filter(isLateArrivalCandidate), [records]);
   const recheckPendingCount = records.filter((record) => attendanceRecheckState(record) === "needs-recheck").length;
   const checkedTwiceCount = records.filter((record) => {
     const state = attendanceRecheckState(record);
@@ -192,13 +197,13 @@ export function AttendanceClient() {
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
     return records.filter((record) => {
-      if (onlyNeedsRecheck && attendanceRecheckState(record) !== "needs-recheck") return false;
+      if (showAdvancedRecheck && onlyNeedsRecheck && attendanceRecheckState(record) !== "needs-recheck") return false;
       return !query ||
         record.studentName.toLowerCase().includes(query) ||
         (record.studentKhmerName ?? "").toLowerCase().includes(query) ||
         (record.studentNumber ?? "").toLowerCase().includes(query);
     });
-  }, [records, search, onlyNeedsRecheck]);
+  }, [records, search, onlyNeedsRecheck, showAdvancedRecheck]);
   // Server query data is the render-safe authoritative baseline; refs are only read inside effects and handlers.
   const hasUnsavedChanges = !attendanceRecordsEqual(records, session?.records ?? []);
 
@@ -344,13 +349,29 @@ export function AttendanceClient() {
       return;
     }
     setMutationError(null);
+    setRecheckMode("standard");
+    setRecheckStudentId(studentId);
+  }
+
+  function openLateArrival(studentId: string) {
+    const candidate = records.find((record) => record.studentId === studentId);
+    if (!candidate || !isLateArrivalCandidate(candidate) || saving) return;
+    if (hasUnsavedChanges) {
+      setMutationError("Save attendance first before recording a late arrival. Your current marks will be preserved.");
+      return;
+    }
+    setMutationError(null);
+    setRecheckMode("late-arrival");
     setRecheckStudentId(studentId);
   }
 
   function moveRecheck(offset: -1 | 1) {
     if (recheckIndex < 0) return;
     const next = records[recheckIndex + offset];
-    if (next) setRecheckStudentId(next.studentId);
+    if (next) {
+      setRecheckMode("standard");
+      setRecheckStudentId(next.studentId);
+    }
   }
 
   function handleRecheckSaved(saved: AttendanceSessionView) {
@@ -449,28 +470,73 @@ export function AttendanceClient() {
 
           <AttendanceSummary counts={counts} hasUnsavedChanges={hasUnsavedChanges} saving={saving} saveFailed={saveFailed} lastSavedAt={session?.updatedAt ?? null} />
 
+          {counts.Absent > 0 ? (
+            <section aria-label="Late arrivals" className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+              <div className="mb-2">
+                <h2 className="text-sm font-semibold text-foreground">Late arrivals · {lateArrivalCandidates.length} to review</h2>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Only students whose saved first check was Absent are listed here. If someone arrives, record Check 2 as Late and confirm the final mark. Students who remain absent need no second check.</p>
+                {hasUnsavedChanges && lateArrivalCandidates.length > 0 ? (
+                  <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">Save attendance first to enable the late-arrival action.</p>
+                ) : null}
+              </div>
+              {lateArrivalCandidates.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No saved Absent Check 1 students are eligible for a late-arrival update. Save the initial roll call first if it has not been saved yet.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {lateArrivalCandidates.map((record) => (
+                    <li key={record.studentId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <div className="min-w-0 text-sm">
+                        {record.studentKhmerName ? <span lang="km" className="mr-2 font-semibold">{record.studentKhmerName}</span> : null}
+                        <span className="font-medium text-foreground">{record.studentName}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">Check 1: Absent</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openLateArrival(record.studentId)}
+                        disabled={saving || hasUnsavedChanges}
+                        aria-describedby={hasUnsavedChanges ? "attendance-recheck-save-hint" : undefined}
+                        className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}
+                      >Record late arrival</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
           <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Check 2: {checkedTwiceCount}/{records.length} recorded · {recheckPendingCount} awaiting Check 2. A second check is optional unless required by your class. Permission Pending requires confirmation of the paper letter.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Record the class once, then use Late arrivals for a student who arrives after being marked absent. Full Check 2 is optional unless required by your class. Permission Pending requires confirmation of the paper letter.</p>
                 {hasUnsavedChanges && records.length > 0 ? <p id="attendance-recheck-save-hint" role="status" className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">Save attendance first to enable Recheck. Unsaved marks must be saved before opening Check 2.</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <input type="checkbox" checked={onlyNeedsRecheck} onChange={(event) => setOnlyNeedsRecheck(event.target.checked)} className="h-4 w-4 accent-primary" />
-                  Awaiting Check 2 ({recheckPendingCount})
-                </label>
+                <button type="button" onClick={() => {
+                  if (showAdvancedRecheck) setOnlyNeedsRecheck(false);
+                  setShowAdvancedRecheck(!showAdvancedRecheck);
+                }} aria-expanded={showAdvancedRecheck} aria-controls="attendance-advanced-recheck" className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>
+                  {showAdvancedRecheck ? "Hide advanced recheck" : "Advanced recheck"}
+                </button>
                 <button type="button" onClick={() => markAll("Present")} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Mark all present</button>
                 <button type="button" onClick={() => markAll(null)} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Clear marks</button>
                 {bulkUndo ? <button type="button" onClick={undoBulkMark} disabled={saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Undo bulk change</button> : null}
                 <button type="button" onClick={() => void save()} disabled={!offeringId || loading || saving || records.length === 0 || !canSaveAttendance || !hasUnsavedChanges} title={!canSaveAttendance ? "Mark at least one student before saving attendance" : !hasUnsavedChanges ? "No unsaved attendance changes" : undefined} className={`${MOBILE_ATTENDANCE_LAYOUT.secondaryAction} gap-2 border-primary text-primary`}><Save className="h-4 w-4" />{saving ? "Saving…" : "Save attendance"}</button>
               </div>
             </div>
+            {showAdvancedRecheck ? (
+              <div id="attendance-advanced-recheck" className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
+                <span>Check 2: {checkedTwiceCount}/{records.length} recorded. Optional unless required by your class.</span>
+                <label className="inline-flex min-h-9 items-center gap-1.5 font-medium">
+                  <input type="checkbox" checked={onlyNeedsRecheck} onChange={(event) => setOnlyNeedsRecheck(event.target.checked)} className="h-4 w-4 accent-primary" />
+                  Awaiting Check 2 ({recheckPendingCount})
+                </label>
+              </div>
+            ) : null}
             {loading ? <div className="p-10 text-center text-sm text-muted-foreground">Loading attendance…</div>
               : !offeringId ? <div className="p-10 text-center text-sm text-muted-foreground">No classes scheduled for this date. Choose another attendance date.</div>
               : records.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">This class has no enrolled students yet. Add students to the offering before recording attendance.</div>
-              : filteredRecords.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">{onlyNeedsRecheck ? "No students awaiting Check 2 match this filter." : "No students match your search."}</div>
+              : filteredRecords.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">{showAdvancedRecheck && onlyNeedsRecheck ? "No students awaiting Check 2 match this filter." : "No students match your search."}</div>
               : <>
                 <div className={MOBILE_ATTENDANCE_LAYOUT.mobileRegister}>
                   {filteredRecords.map((record) => <article key={record.studentId} className={MOBILE_ATTENDANCE_LAYOUT.mobileStudentCard}>
@@ -482,7 +548,7 @@ export function AttendanceClient() {
                         <span>Sex: {record.studentGender ?? "—"}</span>
                       </div>
                     </div>
-                    <RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} />
+                    {showAdvancedRecheck ? <RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /> : null}
                     <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Status
                       <select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`mt-1 h-11 w-full rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>
                         <option value="">Unmarked</option>
@@ -498,7 +564,7 @@ export function AttendanceClient() {
                 <div className={MOBILE_ATTENDANCE_LAYOUT.desktopRegister}>
                   <table className="w-full min-w-[990px] table-fixed text-sm">
                     <thead className="bg-muted/30 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      <tr><th className="w-12 px-3 py-3">#</th><th className="w-[34%] px-3 py-3">Student</th><th className="w-[20%] px-3 py-3">Status</th><th className="px-3 py-3">Note</th><th className="w-[16%] px-3 py-3">Recheck</th></tr>
+                      <tr><th className="w-12 px-3 py-3">#</th><th className="w-[34%] px-3 py-3">Student</th><th className="w-[20%] px-3 py-3">Status</th><th className="px-3 py-3">Note</th>{showAdvancedRecheck ? <th className="w-[16%] px-3 py-3">Recheck</th> : null}</tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {filteredRecords.map((record, index) => <tr key={record.studentId} className="align-middle hover:bg-muted/20">
@@ -514,7 +580,7 @@ export function AttendanceClient() {
                           <option value={PENDING_VALUE}>Permission Pending</option>
                         </select></td>
                         <td className="px-3 py-1.5"><input aria-label={`Attendance note for ${record.studentName}`} value={record.note} maxLength={300} placeholder={record.permissionPending ? "Pending-permission note" : "Optional note"} onChange={(event) => updateRecord(record.studentId, { note: event.target.value })} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" /></td>
-                        <td className="px-3 py-1.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td>
+                        {showAdvancedRecheck ? <td className="px-3 py-1.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td> : null}
                       </tr>)}
                     </tbody>
                   </table>
@@ -548,7 +614,7 @@ export function AttendanceClient() {
         </div>
       </main>
       <RollCallDialog open={rollCallOpen} offering={selectedOffering} date={date} week={teachingWeek} records={records} saving={saving} saveError={mutationError} onUpdateRecord={updateRecord} onRequestClose={requestRollCallClose} onSaveAndClose={saveRollCallAndClose} />
-      <StudentRecheckDialog open={Boolean(recheckRecord)} offeringId={offeringId} date={date} record={recheckRecord} hasPrevious={recheckIndex > 0} hasNext={recheckIndex >= 0 && recheckIndex < records.length - 1} onPrevious={() => moveRecheck(-1)} onNext={() => moveRecheck(1)} onClose={() => setRecheckStudentId(null)} onSaved={handleRecheckSaved} />
+      <StudentRecheckDialog open={Boolean(recheckRecord)} initialMode={recheckMode} offeringId={offeringId} date={date} record={recheckRecord} hasPrevious={recheckMode === "standard" && recheckIndex > 0} hasNext={recheckMode === "standard" && recheckIndex >= 0 && recheckIndex < records.length - 1} onPrevious={() => moveRecheck(-1)} onNext={() => moveRecheck(1)} onClose={() => { setRecheckStudentId(null); setRecheckMode("standard"); }} onSaved={handleRecheckSaved} />
     </>
   );
 }
