@@ -469,7 +469,7 @@ export function AttendanceClient() {
             {loading ? <div className="p-10 text-center text-sm text-muted-foreground">Loading attendance…</div>
               : !offeringId ? <div className="p-10 text-center text-sm text-muted-foreground">No classes scheduled for this date. Choose another attendance date.</div>
               : records.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">This class has no enrolled students yet. Add students to the offering before recording attendance.</div>
-              : filteredRecords.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">No students match your search.</div>
+              : filteredRecords.length === 0 ? <div className="p-10 text-center text-sm text-muted-foreground">{onlyNeedsRecheck ? "No students awaiting Check 2 match this filter." : "No students match your search."}</div>
               : <>
                 <div className={MOBILE_ATTENDANCE_LAYOUT.mobileRegister}>
                   {filteredRecords.map((record) => <article key={record.studentId} className={MOBILE_ATTENDANCE_LAYOUT.mobileStudentCard}>
