@@ -87,13 +87,13 @@ for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     const stub = await stubAttendance(page);
     await page.goto("/attendance");
-    await expect(page.getByText("Synthetic A").filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Synthetic A", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(page.getByText(/Saved at /).first()).toBeVisible();
     await expect(page.getByText("Check 2: 1/3 students")).toBeVisible();
 
     const needs = page.getByRole("checkbox", { name: "Needs recheck (2)" });
     await needs.check();
-    await expect(page.getByText("Synthetic C").filter({ visible: true })).toHaveCount(0);
+    await expect(page.getByText("Synthetic C", { exact: true }).filter({ visible: true })).toHaveCount(0);
     await needs.uncheck();
 
     page.once("dialog", async (dialog) => { expect(dialog.type()).toBe("confirm"); await dialog.dismiss(); });
