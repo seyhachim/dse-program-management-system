@@ -36,9 +36,9 @@ async function stubAttendance(page: Page) {
         { checkNumber: 1, status: "Absent", permissionPending: false, checkedAt: "2026-10-15T02:00:00Z", note: "", checkedById: null },
       ] },
   ];
-  // API rosters are presented in canonical name order; matching that baseline
-  // prevents a synthetic ordering difference from looking like a dirty edit.
-  records.sort((a, b) => a.studentName.localeCompare(b.studentName, "en"));
+  // Deliberately return reverse API order: UI Khmer sorting must not make the
+  // untouched, already-saved register falsely dirty and block late arrivals.
+  records.reverse();
 
   const response = (date: string) => ({
     sessionId: "77777777-7777-4777-8777-777777777777", offeringId, date, updatedAt, records,
