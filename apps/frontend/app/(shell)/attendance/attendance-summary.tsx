@@ -12,13 +12,23 @@ const STATUS_ITEMS = [
   { key: "Unmarked", label: "Unmarked", icon: UsersRound, tone: "text-muted-foreground" },
 ] as const;
 
-export function AttendanceSummary({ counts, hasUnsavedChanges, saving }: {
+export function AttendanceSummary({ counts, hasUnsavedChanges, saving, saveFailed, lastSavedAt }: {
   counts: Counts;
   hasUnsavedChanges: boolean;
   saving: boolean;
+  saveFailed: boolean;
+  lastSavedAt: string | null;
 }) {
   const marked = counts.Total - counts.Unmarked;
   const percentage = counts.Total > 0 ? Math.round((marked / counts.Total) * 100) : 0;
+  const timestamp = lastSavedAt ? new Date(lastSavedAt) : null;
+  const savedTime = timestamp && !Number.isNaN(timestamp.getTime())
+    ? timestamp.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : null;
+  const saveLabel = saving ? "Saving…"
+    : saveFailed ? "Save failed"
+    : hasUnsavedChanges ? "Unsaved changes"
+    : savedTime ? `Saved at ${savedTime}` : "Not saved yet";
 
   return (
     <section aria-label="Attendance summary" className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
@@ -28,8 +38,8 @@ export function AttendanceSummary({ counts, hasUnsavedChanges, saving }: {
           <span className="text-sm font-semibold tabular-nums text-foreground">{marked} / {counts.Total} marked</span>
           <span className="text-xs tabular-nums text-muted-foreground">{percentage}%</span>
         </div>
-        <span role="status" className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${hasUnsavedChanges ? "border-amber-300 bg-amber-50 text-amber-900" : "border-status-live/30 bg-status-live-bg text-status-live"}`}>
-          {saving ? "Saving…" : hasUnsavedChanges ? "Unsaved changes" : "No unsaved changes"}
+        <span role={saveFailed ? "alert" : "status"} className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${saveFailed ? "border-destructive/30 bg-destructive/5 text-destructive" : hasUnsavedChanges ? "border-amber-300 bg-amber-50 text-amber-900" : savedTime ? "border-status-live/30 bg-status-live-bg text-status-live" : "border-border bg-muted/30 text-muted-foreground"}`}>
+          {saveLabel}
         </span>
       </div>
       <div role="progressbar" aria-label="Students marked" aria-valuemin={0} aria-valuemax={counts.Total} aria-valuenow={marked} className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
