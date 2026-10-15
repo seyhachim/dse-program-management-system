@@ -62,6 +62,10 @@ async function stubAttendance(page: Page) {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
     const date = pathname.match(/attendance\/(\d{4}-\d{2}-\d{2})/)?.[1];
+    if (request.method() === "GET" && pathname.includes("/attendance/students/")) {
+      await route.fulfill({ json: { offeringId, studentId: absentId, history: [] } });
+      return;
+    }
     if (request.method() === "GET") {
       await route.fulfill({ json: date ? response(date) : [] });
       return;
