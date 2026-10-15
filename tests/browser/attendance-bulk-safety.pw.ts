@@ -43,7 +43,7 @@ async function stubAttendance(page: Page): Promise<{ saveCount: () => number }> 
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
     if (request.method() === "GET") {
-      const date = pathname.match(/attendance\\/(\\d{4}-\\d{2}-\\d{2})/)?.[1];
+      const date = pathname.match(/attendance\/(\d{4}-\d{2}-\d{2})/)?.[1];
       if (!date) {
         await route.fulfill({ json: [] });
         return;
@@ -68,7 +68,7 @@ async function stubAttendance(page: Page): Promise<{ saveCount: () => number }> 
       return { ...row, status: incoming.status, permissionPending: incoming.permissionPending, note: incoming.note };
     });
     await route.fulfill({ json: { sessionId: "66666666-6666-4666-8666-666666666666",
-      offeringId, date: pathname.match(/attendance\\/(\\d{4}-\\d{2}-\\d{2})/)?.[1],
+      offeringId, date: pathname.match(/attendance\/(\d{4}-\d{2}-\d{2})/)?.[1],
       updatedAt: savedAt, records: currentRecords } });
   });
   return { saveCount: () => saves };
@@ -82,7 +82,6 @@ for (const width of [390, 1280]) {
     const stub = await stubAttendance(page);
     await page.goto("/attendance");
     await expect(page.getByText("Synthetic A").filter({ visible: true })).toBeVisible();
-    await expect(page.getByText("Saved at").first()).not.toBeVisible().catch(() => {});
     await expect(page.getByText(/Saved at /).first()).toBeVisible();
     await expect(page.getByText("Check 2: 1/3 students")).toBeVisible();
 
