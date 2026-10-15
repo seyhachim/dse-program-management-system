@@ -453,12 +453,13 @@ export function AttendanceClient() {
             <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Check 2: {checkedTwiceCount}/{records.length} students · {recheckPendingCount} awaiting recheck. Permission Pending requires confirmation of the paper letter.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Check 2: {checkedTwiceCount}/{records.length} recorded · {recheckPendingCount} awaiting Check 2. A second check is optional unless required by your class. Permission Pending requires confirmation of the paper letter.</p>
+                {hasUnsavedChanges && records.length > 0 ? <p id="attendance-recheck-save-hint" role="status" className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">Save attendance first to enable Recheck. Unsaved marks must be saved before opening Check 2.</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <input type="checkbox" checked={onlyNeedsRecheck} onChange={(event) => setOnlyNeedsRecheck(event.target.checked)} className="h-4 w-4 accent-primary" />
-                  Needs recheck ({recheckPendingCount})
+                  Awaiting Check 2 ({recheckPendingCount})
                 </label>
                 <button type="button" onClick={() => markAll("Present")} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Mark all present</button>
                 <button type="button" onClick={() => markAll(null)} disabled={records.length === 0 || saving} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Clear marks</button>
@@ -481,7 +482,7 @@ export function AttendanceClient() {
                         <span>Sex: {record.studentGender ?? "—"}</span>
                       </div>
                     </div>
-                    <RecheckAction record={record} disabled={saving || hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} />
+                    <RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} />
                     <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Status
                       <select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`mt-1 h-11 w-full rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>
                         <option value="">Unmarked</option>
@@ -513,7 +514,7 @@ export function AttendanceClient() {
                           <option value={PENDING_VALUE}>Permission Pending</option>
                         </select></td>
                         <td className="px-3 py-1.5"><input aria-label={`Attendance note for ${record.studentName}`} value={record.note} maxLength={300} placeholder={record.permissionPending ? "Pending-permission note" : "Optional note"} onChange={(event) => updateRecord(record.studentId, { note: event.target.value })} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" /></td>
-                        <td className="px-3 py-1.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td>
+                        <td className="px-3 py-1.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td>
                       </tr>)}
                     </tbody>
                   </table>
@@ -552,18 +553,18 @@ export function AttendanceClient() {
   );
 }
 
-function RecheckAction({ record, disabled, onOpen }: { record: AttendanceRecordView; disabled: boolean; onOpen: () => void }) {
+function RecheckAction({ record, disabled, requiresSave, onOpen }: { record: AttendanceRecordView; disabled: boolean; requiresSave: boolean; onOpen: () => void }) {
   const state = attendanceRecheckState(record);
   const tone = recheckTone(state);
   const buttonLabel = state === "needs-recheck" ? "Recheck" : "View";
   return <div className="flex flex-wrap items-center gap-2">
     <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${tone}`}>{recheckStateLabel(state)}</span>
-    <button type="button" onClick={onOpen} disabled={disabled} title={disabled ? "Save attendance changes before opening recheck" : undefined} className="min-h-9 rounded-md border border-primary/30 px-2.5 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45">{buttonLabel}</button>
+    <button type="button" onClick={onOpen} disabled={disabled} aria-describedby={requiresSave ? "attendance-recheck-save-hint" : undefined} title={requiresSave ? "Save attendance first to enable Recheck" : disabled ? "Saving attendance…" : undefined} className="min-h-9 rounded-md border border-primary/30 px-2.5 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45">{buttonLabel}</button>
   </div>;
 }
 
 function recheckTone(state: AttendanceRecheckState): string {
-  if (state === "needs-recheck") return "border-status-upcoming/30 bg-status-upcoming-bg text-status-upcoming";
+  if (state === "needs-recheck") return "border-border bg-muted/30 text-muted-foreground";
   if (state === "checked-twice") return "border-status-live/30 bg-status-live-bg text-status-live";
   if (state === "changed") return "border-amber-300/60 bg-amber-50/50 text-amber-800";
   return "border-border bg-muted/30 text-muted-foreground";
