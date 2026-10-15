@@ -29,12 +29,13 @@ import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
-import { checkpointLabel } from "./attendance-recheck-state";
+import { checkpointLabel, isLateArrivalCandidate } from "./attendance-recheck-state";
 
 const PENDING_VALUE = "__permission_pending__";
 
 interface StudentRecheckDialogProps {
   open: boolean;
+  initialMode?: "standard" | "late-arrival";
   offeringId: string;
   date: string;
   record: AttendanceRecordView | null;
@@ -89,6 +90,7 @@ function checkpointTone(checkpoint: AttendanceCheckpointView | undefined): strin
 
 export function StudentRecheckDialog({
   open,
+  initialMode = "standard",
   offeringId,
   date,
   record,
@@ -111,15 +113,20 @@ export function StudentRecheckDialog({
   const check1 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 1);
   const check2 = checkpoints.find((checkpoint) => checkpoint.checkNumber === 2);
   const currentFinalValue = record ? markValue(record) : "";
+  const lateArrival = initialMode === "late-arrival" && record !== null && isLateArrivalCandidate(record);
 
   useEffect(() => {
     if (!open || !record) return;
-    setObservedValue("");
-    setFinalValue("");
+    // Clicking "Record late arrival" explicitly selects a Late observation and
+    // final Late status; only the lecturer's separate Save action can persist it.
+    // The existing advanced Recheck mode never infers a status.
+    const eligibleLateArrival = initialMode === "late-arrival" && isLateArrivalCandidate(record);
+    setObservedValue(eligibleLateArrival ? "Late" : "");
+    setFinalValue(eligibleLateArrival ? "Late" : "");
     setObservationNote("");
     setFinalNote(record.note);
     setError(null);
-  }, [date, open, record?.studentId]);
+  }, [date, initialMode, open, record?.studentId]);
 
   const historyKey = protectedQueryKey(
     { userId: me?.id ?? "pending" },
@@ -206,7 +213,7 @@ export function StudentRecheckDialog({
             <header className="sticky top-0 z-10 border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <div className="pr-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Individual attendance recheck
+                  {lateArrival ? "Record late arrival" : "Individual attendance recheck"}
                 </p>
                 {record.studentKhmerName ? (
                   <h2 lang="km" className="mt-2 break-words text-3xl font-semibold leading-tight text-foreground">
@@ -303,6 +310,10 @@ export function StudentRecheckDialog({
                     </button>
                   </div>
 
+                  {lateArrival ? (
+                    <p className="text-sm text-muted-foreground">Check 1 recorded Absent. You selected Record late arrival, so Check 2 and the final attendance are prepared as Late. Review the observation and explicitly save to confirm.</p>
+                  ) : null}
+
                   <div>
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Observed now</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -391,7 +402,7 @@ export function StudentRecheckDialog({
                     className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Save className="h-4 w-4" />
-                    {submitting ? "Saving Check 2…" : "Save Check 2 & final status"}
+                    {submitting ? "Saving Check 2…" : lateArrival ? "Confirm late arrival & save" : "Save Check 2 & final status"}
                   </button>
                 </section>
               )}
