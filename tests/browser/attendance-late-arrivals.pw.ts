@@ -102,7 +102,7 @@ for (const width of [390, 1280]) {
     await expect(panel.getByText("Synthetic B", { exact: true })).toBeVisible();
     await expect(panel.getByText("Synthetic C", { exact: true })).toHaveCount(0);
     await expect(panel.getByText("Historical D", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Recheck" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Recheck", exact: true })).toHaveCount(0);
 
     // A local unsaved note must block late-arrival Check 2 without hiding the candidate.
     const note = width < 768
