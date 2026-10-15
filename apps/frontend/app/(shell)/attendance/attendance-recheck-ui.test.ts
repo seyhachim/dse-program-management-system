@@ -17,10 +17,16 @@ const stateSource = readFileSync(
 describe("Attendance individual recheck UI", () => {
   test("register exposes per-student recheck state and action", () => {
     expect(attendanceSource).toContain('state === "needs-recheck" ? "Recheck" : "View"');
-    expect(stateSource).toContain("Needs recheck");
+    expect(stateSource).toContain("Awaiting Check 2");
     expect(stateSource).toContain("Checked twice");
     expect(stateSource).toContain("Changed");
-    expect(attendanceSource).toContain("Save attendance changes before opening recheck");
+    expect(attendanceSource).toContain("Save attendance first to enable Recheck.");
+    expect(attendanceSource).toContain("A second check is optional unless required by your class.");
+    expect(attendanceSource).toContain("Awaiting Check 2 ({recheckPendingCount})");
+    expect(attendanceSource).toContain('aria-describedby={requiresSave ? "attendance-recheck-save-hint" : undefined}');
+    expect(attendanceSource).toContain('id="attendance-recheck-save-hint"');
+    expect(attendanceSource).toContain("disabled={saving || hasUnsavedChanges}");
+    expect(attendanceSource).toContain('if (state === "needs-recheck") return "border-border bg-muted/30 text-muted-foreground";');
     expect(attendanceSource).toContain("<StudentRecheckDialog");
   });
 

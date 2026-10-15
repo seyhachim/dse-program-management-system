@@ -51,10 +51,11 @@ describe("attendance recheck state", () => {
     expect(recheckStateLabel("view-only")).toBe("Historical");
   });
 
-  test("Check 1 without Check 2 needs recheck", () => {
+  test("Check 1 without Check 2 awaits an optional second check", () => {
     expect(attendanceRecheckState({ ...BASE_RECORD, checkpoints: [CHECK_1] })).toBe(
       "needs-recheck",
     );
+    expect(recheckStateLabel("needs-recheck")).toBe("Awaiting Check 2");
   });
 
   test("matching observations are checked twice", () => {
