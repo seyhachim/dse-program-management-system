@@ -27,7 +27,7 @@ export function attendanceRecheckState(record: AttendanceRecordView): Attendance
 }
 
 export function recheckStateLabel(state: AttendanceRecheckState): string {
-  if (state === "needs-recheck") return "Needs recheck";
+  if (state === "needs-recheck") return "Awaiting Check 2";
   if (state === "checked-twice") return "Checked twice";
   if (state === "changed") return "Changed";
   if (state === "view-only") return "Historical";
