@@ -3,6 +3,7 @@ import type { AttendanceRecordView } from "@dse-pms/shared-types";
 import {
   attendanceRecheckState,
   checkpointLabel,
+  isLateArrivalCandidate,
   recheckStateLabel,
 } from "./attendance-recheck-state";
 
@@ -94,5 +95,38 @@ describe("attendance recheck state", () => {
         permissionPending: true,
       }),
     ).toBe("Permission Pending");
+  });
+});
+
+describe("late arrival eligibility", () => {
+  const savedAbsent = {
+    ...BASE_RECORD,
+    status: "Absent" as const,
+    checkpoints: [{ ...CHECK_1, status: "Absent" as const }],
+  };
+
+  test("requires saved Absent Check 1 and a currently absent enrolled student", () => {
+    expect(isLateArrivalCandidate(savedAbsent)).toBe(true);
+    expect(isLateArrivalCandidate({ ...savedAbsent, checkpoints: [] })).toBe(false);
+    expect(isLateArrivalCandidate({ ...savedAbsent, status: "Present" })).toBe(false);
+    expect(isLateArrivalCandidate({ ...savedAbsent, status: "Late" })).toBe(false);
+    expect(isLateArrivalCandidate({ ...savedAbsent, status: "Excused" })).toBe(false);
+    expect(isLateArrivalCandidate({ ...savedAbsent, permissionPending: true })).toBe(false);
+    expect(isLateArrivalCandidate({ ...savedAbsent, recheckEligible: false })).toBe(false);
+  });
+
+  test("never offers a duplicate or inferred late arrival", () => {
+    expect(isLateArrivalCandidate({
+      ...savedAbsent,
+      checkpoints: [...savedAbsent.checkpoints, { ...CHECK_2, status: "Late" }],
+    })).toBe(false);
+    expect(isLateArrivalCandidate({
+      ...savedAbsent,
+      checkpoints: [{ ...CHECK_1, status: "Present" }],
+    })).toBe(false);
+    expect(isLateArrivalCandidate({
+      ...savedAbsent,
+      checkpoints: [{ ...CHECK_1, status: null, permissionPending: true }],
+    })).toBe(false);
   });
 });
