@@ -462,7 +462,7 @@ export function AttendanceClient() {
                   disabled={!selectedOffering || saving || availableWeeks.length === 0}
                   className={MOBILE_ATTENDANCE_LAYOUT.control}>
                   {!availableWeeks.some((item) => item.week === teachingWeek) ? <option value="">Select a week</option> : null}
-                  {availableWeeks.map((item) => <option key={item.week} value={item.week}>{`Week ${item.week}`}</option>)}
+                  {availableWeeks.map((item) => <option key={item.week} value={item.week} disabled={!item.targetDate}>{`Week ${item.week}${item.targetDate ? "" : " · No scheduled class"}`}</option>)}
                 </select>
                 <p className="hidden text-xs text-muted-foreground md:block">Week 1 to current week only.</p>
               </div>
