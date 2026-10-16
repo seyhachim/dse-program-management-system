@@ -49,9 +49,18 @@ for (const width of [390, 1280]) {
 
     const offering = page.locator("select").first();
     const date = page.locator('input[type="date"]');
+    const week = page.locator("#attendance-week");
+    const weekProgress = page.getByRole("group", { name: "16-week attendance record progress" });
     await expect(page.getByText("Synthetic Student").filter({ visible: true })).toBeVisible();
+    await expect(weekProgress.getByRole("button")).toHaveCount(16);
+    await expect(week.locator('option:not([value=""])')).toHaveCount(16);
     await page.getByRole("button", { name: "Mark all present" }).click();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
+
+    const initialDate = await date.inputValue();
+    page.once("dialog", async (dialog) => { expect(dialog.type()).toBe("confirm"); await dialog.dismiss(); });
+    await weekProgress.getByRole("button", { name: /Week 1:/ }).click();
+    await expect(date).toHaveValue(initialDate);
 
     page.once("dialog", async (dialog) => { expect(dialog.type()).toBe("confirm"); await dialog.dismiss(); });
     await offering.selectOption(offeringIds[1]);
@@ -60,7 +69,10 @@ for (const width of [390, 1280]) {
 
     page.once("dialog", async (dialog) => { expect(dialog.type()).toBe("confirm"); await dialog.dismiss(); });
     const originalDate = await date.inputValue();
-    await date.fill("2026-10-16");
+    // Always switch to a DIFFERENT date. On Oct 16 the previous hard-coded
+    // date matched today and left a dangling one-shot dialog listener.
+    const otherDate = originalDate === "2026-10-16" ? "2026-10-17" : "2026-10-16";
+    await date.fill(otherDate);
     await expect(date).toHaveValue(originalDate);
 
     page.once("dialog", async (dialog) => { expect(dialog.type()).toBe("confirm"); await dialog.dismiss(); });
@@ -71,6 +83,9 @@ for (const width of [390, 1280]) {
     await offering.selectOption(offeringIds[1]);
     await expect(offering).toHaveValue(offeringIds[1]);
     await expect(page.getByText("Not saved yet")).toBeVisible();
+    await week.selectOption("1");
+    await expect(date).toHaveValue("2020-01-01");
+    await expect(offering).toHaveValue(offeringIds[1]);
 
     await context.close();
   });
