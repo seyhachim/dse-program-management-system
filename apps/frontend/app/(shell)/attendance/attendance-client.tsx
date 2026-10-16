@@ -14,6 +14,8 @@ import { Topbar } from "../topbar";
 import { attendanceRecheckState, isLateArrivalCandidate, recheckStateLabel, type AttendanceRecheckState } from "./attendance-recheck-state";
 import { attendanceDraftKey, clearAttendanceDraft, readAttendanceDraft, writeAttendanceDraft } from "./attendance-draft";
 import { offeringsScheduledOnDate } from "./attendance-schedule";
+import { attendanceWeekOverview, selectableAttendanceWeeks } from "./attendance-week-progress";
+import { AttendanceWeekProgress } from "./attendance-week-progress-view";
 import { AttendanceSummary } from "./attendance-summary";
 import { MOBILE_ATTENDANCE_LAYOUT } from "./mobile-attendance-layout";
 import { RollCallDialog } from "./roll-call-dialog";
@@ -186,6 +188,10 @@ export function AttendanceClient() {
 
   const selectedOffering = scheduledOfferings.find((offering) => offering.id === offeringId) ?? null;
   const teachingWeek = getTeachingWeek(selectedOffering?.startDate, selectedOffering?.endDate, date);
+  const weekOverview = selectedOffering
+    ? attendanceWeekOverview(selectedOffering, history, localDateValue())
+    : { currentWeek: 0, weeks: [] };
+  const availableWeeks = selectableAttendanceWeeks(weekOverview);
   const counts = useMemo(() => getAttendanceCounts(records), [records]);
   const canSaveAttendance = hasAttendanceObservation(records);
   const lateArrivalCandidates = useMemo(() => records.filter(isLateArrivalCandidate), [records]);
@@ -215,6 +221,11 @@ export function AttendanceClient() {
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  function selectAttendanceWeek(targetDate: string) {
+    if (targetDate === date || saving || !confirmContextChange()) return;
+    setDate(targetDate);
+  }
 
   function confirmContextChange(): boolean {
     return !hasUnsavedChanges || window.confirm(
@@ -442,9 +453,18 @@ export function AttendanceClient() {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Week</label>
-                <div className="flex h-11 items-center rounded-md border border-input bg-muted/30 px-3 text-sm font-medium text-foreground md:h-10">{teachingWeek ? `Week ${teachingWeek}` : "—"}</div>
-                <p className="hidden text-xs text-muted-foreground md:block">Derived from the teaching period.</p>
+                <label htmlFor="attendance-week" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Week</label>
+                <select id="attendance-week" value={availableWeeks.some((item) => item.week === teachingWeek) ? String(teachingWeek) : ""}
+                  onChange={(event) => {
+                    const selected = availableWeeks.find((item) => String(item.week) === event.target.value);
+                    if (selected?.targetDate) selectAttendanceWeek(selected.targetDate);
+                  }}
+                  disabled={!selectedOffering || saving || availableWeeks.length === 0}
+                  className={MOBILE_ATTENDANCE_LAYOUT.control}>
+                  {!availableWeeks.some((item) => item.week === teachingWeek) ? <option value="">Select a week</option> : null}
+                  {availableWeeks.map((item) => <option key={item.week} value={item.week} disabled={!item.targetDate}>{`Week ${item.week}${item.targetDate ? "" : " · No scheduled class"}`}</option>)}
+                </select>
+                <p className="hidden text-xs text-muted-foreground md:block">Week 1 to current week only.</p>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance date</label>
@@ -461,6 +481,16 @@ export function AttendanceClient() {
               </div>
             </div>
           </section>
+
+          {selectedOffering ? (
+            <AttendanceWeekProgress
+              overview={weekOverview}
+              selectedWeek={teachingWeek}
+              historyReady={historyQuery.isSuccess}
+              disabled={saving}
+              onSelectDate={selectAttendanceWeek}
+            />
+          ) : null}
 
           <QueryRefreshStatus hasData={hasData} isPending={!hasData && (offeringsQuery.isPending || sessionQuery.isPending || historyQuery.isPending)} isFetching={isFetching} isError={isRefreshError} label="Attendance" />
           {error ? <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
