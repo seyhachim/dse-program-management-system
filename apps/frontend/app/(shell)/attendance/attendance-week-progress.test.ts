@@ -59,7 +59,8 @@ describe("attendance weekly progress", () => {
     expect(overview.currentWeek).toBe(5);
     expect(overview.weeks[2]?.dates).toEqual(["2026-10-01"]);
     expect(overview.weeks[3]).toMatchObject({ dates: [], status: "no-class", targetDate: null });
-    expect(selectableAttendanceWeeks(overview).map((item) => item.week)).toEqual([1, 2, 3]);
+    expect(selectableAttendanceWeeks(overview).map((item) => item.week)).toEqual([1, 2, 3, 4, 5]);
+    expect(selectableAttendanceWeeks(overview)[3]?.targetDate).toBeNull();
   });
 
   test("before semester starts, the selector is empty and future segments stay neutral", () => {
