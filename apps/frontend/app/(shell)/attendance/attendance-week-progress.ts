@@ -102,9 +102,9 @@ export function attendanceWeekOverview(
   return { currentWeek, weeks };
 }
 
-/** Only completed/current teaching weeks with a real recurring meeting can be selected. */
+/** Show every past/current week in the dropdown; weeks without meetings are disabled there. */
 export function selectableAttendanceWeeks(overview: AttendanceWeekOverview): AttendanceWeek[] {
   return overview.weeks.filter((item) =>
-    item.week <= overview.currentWeek && item.targetDate !== null,
+    item.week <= overview.currentWeek,
   );
 }
