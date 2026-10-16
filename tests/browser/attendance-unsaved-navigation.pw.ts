@@ -84,7 +84,8 @@ for (const width of [390, 1280]) {
     await expect(offering).toHaveValue(offeringIds[1]);
     await expect(page.getByText("Not saved yet")).toBeVisible();
     await week.selectOption("1");
-    await expect(date).toHaveValue("2020-01-01");
+    // Every synthetic weekday is scheduled; pick the latest past unsaved date in Week 1.
+    await expect(date).toHaveValue("2020-01-07");
     await expect(offering).toHaveValue(offeringIds[1]);
 
     await context.close();
