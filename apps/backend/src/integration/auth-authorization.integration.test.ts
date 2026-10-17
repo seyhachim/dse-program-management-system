@@ -610,7 +610,7 @@ integrationDescribe("backend integration authorization boundaries", () => {
       const allowedCoordinator = await request(path, { token: signToken(context.users.coordinator) });
       expect(allowedCoordinator.status).toBe(200);
 
-      for (const user of [context.users.student, context.users.coLecturer]) {
+      for (const user of [context.users.student, context.users.coLecturer, context.users.secretary]) {
         const denied = await request(path, { token: signToken(user) });
         expect(denied.status).toBe(403);
         const deniedWrite = await request(`${path}/11111111-1111-4111-8111-111111111111`, {
