@@ -7,7 +7,7 @@ const offeringIds = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222
 const studentId = "33333333-3333-4333-8333-333333333333";
 const meetingDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-async function stubAttendance(page: Page) {
+async function stubAttendance(page: Page, includeSecondStudent = false) {
   await page.route("**/api/offerings", async (route) => {
     if (route.request().method() !== "GET") throw Error("Unexpected Offering mutation");
     await route.fulfill({ json: offeringIds.map((id, index) => ({
@@ -28,12 +28,15 @@ async function stubAttendance(page: Page) {
     if (pathname.endsWith("/semester-notes")) { await route.fulfill({ json: [] }); return; }
     const id = offeringIds.find((value) => pathname.includes(value))!;
     const date = pathname.match(/attendance\/(\d{4}-\d{2}-\d{2})/)?.[1];
-    const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0, Unmarked: 1 };
+    const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0, Unmarked: includeSecondStudent ? 2 : 1 };
     await route.fulfill({ json: date
       ? { sessionId: null, offeringId: id, date, updatedAt: null, counts,
           records: [{ studentId, studentNumber: "TEST001", studentName: "Synthetic Student",
             studentKhmerName: null, studentGender: "Male", status: null, permissionPending: false,
-            permissionPendingSince: null, note: "", checkpoints: [], recheckEligible: true }] }
+            permissionPendingSince: null, note: "", checkpoints: [], recheckEligible: true },
+            ...(includeSecondStudent ? [{ studentId: "66666666-6666-4666-8666-666666666666", studentNumber: "TEST002", studentName: "Second Synthetic Student",
+              studentKhmerName: null, studentGender: "Female", status: null, permissionPending: false,
+              permissionPendingSince: null, note: "", checkpoints: [], recheckEligible: true }] : [])] }
       : [{ sessionId: "55555555-5555-4555-8555-555555555555", offeringId: id,
            date: "2026-10-02", updatedAt: "2026-10-02T12:00:00.000Z",
            counts: { Present: 1, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 } }] });
@@ -191,6 +194,63 @@ for (const width of [390, 1280]) {
     await expect(page.getByRole("button", { name: "Add persistent student note" })).toBeVisible();
     await page.locator("select").first().selectOption(offeringIds[0]);
     await expect(page.getByRole("button", { name: "Edit persistent student note" })).toBeVisible();
+    await context.close();
+  });
+}
+
+for (const width of [390, 1280]) {
+  test(`Roll Call displays only the current student's persistent private note at ${width}px`, async ({ browser }) => {
+    const context = await newRoleContext(browser, "lecturer");
+    const page = await context.newPage();
+    await page.setViewportSize({ width, height: 900 });
+    await stubAttendance(page, true);
+    await page.route("**/api/offerings/*/attendance/semester-notes", async (route) => {
+      if (route.request().method() !== "GET") throw Error("Roll Call must never write a semester note");
+      await route.fulfill({ json: [{
+        studentId, note: "Follow up on previous week's lab.\\nAsk about the missing exercise.",
+        version: 1, updatedAt: "2026-10-17T09:00:00.000Z",
+      }] });
+    });
+    await page.goto("/attendance");
+    await expect(page.getByText("Synthetic Student", { exact: true }).filter({ visible: true })).toBeVisible();
+    await page.getByRole("button", { name: "Start Roll Call" }).click();
+    await page.getByRole("button", { name: "Start DSS301 M1 Roll Call" }).click();
+
+    const pinnedNote = page.locator('[data-testid="roll-call-semester-note"]:visible');
+    await expect(pinnedNote).toHaveCount(1);
+    await expect(pinnedNote).toContainText("Follow up on previous week's lab.");
+    await expect(pinnedNote).toContainText("Ask about the missing exercise.");
+    await expect(pinnedNote).toContainText("read-only during roll call");
+
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("heading", { name: "Second Synthetic Student" })).toBeVisible();
+    await expect(pinnedNote).toHaveCount(0);
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByRole("heading", { name: "Synthetic Student", exact: true })).toBeVisible();
+    await expect(pinnedNote).toContainText("Follow up on previous week's lab.");
+
+    // Marking automatically advances; it must also clear the prior student's note.
+    await page.keyboard.press("p");
+    await expect(page.getByRole("heading", { name: "Second Synthetic Student" })).toBeVisible();
+    await expect(pinnedNote).toHaveCount(0);
+    await context.close();
+  });
+
+  test(`Roll Call explicitly reports private note load failure without blocking attendance at ${width}px`, async ({ browser }) => {
+    const context = await newRoleContext(browser, "lecturer");
+    const page = await context.newPage();
+    await page.setViewportSize({ width, height: 900 });
+    await stubAttendance(page);
+    await page.route("**/api/offerings/*/attendance/semester-notes", async (route) => {
+      await route.fulfill({ status: 503, json: { error: "Notes unavailable" } });
+    });
+    await page.goto("/attendance");
+    await expect(page.getByText("Synthetic Student", { exact: true }).filter({ visible: true })).toBeVisible();
+    await page.getByRole("button", { name: "Start Roll Call" }).click();
+    await page.getByRole("button", { name: "Start DSS301 M1 Roll Call" }).click();
+    await expect(page.getByText("Private semester notes are unavailable. Attendance marking still works.").filter({ visible: true })).toBeVisible();
+    await expect(page.locator('[data-testid="roll-call-semester-note"]:visible')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Present", exact: false })).toBeEnabled();
     await context.close();
   });
 }
