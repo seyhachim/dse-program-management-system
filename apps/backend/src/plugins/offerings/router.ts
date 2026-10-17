@@ -10,12 +10,17 @@ import {
   ResolveTeachingSessionOccurrenceInputSchema,
   RevokeClassResponsibilityInput,
   SaveAttendanceInput,
+  SaveStudentSemesterNoteInput,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { AttendanceSaveConflictError, attendanceService } from "./attendance-service.ts";
+import {
+  SemesterNoteConflictError, SemesterNoteNotFoundError, SemesterNoteReadOnlyError,
+  semesterNoteService,
+} from "./semester-note-service.ts";
 import {
   ClassResponsibilityConflictError,
   ClassResponsibilityEligibilityError,
@@ -126,6 +131,39 @@ export function createOfferingRouter(): Router {
   router.get("/:id/attendance", requirePermission("offerings:read"), async (req, res) => {
     if (!(await assertOwnOfferingOrAdmin(req, res, "view attendance for"))) return;
     res.json(await attendanceService.list(req.params.id!));
+  });
+
+  // Private teaching-team observations; deliberately outside dated academic attendance.
+  // The GET route must precede /:id/attendance/:date to avoid date matching.
+  router.get("/:id/attendance/semester-notes", requirePermission("offerings:write"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res, "view student semester notes for"))) return;
+    try {
+      res.json(await semesterNoteService.list(req.params.id!));
+    } catch {
+      res.status(500).json({ error: "Could not load student semester notes" });
+    }
+  });
+
+  router.put("/:id/attendance/semester-notes/:studentId", requirePermission("offerings:write"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res, "edit student semester notes for"))) return;
+    const parsed = SaveStudentSemesterNoteInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid student semester note", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await semesterNoteService.save(req.params.id!, req.params.studentId!, parsed.data, req.user!.id));
+    } catch (error) {
+      if (error instanceof SemesterNoteConflictError) {
+        res.status(409).json({ error: error.message });
+      } else if (error instanceof SemesterNoteNotFoundError) {
+        res.status(404).json({ error: error.message });
+      } else if (error instanceof SemesterNoteReadOnlyError) {
+        res.status(409).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Could not save student semester note" });
+      }
+    }
   });
 
   router.get("/:id/attendance/:date", requirePermission("offerings:read"), async (req, res) => {
