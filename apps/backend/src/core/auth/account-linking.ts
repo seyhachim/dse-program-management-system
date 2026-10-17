@@ -1,7 +1,7 @@
 /**
  * Supabase validates the JWT, but an upstream provider merge can change which
  * credentials own that UID without changing its already-issued JWT. PMS must
- * refuse any unapproved non-email identity before resolving its own roles.
+ * verify the current hosted identity before resolving its own roles.
  */
 export class AccountLinkingError extends Error {}
 
@@ -14,15 +14,11 @@ export type ConfirmedAuthUser = {
   id: string;
   email?: string | null;
   email_confirmed_at?: string | null;
-  identities?: readonly { provider?: string | null }[] | null;
+  identities?: readonly { id?: string | null; provider?: string | null }[] | null;
 };
 
-/**
- * Require a CURRENT Admin-API identity, not token app_metadata. A stale
- * email-only JWT must also fail if a provider was auto-linked after issuance.
- * Keep external providers disabled until their own audited approval exists.
- */
-export function assertEmailOnlySupabaseIdentity(
+/** Require a CURRENT Admin-API identity matching the verified JWT UID + email. */
+export function assertCurrentSupabaseIdentity(
   identity: VerifiedSupabaseIdentity,
   confirmedUser: ConfirmedAuthUser | null,
 ): void {
@@ -30,9 +26,24 @@ export function assertEmailOnlySupabaseIdentity(
     confirmedUser?.id !== identity.authId ||
     !confirmedUser.email_confirmed_at ||
     confirmedUser.email?.toLowerCase() !== identity.email.toLowerCase() ||
-    !Array.isArray(confirmedUser.identities) ||
-    confirmedUser.identities.length !== 1 ||
-    confirmedUser.identities[0]?.provider !== "email"
+    !Array.isArray(confirmedUser.identities)
+  ) {
+    throw new AccountLinkingError("This sign-in identity is not approved for PMS access");
+  }
+}
+
+/**
+ * Password-only access requires exactly one current email identity. A stale
+ * email JWT also fails if Google/GitHub was attached after token issuance.
+ */
+export function assertEmailOnlySupabaseIdentity(
+  identity: VerifiedSupabaseIdentity,
+  confirmedUser: ConfirmedAuthUser | null,
+): void {
+  assertCurrentSupabaseIdentity(identity, confirmedUser);
+  if (
+    confirmedUser!.identities!.length !== 1 ||
+    confirmedUser!.identities![0]?.provider !== "email"
   ) {
     throw new AccountLinkingError("This sign-in identity is not approved for PMS access");
   }
