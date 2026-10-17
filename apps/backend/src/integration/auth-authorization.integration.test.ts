@@ -592,6 +592,48 @@ integrationDescribe("backend integration authorization boundaries", () => {
     });
   });
 
+  test("student semester notes enforce teaching-team and programme permissions", async () => {
+    const offering = await prisma.offering.create({
+      data: {
+        courseId: context.courses.cs101.id,
+        lecturerId: context.users.lecturer.id,
+        term: `semester-note-auth-${crypto.randomUUID()}`,
+        sectionCode: "A", status: "Planned",
+      },
+    });
+    try {
+      const path = `/api/offerings/${offering.id}/attendance/semester-notes`;
+      const allowedLecturer = await request(path, { token: signToken(context.users.lecturer) });
+      expect(allowedLecturer.status).toBe(200);
+      expect(allowedLecturer.body).toEqual([]);
+
+      const allowedCoordinator = await request(path, { token: signToken(context.users.coordinator) });
+      expect(allowedCoordinator.status).toBe(200);
+
+      for (const user of [context.users.student, context.users.coLecturer]) {
+        const denied = await request(path, { token: signToken(user) });
+        expect(denied.status).toBe(403);
+        const deniedWrite = await request(`${path}/11111111-1111-4111-8111-111111111111`, {
+          token: signToken(user), method: "PUT", body: { note: "Should not save", expectedVersion: 0 },
+        });
+        expect(deniedWrite.status).toBe(403);
+      }
+
+      const invalidNote = await request(`${path}/11111111-1111-4111-8111-111111111111`, {
+        token: signToken(context.users.lecturer),
+        method: "PUT", body: { note: "x".repeat(1001), expectedVersion: 0 },
+      });
+      expect(invalidNote.status).toBe(400);
+      const wrongStudent = await request(`${path}/11111111-1111-4111-8111-111111111111`, {
+        token: signToken(context.users.lecturer),
+        method: "PUT", body: { note: "No enrollment", expectedVersion: 0 },
+      });
+      expect(wrongStudent.status).toBe(404);
+    } finally {
+      await prisma.offering.delete({ where: { id: offering.id } });
+    }
+  });
+
   async function request(
     path: string,
     options: {
