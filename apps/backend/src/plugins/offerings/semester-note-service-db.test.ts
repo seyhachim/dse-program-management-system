@@ -72,9 +72,9 @@ describeDb("private semester note persistence and audit", () => {
       { version: 3, before: "Discussed new approach", after: "", actor: actor.id },
     ]);
 
-    await expect(prisma.offeringStudentSemesterNoteRevision.delete({
+    await expect(Promise.resolve().then(() => prisma.offeringStudentSemesterNoteRevision.delete({
       where: { id: stored.revisions[0]!.id },
-    })).rejects.toThrow();
+    }))).rejects.toThrow();
 
     await expect(semesterNoteService.save(offering.id, crypto.randomUUID(), {
       note: "Not a roster member", expectedVersion: 0,
