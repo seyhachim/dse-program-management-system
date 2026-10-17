@@ -136,7 +136,7 @@ export function createOfferingRouter(): Router {
   // Private teaching-team observations; deliberately outside dated academic attendance.
   // The GET route must precede /:id/attendance/:date to avoid date matching.
   router.get("/:id/attendance/semester-notes", requirePermission("offerings:write"), async (req, res) => {
-    if (!(await assertOwnOfferingOrAdmin(req, res, "view student semester notes for"))) return;
+    if (!(await assertSemesterNoteAccess(req, res))) return;
     try {
       res.json(await semesterNoteService.list(req.params.id!));
     } catch {
@@ -145,7 +145,7 @@ export function createOfferingRouter(): Router {
   });
 
   router.put("/:id/attendance/semester-notes/:studentId", requirePermission("offerings:write"), async (req, res) => {
-    if (!(await assertOwnOfferingOrAdmin(req, res, "edit student semester notes for"))) return;
+    if (!(await assertSemesterNoteAccess(req, res))) return;
     const parsed = SaveStudentSemesterNoteInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid student semester note", details: parsed.error.flatten() });
@@ -394,6 +394,29 @@ async function assertCanManageClassResponsibilities(
   const programmeId = await classResponsibilityService.programmeIdForOffering(req.params.id!);
   if (!hasAnyRoleInProgramme(req.user!, CLASS_RESPONSIBILITY_ADMIN_ROLES, programmeId)) {
     res.status(403).json({ error: "Only an administrator or programme coordinator can manage class responsibilities" });
+    return false;
+  }
+  return true;
+}
+
+/** Semester notes are sensitive lecturer observations, stricter than roster access.
+ * Assigned teaching team or programme admin/coordinator only; not secretary,
+ * student, class monitor or unrelated lecturer even if they can read an Offering.
+ */
+async function assertSemesterNoteAccess(
+  req: import("express").Request,
+  res: import("express").Response,
+): Promise<boolean> {
+  const access = await offeringService.accessScope(req.params.id!);
+  if (!access) {
+    res.status(404).json({ error: "Offering not found" });
+    return false;
+  }
+  const assigned =
+    access.lecturerId === req.user!.id || access.coLecturerIds.includes(req.user!.id);
+  const programmeManager = hasAnyRoleInProgramme(req.user!, CLASS_RESPONSIBILITY_ADMIN_ROLES, access.programmeId);
+  if (!assigned && !programmeManager) {
+    res.status(403).json({ error: "Only the teaching team or programme management can access private student notes" });
     return false;
   }
   return true;
