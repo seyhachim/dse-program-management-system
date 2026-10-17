@@ -14,7 +14,8 @@ describe("Attendance register student identity", () => {
   test("compact desktop register preserves bilingual identity, sex, row number, and recheck action", () => {
     expect(attendanceSource).toContain('>Student</th>');
     expect(attendanceSource).toContain('>Status</th>');
-    expect(attendanceSource).toContain('>Note</th>');
+    expect(attendanceSource).toContain('>Weekly note</th>');
+    expect(attendanceSource).toContain('>Semester note</th>');
     expect(attendanceSource).toContain('>Recheck</th>');
     expect(attendanceSource).toContain('{index + 1}');
     expect(attendanceSource).toContain('lang="km"');
@@ -38,7 +39,7 @@ describe("Attendance register student identity", () => {
     expect(attendanceSource).toContain(
       'placeholder="English / Khmer name or student ID"',
     );
-    expect(attendanceSource).toContain('min-w-[990px]');
+    expect(attendanceSource).toContain('min-w-[1120px]');
     expect(layoutSource).toContain('desktopRegister: "hidden overflow-x-auto md:block"');
   });
 });
