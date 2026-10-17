@@ -224,15 +224,15 @@ for (const width of [390, 1280]) {
     await expect(pinnedNote).toContainText("Ask about the missing exercise.");
     await expect(pinnedNote).toContainText("read-only during roll call");
 
-    await page.keyboard.press("ArrowRight");
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Synthetic Student", exact: true })).toBeVisible();
     await expect(pinnedNote).toHaveCount(0);
-    await page.keyboard.press("ArrowLeft");
+    await page.getByRole("button", { name: "Previous", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Second Synthetic Student" })).toBeVisible();
     await expect(pinnedNote).toContainText("Follow up on previous week's lab.");
 
     // Marking automatically advances; it must also clear the prior student's note.
-    await page.keyboard.press("p");
+    await page.getByRole("button", { name: "Present P" }).click();
     await expect(page.getByRole("heading", { name: "Synthetic Student", exact: true })).toBeVisible();
     await expect(pinnedNote).toHaveCount(0);
     await context.close();
