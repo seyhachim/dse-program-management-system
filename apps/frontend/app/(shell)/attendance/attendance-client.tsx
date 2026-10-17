@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Save, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AttendanceRecordView, AttendanceSessionSummary, AttendanceSessionView, AttendanceStatus, OfferingView } from "@dse-pms/shared-types";
+import type { AttendanceRecordView, AttendanceSessionSummary, AttendanceSessionView, AttendanceStatus, OfferingView, StudentSemesterNoteView } from "@dse-pms/shared-types";
 import { ATTENDANCE_STATUSES } from "@dse-pms/shared-types";
 import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
@@ -24,6 +24,7 @@ import {
   hasAttendanceObservation, setAllAttendanceMarks, toSaveAttendanceRecords, updateAttendanceRecord,
 } from "./roll-call-state";
 import { StudentRecheckDialog } from "./student-recheck-dialog";
+import { SemesterNoteButton, SemesterNoteEditor } from "./semester-note-editor";
 
 const PENDING_VALUE = "__permission_pending__";
 
@@ -81,6 +82,7 @@ export function AttendanceClient() {
   const [recheckStudentId, setRecheckStudentId] = useState<string | null>(null);
   const [draftRecovered, setDraftRecovered] = useState(false);
   const [draftWriteError, setDraftWriteError] = useState(false);
+  const [editingSemesterNote, setEditingSemesterNote] = useState<{ studentId: string; studentName: string; readOnly: boolean } | null>(null);
   const hydratedContextRef = useRef("");
   const restoredContextRef = useRef("");
   const baselineRecordsRef = useRef<AttendanceRecordView[]>([]);
@@ -112,6 +114,7 @@ export function AttendanceClient() {
   const draftKey = me?.id && offeringId && date ? attendanceDraftKey(me.id, offeringId, date) : null;
   const sessionKey = protectedQueryKey(queryScope, "attendance", "session", offeringId || "none", date || "none");
   const historyKey = protectedQueryKey(queryScope, "attendance", "history", offeringId || "none");
+  const semesterNotesKey = protectedQueryKey(queryScope, "attendance", "semester-notes", offeringId || "none");
   const sessionQuery = useQuery({
     queryKey: sessionKey,
     queryFn: () => offeringsApi.attendance(offeringId, date),
@@ -124,6 +127,14 @@ export function AttendanceClient() {
     enabled: Boolean(me?.id && offeringId),
     staleTime: QUERY_STALE_MS.operational,
   });
+  const semesterNotesQuery = useQuery({
+    queryKey: semesterNotesKey,
+    queryFn: () => offeringsApi.semesterNotes(offeringId),
+    enabled: Boolean(me?.id && offeringId),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const semesterNotes = semesterNotesQuery.data ?? [];
+  const semesterNotesByStudent = new Map(semesterNotes.map((item) => [item.studentId, item]));
   const session: AttendanceSessionView | null = sessionQuery.data ?? null;
   const history: AttendanceSessionSummary[] = historyQuery.data ?? [];
 
@@ -147,6 +158,10 @@ export function AttendanceClient() {
     setRollCallSnapshot(null);
     setRecheckStudentId(null);
   }, [attendanceContext]);
+
+  useEffect(() => {
+    setEditingSemesterNote(null);
+  }, [offeringId]);
 
   useEffect(() => {
     if (!session || !attendanceContext) return;
@@ -557,6 +572,7 @@ export function AttendanceClient() {
                 <button type="button" onClick={() => void save()} disabled={!offeringId || loading || saving || records.length === 0 || !canSaveAttendance || !hasUnsavedChanges} title={!canSaveAttendance ? "Mark at least one student before saving attendance" : !hasUnsavedChanges ? "No unsaved attendance changes" : undefined} className={`${MOBILE_ATTENDANCE_LAYOUT.secondaryAction} gap-2 border-primary text-primary`}><Save className="h-4 w-4" />{saving ? "Saving…" : "Save attendance"}</button>
               </div>
             </div>
+            {semesterNotesQuery.isError ? <p role="alert" className="border-b border-destructive/30 px-4 py-2 text-sm text-destructive">Could not load private semester notes. Reload this page before editing notes.</p> : null}
             {showAdvancedRecheck ? (
               <div id="attendance-advanced-recheck" className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
                 <span>Check 2: {checkedTwiceCount}/{records.length} recorded. Optional unless required by your class.</span>
@@ -582,6 +598,7 @@ export function AttendanceClient() {
                       </div>
                     </div>
                     {showAdvancedRecheck ? <RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /> : null}
+                    {semesterNotesQuery.isSuccess ? <SemesterNoteButton note={semesterNotesByStudent.get(record.studentId) ?? null} onClick={() => setEditingSemesterNote({ studentId: record.studentId, studentName: record.studentName, readOnly: selectedOffering?.status === "Completed" || record.recheckEligible === false })} /> : null}
                     <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Status
                       <select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`mt-1 h-11 w-full rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>
                         <option value="">Unmarked</option>
@@ -595,9 +612,9 @@ export function AttendanceClient() {
                   </article>)}
                 </div>
                 <div className={MOBILE_ATTENDANCE_LAYOUT.desktopRegister}>
-                  <table className="w-full min-w-[990px] table-fixed text-sm">
+                  <table className="w-full min-w-[1120px] table-fixed text-sm">
                     <thead className="bg-muted/30 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      <tr><th className="w-12 px-3 py-3">#</th><th className="w-[34%] px-3 py-3">Student</th><th className="w-[20%] px-3 py-3">Status</th><th className="px-3 py-3">Note</th>{showAdvancedRecheck ? <th className="w-[16%] px-3 py-3">Recheck</th> : null}</tr>
+                      <tr><th className="w-12 px-3 py-3">#</th><th className="w-[28%] px-3 py-3">Student</th><th className="w-[16%] px-3 py-3">Status</th><th className="w-[20%] px-3 py-3">Semester note</th><th className="px-3 py-3">Weekly note</th>{showAdvancedRecheck ? <th className="w-[16%] px-3 py-3">Recheck</th> : null}</tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {filteredRecords.map((record, index) => <tr key={record.studentId} className="align-middle hover:bg-muted/20">
@@ -612,6 +629,7 @@ export function AttendanceClient() {
                           {ATTENDANCE_STATUSES.map((status) => <option key={status} value={status}>{attendanceStatusLabel(status)}</option>)}
                           <option value={PENDING_VALUE}>Permission Pending</option>
                         </select></td>
+                        <td className="px-3 py-1.5">{semesterNotesQuery.isSuccess ? <SemesterNoteButton note={semesterNotesByStudent.get(record.studentId) ?? null} onClick={() => setEditingSemesterNote({ studentId: record.studentId, studentName: record.studentName, readOnly: selectedOffering?.status === "Completed" || record.recheckEligible === false })} /> : <span className="text-xs text-muted-foreground">Loading…</span>}</td>
                         <td className="px-3 py-1.5"><input aria-label={`Attendance note for ${record.studentName}`} value={record.note} maxLength={300} placeholder={record.permissionPending ? "Pending-permission note" : "Optional note"} onChange={(event) => updateRecord(record.studentId, { note: event.target.value })} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" /></td>
                         {showAdvancedRecheck ? <td className="px-3 py-1.5"><RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /></td> : null}
                       </tr>)}
@@ -646,6 +664,23 @@ export function AttendanceClient() {
           {session?.updatedAt ? <p className="text-right text-xs text-muted-foreground">Last saved {new Date(session.updatedAt).toLocaleString()}</p> : null}
         </div>
       </main>
+      {editingSemesterNote && offeringId ? (
+        <SemesterNoteEditor
+          key={`${offeringId}:${editingSemesterNote.studentId}`}
+          offeringId={offeringId}
+          studentId={editingSemesterNote.studentId}
+          studentName={editingSemesterNote.studentName}
+          current={semesterNotesByStudent.get(editingSemesterNote.studentId) ?? null}
+          readOnly={editingSemesterNote.readOnly}
+          onClose={() => setEditingSemesterNote(null)}
+          onSaved={(saved: StudentSemesterNoteView) => {
+            queryClient.setQueryData<StudentSemesterNoteView[]>(semesterNotesKey, (previous = []) => [
+              ...previous.filter((item) => item.studentId !== saved.studentId), saved,
+            ]);
+            setEditingSemesterNote(null);
+          }}
+        />
+      ) : null}
       <RollCallDialog open={rollCallOpen} offering={selectedOffering} date={date} week={teachingWeek} records={records} saving={saving} saveError={mutationError} onUpdateRecord={updateRecord} onRequestClose={requestRollCallClose} onSaveAndClose={saveRollCallAndClose} />
       <StudentRecheckDialog open={Boolean(recheckRecord)} initialMode={recheckMode} offeringId={offeringId} date={date} record={recheckRecord} hasPrevious={recheckMode === "standard" && recheckIndex > 0} hasNext={recheckMode === "standard" && recheckIndex >= 0 && recheckIndex < records.length - 1} onPrevious={() => moveRecheck(-1)} onNext={() => moveRecheck(1)} onClose={() => { setRecheckStudentId(null); setRecheckMode("standard"); }} onSaved={handleRecheckSaved} />
     </>
