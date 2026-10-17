@@ -161,3 +161,16 @@ export interface AttendanceStudentHistoryView {
   studentId: string;
   history: AttendanceStudentHistoryItem[];
 }
+/** Private, Offering-scoped lecturer notes. Never included in Student Portal DTOs. */
+export const SaveStudentSemesterNoteInput = z.object({
+  note: z.string().trim().max(1000),
+  expectedVersion: z.number().int().min(0),
+}).strict();
+export type SaveStudentSemesterNoteInput = z.infer<typeof SaveStudentSemesterNoteInput>;
+
+export interface StudentSemesterNoteView {
+  studentId: string;
+  note: string;
+  version: number;
+  updatedAt: string | null;
+}

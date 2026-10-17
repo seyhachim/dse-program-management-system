@@ -25,6 +25,7 @@ async function stubAttendance(page: Page) {
   await page.route("**/api/offerings/*/attendance**", async (route) => {
     if (route.request().method() !== "GET") throw Error("Unexpected attendance mutation");
     const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith("/semester-notes")) { await route.fulfill({ json: [] }); return; }
     const id = offeringIds.find((value) => pathname.includes(value))!;
     const date = pathname.match(/attendance\/(\d{4}-\d{2}-\d{2})/)?.[1];
     const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0, Unmarked: 1 };
@@ -130,6 +131,66 @@ for (const width of [390, 1280]) {
 
     await expect(page.getByText("This class has no enrolled students yet")).toHaveCount(0);
     await expect(page.getByText("Unsaved changes")).toHaveCount(0);
+    await context.close();
+  });
+}
+
+for (const width of [390, 1280]) {
+  test(`private semester note persists across 16-week navigation at ${width}px`, async ({ browser }) => {
+    const context = await newRoleContext(browser, "lecturer");
+    const page = await context.newPage();
+    await page.setViewportSize({ width, height: 900 });
+    await stubAttendance(page);
+
+    const notes = new Map<string, { studentId: string; note: string; version: number; updatedAt: string }>();
+    await page.route("**/api/offerings/*/attendance/semester-notes**", async (route) => {
+      const url = new URL(route.request().url());
+      const selectedOffering = offeringIds.find((id) => url.pathname.includes(id))!;
+      const method = route.request().method();
+      if (method === "GET") {
+        await route.fulfill({ json: notes.has(selectedOffering) ? [notes.get(selectedOffering)] : [] });
+        return;
+      }
+      if (method !== "PUT") throw Error("Unexpected semester note request");
+      const body = route.request().postDataJSON() as { note: string; expectedVersion: number };
+      const current = notes.get(selectedOffering);
+      if ((current?.version ?? 0) !== body.expectedVersion) {
+        await route.fulfill({ status: 409, json: { error: "Student note changed" } });
+        return;
+      }
+      const saved = {
+        studentId, note: body.note, version: (current?.version ?? 0) + 1,
+        updatedAt: "2026-10-17T09:00:00.000Z",
+      };
+      notes.set(selectedOffering, saved);
+      await route.fulfill({ json: saved });
+    });
+
+    await page.goto("/attendance");
+    const visibleStudent = page.getByText("Synthetic Student").filter({ visible: true });
+    await expect(visibleStudent).toBeVisible();
+    await page.getByRole("button", { name: "Add persistent student note" }).click();
+    await page.getByRole("textbox", { name: "Lecturer-only note" }).fill("Discuss tutorial exercises next week");
+    await page.getByRole("button", { name: "Save note" }).click();
+    await expect(page.getByRole("button", { name: "Edit persistent student note" })).toBeVisible();
+    await expect(page.getByText("Discuss tutorial exercises next week").filter({ visible: true })).toBeVisible();
+
+    const week = page.locator("#attendance-week");
+    await week.selectOption("1");
+    await expect(visibleStudent).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit persistent student note" })).toBeVisible();
+    await week.selectOption("2");
+    await expect(page.getByRole("button", { name: "Edit persistent student note" })).toBeVisible();
+    await week.selectOption("1");
+    await expect(page.getByRole("button", { name: "Edit persistent student note" })).toBeVisible();
+    await expect(page.getByText("Unsaved changes")).toHaveCount(0);
+
+    // The note must not leak across sections of the same course.
+    await page.locator("select").first().selectOption(offeringIds[1]);
+    await expect(visibleStudent).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add persistent student note" })).toBeVisible();
+    await page.locator("select").first().selectOption(offeringIds[0]);
+    await expect(page.getByRole("button", { name: "Edit persistent student note" })).toBeVisible();
     await context.close();
   });
 }

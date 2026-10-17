@@ -436,6 +436,8 @@ model User {
 securityAuditEventsAsActor         UserSecurityAuditEvent[]                  @relation("UserSecurityAuditActor")
 securityAuditEventsAsTarget        UserSecurityAuditEvent[]                  @relation("UserSecurityAuditTarget")
   enrollmentPlacementCorrections     EnrollmentPlacementCorrection[]            @relation("EnrollmentPlacementCorrectionActor")
+  semesterNotesEdited               OfferingStudentSemesterNote[]              @relation("OfferingSemesterNoteEditor")
+  semesterNoteRevisions             OfferingStudentSemesterNoteRevision[]      @relation("OfferingSemesterNoteRevisionActor")
 }
 
 /// Lecturer-specific professional metadata used for AUN-QA staff evidence.
@@ -1570,6 +1572,7 @@ model Student {
   classResponsibilityAssignments ClassResponsibilityAssignment[]
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
   enrollmentPlacementCorrections EnrollmentPlacementCorrection[]
+  semesterNotes                 OfferingStudentSemesterNote[]
   cohortMemberships              StudentCohortMembership[]
 
   @@index([status])
@@ -2617,6 +2620,7 @@ model Offering {
   classResponsibilityAuditEvents ClassResponsibilityAuditEvent[]
   enrollmentCorrectionsFrom       EnrollmentPlacementCorrection[] @relation("EnrollmentPlacementCorrectionFromOffering")
   enrollmentCorrectionsTo         EnrollmentPlacementCorrection[] @relation("EnrollmentPlacementCorrectionToOffering")
+  semesterNotes                   OfferingStudentSemesterNote[]
   qaCloAttainmentSnapshots       QaCloAttainmentSnapshot[]
   portfolioEvidence              StudentPortfolioEvidence[]
 
@@ -2625,6 +2629,47 @@ model Offering {
   @@index([lecturerId])
   @@index([courseSpecId])
   @@index([academicCalendarPeriodId])
+}
+
+
+//// Private, offering-scoped lecturer observations. Distinct from immutable attendance
+//// session/date-specific marks and notes; never served through Student Portal.
+model OfferingStudentSemesterNote {
+  id          String   @id @default(uuid())
+  offeringId  String
+  studentId   String
+  note        String   @default("") @db.VarChar(1000)
+  version     Int      @default(1)
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  offering  Offering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  updatedBy User     @relation("OfferingSemesterNoteEditor", fields: [updatedById], references: [id], onDelete: Restrict)
+  revisions OfferingStudentSemesterNoteRevision[]
+
+  @@unique([offeringId, studentId])
+  @@index([studentId])
+  @@index([updatedById])
+}
+
+//// Every actual note change (including clear) is recorded atomically and is
+//// append-only at database level; the prior text is retained for audit.
+model OfferingStudentSemesterNoteRevision {
+  id            String   @id @default(uuid())
+  noteId        String
+  version       Int
+  previousNote  String   @db.VarChar(1000)
+  nextNote      String   @db.VarChar(1000)
+  actorId       String
+  createdAt     DateTime @default(now())
+
+  semesterNote OfferingStudentSemesterNote @relation(fields: [noteId], references: [id], onDelete: Restrict)
+  actor        User                        @relation("OfferingSemesterNoteRevisionActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@unique([noteId, version])
+  @@index([actorId])
 }
 
 model OfferingResultAccessPolicy {

@@ -152,6 +152,9 @@ jobs:
       - name: Seed clean database
         run: bun run seed
 
+      - name: Verify private semester notes, optimistic conflicts and audit history
+        run: SEMESTER_NOTE_DB_TESTS=1 bun test apps/backend/src/plugins/offerings/semester-note-service-db.test.ts
+
       - name: Verify curriculum database invariants
         run: bun test apps/backend/src/plugins/programme/curriculum-db.test.ts
         env:
