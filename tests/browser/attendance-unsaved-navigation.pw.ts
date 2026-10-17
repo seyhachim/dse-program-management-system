@@ -207,7 +207,9 @@ for (const width of [390, 1280]) {
     await page.route("**/api/offerings/*/attendance/semester-notes", async (route) => {
       if (route.request().method() !== "GET") throw Error("Roll Call must never write a semester note");
       await route.fulfill({ json: [{
-        studentId, note: "Follow up on previous week's lab.\\nAsk about the missing exercise.",
+        // The roster sorts "Second Synthetic Student" before "Synthetic Student".
+        studentId: "66666666-6666-4666-8666-666666666666",
+        note: "Follow up on previous week's lab.\nAsk about the missing exercise.",
         version: 1, updatedAt: "2026-10-17T09:00:00.000Z",
       }] });
     });
@@ -223,15 +225,15 @@ for (const width of [390, 1280]) {
     await expect(pinnedNote).toContainText("read-only during roll call");
 
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("heading", { name: "Second Synthetic Student" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Synthetic Student", exact: true })).toBeVisible();
     await expect(pinnedNote).toHaveCount(0);
     await page.keyboard.press("ArrowLeft");
-    await expect(page.getByRole("heading", { name: "Synthetic Student", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Second Synthetic Student" })).toBeVisible();
     await expect(pinnedNote).toContainText("Follow up on previous week's lab.");
 
     // Marking automatically advances; it must also clear the prior student's note.
     await page.keyboard.press("p");
-    await expect(page.getByRole("heading", { name: "Second Synthetic Student" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Synthetic Student", exact: true })).toBeVisible();
     await expect(pinnedNote).toHaveCount(0);
     await context.close();
   });
