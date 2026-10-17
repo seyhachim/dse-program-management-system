@@ -80,6 +80,8 @@ const EXPECTED_PUBLIC_TABLES = [
   "CourseSpecDocumentTheme",
   "CourseSpecDocumentThemeAuditEvent",
   "Offering",
+  "OfferingStudentSemesterNote",
+  "OfferingStudentSemesterNoteRevision",
   "OfferingResultAccessPolicy",
   "OfferingMeeting",
   "OfferingMeetingLecturer",
