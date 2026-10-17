@@ -12,14 +12,16 @@ describe("Attendance local record hydration", () => {
       "const previousBaseline = baselineRecordsRef.current;",
     );
     expect(attendanceClientSource).toContain(
-      "if (attendanceRecordsEqual(records, previousBaseline)) {",
+      "if (firstHydration || attendanceRecordsEqual(records, previousBaseline)) {",
     );
     expect(attendanceClientSource).toContain(
-      "attendanceRecordsEqual(current, previousBaseline) ? (restored ?? serverRecords) : current",
+      "firstHydration || attendanceRecordsEqual(current, previousBaseline) ? (restored ?? serverRecords) : current",
     );
     expect(attendanceClientSource).not.toContain(
       "const dirty = !attendanceRecordsEqual(current, baselineRecordsRef.current);",
     );
+    // A cached next session may hydrate before the prior context's reset commits.
+    expect(attendanceClientSource).toContain("if (firstHydration) restoredContextRef.current = attendanceContext;");
     expect(attendanceClientSource).toContain(
       "}, [attendanceContext, date, offeringId, session, draftKey]);",
     );
