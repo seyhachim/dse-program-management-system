@@ -312,7 +312,7 @@ describe("public Telegram webhook", () => {
     expect(sent.text).toContain("DSE Program Information Bot");
     expect(sent.replyMarkup).toHaveProperty("keyboard");
     const keyboard = (sent.replyMarkup as { keyboard: Array<Array<{ text: string }>> }).keyboard;
-    expect(keyboard.flat().map((item) => item.text)).toEqual(["🏠 Home", "❓ Ask DSE"]);
+    expect(keyboard.flat().map((item) => item.text)).toEqual(["🏠 Home", "❓ Ask a Question"]);
   });
 
   test("primary Admission selection renders a concise topic menu without batch FAQ answers", async () => {
