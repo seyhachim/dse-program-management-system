@@ -3,6 +3,7 @@
 import {
   AlignmentType,
   Document,
+  ExternalHyperlink,
   Footer,
   Header,
   HeadingLevel,
@@ -63,6 +64,18 @@ function downloadBlob(blob: Blob, filename: string): void {
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+function absoluteExportHref(href: string): string | null {
+  try {
+    if (/^https?:\/\//i.test(href)) return new URL(href).toString();
+    if (href.startsWith("/") && typeof window !== "undefined") {
+      return new URL(href, window.location.origin).toString();
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function textRuns(nodes: DseTextNode[], model: StudentHandbookExportModel): TextRun[] {
@@ -187,42 +200,44 @@ function sourceBlockToDocx(
     output.push(
       new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: block.source.rows.map(
-          (row) =>
-            new TableRow({
-              children: [
-                new TableCell({
-                  width: { size: 35, type: WidthType.PERCENTAGE },
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: row.key,
-                          bold: true,
-                          font: model.theme.bodyFontFamily,
-                          size: ptToHalfPoint(model.theme.bodyFontSizePt),
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-                new TableCell({
-                  width: { size: 65, type: WidthType.PERCENTAGE },
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: row.value,
-                          font: model.theme.bodyFontFamily,
-                          size: ptToHalfPoint(model.theme.bodyFontSizePt),
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-              ],
-            }),
-        ),
+        rows: block.source.rows.map((row) => {
+          const target = row.href ? absoluteExportHref(row.href) : null;
+          const valueRun = new TextRun({
+            text: row.value,
+            font: model.theme.bodyFontFamily,
+            size: ptToHalfPoint(model.theme.bodyFontSizePt),
+            ...(target ? { color: "0563C1", underline: {} } : {}),
+          });
+          return new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 35, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: row.key,
+                        bold: true,
+                        font: model.theme.bodyFontFamily,
+                        size: ptToHalfPoint(model.theme.bodyFontSizePt),
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 65, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    children: target
+                      ? [new ExternalHyperlink({ link: target, children: [valueRun] })]
+                      : [valueRun],
+                  }),
+                ],
+              }),
+            ],
+          });
+        }),
       }),
     );
   } else if (block.source.text) {

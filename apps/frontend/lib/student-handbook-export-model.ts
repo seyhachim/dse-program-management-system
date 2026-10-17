@@ -12,6 +12,7 @@ import {
 export type StudentHandbookExportSourceRow = {
   key: string;
   value: string;
+  href?: string;
 };
 
 export type StudentHandbookExportSource = {
@@ -63,6 +64,20 @@ function safeValue(value: unknown): string {
     return JSON.stringify(value);
   } catch {
     return String(value);
+  }
+}
+
+function sourceHref(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (/^\/calendar\/[A-Za-z0-9%._~-]+\/[A-Za-z0-9%._~-]+\/year-[1-4]$/.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -122,7 +137,7 @@ function sourceForExport(
       message: null,
       rows: Object.entries(preview.data as Record<string, unknown>)
         .slice(0, 100)
-        .map(([key, value]) => ({ key, value: safeValue(value) })),
+        .map(([key, value]) => ({ key, value: safeValue(value), href: sourceHref(value) })),
       text: null,
     };
   }
