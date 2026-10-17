@@ -164,11 +164,14 @@ export function AttendanceClient() {
     // invoke a state updater twice in development; mutating refs inside it makes
     // the second invocation incorrectly treat first hydration as a dirty draft.
     const previousBaseline = baselineRecordsRef.current;
-    if (attendanceRecordsEqual(records, previousBaseline)) {
+    // Cached sessions may arrive in the same effect flush as the context reset.
+    // First hydration belongs to the NEW class/date, not the prior local records.
+    // Later refetches must still preserve any unsaved edits in this context.
+    if (firstHydration || attendanceRecordsEqual(records, previousBaseline)) {
       baselineRecordsRef.current = serverRecords;
       baselineVersionRef.current = session.updatedAt ?? null;
       setRecords((current) =>
-        attendanceRecordsEqual(current, previousBaseline) ? (restored ?? serverRecords) : current,
+        firstHydration || attendanceRecordsEqual(current, previousBaseline) ? (restored ?? serverRecords) : current,
       );
     }
     if (restored) setDraftRecovered(true);

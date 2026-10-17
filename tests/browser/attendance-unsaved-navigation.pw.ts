@@ -91,3 +91,45 @@ for (const width of [390, 1280]) {
     await context.close();
   });
 }
+
+for (const width of [390, 1280]) {
+  test(`cached week/date/class navigation restores the register at ${width}px`, async ({ browser }) => {
+    const context = await newRoleContext(browser, "lecturer");
+    const page = await context.newPage();
+    await page.setViewportSize({ width, height: 900 });
+    await stubAttendance(page);
+    await page.goto("/attendance");
+
+    const offering = page.locator("select").first();
+    const date = page.locator('input[type="date"]');
+    const week = page.locator("#attendance-week");
+    const visibleStudent = page.getByText("Synthetic Student").filter({ visible: true });
+    const originalDate = await date.inputValue();
+
+    // Load two distinct weeks, then revisit Week 1 from React Query cache.
+    await expect(visibleStudent).toBeVisible();
+    await week.selectOption("1");
+    await expect(date).toHaveValue("2020-01-07");
+    await expect(visibleStudent).toBeVisible();
+    await week.selectOption("2");
+    await expect(date).toHaveValue("2020-01-14");
+    await expect(visibleStudent).toBeVisible();
+    await week.selectOption("1");
+    await expect(date).toHaveValue("2020-01-07");
+    await expect(visibleStudent).toBeVisible();
+
+    // Date picker and class selector must also restore cached server rosters.
+    await date.fill(originalDate);
+    await expect(visibleStudent).toBeVisible();
+    await date.fill("2020-01-07");
+    await expect(visibleStudent).toBeVisible();
+    await offering.selectOption(offeringIds[1]);
+    await expect(visibleStudent).toBeVisible();
+    await offering.selectOption(offeringIds[0]);
+    await expect(visibleStudent).toBeVisible();
+
+    await expect(page.getByText("This class has no enrolled students yet")).toHaveCount(0);
+    await expect(page.getByText("Unsaved changes")).toHaveCount(0);
+    await context.close();
+  });
+}
